@@ -143,7 +143,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 final CatalogChangeResult changeResult = (CatalogChangeResult) result;
 
                 // if the catalog change is a null change
-                if (changeResult.encodedDiffCommands.trim().length() == 0) {
+                if (changeResult.encodedDiffCommands.trim().isEmpty()) {
                     ClientResponseImpl response =
                             new ClientResponseImpl(
                                     ClientResponseImpl.SUCCESS,
@@ -192,11 +192,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             ProcedureCallback proccb) {
         m_context = context;
         m_proccb = proccb;
-        ParameterSet params = task.getParams();
+        Object[] params = task.getParams().toArray();
         // default catalogBytes to null, when passed along, will tell the
         // catalog change planner that we want to use the current catalog.
         byte[] catalogBytes = null;
-        Object catalogObj = params.toArray()[0];
+        Object catalogObj = params[0];
         if (catalogObj != null) {
             if (catalogObj instanceof String) {
                 // treat an empty string as no catalog provided
@@ -212,7 +212,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 }
             }
         }
-        String deploymentString = (String) params.toArray()[1];
+        String deploymentString = (String) params[1];
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     getClientInterface().m_siteId,

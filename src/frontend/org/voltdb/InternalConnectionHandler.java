@@ -116,7 +116,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        if (task.procName.equals("@UpdateApplicationCatalog")) {
+        if ("@UpdateApplicationCatalog".equals(task.procName)) {
             return m_adapter.dispatchUpdateApplicationCatalog(task, m_user, caller, procCallback);
         }
 
