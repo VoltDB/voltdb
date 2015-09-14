@@ -844,7 +844,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (!m_replicaRunning) {
                 exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica");
                 m_replicaRunning = true;
-                acceptMastership();
+                acceptMastership(true);
             }
             return;
         }
@@ -903,17 +903,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public void acceptMastership() {
-        try {
-            m_allowAcceptingMastership.acquire();
-        } catch (InterruptedException ex) {
-            exportLog.warn("Export generation " + getGeneration() + " failed to acquire mastership semaphore.");
-        }
+    public void acceptMastership(final boolean isContinueing) {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
+                    if (isContinueing) {
+                        m_allowAcceptingMastership.acquire();
+                    }
                     if (!m_es.isShutdown() || !m_closed) {
                         exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();

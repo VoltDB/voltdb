@@ -386,7 +386,7 @@ public class ExportGeneration {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
                         eds.setMaster();
-                        eds.acceptMastership();
+                        eds.acceptMastership(this.m_isContinueingGeneration);
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
                     }
@@ -970,7 +970,7 @@ public class ExportGeneration {
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
                 eds.setMaster();
-                eds.acceptMastership();
+                eds.acceptMastership(this.m_isContinueingGeneration);
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);
             }
