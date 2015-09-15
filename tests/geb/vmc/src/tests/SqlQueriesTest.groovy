@@ -89,6 +89,23 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         GENQA_ALL_TABLES.addAll(GENQA_TEST_TABLES)
         // Move contents of the various files into memory
         fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false, (file == sqlQueriesFile ? '}' : ''))) }
+
+        // Get the list of tests that we actually want to run
+        // (if empty, run all tests)
+        String sqlTestNamesProperty = System.getProperty('sqlTestNames', '')
+        debugPrint '\nsqlTestNamesProperty: ' + sqlTestNamesProperty
+        def sqlTestNames = []
+        if (sqlTestNamesProperty) {
+            sqlTestNames = Arrays.asList(sqlTestNamesProperty.split(','))
+        }
+        debugPrint 'sqlTestNames:\n' + sqlTestNames
+        debugPrint 'sqlTestNames.isEmpty(): ' + sqlTestNames.isEmpty()
+
+        // If specific test names to run were specified, prune out all others
+        if (sqlTestNames) {
+            sqlQueryLines.retainAll { line -> sqlTestNames.find { name -> line.contains(name) } }
+            debugPrint '\nsqlQueryLines:\n' + sqlQueryLines
+        }
     }
 
     def setup() { // called before each test
