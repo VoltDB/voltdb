@@ -63,6 +63,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
 {
     typedef typename KeyValuePair::first_type KeyType;
     typedef typename KeyType::KeyComparator KeyComparator;
+    typedef typename KeyValuePair::second_type ValueType;
     typedef CompactingMap<KeyValuePair, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MapIterator;
     typedef typename MapType::const_iterator MapConstIterator;
@@ -79,10 +80,10 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return *reinterpret_cast<MapConstIterator*> (cursor.m_keyEndIter);
     }
 
-    bool addEntryDo(const TableTuple *tuple)
+    void addEntryDo(const TableTuple *tuple, TableTuple *conflictTuple)
     {
         ++m_inserts;
-        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        m_entries.insert(setKeyFromTuple(tuple), tuple->address());
     }
 
     bool deleteEntryDo(const TableTuple *tuple)
@@ -105,7 +106,9 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if ( ! CompactingTreeMultiMapIndex::deleteEntry(&originalTuple)) {
             return false;
         }
-        return CompactingTreeMultiMapIndex::addEntry(&destinationTuple);
+        TableTuple conflict(destinationTuple.getSchema());
+        CompactingTreeMultiMapIndex::addEntry(&destinationTuple, &conflict);
+        return conflict.isNullTuple();
     }
 
     bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }

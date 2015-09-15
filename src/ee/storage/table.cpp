@@ -601,7 +601,7 @@ void Table::addIndex(TableIndex *index) {
     TableTuple tuple(m_schema);
     TableIterator iter = iterator();
     while (iter.next(tuple)) {
-        index->addEntry(&tuple);
+        index->addEntry(&tuple, NULL);
     }
 
     // add the index to the table
