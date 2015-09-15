@@ -92,7 +92,16 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(databaseId, name, table);
 
-    return dynamic_cast<Table*>(table);
+    if(!exportOnly) {
+        // allocate tuple storage block for the persistent table ahead of time
+        // instead of waiting till first tuple insertion. Intend of allocating tuple
+        // block storage ahead is to improve performance on first tuple insertion.
+        PersistentTable *persistentTable = static_cast<PersistentTable*>(table);
+        TBPtr block = persistentTable->allocateNextBlock();
+        assert(block->hasFreeTuples());
+        persistentTable->m_blocksWithSpace.insert(block);
+    }
+    return table;
 }
 
 TempTable* TableFactory::getTempTable(

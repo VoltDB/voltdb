@@ -35,7 +35,7 @@ public:
     /**
      * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
      */
-    virtual int getMaxSerializedTupleSize(const TupleSchema *schema) = 0;
+    virtual size_t getMaxSerializedTupleSize(const TupleSchema *schema) = 0;
 
     virtual ~TupleSerializer() {}
 };

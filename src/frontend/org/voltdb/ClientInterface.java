@@ -2388,7 +2388,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else {
                     ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
-                                ClientResponseImpl.GRACEFUL_FAILURE,
+                                (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
                                 new VoltTable[0], result.errorMsg,
                                 result.clientHandle);
                     writeResponseToConnection(errorResponse);

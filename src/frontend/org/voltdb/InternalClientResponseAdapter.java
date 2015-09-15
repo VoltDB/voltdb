@@ -37,7 +37,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
@@ -70,44 +69,34 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private class InternalCallback implements Callback {
 
-        private DBBPool.BBContainer m_cont;
-        @SuppressWarnings("unused")
-        private final long m_id;
         private final ProcedureCallback m_cb;
-        private final String m_procedure;
         private final int m_partition;
         private final InternalConnectionContext m_context;
+        private final StoredProcedureInvocation m_task;
+        private final Procedure m_proc;
 
-        public InternalCallback(final InternalConnectionContext context, final DBBPool.BBContainer cont, String proc, int partition, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, Procedure proc, StoredProcedureInvocation task, String procName, int partition, ProcedureCallback cb, long id) {
             m_context = context;
-            m_cont = cont;
+            m_task = task;
+            m_proc = proc;
             m_cb = cb;
-            m_id = id;
-            m_procedure = proc;
             m_partition = partition;
-        }
-
-        public void discard() {
-            if (m_cont != null) {
-                m_cont.discard();
-                m_cont = null;
-            }
         }
 
         @Override
         public void handleResponse(ClientResponse response) throws Exception {
-            try {
-                if (m_cb != null) {
-                    m_cb.clientCallback(response);
-                }
-            } finally {
-                discard();
+            if (m_cb != null) {
+                m_cb.clientCallback(response);
+            }
+            if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+                //Handle failure of transaction due to node kill
+                createTransaction(m_context, m_task.getProcName(), m_proc, m_cb, m_task, m_partition, System.nanoTime());
             }
         }
 
         @Override
         public String getProcedureName() {
-            return m_procedure;
+            return m_task.getProcName();
         }
 
         @Override
@@ -139,7 +128,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final Procedure catProc,
             final ProcedureCallback proccb,
             final StoredProcedureInvocation task,
-            final DBBPool.BBContainer tcont,
             final int partition, final long nowNanos) {
 
         if (!m_partitionExecutor.containsKey(partition)) {
@@ -156,7 +144,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(context, tcont, procName, partition, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, catProc, task, procName, partition, proccb, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
@@ -165,7 +153,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             task.getSerializedSize(), nowNanos);
                     if (!bval) {
                         m_logger.error("Failed to submit transaction.");
-                        cb.discard();
                         m_callbacks.remove(handle);
                     }
                     return bval;
@@ -209,6 +196,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             ByteBuffer buf = null;
             synchronized(this) {
                 final int serializedSize = ds.getSerializedSize();
+                if (serializedSize <= 0) {
+                    //Bad ignored transacton.
+                    return;
+                }
                 buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
             }

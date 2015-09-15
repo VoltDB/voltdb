@@ -49,8 +49,14 @@ public interface ExportDataProcessor  {
 
     /**
      * Inform the processor that initialization is complete; commence work.
+     * @param startup wait or not for the {@link #startPolling()} invocation
      */
-    public void readyForData();
+    public void readyForData(boolean startup);
+
+    /**
+     * Allows processor to initiate polling
+     */
+    public void startPolling();
 
     /**
      * Queue a work message to the processor's mailbox.

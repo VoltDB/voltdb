@@ -46,7 +46,7 @@
 #ifndef VOLTDBENGINE_H
 #define VOLTDBENGINE_H
 
-#include "common/DefaultTupleSerializer.h"
+#include "common/FullTupleSerializer.h"
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
@@ -578,7 +578,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // other components. (Components MUST NOT depend on VoltDBEngine.h).
         ExecutorContext *m_executorContext;
 
-        DefaultTupleSerializer m_tupleSerializer;
+        FullTupleSerializer m_tupleSerializer;
 
         int32_t m_compactionThreshold;
 

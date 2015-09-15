@@ -203,6 +203,7 @@ CTX.INPUT['common'] = """
  RecoveryProtoMessage.cpp
  RecoveryProtoMessageBuilder.cpp
  DefaultTupleSerializer.cpp
+ FullTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
  StreamPredicateList.cpp

@@ -48,6 +48,10 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
+    int reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, Table* input, Table* output);
+
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
@@ -68,6 +72,7 @@ private:
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
+    jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;

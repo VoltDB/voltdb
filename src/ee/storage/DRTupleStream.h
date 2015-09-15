@@ -41,7 +41,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 1;
+    static const uint8_t DR_VERSION = 2;
 
     DRTupleStream();
 
@@ -67,8 +67,16 @@ public:
                        int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type,
-                       const TableIndex *uniqueIndex = NULL,
-                       uint32_t uniqueIndexCrc = 0);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+
+    virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId,
+                       TableTuple &oldTuple,
+                       TableTuple &newTuple,
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -76,8 +84,6 @@ public:
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
-
-    size_t computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns);
 
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
@@ -93,6 +99,22 @@ public:
 
     static int32_t getTestDRBuffer(char *out);
 private:
+    void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
+
+    void writeRowTuple(TableTuple& tuple,
+            size_t rowHeaderSz,
+            size_t rowMetadataSz,
+            const std::vector<int> *interestingColumns,
+            const std::pair<const TableIndex*, uint32_t> &indexPair,
+            ExportSerializeOutput &io);
+
+    size_t computeOffsets(DRRecordType &type,
+            const std::pair<const TableIndex*, uint32_t> &indexPair,
+            TableTuple &tuple,
+            size_t &rowHeaderSz,
+            size_t &rowMetadataSz,
+            const std::vector<int> *&interestingColumns);
+
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
     bool m_opened;
@@ -110,8 +132,7 @@ public:
                            int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type,
-                           const TableIndex *uniqueIndex = NULL,
-                           uint32_t uniqueIndexCrc = 0) {
+                           const std::pair<const TableIndex*, uint32_t>& indexPair) {
         return 0;
     }
 

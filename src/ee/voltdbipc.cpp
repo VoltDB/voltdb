@@ -49,6 +49,7 @@ using namespace std;
 namespace voltdb {
 class Pool;
 class StreamBlock;
+class Table;
 }
 
 class VoltDBIPC : public voltdb::Topend {
@@ -130,6 +131,9 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
+    int reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, voltdb::Table* input, voltdb::Table* output);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;
@@ -1554,6 +1558,12 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
         delete []block->rawPtr();
     }
     return -1;
+}
+
+int VoltDBIPC::reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, voltdb::Table* input, voltdb::Table* output) {
+    return 0;
 }
 
 void *eethread(void *ptr) {
