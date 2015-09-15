@@ -3828,7 +3828,7 @@ function loadAdminPage() {
 
                 } else {
                     result += '<tr class="childprop-row-60 subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3">No features available.</td>' +
+                        '<td width="67%" class="configLabel" colspan="3">No features enabled for disk space limit.</td>' +
                         '<td width="33%">&nbsp</td>' +
                         '</tr>';
                 }
