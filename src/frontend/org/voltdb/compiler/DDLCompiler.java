@@ -1811,33 +1811,11 @@ public class DDLCompiler {
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
-        boolean has_nonint_col = false;
-        String nonint_col_name = null;
 
         for (int i = 0; i < colNames.length; i++) {
             columns[i] = columnMap.get(colNames[i]);
             if (columns[i] == null) {
                 return;
-            }
-        }
-
-        if (exprs == null) {
-            for (int i = 0; i < colNames.length; i++) {
-                VoltType colType = VoltType.get((byte)columns[i].getType());
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
-                        colType == VoltType.STRING || colType == VoltType.VARBINARY) {
-                    has_nonint_col = true;
-                    nonint_col_name = colNames[i];
-                }
-            }
-        } else {
-            for (AbstractExpression expression : exprs) {
-                VoltType colType = expression.getValueType();
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
-                        colType == VoltType.STRING || colType == VoltType.VARBINARY) {
-                    has_nonint_col = true;
-                    nonint_col_name = "<expression>";
-                }
             }
         }
 
@@ -1855,13 +1833,6 @@ public class DDLCompiler {
                  ! indexNameNoCase.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX.toLowerCase());
 
         if (makeHashable) {
-            // If the column type is not an integer, we cannot
-            // make the index a hash.
-            if (has_nonint_col) {
-                String emsg = "Index " + name + " in table " + table.getTypeName() +
-                             " uses a non-hashable column " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(emsg);
-            }
             index.setType(IndexType.HASH_TABLE.getValue());
         }
         else
