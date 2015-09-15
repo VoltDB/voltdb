@@ -97,7 +97,7 @@ void uniqueFuzzIteration() {
         int64_t value = rand();
         if (insert) {
             insertSTLIter = stl.insert(pair<int64_t,int64_t>(value,value));
-            bool didInsert = volt.insert(value, value);
+            bool didInsert = (volt.insert(value, value) == NULL);
             assert (insertSTLIter.second == didInsert);
         }
         else {
@@ -165,7 +165,7 @@ void multiFuzzIteration() {
             for (int j = 0; j < dups; j++) {
                 int64_t toInsert = randomValue(100);
                 stlIter = stl.insert(pair<int64_t,int64_t>(value, toInsert));
-                bool didInsert = volt.insert(value, toInsert);
+                bool didInsert = (volt.insert(value, toInsert) == NULL);
                 insertions++;
                 assert(didInsert);
             }
@@ -255,7 +255,7 @@ TEST_F(CompactingHashTest, ShrinkAndGrowUnique) {
     voltdb::CompactingHashTable<uint64_t,uint64_t> volt(true);
 
     for (uint64_t i = 0; i < ITERATIONS; i++)
-        ASSERT_TRUE(volt.insert(i, i));
+        ASSERT_TRUE(volt.insert(i, i) == NULL);
 
     volt.verify();
 
@@ -265,7 +265,7 @@ TEST_F(CompactingHashTest, ShrinkAndGrowUnique) {
     volt.verify();
 
     for (uint64_t i = 0; i < ITERATIONS; i++)
-        ASSERT_TRUE(volt.insert(i, i));
+        ASSERT_TRUE(volt.insert(i, i) == NULL);
 
     volt.verify();
 
@@ -281,7 +281,7 @@ TEST_F(CompactingHashTest, ShrinkAndGrowMulti) {
     voltdb::CompactingHashTable<uint64_t,uint64_t> volt(false);
 
     for (uint64_t i = 0; i < ITERATIONS; i++)
-        ASSERT_TRUE(volt.insert(i, i));
+        ASSERT_TRUE(volt.insert(i, i) == NULL);
 
     volt.verify();
 
@@ -291,7 +291,7 @@ TEST_F(CompactingHashTest, ShrinkAndGrowMulti) {
     volt.verify();
 
     for (uint64_t i = 0; i < ITERATIONS; i++)
-        ASSERT_TRUE(volt.insert(i, i));
+        ASSERT_TRUE(volt.insert(i, i) == NULL);
 
     volt.verify();
 
@@ -559,11 +559,11 @@ TEST_F(CompactingHashTest, Trivial) {
 
     // UNIQUE MAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m(true);
-    success = m.insert(two,two);
+    success = (m.insert(two,two) == NULL);
     ASSERT_TRUE(success);
-    success = m.insert(one,one);
+    success = (m.insert(one,one) == NULL);
     ASSERT_TRUE(success);
-    success = m.insert(three,three);
+    success = (m.insert(three,three) == NULL);
     ASSERT_TRUE(success);
 
     ASSERT_TRUE(m.verify());
@@ -583,19 +583,19 @@ TEST_F(CompactingHashTest, Trivial) {
 
     // MULTIMAP
     voltdb::CompactingHashTable<uint64_t,uint64_t> m2(false);
-    success = m2.insert(one,two);
+    success = (m2.insert(one,two) == NULL);
     ASSERT_TRUE(success);
-    success = m2.insert(one,one);
+    success = (m2.insert(one,one) == NULL);
     ASSERT_TRUE(success);
-    success = m2.insert(one,one);
+    success = (m2.insert(one,one) == NULL);
     ASSERT_TRUE(success);
-    success = m2.insert(one,one);
+    success = (m2.insert(one,one) == NULL);
     ASSERT_TRUE(success);
-    success = m2.insert(one,one);
+    success = (m2.insert(one,one) == NULL);
     ASSERT_TRUE(success);
-    success = m2.insert(one,one);
+    success = (m2.insert(one,one) == NULL);
     ASSERT_TRUE(success);
-    success = m2.insert(one,one);
+    success = (m2.insert(one,one) == NULL);
     ASSERT_TRUE(success);
 
     ASSERT_TRUE(m2.verify());
