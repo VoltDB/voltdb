@@ -141,6 +141,9 @@ drivers.each { driver ->
         systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
         systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
         systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
+        // System properties specific to SqlQueriesTest or FullDdlSqlTest
+        systemProperty "sqlTestNames", getProjectPropertyOrDefaultValue("sqlTestNames", null)
+        // System properties specific to SqlQueriesTest
         systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
         systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
         systemProperty "testTables", getProjectPropertyOrDefaultValue("testTables", "PARTITIONED_TABLE,REPLICATED_TABLE")
