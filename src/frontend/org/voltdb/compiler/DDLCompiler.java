@@ -1824,27 +1824,19 @@ public class DDLCompiler {
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
+                        colType == VoltType.STRING || colType == VoltType.VARBINARY) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
-                }
-                // disallow columns from VARBINARYs
-                if (colType == VoltType.VARBINARY) {
-                    String emsg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
-                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         } else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT ||
+                        colType == VoltType.STRING || colType == VoltType.VARBINARY) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
-                }
-                // disallow expressions of type VARBINARY
-                if (colType == VoltType.VARBINARY) {
-                    String emsg = "VARBINARY expressions are not currently supported as index keys.";
-                    throw this.m_compiler.new VoltCompilerException(emsg);
                 }
             }
         }
