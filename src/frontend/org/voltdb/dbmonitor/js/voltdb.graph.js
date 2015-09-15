@@ -922,11 +922,12 @@
             var dataMemMin = monitor.memDataMin;
             var dataMemDay = monitor.memDataDay;
             var memDetails = memoryDetails;
+
+            if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
+                return;
+
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
-
-            if ($.isEmptyObject(memDetails) || memDetails[currentServer].PHYSICALMEMORY == null || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].RSS == null || memDetails[currentServer].TIMESTAMP == null || memDetails[currentServer].TIMESTAMP == undefined)
-                return;
 
             if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
                 physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
@@ -982,11 +983,12 @@
             var datatransMin = monitor.tpsDataMin;
             var datatransDay = monitor.tpsDataDay;
             var transacDetail = transactionDetails;
+
+            if ($.isEmptyObject(transacDetail) || transacDetail == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["TimeStamp"] == undefined || transacDetail["currentTimerTick"] == undefined)
+                return;
+
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
-
-            if ($.isEmptyObject(transacDetail) || transacDetail["CurrentTimedTransactionCount"] == null || transacDetail["TimeStamp"] == null || transacDetail["TimeStamp"] == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["currentTimerTick"] == null || transacDetail["currentTimerTick"] == undefined)
-                return;
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
@@ -1040,11 +1042,12 @@
             var cpuDataMin = monitor.cpuDataMin;
             var cpuDataDay = monitor.cpuDataHrs;
             var cpuDetail = cpuDetails;
+
+            if ($.isEmptyObject(cpuDetail) || cpuDetail == undefined || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == undefined)
+                return;
+
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
-
-            if ($.isEmptyObject(cpuDetail) || cpuDetail[currentServer].PERCENT_USED == null || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == null || cpuDetail[currentServer].TIMESTAMP == undefined)
-                return;
 
             if (percentageUsage < 0)
                 percentageUsage = 0;
@@ -1103,11 +1106,11 @@
             var partitionDataMin = monitor.partitionDataMin;
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
-            var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
 
-            if ($.isEmptyObject(partitionDetail) || partitionDetail["partitionDetail"]["timeStamp"] == null || partitionDetail["partitionDetail"]["timeStamp"] == undefined)
+            if ($.isEmptyObject(partitionDetail) || partitionDetail == undefined ||partitionDetail["partitionDetail"]["timeStamp"] == undefined)
                 return;
 
+            var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
             $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
                 $.each(datavalue, function (partitionKey, partitionValue) {
                     var keyValue = partitionKey;
@@ -1173,11 +1176,12 @@
             var drDataMin = monitor.drReplicationDataMin;
             var drDataDay = monitor.drReplicationDataDay;
             var drDetail = drDetails;
+
+            if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
+                return;
+
             var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
-
-            if ($.isEmptyObject(drDetail) || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == null || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == null || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
-                return;
 
             if (drSecCount >= 6 || monitor.drFirstData) {
                 drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
@@ -1222,7 +1226,7 @@
             var cmdLogDataDay = monitor.cmdLogDataDay;
             var cmdLogDetail = cmdLogDetails;
 
-            if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail[currentServer].OUTSTANDING_TXNS == null || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == null || cmdLogDetail[currentServer].TIMESTAMP == undefined)
+            if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;
 
             var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;
