@@ -283,77 +283,62 @@ def buildMakefile(CTX):
     makefile.write("\n")
 
     LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
-    # This is a list of pairs (filename, cppflags) for all files
-    # we will compile.  This is only used to generate dependence
-    # lists.
-    allsources = []
-    # The elements, of input_paths will be file descriptions.
-    # A file description, file_descr_ is a dictionary containing
-    # the actual name, as file_descr['filename'],
-    # the cpp flags, as file_descr['cppflags'], and
-    # the list of include files, as file_descr['includes'].
     for file_descr in input_paths:
-        filename = file_descr['filename']
-        cppflags = file_descr['cppflags']
-        includes = " ".join(["-I %s" % includename for includename in file_descr['includes']])
-        allsources += [(filename, LOCALCPPFLAGS + " " + cppflags + includes, IGNORE_SYS_PREFIXES)]
-    # The third_parth_input_paths also are file descriptions.
-    for file_descr in third_party_input_paths:
-        filename = file_descr['filename']
-        cppflags = file_descr['cppflags']
-        includes = " ".join(["-I %s" % includename for includename in file_descr['includes']])
-        allsources += [(filename, LOCALCPPFLAGS + cppflags + " " + includes, IGNORE_SYS_PREFIXES)]
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
-        allsources += [(sourcename, LOCALTESTCPPFLAGS, IGNORE_SYS_PREFIXES)]
-    # deps = getAllDependencies(allsources, 1)
-
-    for file_descr in input_paths:
-        filename = file_descr['filename']
+        original_filename = file_descr['filename']
         cppflags = file_descr['cppflags']
         includes = " ".join([ "-I ../../%s" % include_name for include_name in file_descr['includes']])
-        jni_objname, static_objname = outputNamesForSource(filename)
-        filename = filename.replace(INPUT_PREFIX, "$(SRC)")
+        jni_objname, static_objname = outputNamesForSource(original_filename)
+        filename = original_filename.replace(INPUT_PREFIX, "$(SRC)")
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write("\n")
+        makefile.write("######################################################################\n")
+        makefile.write("#\n# %s\n#\n" % original_filename)
+        makefile.write("######################################################################\n")
         makefile.write(jni_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
-        makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -MMD -MP -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, jni_objname, filename))
         makefile.write(static_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -MMD -MP -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, static_objname, filename))
+        makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
     makefile.write("\n")
 
     for file_descr in third_party_input_paths:
-        filename = file_descr['filename']
+        original_filename = file_descr['filename']
         cppflags = file_descr['cppflags']
         includes = " ".join([ "-I ../../%s" % include_name for include_name in file_descr['includes']])
-        jni_objname, static_objname = outputNamesForSource(filename)
-        filename = filename.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)")
+        jni_objname, static_objname = outputNamesForSource(original_filename)
+        filename = original_filename.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)")
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write("\n")
+        makefile.write("######################################################################\n")
+        makefile.write("#\n# %s\n#\n" % original_filename)
+        makefile.write("######################################################################\n")
         makefile.write(jni_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
-        makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, jni_objname, filename))
         makefile.write(static_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) $(CPPFLAGS) %s %s %s -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, static_objname, filename))
+        makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
     makefile.write("\n")
 
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
-        makefile.write("%s: ../../%s" % (objectname, sourcename))
-        # mydeps = deps[sourcename]
-        # for dep in mydeps:
-        #    makefile.write(" ../../%s" % (dep))
         makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("######################################################################\n")
+        makefile.write("#\n# %s\n#\n" % sourcename)
+        makefile.write("######################################################################\n")
+        makefile.write("%s: ../../%s" % (objectname, sourcename))
+        makefile.write("\n")
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o %s ../../%s\n" % (TEST_PREFIX, objectname, sourcename))
+        makefile.write("-include %s\n" % replaceExtension(objectname, ".d"))
 
         # link the test
         makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
