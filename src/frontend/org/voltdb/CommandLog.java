@@ -78,14 +78,36 @@ public interface CommandLog {
             int partitionId, long spHandle);
 
     interface CompletionChecks {
+        /**
+         * Use the current CompletionChecks object to create a new CompletionChecks object
+         * @param startSize - pre-allocated size of the next empty transaction list
+         * @return the newly created CompletionChecks object
+         */
         public CompletionChecks startNewCheckList(int startSize);
 
-        public void addTask(TransactionTask task);
+        /**
+         * Add a new transaction to the per-scheduler durable transaction tracker
+         * @param task
+         */
 
+        public void addTask(TransactionTask task);
+        /**
+         * Get the number of TransactionTasks tracked by this instance of CompletionChecks
+         * @return
+         */
         public int getTaskListSize();
 
+        /**
+         * Perform all class-specific processing for this batch of transactions including
+         * Durability Listener notifications
+         */
         public void processChecks();
 
+        /**
+         * This is like processChecks but executed when we started a sync but there were no
+         * new transactions. This is used to start non-commmand-logged system procedures
+         * when synchronous command logging is set
+         */
         public void checkForSyncLoggedSysProcs();
     }
 
