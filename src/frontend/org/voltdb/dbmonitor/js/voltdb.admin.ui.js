@@ -181,20 +181,6 @@ function loadAdminPage() {
         errorMemorySize: $("#errorMemorySize"),
         editStateMemorySize: editStates.ShowEdit,
 
-        //Disk Size Limit
-        rowDiskSizeTimeout: $("#diskSizeTimeout"),
-        btnEditDiskSize: $("#btnEditDiskSize"),
-        btnEditDiskSizeOk: $("#btnEditDiskSizeOk"),
-        btnEditDiskSizeCancel: $("#btnEditDiskSizeCancel"),
-        // spanDiskLimitSizeValue: $("#diskLimitSize").text(),
-        //spanDiskLimitSize: $("#diskLimitSize"),
-        //txtDiskLimitSize: $("#txtDiskLimitSize"),
-        //spanDiskLimitSizeUnit: $("#diskLimitSizeUnit"),
-        //   loadingDiskLimit: $("#loadingDiskLimit"),
-        errorDiskSize: $("#errorDiskSize"),
-        editStateDiskSize: editStates.ShowEdit,
-
-
         //Update Error
         updateErrorFieldMsg: $("#updateErrorFieldMsg"),
         updateSnapshotErrorFieldMsg: $("#updateSnapshotErrorFieldMsg"),
@@ -223,7 +209,7 @@ function loadAdminPage() {
         editDiskLimitLink: $("#btnEditDiskLimit"),
         loadingDiskLimit: $("#loadingDiskLimit"),
         diskLimitConfiguration: $("#diskLimitConfiguration"),
-        // exportConfigurationLoading: $('#exportConfigurationLoading'),
+        
 
         //Dr Mode object
         labelDrmode: $("#drMode"),
@@ -1601,7 +1587,6 @@ function loadAdminPage() {
             adminEditObjects.spanMemoryLimitSizeUnit.hide();
             adminEditObjects.txtMemoryLimitSize.show();
             adminEditObjects.ddlMemoryLimitSizeUnit.show();
-            //adminEditObjects.spanMemoryLimitSizeUnit.text("GB");
         } else {
           
             adminEditObjects.loadingMemoryLimit.hide();
@@ -1617,9 +1602,6 @@ function loadAdminPage() {
             }
             adminEditObjects.ddlMemoryLimitSizeUnit.hide();
             adminEditObjects.spanMemoryLimitSizeUnit.show();
-          
-            //            if (adminEditObjects.spanMemoryLimitSize.text() == "Not Enforced")
-            //  adminEditObjects.spanMemoryLimitSizeUnit.text("");
         }
     };
 
@@ -1788,7 +1770,6 @@ function loadAdminPage() {
                 //Set the new value to be saved.
                 var memoryLimitSize = "";
                 memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
-                //adminEditObjects.txtMemoryLimitSize.val() + adminEditObjects.ddlMemoryLimitSizeUnit.val();
 
                 if (adminEditObjects.txtMemoryLimitSize.val() != "") {
                     adminConfigurations.systemsettings.resourcemonitor.memorylimit.size = memoryLimitSize;
@@ -1864,8 +1845,6 @@ function loadAdminPage() {
                 toggleMemorySizeEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
-                        //                        adminEditObjects.spanMemoryLimitSizeValue = adminEditObjects.txtMemoryLimitSize.val();
-                        //                        adminEditObjects.spanMemoryLimitSize.html(adminEditObjects.spanMemoryLimitSizeValue);
 
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
@@ -1895,16 +1874,6 @@ function loadAdminPage() {
             });
 
         }
-    });
-
-    //Disk Limit
-    adminEditObjects.btnEditDiskSize.on("click", function () {
-        toggleDiskSizeEdit(editStates.ShowOkCancel);
-        $("td.diskSize span").toggleClass("unit");
-    });
-
-    adminEditObjects.btnEditDiskSizeCancel.on("click", function () {
-        toggleDiskSizeEdit(editStates.ShowEdit);
     });
 
 
@@ -2545,7 +2514,6 @@ function loadAdminPage() {
                         e.stopPropagation();
                     } else {
                         $("#addDiskLimitControls").hide();
-                        // $("#deleteAddDiskLimit").hide();
                         $("#saveDiskLimitConfirmation").show();
                     }
                 }
@@ -4192,7 +4160,6 @@ var editStream = function (editId) {
 };
 
 var editDiskLimit = function (editId) {
-    // adminDOMObjects.addDiskLimitLink.data("id", editId);
     adminDOMObjects.addDiskLimitLink.trigger("click");
 };
 
