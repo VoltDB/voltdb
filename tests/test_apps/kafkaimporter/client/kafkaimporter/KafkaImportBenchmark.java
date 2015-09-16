@@ -384,8 +384,8 @@ public class KafkaImportBenchmark {
             }
         }
 
-        if (importRowCount < exportRowCount && config.useexport) {
-            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
+        if (importRows < exportRowCount && config.useexport) {
+            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRows + "' test fails.");
             testResult = false;
         }
 
