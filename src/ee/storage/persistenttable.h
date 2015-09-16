@@ -837,7 +837,7 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 
 inline void
 PersistentTableSurgeon::DRRollback(size_t drMark) {
-    if (drMark < SIZE_MAX && !m_table.m_isMaterialized && m_table.m_drEnabled) {
+    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
         if (m_table.m_partitionColumn == -1) {
             if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
                 ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark);

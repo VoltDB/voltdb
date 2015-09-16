@@ -325,6 +325,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
 void DRTupleStream::rollbackTo(size_t mark) {
+    if (mark == SIZE_MAX) return;
     m_opened = false;
     m_txnRowCount = 0;
     TupleStreamBase::rollbackTo(mark);
