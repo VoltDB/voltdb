@@ -2126,15 +2126,17 @@ var getCurrentTab = function () {
         activeLinkId = activeLink.attr("id");
     }
 
-    if (activeLinkId == "navSqlQuery")
+    if (activeLinkId == "navSqlQuery") {
+        $(".nvtooltip").hide();
         return NavigationTabs.SQLQuery;
-
-    else if (activeLinkId == "navSchema")
+    } else if (activeLinkId == "navSchema") {
+        $(".nvtooltip").hide();
         return NavigationTabs.Schema;
-
-    else if (activeLinkId == "navAdmin")
+    } else if (activeLinkId == "navAdmin") {
+        $(".nvtooltip").hide();
         return NavigationTabs.Admin;
-
+    }
+    $(".nvtooltip").show();
     return NavigationTabs.DBMonitor;
 };
 
