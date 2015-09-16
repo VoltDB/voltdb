@@ -635,6 +635,9 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
          m_wrapper.endTransaction();
     }
 
+    const int64_t expectedSequenceNumber = m_wrapper.m_openSequenceNumber;
+    const int64_t expectedUniqueId = m_wrapper.m_openUniqueId;
+
     // The following should be ignored because of the guard is on
     size_t mark1;
     size_t mark2;
@@ -645,8 +648,13 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     }
     EXPECT_EQ(mark1, INVALID_DR_MARK);
     EXPECT_EQ(mark2, INVALID_DR_MARK);
+    EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
+    EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
+
     m_wrapper.rollbackTo(mark2);
     m_wrapper.rollbackTo(mark1);
+    EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
+    EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
 
     // Append one more tuple after the rollback
     appendTuple(12, 13);
