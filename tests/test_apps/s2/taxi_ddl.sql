@@ -10,6 +10,7 @@ create table taxis (
 );
 
 create index taxis_cellid_idx on taxis(cellid);
+partition table taxis on column id;
 
 create table cities (
     id              bigint not null primary key,
@@ -38,6 +39,10 @@ create index ccm_regionid_idx on cellid_region_map(regionid);
 -- Insert a new city in the city table.
 -- Cities are constant.
 create procedure from class iwdemo.InsertCity;
+create procedure
+  partition on table taxis column id parameter 0
+  from class iwdemo.TaxisPerCity;
+
 -- Insert a new region in the region table
 -- Regions are constant.
 -- create procedure from class iwdemo.InsertRegion;

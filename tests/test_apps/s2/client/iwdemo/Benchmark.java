@@ -350,6 +350,9 @@ public class Benchmark {
         // insertCounties();
         setUpTaxis();
 
+        // Show reports every second.
+        scheduler.scheduleWithFixedDelay(new Reporter(client), 0, 1, TimeUnit.SECONDS);
+
         // sleep for configured time
         // Periodic activity registered with the scheduler will happen during this time.
         Thread.sleep(config.duration * 1000);

@@ -57,7 +57,7 @@ public class TaxiManager implements Runnable {
 
     public void createTaxis() {
         try {
-            System.out.println("Creating taxis in starting cities:");
+            System.out.println("Creating taxis in " + NUM_STARTING_CITIES + " starting cities:");
             final long NUM_CITIES = m_client.callProcedure("@AdHoc", "select max(id) from cities")
                     .getResults()[0].asScalarLong();
 
