@@ -42,6 +42,7 @@ CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
     \ls -1 "$VOLTDB_LIB"/super-csv-2.1.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
+CLIENTCLASSPATH=${CLIENTCLASSPATH}:s2-src
 echo "CLIENTCLASSPATH:$CLIENTCLASSPATH"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -134,8 +135,6 @@ fi
 echo
 echo
 echo
-
-export CLASSPATH=${CLASSPATH}:${PWD}/client.jar
 
 java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
      iwdemo.Benchmark
