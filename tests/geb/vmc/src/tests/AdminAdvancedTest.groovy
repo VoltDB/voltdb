@@ -500,7 +500,6 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-
     def "Check memory limit edit and then click Ok and confirm Ok(Using GB)"() {
         when:
         String memoryLimit = 20

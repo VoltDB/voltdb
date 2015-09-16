@@ -291,33 +291,6 @@ class Overview extends Module {
 
 
 
-        //Disk Limit
-
-
-        lnkAddNewFeature {$("#lnkAddNewFeature")}
-        btnAddDiskLimitSave {$("#btnAddDiskLimitSave")}
-        btnAddDiskLimitCancel {$("#btnAddDiskLimitCancel")}
-        btnSaveDiskLimitOk {$("#btnSaveDiskLimitOk")}
-        btnSaveDiskLimitCancel {$("#btnSaveDiskLimitCancel")}
-        addDiskLimitHeader {$("#addDiskLimitHeader")}
-        featureName1 {$("#txtNameDL1")}
-        featureValue1 {$("#txtValueDL1")}
-        featureUnit1 {$("#txtUnitDL1")}
-        featureName2 {$("#txtNameDL2")}
-        featureValue2 {$("#txtValueDL2")}
-        featureUnit2 {$("#txtUnitDL2")}
-        deleteFirstFeature {$("#deleteFirstFeature")}
-        errorValue1 {$("#errorValueDL1")}
-        errortxtName2 {$("#error_txtNameDL2")}
-        errortxtName1 {$("#error_txtNameDL1")}
-
-
-            //$(class:"labelCollapsed labelExpanded", text:"Disk Limit") }
-
-
-
-
-
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
         errorQuery				{ $("#errorQueryTimeout") }

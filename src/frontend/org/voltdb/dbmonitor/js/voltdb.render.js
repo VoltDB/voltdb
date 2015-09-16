@@ -611,7 +611,8 @@ function alertNodeClicked(obj) {
 
             var alertHtml = "";
 
-            jQuery.each(systemOverview, function (id, val) {
+            
+            jQuery.each(systemOverview, function(id, val) {
                 var hostName;
                 var hostIp;
                 hostName = val["HOSTNAME"];

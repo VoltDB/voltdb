@@ -1023,7 +1023,6 @@ ul.servers-list li {
 }
 
 
-
 .serversTbl { width: 100%;}
 .serversTbl tr th,.serversTbl tr td { border-right: none;border-bottom: 1px solid #CCCCCC;vertical-align: top;}
 .serversTbl tr th {  padding: 20px 19px 20px 0;font-weight: bold;background: #dee0e0;}
@@ -1039,7 +1038,6 @@ ul.servers-list li {
 
 
 .alertWrap { height:220px;overflow: auto;width: 100%;}
-
 .serversListTbl { width: 100%;}
 .serversListTbl tr th,.serversListTbl tr td { border-right: none;border-bottom: 1px solid #CCCCCC;}
 .serversListTbl tr th {  padding: 20px 19px 20px 0;font-weight: bold;}
@@ -1108,8 +1106,6 @@ a.setVal {
     }
 
 
-
-
 table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
@@ -1128,7 +1124,6 @@ table.serversTbl tr td.pauseActiveMonitoring {
     background-repeat: no-repeat;
     background-color: #f0f3f4;
 }
-
 
 table.serversTbl tr td.active{
     background-position: 5px 17px;
