@@ -64,6 +64,10 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
+    virtual int reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, Table* input, Table* output) = 0;
+
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
 
     /** Calls the java method in org.voltdb.utils.Encoder */
@@ -94,6 +98,10 @@ public:
     virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream);
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+
+    int reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, Table* input, Table* output);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 

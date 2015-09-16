@@ -70,8 +70,16 @@ SELECT _variable[#ord]         FROM @fromtables A15 WHERE __[#agg] _symbol[#cmp 
 SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg])                 FROM @fromtables WHERE _variable[@comparabletype]              _cmp  A31._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A31 GROUP BY C0
 SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg @comparabletype]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A32._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A32 GROUP BY C0 HAVING __[#agfcn](__[#agg]) __[#cmp] 12
 SELECT (SELECT _symbol[#agfcn _stringagg](_variable[#agg string])    FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A33._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A33 GROUP BY C0 HAVING __[#agfcn](__[#agg]) __[#cmp] 'Z'
---- Queries with scalar subqueries (or just 'C1') in the HAVING clause
---- These do not currently work, due to ENG-8915 & ENG-8306 (meanwhile, commented out to save execution time)
---SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A34._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1 __[#cmp] 12
---SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A35 GROUP BY C0 HAVING (SELECT __[#agfcn](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A35._variable[@comparabletype]) __[#cmp] 12
---SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A36 GROUP BY C0 HAVING __[#agfcn](__[#agg]) _symbol[#cmp _cmp] (SELECT __[#agfcn](__[#agg]) FROM @fromtables WHERE __[#grp] __[#cmp] A36.__[#grp])
+--- These do not currently work, due to ENG-8915 (use of 'C1' alias in HAVING; meanwhile, commented out to save execution time)
+--SELECT (SELECT _symbol[#agfcn @agg](_variable[#agg @comparabletype]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A34._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A34 GROUP BY C0 HAVING C1                   __[#cmp] 12
+--SELECT (SELECT _symbol[#agfcn _stringagg](_variable[#agg string])    FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A35._variable[@comparabletype]) C0, __[#agfcn](__[#agg]) C1 FROM @fromtables A35 GROUP BY C0 HAVING C1                   __[#cmp] 'Z'
+
+--- Queries with a HAVING clause, but without scalar subqueries, just for comparison with the next two patterns
+--SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A40 GROUP BY C0 HAVING __[#agfcn](__[#agg]) _cmp 12
+
+--- Queries with scalar subqueries in the HAVING clause
+--- These do not currently work, due to ENG-8306 (meanwhile, commented out to save execution time)
+--SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A41 GROUP BY C0 HAVING __[#agfcn](__[#agg]) _symbol[#cmp _cmp] (SELECT __[#agfcn](__[#agg]) FROM @fromtables WHERE __[#grp] __[#cmp] A41.__[#grp])
+--- This query pattern is even "worse" (harder for VoltDB): it attempts to use a subquery in
+--- place of an aggregate function (in the HAVING clause), so it may not be fixed with ENG-8306
+--SELECT _variable[#grp] C0, _symbol[#agfcn @agg](_variable[#agg]) C1 FROM @fromtables A42 GROUP BY C0 HAVING (SELECT __[#agfcn](_variable[#agg]) FROM @fromtables WHERE _variable[@comparabletype] _symbol[#cmp _cmp] A42.__[#grp]) __[#cmp] 12

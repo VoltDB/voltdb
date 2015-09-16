@@ -424,32 +424,32 @@ class AdminAdvancedTest extends TestBase {
     }
 
     //Memory Limit
-//    def "Check the memory limit edit button and then Cancel button"() {
-//        when:
-//        page.advanced.click()
-//        then:
-//        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
-//
-//        when:
-//        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
-//        then:
-//        waitFor(waitTime) {
-//            page.overview.memoryLimitField.isDisplayed()
-//            page.overview.memoryLimitUnit.isDisplayed()
-//            page.overview.memoryLimitOk.isDisplayed()
-//            page.overview.memoryLimitCancel.isDisplayed()
-//        }
-//
-//        when:
-//        waitFor(waitTime) { page.overview.memoryLimitCancel.click() }
-//        then:
-//        waitFor(waitTime) {
-//            !page.overview.memoryLimitField.isDisplayed()
-//            !page.overview.memoryLimitOk.isDisplayed()
-//            !page.overview.memoryLimitCancel.isDisplayed()
-//            page.overview.memoryLimitEdit.isDisplayed()
-//        }
-//    }
+    def "Check the memory limit edit button and then Cancel button"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitCancel.click() }
+        then:
+        waitFor(waitTime) {
+            !page.overview.memoryLimitField.isDisplayed()
+            !page.overview.memoryLimitOk.isDisplayed()
+            !page.overview.memoryLimitCancel.isDisplayed()
+            page.overview.memoryLimitEdit.isDisplayed()
+        }
+    }
 
     def "Check memory limit edit and then click Ok and Cancel"() {
         when:
@@ -462,6 +462,7 @@ class AdminAdvancedTest extends TestBase {
         then:
         waitFor(waitTime) {
             page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
             page.overview.memoryLimitOk.isDisplayed()
             page.overview.memoryLimitCancel.isDisplayed()
         }
@@ -499,9 +500,11 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check memory limit edit and then click Ok and confirm Ok"() {
+
+    def "Check memory limit edit and then click Ok and confirm Ok(Using GB)"() {
         when:
         String memoryLimit = 20
+        String memoryLimitUnit = "GB"
         page.advanced.click()
         waitFor(waitTime) {
             page.overview.memoryLimitValue.isDisplayed()
@@ -518,12 +521,66 @@ class AdminAdvancedTest extends TestBase {
         then:
         waitFor(waitTime) {
             page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
             page.overview.memoryLimitOk.isDisplayed()
             page.overview.memoryLimitCancel.isDisplayed()
         }
 
         when:
         page.overview.memoryLimitField.value(memoryLimit)
+        page.overview.memoryLimitDdlUnit.value(memoryLimitUnit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        waitFor(waitTime) {
+            try {
+                page.overview.memoryLimitPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Retrying")
+            }
+
+            page.overview.memoryLimitEdit.isDisplayed()
+            page.overview.memoryLimitValue.text().equals(memoryLimit)
+            !page.overview.memoryLimitPopupOk.isDisplayed()
+            !page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check memory limit edit and then click Ok and confirm Ok(Using %)"() {
+        when:
+        String memoryLimit = 50
+        String memoryLimitUnit = "%"
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.memoryLimitValue.isDisplayed()
+        }
+        if(initialMemoryLimit == "-1"){
+            initialMemoryLimit = page.overview.memoryLimitValue.text()
+            println("Initial value of memory limit "+ initialMemoryLimit)
+            revertMemorySize = true
+        }
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(memoryLimit)
+        page.overview.memoryLimitDdlUnit.value(memoryLimitUnit)
         waitFor(waitTime) {
             page.overview.memoryLimitOk.click()
         }
@@ -662,6 +719,40 @@ class AdminAdvancedTest extends TestBase {
         !page.overview.memoryLimitError.isDisplayed()
     }
 
+    def "Check memory limit, maximum limit validation when unit is %"(){
+        when:
+        String invalidMemoryLimitInPer = "100"
+        String validMemoryLimitInPer = "99"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(invalidMemoryLimitInPer)
+        page.overview.memoryLimitDdlUnit.value("%")
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitError.isDisplayed()
+            page.overview.memoryLimitError.text().equals("Maximum value of percentage cannot be greater than 99.")
+        }
+        when:
+        page.overview.memoryLimitField.value(validMemoryLimitInPer)
+        then:
+        !page.overview.memoryLimitError.isDisplayed()
+    }
 
    // Disk Limit
 

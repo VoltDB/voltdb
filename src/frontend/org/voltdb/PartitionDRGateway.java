@@ -43,7 +43,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
 
         public static final ImmutableMap<Integer, DRRecordType> conversion;
         static {
@@ -144,6 +144,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     };
 
+    public int processDRConflict(int partitionId, long remoteSequenceNumber, long remoteUniqueId,
+                                 String tableName, ByteBuffer input, ByteBuffer output) {
+        final BBContainer cont = DBBPool.wrapBB(input);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
+        return 0;
+    }
+
     public static synchronized long pushDRBuffer(
             int partitionId,
             long startSequenceNumber,
@@ -186,6 +194,29 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                     checksum = buf.getInt();
                     log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
                               (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
+                    break;
+                }
+                case UPDATE:
+                case UPDATE_BY_INDEX: {
+                    if (haveOpenTransaction.get() == -1) {
+                        log.error("Have update but no open transaction");
+                        break;
+                    }
+                    final long tableHandle = buf.getLong();
+                    final int oldRowLengthPrefix = buf.getInt();
+                    final int oldRowIndexCrc;
+                    if (recordType == DRRecordType.UPDATE_BY_INDEX) {
+                        oldRowIndexCrc = buf.getInt();
+                    } else {
+                        oldRowIndexCrc = 0;
+                    }
+                    buf.position(buf.position() + oldRowLengthPrefix);
+                    final int newRowLengthPrefix = buf.getInt();
+                    buf.position(buf.position() + newRowLengthPrefix);
+                    checksum = buf.getInt();
+                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " old row length " + oldRowLengthPrefix +
+                              " new row length " + newRowLengthPrefix + " checksum " + checksum +
+                              (recordType == DRRecordType.UPDATE_BY_INDEX ? (" index checksum " + oldRowIndexCrc) : ""));
                     break;
                 }
                 case BEGIN_TXN: {
@@ -242,4 +273,13 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
+
+    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, long remoteUniqueId,
+                                       String tableName, ByteBuffer input, ByteBuffer output) {
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
+        if (pdrg == null) {
+            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+        }
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, remoteUniqueId, tableName, input, output);
+    }
 }

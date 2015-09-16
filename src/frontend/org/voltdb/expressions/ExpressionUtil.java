@@ -319,6 +319,8 @@ public abstract class ExpressionUtil {
         } else if (exprType == ExpressionType.CONJUNCTION_OR) {
             assert(expr.m_left != null && expr.m_right != null);
             return isNullRejectingExpression(expr.m_left, tableAlias) && isNullRejectingExpression(expr.m_right, tableAlias);
+        } else if (exprType == ExpressionType.COMPARE_NOTDISTINCT) {
+            return false;
         } else if (exprType == ExpressionType.OPERATOR_NOT) {
             assert(expr.m_left != null);
             // "NOT ( P and Q )" is as null-rejecting as "NOT P or NOT Q"

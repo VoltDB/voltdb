@@ -241,7 +241,10 @@ class Table {
     // SERIALIZATION
     // ------------------------------------------------------------------
     int getApproximateSizeToSerialize() const;
+    size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
+    size_t getAccurateSizeToSerialize(bool includeTotalSize);
     bool serializeTo(SerializeOutput &serialize_out);
+    bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
     bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
 
     /*

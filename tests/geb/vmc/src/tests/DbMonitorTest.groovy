@@ -180,6 +180,10 @@ class DbMonitorTest extends TestBase {
         page.openServerList()
         then: 'Server list is open'
         page.isServerListOpen()
+        page.serverListHeader.isDisplayed()
+        page.serverNameHeader.isDisplayed()
+        page.serverIpAddressHeader.isDisplayed()
+        page.serverMemoryUsageHeader.isDisplayed()
 
         when: 'click Server button (to close list)'
         page.closeServerList()

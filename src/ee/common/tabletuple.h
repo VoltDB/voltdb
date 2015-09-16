@@ -164,6 +164,16 @@ public:
         return bytes;
     }
 
+    // return the number of bytes when serialized for regular usage (other
+    // than export and DR).
+    size_t serializationSize() const {
+        size_t bytes = sizeof(int32_t);
+        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
+            bytes += maxSerializedColumnSize(colIdx);
+        }
+        return bytes;
+    }
+
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
@@ -441,6 +451,25 @@ private:
                     valueToString(columnType).c_str() );
             return (size_t)0;
         }
+    }
+
+    inline size_t maxSerializedColumnSize(int colIndex) const {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+        voltdb::ValueType columnType = columnInfo->getVoltType();
+
+        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+            // Null variable length value doesn't take any bytes in
+            // export table, so here needs a special handle for VARCHAR
+            // and VARBINARY
+            if (isNull(colIndex)) {
+                return sizeof(int32_t);
+            }
+        } else if (columnType == VALUE_TYPE_DECIMAL) {
+            // Other than export and DR table, decimal column in regular table
+            // doesn't contain scale and precision bytes.
+            return 16;
+        }
+        return maxExportSerializedColumnSize(colIndex);
     }
 };
 
