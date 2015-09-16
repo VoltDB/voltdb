@@ -29,6 +29,9 @@ namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
+// Use this to indicate uninitialized DR mark
+const size_t INVALID_DR_MARK = SIZE_MAX;
+
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 69;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
