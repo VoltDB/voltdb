@@ -1,5 +1,5 @@
 
--- load classes procs.jar;
+load classes procs.jar;
 
 file -inlinebatch EOB
 
@@ -37,18 +37,18 @@ create index ccm_regionid_idx on cellid_region_map(regionid);
 
 -- Upsert a new taxi in the taxi table.
 -- We want to be able to update its location.
--- create procedure from class s2demo.UpsertTaxi;
+-- create procedure from class iwdemo.UpsertTaxi;
 -- Insert a new city in the city table.
 -- Cities are constant.
--- create procedure from class s2demo.InsertCity;
+create procedure from class iwdemo.InsertCity;
 -- Insert a new region in the region table
 -- Regions are constant.
--- create procedure from class s2demo.InsertRegion;
+-- create procedure from class iwdemo.InsertRegion;
 -- Find all the regions containing a particular taxi.
--- create procedure from class s2demo.FindTaxi;
+-- create procedure from class iwdemo.FindTaxi;
 -- Find all the counties in a given state.
--- create procedure from class s2demo.FindCountiesInState;
+-- create procedure from class iwdemo.FindCountiesInState;
 -- Find the nearest points.
--- create procedure from class s2demo.FindNearestPoints;
+-- create procedure from class iwdemo.FindNearestPoints;
 
 EOB
