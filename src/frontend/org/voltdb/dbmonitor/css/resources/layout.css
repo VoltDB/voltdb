@@ -3623,8 +3623,9 @@ a:hover.changePsd {
 /*add idsk limit*/
 table.diskLimitTbl tr td { border: none;}
 
-
-
+/*********overlapping nv.d3.css*********/
+.nvtooltip{ padding: 5px!important;}
+svg.nvd3-svg { padding: 0 0 0 10px!important; }
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
