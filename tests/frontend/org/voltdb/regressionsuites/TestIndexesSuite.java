@@ -53,6 +53,23 @@ public class TestIndexesSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = { Insert.class,
         CheckMultiMultiIntGTEFailure.class, CompiledInLists.class};
 
+    private void truncateTables(String[] tables) throws IOException, ProcCallException {
+        Client client = getClient();
+        for (String tb : tables) {
+            client.callProcedure("@AdHoc", "Truncate table " + tb);
+        }
+    }
+    public void testOrderedIntIndex()
+            throws IOException, ProcCallException
+    {
+        subTestOrderedMultiMultiPrefixOnly();
+        subTestOrderedUniqueOneColumnIntIndex();
+        subTestOrderedMultiOneColumnIntIndex();
+        subTestOrderedMultiOneColumnIndexLessThan();
+        subTestOrderedMultiMultiColumnIntIndex();
+        subTestOrderedMultiMultiIntGTEFailure();
+    }
+
     // Index stuff to test:
     // scans against tree
     // - < <= = > >=, range with > and <
@@ -65,7 +82,7 @@ public class TestIndexesSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    public void testOrderedMultiMultiPrefixOnly()
+    private void subTestOrderedMultiMultiPrefixOnly()
     throws IOException, ProcCallException
     {
         String[] tables = {"P3", "R3"};
@@ -86,75 +103,11 @@ public class TestIndexesSuite extends RegressionSuite {
             VoltTable[] resultsEq = client.callProcedure("@AdHoc", queryEq).getResults();
             assertEquals(2, resultsEq[0].getRowCount());
         }
+
+        truncateTables(tables);
     }
 
-    public void testParameterizedLimitOnIndexScan()
-    throws IOException, ProcCallException {
-        String[] tables = {"P1", "R1", "P2", "R2"};
-        Client client = getClient();
-        for (String table : tables)
-        {
-            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
-            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
-            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
-            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
-            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
-            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-
-            VoltTable[] results = client.callProcedure("Eng397LimitIndex" + table, new Integer(2)).getResults();
-            assertEquals(2, results[0].getRowCount());
-        }
-    }
-
-    public void testPushDownAggregateWithLimit() throws Exception {
-        String[] tables = {"R1", "P1", "P2", "R2"};
-        Client client = getClient();
-        for (String table : tables)
-        {
-            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
-            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
-            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
-            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
-            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
-            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            client.callProcedure("Insert", table, 9, "h", 300, 8, 19.5);
-
-            String sql = String.format("select T.ID, MIN(T.ID) from %s T group by T.ID order by T.ID limit 4",
-                    table);
-            VoltTable results = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.out.println(results);
-        }
-    }
-
-    public void testNaNInIndexes() throws Exception {
-        // current hsql seems to fail on null handling
-        if (isHSQL()) return;
-
-        Client client = getClient();
-
-        int i = 0;
-        for (int j = 0; j < 20; j++) {
-            client.callProcedure("R1IX.insert", i++, "a", 100 * i, 0.0 / 0.0);
-            client.callProcedure("R1IX.insert", i++, "b", 100 * i, 16.5);
-            client.callProcedure("R1IX.insert", i++, "c", 100 * i, 119.5);
-            client.callProcedure("R1IX.insert", i++, "d", 100 * i, 9.5);
-            client.callProcedure("R1IX.insert", i++, "e", 100 * i, 1.0 / 0.0);
-            client.callProcedure("R1IX.insert", i++, "f", 100 * i, -14.5);
-            client.callProcedure("R1IX.insert", i++, "g", 100 * i, 0.0 / 0.0);
-            client.callProcedure("R1IX.insert", i++, "h", 100 * i, 14.5);
-            client.callProcedure("R1IX.insert", i++, "i", 100 * i, 14.5);
-            client.callProcedure("R1IX.insert", i++, "j", 100 * i, 1.0 / 0.0);
-            client.callProcedure("R1IX.insert", i++, "k", 100 * i, 14.5);
-            client.callProcedure("R1IX.insert", i++, "l", 100 * i, 0.0 / 0.0);
-            client.callProcedure("R1IX.insert", i++, "m", 100 * i, 11.5);
-            client.callProcedure("R1IX.insert", i++, "n", 100 * i, 10.5);
-        }
-
-        VoltTable results = client.callProcedure("@AdHoc", "delete from R1IX;").getResults()[0];
-        System.out.println(results);
-    }
-
-    public void testOrderedUniqueOneColumnIntIndex()
+    private void subTestOrderedUniqueOneColumnIntIndex()
     throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
@@ -222,6 +175,8 @@ public class TestIndexesSuite extends RegressionSuite {
 //            results = client.callProcedure("@AdHoc", query);
 //            assertEquals(4, results[0].getRowCount());
         }
+
+        truncateTables(tables);
     }
 
     //
@@ -229,7 +184,7 @@ public class TestIndexesSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    public void testOrderedMultiOneColumnIntIndex()
+    private void subTestOrderedMultiOneColumnIntIndex()
     throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
@@ -294,12 +249,14 @@ public class TestIndexesSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
         }
+
+        truncateTables(tables);
     }
 
     /**
      * Multimap one column less than.
      */
-    public void testOrderedMultiOneColumnIndexLessThan()
+    private void subTestOrderedMultiOneColumnIndexLessThan()
     throws IOException, ProcCallException
     {
         Client client = getClient();
@@ -332,6 +289,157 @@ public class TestIndexesSuite extends RegressionSuite {
         result = client.callProcedure("@AdHoc", "select * from P3 where NUM < 4 order by num desc")
                        .getResults()[0];
         assertEquals(4, result.getRowCount());
+
+        truncateTables(new String[]{"P3"});
+    }
+
+    //
+    // Multimap multi column
+    // @throws IOException
+    // @throws ProcCallException
+    //
+    private void subTestOrderedMultiMultiColumnIntIndex()
+    throws IOException, ProcCallException
+    {
+        String[] tables = {"P3", "R3"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            String query = String.format("select * from %s T where T.NUM > 100 AND T.NUM2 > 1",
+                                         table);
+            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+        }
+
+        truncateTables(tables);
+    }
+
+    private void subTestOrderedMultiMultiIntGTEFailure()
+    throws IOException, ProcCallException
+    {
+        final Client client = getClient();
+        final VoltTable results[] = client.callProcedure("CheckMultiMultiIntGTEFailure").getResults();
+        if (results == null) {
+            fail();
+        }
+        //
+        // Must pass 10 tests
+        //
+        assertEquals(10, results.length);
+
+        // Start off easy, with COUNT(*)s
+        // Actually, these exercise a different (counted index) code path which has experienced its own regressions.
+        // Test 1 -- count EQ first component of compound key
+        int tableI = 0;
+        final VoltTableRow countEQ = results[tableI].fetchRow(0);
+        assertEquals( 2, countEQ.getLong(0));
+
+        // Test 2 -- count GTE first component of compound key
+        tableI++;
+        final VoltTableRow countGT = results[tableI].fetchRow(0);
+        assertEquals( 3, countGT.getLong(0));
+
+        // Test 3 -- count GT first component of compound key
+        tableI++;
+        final VoltTableRow countGTE = results[tableI].fetchRow(0);
+        assertEquals( 1, countGTE.getLong(0));
+
+        // Test 4 -- count LTE first component of compound key
+        tableI++;
+        final VoltTableRow countLTE = results[tableI].fetchRow(0);
+        assertEquals( 3, countLTE.getLong(0));
+
+        // Test 5 -- count LT first component of compound key
+        tableI++;
+        final VoltTableRow countLT = results[tableI].fetchRow(0);
+        assertEquals( 1, countLT.getLong(0));
+
+        // Test 6 -- EQ first component of compound key
+        tableI++;
+        int rowI = 0;
+        assertEquals( 2, results[tableI].getRowCount());
+        final VoltTableRow rowEQ0 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowEQ0.getLong(0));
+        assertEquals( 0, rowEQ0.getLong(1));
+
+        final VoltTableRow rowEQ1 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowEQ1.getLong(0));
+        assertEquals( 1, rowEQ1.getLong(1));
+
+        // Test 7 -- GTE first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 3, results[tableI].getRowCount());
+        final VoltTableRow rowGTE0 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowGTE0.getLong(0));
+        assertEquals( 0, rowGTE0.getLong(1));
+
+        final VoltTableRow rowGTE1 = results[tableI].fetchRow(rowI++);
+        assertEquals( 0, rowGTE1.getLong(0));
+        assertEquals( 1, rowGTE1.getLong(1));
+
+        final VoltTableRow rowGTE2 = results[tableI].fetchRow(rowI++);
+        assertEquals( 1, rowGTE2.getLong(0));
+        assertEquals( 1, rowGTE2.getLong(1));
+
+        // Test 8 -- GT first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 1, results[tableI].getRowCount());
+        final VoltTableRow rowGT0 = results[tableI].fetchRow(rowI++);
+        assertEquals( 1, rowGT0.getLong(0));
+        assertEquals( 1, rowGT0.getLong(1));
+
+        // Test 9 -- LTE first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 3, results[tableI].getRowCount());
+        // after adding reserve scan, JNI and HSQL will report
+        // tuples in different order
+        // so, add them to a set and ignore the order instead
+        final VoltTableRow rowLTE0 = results[tableI].fetchRow(rowI++);
+        final VoltTableRow rowLTE1 = results[tableI].fetchRow(rowI++);
+        final VoltTableRow rowLTE2 = results[tableI].fetchRow(rowI++);
+        HashSet<Long> TID = new HashSet<Long>();
+
+        HashSet<Long> BID = new HashSet<Long>();
+        HashSet<Long> expectedTID = new HashSet<Long>();
+        HashSet<Long> expectedBID = new HashSet<Long>();
+
+        expectedTID.add(-1L);
+        expectedTID.add(0L);
+        expectedTID.add(0L);
+
+        expectedBID.add(0L);
+        expectedBID.add(0L);
+        expectedBID.add(1L);
+
+        TID.add(rowLTE0.getLong(0));
+        TID.add(rowLTE1.getLong(0));
+        TID.add(rowLTE2.getLong(0));
+        BID.add(rowLTE0.getLong(1));
+        BID.add(rowLTE1.getLong(1));
+        BID.add(rowLTE2.getLong(1));
+
+        assertTrue(TID.equals(expectedTID));
+        assertTrue(BID.equals(expectedBID));
+
+        // Test 10 -- LT first component of compound key
+        tableI++;
+        rowI = 0;
+        assertEquals( 1, results[tableI].getRowCount());
+        final VoltTableRow rowLT0 = results[tableI].fetchRow(rowI++);
+        assertEquals( -1, rowLT0.getLong(0));
+        assertEquals( 0, rowLT0.getLong(1));
+
+
+        truncateTables(new String[]{"BINGO_BOARD"});
     }
 
     private static void compareTable(VoltTable vt, Object [][] expected) {
@@ -724,7 +832,89 @@ public class TestIndexesSuite extends RegressionSuite {
 
     }
 
-    public void testTicket195()
+    public void testRegressEdgeCases() throws IOException, ProcCallException, InterruptedException {
+        subTestParameterizedLimitOnIndexScan();
+        subTestPushDownAggregateWithLimit();
+
+        subTestNaNInIndexes();
+        subTestTicket195();
+
+        subTestUpdateRange();
+
+        subTestKeyCastingOverflow();
+    }
+
+    private void subTestParameterizedLimitOnIndexScan()
+            throws IOException, ProcCallException {
+        String[] tables = {"P1", "R1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+
+            VoltTable[] results = client.callProcedure("Eng397LimitIndex" + table, new Integer(2)).getResults();
+            assertEquals(2, results[0].getRowCount());
+        }
+
+        truncateTables(tables);
+    }
+
+    private void subTestPushDownAggregateWithLimit() throws IOException, ProcCallException {
+        String[] tables = {"R1", "P1", "P2", "R2"};
+        Client client = getClient();
+        for (String table : tables)
+        {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            client.callProcedure("Insert", table, 9, "h", 300, 8, 19.5);
+
+            String sql = String.format("select T.ID, MIN(T.ID) from %s T group by T.ID order by T.ID limit 4",
+                    table);
+            VoltTable results = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.out.println(results);
+        }
+
+        truncateTables(tables);
+    }
+
+    private void subTestNaNInIndexes() throws IOException, ProcCallException {
+        // current hsql seems to fail on null handling
+        if (isHSQL()) return;
+
+        Client client = getClient();
+
+        int i = 0;
+        for (int j = 0; j < 20; j++) {
+            client.callProcedure("R1IX.insert", i++, "a", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "b", 100 * i, 16.5);
+            client.callProcedure("R1IX.insert", i++, "c", 100 * i, 119.5);
+            client.callProcedure("R1IX.insert", i++, "d", 100 * i, 9.5);
+            client.callProcedure("R1IX.insert", i++, "e", 100 * i, 1.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "f", 100 * i, -14.5);
+            client.callProcedure("R1IX.insert", i++, "g", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "h", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "i", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "j", 100 * i, 1.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "k", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "l", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "m", 100 * i, 11.5);
+            client.callProcedure("R1IX.insert", i++, "n", 100 * i, 10.5);
+        }
+
+        VoltTable results = client.callProcedure("@AdHoc", "delete from R1IX;").getResults()[0];
+        System.out.println(results);
+    }
+
+    private void subTestTicket195()
     throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
@@ -744,149 +934,7 @@ public class TestIndexesSuite extends RegressionSuite {
         }
     }
 
-    //
-    // Multimap multi column
-    // @throws IOException
-    // @throws ProcCallException
-    //
-    public void testOrderedMultiMultiColumnIntIndex()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P3", "R3"};
-        Client client = getClient();
-        for (String table : tables)
-        {
-            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
-            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
-            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
-            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
-            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
-            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            String query = String.format("select * from %s T where T.NUM > 100 AND T.NUM2 > 1",
-                                         table);
-            VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
-        }
-    }
 
-    public void testOrderedMultiMultiIntGTEFailure()
-    throws IOException, ProcCallException
-    {
-        final Client client = getClient();
-        final VoltTable results[] = client.callProcedure("CheckMultiMultiIntGTEFailure").getResults();
-        if (results == null) {
-            fail();
-        }
-        //
-        // Must pass 10 tests
-        //
-        assertEquals(10, results.length);
-
-        // Start off easy, with COUNT(*)s
-        // Actually, these exercise a different (counted index) code path which has experienced its own regressions.
-        // Test 1 -- count EQ first component of compound key
-        int tableI = 0;
-        final VoltTableRow countEQ = results[tableI].fetchRow(0);
-        assertEquals( 2, countEQ.getLong(0));
-
-        // Test 2 -- count GTE first component of compound key
-        tableI++;
-        final VoltTableRow countGT = results[tableI].fetchRow(0);
-        assertEquals( 3, countGT.getLong(0));
-
-        // Test 3 -- count GT first component of compound key
-        tableI++;
-        final VoltTableRow countGTE = results[tableI].fetchRow(0);
-        assertEquals( 1, countGTE.getLong(0));
-
-        // Test 4 -- count LTE first component of compound key
-        tableI++;
-        final VoltTableRow countLTE = results[tableI].fetchRow(0);
-        assertEquals( 3, countLTE.getLong(0));
-
-        // Test 5 -- count LT first component of compound key
-        tableI++;
-        final VoltTableRow countLT = results[tableI].fetchRow(0);
-        assertEquals( 1, countLT.getLong(0));
-
-        // Test 6 -- EQ first component of compound key
-        tableI++;
-        int rowI = 0;
-        assertEquals( 2, results[tableI].getRowCount());
-        final VoltTableRow rowEQ0 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowEQ0.getLong(0));
-        assertEquals( 0, rowEQ0.getLong(1));
-
-        final VoltTableRow rowEQ1 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowEQ1.getLong(0));
-        assertEquals( 1, rowEQ1.getLong(1));
-
-        // Test 7 -- GTE first component of compound key
-        tableI++;
-        rowI = 0;
-        assertEquals( 3, results[tableI].getRowCount());
-        final VoltTableRow rowGTE0 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowGTE0.getLong(0));
-        assertEquals( 0, rowGTE0.getLong(1));
-
-        final VoltTableRow rowGTE1 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowGTE1.getLong(0));
-        assertEquals( 1, rowGTE1.getLong(1));
-
-        final VoltTableRow rowGTE2 = results[tableI].fetchRow(rowI++);
-        assertEquals( 1, rowGTE2.getLong(0));
-        assertEquals( 1, rowGTE2.getLong(1));
-
-        // Test 8 -- GT first component of compound key
-        tableI++;
-        rowI = 0;
-        assertEquals( 1, results[tableI].getRowCount());
-        final VoltTableRow rowGT0 = results[tableI].fetchRow(rowI++);
-        assertEquals( 1, rowGT0.getLong(0));
-        assertEquals( 1, rowGT0.getLong(1));
-
-        // Test 9 -- LTE first component of compound key
-        tableI++;
-        rowI = 0;
-        assertEquals( 3, results[tableI].getRowCount());
-        // after adding reserve scan, JNI and HSQL will report
-        // tuples in different order
-        // so, add them to a set and ignore the order instead
-        final VoltTableRow rowLTE0 = results[tableI].fetchRow(rowI++);
-        final VoltTableRow rowLTE1 = results[tableI].fetchRow(rowI++);
-        final VoltTableRow rowLTE2 = results[tableI].fetchRow(rowI++);
-        HashSet<Long> TID = new HashSet<Long>();
-
-        HashSet<Long> BID = new HashSet<Long>();
-        HashSet<Long> expectedTID = new HashSet<Long>();
-        HashSet<Long> expectedBID = new HashSet<Long>();
-
-        expectedTID.add(-1L);
-        expectedTID.add(0L);
-        expectedTID.add(0L);
-
-        expectedBID.add(0L);
-        expectedBID.add(0L);
-        expectedBID.add(1L);
-
-        TID.add(rowLTE0.getLong(0));
-        TID.add(rowLTE1.getLong(0));
-        TID.add(rowLTE2.getLong(0));
-        BID.add(rowLTE0.getLong(1));
-        BID.add(rowLTE1.getLong(1));
-        BID.add(rowLTE2.getLong(1));
-
-        assertTrue(TID.equals(expectedTID));
-        assertTrue(BID.equals(expectedBID));
-
-        // Test 10 -- LT first component of compound key
-        tableI++;
-        rowI = 0;
-        assertEquals( 1, results[tableI].getRowCount());
-        final VoltTableRow rowLT0 = results[tableI].fetchRow(rowI++);
-        assertEquals( -1, rowLT0.getLong(0));
-        assertEquals( 0, rowLT0.getLong(1));
-}
 
     void callHelper(Client client, String procname, Object ...objects )
     throws InterruptedException, IOException
@@ -902,7 +950,7 @@ public class TestIndexesSuite extends RegressionSuite {
     }
 
     // Testing ENG-506 but this probably isn't enough to trust...
-    public void testUpdateRange() throws IOException, ProcCallException, InterruptedException {
+    private void subTestUpdateRange() throws IOException, ProcCallException, InterruptedException {
         final Client client = getClient();
         VoltTable[] results;
 
@@ -1133,7 +1181,7 @@ public class TestIndexesSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc", "delete from R1IX").getResults();
     }
 
-    public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
+    private void subTestKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
 
         ClientResponseImpl cr =
@@ -1150,6 +1198,56 @@ public class TestIndexesSuite extends RegressionSuite {
                     + " java.lang.Long is not a match or is out of range for the target parameter type: int"));
         }
     }
+
+    public void testVarbinaryIndex() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        String sql, explainPlanStr;
+
+        client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (1, 'ABCD', '0A0BCD');");
+        client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (2, 'ABEF', '0A0BEF');");
+
+        //
+        // inline varbinary
+        //
+
+        // exactly match
+        sql = "select blob2 from blobTableTree where blob2 = x'ABCD'";
+        explainPlanStr = "INDEX SCAN of \"BLOBTABLETREE\" using \"BLOBTABLETREE_INDEX_BLOB2\"";
+        checkQueryPlan(client, sql, explainPlanStr);
+        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD"});
+
+        // no match
+        sql = "select blob2 from blobTableTree where blob2 = x'0101'";
+        checkQueryPlan(client, sql, explainPlanStr);
+        validateTableColumnOfScalarVarbinary(client, sql, new String[]{});
+
+        // greater than
+        sql = "select blob2 from blobTableTree where blob2 > x'0101' order by blob2";
+        checkQueryPlan(client, sql, explainPlanStr);
+        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
+
+
+        //
+        // not inline varbinary
+        //
+
+        // exactly match
+        sql = "select blob512 from blobTableTree where blob512 = x'0A0BCD'";
+        explainPlanStr = "INDEX SCAN of \"BLOBTABLETREE\" using \"BLOBTABLETREE_INDEX_BLOB512\"";
+        checkQueryPlan(client, sql, explainPlanStr);
+        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD"});
+
+        // no match
+        sql = "select blob512 from blobTableTree where blob512 = x'0A0B00'";
+        checkQueryPlan(client, sql, explainPlanStr);
+        validateTableColumnOfScalarVarbinary(client, sql, new String[]{});
+
+        // greater than
+        sql = "select blob512 from blobTableTree where blob512 > x'0A0B00' order by blob512";
+        checkQueryPlan(client, sql, explainPlanStr);
+        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD", "0A0BEF"});
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate

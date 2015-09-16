@@ -834,7 +834,8 @@ public class RegressionSuite extends TestCase {
         assertTrue(found);
     }
 
-    static protected void checkQueryPlan(Client client, String query, String...patterns) throws Exception {
+    static protected void checkQueryPlan(Client client, String query, String...patterns)
+            throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt;
         assert(patterns.length >= 1);
 
@@ -842,7 +843,10 @@ public class RegressionSuite extends TestCase {
         String vtStr = vt.toString();
 
         for (String pattern : patterns) {
-            assertTrue(vtStr.contains(pattern));
+            if (! vtStr.contains(pattern)) {
+                System.err.println(vtStr);
+                fail("The above explain plan is expected to contain pattern: " + pattern);
+            }
         }
     }
 
