@@ -35,9 +35,6 @@ create table cellid_region_map (
 create index ccm_cellid_idx on cellid_region_map(cellid);
 create index ccm_regionid_idx on cellid_region_map(regionid);
 
--- Upsert a new taxi in the taxi table.
--- We want to be able to update its location.
--- create procedure from class iwdemo.UpsertTaxi;
 -- Insert a new city in the city table.
 -- Cities are constant.
 create procedure from class iwdemo.InsertCity;
