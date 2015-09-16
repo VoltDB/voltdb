@@ -1107,7 +1107,6 @@ a.setVal {
     }
 
 
-
 table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
@@ -1129,12 +1128,10 @@ table.serversTbl tr td.pauseActiveMonitoring {
 
 table.serversTbl tr td.active{
     background-position: 5px 17px;
-
 }
 
 table.serversListTbl tr td.active {
     background-position: 5px 20px;
-
 }
 
 table.serversTbl tr td.pauseMonitoring {

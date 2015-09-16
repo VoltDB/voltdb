@@ -46,7 +46,7 @@ public:
     inline CompactingSet(const CompactingSet<Key, Compare> &other) : m_map(other.m_map) {}
 
     inline bool exists(const Key &key) const { return !m_map.find(key).isEnd(); }
-    inline bool insert(const Key &key) { return m_map.insert(key, Data()); }
+    inline bool insert(const Key &key) { return (m_map.insert(key, Data()) == NULL); }
     bool erase(const Key &key) { return m_map.erase(key); }
 
     inline bool empty() const { return m_map.empty(); }
