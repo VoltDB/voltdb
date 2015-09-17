@@ -49,6 +49,7 @@ HOST="localhost"
 
 # wait for backgrounded server to start up
 function wait_for_startup() {
+    TIMEOUT="$1"
     until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
     do
         sleep 2
@@ -76,7 +77,7 @@ fi
 rm -f *.jar
 rm -f procedures/iwdemo/*.class
 rm -f client/iwdemo/*.class
-rm -f s2-src/com/google/common/geometry/*.class
+rm -f s2-src/com/google_voltpatches/common/geometry/*.class
 
 echo
 echo
@@ -104,8 +105,7 @@ if (($? != 0)); then
 fi
 
 echo "****** Compiling Client ******"
-echo "CLASSPATH=$CLIENTCLASSPATH"
-javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/iwdemo/*.java
+set -x; javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH:s2-src client/iwdemo/*.java
 if (($? != 0)); then
     echo "Error compiling client"
     exit 1
@@ -123,6 +123,7 @@ echo
 
 
 voltdb create &
+# read -p "Attach Debugger" startup
 wait_for_startup
 
 sqlcmd < taxi_ddl.sql
@@ -137,5 +138,5 @@ echo
 
 export CLASSPATH=${CLASSPATH}:${PWD}/client.jar
 
-java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+java -classpath $CLIENTCLASSPATH:s2-src -Dlog4j.configuration=file://$LOG4J \
      iwdemo.Benchmark
