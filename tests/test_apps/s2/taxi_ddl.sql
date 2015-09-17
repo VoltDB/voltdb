@@ -5,11 +5,13 @@ file -inlinebatch EOB
 
 create table taxis (
     id              bigint not null primary key,
-    location        point not null,
+    lat             float not null,
+    lng             float not null,
     cellid          bigint not null
 );
 
 create index taxis_cellid_idx on taxis(cellid);
+partition table taxis on column id;
 
 create table cities (
     id              bigint not null primary key,
@@ -58,16 +60,16 @@ create table cellid_region_map (
 create index ccm_cellid_idx on cellid_region_map(cellid);
 create index ccm_regionid_idx on cellid_region_map(regionid);
 
--- Upsert a new taxi in the taxi table.
--- We want to be able to update its location.
--- This has to be a shared procedure and not built
--- in because w need to calculate the cell id.
--- create procedure from class iwdemo.UpsertTaxi;
 -- Insert a new city in the city table.
--- Cities are constant, so this is an Insert and
--- not an Upsert.  This has to be a shared
--- procedure because we want to make a cellid. 
+-- Cities are constant.
 create procedure from class iwdemo.InsertCity;
+create procedure
+  partition on table taxis column id parameter 0
+  from class iwdemo.TaxisPerCity;
+
+create procedure selectTaxiLocations as
+  select lat, lng from taxis order by id;
+
 -- Insert a new region in the region table
 -- Regions are constant.  We want to make a
 -- tesselation, so this has to be a region.

@@ -54,6 +54,9 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.supercsv.cellprocessor.ParseDouble;
 import org.supercsv.cellprocessor.ParseInt;
@@ -94,6 +97,9 @@ public class Benchmark {
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
+
+    // For periodic actions
+    final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -342,10 +348,19 @@ public class Benchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
-        insertTaxis();
         insertStates();
         insertCounties();
         insertCities();
+        setUpTaxis();
+
+        // Show reports every second.
+        scheduler.scheduleWithFixedDelay(new Reporter(client), 0, 1, TimeUnit.SECONDS);
+
+        // sleep for configured time
+        // Periodic activity registered with the scheduler will happen during this time.
+        Thread.sleep(config.duration * 1000);
+
+        scheduler.shutdown();
         client.close();
     }
 
@@ -719,6 +734,7 @@ public class Benchmark {
         }
     }
     private void insertCities() {
+        System.out.printf("Inserting cities...\n");
         CsvBeanReader beanReader = null;
         long id = 0;
         try {
@@ -754,7 +770,14 @@ public class Benchmark {
         System.out.printf("Inserted %d cities\n", id);
     }
 
-    private void insertTaxis() {
+    private void setUpTaxis() {
+        TaxiManager tm = new TaxiManager(client);
+
+        // Create the initial locations of all the taxis
+        tm.createTaxis();
+
+        // Update the location of taxis periodically
+        scheduler.scheduleWithFixedDelay(tm, TaxiManager.getUpdateInterval(), TaxiManager.getUpdateInterval(), TimeUnit.MILLISECONDS);
     }
 
     /**

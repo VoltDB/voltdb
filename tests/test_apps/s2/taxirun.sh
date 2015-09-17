@@ -49,7 +49,6 @@ HOST="localhost"
 
 # wait for backgrounded server to start up
 function wait_for_startup() {
-    TIMEOUT="$1"
     until echo "exec @SystemInformation, OVERVIEW;" | sqlcmd > /dev/null 2>&1
     do
         sleep 2
@@ -77,8 +76,8 @@ fi
 rm -f *.jar
 rm -f procedures/iwdemo/*.class
 rm -f client/iwdemo/*.class
+rm -f s2-src/com/google/common/geometry/*.class
 rm -f s2-src/com/google_voltpatches/common/geometry/*.class
-
 echo
 echo
 echo
@@ -122,8 +121,7 @@ echo
 echo
 
 
-voltdb create &
-# read -p "Attach Debugger" startup
+voltdb create -d ./deployment.xml &
 wait_for_startup
 
 sqlcmd < taxi_ddl.sql
@@ -135,8 +133,6 @@ fi
 echo
 echo
 echo
-
-export CLASSPATH=${CLASSPATH}:${PWD}/client.jar
 
 java -classpath $CLIENTCLASSPATH:s2-src -Dlog4j.configuration=file://$LOG4J \
      iwdemo.Benchmark
