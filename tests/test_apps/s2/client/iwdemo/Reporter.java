@@ -18,7 +18,7 @@ public class Reporter implements Runnable {
 
     @Override
     public void run() {
-        double rangeInKm = 1.0;
+        double rangeInKm = 10.0;
         Map<String, Long> taxisPerCityAllPtns = new HashMap<>();
 
         try {

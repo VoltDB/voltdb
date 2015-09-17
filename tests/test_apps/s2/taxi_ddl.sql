@@ -43,6 +43,9 @@ create procedure
   partition on table taxis column id parameter 0
   from class iwdemo.TaxisPerCity;
 
+create procedure selectTaxiLocations as
+  select location from taxis order by id;
+
 -- Insert a new region in the region table
 -- Regions are constant.
 -- create procedure from class iwdemo.InsertRegion;

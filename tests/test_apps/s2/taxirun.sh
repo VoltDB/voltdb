@@ -123,7 +123,7 @@ echo
 echo
 
 
-voltdb create &
+voltdb create -d ./deployment.xml &
 wait_for_startup
 
 sqlcmd < taxi_ddl.sql

@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script language="javascript" type="text/javascript" src="js/jquery-1.10.2.min.js"></script>
+    <script language="javascript" type="text/javascript" src="js/voltdb.js"></script>
+    <script>
+
+var con;
+
+function checkConnection() {
+    console.log("Trying to connect to DB...");
+    VoltDB.TestConnection(location.hostname, 8080, false, null, null, false,
+                          function(connected){
+                              if (connected) {
+                                  $('#loadingModal').modal('hide');
+                                  console.log("Success!");
+                                  connectToDatabase();
+                              } else {
+                                  checkConnection();
+                              }
+                          });
+}
+
+function connectToDatabase() {
+
+            con = VoltDB.AddConnection(location.hostname, 8080, false, null, null, false, (function(connection, success)
+            {
+                console.log("Connection added.");
+                getTaxiLocations();
+            }));
+        }
+
+
+var map;
+var markers;
+
+function getTaxiLocations() {
+    con.CallExecute('selectTaxiLocations', [], function(response)
+    {
+        try
+        {
+            var contentString = "recieved info on " + response + " taxis from database.";
+
+            console.log(contentString);
+
+            // var infoWindow = new google.maps.InfoWindow({
+            //     content: contentString,
+            //     position: {lat: 40.417193, lng: -95.445279},
+            // });
+            // infoWindow.open(map);
+        }
+        catch(x) {
+            console.log(x);
+        }
+    });
+}
+
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 40.417193, lng: -95.445279},
+    zoom: 5
+  });
+
+    $('#loadingModal').modal('show');
+    checkConnection();
+}
+
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?callback=initMap"
+        async defer></script>
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" role="dialog"
+         aria-labelledby="myModalLabel" aria-hidden="true"
+         data-backdrop="static"
+         data-keyboard="false">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body center-block">
+            <h4 class="modal-title" id="myModalLabel">Starting database, this may take 30 seconds...</h4>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/bootstrap.min.js"></script>
+  </body>
+</html>
