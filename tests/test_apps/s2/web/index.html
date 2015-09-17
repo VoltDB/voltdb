@@ -51,12 +51,34 @@ function connectToDatabase() {
 var map;
 var markers = [];
 
-function getTaxiInfoWindow(taxiId, lat, lng) {
-    // This will be populate by a DB stored procedure
-    // result.
-    var content = 'Taxi #' + taxiId + '<br/>Latitude: ' + lat + '<br/>Longitude: ' + lng;
-    return new google.maps.InfoWindow({
-        content: content
+function getTaxiInfoWindow(taxiId) {
+    con.CallExecute('GetTaxiInfo', [taxiId], function(response) {
+        var nearbyTaxis = response.results[0].data;
+        var nearbyCities = response.results[1].data;
+
+        var lat = markers[taxiId].getPosition().lat();
+        var lng = markers[taxiId].getPosition().lng();
+        var windowContent = "<h2>Taxi #" + taxiId + "</h2>\n";
+        windowContent += "<p>Lat/long: " + lat + ", " + lng + "</p>\n";
+
+        windowContent += '<p>Other taxis within 5 miles:</p>\n';
+        windowContent += '<ul>\n';
+        for (var i = 0; i < nearbyTaxis.length; ++i) {
+            windowContent += '<li>Taxi #' + nearbyTaxis[i] + '</li>\n';
+        }
+        windowContent += '</ul>\n';
+
+        windowContent += '<p>Places within 5 miles:</p>\n';
+        windowContent += '<ul>\n';
+        for (var i = 0; i < nearbyCities.length; ++i) {
+            windowContent += '<li>' + nearbyCities[i] + '</li>\n';
+        }
+        windowContent += '</ul>\n';
+
+        var infoWindow = new google.maps.InfoWindow({
+            content: windowContent
+        });
+        infoWindow.open(map, markers[taxiId]);
     });
 }
 
@@ -72,31 +94,27 @@ function getTaxiLocations() {
                     markers.push(new google.maps.Marker({
                         position: latLng,
                         map: map,
-                        title: 'Taxi# ' + i,
+                        title: 'Taxi #' + i,
                         zIndex: i
                     }));
-                    markers[i].addListener('click',
-                                     (function() {
-                                         var lat = latLng.lat;
-                                         var lng = latLng.lng;
-                                         return function() {
-                                             getTaxiInfoWindow(this.zIndex, lat, lng).open(map, this);
-                                         }
-                                     } ()));
+                    markers[i].addListener('click', function() {
+                        getTaxiInfoWindow(this.zIndex);
+                    });
+                                     // (function() {
+                                     //     var lat = latLng.lat;
+                                     //     var lng = latLng.lng;
+                                     //     return function() {
+
+                                     //     }
+                                     // } ()));
                 }
                 else {
                     markers[i].setPosition(latLng);
                 }
             }
-
-            // var infoWindow = new google.maps.InfoWindow({
-            //     content: contentString,
-            //     position: {lat: 40.417193, lng: -95.445279},
-            // });
-            // infoWindow.open(map);
         }
         catch(x) {
-            console.log(x);
+            //console.log(x);
         }
     });
 }
