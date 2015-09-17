@@ -20,8 +20,8 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -100,13 +100,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
-        final Table[] tableArray;
-        if (config.tables.length == 0) {
-            tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
-        }
-        else {
-            tableArray = config.tables;
-        }
+        assert config.tables.length > 0;
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -114,13 +108,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.NATIVE,
-                    tableArray);
+                    config.tables);
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
         final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
-        for (final Table table : tableArray) {
+        for (final Table table : config.tables) {
             final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table,
@@ -143,7 +137,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     "");
         }
 
-        if (tableArray.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
+        if (config.tables.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
             SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
@@ -156,7 +150,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds,
                 remoteDCLastIds, context,
                 exportSequenceNumbers, drTupleStreamInfo, tracker, hashinatorData, timestamp,
-                newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
+                newPartitionCount, config.tables, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks);
     }
 
@@ -190,7 +184,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                         drTupleStreamInfo,
                         hashinatorData,
                         timestamp,
-                        newPartitionCount);
+                        newPartitionCount,
+                        tables);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
@@ -297,9 +292,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
             HashinatorSnapshotData hashinatorData,
-            long timestamp, int newPartitionCount) throws IOException
+            long timestamp, int newPartitionCount,
+            Table[] tables) throws IOException
     {
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
         long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
@@ -307,7 +302,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 context.getCatalogCRC(),
                 file_path,
                 file_nonce,
-                tables,
+                Arrays.asList(tables),
                 context.getHostId(),
                 exportSequenceNumbers,
                 drTupleStreamInfo,
