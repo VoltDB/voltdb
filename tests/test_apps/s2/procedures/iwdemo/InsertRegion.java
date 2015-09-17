@@ -52,7 +52,7 @@ public class InsertRegion extends VoltProcedure {
         varboundary = new byte[0];
         voltQueueSQL(insStmt, id, containerid, componentNumber, kind, varboundary);
         for (S2CellId cellid : covering) {
-            voltQueueSQL(insMapStmt, id, cellid.id());
+            voltQueueSQL(insMapStmt, cellid.id(), id);
         }
         VoltTable vt = voltExecuteSQL(true)[0];
         vt.advanceRow();
