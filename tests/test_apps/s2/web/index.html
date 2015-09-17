@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Simple Map</title>
+    <title>Innovation Week Sept 2015</title>
     <meta name="viewport" content="initial-scale=1.0">
     <meta charset="utf-8">
     <style>
@@ -51,6 +51,15 @@ function connectToDatabase() {
 var map;
 var markers = [];
 
+function getTaxiInfoWindow(taxiId) {
+    // This will be populate by a DB stored procedure
+    // result.
+    var content = 'Taxi #' + taxiId;
+    return new google.maps.InfoWindow({
+        content: content
+    });
+}
+
 function getTaxiLocations() {
     con.CallExecute('selectTaxiLocations', [], function(response)
     {
@@ -66,6 +75,9 @@ function getTaxiLocations() {
                         title: 'Taxi# ' + i,
                         zIndex: i
                     }));
+                    markers[i].addListener('click', function() {
+                        getTaxiInfoWindow(this.zIndex).open(map, this);
+                    });
                 }
                 else {
                     markers[i].setPosition(latLng);
