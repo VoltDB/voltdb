@@ -42,7 +42,6 @@ CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
     \ls -1 "$VOLTDB_LIB"/super-csv-2.1.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=${CLIENTCLASSPATH}:s2-src
 echo "CLIENTCLASSPATH:$CLIENTCLASSPATH"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -78,7 +77,7 @@ rm -f *.jar
 rm -f procedures/iwdemo/*.class
 rm -f client/iwdemo/*.class
 rm -f s2-src/com/google/common/geometry/*.class
-
+rm -f s2-src/com/google_voltpatches/common/geometry/*.class
 echo
 echo
 echo
@@ -105,8 +104,7 @@ if (($? != 0)); then
 fi
 
 echo "****** Compiling Client ******"
-echo "CLASSPATH=$CLIENTCLASSPATH"
-javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/iwdemo/*.java
+set -x; javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH:s2-src client/iwdemo/*.java
 if (($? != 0)); then
     echo "Error compiling client"
     exit 1
@@ -136,5 +134,5 @@ echo
 echo
 echo
 
-java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+java -classpath $CLIENTCLASSPATH:s2-src -Dlog4j.configuration=file://$LOG4J \
      iwdemo.Benchmark

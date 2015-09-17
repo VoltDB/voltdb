@@ -45,10 +45,12 @@ package iwdemo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -74,6 +76,8 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+
+import com.google_voltpatches.common.geometry.S2LatLng;
 
 public class Benchmark {
 
@@ -344,10 +348,9 @@ public class Benchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
-
+        insertStates();
+        insertCounties();
         insertCities();
-        // insertStates();
-        // insertCounties();
         setUpTaxis();
 
         // Show reports every second.
@@ -367,90 +370,22 @@ public class Benchmark {
                 new ParseInt(), // STATEFP;
                 new ParseInt(), // COUNTYFP;
                 new ParseInt(), // COUNTYNS;
-                new ParseInt(), // AFFGEOID;
-                new ParseInt(), // GEOID;
+                new NotNull(), // AFFGEOID;
+                new NotNull(), // GEOID;
                 new NotNull(), //  NAME;
-                new ParseInt(), // LSAD;
-                new ParseInt(), // ALAND;
-                new ParseInt() // AWATER;
+                new NotNull(), // LSAD;
+                new NotNull(), // ALAND;
+                new NotNull() // AWATER;
         };
         return processors;
     }
 
-    @SuppressWarnings("unused")
-    public class CountyAttributeBean {
-        private String SHAPEID;
-        private Integer STATEFP;
-        private Integer COUNTYFP;
-        private Integer COUNTYNS;
-        private Integer AFFGEOID;
-        private Integer GEOID;
-        private String  NAME;
-        private Integer LSAD;
-        private Integer ALAND;
-        private Integer AWATER;
-        public final String getSHAPEID() {
-            return SHAPEID;
-        }
-        public final void setSHAPEID(String sHAPEID) {
-            SHAPEID = sHAPEID;
-        }
-        public final Integer getSTATEFP() {
-            return STATEFP;
-        }
-        public final void setSTATEFP(Integer sTATEFP) {
-            STATEFP = sTATEFP;
-        }
-        public final Integer getCOUNTYFP() {
-            return COUNTYFP;
-        }
-        public final void setCOUNTYFP(Integer cOUNTYFP) {
-            COUNTYFP = cOUNTYFP;
-        }
-        public final Integer getCOUNTYNS() {
-            return COUNTYNS;
-        }
-        public final void setCOUNTYNS(Integer cOUNTYNS) {
-            COUNTYNS = cOUNTYNS;
-        }
-        public final Integer getAFFGEOID() {
-            return AFFGEOID;
-        }
-        public final void setAFFGEOID(Integer aFFGEOID) {
-            AFFGEOID = aFFGEOID;
-        }
-        public final Integer getGEOID() {
-            return GEOID;
-        }
-        public final void setGEOID(Integer gEOID) {
-            GEOID = gEOID;
-        }
-        public final String getNAME() {
-            return NAME;
-        }
-        public final void setNAME(String nAME) {
-            NAME = nAME;
-        }
-        public final Integer getLSAD() {
-            return LSAD;
-        }
-        public final void setLSAD(Integer lSAD) {
-            LSAD = lSAD;
-        }
-        public final Integer getALAND() {
-            return ALAND;
-        }
-        public final void setALAND(Integer aLAND) {
-            ALAND = aLAND;
-        }
-        public final Integer getAWATER() {
-            return AWATER;
-        }
-        public final void setAWATER(Integer aWATER) {
-            AWATER = aWATER;
-        }
-    }
-    private static CellProcessor[] getCountyBoundaryProcessors() {
+    /**
+     * The boundary processors are the same for states and counties.
+     *
+     * @return
+     */
+    private static CellProcessor[] getBoundaryProcessors() {
         final CellProcessor[] processors = new CellProcessor[] {
             new NotNull(), // SHAPEID;
             new ParseDouble(), // X
@@ -459,52 +394,101 @@ public class Benchmark {
         return processors;
     }
 
-    @SuppressWarnings("unused")
-    public class CountyBoundaryBean {
-        private String SHAPEID;
-        private Double X;
-        private Double Y;
-        public final String getSHAPEID() {
-            return SHAPEID;
+    private static class CountyData {
+        /*
+         * Map from shapeid strings into countyid.  A countyid is the
+         * concatenation of a state fip and a county fip id.
+         */
+        Map<String, Long>     shapeidMap = new HashMap<String, Long>();
+        /*
+         * Map from a countyid to an attribute bean.
+         * Return true if we have already seen this countyid.
+         */
+        Map<Long, CountyAttributeBean>       idMap = new HashMap<Long, CountyAttributeBean>();
+        public boolean addCounty(CountyAttributeBean bean) {
+            boolean newBean = false;
+            Long oldcid = shapeidMap.get(bean.getSHAPEID());
+            CountyAttributeBean oldBean = idMap.get(bean.getCOUNTYID());
+            if (oldcid == null) {
+                shapeidMap.put(bean.getSHAPEID(), bean.getCOUNTYID());
+            }
+            if (oldBean == null) {
+                idMap.put(bean.getCOUNTYID(), bean);
+                newBean = true;
+            }
+            if (oldcid != null) {
+                if (oldcid != bean.getCOUNTYID()) {
+                    System.out.printf("County %s (%d) has cid %d and %d\n",
+                                      oldcid, bean.getCOUNTYID());
+                }
+            }
+            return newBean;
         }
-        public final void setSHAPEID(String sHAPEID) {
-            SHAPEID = sHAPEID;
+
+        public Set<Map.Entry<Long, CountyAttributeBean>> getIDEntrySet() {
+            return idMap.entrySet();
         }
-        public final Double getX() {
-            return X;
+
+        public Long getCountyId(String shapeId) {
+            return shapeidMap.get(shapeId);
         }
-        public final void setX(Double x) {
-            X = x;
+
+        public CountyAttributeBean getByShapeID(String shapeId) {
+            Long cid = shapeidMap.get(shapeId);
+            if (cid == null) {
+                return null;
+            }
+            return idMap.get(cid);
         }
-        public final Double getY() {
-            return Y;
-        }
-        public final void setY(Double y) {
-            Y = y;
+
+        public CountyAttributeBean getByID(Long id) {
+            return idMap.get(id);
         }
     }
-    private void insertCounties() {
-        Map<String, CountyAttributeBean> cattrs = readCountyAttributes();
+
+    private void insertCounties() throws NoConnectionsException, IOException, ProcCallException {
+        CountyData cattrs = readCountyAttributes();
+        insertCountyAttributes(cattrs);
         insertCountyBoundaries(cattrs);
     }
 
-    private Map<String, CountyAttributeBean> readCountyAttributes() {
+    private void insertCountyAttributes(CountyData cattrs) throws NoConnectionsException, IOException, ProcCallException {
+        for (Map.Entry<Long, CountyAttributeBean> cabe : cattrs.getIDEntrySet()) {
+            CountyAttributeBean cab = cabe.getValue();
+            // System.out.printf("Key: %s, id: %d, name: %s\n", cabe.getKey(), cab.getCOUNTYID(), cab.getNAME());
+            ClientResponse cr = client.callProcedure("COUNTY.INSERT", cab.getCOUNTYID(), cab.getNAME(), cab.getSTATEFP().longValue());
+            if (cr.getStatus() != ClientResponse.SUCCESS) {
+                System.err.printf("Insertion into county table failed, status %d\n", cr.getStatus());
+                System.exit(100);
+            }
+        }
+    }
+
+    /**
+     * Read the county attributes.
+     * @return A map from county shapeids and shape numbers to attributes.
+     */
+    private CountyData readCountyAttributes() {
         CsvBeanReader beanReader = null;
-        Map<String, CountyAttributeBean> answer = new HashMap<String, CountyAttributeBean>();
-        long id = 0;
+        CountyData answer = new CountyData();
+        long nread = 0;
+        long ndistinct = 0;
         try {
             InputStream is = Benchmark.class.getResourceAsStream("data/counties_attributes.csv");
             beanReader = new CsvBeanReader(new InputStreamReader(is),
                                            CsvPreference.TAB_PREFERENCE);
-            final String[] header = beanReader.getHeader(true);
+            final String[] headers = beanReader.getHeader(true);
             final CellProcessor[] processors = getCountyAttributeCellProcessors();
             CountyAttributeBean county;
-            while ( (county = beanReader.read(CountyAttributeBean.class, header, processors)) != null) {
-                answer.put(county.getSHAPEID(), county);
+            while ( (county = beanReader.read(CountyAttributeBean.class, headers, processors)) != null) {
+                if (answer.addCounty(county)) {
+                    ndistinct += 1;
+                }
+                nread += 1;
             }
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
+            System.exit(100);
         } finally {
             try {
                 beanReader.close();
@@ -512,95 +496,299 @@ public class Benchmark {
                 ;
             }
         }
-        System.out.printf("Read %d county attributes\n", id);
+        System.out.printf("Read %d county attributes (%d distinct)\n", nread, ndistinct);
         return answer;
     }
 
-    private class LatLong {
-        private Double latitude;
-        private Double longitude;
-        LatLong(Double X, Double Y) {
-            latitude = X;
-            longitude = Y;
+    private byte[] convertBoundary(ArrayList<ArrayList<S2LatLng>> boundary) {
+        // Save enough space for a 4 byte integer and
+        // two doubles per coordinate.  Replicate the first
+        // and last coordinate needlessly.
+        int bytecount = 4;
+        for (ArrayList<S2LatLng> loop : boundary) {
+            bytecount += 4 + 16 * loop.size();
         }
-        public final Double getLatitude() {
-            return latitude;
+        ByteBuffer fbuf = ByteBuffer.allocate(bytecount);
+        int idx = 0;
+        fbuf.putInt(idx, boundary.size());
+        idx += 4;
+        for (List<S2LatLng> loop : boundary) {
+            fbuf.putInt(idx, loop.size());
+            idx += 4;
+            for (S2LatLng ll : loop) {
+                fbuf.putDouble(idx, ll.latDegrees());
+                fbuf.putDouble(idx + 8, ll.lngDegrees());
+                idx += 16;
+            }
         }
-        public final void setLatitude(Double latitude) {
-            this.latitude = latitude;
-        }
-        public final Double getLongitude() {
-            return longitude;
-        }
-        public final void setLongitude(Double longitude) {
-            this.longitude = longitude;
-        }
+        return fbuf.array();
     }
 
-    private byte[] makeVarBinary(List<LatLong> vertices) {
-        return null;
-    }
-    private void insertOneCountyBoundary(long id,
-                                         CountyAttributeBean cattrs,
-                                         List<LatLong>       vertices) {
+    private void insertOneCountyBoundary(long                   regionId,
+                                         int                    componentCount,
+                                         CountyAttributeBean    cattrs,
+                                         ArrayList<ArrayList<S2LatLng>>   vertices) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = null;
-        try {
-            cr = client.callProcedure("InsertRegion",
-                                                     ++id,
-                                                     cattrs.getNAME(),
-                                                     0,
-                                                     makeVarBinary(vertices));
-        } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (ProcCallException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        byte[] vertarray = convertBoundary(vertices);
+        cr = client.callProcedure("InsertRegion",
+                                  regionId,
+                                  cattrs.getCOUNTYID(),
+                                  componentCount,
+                                  0,
+                                  vertarray);
         if (cr.getStatus() != ClientResponse.SUCCESS) {
-            System.err.printf("Cannot insert county %d (county %s)\n", id, cattrs.getNAME());
+            System.err.printf("Cannot insert county boundary %d.%d (county %s)\n",
+                              regionId, cattrs.getCOUNTYID(), cattrs.getNAME());
+            System.exit(100);
         }
     }
-    private void insertCountyBoundaries(Map<String, CountyAttributeBean> cattrs) {
+    private static Integer regionId = 0;
+    private void insertCountyBoundaries(CountyData cattrs)
+            throws IOException, ProcCallException {
         CsvBeanReader beanReader = null;
-        long id = 0;
+        InputStream is = null;
+        int numBoundaries = 0;
+        int numCounties = 0;
         try {
-            InputStream is = Benchmark.class.getResourceAsStream("data/county_geometry.csv");
+            is = Benchmark.class.getResourceAsStream("data/counties_geometry.csv");
             beanReader = new CsvBeanReader(new InputStreamReader(is),
                                            CsvPreference.TAB_PREFERENCE);
             final String[] header = beanReader.getHeader(true);
-            final CellProcessor[] processors = getCityProcessors();
-            CountyBoundaryBean county;
-            String lastShapeId = "";
-            List<LatLong> currentPolygon = null;
-            while ( (county = beanReader.read(CountyBoundaryBean.class, header, processors)) != null) {
-                if (false == county.getSHAPEID().equals(lastShapeId)) {
-                    if (currentPolygon != null) {
-                        insertOneCountyBoundary(++id, cattrs.get(lastShapeId), currentPolygon);
+            final CellProcessor[] processors = getBoundaryProcessors();
+            BoundaryBean countyBoundary;
+            String lastShapeId = null;
+            ArrayList<S2LatLng> currentLoop = null;
+            ArrayList<ArrayList<S2LatLng>> currentPolygon = null;
+            Long currentCountyId = -1L;
+            int componentCount = 0;
+            while ( (countyBoundary = beanReader.read(BoundaryBean.class, header, processors)) != null) {
+                if (lastShapeId == null) {
+                    // First boundary.  Initialize everything.
+                    currentPolygon = new ArrayList<ArrayList<S2LatLng>>();
+                    currentLoop = new ArrayList<S2LatLng>();
+                    lastShapeId = countyBoundary.getSHAPEID();
+                    currentCountyId = cattrs.getCountyId(countyBoundary.getSHAPEID());
+                    componentCount = 0;
+                } else if (false == countyBoundary.getSHAPEID().equals(lastShapeId)) {
+                    // New shapeid.
+                    //   Add the current loop.
+                    //   If it's a new county, then write the current boundary.
+                    //   Initialize for the next loop.
+                    currentPolygon.add(currentLoop);
+                    // Is this a new county?
+                    // Hope the counties are all in order in the
+                    // csv file!!
+                    if (currentCountyId != cattrs.getCountyId(countyBoundary.getSHAPEID())) {
+                        insertOneCountyBoundary(++regionId, componentCount,
+                                                cattrs.getByShapeID(lastShapeId),
+                                                currentPolygon);
+                        numCounties += 1;
+                        currentPolygon = new ArrayList<ArrayList<S2LatLng>>();
                     }
-                    currentPolygon = new ArrayList<LatLong>();
-                    lastShapeId = county.getSHAPEID();
+                    componentCount += 1;
+                    numBoundaries += 1;
+                    currentLoop = new ArrayList<S2LatLng>();
+                    lastShapeId = countyBoundary.getSHAPEID();
+               }
+                currentLoop.add(S2LatLng.fromDegrees(countyBoundary.getX(), countyBoundary.getY()));
+            }
+            if (currentLoop.size() > 0) {
+                currentPolygon.add(currentLoop);
+            }
+            if (currentPolygon.size() > 0) {
+                insertOneCountyBoundary(++regionId, componentCount,
+                                        cattrs.getByShapeID(lastShapeId),
+                                        currentPolygon);
+                numBoundaries += 1;
+            }
+        } finally {
+            try {
+                if (beanReader != null) {
+                    beanReader.close();
                 }
-                currentPolygon.add(new LatLong(county.getX(), county.getY()));
+            } catch (IOException e) {
+                ;
+            }
+            try {
+                if (is != null) {
+                    is.close();
+                }
+            } catch (IOException e) {
+                ;
+            }
+        }
+        System.out.printf("Inserted %d counties, %d county boundaries.\n",
+                          numCounties,
+                          numBoundaries);
+    }
+    private void insertStates() throws NoConnectionsException, IOException, ProcCallException {
+        StateData sattrs = readStateAttributes();
+        insertStateAttributes(sattrs);
+        insertStateBoundaries(sattrs);
+    }
+
+    private static CellProcessor[] getStateAttributeCellProcessors() {
+        final CellProcessor[] processors = new CellProcessor[] {
+                new NotNull(),
+                new ParseInt(),
+                new NotNull(),
+                new NotNull(),
+                new NotNull(),
+                new NotNull(),
+                new NotNull(),
+                new NotNull(),
+                new NotNull(),
+                new NotNull()
+        };
+        return processors;
+    }
+
+    private StateData readStateAttributes() {
+        CsvBeanReader beanReader = null;
+        StateData answer = new StateData();
+        long nread = 0;
+        long ndistinct = 0;
+        try {
+            InputStream is = Benchmark.class.getResourceAsStream("data/states_attributes.csv");
+            beanReader = new CsvBeanReader(new InputStreamReader(is),
+                                           CsvPreference.TAB_PREFERENCE);
+            final String[] headers = beanReader.getHeader(true);
+            final CellProcessor[] processors = getStateAttributeCellProcessors();
+            StateAttributeBean state;
+            while ( (state = beanReader.read(StateAttributeBean.class, headers, processors)) != null) {
+                if (answer.addState(state)) {
+                    ndistinct += 1;
+                }
+                nread += 1;
             }
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
-        }  finally {
+            System.exit(100);
+        } finally {
             try {
                 beanReader.close();
             } catch (IOException e) {
                 ;
             }
         }
-        System.out.printf("Inserted %d county boundaries.\n", id);
-    }
-    private void insertStates() {
-        // TODO Auto-generated method stub
+        System.out.printf("Read %d county attributes (%d distinct)\n", nread, ndistinct);
+        return answer;
 
+    }
+
+    private void insertStateAttributes(StateData sattrs) throws NoConnectionsException, IOException, ProcCallException {
+        for (Map.Entry<Long, StateAttributeBean> sabe : sattrs.getIDEntrySet()) {
+            StateAttributeBean sab = sabe.getValue();
+            // System.out.printf("Key: %s, id: %d, name: %s\n", cabe.getKey(), cab.getCOUNTYID(), cab.getNAME());
+            ClientResponse cr = client.callProcedure("STATE.INSERT", sab.getSTATEID(), sab.getNAME(), sab.getSTUSPS());
+            if (cr.getStatus() != ClientResponse.SUCCESS) {
+                System.err.printf("Insertion into county table failed, status %d\n", cr.getStatus());
+                System.exit(100);
+            }
+        }
+
+    }
+
+    private void insertStateBoundaries(StateData sattrs)
+            throws IOException, ProcCallException {
+        CsvBeanReader beanReader = null;
+        InputStream is = null;
+        int numBoundaries = 0;
+        try {
+            is = Benchmark.class.getResourceAsStream("data/states_geometry.csv");
+            beanReader = new CsvBeanReader(new InputStreamReader(is),
+                                           CsvPreference.TAB_PREFERENCE);
+            final String[] header = beanReader.getHeader(true);
+            final CellProcessor[] processors = getBoundaryProcessors();
+            BoundaryBean stateBoundary;
+            String lastShapeId = null;
+            ArrayList<S2LatLng> currentLoop = null;
+            ArrayList<ArrayList<S2LatLng>> currentPolygon = null;
+            Long currentStateId = -1L;
+            int componentCount = 0;
+            while ( (stateBoundary = beanReader.read(BoundaryBean.class, header, processors)) != null) {
+                if (lastShapeId == null) {
+                    // First boundary.  Initialize everything.
+                    currentPolygon = new ArrayList<ArrayList<S2LatLng>>();
+                    currentLoop = new ArrayList<S2LatLng>();
+                    lastShapeId = stateBoundary.getSHAPEID();
+                    currentStateId = sattrs.getStateId(stateBoundary.getSHAPEID());
+                    componentCount = 0;
+                } else if (false == stateBoundary.getSHAPEID().equals(lastShapeId)) {
+                    // New shapeid.
+                    //   Add the current loop.
+                    //   If it's a new county, then write the current boundary.
+                    //   Initialize for the next loop.
+                    currentPolygon.add(currentLoop);
+                    // Is this a new State?
+                    // Hope the counties are all in order in the
+                    // csv file!!
+                    if (currentStateId != sattrs.getStateId(stateBoundary.getSHAPEID())) {
+                        insertOneStateBoundary(++regionId, componentCount,
+                                                sattrs.getByShapeID(lastShapeId),
+                                                currentPolygon);
+                        currentPolygon = new ArrayList<ArrayList<S2LatLng>>();
+                    }
+                    componentCount += 1;
+                    numBoundaries += 1;
+                    currentLoop = new ArrayList<S2LatLng>();
+                    lastShapeId = stateBoundary.getSHAPEID();
+               }
+                currentLoop.add(S2LatLng.fromDegrees(stateBoundary.getX(), stateBoundary.getY()));
+            }
+            if (currentLoop.size() > 0) {
+                currentPolygon.add(currentLoop);
+            }
+            if (currentPolygon.size() > 0) {
+                insertOneStateBoundary(++regionId, componentCount,
+                                       sattrs.getByShapeID(lastShapeId),
+                                       currentPolygon);
+                numBoundaries += 1;
+            }
+        } finally {
+            try {
+                if (beanReader != null) {
+                    beanReader.close();
+                }
+            } catch (IOException e) {
+                ;
+            }
+            try {
+                if (is != null) {
+                    is.close();
+                }
+            } catch (IOException e) {
+                ;
+            }
+        }
+        System.out.printf("Inserted %d state boundaries.\n",
+                          numBoundaries);
+    }
+
+    private void insertOneStateBoundary(long                   regionId,
+                                        int                    componentCount,
+                                        StateAttributeBean     sattrs,
+                                        ArrayList<ArrayList<S2LatLng>>   vertices)
+                throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr = null;
+        byte[] vertarray = convertBoundary(vertices);
+        if (vertarray.length > 120000) {
+            System.out.printf("State %s boundaries are too big: %d > 120000\n",
+                              sattrs.getNAME(),
+                              vertarray.length);
+            System.out.printf("  Not all of the polygon will be represented.\n");
+        }
+        cr = client.callProcedure("InsertRegion",
+                                  regionId,
+                                  sattrs.getSTATEID(),
+                                  componentCount,
+                                  1,
+                                  vertarray);
+        if (cr.getStatus() != ClientResponse.SUCCESS) {
+            System.err.printf("Cannot insert county boundary %d.%d (county %s)\n",
+                              regionId, sattrs.getSTATEID(), sattrs.getNAME());
+            System.exit(100);
+        }
     }
 
     /**

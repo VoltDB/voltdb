@@ -102,7 +102,7 @@ if (($? != 0)); then
 fi
 
 echo "****** Compiling Client ******"
-javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/s2demo/*.java
+set -x; javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/s2demo/*.java
 if (($? != 0)); then
     echo "Error compiling client"
     exit 1
