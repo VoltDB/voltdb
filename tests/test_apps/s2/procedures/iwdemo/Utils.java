@@ -1,7 +1,11 @@
 package iwdemo;
 
+import com.google_voltpatches.common.geometry.S1Angle;
+import com.google_voltpatches.common.geometry.S2Cap;
 import com.google_voltpatches.common.geometry.S2Cell;
 import com.google_voltpatches.common.geometry.S2CellId;
+import com.google_voltpatches.common.geometry.S2LatLng;
+import com.google_voltpatches.common.geometry.S2Point;
 import com.google_voltpatches.common.geometry.S2RegionCoverer;
 
 public class Utils {
@@ -30,6 +34,13 @@ public class Utils {
         S2RegionCoverer coverer = new S2RegionCoverer();
         coverer.setMaxLevel(COVERER_MAX_LEVEL);
         return coverer;
+    }
+
+    public static S2Cap getCap(double lat, double lng, double rangeInKm) {
+        S1Angle capAngle = S1Angle.radians(rangeInKm / Utils.radiusOfEarth());
+        S2Point capAxis = S2LatLng.fromDegrees(lat, lng).toPoint();
+        S2Cap cap = S2Cap.fromAxisAngle(capAxis, capAngle);
+        return cap;
     }
 
     //    avg area of cells in level 0: 85021153.482 km^2.

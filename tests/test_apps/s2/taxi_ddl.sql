@@ -70,6 +70,10 @@ create procedure
 create procedure selectTaxiLocations as
   select lat, lng from taxis order by id;
 
+create procedure
+  partition on table taxis column id parameter 0
+  from class iwdemo.GetTaxiInfo;
+
 -- Insert a new region in the region table
 -- Regions are constant.  We want to make a
 -- tesselation, so this has to be a region.
