@@ -117,6 +117,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         // Get the list of TestDDLFeatures.java test methods
         testDdlFeatures = new TestDDLFeatures();
         // The first method to run should be TestDDLFeatures.startClient()
+        // (even though that is not an @Test method)
         testDdlFeaturesTestMethods.add(testDdlFeatures.getClass().getMethod('startClient'))
         def allMethods = testDdlFeatures.getClass().getMethods()
         allMethods.each {
@@ -219,8 +220,13 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
      */
     @Unroll // performs this method for each statement in the fullDDL.sql file
     def '#fullDdlSqlFileTestName'() {
-        String statementUpperCase = statement.toUpperCase()
 
+        setup: 'get the specified (DDL) SQL statement(s) in upper case'
+        String statementUpperCase = statement.toUpperCase()
+        def error = null
+        def duration = ''
+
+        when: 'run the specified (DDL) SQL statement(s)'
         // Skip any 'CREATE PROCEDURE ... FROM CLASS ...' commands: there
         // is currently no way to load these, in this client-side test
         if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('PROCEDURE') &&
@@ -228,16 +234,23 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
             println '\nSkipping statement:\n' + statement
         // Execute all other statements
         } else {
-            def qResults = runQuery(page, statement, ColumnHeaderCase.AS_IS)
+            runQuery(page, statement, ColumnHeaderCase.AS_IS)
+            error    = page.getQueryError()
+            duration = page.getQueryDuration()
         }
 
-        // Keep track of CREATE ROLE commands
+        and: 'keep track of certain (DDL) SQL statements'
+        // Keep track of CREATE ROLE statements
         if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('ROLE')) {
             newRoles.add(getTableOrRoleName(statement, 'ROLE'))
-        // Keep track of EXPORT TABLE commands
+        // Keep track of EXPORT TABLE statements
         } else if (statementUpperCase.contains('EXPORT') && statementUpperCase.contains('TABLE')) {
             newExportTables.add(getTableOrRoleName(statement, 'TABLE'))
         }
+
+        then: 'make sure there was no error'
+        error == null
+        duration != null && !duration.contains('error')
 
         where: 'list of DDL SQL statements to test'
         statement << fullDdlSqlStatements
@@ -250,6 +263,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
      */
     @Unroll // performs this method for each JUnit test in TestDDLFeatures.java
     def '#testDdlFeaturesTestName'() {
+        when: 'run the specified JUnit test method'
         if (ignoreTheseTestMethods.contains(testDdlFeaturesTestName)) {
             debugPrint '\nSkipping JUnit Method: TestDDLFeatures.' + testDdlFeaturesTestName
         } else {
@@ -257,6 +271,9 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
             testMethod.invoke(testDdlFeatures)
             debugPrint 'JUnit Method passed  : TestDDLFeatures.' + testDdlFeaturesTestName
         }
+
+        then: 'test passes if you reach this point without an AssertionFailedError'
+        true
 
         where: 'list of TestDDLFeatures.java JUnit test methods'
         testMethod << testDdlFeaturesTestMethods
