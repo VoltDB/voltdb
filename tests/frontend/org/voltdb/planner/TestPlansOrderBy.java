@@ -475,6 +475,15 @@ public class TestPlansOrderBy extends PlannerTestCase {
             AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
             assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
         }
+        {
+            // NLJ - a replicated table is on the "outer" side of an outer join with a partitioned table.
+            // The optimization is rejected because of the coordinator NLJ node is a child of the ORDER BY node.
+            List<AbstractPlanNode> frags =  compileToFragments(
+                    "select P_D1 from T left join P on P.P_D1 = T.T_D0 order by T.T_D2 limit 3");
+            assertEquals(2, frags.size());
+            AbstractPlanNode pn = frags.get(0).getChild(0).getChild(0);
+            assertEquals(PlanNodeType.ORDERBY, pn.getPlanNodeType());
+        }
     }
 
     public void testOrderByMPSubquery() {
