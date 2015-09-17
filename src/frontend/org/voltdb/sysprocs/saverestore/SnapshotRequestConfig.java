@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -55,12 +56,13 @@ public class SnapshotRequestConfig {
                                               Database catalogDatabase)
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(catalogDatabase);
-        final Set<String> tableNamesToInclude = new HashSet<String>();
-        final Set<String> tableNamesToExclude = new HashSet<>();
+        Set<String> tableNamesToInclude = null;
+        Set<String> tableNamesToExclude = null;
 
         if (jsData != null) {
             JSONArray tableNames = jsData.optJSONArray("tables");
             if (tableNames != null) {
+                tableNamesToInclude = Sets.newHashSet();
                 for (int i = 0; i < tableNames.length(); i++) {
                     try {
                         final String s = tableNames.getString(i).trim().toUpperCase();
@@ -75,6 +77,7 @@ public class SnapshotRequestConfig {
 
             JSONArray excludeTableNames = jsData.optJSONArray("skiptables");
             if (excludeTableNames != null) {
+                tableNamesToExclude = Sets.newHashSet();
                 for (int i = 0; i < excludeTableNames.length(); i++) {
                     try {
                         final String s = excludeTableNames.getString(i).trim().toUpperCase();
@@ -88,12 +91,15 @@ public class SnapshotRequestConfig {
             }
         }
 
-        if (!tableNamesToInclude.isEmpty() || !tableNamesToExclude.isEmpty()) {
+        if (tableNamesToInclude != null && tableNamesToInclude.isEmpty()) {
+            // Stream snapshot may specify empty snapshot sometimes.
+            tables.clear();
+        } else {
             ListIterator<Table> iter = tables.listIterator();
             while (iter.hasNext()) {
                 Table table = iter.next();
-                if ((!tableNamesToInclude.isEmpty() && !tableNamesToInclude.contains(table.getTypeName())) ||
-                    tableNamesToExclude.contains(table.getTypeName())) {
+                if ((tableNamesToInclude != null && !tableNamesToInclude.contains(table.getTypeName())) ||
+                    (tableNamesToExclude != null && tableNamesToExclude.contains(table.getTypeName()))) {
                     // If the table index is not in the list to include or
                     // is in the list to exclude, remove it
                     iter.remove();

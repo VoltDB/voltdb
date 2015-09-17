@@ -101,6 +101,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
+        final Table[] tableArray;
+        if (config.tables.length == 0) {
+            tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
+        } else {
+            tableArray = config.tables;
+        }
+
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -108,13 +115,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.NATIVE,
-                    config.tables);
+                    tableArray);
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
         final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
-        for (final Table table : config.tables) {
+        for (final Table table : tableArray) {
             final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table,
@@ -137,7 +144,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     "");
         }
 
-        if (config.tables.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
+        if (tableArray.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
             SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
@@ -155,7 +162,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds,
                 remoteDCLastIds, context,
                 exportSequenceNumbers, drTupleStreamInfo, tracker, hashinatorData, timestamp,
-                newPartitionCount, config.tables, m_snapshotRecord, partitionedSnapshotTasks,
+                newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks, isTruncationSnapshot);
     }
 
