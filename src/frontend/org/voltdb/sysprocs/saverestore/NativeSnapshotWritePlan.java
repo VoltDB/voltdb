@@ -43,6 +43,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.PartitionTimestampExpression;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
@@ -78,6 +80,21 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 tracker, hashinatorData, timestamp, context.getNumberOfPartitions());
     }
 
+    /**
+     *  Create a expression that helps selective snapshot to choose which row for any give table it needs to include.
+     * @param config could be instance of SelectiveSnapshotRequestConfig
+     * @param table any given table
+     * @return
+     */
+    static AbstractExpression createExpressionOnTable(SnapshotRequestConfig config, Table table) {
+        if (config instanceof SelectiveSnapshotRequestConfig) {
+            PartitionTimestampExpression expr = new PartitionTimestampExpression();
+            return expr;
+        } else {
+            return null;
+        }
+    }
+
     Callable<Boolean> createSetupInternal(String file_path,
                                                     String file_nonce,
                                                     long txnId,
@@ -99,7 +116,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
-        final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
+        SnapshotRequestConfig config;
+        if (jsData.optJSONObject("partitiontimestamp") != null) {
+            config = new SelectiveSnapshotRequestConfig(jsData, context.getDatabase());
+        } else {
+            config = new SnapshotRequestConfig(jsData, context.getDatabase());
+        }
+
         final Table[] tableArray;
         if (config.tables.length == 0) {
             tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
@@ -125,7 +148,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     new SnapshotTableTask(
                             table,
                             new SnapshotDataFilter[0],
-                            null,
+                            createExpressionOnTable(config, table),
                             false);
 
             SNAP_LOG.debug("ADDING TASK: " + task);
