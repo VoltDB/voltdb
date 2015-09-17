@@ -279,6 +279,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
     @Test
     public void testCreateTableConstraintWithoutKeyword() throws Exception {
+        ClientResponse resp;
+        boolean threw;
 
         // Test for T17
         assertTrue(findTableInSystemCatalogResults("T17"));
