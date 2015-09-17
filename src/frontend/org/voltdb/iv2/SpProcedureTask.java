@@ -28,6 +28,7 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -74,7 +75,23 @@ public class SpProcedureTask extends ProcedureTask
 
         // cast up here .. ugly.
         SpTransactionState txnState = (SpTransactionState)m_txnState;
-        final InitiateResponseMessage response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
+
+        InitiateResponseMessage response;
+        int originalTimeout = siteConnection.getBatchTimeout();
+        int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
+        try {
+            // run the procedure with a specific individual timeout
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
+                siteConnection.setBatchTimeout(individualTimeout);
+            }
+            response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
+        } finally {
+            // reset the deployment timeout value back to its original value
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
+                siteConnection.setBatchTimeout(originalTimeout);
+            }
+        }
+
         if (!response.shouldCommit()) {
             m_txnState.setNeedsRollback(true);
         }

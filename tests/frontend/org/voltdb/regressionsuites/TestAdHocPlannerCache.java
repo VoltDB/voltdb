@@ -34,6 +34,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.jni.ExecutionEngine;
 
 public class TestAdHocPlannerCache extends RegressionSuite {
     // 1 means cache level 1, the literal sql string cache
@@ -126,6 +127,50 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         checkCacheStatistics(client, m_cache1_level, m_cache2_level, m_cache1_hits, m_cache2_hits, m_cache_misses);
     }
 
+    // ENG-8424: fix for the L1 cache statistics on execution site, other than the MPI
+    private void subtestENG8424(Client client) throws IOException, ProcCallException {
+        System.out.println("subtestENG8424...");
+        VoltTable vt;
+        long l1Before = ExecutionEngine.EE_PLAN_CACHE_SIZE + 1;
+        long l1After = ExecutionEngine.EE_PLAN_CACHE_SIZE + 1;
+
+        vt = client.callProcedure("@Statistics", "PLANNER", 0).getResults()[0];
+        assertTrue(vt.getRowCount() > 0);
+        while(vt.advanceRow()) {
+            // MPI's site id is -1 by design
+            Integer siteID = (Integer) vt.get("SITE_ID", VoltType.INTEGER);
+            assertNotNull(siteID);
+            if (siteID == -1) {
+                continue;
+            }
+
+            l1Before = vt.getLong("CACHE1_LEVEL");
+            break;
+        }
+        assertTrue(l1Before <= ExecutionEngine.EE_PLAN_CACHE_SIZE);
+
+        client.callProcedure("@AdHoc", "select * from R1 as ENG8424;");
+        ++m_cache1_level;
+        ++m_cache_misses;
+
+        vt = client.callProcedure("@Statistics", "PLANNER", 0).getResults()[0];
+        assertTrue(vt.getRowCount() > 0);
+        while(vt.advanceRow()) {
+            // MPI's site id is -1 by design
+            Integer siteID = (Integer) vt.get("SITE_ID", VoltType.INTEGER);
+            assertNotNull(siteID);
+            if (siteID == -1) {
+                continue;
+            }
+
+            l1After = vt.getLong("CACHE1_LEVEL");
+            break;
+        }
+        assertTrue(l1After <= ExecutionEngine.EE_PLAN_CACHE_SIZE);
+
+        // Assuming the max size of cache has not been reached
+        assertEquals(l1Before + 1, l1After);
+    }
 
     public void testAdHocPlannerCache() throws IOException, ProcCallException {
          System.out.println("testAdHocPlannerCache...");
@@ -133,7 +178,6 @@ public class TestAdHocPlannerCache extends RegressionSuite {
          resetStatistics();
 
          Client client = getClient();
-
          client.callProcedure("R1.insert", 1, "foo1", 0, 1.1);
          client.callProcedure("R1.insert", 2, "foo2", 0, 2.2);
          client.callProcedure("R1.insert", 3, "foo3", 1, 3.3);
@@ -149,6 +193,8 @@ public class TestAdHocPlannerCache extends RegressionSuite {
          subtest5ExplainPlans(client);
 
          subtest6ExpressionIndex(client);
+
+         subtestENG8424(client);
     }
 
     public void subtest1AdHocPlannerCache(Client client) throws IOException, ProcCallException {
@@ -840,7 +886,6 @@ public class TestAdHocPlannerCache extends RegressionSuite {
                 + "create procedure proc1 AS select num as number from R1 where id > ? order by num;"
                 + ""
                 ;
-
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {

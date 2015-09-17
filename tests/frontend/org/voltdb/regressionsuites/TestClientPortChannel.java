@@ -31,6 +31,7 @@ import java.util.Arrays;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -394,40 +395,42 @@ public class TestClientPortChannel extends TestCase {
         System.out.println("Testing good Ping invocation");
         verifyInvocation(pingr, channel, (byte) 1);
 
+        final byte ERROR_CODE = -3;
+
         //With bad message length of various shapes and sizes
         //Procedure name length mismatch
         System.out.println("Testing Ping invocation with bad procname length");
         byte bad_length[] = VAR1.clone();
         updateLength(bad_length, 6);
-        verifyInvocation(bad_length, channel, (byte) -3);
+        verifyInvocation(bad_length, channel, ERROR_CODE);
 
         //Procedure name length -ve long
         System.out.println("Testing Ping invocation with -1 procname length.");
         byte neg1_length[] = VAR1.clone();
         updateLength(neg1_length, -1);
-        verifyInvocation(neg1_length, channel, (byte) -3);
+        verifyInvocation(neg1_length, channel, ERROR_CODE);
 
         System.out.println("Testing Ping invocation with -200 procname length.");
         byte neg2_length[] = VAR1.clone();
         updateLength(neg2_length, -200);
-        verifyInvocation(neg2_length, channel, (byte) -3);
+        verifyInvocation(neg2_length, channel, ERROR_CODE);
 
         //Procedure name length too long
         System.out.println("Testing Ping invocation with looooong procname length.");
         byte too_long_length[] = VAR1.clone();
         updateLength(too_long_length, Integer.MAX_VALUE);
-        verifyInvocation(too_long_length, channel, (byte) -3);
+        verifyInvocation(too_long_length, channel, ERROR_CODE);
 
         //Bad protocol version
         System.out.println("Testing good Ping invocation with bad protocol version.");
         byte bad_proto[] = VAR1.clone();
-        bad_proto[iVERSION] = 1;
-        verifyInvocation(bad_proto, channel, (byte) 1);
+        bad_proto[iVERSION] = StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1;
+        verifyInvocation(bad_proto, channel, ERROR_CODE);
 
         //Client Data - Bad Data meaning invalid number of bytes.
         System.out.println("Testing good Ping invocation with incomplete client data");
         byte bad_cl_data[] = Arrays.copyOfRange(VAR1, 0, 12);
-        verifyInvocation(bad_cl_data, channel, (byte) -3);
+        verifyInvocation(bad_cl_data, channel, ERROR_CODE);
 
         System.out.println("Testing good Ping invocation Again");
         verifyInvocation(pingr, channel, (byte) 1);

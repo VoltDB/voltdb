@@ -22,6 +22,7 @@ import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -38,6 +39,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.collect.FluentIterable;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
@@ -50,6 +55,8 @@ public class ImportManager implements ChannelChangeCallback {
      * Processors also log using this facility.
      */
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
+
+    private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
     private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
@@ -70,6 +77,13 @@ public class ImportManager implements ChannelChangeCallback {
         return m_self;
     }
 
+    private final static Function<String,String> appendVersion = new Function<String, String>() {
+        @Override
+        public String apply(String input) {
+            return input + ";version=1.0.0";
+        }
+    };
+
     protected ImportManager(int myHostId, HostMessenger messenger) throws IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
@@ -85,10 +99,24 @@ public class ImportManager implements ChannelChangeCallback {
             throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
         }
 
+        List<String> packages = ImmutableList.<String>builder()
+                .add("org.voltcore.network")
+                .add("org.voltdb.importer")
+                .add("org.apache.log4j")
+                .add("org.voltdb.client")
+                .add("org.slf4j")
+                .add("org.voltcore.utils")
+                .add("com.google_voltpatches.common.base")
+                .add("com.google_voltpatches.common.collect")
+                .add("com.google_voltpatches.common.net")
+                .add("com.google_voltpatches.common.io")
+                .add("com.google_voltpatches.common.util.concurrent")
+                .build();
+
+        String systemPackagesSpec = FluentIterable.from(packages).transform(appendVersion).join(COMMA_JOINER);
+
         m_frameworkProps = ImmutableMap.<String,String>builder()
-                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
-                    + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0"
-                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0")
+                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, systemPackagesSpec)
                 .put("org.osgi.framework.storage.clean", "onFirstInit")
                 .put("felix.cache.rootdir", f.getAbsolutePath())
                 .put("felix.cache.locking", Boolean.FALSE.toString())

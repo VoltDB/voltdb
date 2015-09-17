@@ -123,6 +123,9 @@
     <not><isset property="verifycatalogdebug"/></not>
 </condition>
 
+<!-- Property "kitbuild" is true if we're pulling in both Mac and Linux native libraries -->
+<property name="kitbuild" value="false"/>
+
 <!-- Overridden in the Hudson test script. -->
 <property name='junit.haltonfailure'    value='false' />
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
@@ -961,11 +964,12 @@ DISTRIBUTION
     </copy>
 
     <!-- Call shell script that handles copying native libs so they can be packaged together -->
-    <exec dir='.' executable="/usr/bin/env" failonerror='false'>
+    <exec dir='.' executable="/usr/bin/env" failonerror='true'>
         <arg value='bash' />
         <arg value='tools/copy-lib.sh'/>
         <arg value='${build.prod.dir}/org/voltdb/native/Mac/x86_64' />
         <arg value='${dist.version}'/>
+        <arg value='${kitbuild}'/>
     </exec>
 </target>
 

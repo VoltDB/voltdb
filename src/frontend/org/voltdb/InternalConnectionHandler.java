@@ -85,7 +85,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-      //Indicate backpressure or not.
+        //Indicate backpressure or not.
         boolean b = m_adapter.hasBackPressure();
         caller.setBackPressure(b);
         if (b) {
@@ -98,6 +98,7 @@ public class InternalConnectionHandler {
         final long nowNanos = System.nanoTime();
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         ParameterSet pset = ParameterSet.fromArrayWithCopy(fieldList);
+        // Another place with hard code size calculations
         //type + procname(len + name) + connectionId (long) + params
         int sz = 1 + 4 + proc.length() + 8 + pset.getSerializedSize();
         //This is released in callback from adapter side.

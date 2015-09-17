@@ -111,6 +111,40 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
+     * <p>Synchronously invoke a procedure with timeout. Blocks until a result is available. A {@link ProcCallException}
+     * is thrown if the response is anything other then success.</p>
+     *
+     * @param batchTimeout batch timeout setting in milliseconds of queries in a batch for read only procedures.
+     * @param procName <code>class</code> name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return {@link ClientResponse} instance of procedure call results.
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
+    throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * <p>Asynchronously invoke a replicated procedure with timeout, by providing a callback that will be invoked by
+     * the single thread backing the client instance when the procedure invocation receives a response.
+     * See the {@link Client} class documentation for information on the negative performance impact of slow or
+     * blocking callbacks. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
+     *
+     * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
+     * @param batchTimeout batch timeout setting in milliseconds of queries in a batch for read only procedures.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public boolean callProcedureWithTimeout(ProcedureCallback callback, int batchTimeout, String procName, Object... parameters)
+    throws IOException, NoConnectionsException;
+
+    /**
      * <p>Asynchronously invoke a replicated procedure. If there is backpressure
      * this call will block until the invocation is queued. If configureBlocking(false) is invoked
      * then it will return immediately. Check the return value to determine if queuing actually took place.</p>

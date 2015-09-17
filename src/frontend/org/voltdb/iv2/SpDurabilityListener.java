@@ -23,6 +23,9 @@ import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
+/**
+ * This class is not thread-safe. Most of its usage is on the Site thread.
+ */
 public class SpDurabilityListener implements DurabilityListener {
 
     // No command logging

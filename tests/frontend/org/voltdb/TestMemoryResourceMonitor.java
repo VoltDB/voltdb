@@ -38,10 +38,10 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
-public class TestResourceMonitor extends TestCase
+public class TestMemoryResourceMonitor extends TestCase
 {
+    private static final int DEFAULT_MONITORING_INTERVAL=60;
     private static final int MONITORING_INTERVAL = 2;
-    private static final int DEFAULT_MONITORING_INTERVAL = 60;
 
     private ServerThread m_localServer;
     private VoltDB.Configuration m_config;
