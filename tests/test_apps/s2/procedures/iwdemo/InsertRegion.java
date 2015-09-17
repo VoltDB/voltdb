@@ -29,7 +29,6 @@ public class InsertRegion extends VoltProcedure {
             + ")");
 
     public long run(long id, int containerid, int componentNumber, int kind, byte varboundary[]) {
-        voltQueueSQL(insStmt, id, containerid, componentNumber, kind, varboundary);
         ArrayList<S2Loop> loops = new ArrayList<S2Loop>();
         ByteBuffer buf = ByteBuffer.wrap(varboundary);
         Integer numLoops = buf.getInt(0);
@@ -50,6 +49,8 @@ public class InsertRegion extends VoltProcedure {
         S2RegionCoverer coverer = new S2RegionCoverer();
         ArrayList<S2CellId> covering = new ArrayList<S2CellId>();
         coverer.getCovering(poly, covering);
+        varboundary = new byte[0];
+        voltQueueSQL(insStmt, id, containerid, componentNumber, kind, varboundary);
         for (S2CellId cellid : covering) {
             voltQueueSQL(insMapStmt, id, cellid.id());
         }
