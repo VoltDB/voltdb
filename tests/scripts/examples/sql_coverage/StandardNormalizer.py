@@ -32,6 +32,7 @@ import decimal
 import math
 import re
 import types
+import array
 
 from NotANormalizer import NotANormalizer
 from SortNulls import SortNulls
@@ -84,7 +85,8 @@ def normalize_values(tuples, columns):
     # I assume t is a voltdbclient.VoltTable.
     if hasattr(tuples, "__iter__"):
         for i in xrange(len(tuples)):
-            if hasattr(tuples[i], "__iter__"):
+            # varbinary is array.array type and has __iter__ defined, but should a single value to be compareds
+            if hasattr(tuples[i], "__iter__") and type(tuples[i]) is not array.array:
                 normalize_values(tuples[i], columns)
             else:
                 tuples[i] = normalize_value(tuples[i], columns[i].type)

@@ -121,8 +121,8 @@ CREATE INDEX idx_y_keyI ON tableY(keyH,keyI);
 -- tree index on varbinary type
 CREATE TABLE blobTableTree (
     id INTEGER NOT NULL,
-    blob2 VARBINARY(2) NOT NULL,
-    blob512 VARBINARY(512) NOT NULL
+    blob2 VARBINARY(2),
+    blob512 VARBINARY(512)
 );
 CREATE INDEX blobTableTree_INDEX_blob2 ON blobTableTree(blob2);
 CREATE INDEX blobTableTree_INDEX_blob512 ON blobTableTree(blob512);

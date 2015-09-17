@@ -1205,14 +1205,15 @@ public class TestIndexesSuite extends RegressionSuite {
 
         client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (1, 'ABCD', '0A0BCD');");
         client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (2, 'ABEF', '0A0BEF');");
+        client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (3, NULL, NULL);");
 
         //
         // inline varbinary
         //
 
+        explainPlanStr = "INDEX SCAN of \"BLOBTABLETREE\" using \"BLOBTABLETREE_INDEX_BLOB2\"";
         // exactly match
         sql = "select blob2 from blobTableTree where blob2 = x'ABCD'";
-        explainPlanStr = "INDEX SCAN of \"BLOBTABLETREE\" using \"BLOBTABLETREE_INDEX_BLOB2\"";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD"});
 
@@ -1226,6 +1227,10 @@ public class TestIndexesSuite extends RegressionSuite {
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
 
+        // ENG-9032 (when this ticket is fixed, uncomment the test case next)
+//        sql = "select blob2 from blobTableTree where blob2 < x'ACEF' order by blob2";
+//        checkQueryPlan(client, sql, explainPlanStr);
+//        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
 
         //
         // not inline varbinary
@@ -1247,7 +1252,6 @@ public class TestIndexesSuite extends RegressionSuite {
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD", "0A0BEF"});
     }
-
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -1328,7 +1332,7 @@ public class TestIndexesSuite extends RegressionSuite {
         // end of easy-to-disable code section */
 
         /*/ CONFIG #3: IPC -- keep this normally disabled with / * vs. //
-        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
