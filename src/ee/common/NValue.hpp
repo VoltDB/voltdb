@@ -953,8 +953,8 @@ private:
 
     const Point& getPoint() const {
 
-        BOOST_STATIC_ASSERT_MSG(sizeof(Point) <= sizeof(m_data),
-                                "Size of Point is too large for NValue m_data");
+        //BOOST_STATIC_ASSERT_MSG(sizeof(Point) <= sizeof(m_data),
+        //                        "Size of Point is too large for NValue m_data");
 
         assert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<const Point*>(m_data);
