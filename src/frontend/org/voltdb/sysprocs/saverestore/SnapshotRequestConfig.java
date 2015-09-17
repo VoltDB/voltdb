@@ -56,26 +56,48 @@ public class SnapshotRequestConfig {
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(catalogDatabase);
         final Set<String> tableNamesToInclude = new HashSet<String>();
+        final Set<String> tableNamesToExclude = new HashSet<>();
 
         if (jsData != null) {
-            JSONArray tableNames = jsData.optJSONArray("tableNames");
+            JSONArray tableNames = jsData.optJSONArray("tables");
             if (tableNames != null) {
                 for (int i = 0; i < tableNames.length(); i++) {
                     try {
-                        tableNamesToInclude.add(tableNames.getString(i));
+                        final String s = tableNames.getString(i).trim().toUpperCase();
+                        if (!s.isEmpty()) {
+                            tableNamesToInclude.add(s);
+                        }
                     } catch (JSONException e) {
-                        SNAP_LOG.warn("Unable to parse tables to include for stream snapshot", e);
+                        SNAP_LOG.warn("Unable to parse tables to include for snapshot", e);
+                    }
+                }
+            }
+
+            JSONArray excludeTableNames = jsData.optJSONArray("skiptables");
+            if (excludeTableNames != null) {
+                for (int i = 0; i < excludeTableNames.length(); i++) {
+                    try {
+                        final String s = excludeTableNames.getString(i).trim().toUpperCase();
+                        if (!s.isEmpty()) {
+                            tableNamesToExclude.add(s);
+                        }
+                    } catch (JSONException e) {
+                        SNAP_LOG.warn("Unable to parse tables to exclude for snapshot", e);
                     }
                 }
             }
         }
 
-        ListIterator<Table> iter = tables.listIterator();
-        while (iter.hasNext()) {
-            Table table = iter.next();
-            if (!tableNamesToInclude.contains(table.getTypeName())) {
-                // If the table index is not in the list to include, remove it
-                iter.remove();
+        if (!tableNamesToInclude.isEmpty() || !tableNamesToExclude.isEmpty()) {
+            ListIterator<Table> iter = tables.listIterator();
+            while (iter.hasNext()) {
+                Table table = iter.next();
+                if ((!tableNamesToInclude.isEmpty() && !tableNamesToInclude.contains(table.getTypeName())) ||
+                    tableNamesToExclude.contains(table.getTypeName())) {
+                    // If the table index is not in the list to include or
+                    // is in the list to exclude, remove it
+                    iter.remove();
+                }
             }
         }
 
@@ -85,7 +107,7 @@ public class SnapshotRequestConfig {
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         if (tables != null) {
-            stringer.key("tableNames");
+            stringer.key("tables");
             stringer.array();
             for (Table table : tables) {
                 stringer.value(table.getTypeName());
