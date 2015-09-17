@@ -107,7 +107,7 @@ public class Benchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 30;
+        int duration = 120;
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;

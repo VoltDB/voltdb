@@ -2,14 +2,12 @@ package iwdemo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.types.PointType;
 
 import com.google_voltpatches.common.geometry.S1Angle;
 import com.google_voltpatches.common.geometry.S2Cap;
@@ -19,7 +17,7 @@ import com.google_voltpatches.common.geometry.S2Point;
 
 public class TaxisPerCity extends VoltProcedure {
 
-    final SQLStmt selTaxiLocations = new SQLStmt("select location from taxis");
+    final SQLStmt selTaxiLocations = new SQLStmt("select lat, lng from taxis");
 
     final SQLStmt selCitiesInCellRange = new SQLStmt(
             "select name "
@@ -32,8 +30,9 @@ public class TaxisPerCity extends VoltProcedure {
         S1Angle capAngle = S1Angle.radians(rangeInKm / Utils.radiusOfEarth());
         while (taxiLocations.advanceRow()) {
 
-            PointType pt = taxiLocations.getPoint(0);
-            S2Point capAxis = S2LatLng.fromDegrees(pt.getLatitude(), pt.getLongitude()).toPoint();
+            double lat = taxiLocations.getDouble(0);
+            double lng = taxiLocations.getDouble(1);
+            S2Point capAxis = S2LatLng.fromDegrees(lat, lng).toPoint();
             S2Cap cap = S2Cap.fromAxisAngle(capAxis, capAngle);
             ArrayList<S2CellId> coveringCells = new ArrayList<>();
             Utils.getCoverer().getCovering(cap, coveringCells);

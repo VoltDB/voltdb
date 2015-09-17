@@ -2,9 +2,7 @@ package iwdemo;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 import org.voltdb.VoltTable;
@@ -28,23 +26,23 @@ public class TaxiManager implements Runnable {
      * The time in milliseconds between calls to the run() method,
      * which updates the location of one taxi.
      */
-    final private static int UPDATE_INTERVAL = 50;
+    final private static int UPDATE_INTERVAL = 25;
 
     /**
      * This value controls the amount that one taxi will move during an update.
      * We find the lat/lng of a neighboring cell in this level.  Lower levels have
      * larger cells, so setting this number lower will make the taxis move faster.
      */
-    final private static int S2_UPDATE_LEVEL = 8;
+    final private static int S2_UPDATE_LEVEL = 12;
 
     private final Client m_client;
     private final Random m_random;
-    private final PointType[] m_taxiLocations;
+    private final double[][] m_taxiLocations;
 
     TaxiManager(Client client) {
         m_client = client;
-        m_random = new Random(777);
-        m_taxiLocations = new PointType[NUM_TAXIS];
+        m_random = new Random(8888);
+        m_taxiLocations = new double[NUM_TAXIS][2];
     }
 
     /**
@@ -73,10 +71,11 @@ public class TaxiManager implements Runnable {
 
                 // Allocate 8 cabs to this point
                 for (int j = 0; j < NUM_DIRECTIONS; ++j) {
-                    m_taxiLocations[taxiId] = pt;
+                    m_taxiLocations[taxiId][0] = pt.getLatitude();
+                    m_taxiLocations[taxiId][1] = pt.getLongitude();
                     S2LatLng ll = S2LatLng.fromDegrees(pt.getLatitude(), pt.getLongitude());
                     S2CellId cell = S2CellId.fromLatLng(ll);
-                    m_client.callProcedure("taxis.Insert", taxiId, pt, cell.id());
+                    m_client.callProcedure("taxis.Insert", taxiId, pt.getLatitude(), pt.getLongitude(), cell.id());
                     ++taxiId;
                 }
             }
@@ -88,50 +87,14 @@ public class TaxiManager implements Runnable {
         }
     }
 
-    private final Map<String, List<Integer> > dirValMap = new HashMap<>();
-
-    private void debugUpdate(int whichTaxi, PointType origPt, PointType newPt){
-        String dir = "";
-
-        float nsDelta = newPt.getLatitude() - origPt.getLatitude();
-        if (nsDelta > 0.1) {
-            dir += "N";
-        }
-        else if (nsDelta < -0.1) {
-            dir += "S";
-        }
-
-        float ewDelta = newPt.getLongitude() - origPt.getLongitude();
-        if (ewDelta > 0.1) {
-            dir += "E";
-        }
-        else if (ewDelta < -0.1) {
-            dir += "W";
-        }
-
-        assert(dir != "");
-
-        if (dirValMap.get(dir) == null) {
-            dirValMap.put(dir, new ArrayList<Integer>());
-        }
-
-        dirValMap.get(dir).add(whichTaxi % 8);
-
-        for (String k : dirValMap.keySet()) {
-            System.out.println(k + ": " + dirValMap.get(k));
-        }
-        System.out.println("\n");
-    }
-
     @Override
     public void run() {
         // Choose a taxi at random
         int whichTaxi = m_random.nextInt(NUM_TAXIS);
-        PointType origPt = m_taxiLocations[whichTaxi];
+        double origLat = m_taxiLocations[whichTaxi][0];
+        double origLng = m_taxiLocations[whichTaxi][1];
 
-        S2LatLng ll = S2LatLng.fromDegrees(
-                origPt.getLatitude(),
-                origPt.getLongitude());
+        S2LatLng ll = S2LatLng.fromDegrees(origLat, origLng);
         S2CellId cell = S2CellId.fromLatLng(ll);
 
         // Go up to a coarser level of granularity,
@@ -141,25 +104,25 @@ public class TaxiManager implements Runnable {
         parent.getAllNeighbors(S2_UPDATE_LEVEL, parentNeighbors);
 
         // Hopefully, directions are always returned in the same order...
-        // Empirically this seems mostly true.  Uncomment call to debugUpdate below
-        // to verify.
+        // Empirically this seems mostly true.
         S2CellId newParent = parentNeighbors.get(whichTaxi % parentNeighbors.size());
         S2Point s2Pt = (new S2Cell(newParent)).getCenter();
         S2CellId newCell = S2CellId.fromPoint(s2Pt);
-        PointType newPt = new PointType(
-                (float)S2LatLng.latitude(s2Pt).degrees(),
-                (float)S2LatLng.longitude(s2Pt).degrees());
-        //debugUpdate(whichTaxi, origPt, newPt);
+        double newLat = S2LatLng.latitude(s2Pt).degrees();
+        double newLng = S2LatLng.longitude(s2Pt).degrees();
 
         try {
             m_client.callProcedure(new NullCallback(), "@AdHoc",
-                    "update taxis set location = ?, cellid = ? "
-                    + "where id = ?", newPt, newCell.id(), whichTaxi);
+                    "update taxis set lat = ?, lng = ?, cellid = ? "
+                    + "where id = ?",
+                    newLat, newLng, newCell.id(), whichTaxi);
+            m_taxiLocations[whichTaxi][0] = newLat;
+            m_taxiLocations[whichTaxi][1] = newLng;
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
         }
 
-        m_taxiLocations[whichTaxi] = newPt;
+
     }
 }

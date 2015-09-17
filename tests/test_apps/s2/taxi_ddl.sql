@@ -5,7 +5,8 @@ file -inlinebatch EOB
 
 create table taxis (
     id              bigint not null primary key,
-    location        point not null,
+    lat             float not null,
+    lng             float not null,
     cellid          bigint not null
 );
 
@@ -44,7 +45,7 @@ create procedure
   from class iwdemo.TaxisPerCity;
 
 create procedure selectTaxiLocations as
-  select location from taxis order by id;
+  select lat, lng from taxis order by id;
 
 -- Insert a new region in the region table
 -- Regions are constant.

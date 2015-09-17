@@ -43,22 +43,34 @@ function connectToDatabase() {
             con = VoltDB.AddConnection(location.hostname, 8080, false, null, null, false, (function(connection, success)
             {
                 console.log("Connection added.");
-                getTaxiLocations();
+                setInterval(getTaxiLocations, 250);
             }));
         }
 
 
 var map;
-var markers;
+var markers = [];
 
 function getTaxiLocations() {
     con.CallExecute('selectTaxiLocations', [], function(response)
     {
         try
         {
-            var contentString = "recieved info on " + response + " taxis from database.";
-
-            console.log(contentString);
+            var data = response.results[0].data;
+            for (var i = 0; i < data.length; ++i) {
+                var latLng = {lat: data[i][0], lng: data[i][1]};
+                if (markers.length < data.length) {
+                    markers.push(new google.maps.Marker({
+                        position: latLng,
+                        map: map,
+                        title: 'Taxi# ' + i,
+                        zIndex: i
+                    }));
+                }
+                else {
+                    markers[i].setPosition(latLng);
+                }
+            }
 
             // var infoWindow = new google.maps.InfoWindow({
             //     content: contentString,
