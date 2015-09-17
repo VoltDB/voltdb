@@ -51,10 +51,10 @@ function connectToDatabase() {
 var map;
 var markers = [];
 
-function getTaxiInfoWindow(taxiId) {
+function getTaxiInfoWindow(taxiId, lat, lng) {
     // This will be populate by a DB stored procedure
     // result.
-    var content = 'Taxi #' + taxiId;
+    var content = 'Taxi #' + taxiId + '<br/>Latitude: ' + lat + '<br/>Longitude: ' + lng;
     return new google.maps.InfoWindow({
         content: content
     });
@@ -75,9 +75,14 @@ function getTaxiLocations() {
                         title: 'Taxi# ' + i,
                         zIndex: i
                     }));
-                    markers[i].addListener('click', function() {
-                        getTaxiInfoWindow(this.zIndex).open(map, this);
-                    });
+                    markers[i].addListener('click',
+                                     (function() {
+                                         var lat = latLng.lat;
+                                         var lng = latLng.lng;
+                                         return function() {
+                                             getTaxiInfoWindow(this.zIndex, lat, lng).open(map, this);
+                                         }
+                                     } ()));
                 }
                 else {
                     markers[i].setPosition(latLng);
