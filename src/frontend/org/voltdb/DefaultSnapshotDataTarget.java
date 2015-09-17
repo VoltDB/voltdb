@@ -48,6 +48,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.PosixAdvise;
+import org.voltdb.VoltTable.ColumnInfo;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -236,7 +237,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b().putInt(container.b().remaining() - 4);
         container.b().position(0);
 
-        final byte schemaBytes[] = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
+        final byte schemaBytes[];
+        schemaBytes = PrivateVoltTableFactory.getSchemaBytes(schemaTable);
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
         ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);

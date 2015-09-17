@@ -1,0 +1,7 @@
+drop table t if exists;
+create table t ( a INTEGER NOT NULL, b INTEGER NOT NULL, c INTEGER NOT NULL);
+file ./scripts/querytimeout/datainput.sql
+
+SELECT t1.b, t2.c, COUNT(*) as tag FROM t t1, t t2 WHERE t1.b > ANY (SELECT t4.a from t t3, t t4, t t5 WHERE t5.a=t4.a AND t1.a > t3.c) AND T2.b > -1 GROUP BY t1.b, t2.c ORDER BY b, c LIMIT 10;
+
+drop table t;

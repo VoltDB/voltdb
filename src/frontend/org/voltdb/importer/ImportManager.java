@@ -69,6 +69,8 @@ public class ImportManager implements ChannelChangeCallback {
     private final int m_myHostId;
     private Framework m_framework;
     private ChannelDistributer m_distributer;
+    private boolean m_serverStarted;
+
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -192,11 +194,11 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
         m_self.create(m_myHostId, catalogContext);
-        m_self.readyForData(catalogContext, messenger);
+        m_self.readyForDataInternal(catalogContext, messenger);
     }
 
     //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
-    public synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
+    private synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
         //Shutdown and recreate.
         m_self.close();
         assert(m_processor.get() == null);
@@ -208,6 +210,18 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
+        m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
+        readyForDataInternal(catalogContext, messenger);
+    }
+
+    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
+        if (!m_serverStarted) {
+            if (importLog.isDebugEnabled()) {
+                importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
+            }
+            return;
+        }
+
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
             return;

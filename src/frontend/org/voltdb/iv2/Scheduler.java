@@ -53,7 +53,7 @@ import org.voltdb.rejoin.TaskLog;
  */
 abstract public class Scheduler implements InitiatorMessageHandler
 {
-    protected static VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // A null task that unblocks the site task queue, used during shutdown
     static final SiteTasker m_nullTask = new SiteTasker() {

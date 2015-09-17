@@ -21,34 +21,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/*
- * Stored procedure for Kafka Import test
- *
- * Write the final marker row to the export table.
- *
- * Then the driver program can look for to signal import completion
- */
+package org.voltdb_testprocs.regressionsuites.querytimeout;
 
-package kafkaimporter.db.procedures;
-
-import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
-//@ProcInfo(
-//        partitionInfo = "ALL_VALUES1.rowid:0",
-//        singlePartition = true
-//    )
+public class AdHocPartitionReadOnlyProc extends VoltProcedure {
+    public String longRunningCrossJoinAgg =
+            "SELECT t1.contestant_number, t2.state, COUNT(*) "
+            + "FROM P1 t1, R1 t2 "
+            + "GROUP BY t1.contestant_number, t2.state;";
 
-public class InsertFinalMarker extends VoltProcedure {
-    public final String sqlBase = "(key, value) VALUES (?, ?)";
-    public final SQLStmt exportInsert = new SQLStmt("INSERT INTO kafkaExportTable1 " + sqlBase);
-
-    public long run(long key, long value)
-    {
-        voltQueueSQL(exportInsert, key, value);
-
-        // Execute queued statements
-        voltExecuteSQL(true);
-        return 0;
+    @SuppressWarnings("deprecation")
+    public VoltTable[] run() {
+        voltQueueSQLExperimental(longRunningCrossJoinAgg);
+        return voltExecuteSQL(true);
     }
 }

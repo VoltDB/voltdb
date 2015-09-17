@@ -135,7 +135,7 @@ class JavaRunner(object):
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
-	java_args.append('-Djava.library.path=dummyvalue')
+        java_args.append('-Djava.library.path=default')
         java_args.extend(('-classpath', classpath))
         java_args.append(java_class)
         for arg in args:

@@ -17,12 +17,13 @@
 
 package org.voltdb;
 
+import static org.voltcore.common.Constants.VOLT_TMP_DIR;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
-import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import org.voltcore.logging.VoltLogger;
 
@@ -73,14 +74,22 @@ public class EELibraryLoader {
                     voltSharedLibraryLoaded = true;
                     hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
                 } catch (Throwable e) {
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Error loading VoltDB JNI shared library", e);
+                    }
                     if (mustSuccede) {
-                        String msg = "Library VOLTDB JNI shared library loading failed. Library path " +
-                                System.getProperty("java.library.path") + "\n";
+                        String msg = "Library VOLTDB JNI shared library loading failed with error: " + e.getMessage() + "\n";
+                        msg += "Library path " + System.getProperty("java.library.path") + ", " +
+                               USE_JAVA_LIBRARY_PATH + "=" + System.getProperty(USE_JAVA_LIBRARY_PATH) + "\n";
                         msg += "The library may have failed to load because it can't be found in your " +
                                 "load library path, or because it is not compatible with the current " +
                                 "platform.\n";
                         msg +=  "VoltDB provides builds on our website for 64-bit OSX systems >= 10.6, " +
                                 "and 64-bit Linux systems with kernels >= 2.6.18.";
+                        if (e instanceof UnsatisfiedLinkError) {
+                            msg += "\nOr the library may have failed to load because java.io.tmpdir should be set to a different directory. " +
+                                   "Use VOLTDB_OPTS='-Djava.io.tmpdir=<dirpath>' to set it.";
+                        }
                         VoltDB.crashLocalVoltDB(msg, false, null);
                     } else {
                         hostLog.info("Library VOLTDB JNI shared library loading failed. Library path "
@@ -123,6 +132,9 @@ public class EELibraryLoader {
         }
 
         File tmpFilePath = new File(System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir")));
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("Temp directory to which shared libs are extracted is: " + tmpFilePath.getAbsolutePath());
+        }
         try {
             return loadLibraryFile(libPath, libFileName, tmpFilePath.getAbsolutePath());
         } catch(IOException e) {

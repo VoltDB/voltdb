@@ -25,11 +25,7 @@ ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
 : m_count(0), m_allocSize(allocSize), m_chunkSize(chunkSize), m_tail(NULL), m_blockCount(0) {}
 
 ContiguousAllocator::~ContiguousAllocator() {
-    while (m_tail) {
-        Buffer *buf = m_tail->prev;
-        free(m_tail);
-        m_tail = buf;
-    }
+    clear();
 }
 
 void *ContiguousAllocator::alloc() {
@@ -86,6 +82,17 @@ void ContiguousAllocator::trim() {
         m_tail = buf;
         m_blockCount--;
     }
+}
+
+void ContiguousAllocator::clear() {
+    while (m_tail) {
+        Buffer *buf = m_tail->prev;
+        free(m_tail);
+        m_tail = buf;
+    }
+
+    m_count = 0;
+    m_blockCount = 0;
 }
 
 size_t ContiguousAllocator::bytesAllocated() const {

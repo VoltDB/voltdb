@@ -33,6 +33,7 @@ from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
 # Need these to print non-ascii characters:
 import codecs
+import sys
 UTF8Writer = codecs.getwriter('utf8')
 sys.stdout = UTF8Writer(sys.stdout)
 
@@ -280,7 +281,7 @@ class BaseGenerator:
     #                   |       |             |
     TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
     #                   |       |             |                      |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" \
                       r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
     #                         |                |                             |                   |
     #                         |                |                             |       end of [] attribute section
@@ -474,11 +475,37 @@ class ColumnGenerator(BaseGenerator):
             self.__supertype = ""
 
     def configure_from_schema(self, schema, prior_generators):
-        """ Get matcing column values fom schema
+        """ Get matching column values from schema
         """
         self.values = schema.get_typed_columns(self.__supertype)
         self.prior_generator = prior_generators.get("variable")
         prior_generators["variable"] = self # new variable generator at the head of the chain
+        return prior_generators
+
+
+class SymbolGenerator(BaseGenerator):
+    """This replaces occurrences of token _symbol with a piece of text, such as a function name
+       or a comparison operator.
+       Within a statement, intended occurrences of the same symbol must use the same '#label'.
+       Attributes only matter on the first occurrence of "_symbol" for a given label.
+       As a convenience, forward references can use the __[#label] syntax instead of _symbol[#label]
+       to defer locking in attribute settings until a later _symbol occurrence.
+    """
+
+    def __init__(self):
+        BaseGenerator.__init__(self, "_symbol")
+
+    def prepare_params(self, attribute_groups):
+        self.__symbol = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
+        if not self.__symbol:
+            self.__symbol = ""
+
+    def configure_from_schema(self, schema, prior_generators):
+        """ Get matching text values; does not actually use the schema.
+        """
+        self.values.append(self.__symbol)
+        self.prior_generator = prior_generators.get("symbol")
+        prior_generators["symbol"] = self # new symbol generator at the head of the chain
         return prior_generators
 
 
@@ -822,10 +849,10 @@ class SQLGenerator:
         self.__statements = self.__template.get_statements()
 
         self.__min_statements_per_pattern = sys.maxint
-        self.__max_statements_per_pattern = 0
+        self.__max_statements_per_pattern = -1
         self.__num_insert_statements      = 0
 
-    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, ConstantGenerator, IdGenerator)
+    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, SymbolGenerator, ConstantGenerator, IdGenerator)
 
     UNRESOLVED_PUNCTUATION = re.compile(r'[][#@]') # Literally, ']', '[', '#', or '@'.
     UNRESOLVED_GENERATOR = re.compile(r'(^|\W)[_]')

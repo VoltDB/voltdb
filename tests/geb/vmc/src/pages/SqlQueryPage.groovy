@@ -225,7 +225,19 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the list of User-defined Stored Procedure names.
      */
     def List<String> getUserStoredProcedures() {
-        return getSpecifiedStoredProcedures(userStoredProcsHeader, userStoredProcs)
+        def storedProcs = []
+        try {
+            showStoredProcedures()
+            clickToDisplay(userStoredProcsHeader, userStoredProcs)
+            userStoredProcs.each {
+                scrollIntoView(it)
+                storedProcs.add(it.text())
+            }
+            clickToNotDisplay(userStoredProcsHeader, userStoredProcs)
+        } catch (RequiredPageContentNotPresent e) {
+            // do nothing: empty list will be returned
+        }
+        return storedProcs
     }
 
     /**

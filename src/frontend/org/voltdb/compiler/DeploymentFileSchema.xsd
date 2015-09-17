@@ -132,13 +132,6 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <xs:simpleType name="memoryLimitType">
-    <xs:restriction base="xs:decimal">
-      <xs:minInclusive value="0"/>
-      <xs:maxInclusive value="1000"/>
-    </xs:restriction>
-  </xs:simpleType>
-
   <xs:simpleType name="featureNameType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="snapshots"/>
@@ -151,21 +144,20 @@
 
   <xs:complexType name="diskLimitType">
       <xs:sequence>
-          <xs:element name="feature" minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="feature" minOccurs="1" maxOccurs="unbounded">
              <xs:complexType>
                 <xs:attribute name="name" type="featureNameType"/>
                 <xs:attribute name="size" type="xs:string"/>
              </xs:complexType>
           </xs:element>
       </xs:sequence>
-      <xs:attribute name="size" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="resourceMonitorType">
       <xs:all>
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="size" type="memoryLimitType" default="0"/>
+                <xs:attribute name="size" type="xs:string" default="0"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="disklimit" type="diskLimitType"

@@ -276,6 +276,8 @@ enum ExpressionType {
     EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO    = 15, // greater than equal operator between left and right
     EXPRESSION_TYPE_COMPARE_LIKE                    = 16, // LIKE operator (left LIKE right). both children must be string.
     EXPRESSION_TYPE_COMPARE_IN                      = 17, // IN operator [left IN (right1, right2, ...)]
+    // value 18 is assigned to EXPRESSION_TYPE_OPERATOR_EXISTS
+    EXPRESSION_TYPE_COMPARE_NOTDISTINCT             = 19, // Not distinct operator between left and right
 
     // -----------------------------
     // Conjunction Operators
@@ -490,8 +492,25 @@ enum DRRecordType {
     DR_RECORD_BEGIN_TXN = 3,
     DR_RECORD_END_TXN = 4,
     DR_RECORD_TRUNCATE_TABLE = 5,
-    DR_RECORD_DELETE_BY_INDEX = 6
+    DR_RECORD_DELETE_BY_INDEX = 6,
+    DR_RECORD_UPDATE_BY_INDEX = 7
 };
+
+inline size_t rowCostForDRRecord(DRRecordType type) {
+    switch (type) {
+    case DR_RECORD_INSERT:
+    case DR_RECORD_DELETE:
+    case DR_RECORD_DELETE_BY_INDEX:
+        return 1;
+    case DR_RECORD_UPDATE:
+    case DR_RECORD_UPDATE_BY_INDEX:
+        return 2;
+    case DR_RECORD_TRUNCATE_TABLE:
+        return 100;
+    default:
+        return 0;
+    }
+}
 
 // ------------------------------------------------------------------
 // Tuple serialization formats
@@ -514,7 +533,7 @@ bool isNumeric(ValueType type);
 bool isIntegralType(ValueType type);
 
 // for testing, obtain a random instance of the specified type
-NValue getRandomValue(ValueType type);
+NValue getRandomValue(ValueType type, uint32_t maxLength);
 
 std::string valueToString(ValueType type);
 ValueType stringToValue(std::string str );

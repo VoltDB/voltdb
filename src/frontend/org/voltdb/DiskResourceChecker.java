@@ -22,6 +22,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.PathsType;
@@ -89,8 +90,8 @@ public class DiskResourceChecker
             if (config.m_diskSizeLimit <= 0 && config.m_diskSizeLimitPerc <= 0) {
                 continue;
             }
-            if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit)) {
-                m_logger.warn("Disk is over configured limits for feature " + config.m_featureName);
+            if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit, config.m_featureName)) {
+                m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
                 return true;
             }
         }
@@ -106,10 +107,8 @@ public class DiskResourceChecker
             return;
         }
 
-        String defaultSize = diskLimitConfig.getSize();
         List<DiskLimitType.Feature> features = diskLimitConfig.getFeature();
-        //If defaultsize is configured, that should be set as the limit size for all features not explicitly configured
-        if ( (features==null || features.isEmpty()) && (defaultSize == null || defaultSize.trim().isEmpty()) ) {
+        if (features==null || features.isEmpty()) {
             return;
         }
 
@@ -119,31 +118,16 @@ public class DiskResourceChecker
         {
             for (DiskLimitType.Feature feature : features) {
                 configuredFeatures.add(feature.getName());
+                FeatureDiskLimitConfig aConfig =
+                        new FeatureDiskLimitConfig(feature.getName(), pathsConfig, feature.getSize());
                 if (!isSupportedFeature(feature.getName())) {
                     m_logger.warn("Ignoring unsupported feature " + feature.getName());
                     continue;
                 }
                 String size = feature.getSize();
-                builder.put(feature.getName(),
-                        new FeatureDiskLimitConfig(feature.getName(), pathsConfig, size));
+                builder.put(feature.getName(), aConfig);
                 if (m_logger.isDebugEnabled()) {
                     m_logger.debug("Added disk usage limit configuration " + size + " for feature " + feature.getName());
-                }
-            }
-        }
-
-        if (defaultSize !=null && !defaultSize.trim().isEmpty())
-        {
-            EnumSet<FeatureNameType> forDefault = EnumSet.complementOf(configuredFeatures);
-            for (FeatureNameType featureName : forDefault)
-            {
-                if (!isSupportedFeature(featureName)) {
-                    continue;
-                }
-                builder.put(featureName,
-                        new FeatureDiskLimitConfig(featureName, pathsConfig, defaultSize));
-                if (m_logger.isDebugEnabled()) {
-                    m_logger.debug("Added disk usage limit configuration " + defaultSize + " for feature " + featureName);
                 }
             }
         }
@@ -154,6 +138,10 @@ public class DiskResourceChecker
     private boolean isSupportedFeature(FeatureNameType featureName)
     {
         LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
+        if (licenseApi==null) { // this is null when compile deployment is called at startup.
+                                // Ignore at that point. This will be checked later.
+            return true;
+        }
         switch(featureName)
         {
         case COMMANDLOG:
@@ -168,11 +156,13 @@ public class DiskResourceChecker
         }
     }
 
-    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold)
+    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold, FeatureNameType featureName)
     {
         boolean canWrite = (s_testFileCheck==null) ? filePath.canWrite() : s_testFileCheck.canWrite(filePath);
         if (!canWrite) {
-            m_logger.warn("Invalid or readonly file path " + filePath);
+            m_logger.error(String.format("Invalid or readonly file path %s (%s). Setting database to read-only. " +
+                    "Use \"voltadmin resume\" command once resource constraint is corrected.",
+                    filePath, featureName.value()));
             return false;
         }
 
@@ -190,9 +180,14 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            m_logger.warn(String.format("Disk space usage on %s is >= the threshold value of %s. Total space=%d, Used space=%d",
-                    filePath,
-                    (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+"GB"), total, usedSpace));
+            m_logger.error(String.format(
+                    "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. " +
+                    "Use \"voltadmin resume\" command once resource constraint is corrected.",
+                    filePath, featureName.value(),
+                    (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB"),
+                    CoreUtils.getHostnameOrAddress()));
+            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
+                    filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
             return false;
         } else {
             return true;
@@ -202,7 +197,7 @@ public class DiskResourceChecker
     private static File getPathForFeature(FeatureNameType featureName, PathsType pathsConfig)
     {
         // pathsConfig will never be null or something is really wrong
-        File voltDbRoot = CatalogUtil.getVoltDbRoot(pathsConfig);
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(pathsConfig).getAbsoluteFile();
         switch(featureName) {
         case COMMANDLOG :
             return CatalogUtil.getCommandLog(pathsConfig.getCommandlog(), voltDbRoot);
@@ -246,7 +241,7 @@ public class DiskResourceChecker
                     if (str.charAt(str.length()-1) == '%') {
                         m_diskSizeLimit = 0;
                         m_diskSizeLimitPerc = Integer.parseInt(str.substring(0, str.length()-1));
-                        if (m_diskSizeLimitPerc > 100 || m_diskSizeLimitPerc < 0) {
+                        if (m_diskSizeLimitPerc > 99 || m_diskSizeLimitPerc < 0) {
                             throw new IllegalArgumentException(
                                     "Invalid percentage value " + sizeConfig + " configured for disk limit size for feature " + featureName);
                         }

@@ -114,7 +114,11 @@ public interface Client {
      * <p>Synchronously invoke a procedure with timeout. Blocks until a result is available. A {@link ProcCallException}
      * is thrown if the response is anything other then success.</p>
      *
-     * @param batchTimeout batch timeout setting in milliseconds of queries in a batch for read only procedures.
+     * <p>WARNING: Use of a queryTimeout value that is greater than the global timeout value for your VoltDB configuration
+     * will temporarily override that safeguard. Currently, non-privileged users (requiring only SQLREAD permissions)
+     * can invoke this method, potentially degrading system performance with an uncontrolled long-running procedure.</p>
+     *
+     * @param queryTimeout query batch timeout setting in milliseconds of queries in a batch for read only procedures.
      * @param procName <code>class</code> name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return {@link ClientResponse} instance of procedure call results.
@@ -122,7 +126,8 @@ public interface Client {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
+    @Deprecated
+    public ClientResponse callProcedureWithTimeout(int queryTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
@@ -133,15 +138,20 @@ public interface Client {
      * this call will block until the invocation is queued. If configureBlocking(false) is invoked
      * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
      *
+     * <p>WARNING: Use of a queryTimeout value that is greater than the global timeout value for your VoltDB configuration
+     * will temporarily override that safeguard. Currently, non-privileged users (requiring only SQLREAD permissions)
+     * can invoke this method, potentially degrading system performance with an uncontrolled long-running procedure.</p>
+     *
      * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
-     * @param batchTimeout batch timeout setting in milliseconds of queries in a batch for read only procedures.
+     * @param queryTimeout query batch timeout setting in milliseconds of queries in a batch for read only procedures.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    public boolean callProcedureWithTimeout(ProcedureCallback callback, int batchTimeout, String procName, Object... parameters)
+    @Deprecated
+    public boolean callProcedureWithTimeout(ProcedureCallback callback, int queryTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException;
 
     /**

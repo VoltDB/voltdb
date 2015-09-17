@@ -115,7 +115,7 @@ $(document).ready(function () {
     // Pop Slide Server Search
     $('#popServerSearch').keyup(function () {
         var searchText = $(this).val().toLowerCase();
-        $('ul.servers-list > li').each(function () {
+        $('#serversList > tbody > tr.filterClass').each(function () {
             var currentLiText = $(this).text().toLowerCase(),
                 showCurrentLi = currentLiText.indexOf(searchText) !== -1;
             $(this).toggle(showCurrentLi);
@@ -530,7 +530,7 @@ var loadPage = function (serverName, portid) {
             //hide loading icon
             $("#overlay").hide();
 
-            $('#serversList > li.active > a').click(function () {
+            $('#serversList >  tbody > tr > td.active > a').click(function () {
                 var clickedServer = $(this).html();
                 $('.activeServerName').html(clickedServer).attr('title', clickedServer);
 
@@ -587,7 +587,7 @@ var loadPage = function (serverName, portid) {
 
             $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').click(function () {
                 var clickedServer = $(this).html();
-                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').find("a").attr('data-hostid'));
+                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').next().find("a").attr('data-hostid'));
                 var currentUrl = window.location.href.split('?')[0];
                 var urlArray = currentUrl.split('/');
                 var newUrl = '';
@@ -1221,10 +1221,10 @@ var loadPage = function (serverName, portid) {
     var replicationWarning = function (count) {
         if (count == 0 || count == undefined) {
             $('#drWarning').hide();
-            $('.alertIcon').hide();
+            $('#drAlertWarning').hide();
         } else {
             $('#drWarning').show();
-            $('.alertIcon').show();
+            $('#drAlertWarning').show();
             if (count == 1) {
                 $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
             } else {
@@ -1241,8 +1241,8 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
 
             voltDbRenderer.GetSnapshotStatus(function (snapshotDetails) {
-                cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
-                cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
+                //cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
+                //cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
                 cmdLogDetails[getCurrentServer()].SNAPSHOTS = snapshotDetails[getCurrentServer()];
                 MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
             });

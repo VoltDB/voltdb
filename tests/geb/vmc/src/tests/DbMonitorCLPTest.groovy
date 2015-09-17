@@ -324,4 +324,60 @@ class DbMonitorCLPTest extends TestBase {
         }
     }
 
+    def "Verify search in Command Log Performance Table"(){
+        boolean isValid=false
+        String searchText = ""
+        boolean isCLPOpen = false
+
+        when: "Check if CLP section is present"
+
+        if(!waitFor(20){page.isCmdLogSectionOpen()})
+        {
+            println("CLP section is not present")
+            isCLPOpen = false
+        }
+        else {
+            isCLPOpen = true
+        }
+
+        then:
+        println("proceed")
+        when: "Set the value of Master filter"
+        println("isCLPOpen" + isCLPOpen)
+        if(isCLPOpen==true) {
+            if (waitFor(20){page.clpServerRows.size()} > 1) {
+                searchText = page.clpServerRows[0].text().substring(0, 1)
+                page.filterServer.value(page.clpServerRows[0].text().substring(0, 1))
+            } else {
+                isValid = false
+                assert true
+            }
+            then: "check the table"
+            for (def i = 0; i <= page.clpServerRows.size() - 1; i++) {
+                if (!page.clpServerRows[i].text().toString().contains(searchText)) {
+                    println("test false")
+                    isValid = false
+                    break
+                } else {
+                    isValid = true
+                }
+
+            }
+        }
+        else
+        {
+            isValid=true
+        }
+        then:
+        println("proceed")
+        if (isValid == true) {
+            assert true;
+        } else {
+            assert false;
+        }
+
+
+
+    }
+
 }

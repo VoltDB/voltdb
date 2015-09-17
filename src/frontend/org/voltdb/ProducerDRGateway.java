@@ -37,12 +37,6 @@ public interface ProducerDRGateway {
     public abstract boolean isStarted();
 
     /**
-     * @param ib This is really the invocation buffer
-     * @return
-     */
-    public abstract boolean offer(final Object ib);
-
-    /**
      * Queues up a task to move all the InvocationBuffers to the PersistentBinaryDeque
      * @param nofsync do not force the sync to disk (when True)
      * @return the FutureTask indicating completion

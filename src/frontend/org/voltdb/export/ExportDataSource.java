@@ -56,6 +56,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.io.Files;
+import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -423,6 +424,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     return m_committedBuffers.sizeInBytes();
                 }
             }).get();
+        } catch (RejectedExecutionException e) {
+                return 0;
         } catch (Throwable t) {
             Throwables.propagate(t);
             return 0;
@@ -567,6 +570,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
+        if (m_es.isShutdown()) {
+            return Futures.immediateFuture(null);
+        }
         return m_es.submit((new Runnable() {
             @Override
             public void run() {
@@ -854,5 +860,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ExportFormat getExportFormat() {
         return m_format;
+    }
+
+    public ListeningExecutorService getExecutorService() {
+        return m_es;
     }
 }

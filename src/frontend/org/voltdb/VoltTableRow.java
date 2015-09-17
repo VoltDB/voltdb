@@ -122,6 +122,12 @@ public abstract class VoltTableRow {
     abstract int getRowStart();
 
     /**
+     * Provide a way to efficiently compare two schemas belonging to a table or row.
+     * @return A byte string uniquely identifying the schema of the table.
+     */
+    abstract byte[] getSchemaString();
+
+    /**
      * Clone a row. The new instance returned will have an independent
      * position from the original instance.
      * @return A deep copy of the current <tt>VoltTableRow</tt> instance.
@@ -138,12 +144,15 @@ public abstract class VoltTableRow {
             // handle variable length types specially
             if ((type == VoltType.STRING) || (type == VoltType.VARBINARY)) {
                 final int len = m_buffer.getInt(m_offsets[i - 1]);
-                if (len == VoltTable.NULL_STRING_INDICATOR)
+                if (len == VoltTable.NULL_STRING_INDICATOR) {
                     m_offsets[i] = m_offsets[i - 1] + STRING_LEN_SIZE;
-                else if (len < 0)
+                }
+                else if (len < 0) {
                     throw new RuntimeException("Invalid object length for column: " + i);
-                else
+                }
+                else {
                     m_offsets[i] = m_offsets[i - 1] + len + STRING_LEN_SIZE;
+                }
             }
             else {
                 m_offsets[i] = m_offsets[i - 1] + type.getLengthInBytesForFixedTypes();
@@ -205,17 +214,21 @@ public abstract class VoltTableRow {
         int rows_to_move = rowIndex - m_activeRowIndex;
         m_activeRowIndex = rowIndex;
 
-        if (m_activeRowIndex >= getRowCount())
+        if (m_activeRowIndex >= getRowCount()) {
             return false;
-        if (rows_to_move < 0) // this is "advance" to row, don't move backwards
+        }
+        if (rows_to_move < 0) {// this is "advance" to row, don't move backwards
             return false;
+        }
 
         m_hasCalculatedOffsets = false;
-        if (m_offsets == null)
+        if (m_offsets == null) {
             m_offsets = new int[getColumnCount()];
+        }
 
-        if (m_activeRowIndex == 0)
+        if (m_activeRowIndex == 0) {
             m_position = getRowStart() + ROW_COUNT_SIZE + ROW_HEADER_SIZE;
+        }
         else {
             // Move n rows - this code assumes rows can be variable size, so we
             // have to fetch the size of each row in order to advance to the
@@ -370,6 +383,71 @@ public abstract class VoltTableRow {
      */
     public final boolean wasNull() {
         return m_wasNull;
+    }
+
+    /**
+     * @return A slice of the underlying buffer containing the raw data of a row
+     * in a format that can be blindly copied into a VoltDB with sufficient space
+     * and the exact same schema.
+     */
+    final ByteBuffer getRawRow() {
+        int rowSize = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
+        int pos = m_buffer.position();
+        m_buffer.position(m_position - ROW_HEADER_SIZE);
+        ByteBuffer retval = m_buffer.slice();
+        m_buffer.position(pos);
+        retval.limit(ROW_HEADER_SIZE + rowSize);
+        return retval;
+    }
+
+    /**
+     * A way to get a column value in raw byte form without doing any
+     * expensive conversions, like date processing or string encoding.
+     *
+     * Next optimization is to do this without an allocation (maybe).
+     *
+     * @param columnIndex Index of the column
+     * @return A byte string containing the raw byte value.
+     */
+    final byte[] getRaw(int columnIndex) {
+        byte[] retval;
+        int pos = m_buffer.position();
+        int offset = getOffset(columnIndex);
+        VoltType type = getColumnType(columnIndex);
+
+        // value is ignored for strings and blobs (variable length types)
+        int length = type.getLengthInBytesForFixedTypesWithoutCheck();
+
+        switch(type) {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+        case FLOAT:
+        case DECIMAL:
+            // all of these types are fixed length, so easy to get raw type
+            retval = new byte[length];
+            m_buffer.position(offset);
+            m_buffer.get(retval);
+            m_buffer.position(pos);
+            return retval;
+        case STRING:
+        case VARBINARY:
+            // all of these types are variable length with a prefix
+            length = m_buffer.getInt(offset);
+            if (length == VoltTable.NULL_STRING_INDICATOR) {
+                length = 0;
+            }
+            length += 4;
+            retval = new byte[length];
+            m_buffer.position(offset);
+            m_buffer.get(retval);
+            m_buffer.position(pos);
+            return retval;
+        default:
+            throw new RuntimeException("Unknown type");
+        }
     }
 
     /**

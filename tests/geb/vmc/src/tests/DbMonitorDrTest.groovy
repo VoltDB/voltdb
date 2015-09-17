@@ -519,4 +519,122 @@ class DbMonitorDrTest extends TestBase {
         }
     }
 
+
+    def "Verify search in Database Replication table (MASTER)"(){
+        boolean isValid=false
+        String searchText = ""
+        boolean isDROpen = false
+
+       when: "Check if DR section is present"
+        if(!page.isDrSectionOpen())
+        {
+            isDROpen = false
+            println("Dr Replication is not present")
+        }
+        else
+        {
+            if(!page.isDrMasterSectionOpen())
+            {
+                println("Dr MAster section is not present")
+                isDROpen = false
+            }
+            else {
+                isDROpen = true
+            }
+        }
+        then:
+        println("proceed")
+        when: "Set the value of Master filter"
+        if(isDROpen==true) {
+            if (page.partitionIdRows.size() > 1) {
+                searchText = page.partitionIdRows[0].text().substring(0, 1)
+                page.filterPartitionId.value(page.partitionIdRows[0].text().substring(0, 1))
+            } else {
+                isValid = false
+                assert true
+            }
+            then: "check the table"
+            for (def i = 0; i <= page.partitionIdRows.size() - 1; i++) {
+                if (!page.partitionIdRows[i].text().toString().contains(searchText)) {
+                    println("test false")
+                    isValid = false
+                    break
+                } else {
+                    isValid = true
+                }
+
+            }
+        }
+        else
+        {
+            isValid=true
+        }
+        then:
+        println("proceed")
+            if (isValid == true) {
+                assert true;
+            } else {
+                assert false;
+            }
+
+    }
+
+    def "Verify search in Database Replication table (REPLICA)"(){
+        boolean isValid=false
+        String searchText = ""
+        boolean isDROpen = false
+
+        when: "Check if DR section is present"
+        if(!page.isDrSectionOpen())
+        {
+            isDROpen = false
+            println("Dr Replication is not present")
+        }
+        else
+        {
+            if(!page.isDrReplicaSectionOpen())
+            {
+                println("Dr Replica section is not present")
+                isDROpen = false
+            }
+            else {
+                isDROpen = true
+            }
+        }
+        then:
+        println("proceed")
+        when: "Set the value of Master filter"
+        if(isDROpen==true) {
+            if (page.filterReplicaServerRows.size() > 1) {
+                searchText = waitFor(20){page.filterReplicaServerRows[0].text().substring(0, 1)}
+                page.filterHostID.value(page.filterReplicaServerRows[0].text().substring(0, 1))
+            } else {
+                isValid = false
+                assert true
+            }
+            then: "check the table"
+            for (def i = 0; i <= page.filterReplicaServerRows.size() - 1; i++) {
+                if (!page.filterReplicaServerRows[i].text().toString().contains(searchText)) {
+                    println("test false")
+                    isValid = false
+                    break
+                } else {
+                    isValid = true
+                }
+
+            }
+        }
+        else
+        {
+            isValid=true
+        }
+        then:
+        println("proceed")
+        if (isValid == true) {
+            assert true;
+        } else {
+            assert false;
+        }
+
+    }
 }

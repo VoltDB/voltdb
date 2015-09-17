@@ -18,7 +18,7 @@
 #include "common/StreamBlock.h"
 
 namespace voltdb {
-    DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false) {
+    DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1) {
 
     }
 
@@ -59,11 +59,19 @@ namespace voltdb {
         receivedExportBuffer = true;
     }
 
-    void DummyTopend::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+    int64_t DummyTopend::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
         receivedDRBuffer = true;
         partitionIds.push(partitionId);
         blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
+        return pushDRBufferRetval;
+    }
+
+    int DummyTopend::reportDRConflict(int32_t partitionId,
+                int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+                std::string tableName, Table* input, Table* output) {
+        // TODO conform to return value contract of reportDRConflict()
+        return 0;
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}

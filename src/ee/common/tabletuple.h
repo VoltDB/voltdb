@@ -164,6 +164,16 @@ public:
         return bytes;
     }
 
+    // return the number of bytes when serialized for regular usage (other
+    // than export and DR).
+    size_t serializationSize() const {
+        size_t bytes = sizeof(int32_t);
+        for (int colIdx = 0; colIdx < sizeInValues(); ++colIdx) {
+            bytes += maxSerializedColumnSize(colIdx);
+        }
+        return bytes;
+    }
+
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
@@ -317,7 +327,7 @@ public:
 
     void deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool *stringPool);
     void deserializeFromDR(voltdb::SerializeInputLE &tupleIn, Pool *stringPool);
-    void serializeTo(voltdb::SerializeOutput &output);
+    void serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns = false);
     void serializeToExport(voltdb::ExportSerializeOutput &io,
                           int colOffset, uint8_t *nullArray);
     void serializeToDR(voltdb::ExportSerializeOutput &io,
@@ -402,6 +412,12 @@ private:
         }
     }
 
+    inline void serializeHiddenColumnsToDR(ExportSerializeOutput &io) const {
+        for (int colIdx = 0; colIdx < m_schema->hiddenColumnCount(); colIdx++) {
+            getHiddenNValue(colIdx).serializeToExport_withoutNull(io);
+        }
+    }
+
     inline size_t maxExportSerializedColumnSize(int colIndex) const {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -435,6 +451,25 @@ private:
                     valueToString(columnType).c_str() );
             return (size_t)0;
         }
+    }
+
+    inline size_t maxSerializedColumnSize(int colIndex) const {
+        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+        voltdb::ValueType columnType = columnInfo->getVoltType();
+
+        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+            // Null variable length value doesn't take any bytes in
+            // export table, so here needs a special handle for VARCHAR
+            // and VARBINARY
+            if (isNull(colIndex)) {
+                return sizeof(int32_t);
+            }
+        } else if (columnType == VALUE_TYPE_DECIMAL) {
+            // Other than export and DR table, decimal column in regular table
+            // doesn't contain scale and precision bytes.
+            return 16;
+        }
+        return maxExportSerializedColumnSize(colIndex);
     }
 };
 
@@ -765,8 +800,10 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
     assert(m_schema);
     assert(m_data);
 
+    const int32_t columnCount  = m_schema->columnCount();
+    const int32_t hiddenColumnCount  = m_schema->hiddenColumnCount();
     tupleIn.readInt();
-    for (int j = 0; j < m_schema->columnCount(); ++j) {
+    for (int j = 0; j < columnCount; ++j) {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(j);
 
         /**
@@ -785,6 +822,23 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInputBE &tupleIn, Pool 
         NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
                 columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
     }
+
+        for (int j = 0; j < hiddenColumnCount; ++j) {
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(j);
+
+            // tupleIn may not have hidden column
+            if (!tupleIn.hasRemaining()) {
+                std::ostringstream message;
+                message << "TableTuple::deserializeFrom table tuple doesn't have enough space to deserialize the hidden column "
+                        << "(index=" << j << ")"
+                        << std::endl;
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message.str().c_str());
+            }
+
+            char *dataPtr = getWritableDataPtr(columnInfo);
+            NValue::deserializeFrom(tupleIn, dataPool, dataPtr, columnInfo->getVoltType(),
+                    columnInfo->inlined, static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
+        }
 }
 
 inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Pool *dataPool) {
@@ -813,9 +867,19 @@ inline void TableTuple::deserializeFromDR(voltdb::SerializeInputLE &tupleIn,  Po
                     static_cast<int32_t>(columnInfo->length), columnInfo->inBytes);
         }
     }
+
+    const int32_t hiddenColumnCount = m_schema->hiddenColumnCount();
+    for (int i = 0; i < hiddenColumnCount; i++) {
+        const TupleSchema::ColumnInfo * hiddenColumnInfo = m_schema->getHiddenColumnInfo(i);
+        char *dataPtr = getWritableDataPtr(hiddenColumnInfo);
+        NValue::deserializeFrom<TUPLE_SERIALIZATION_DR, BYTE_ORDER_LITTLE_ENDIAN>(
+                            tupleIn, dataPool, dataPtr,
+                            hiddenColumnInfo->getVoltType(), hiddenColumnInfo->inlined,
+                            static_cast<int32_t>(hiddenColumnInfo->length), hiddenColumnInfo->inBytes);
+    }
 }
 
-inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
+inline void TableTuple::serializeTo(voltdb::SerializeOutput &output, bool includeHiddenColumns) {
     size_t start = output.reserveBytes(4);
 
     for (int j = 0; j < m_schema->columnCount(); ++j) {
@@ -824,13 +888,18 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
         value.serializeTo(output);
     }
 
+    if (includeHiddenColumns) {
+        for (int j = 0; j < m_schema->hiddenColumnCount(); ++j) {
+            NValue value = getHiddenNValue(j);
+            value.serializeTo(output);
+        }
+    }
+
     // write the length of the tuple
     output.writeIntAt(start, static_cast<int32_t>(output.position() - start - sizeof(int32_t)));
 }
 
-inline
-void
-TableTuple::serializeToExport(ExportSerializeOutput &io,
+inline void TableTuple::serializeToExport(ExportSerializeOutput &io,
                               int colOffset, uint8_t *nullArray)
 {
     int columnCount = sizeInValues();
@@ -844,11 +913,13 @@ inline void TableTuple::serializeToDR(ExportSerializeOutput &io,
                               const std::vector<int>* interestingColumns) {
     if (!interestingColumns) {
         serializeToExport(io, colOffset, nullArray);
+        serializeHiddenColumnsToDR(io);
     } else {
         std::vector<int> cols = *interestingColumns;
         for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
             serializeColumnToExport(io, colOffset, *cit, nullArray);
         }
+        serializeHiddenColumnsToDR(io);
     }
 }
 

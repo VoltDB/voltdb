@@ -1649,7 +1649,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
 
     if (!tableStreamTypeIsValid(streamType)) {
         // Failure
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     TupleOutputStreamProcessor outputStreams(nBuffers);
@@ -1657,7 +1657,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
         int offset = serializeIn.readInt();
         int length = serializeIn.readInt();
-        outputStreams.add(ptr + offset, length - offset);
+        outputStreams.add(ptr + offset, length);
     }
     retPositions.reserve(nBuffers);
 
@@ -1665,7 +1665,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     // If a completed table is polled, return remaining==-1. The
     // Java engine will always poll a fully serialized table one more
     // time (it doesn't see the hasMore return code).
-    int64_t remaining = -1;
+    int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     PersistentTable *table = NULL;
 
     if (tableStreamTypeIsSnapshot(streamType)) {
@@ -1674,6 +1674,9 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
         table = findInMapOrNull(tableId, m_snapshottingTables);
+        if (table == NULL) {
+            return TABLE_STREAM_SERIALIZATION_ERROR;
+        }
 
         remaining = table->streamMore(outputStreams, streamType, retPositions);
         if (remaining <= 0) {
@@ -1683,9 +1686,10 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
         Table* found = getTable(tableId);
-        if (!found) {
-            return -1;
+        if (found == NULL) {
+            return TABLE_STREAM_SERIALIZATION_ERROR;
         }
+
         PersistentTable * currentTable = dynamic_cast<PersistentTable*>(found);
         assert(currentTable != NULL);
         // The ongoing TABLE STREAM needs the original table from the first table truncate.
@@ -1705,10 +1709,12 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     else {
         Table* found = getTable(tableId);
-        if (found) {
-            table = dynamic_cast<PersistentTable*>(found);
-            remaining = table->streamMore(outputStreams, streamType, retPositions);
+        if (found == NULL) {
+            return TABLE_STREAM_SERIALIZATION_ERROR;
         }
+
+        table = dynamic_cast<PersistentTable*>(found);
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
     }
 
     return remaining;
@@ -1866,18 +1872,13 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     }
 }
 
-void VoltDBEngine::applyBinaryLog(int64_t txnId,
+int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t spHandle,
                                   int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
                                   int64_t undoToken,
                                   const char *log) {
-    if (m_database->isActiveActiveDRed()) {
-        DRTupleStreamDisableGuard guard(m_drStream);
-        if (m_drReplicatedStream) {
-            DRTupleStreamDisableGuard guardReplicated(m_drReplicatedStream);
-        }
-    }
+    DRTupleStreamDisableGuard guard(m_drStream, m_drReplicatedStream, !m_database->isActiveActiveDRed());
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
@@ -1885,7 +1886,7 @@ void VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
+    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
@@ -1940,19 +1941,13 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::reportProgressToTopend() {
-    std::string tableName;
-    int64_t tableSize;
-
+    // TableName and tableSize are not really used in the JNI call
+    // Very low risk fix is make them constants
+    // TODO: refer ENG-8903 to deal with them
+    std::string tableName = "None";
+    int64_t tableSize = 0;
     assert(m_currExecutorVec);
 
-    if (m_lastAccessedTable == NULL) {
-        tableName = "None";
-        tableSize = 0;
-    }
-    else {
-        tableName = m_lastAccessedTable->name();
-        tableSize = m_lastAccessedTable->activeTupleCount();
-    }
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
     m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,

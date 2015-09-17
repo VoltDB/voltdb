@@ -72,24 +72,33 @@
 using namespace std;
 using namespace voltdb;
 
-#define NUM_OF_COLUMNS 5
-#define NUM_OF_TUPLES 10000
+#define NUM_OF_COLUMNS 9
+#define NUM_OF_TUPLES 5000
 
-ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
-                                            VALUE_TYPE_TINYINT,
+ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_TINYINT,
                                             VALUE_TYPE_SMALLINT,
                                             VALUE_TYPE_INTEGER,
-                                            VALUE_TYPE_BIGINT };
+                                            VALUE_TYPE_BIGINT,
+                                            VALUE_TYPE_DECIMAL,
+                                            VALUE_TYPE_DOUBLE,
+                                            VALUE_TYPE_TIMESTAMP,
+                                            VALUE_TYPE_VARCHAR,
+                                            VALUE_TYPE_VARBINARY };
 
 int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
     {
-        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
-        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)
+        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),    // 1
+        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),   // 2
+        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),    // 4
+        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),     // 8
+        NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL),    // 16
+        NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE),     // 8
+        NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP),  // 8
+        10,    /* The test uses getRandomValue() to generate random value,
+                  make sure the column size not conflict with the value it generates. */
+        16     /* same as above */
     };
-bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true };
+bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true, true, true, true, true };
 
 class TableTest : public Test {
 public:
@@ -106,7 +115,6 @@ public:
 protected:
     void init(bool xact) {
         CatalogId database_id = 1000;
-        vector<boost::shared_ptr<const TableColumn> > columns;
         char buffer[32];
 
         vector<string> columnNames(NUM_OF_COLUMNS);
@@ -128,7 +136,11 @@ protected:
             temp_table = TableFactory::getTempTable(database_id, "test_temp_table", schema, columnNames, &limits);
             m_table = temp_table;
         }
-        assert(tableutil::addRandomTuples(m_table, NUM_OF_TUPLES));
+
+        bool addTuples = tableutil::addRandomTuples(m_table, NUM_OF_TUPLES);
+        if(!addTuples) {
+            assert(!"Failed adding random tuples");
+        }
     }
 
     Table* m_table;
@@ -153,6 +165,28 @@ TEST_F(TableTest, ValueTypes) {
             EXPECT_EQ(COLUMN_TYPES[ctr], columnInfo->getVoltType());
         }
     }
+}
+
+TEST_F(TableTest, TableSerialize) {
+    size_t serializeSize = m_table->getAccurateSizeToSerialize(true);
+    char* backingCharArray = new char[serializeSize];
+    ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+    m_table->serializeTo(conflictSerializeOutput);
+
+    EXPECT_EQ(serializeSize, conflictSerializeOutput.size());
+
+    delete[] backingCharArray;
+}
+
+TEST_F(TableTest, TableSerializeWithoutTotalSize) {
+    size_t serializeSize = m_table->getAccurateSizeToSerialize(false);
+    char* backingCharArray = new char[serializeSize];
+    ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+    m_table->serializeToWithoutTotalSize(conflictSerializeOutput);
+
+    EXPECT_EQ(serializeSize, conflictSerializeOutput.size());
+
+    delete[] backingCharArray;
 }
 
 TEST_F(TableTest, TupleInsert) {

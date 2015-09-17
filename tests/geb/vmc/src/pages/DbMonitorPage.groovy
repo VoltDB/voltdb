@@ -48,7 +48,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         serverList     			        { $('#popServerList') }
         servers         		        { serverList.find('.active') }
         servName        		        { servers.find('a') }
-        servMemory      		        { servers.find('.memory-status') }
+        servMemory      		        { servers.next().next().find('.memory-status') }
         showHideGraph  		 	        { $('#showHideGraphBlock') }
         graphsArea      		        { $('#graphChart') }
         showHideData    		        { $('#ShowHideBlock') }
@@ -155,11 +155,11 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         //partition idle graph
         partitiongraphmin 		        { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         partitiongraphmax		        { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
-        
+
         //command log statistics graph
         commandLogStatisticsMin         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
         commandLogStatisticsMax         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
-        
+
 
         //database replication graph
         databaseReplicationMin          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
@@ -204,6 +204,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         dbDrMode {$("#dbDrMode")}
 
+        filterPartitionId {$("#filterPartitionId")}
+
+        partitionIdRows{$("#tblDrMAster").find(class:"sorting_1")}
+
+
+
 
         //Dr Replica Section
 
@@ -213,6 +219,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicaStatus{$("#replicaStatus")}
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
+
+        filterReplicaServerRows{$("#tblDrReplica").find(class:"sorting_1")}
+
+        filterHostID {($("#filterHostID"))}
 
         // Command Log Table
 
@@ -231,8 +241,14 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drReplicaTitle {$("#drReplicaTitle")}
         drCLPTitle {$("#drCLPTitle")}
 
-        
-        // UAT 
+        filterServer {$("#filterServer")}
+
+        clpServerRows {$("#tblCmdLog").find(class:"sorting_1")}
+
+
+
+
+        // UAT
         drTableModeTypeText         { $("#dbDrMode") }
         drTableBlock                { $("#showHideDrBlock") }
         drTableCurrentPageReplica   { $("#tblDrReplica_paginate > div > span.pageIndex") }
@@ -241,13 +257,37 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         drTablePrevReplicaDisabled  { $("#tblDrReplica_paginate > span.paginate_disabled_previous.paginate_button") }
         drTableNextReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_next.paginate_button") }
         drTablePrevReplicaEnabled   { $("#tblDrReplica_paginate > span.paginate_enabled_previous.paginate_button") }
-        
+
         drTableCurrentPageMaster    { $("#tblDrMAster_paginate > div > span.pageIndex") }
         drTableTotalPagesMaster     { $("#tblDrMAster_paginate > div > span.totalPages") }
         drTableNextMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_next.paginate_button") }
         drTablePrevMasterEnabled    { $("#tblDrMAster_paginate > span.paginate_enabled_previous.paginate_button") }
         drTableNextMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_next.paginate_button") }
         drTablePrevMasterDisabled   { $("#tblDrMAster_paginate > span.paginate_disabled_previous.paginate_button") }
+
+        //
+        clpPrevDisabled             { $("#tblCmdLog_paginate > span.paginate_disabled_previous.paginate_button") }
+        clpNextDisabled             { $("#tblCmdLog_paginate > span.paginate_disabled_next.paginate_button") }
+        clpPrevEnabled              { $("#tblCmdLog_paginate > span.paginate_enabled_previous.paginate_button") }
+        clpNextEnabled              { $("#tblCmdLog_paginate > span.paginate_enabled_next.paginate_button") }
+
+        clpCurrentPage              { $("#tblCmdLog_paginate > div > span.pageIndex") }
+        clpTotalPages               { $("#tblCmdLog_paginate > div > span.totalPages") }
+        
+        //
+        storedProcPrev              { $("#previousProcedures") }
+        storedProcNext              { $("#nextProcedures") }
+        storedProcCurrentPage       { $("#lblPrevious") }
+        storedProcTotalPages        { $("#lblTotalPages") }
+        
+        //
+        tablesPrev                  { $("#previousTables") }
+        tablesNext                  { $("#nextTables") }
+
+        serverListHeader            { $("#tblServerListHeader") }
+        serverNameHeader            { $("#thServerName") }
+        serverIpAddressHeader       { $("#thIpAddress") }
+        serverMemoryUsageHeader     { $("#thMemoryUsage") }
     }
 
     static at = {
@@ -430,8 +470,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      */
     def String getMemoryUsage(String serverName) {
         openServerList()
-        waitFor { servName.filter(text: serverName).next('.memory-status').displayed }
-        String text = servName.filter(text: serverName).next('.memory-status').text()
+        waitFor { servName.filter(text: serverName).parent().next().next().find('.memory-status').displayed }
+        String text = servName.filter(text: serverName).parent().next().next().find('.memory-status').text()
         closeServerList()
         return text
     }

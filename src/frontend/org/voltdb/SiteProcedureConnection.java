@@ -196,5 +196,5 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public void applyBinaryLog(long txnId, long spHandle, long uniqueId, byte logData[]);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, byte logData[]);
 }

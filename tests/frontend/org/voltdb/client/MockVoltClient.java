@@ -370,7 +370,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
 
     @Override
-    public ClientResponse callProcedureWithTimeout(int fragTimeout, String procName, Object... parameters)
+    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException {
         // TODO Auto-generated method stub
         return null;
