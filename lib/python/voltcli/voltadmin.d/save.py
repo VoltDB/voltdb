@@ -37,7 +37,13 @@ import urllib
                            default = False),
         VOLT.EnumOption('-f', '--format', 'format',
                         'snapshot format', 'native', 'csv',
-                        default = 'native')
+                        default = 'native'),
+        VOLT.StringListOption(None, '--tables', 'tables',
+                              'tables to include in the snapshot',
+                              default = ''),
+        VOLT.StringListOption(None, '--exclude-tables', 'exclude_tables',
+                              'tables to exclude in the snapshot',
+                              default = '')
     ),
     arguments = (
         VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
@@ -51,8 +57,8 @@ def save(runner):
         blocking = 'true'
     else:
         blocking = 'false'
-    json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s"}'
-                    % (uri, nonce, blocking, runner.opts.format)]
+    json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s",tableNames:%s,excludeTableNames:%s}'
+                    % (uri, nonce, blocking, runner.opts.format, runner.opts.tables, runner.opts.exclude_tables)]
     runner.verbose_info('@SnapshotSave "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     response = runner.call_proc('@SnapshotSave', columns, json_opts)
