@@ -634,6 +634,7 @@ ul.rightShowhideList {
 }
 
 
+
 .chart {
     overflow: hidden;
     background: #FFFFFF;
@@ -1106,7 +1107,6 @@ a.setVal {
     }
 
 
-
 table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
@@ -1128,12 +1128,10 @@ table.serversTbl tr td.pauseActiveMonitoring {
 
 table.serversTbl tr td.active{
     background-position: 5px 17px;
-
 }
 
 table.serversListTbl tr td.active {
     background-position: 5px 20px;
-
 }
 
 table.serversTbl tr td.pauseMonitoring {
@@ -3625,8 +3623,9 @@ a:hover.changePsd {
 /*add idsk limit*/
 table.diskLimitTbl tr td { border: none;}
 
-
-
+/*********overlapping nv.d3.css*********/
+.nvtooltip{ padding: 5px!important;}
+svg.nvd3-svg { padding: 0 0 0 10px!important; }
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
@@ -4092,7 +4091,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 350px;
+        height: 350px!important;
         margin-top: 30px;
     }
     .logHeight {
@@ -4115,7 +4114,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 30px;
     }
     .logHeight {
@@ -4339,7 +4338,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 75px;
     }
 }
@@ -4347,7 +4346,7 @@ table.diskLimitTbl tr td { border: none;}
 
 @media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
     }
      .logHeight {
           height: 364px;
@@ -4380,7 +4379,7 @@ table.diskLimitTbl tr td { border: none;}
 
 @media (min-width: 768px) and (max-width:1246px) {
     .partitionHeight {
-        height: 310px;
+        height: 310px!important;
     }
      
 

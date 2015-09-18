@@ -550,58 +550,62 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 return '';
             }
 
-            var table = d3.select(document.createElement("table"));
-            if (headerEnabled) {
-                var theadEnter = table.selectAll("thead")
-                    .data([d])
-                    .enter().append("thead");
-
-                theadEnter.append("tr")
-                    .append("td")
-                    .attr("colspan", 3)
-                    .append("strong")
-                    .classed("x-value", true)
-                    .html(headerFormatter(d.value));
+            if (d.series[0].value == null) {
+                return '';
             }
+            
+            var table = d3.select(document.createElement("table"));
+                if (headerEnabled) {
+                    var theadEnter = table.selectAll("thead")
+                        .data([d])
+                        .enter().append("thead");
 
-            var tbodyEnter = table.selectAll("tbody")
-                .data([d])
-                .enter().append("tbody");
+                    theadEnter.append("tr")
+                        .append("td")
+                        .attr("colspan", 3)
+                        .append("strong")
+                        .classed("x-value", true)
+                        .html(headerFormatter(d.value));
+                }
 
-            var trowEnter = tbodyEnter.selectAll("tr")
-                    .data(function(p) { return p.series})
+                var tbodyEnter = table.selectAll("tbody")
+                    .data([d])
+                    .enter().append("tbody");
+
+                var trowEnter = tbodyEnter.selectAll("tr")
+                    .data(function(p) { return p.series })
                     .enter()
                     .append("tr")
-                    .classed("highlight", function(p) { return p.highlight});
+                    .classed("highlight", function(p) { return p.highlight });
 
-            trowEnter.append("td")
-                .classed("legend-color-guide",true)
-                .append("div")
-                .style("background-color", function(p) { return p.color});
+                trowEnter.append("td")
+                    .classed("legend-color-guide", true)
+                    .append("div")
+                    .style("background-color", function(p) { return p.color });
 
-            trowEnter.append("td")
-                .classed("key",true)
-                .html(function(p, i) {return keyFormatter(p.key, i)});
+                trowEnter.append("td")
+                    .classed("key", true)
+                    .html(function(p, i) { return keyFormatter(p.key, i) });
 
-            trowEnter.append("td")
-                .classed("value",true)
-                .html(function(p, i) { return valueFormatter(p.value, i) });
+                trowEnter.append("td")
+                    .classed("value", true)
+                    .html(function(p, i) { return valueFormatter(p.value, i) });
 
 
-            trowEnter.selectAll("td").each(function(p) {
-                if (p.highlight) {
-                    var opacityScale = d3.scale.linear().domain([0,1]).range(["#fff",p.color]);
-                    var opacity = 0.6;
-                    d3.select(this)
-                        .style("border-bottom-color", opacityScale(opacity))
-                        .style("border-top-color", opacityScale(opacity))
-                    ;
-                }
-            });
+                trowEnter.selectAll("td").each(function(p) {
+                    if (p.highlight) {
+                        var opacityScale = d3.scale.linear().domain([0, 1]).range(["#fff", p.color]);
+                        var opacity = 0.6;
+                        d3.select(this)
+                            .style("border-bottom-color", opacityScale(opacity))
+                            .style("border-top-color", opacityScale(opacity));
+                    }
+                });
 
-            var html = table.node().outerHTML;
-            if (d.footer !== undefined)
-                html += "<div class='footer'>" + d.footer + "</div>";
+                var html = table.node().outerHTML;
+                if (d.footer !== undefined)
+                    html += "<div class='footer'>" + d.footer + "</div>";
+            
             return html;
 
         };
@@ -783,6 +787,7 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 tooltip.selectAll("div, table, td, tr").classed(nvPointerEventsClass, true);
                 tooltip.classed(nvPointerEventsClass, true);
                 tooltipElem = tooltip.node();
+
             }
         }
 
@@ -790,6 +795,16 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
         function nvtooltip() {
             if (!enabled) return;
             if (!dataSeriesExists(data)) return;
+            //code added in order to not display hover div while value is null @Sujesh
+            if (data.series.length > 1) {
+                if (data.series[0].value == null) {
+                    $(".nvtooltip").first().hide();
+                    return;
+                } else {
+                    $(".nvtooltip").first().show();
+                }
+            }
+            
 
             convertViewBoxRatio();
 
@@ -804,6 +819,8 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 var newContent = contentGenerator(data);
                 if (newContent) {
                     tooltipElem.innerHTML = newContent;
+                } else {
+                    tooltipElem.innerHTML = "";
                 }
 
                 if (chartContainer && isInteractiveLayer) {
@@ -6214,7 +6231,7 @@ nv.models.lineChart = function() {
                 g.select(".nv-y.nv-axis")
                     .attr("transform", "translate(" + availableWidth + ",0)");
             }
-
+            
             //Set up interactive layer
             if (useInteractiveGuideline) {
                 interactiveLayer
