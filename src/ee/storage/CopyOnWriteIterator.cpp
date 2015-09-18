@@ -33,7 +33,7 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_skippedInactiveRows(0) {
 
     if ((m_blocks.size() == 1) && m_blockIterator.value()->isEmpty()) {
-        //m_blockIterator = m_end;
+        m_blockIterator = m_end;
         return;
     }
 
