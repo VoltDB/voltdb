@@ -108,6 +108,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryRes.displayed
         queryDur.displayed
     }
+    boolean textHasChanged = false
 
     /**
      * Displays the list of Tables (by clicking the "Tables" tab).
@@ -406,27 +407,30 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
-     * Returns true if the specified element, <i>navElem</i>, is displayed
-     * (i.e., visible on the page), with (non-null) non-empty text, and is
-     * different from before, meaning that either the text has changed from
-     * its original value, <i>initText</i>, or the original WebElement,
-     * <i>initElem</i>, is stale.
-     * @param navElem - a Navigator specifying the element to be checked
-     * for having been updated..
-     * @param initText - the text of the original WebElement, <i>initElem</i>,
-     * before being updated.
-     * @param initElem - the original (first) WebElement specified by
-     * <i>navElem</i>, before being updated.
-     * @return true if the specified element has been updated.
+     * Returns true if the text of either of the two specified elements
+     * (containing query results and duration), has changed to a different
+     * value - even if it subsequently changed back to the same value.
+     *
+     * @param navResElem - a Navigator specifying the query result element
+     * to be checked for having changed.
+     * @param initResText - the original text of the query result element,
+     * before running a new query.
+     * @param navDurElem - a Navigator specifying the query duration element
+     * to be checked for having changed.
+     * @param initDurText - the original text of the query duration element,
+     * before running a new query.
+     * @return true if the text of either element has changed.
      */
-    private boolean isUpdated(Navigator navElem, String initText, WebElement initElem) {
-        // TODO: temporary debug print:
-        if (isStale(initElem)) {
-            println 'isStale(' + initElem + '): is true!'
+    private boolean hasChanged(Navigator navResElem, String initResText,
+                               Navigator navDurElem, String initDurText) {
+        if (textHasChanged) {
+            return true
         }
-        String navElemText = navElem.text()
-        return navElemText != null && !navElemText.isEmpty() &&
-              (navElemText != initText || isStale(initElem))
+        if (navResElem.text() != initResText ||
+            navDurElem.text() != initDurText ) {
+            textHasChanged = true
+         }
+        return textHasChanged
     }
 
     /**
@@ -434,20 +438,18 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * (by clicking the "Run" button).
      */
     def runQuery() {
-        WebElement initQueryResElem  = queryRes.firstElement()
-        WebElement initQueryDurElem  = queryDur.firstElement()
         String initQueryResultText   = queryRes.text()
         String initQueryDurationText = queryDur.text()
         runButton.click()
 
         // Wait for both the query result and duration to be displayed, with
-        // at least one different from before; 'different' can mean that the
-        // original WebElement is stale, or that the text has changed
+        // (non-null) non-empty text; and for something to have changed
         try {
+            textHasChanged = false
             waitFor() {
-                isDisplayed(queryRes) && isDisplayed(queryDur) &&
-                (isUpdated(queryRes, initQueryResultText,   initQueryResElem) ||
-                 isUpdated(queryDur, initQueryDurationText, initQueryDurElem) )
+                hasChanged(queryRes, initQueryResultText, queryDur, initQueryDurationText) &&
+                isDisplayed(queryRes) && queryRes.text() != null && !queryRes.text().isEmpty() &&
+                isDisplayed(queryDur) && queryDur.text() != null && !queryDur.text().isEmpty()
             }
         } catch (WaitTimeoutException e) {
             String message = '\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; this is probably nothing to worry about'
