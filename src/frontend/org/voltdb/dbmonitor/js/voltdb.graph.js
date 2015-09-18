@@ -1261,7 +1261,7 @@
             d3.select('#visualisationCommandLog .nv-y')
                 .append('rect')
                 .attr('x', 2)
-                .attr('width', 475)
+                .attr('width', 560)
                 .style('fill', 'white')
                 .style('opacity', 1)
                 .attr('y', 0)
@@ -1271,7 +1271,7 @@
                 var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
                 var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
                 var opacity = 1;
-                if (x1 > 3 && x1 < 475 && (x2 - x1 > 0)) {
+                if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
                     opacity = ((x2 - x1) > 4) ? 0.2 : 1;
                     d3.select('#visualisationCommandLog .nv-y')
                         .append('rect')
