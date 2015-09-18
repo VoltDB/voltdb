@@ -43,7 +43,7 @@ public:
      * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
      */
     bool needToDirtyTuple(const char *blockAddress, const char *tupleAddress) {
-        if(m_currentBlock == NULL) {
+        if (m_currentBlock == NULL) {
             return false;
         }
 
