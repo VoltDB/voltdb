@@ -132,8 +132,11 @@ public:
                                                    columnIndices, TableIndex::simplyIndexColumns(),
                                                    true, true, m_otherSchemaWithIndex);
         TableIndex *index = TableIndexFactory::getInstance(scheme);
-        TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
         m_otherTableWithIndex->addIndex(index);
+        scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
+                                  columnIndices, TableIndex::simplyIndexColumns(),
+                                  true, true, m_otherSchemaWithIndexReplica);
+        TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
         m_otherTableWithIndexReplica->addIndex(replicaIndex);
 
         m_otherTableWithIndex->setDR(true);
@@ -205,6 +208,17 @@ public:
         table->deleteTuple(tuple_to_delete, true);
     }
 
+    void updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
+        TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
+        ASSERT_FALSE(tuple_to_update.isNullTuple());
+        TableTuple new_tuple = table->tempTuple();
+        new_tuple.copy(tuple_to_update);
+        new_tuple.setNValue(0, ValueFactory::getTinyIntValue(new_index_value));
+        m_cachedStringValues.push_back(ValueFactory::getStringValue(new_nonindex_value));
+        new_tuple.setNValue(3, m_cachedStringValues.back());
+        table->updateTuple(tuple_to_update, new_tuple);
+    }
+
     TableTuple prepareTempTuple(PersistentTable* table, int8_t tinyint, int64_t bigint, const std::string& decimal,
             const std::string& short_varchar, const std::string& long_varchar, int64_t timestamp) {
         TableTuple temp_tuple = table->tempTuple();
@@ -261,6 +275,9 @@ public:
                                                    firstColumnIndices, TableIndex::simplyIndexColumns(),
                                                    true, true, m_schema);
         TableIndex *firstIndex = TableIndexFactory::getInstance(scheme);
+        scheme = TableIndexScheme("first_unique_index", HASH_TABLE_INDEX,
+                                  firstColumnIndices, TableIndex::simplyIndexColumns(),
+                                  true, true, m_schemaReplica);
         TableIndex *firstReplicaIndex = TableIndexFactory::getInstance(scheme);
 
         vector<int> secondColumnIndices;
@@ -271,6 +288,9 @@ public:
                                   secondColumnIndices, TableIndex::simplyIndexColumns(),
                                   true, true, m_schema);
         TableIndex *secondIndex = TableIndexFactory::getInstance(scheme);
+        scheme = TableIndexScheme("second_unique_index", HASH_TABLE_INDEX,
+                                  secondColumnIndices, TableIndex::simplyIndexColumns(),
+                                  true, true, m_schemaReplica);
         TableIndex *secondReplicaIndex = TableIndexFactory::getInstance(scheme);
 
         m_table->addIndex(firstIndex);
@@ -313,6 +333,45 @@ public:
 
         EXPECT_EQ(1, m_tableReplica->activeTupleCount());
         TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+    }
+
+    void simpleUpdateTest() {
+        beginTxn(99, 99, 98, 70);
+        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+        TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+        endTxn(true);
+
+        flushAndApply(99);
+
+        EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+
+        beginTxn(100, 100, 99, 71);
+        // update the non-index column only
+        updateTuple(m_table, first_tuple, 42, "not that");
+        endTxn(true);
+
+        flushAndApply(100);
+
+        EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+        TableTuple expected_tuple = prepareTempTuple(m_table, 42, 55555, "349508345.34583", "not that", "a totally different thing altogether", 5433);
+        TableTuple tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+        tuple = m_table->lookupTupleByValues(second_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+
+        beginTxn(101, 101, 100, 72);
+        // update the index column only
+        updateTuple(m_table, second_tuple, 99, "and another");
+        endTxn(true);
+
+        flushAndApply(101);
+
+        EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+        tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+        expected_tuple = prepareTempTuple(m_table, 99, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222);
+        tuple = m_table->lookupTupleByValues(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
@@ -432,6 +491,8 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
+    m_singleColumnTable->setDR(false);
+
     beginTxn(99, 99, 98, 70);
     TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
     endTxn(false);
@@ -450,6 +511,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
 
     // Roll back a txn that hasn't applied any binary log data
     beginTxn(101, 101, 100, 72);
+    TableTuple temp_tuple = m_singleColumnTable->tempTuple();
+    temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(1));
+    insertTuple(m_singleColumnTable, temp_tuple);
     endTxn(false);
 
     flushAndApply(101);
@@ -644,7 +708,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(0));
     temp_tuple.setNValue(1, ValueFactory::getBigIntValue(1));
     TableTuple third_tuple = insertTuple(m_otherTableWithIndex, temp_tuple);
-    m_otherTableWithoutIndex->tempTuple();
+    temp_tuple = m_otherTableWithoutIndex->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(2));
     temp_tuple.setNValue(1, ValueFactory::getBigIntValue(3));
     TableTuple fourth_tuple = insertTuple(m_otherTableWithoutIndex, temp_tuple);
@@ -684,12 +748,29 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexNoninlineVarchar) {
                                                columnIndices, TableIndex::simplyIndexColumns(),
                                                true, true, m_schema);
     TableIndex *index = TableIndexFactory::getInstance(scheme);
+    scheme = TableIndexScheme("the_index", HASH_TABLE_INDEX,
+                              columnIndices, TableIndex::simplyIndexColumns(),
+                              true, true, m_schemaReplica);
     TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
 
     m_table->addIndex(index);
     m_tableReplica->addIndex(replicaIndex);
 
     simpleDeleteTest();
+}
+
+TEST_F(DRBinaryLogTest, BasicUpdate) {
+    simpleUpdateTest();
+}
+
+TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+    ASSERT_FALSE(indexPair.first == NULL);
+    ASSERT_FALSE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, indexPairReplica.second);
+    simpleUpdateTest();
 }
 
 int main() {

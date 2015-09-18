@@ -166,6 +166,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             m_hash = null;
         }
         int tableCount = buf.getShort();
+        if (tableCount < 0) {
+            throw new IOException("Table count is negative: " + tableCount);
+        }
         results = new VoltTable[tableCount];
         for (int i = 0; i < tableCount; i++) {
             int tableSize = buf.getInt();
@@ -238,7 +241,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (m_hash != null) {
             buf.putInt(m_hash.intValue());
         }
-        buf.putShort((short)results.length);
+        buf.putShort((short) results.length);
         for (VoltTable vt : results)
         {
             vt.flattenToBuffer(buf);

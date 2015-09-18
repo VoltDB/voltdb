@@ -50,7 +50,8 @@
 
 package org.voltdb;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -58,6 +59,7 @@ import java.util.Date;
 import junit.framework.TestCase;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.types.TimestampType;
 
@@ -214,6 +216,23 @@ public class TestVoltProcedure extends TestCase {
         }
     }
 
+    static class LargeNumberOfTablesProc extends NullProcedureWrapper
+    {
+        public static VoltTable[] run(String arg)
+        {
+            ColumnInfo columnInfo = new ColumnInfo("intcol", VoltType.INTEGER);
+            VoltTable table = new VoltTable(columnInfo);
+            table.addRow(10);
+            int count = Short.MAX_VALUE + 1;
+            VoltTable[] results = new VoltTable[count];
+            for (int i=0; i<count; i++) {
+                results[i] = table;
+            }
+
+            return results;
+        }
+    }
+
     static class NullProcedureWrapper extends VoltProcedure {
         VoltTable runQueryStatement(SQLStmt stmt, Object... params) {
             assert false;
@@ -272,6 +291,7 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(BoxedDoubleProcedure.class.getName());
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
+        manager.addProcedureForTest(LargeNumberOfTablesProc.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
         site = mock(SiteProcedureConnection.class);
         doReturn(42).when(site).getCorrespondingPartitionId();
@@ -383,6 +403,13 @@ public class TestVoltProcedure extends TestCase {
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.getStatus());
         System.out.println(r.getStatusString());
         assertTrue(r.getStatusString().contains("java.lang.NullPointerException"));
+    }
+
+    public void testLargeNumberOfTablesError() {
+        ClientResponse r = call(LargeNumberOfTablesProc.class);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.getStatus());
+        System.out.println(r.getStatusString());
+        assertTrue(r.getStatusString().contains("Exceeded  maximum number of VoltTables"));
     }
 
     public void testNegativeWiderType() {
