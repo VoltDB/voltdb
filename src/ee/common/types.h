@@ -320,6 +320,11 @@ enum ExpressionType {
     // -----------------------------
     EXPRESSION_TYPE_HASH_RANGE                      = 200,
 
+    // ---------------------------------------
+    // Internals added for Selective Snapshot
+    // ---------------------------------------
+    EXPRESSION_TYPE_HAPPENED_AFTER                  = 260,
+
     // -----------------------------
     // Internals added for Case When
     // -----------------------------

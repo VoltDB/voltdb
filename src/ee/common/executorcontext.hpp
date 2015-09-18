@@ -22,6 +22,7 @@
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
+#include "common/valuepeeker.hpp"
 
 #include <vector>
 #include <map>
@@ -32,7 +33,7 @@ class AbstractExecutor;
 class DRTupleStream;
 class VoltDBEngine;
 
-
+const int64_t TIMESTAMP_MASK = (1L << 49) - 1L;
 /*
  * EE site global data required by executors at runtime.
  *
@@ -88,6 +89,16 @@ class ExecutorContext {
         m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
         m_currentDRTimestamp = (static_cast<int64_t>(m_drClusterId) << 49) | (m_uniqueId >> 14);
+    }
+
+    int64_t getTimestampFromHiddenNValue(NValue value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return ((hiddenValue & TIMESTAMP_MASK) >> 9) + m_epoch;
+    }
+
+    int32_t getClusterIdFromHiddenNValue(NValue value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return hiddenValue >> 49;
     }
 
     // data available via tick()

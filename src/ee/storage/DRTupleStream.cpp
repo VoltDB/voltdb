@@ -464,7 +464,7 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
 }
 
 void DRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
-    assert(m_committedSequenceNumber == 0);
+    assert(m_committedSequenceNumber == -1);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;
 }

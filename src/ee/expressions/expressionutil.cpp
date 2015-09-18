@@ -76,6 +76,16 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
+/** Parse JSON parameters to create a happened-after expression */
+static AbstractExpression*
+happenedAfterFactory(PlannerDomValue obj) {
+    PlannerDomValue clusterIdValue = obj.valueForKey("CLUSTERID");
+
+    PlannerDomValue timestampValue = obj.valueForKey("TIMESTAMP");
+
+    return new HappenedAfterExpression(clusterIdValue.asInt(), timestampValue.asInt64());
+}
+
 /** Parse JSON parameters to create a subquery expression */
 static AbstractExpression*
 subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
@@ -631,6 +641,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         break;
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
+        break;
+    case (EXPRESSION_TYPE_HAPPENED_AFTER):
+        ret = happenedAfterFactory(obj);
         break;
     case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):
         ret = caseWhenFactory(vt, lc, rc);

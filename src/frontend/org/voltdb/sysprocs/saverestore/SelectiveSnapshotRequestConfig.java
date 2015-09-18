@@ -43,7 +43,7 @@ public class SelectiveSnapshotRequestConfig extends SnapshotRequestConfig {
         }
     }
 
-    Collection<PartitionTimestamp> m_lastSeenTimestamp;
+    public Collection<PartitionTimestamp> m_lastSeenTimestamp;
 
     public SelectiveSnapshotRequestConfig(List<Table> tables, Collection<PartitionTimestamp> timestampMap) {
         super(tables);

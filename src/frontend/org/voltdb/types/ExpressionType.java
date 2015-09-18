@@ -27,6 +27,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.HappenedAfterExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
@@ -132,6 +133,11 @@ public enum ExpressionType {
     // Internals added for Elastic
     // -----------------------------
     HASH_RANGE    (HashRangeExpression.class, 200, "#"),
+
+    // -----------------------------
+    // Internals added for Selective Snapshot
+    // -----------------------------
+    HAPPENED_AFTER      (HappenedAfterExpression.class, 260, "HAPPENED_AFTER"),
 
     // -----------------------------
     // Internals added for CASE WHEN expression.
