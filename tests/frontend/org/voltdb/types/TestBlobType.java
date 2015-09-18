@@ -189,7 +189,7 @@ public class TestBlobType extends TestCase {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
-            "b varbinary(256) default null, " +
+            "b varbinary(256) default null); " +
             "create index idx on blah (b);";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
