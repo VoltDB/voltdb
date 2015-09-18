@@ -602,17 +602,16 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     // now, fill a couple of buffers with tuples from a single transaction
     // Tuples in txnid 11 will be splited into a new buffer to make sure txnid 11
     // not span two buffers.
-    size_t mark = 0;
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE - 1;
+    size_t marks[tuples_to_fill];
     for (int i = 0; i < tuples_to_fill; i++)
     {
-        if (mark != 0) {
-            appendTuple(10, 11);
-        } else {
-            mark = appendTuple(10, 11);
-        }
+        marks[i] = appendTuple(10, 11);
     }
-    m_wrapper.rollbackTo(mark);
+    for (int i = tuples_to_fill-1; i >= 0; i--)
+    {
+        m_wrapper.rollbackTo(marks[i]);
+    }
     m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -621,6 +620,53 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     EXPECT_EQ(results->uso(), 0);
     // Txnid 11 move to a new buffer, so current buffer only contains txn 1~10
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+}
+
+/**
+ * Rollback a transaction that doesn't generate DR data. It should not mess with
+ * the DR buffer at all.
+ */
+TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
+{
+    // append a bunch of tuples
+    for (int i = 1; i <= 10; i++)
+    {
+         appendTuple(i-1, i);
+         m_wrapper.endTransaction();
+    }
+
+    const int64_t expectedSequenceNumber = m_wrapper.m_openSequenceNumber;
+    const int64_t expectedUniqueId = m_wrapper.m_openUniqueId;
+
+    // The following should be ignored because of the guard is on
+    size_t mark1;
+    size_t mark2;
+    {
+        DRTupleStreamDisableGuard guard(&m_wrapper, NULL);
+        mark1 = appendTuple(10, 11);
+        mark2 = appendTuple(11, 12);
+    }
+    EXPECT_EQ(mark1, INVALID_DR_MARK);
+    EXPECT_EQ(mark2, INVALID_DR_MARK);
+    EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
+    EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
+
+    m_wrapper.rollbackTo(mark2);
+    m_wrapper.rollbackTo(mark1);
+    EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
+    EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
+
+    // Append one more tuple after the rollback
+    appendTuple(12, 13);
+    m_wrapper.endTransaction();
+
+    m_wrapper.periodicFlush(-1, addPartitionId(14));
+
+    ASSERT_TRUE(m_topend.receivedDRBuffer);
+    boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
+    EXPECT_EQ(results->uso(), 0);
+    EXPECT_EQ(results->offset(), MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 11);
 }
 
 /**

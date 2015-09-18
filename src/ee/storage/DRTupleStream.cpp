@@ -69,7 +69,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
-    if (!m_enabled) return m_uso;
+    if (!m_enabled) return INVALID_DR_MARK;
 
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
 
@@ -128,7 +128,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
-    if (!m_enabled) return m_uso;
+    if (!m_enabled) return INVALID_DR_MARK;
 
     size_t rowHeaderSz = 0;
     size_t rowMetadataSz = 0;
@@ -186,7 +186,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
-    if (!m_enabled) return m_uso;
+    if (!m_enabled) return INVALID_DR_MARK;
 
     size_t oldRowHeaderSz = 0;
     size_t oldRowMetadataSz = 0;
@@ -325,6 +325,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
 void DRTupleStream::rollbackTo(size_t mark) {
+    if (mark == INVALID_DR_MARK) return;
     m_opened = false;
     m_txnRowCount = 0;
     TupleStreamBase::rollbackTo(mark);
