@@ -92,18 +92,18 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
         // Get the list of tests that we actually want to run
         // (if empty, run all tests)
-        String sqlTestNamesProperty = System.getProperty('sqlTestNames', '')
-        debugPrint '\nsqlTestNamesProperty: ' + sqlTestNamesProperty
-        def sqlTestNames = []
-        if (sqlTestNamesProperty) {
-            sqlTestNames = Arrays.asList(sqlTestNamesProperty.split(','))
+        String sqlTestsProperty = System.getProperty('sqlTests', '')
+        debugPrint '\nsqlTestsProperty: ' + sqlTestsProperty
+        def sqlTests = []
+        if (sqlTestsProperty) {
+            sqlTests = Arrays.asList(sqlTestsProperty.split(','))
         }
-        debugPrint 'sqlTestNames:\n' + sqlTestNames
-        debugPrint 'sqlTestNames.isEmpty(): ' + sqlTestNames.isEmpty()
+        debugPrint 'sqlTests:\n' + sqlTests
+        debugPrint 'sqlTests.isEmpty(): ' + sqlTests.isEmpty()
 
         // If specific test names to run were specified, prune out all others
-        if (sqlTestNames) {
-            sqlQueryLines.retainAll { line -> sqlTestNames.find { name -> line.contains(name) } }
+        if (sqlTests) {
+            sqlQueryLines.retainAll { line -> sqlTests.find { name -> line.contains(name) } }
             debugPrint '\nsqlQueryLines:\n' + sqlQueryLines
         }
     }
