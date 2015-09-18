@@ -35,6 +35,7 @@ if [ $FOUND == false ]; then
 fi
 
 # Run the GEB tests of the VMC
+echo "pwd:" `pwd`
 echo "Executing:"
 echo "./gradlew ${FIRST_ARGS[@]} ${MIDDLE_ARGS[@]} ${LAST_ARGS[@]}"
 ./gradlew ${FIRST_ARGS[@]} ${MIDDLE_ARGS[@]} ${LAST_ARGS[@]}

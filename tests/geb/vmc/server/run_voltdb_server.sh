@@ -15,6 +15,7 @@ if [[ "$@" == *"-p"* ]]; then  # -p arg means to use "pro"
 else  # default is to use "community"
     PATH=$PATH:../../../../bin
 fi
+echo "pwd:" `pwd`
 echo "which voltdb:" `which voltdb`
 
 # Start the VoltDB server
