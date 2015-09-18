@@ -351,6 +351,16 @@ public class Benchmark {
         insertStates();
         insertCounties();
         insertCities();
+
+        System.out.println("City, state and county data loaded.\n"
+                + "Press enter to start demo.");
+        try
+        {
+            System.in.read();
+        }
+        catch(Exception e)
+        {}
+
         setUpTaxis();
 
         // Show reports every second.

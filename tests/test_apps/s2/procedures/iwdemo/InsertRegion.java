@@ -13,6 +13,7 @@ import com.google_voltpatches.common.geometry.S2LatLng;
 import com.google_voltpatches.common.geometry.S2Loop;
 import com.google_voltpatches.common.geometry.S2Point;
 import com.google_voltpatches.common.geometry.S2Polygon;
+import com.google_voltpatches.common.geometry.S2PolygonBuilder;
 import com.google_voltpatches.common.geometry.S2RegionCoverer;
 
 public class InsertRegion extends VoltProcedure {
@@ -38,17 +39,20 @@ public class InsertRegion extends VoltProcedure {
             idx += 4;
             ArrayList<S2Point> verts = new ArrayList<S2Point>();
             for (int vertidx = 0; vertidx < numVerts; vertidx += 1) {
-                Double lat = buf.getDouble(idx);
-                Double lng = buf.getDouble(idx + 8);
+                Double lng = buf.getDouble(idx);
+                Double lat = buf.getDouble(idx + 8);
                 idx += 16;
                 verts.add(S2LatLng.fromDegrees(lat, lng).toPoint());
             }
             loops.add(new S2Loop(verts));
         }
-        S2Polygon poly = new S2Polygon(loops);
-        S2RegionCoverer coverer = new S2RegionCoverer();
+        S2PolygonBuilder polyBuilder = new S2PolygonBuilder();
+        // There might be more than one loop (holes?) but for now
+        // just use the outer, positive loop.
+        polyBuilder.addLoop(loops.get(0));
+        S2Polygon poly = polyBuilder.assemblePolygon();
         ArrayList<S2CellId> covering = new ArrayList<S2CellId>();
-        coverer.getCovering(poly, covering);
+        Utils.getCoverer().getCovering(poly, covering);
         varboundary = new byte[0];
         voltQueueSQL(insStmt, id, containerid, componentNumber, kind, varboundary);
         for (S2CellId cellid : covering) {
