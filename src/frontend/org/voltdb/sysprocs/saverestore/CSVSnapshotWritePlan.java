@@ -95,7 +95,6 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         }
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
-        assert config.tables.length > 0;
         final AtomicInteger numTables = new AtomicInteger(config.tables.length);
         final SnapshotRegistry.Snapshot snapshotRecord =
             SnapshotRegistry.startSnapshot(

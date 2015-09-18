@@ -100,7 +100,6 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
-        assert config.tables.length > 0;
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
