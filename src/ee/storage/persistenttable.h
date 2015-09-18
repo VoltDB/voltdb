@@ -915,10 +915,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, 
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
-    } else if (block->isEmpty()){
-        bool blockInPendingList = m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end();
-        std::cout << "empty block not deleted; # blocks in pending list: " << blockInPendingList<< std::endl;
-
     } else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
     }

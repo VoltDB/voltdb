@@ -157,6 +157,8 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         File error = new File("error.log");
 
         ProcessBuilder pb = null;
+        System.out.println("create process builder. fastmode:" + fastModeDDL + " command path:" +
+                commandPath + " file path: " + f.getPath());
         if (fastModeDDL) {
             pb = new ProcessBuilder(commandPath, "--ddl-file=" + f.getPath());
         } else {
@@ -176,6 +178,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
             Thread.sleep(1000);
             try {
                 int exitValue = process.exitValue();
+                System.out.println("exit value:" + exitValue);
                 // Only verbosely report the successful exit after verbosely reporting a delay.
                 // Frequent false alarms might lead to raising the sleep time.
                 if (pollcount > 0) {

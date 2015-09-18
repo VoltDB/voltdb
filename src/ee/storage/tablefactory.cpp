@@ -92,7 +92,7 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(databaseId, name, table);
 
-    /*if(!exportOnly) {
+    if(!exportOnly) {
         // allocate tuple storage block for the persistent table ahead of time
         // instead of waiting till first tuple insertion. Intend of allocating tuple
         // block storage ahead is to improve performance on first tuple insertion.
@@ -100,8 +100,7 @@ Table* TableFactory::getPersistentTable(
         TBPtr block = persistentTable->allocateNextBlock();
         assert(block->hasFreeTuples());
         persistentTable->m_blocksWithSpace.insert(block);
-        std::cout << "getPersistentTable(); "<<std::endl;
-    }*/
+    }
 
     return table;
 }

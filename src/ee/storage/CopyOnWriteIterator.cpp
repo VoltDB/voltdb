@@ -31,6 +31,12 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_currentBlock(NULL),
         m_skippedDirtyRows(0),
         m_skippedInactiveRows(0) {
+
+    if ((m_blocks.size() == 1) && m_blockIterator.value()->isEmpty()) {
+        //m_blockIterator = m_end;
+        return;
+    }
+
     //Prime the pump
     if (m_blockIterator != m_end) {
         m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
@@ -52,7 +58,6 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
     while (true) {
         if (m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
             if (m_blockIterator == m_end) {
-                std::cout<<"finished scanning block" << std::endl;
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
             }

@@ -190,7 +190,6 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 
                 int32_t iterationCount = 0;
                 TupleIterator *iter = table.makeIterator();
-                std::cout << "is this suicide path to fatal exception!!!" << std::endl;
                 while (iter->next(tuple)) {
                     iterationCount++;
                 }

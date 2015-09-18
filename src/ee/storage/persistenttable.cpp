@@ -1595,6 +1595,10 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
 }
 
 void PersistentTableSurgeon::activateSnapshot() {
+    if((m_table.m_data.size() == 1) && (m_table.activeTupleCount() == 0)) {
+        return;
+    }
+
     //All blocks are now pending snapshot
     m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
     m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);
