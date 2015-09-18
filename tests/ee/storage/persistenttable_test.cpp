@@ -302,7 +302,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     ASSERT_NE(NULL, table);
     ASSERT_EQ(blockCount, table->allocatedBlockCount());
 
-    bool tupleInsertion = tableutil::addRandomTuples(table, tuplesToInsert);
+    tupleInsertion = tableutil::addRandomTuples(table, tuplesToInsert);
     ASSERT_EQ(true, tupleInsertion);
     table->truncateTable(engine);
 
