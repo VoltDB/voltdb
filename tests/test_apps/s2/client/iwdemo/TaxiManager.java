@@ -22,6 +22,28 @@ public class TaxiManager implements Runnable {
     final private static int NUM_DIRECTIONS = 8;
     final private static int NUM_TAXIS = NUM_STARTING_CITIES * NUM_DIRECTIONS;
 
+    // choose fairly large cities
+    // (which are generally near other stuff)
+    // that are evenly dispersed over the contiguous US.
+    final private long[] cityIds = new long[] {
+      1259, // san jose
+      11472, // burlington
+      15682, // las vegas
+      3565, // denver
+      12928, // minneapolis
+
+      24884, // dallas
+      7698, // indianapolis
+      23991, // rapid city, SD
+      9417, // Kansas City
+      5080, // atlanta
+
+      14727, // butte, mt
+      27834, // spokane
+      4133, // washington
+      21394, // portland or
+    };
+
     /**
      * The time in milliseconds between calls to the run() method,
      * which updates the location of one taxi.
@@ -55,16 +77,11 @@ public class TaxiManager implements Runnable {
 
     public void createTaxis() {
         try {
-            System.out.println("Creating taxis in " + NUM_STARTING_CITIES + " starting cities:");
-            final long NUM_CITIES = m_client.callProcedure("@AdHoc", "select max(id) from cities")
-                    .getResults()[0].asScalarLong();
-
             int taxiId = 0;
             for (int i = 0; i < NUM_STARTING_CITIES; ++i) {
 
-                // pick a city at random
                 VoltTable vt = m_client.callProcedure("@AdHoc", "select location, name from cities where id = ?",
-                        m_random.nextInt((int)NUM_CITIES)).getResults()[0];
+                        cityIds[i]).getResults()[0];
                 vt.advanceRow();
                 PointType pt = vt.getPoint(0);
                 System.out.println("  " + vt.getString(1));

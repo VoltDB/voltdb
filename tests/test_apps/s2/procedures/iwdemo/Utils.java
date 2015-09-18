@@ -24,7 +24,7 @@ public class Utils {
         return 6371.0 * 6371.0;
     }
 
-    private static final int COVERER_MAX_LEVEL = 14; // avg cell size 0.317 km^2
+    private static final int COVERER_MAX_LEVEL = 15; // avg cell size 0.079 km^2
 
     public static int getCovererMaxLevel() {
         return COVERER_MAX_LEVEL;
@@ -33,6 +33,7 @@ public class Utils {
     public static S2RegionCoverer getCoverer() {
         S2RegionCoverer coverer = new S2RegionCoverer();
         coverer.setMaxLevel(COVERER_MAX_LEVEL);
+        coverer.setMaxCells(16);
         return coverer;
     }
 
