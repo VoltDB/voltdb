@@ -384,11 +384,10 @@ void setSearchKeyFromTuple(TableTuple &source) {
 
 void PersistentTable::setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update) {
     assert(hasDRTimestampColumn());
-    // HACK HACK! Temporarily comment out the if statement, as we always get a mysterious zero hidden column value.
-    //if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
+    if (update || tuple.getHiddenNValue(getDRTimestampColumnIndex()).isNull()) {
         const int64_t drTimestamp = ec->currentDRTimestamp();
         tuple.setHiddenNValue(getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(drTimestamp));
-    //}
+    }
 }
 
 /*

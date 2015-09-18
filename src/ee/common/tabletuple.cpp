@@ -81,7 +81,7 @@ std::string TableTuple::debug(const std::string& tableName) const {
             buffer << " hidden->";
             for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
                 buffer << "(";
-                if (isNull(ctr)) {
+                if (isHiddenColumnNull(ctr)) {
                     buffer << "<NULL>";
                 } else {
                     buffer << getHiddenNValue(ctr).debug();
