@@ -34,9 +34,12 @@ class BuildContext:
         self.THIRD_PARTY_INCLUDES = {}
         self.THIRD_PARTY_CPPFLAGS = {}
         self.THIRD_PARTY_LIBS = ""
-        # We should do the same with tests as with the ones
-        # above, but we do not.
+        # We do almost the same with tests as with the ones
+        # above.  But libraries are slightly different.
         self.TESTS = {}
+        self.TESTS_INCLUDES = {}
+        self.TESTS_CPPFLAGS = {}
+        self.TESTS_LIBS = {}
         self.PLATFORM = os.uname()[0]
         self.LEVEL = "DEBUG"
         self.TARGET = "BUILD"
@@ -129,6 +132,7 @@ def buildMakefile(CTX):
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
     LIBS = " " + CTX.INPUT_LIBS + " " + CTX.THIRD_PARTY_LIBS
+
     # create directories for output if they don't exist
     os.system("mkdir -p %s" % (OUTPUT_PREFIX))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
@@ -168,9 +172,17 @@ def buildMakefile(CTX):
         third_party_input_paths += [{'filename': THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x, 'cppflags': flags, 'includes': includes} for x in input]
     tests = []
     for dir in CTX.TESTS.keys():
+        flags = ""
+        includes = ""
+        libs = ""
+        if dir in CTX.TESTS_CPPFLAGS:
+            flags += (" " + CTX.TESTS_CPPFLAGS[dir])
+        if dir in CTX.TESTS_INCLUDES:
+            includes += " " + CTX.TESTS_INCLUDES[dir]
+        if dir in CTX.TESTS_LIBS:
+            libs = CTX.TESTS_LIBS[dir]
         input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
-
+        tests += [{'filename': TEST_PREFIX + "/" + dir + "/" + x, 'cppflags': flags, 'includes': includes, 'libs': libs} for x in input]
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
     makefile.write("CC = %s\n" % CTX.CC)
     makefile.write("CXX = %s\n" % CTX.CXX)
@@ -239,7 +251,7 @@ def buildMakefile(CTX):
     makefile.write(".PHONY: test\n")
     makefile.write("test: ")
     for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
+        binname, objectname, sourcename = namesForTestCode(test['filename'])
         makefile.write(binname + " ")
     if CTX.LEVEL == "MEMCHECK":
         makefile.write("prod/voltdbipc")
@@ -266,10 +278,10 @@ def buildMakefile(CTX):
         os.system("mkdir -p %s" % (static_targetpath))
         makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
         makefile.write(jni_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -MMD -MP -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, jni_objname, filename))
         makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
         makefile.write(static_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -MMD -MP -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, static_objname, filename))
     makefile.write("\n")
 
     for file_descr in third_party_input_paths:
@@ -284,23 +296,27 @@ def buildMakefile(CTX):
         os.system("mkdir -p %s" % (static_targetpath))
         makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
         makefile.write(jni_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, jni_objname, filename))
         makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
         makefile.write(static_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -o $@ %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, static_objname, filename))
     makefile.write("\n")
 
-    for test in tests:
+    for test_descr in tests:
+        test = test_descr['filename']
+        cppflags = test_descr['cppflags']
+        includes = test_descr['includes']
+        libs     = test_descr['libs']
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
         makefile.write("%s: ../../%s" % (objectname, sourcename))
         makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -I../../%s %s -o %s ../../%s\n" % (cppflags, TEST_PREFIX, includes, objectname, sourcename))
 
         # link the test
         makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a\n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, libs))
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
 
@@ -322,14 +338,7 @@ def runTests(CTX):
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
         return -1
-    TESTOBJECTS_DIR = os.environ['TEST_DIR']
-    TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
-    OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
 
-    tests = []
-    for dir in CTX.TESTS.keys():
-        input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
     successes = 0
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
