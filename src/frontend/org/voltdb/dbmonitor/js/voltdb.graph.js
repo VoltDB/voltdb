@@ -224,59 +224,6 @@
         var dataPartitionIdleTime = [];
 
         var dataParitionDetails = [];
-//        nv.addGraph(function () {
-//          
-//            //Formats: http://www.d3noob.org/2012/12/formatting-date-time-on-d3js-graph.html
-//            //%b %d : Feb 01, %x : 02/01/2012, %X: HH:MM:ss
-//
-//
-//            MonitorGraphUI.ChartCpu.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartCpu.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartCpu.yAxis
-//                .tickFormat(d3.format(',.2f'));
-//
-//            MonitorGraphUI.ChartCpu.yAxis
-//                .axisLabel('(%)')
-//                .axisLabelDistance(10);
-//
-//
-//
-//
-//            MonitorGraphUI.ChartCpu.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3 style='color:" + elem.color + "'>"
-//                        + elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.pointIndex).toFixed(2) + "% at " + d3.time.format('%d %b %X')(new Date(d.value)) + "</h2>";
-//
-//                return html;
-//                        });
-//            
-//            //            MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
-//            //                return '<h3> RAM </h3>'
-//            //                    + '<p>' + e + ' GB at ' + y + '</p>';
-//            //            });
-//
-//
-//            MonitorGraphUI.ChartCpu.margin({ left: 80 });
-//            MonitorGraphUI.ChartCpu.yAxis.scale().domain([0, 100]);
-//            MonitorGraphUI.ChartCpu.lines.forceY([0, 100]);
-//
-//            d3.select('#visualisationCpu')
-//                .datum(dataCpu)
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartCpu);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
-//
-//            return MonitorGraphUI.ChartCpu;
-//        });
 
         nv.addGraph({
             generate: function() {
@@ -311,7 +258,6 @@
                 MonitorGraphUI.ChartRam.useInteractiveGuideline(false);
                 var tooltip = MonitorGraphUI.ChartCpu.tooltip;
                 tooltip.gravity('s');
-                //tooltip.fixedTop(65);
                 tooltip.contentGenerator(function (d) {
                     console.log(d);
                     var html = '';
@@ -326,52 +272,6 @@
                 return MonitorGraphUI.ChartCpu;
             }
         });
-
-//        nv.addGraph(function () {
-//            MonitorGraphUI.ChartRam.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartRam.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartRam.yAxis
-//                .tickFormat(d3.format(',.4f'));
-//
-//            MonitorGraphUI.ChartRam.yAxis
-//                .axisLabel('(GB)')
-//                .axisLabelDistance(10);
-//
-//            MonitorGraphUI.ChartRam.margin({ left: 80 });
-//            MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
-//
-//            //            MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
-//            //                return '<h3> RAM </h3>'
-//            //                    + '<p>' + e + ' GB at ' + y + '</p>';
-//            //            });
-//
-//            // MonitorGraphUI.ChartRam.interactiveLayer.tooltip.contentGenerator();
-//
-//            MonitorGraphUI.ChartRam.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3 style='color:" + elem.color + "'>"
-//                        + elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-//
-//                return html;
-//            });
-//
-//            d3.select('#visualisationRam')
-//                .datum(dataRam)
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartRam);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartRam.update);
-//
-//            return MonitorGraphUI.ChartRam;
-//        });
 
         nv.addGraph({
             generate: function() {
@@ -402,13 +302,7 @@
             callback: function (p) {
                 MonitorGraphUI.ChartRam.useInteractiveGuideline(false);
                 var tooltip = MonitorGraphUI.ChartRam.tooltip;
-              //  tooltip.gravity('s');
-                //tooltip.fixedTop(65);
-                
-                //                tooltip.contentGenerator(function (d) {
-                //                   // d.conseil = conseilLabel[quelConseil(d.series[0].value, d.series[1].value)];
-                //                    return '<p>' + p.tooltipContent(d) + '</p>';
-                //                });
+
                 tooltip.contentGenerator(function (d) {
                     var html = '';
                     d.series.forEach(function (elem) {
@@ -422,42 +316,6 @@
                 return MonitorGraphUI.ChartCpu;
             }
         });
-
-//        nv.addGraph(function () {
-//
-//            MonitorGraphUI.ChartLatency.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartLatency.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartLatency.yAxis
-//                .tickFormat(d3.format(',.2f'));
-//
-//            MonitorGraphUI.ChartLatency.yAxis
-//                .axisLabel('(ms)')
-//                .axisLabelDistance(10);
-//
-//            MonitorGraphUI.ChartLatency.margin({ left: 80 });
-//            MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
-//
-//            //            MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
-//            //                return '<h3> Latency </h3>'
-//            //                    + '<p>' + e + ' ms at ' + y + '</p>';
-//            //            });
-//
-//            //  MonitorGraphUI.ChartLatency.interactiveLayer.tooltip.contentGenerator();
-//
-//            d3.select('#visualisationLatency')
-//                .datum(dataLatency)
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartLatency);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartLatency.update);
-//
-//            return MonitorGraphUI.ChartLatency;
-//        });
 
         nv.addGraph({
             generate: function() {
@@ -478,13 +336,6 @@
                 MonitorGraphUI.ChartLatency.margin({ left: 80 });
                 MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
 
-                //            MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
-                //                return '<h3> Latency </h3>'
-                //                    + '<p>' + e + ' ms at ' + y + '</p>';
-                //            });
-
-                //  MonitorGraphUI.ChartLatency.interactiveLayer.tooltip.contentGenerator();
-
                 d3.select('#visualisationLatency')
                     .datum(dataLatency)
                     .transition().duration(500)
@@ -495,13 +346,7 @@
             callback: function(p) {
                 MonitorGraphUI.ChartLatency.useInteractiveGuideline(false);
                 var tooltip = MonitorGraphUI.ChartLatency.tooltip;
-                //  tooltip.gravity('s');
-               // tooltip.fixedTop(2);
-
-                //                tooltip.contentGenerator(function (d) {
-                //                   // d.conseil = conseilLabel[quelConseil(d.series[0].value, d.series[1].value)];
-                //                    return '<p>' + p.tooltipContent(d) + '</p>';
-                //                });
+               
                 tooltip.contentGenerator(function (d) {
                     var html = '';
                     d.series.forEach(function (elem) {
@@ -516,41 +361,6 @@
             }
         });
 
-//        nv.addGraph(function () {
-//
-//            MonitorGraphUI.ChartTransactions.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartTransactions.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartTransactions.yAxis
-//                .tickFormat(d3.format(',.2f'));
-//
-//            MonitorGraphUI.ChartTransactions.yAxis
-//                .axisLabel('(Transactions/s)')
-//                .axisLabelDistance(10);
-//
-//            MonitorGraphUI.ChartTransactions.margin({ left: 80 });
-//            MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
-//
-//            //            MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
-//            //                return '<h3> Transactions </h3>'
-//            //                    + '<p>' + e + ' tps at ' + y + '</p>';
-//            //            });
-//
-//            //  MonitorGraphUI.ChartTransactions.interactiveLayer.tooltip.contentGenerator();
-//
-//            d3.select('#visualisationTransaction')
-//                .datum(dataTransactions)
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartTransactions);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartTransactions.update);
-//
-//            return MonitorGraphUI.ChartTransactions;
-//        });
 
         nv.addGraph({            
            generate: function() {
@@ -572,13 +382,6 @@
                MonitorGraphUI.ChartTransactions.margin({ left: 80 });
                MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
 
-               //            MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
-               //                return '<h3> Transactions </h3>'
-               //                    + '<p>' + e + ' tps at ' + y + '</p>';
-               //            });
-
-               //  MonitorGraphUI.ChartTransactions.interactiveLayer.tooltip.contentGenerator();
-
                d3.select('#visualisationTransaction')
                    .datum(dataTransactions)
                    .transition().duration(500)
@@ -589,14 +392,7 @@
            callback: function(p) {
                MonitorGraphUI.ChartTransactions.useInteractiveGuideline(false);
                var tooltip = MonitorGraphUI.ChartTransactions.tooltip;
-               //tooltip.fixedTop(-10);
-               //  tooltip.gravity('s');
-               //tooltip.fixedTop(65);
-
-               //                tooltip.contentGenerator(function (d) {
-               //                   // d.conseil = conseilLabel[quelConseil(d.series[0].value, d.series[1].value)];
-               //                    return '<p>' + p.tooltipContent(d) + '</p>';
-               //                });
+               
                tooltip.contentGenerator(function (d) {
                    var html = '';
                    d.series.forEach(function (elem) {
@@ -611,40 +407,6 @@
            }
         });
 
-//        nv.addGraph(function () {
-//            MonitorGraphUI.ChartPartitionIdleTime.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartPartitionIdleTime.showLegend(false);
-//            MonitorGraphUI.ChartPartitionIdleTime.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartPartitionIdleTime.yAxis
-//                .tickFormat(d3.format(',.2f'));
-//
-//            MonitorGraphUI.ChartPartitionIdleTime.yAxis
-//                .axisLabel('(%)')
-//                .axisLabelDistance(10);
-//
-//            MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 80 });
-//            MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
-//            MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
-//
-//            MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
-//                return '<h3> Partition Idle Time </h3>'
-//                    + '<p>' + e + ' % at ' + y + '</p>';
-//            });
-//
-//            d3.select('#visualisationPartitionIdleTime')
-//                .datum([])
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartPartitionIdleTime);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartPartitionIdleTime.update);
-//
-//            return MonitorGraphUI.ChartPartitionIdleTime;
-//        });
 
         nv.addGraph({            
             generate:function() {
@@ -667,11 +429,6 @@
                 MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
                 MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
 
-                MonitorGraphUI.ChartPartitionIdleTime.tooltipContent(function (key, y, e, graph) {
-                    return '<h3> Partition Idle Time </h3>'
-                        + '<p>' + e + ' % at ' + y + '</p>';
-                });
-
                 d3.select('#visualisationPartitionIdleTime')
                     .datum([])
                     .transition().duration(500)
@@ -681,64 +438,10 @@
             },
             callback: function () {
                 MonitorGraphUI.ChartPartitionIdleTime.useInteractiveGuideline(true);
-//                MonitorGraphUI.ChartPartitionIdleTime.useInteractiveGuideline(false);
-//                var tooltip = MonitorGraphUI.ChartPartitionIdleTime.tooltip;
-//                tooltip.fixedTop(-10);
-//                //  tooltip.gravity('s');
-//                //tooltip.fixedTop(65);
-//
-//                //                tooltip.contentGenerator(function (d) {
-//                //                   // d.conseil = conseilLabel[quelConseil(d.series[0].value, d.series[1].value)];
-//                //                    return '<p>' + p.tooltipContent(d) + '</p>';
-//                //                });
-//                tooltip.contentGenerator(function (d) {
-//                    var html = '';
-//                    d.series.forEach(function (elem) {
-//                        html += "<h3>"
-//                            + elem.key + "</h3>";
-//                    });
-//                    html = html + "<h2>" + parseFloat(d.pointIndex).toFixed(2) + " tps at " + d3.time.format('%d %b %X')(new Date(d.value)) + "</h2>";
-//
-//                    return html;
-//                });
                 return MonitorGraphUI.ChartPartitionIdleTime;
             }
         });
 
-//        nv.addGraph(function () {
-//            MonitorGraphUI.ChartDrReplicationRate.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartDrReplicationRate.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartDrReplicationRate.yAxis
-//                .tickFormat(d3.format(',.2f'));
-//
-//            MonitorGraphUI.ChartDrReplicationRate.yAxis
-//                .axisLabel('(KBps)')
-//                .axisLabelDistance(10);
-//
-//            MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
-//            MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
-//
-//            //            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
-//            //                return '<h3> Replication Rate </h3>'
-//            //                    + '<p>' + e + ' KBps at ' + y + '</p>';
-//            //            });
-//
-//            //MonitorGraphUI.ChartDrReplicationRate.interactiveLayer.tooltip.contentGenerator();
-//
-//            d3.select('#visualizationDrReplicationRate')
-//                .datum(dataDrReplicationRate)
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartDrReplicationRate);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartDrReplicationRate.update);
-//
-//            return MonitorGraphUI.ChartDrReplicationRate;
-//        });
 
         nv.addGraph({
             generate:function() {
@@ -759,13 +462,6 @@
                 MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
                 MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
 
-                //            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
-                //                return '<h3> Replication Rate </h3>'
-                //                    + '<p>' + e + ' KBps at ' + y + '</p>';
-                //            });
-
-                //MonitorGraphUI.ChartDrReplicationRate.interactiveLayer.tooltip.contentGenerator();
-
                 d3.select('#visualizationDrReplicationRate')
                     .datum(dataDrReplicationRate)
                     .transition().duration(500)
@@ -776,14 +472,6 @@
             callback: function() {
                 MonitorGraphUI.ChartDrReplicationRate.useInteractiveGuideline(false);
                 var tooltip = MonitorGraphUI.ChartDrReplicationRate.tooltip;
-                //tooltip.fixedTop(-10);
-                //  tooltip.gravity('s');
-                //tooltip.fixedTop(65);
-
-                //                tooltip.contentGenerator(function (d) {
-                //                   // d.conseil = conseilLabel[quelConseil(d.series[0].value, d.series[1].value)];
-                //                    return '<p>' + p.tooltipContent(d) + '</p>';
-                //                });
                 tooltip.contentGenerator(function (d) {
                     var html = '';
                     d.series.forEach(function (elem) {
@@ -819,13 +507,6 @@
                 MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
                 MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
 
-                //            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
-                //                return '<h3> Command Log Statistic </h3>'
-                //                    + '<p>' + e + ' Pending at ' + y + '</p>';
-                //            });
-                //            
-                //  MonitorGraphUI.ChartCommandlog.interactiveLayer.tooltip.contentGenerator();
-
                 d3.select('#visualisationCommandLog')
                     .datum(dataCommandLog)
                     .transition().duration(500)
@@ -836,14 +517,6 @@
             callback:function() {
                MonitorGraphUI.ChartCommandlog.useInteractiveGuideline(false);
                var tooltip = MonitorGraphUI.ChartCommandlog.tooltip;
-              // tooltip.fixedTop(-10);
-               //  tooltip.gravity('s');
-               //tooltip.fixedTop(65);
-
-               //                tooltip.contentGenerator(function (d) {
-               //                   // d.conseil = conseilLabel[quelConseil(d.series[0].value, d.series[1].value)];
-               //                    return '<p>' + p.tooltipContent(d) + '</p>';
-               //                });
                tooltip.contentGenerator(function (d) {
                    var html = '';
                    d.series.forEach(function (elem) {
@@ -857,41 +530,6 @@
                return MonitorGraphUI.ChartCommandlog;
            }
         });
-//        nv.addGraph(function () {
-//            MonitorGraphUI.ChartCommandlog.showLegend(false);
-//            MonitorGraphUI.ChartCommandlog.xAxis
-//                .tickFormat(function (d) {
-//                    return d3.time.format('%X')(new Date(d));
-//                });
-//
-//            MonitorGraphUI.ChartCommandlog.xAxis.rotateLabels(-20);
-//
-//            MonitorGraphUI.ChartCommandlog.yAxis
-//                .tickFormat(d3.format(',.2f'));
-//
-//            MonitorGraphUI.ChartCommandlog.yAxis
-//                .axisLabel('(Pending Transactions)')
-//                .axisLabelDistance(10);
-//
-//            MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
-//            MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
-//
-//            //            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
-//            //                return '<h3> Command Log Statistic </h3>'
-//            //                    + '<p>' + e + ' Pending at ' + y + '</p>';
-//            //            });
-//            //            
-//            //  MonitorGraphUI.ChartCommandlog.interactiveLayer.tooltip.contentGenerator();
-//
-//            d3.select('#visualisationCommandLog')
-//                .datum(dataCommandLog)
-//                .transition().duration(500)
-//                .call(MonitorGraphUI.ChartCommandlog);
-//
-//            nv.utils.windowResize(MonitorGraphUI.ChartCommandlog.update);
-//
-//            return MonitorGraphUI.ChartCommandlog;
-//        });
 
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
@@ -1153,79 +791,9 @@
                     return d3.time.format(dateFormat)(new Date(d));
                 });
             MonitorGraphUI.ChartCommandlog.xAxis
-                .tickFormat(function (d) {
+                .tickFormat(function(d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-
-
-//                        MonitorGraphUI.ChartCpu.tooltip.contentGenerator(function (d) {
-//                            var html = '';
-//                            d.series.forEach(function (elem) {
-//                                html += "<h3 style='color:" + elem.color + "'>"
-//                                    + elem.key + "</h3>";
-//                            });
-//            
-//            
-//                            html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + "% at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
-//            
-//            
-//                            return html;
-//                        });
-
-//            MonitorGraphUI.ChartRam.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3>"
-//                        + elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
-//
-//                return html;
-//            });
-//            
-//            MonitorGraphUI.ChartLatency.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3>"+ elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
-//
-//                return html;
-//            });
-//
-//            MonitorGraphUI.ChartTransactions.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3>"
-//                        + elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " tps at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
-//
-//                return html;
-//            });
-//
-//            MonitorGraphUI.ChartCommandlog.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3>"
-//                        + elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " Pending at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
-//
-//                return html;
-//            });
-//
-//            MonitorGraphUI.ChartDrReplicationRate.tooltip.contentGenerator(function (d) {
-//                var html = '';
-//                d.series.forEach(function (elem) {
-//                    html += "<h3>"
-//                        + elem.key + "</h3>";
-//                });
-//                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
-//
-//                return html;
-//            });
-
         };
 
         var dataView = {
