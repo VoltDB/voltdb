@@ -33,6 +33,9 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_skippedInactiveRows(0) {
 
     if ((m_blocks.size() == 1) && m_blockIterator.value()->isEmpty()) {
+        // empty persistent table - no tuples in table and only has
+        // an tuple storage block associated to it. So no need to
+        // set it up for snapshot
         m_blockIterator = m_end;
         return;
     }

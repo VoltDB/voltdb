@@ -423,12 +423,8 @@ public class TestSqlCmdErrorHandling extends TestCase {
     }
 
     private void subtestExecWithNull(String type, int id) throws Exception {
-        int path = 0;
-        System.out.println("subtestExecWithNull:" + path++);
         assertFalse("pre-condition violated", checkIfWritten(id));
-        System.out.println("subtestExecWithNull:" + path++);
         String inputText = execWithNullCommand(type, id);
-        System.out.println("subtestExecWithNull:" + path++);
         assertEquals("sqlcmd was expected to succeed, but failed", 0, callSQLcmd(true, inputText));
         assertTrue("did not write row as expected", checkIfWritten(id));
     }
