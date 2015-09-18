@@ -5,6 +5,18 @@
 # Build the jar file used by FullDdlSqlTest, to test CREATE PROCEDURE FROM CLASS
 jar cf fullddlfeatures.jar -C ../../../../obj/release/testprocs org/voltdb_testprocs/fullddlfeatures/testCreateProcFromClassProc.class
 
+# Add (pro or community) bin directory to PATH
+if [[ "$@" == *"-p"* ]]; then  # -p arg means to use "pro"
+    CURRENT_DIR=`pwd`
+    cd ../../../../../pro/obj/pro/
+    SUBDIR=`ls -d1 volt* | grep -v tar.gz`
+    cd $CURRENT_DIR
+    PATH=$PATH:../../../../../pro/obj/pro/$SUBDIR/bin
+else  # default is to use "community"
+    PATH=$PATH:../../../../bin
+fi
+echo "which voltdb:" `which voltdb`
+
 # Start the VoltDB server
 voltdb create -d deployment.xml &
 
