@@ -1595,6 +1595,22 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
 }
 
 void PersistentTableSurgeon::activateSnapshot() {
+    TBMapI blockIterator = m_table.m_data.begin();
+
+    // persistent table should have atleast one block in
+    // it's block map.
+    assert(m_table.m_data.begin() != m_table.m_data.end());
+
+    if ((m_table.m_data.size() == 1) && blockIterator.value()->isEmpty()) {
+        assert(m_table.activeTupleCount() == 0);
+        // table is empty at this point with no tuples in it. Snapshot
+        // not pending queue contains empty block and this will not be
+        // processed by COW iterator as it does not have tuple entries.
+        // So do not push only remaining empty block to pending list
+        // (doing so has side effects to COW iterator's logic)
+        return;
+    }
+
     //All blocks are now pending snapshot
     m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
     m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);
