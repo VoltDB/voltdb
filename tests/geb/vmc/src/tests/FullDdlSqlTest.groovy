@@ -50,7 +50,6 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     @Shared def newExportTables = []
     @Shared def newRoles = []
     @Shared def errors = [:]
-    @Shared def ignoreTheseTestMethods = ['testCreateProcedureFromClass']
 
     def setupSpec() { // called once, before any tests
         // Make sure we're on the SQL Query page
@@ -70,14 +69,14 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
 
         // Get the list of tests that we actually want to run
         // (if empty, run all tests)
-        String sqlTestNamesProperty = System.getProperty('sqlTestNames', '')
-        debugPrint '\nsqlTestNamesProperty: ' + sqlTestNamesProperty
-        def sqlTestNames = []
-        if (sqlTestNamesProperty) {
-            sqlTestNames = Arrays.asList(sqlTestNamesProperty.split(','))
+        String sqlTestsProperty = System.getProperty('sqlTests', '')
+        debugPrint '\nsqlTestsProperty: ' + sqlTestsProperty
+        def sqlTests = []
+        if (sqlTestsProperty) {
+            sqlTests = Arrays.asList(sqlTestsProperty.split(','))
         }
-        debugPrint 'sqlTestNames:\n' + sqlTestNames
-        debugPrint 'sqlTestNames.isEmpty(): ' + sqlTestNames.isEmpty()
+        debugPrint 'sqlTests:\n' + sqlTests
+        debugPrint 'sqlTests.isEmpty(): ' + sqlTests.isEmpty()
 
         // Get the lines of the fullDDL.sql file (ignoring comment lines
         // starting with '--', and blank lines)
@@ -99,7 +98,6 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
                 String statementUpper = statement.toUpperCase()
                 if (fullDdlSqlStatements && !statementUpper.contains('CREATE TABLE') &&
                         !statementUpper.contains('CREATE ROLE') &&
-                        !statementUpper.contains('CREATE PROCEDURE') &&
                         !statementUpper.contains('EXPORT TABLE')) {
                     int len = fullDdlSqlStatements.size()
                     fullDdlSqlStatements.set(len-1, fullDdlSqlStatements[len-1] + '\n' + statement)
@@ -109,8 +107,8 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
             }
         }
         // If specific test names to run were specified, prune out all others
-        if (sqlTestNames) {
-            fullDdlSqlStatements.retainAll { sqlTestNames.contains(getSqlStatementTestName(it)) }
+        if (sqlTests) {
+            fullDdlSqlStatements.retainAll { sqlTests.contains(getSqlStatementTestName(it)) }
             debugPrint '\nfullDdlSqlStatements:\n' + fullDdlSqlStatements
         }
 
@@ -122,7 +120,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         def allMethods = testDdlFeatures.getClass().getMethods()
         allMethods.each {
             // If specific test names to run were specified, include only those
-            if (!sqlTestNames || sqlTestNames.contains(it.getName())) {
+            if (!sqlTests || sqlTests.contains(it.getName())) {
                 // Include only methods with an @Test annotation
                 Annotation[] annotations = it.getAnnotations()
                 for (Annotation annotation : annotations) {
@@ -132,7 +130,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
                 }
             }
         }
-        if (sqlTestNames) {
+        if (sqlTests) {
             debugPrint '\ntestDdlFeaturesTestMethods:\n' + testDdlFeaturesTestMethods
         }
     }
@@ -227,22 +225,14 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         def duration = ''
 
         when: 'run the specified (DDL) SQL statement(s)'
-        // Skip any 'CREATE PROCEDURE ... FROM CLASS ...' commands: there
-        // is currently no way to load these, in this client-side test
-        if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('PROCEDURE') &&
-            statementUpperCase.contains('FROM') && statementUpperCase.contains('CLASS')) {
-            println '\nSkipping statement:\n' + statement
-        // Execute all other statements
-        } else {
-            runQuery(page, statement, ColumnHeaderCase.AS_IS)
-            error    = page.getQueryError()
-            duration = page.getQueryDuration()
-            if (error != null || duration == null || duration.isEmpty()) {
-                println '\nWARNING: error non-null or duration null/empty'
-                println 'Error   :' + error
-                println 'Duration:' + duration
-                println 'All result text:\n' + page.getQueryResultText()
-            }
+        runQuery(page, statement, ColumnHeaderCase.AS_IS)
+        error    = page.getQueryError()
+        duration = page.getQueryDuration()
+        if (error != null || duration == null || duration.isEmpty()) {
+            println '\nWARNING: error non-null or duration null/empty'
+            println 'Error   :' + error
+            println 'Duration:' + duration
+            println 'All result text:\n' + page.getQueryResultText()
         }
 
         and: 'keep track of certain (DDL) SQL statements'
@@ -270,13 +260,9 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     @Unroll // performs this method for each JUnit test in TestDDLFeatures.java
     def '#testDdlFeaturesTestName'() {
         when: 'run the specified JUnit test method'
-        if (ignoreTheseTestMethods.contains(testDdlFeaturesTestName)) {
-            debugPrint '\nSkipping JUnit Method: TestDDLFeatures.' + testDdlFeaturesTestName
-        } else {
-            debugPrint '\nInvoking JUnit Method: TestDDLFeatures.' + testDdlFeaturesTestName
-            testMethod.invoke(testDdlFeatures)
-            debugPrint 'JUnit Method passed  : TestDDLFeatures.' + testDdlFeaturesTestName
-        }
+        debugPrint '\nInvoking JUnit Method: TestDDLFeatures.' + testDdlFeaturesTestName
+        testMethod.invoke(testDdlFeatures)
+        debugPrint 'JUnit Method passed  : TestDDLFeatures.' + testDdlFeaturesTestName
 
         then: 'test passes if you reach this point without an AssertionFailedError'
         true
