@@ -550,9 +550,9 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 return '';
             }
 
-//            if (d.series[0].value == null) {
-//                return '';
-//            }
+            if (d.series[0].value == null) {
+                return '';
+            }
             
             var table = d3.select(document.createElement("table"));
                 if (headerEnabled) {
@@ -796,7 +796,15 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
             if (!enabled) return;
             if (!dataSeriesExists(data)) return;
             //code added in order to not display hover div while value is null @Sujesh
-            if (data.series[0].value == null) return;
+            if (data.series.length > 1) {
+                if (data.series[0].value == null) {
+                    $(".nvtooltip").first().hide();
+                    return;
+                } else {
+                    $(".nvtooltip").first().show();
+                }
+            }
+            
 
             convertViewBoxRatio();
 
