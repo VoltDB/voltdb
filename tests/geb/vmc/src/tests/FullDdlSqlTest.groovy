@@ -237,6 +237,12 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
             runQuery(page, statement, ColumnHeaderCase.AS_IS)
             error    = page.getQueryError()
             duration = page.getQueryDuration()
+            if (error != null || duration == null || duration.isEmpty()) {
+                println '\nWARNING: error non-null or duration null/empty'
+                println 'Error   :' + error
+                println 'Duration:' + duration
+                println 'All result text:\n' + page.getQueryResultText()
+            }
         }
 
         and: 'keep track of certain (DDL) SQL statements'
