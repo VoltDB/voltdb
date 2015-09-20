@@ -246,9 +246,9 @@ public class KafkaImportBenchmark {
                         System.exit(-1);
                     }
                 }
-                int sz = importProgress.size();
-                if (sz > 1) {
-                    log.info("Import Throughput " + (count - importProgress.get(sz - 2)) / period + "/s, Total Rows: " + count);
+                //int sz = importProgress.size();
+                if (importProgress.size() > 1) {
+                    log.info("Import Throughput " + (count - importProgress.get(importProgress.size() - 2)) / period + "/s, Total Rows: " + count);
                 }
             }
         },
@@ -384,8 +384,8 @@ public class KafkaImportBenchmark {
             }
         }
 
-        if (importRows < exportRowCount && config.useexport) {
-            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRows + "' test fails.");
+        if (importRowCount < exportRowCount && config.useexport) {
+            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
             testResult = false;
         }
 
@@ -396,6 +396,7 @@ public class KafkaImportBenchmark {
         client.drain();
         client.close();
 
+        System.out.println("Test result is " + (testResult ?  "Pass" : "Fail"));
         if (testResult == true) {
             log.info("Test passed!");
             System.exit(0);
