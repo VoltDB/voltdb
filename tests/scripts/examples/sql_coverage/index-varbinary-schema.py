@@ -30,10 +30,11 @@
                     ("B", FastSerializer.VOLTTYPE_VARBINARY),
                     ("C", FastSerializer.VOLTTYPE_VARBINARY),
                     ("D", FastSerializer.VOLTTYPE_VARBINARY),
-                    ("E", FastSerializer.VOLTTYPE_VARBINARY)
+                    ("E", FastSerializer.VOLTTYPE_VARBINARY),
+                    ("F", FastSerializer.VOLTTYPE_VARBINARY)
                     ),
-        "partitions": ("ID",),
-        "indexes": ("A",)
+        "partitions": (),
+        "indexes": ()
     }
 #,
 #    "BLOB_TABLE": {
