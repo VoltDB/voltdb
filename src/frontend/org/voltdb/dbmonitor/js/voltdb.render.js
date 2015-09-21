@@ -610,6 +610,7 @@ function alertNodeClicked(obj) {
                     '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
             var alertHtml = "";
+
             
             jQuery.each(systemOverview, function(id, val) {
                 var hostName;
@@ -623,7 +624,7 @@ function alertNodeClicked(obj) {
                         '<td width="30%"><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
                     alertCount++;
                 }
-                
+
             });
             if (alertCount > 0) {
                 html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
