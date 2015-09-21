@@ -218,6 +218,7 @@ public class LoadTableLoader extends BenchmarkThread {
         final String m_cpprocName;
         //proc name for 2 delete
         final String m_delprocName;
+        final Random r2;
 
         void shutdown() {
             m_shouldContinue.set(false);
@@ -228,6 +229,7 @@ public class LoadTableLoader extends BenchmarkThread {
             setDaemon(true);
             m_cpprocName = (m_isMP ? "CopyLoadPartitionedMP" : "CopyLoadPartitionedSP");
             m_delprocName = (m_isMP ? "DeleteLoadPartitionedMP" : "DeleteLoadPartitionedSP");
+            r2 = new Random();
         }
 
         @Override
@@ -244,7 +246,7 @@ public class LoadTableLoader extends BenchmarkThread {
                     log.debug("WorkList Size: " + workList.size());
                     CountDownLatch clatch = new CountDownLatch(workList.size());
                     for (Long lcid : workList) {
-                        client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid);
+                        client.callProcedure(new InsertCopyCallback(clatch), m_cpprocName, lcid, r2.nextInt(2));
                     }
                     clatch.await();
                     CountDownLatch dlatch = new CountDownLatch(workList.size());

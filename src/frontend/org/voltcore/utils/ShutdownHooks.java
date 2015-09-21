@@ -35,8 +35,8 @@ public class ShutdownHooks
     /**
      * Provide some initial constants for shutdown order
      */
-    public static int FIRST = 1;
-    public static int MIDDLE = 50;
+    public static final int FIRST = 1;
+    public static final int MIDDLE = 50;
     // There is only 1 final action allowed after VoltLogger shuts down.
     private Runnable m_finalAction;
 

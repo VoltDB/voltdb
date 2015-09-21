@@ -40,11 +40,12 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.IndexRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
+import org.voltdb.utils.CatalogUtil;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -728,5 +729,41 @@ public class TestDDLCompiler extends TestCase {
         tester.testFailure("create table an_unquoted_table (\"a_quoted_column_without_spaces\" integer)");
         tester.testFailure("create table an_unquoted_table (\"a quoted column with spaces\" integer)");
         tester.testSuccess("create table an_unquoted_table (an_unquoted_column integer)");
+    }
+
+    public void testAutogenDRConflictTable() {
+        File jarOut = new File("setDatabaseConfig.jar");
+        jarOut.deleteOnExit();
+
+        VoltCompiler compiler = new VoltCompiler();
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(
+        "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+        "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER, D3 VARCHAR(32), VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER, PRIMARY KEY (D1), LIMIT PARTITION ROWS 1000);\n" +
+        "DR TABLE T;\n" +
+        "PARTITION TABLE T ON COLUMN D1;\n");
+        String schemaPath = schemaFile.getPath();
+
+        try {
+            assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
+            Table t = compiler.getCatalogDatabase().getTables().get(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + "T");
+            assertNotNull(t);
+            // verify table schema
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TABLE_NAME"));
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_CLUSTER_ID"));
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TIMESTAMP"));
+            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_OPERATION_TYPE"));
+            assertNotNull(t.getColumns().get("D1"));
+            assertNotNull(t.getColumns().get("D2"));
+            assertNotNull(t.getColumns().get("D3"));
+            assertNotNull(t.getColumns().get("VAL1"));
+            assertNotNull(t.getColumns().get("VAL2"));
+            assertNotNull(t.getColumns().get("VAL3"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail(e.getMessage());
+        }
+
+        // cleanup after the test
+        jarOut.delete();
     }
 }

@@ -30,7 +30,6 @@
 #include <string>
 #include <cassert>
 #include <stdlib.h>
-#include <stx/btree_map>
 #include <murmur3/MurmurHash3.h>
 #include <limits>
 

@@ -30,7 +30,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltcore.logging.VoltLogger;
 
 public class TableChangeMonitor {
-
     static VoltLogger log = new VoltLogger("Benchmark.tableChangeMonitor");
 
     Client client;
@@ -74,9 +73,7 @@ public class TableChangeMonitor {
             long ts = 0;
             while (stats.advanceRow()) {
                 String ttable = stats.getString("TABLE_NAME");
-                //log.info("foo " + ttable);
-                String ttype = stats.getString(6); //("TABLE_TYPE");
-                //log.info(ttype);
+                String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
                 //Get highest timestamp and watch it change
                 if (tts > ts) {

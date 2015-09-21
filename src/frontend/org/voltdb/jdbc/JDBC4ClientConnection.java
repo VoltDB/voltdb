@@ -33,6 +33,7 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
@@ -272,14 +273,14 @@ public class JDBC4ClientConnection implements Closeable {
      */
    public ClientResponse execute(String procedure, long timeout, TimeUnit unit, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
-        long start = System.currentTimeMillis();
         ClientImpl currentClient = this.getClient();
         if (unit == null) {
             unit = TimeUnit.SECONDS;
         }
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, unit, parameters);
+            ClientResponse response = currentClient.callProcedureWithClientTimeout(
+                    BatchTimeoutOverrideType.NO_TIMEOUT, procedure, timeout, unit, parameters);
             return response;
         }
         catch (ProcCallException pce) {

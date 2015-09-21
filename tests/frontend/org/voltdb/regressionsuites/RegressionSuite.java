@@ -141,6 +141,10 @@ public class RegressionSuite extends TestCase {
         return m_config instanceof LocalCluster;
     }
 
+    public boolean isDebug() {
+        return m_config.isDebug();
+    }
+
     /**
      * @return a reference to the associated VoltServerConfig
      */

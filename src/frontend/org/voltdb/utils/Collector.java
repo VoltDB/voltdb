@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,6 +57,7 @@ public class Collector {
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
     private static String m_deploymentPath = null;
+    private static String m_systemCheckPath = null;
     private static CollectConfig m_config;
 
     public static long m_currentTimeMillis = System.currentTimeMillis();
@@ -63,7 +65,7 @@ public class Collector {
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
 
-    public static String[] cmdFilenames = {"sardata", "dmesgdata"};
+    public static String[] cmdFilenames = {"sardata", "dmesgdata", "syscheckdata"};
 
     static class CollectConfig extends CLIConfig {
         @Option(desc = "file name prefix for uniquely identifying collection")
@@ -197,6 +199,7 @@ public class Collector {
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";
         m_deploymentPath = configLogDirPath + "deployment.xml";
+        m_systemCheckPath = voltDbRootPath + File.separator + "systemcheck";
     }
 
     public static JSONObject parseJSONFile(String configInfoPath) {
@@ -252,6 +255,9 @@ public class Collector {
             }
             if (new File(m_catalogJarPath).exists()) {
                 collectionFilesList.add(m_catalogJarPath);
+            }
+            if (new File(m_systemCheckPath).exists()) {
+                collectionFilesList.add(m_systemCheckPath);
             }
 
             for (String path: m_logPaths) {

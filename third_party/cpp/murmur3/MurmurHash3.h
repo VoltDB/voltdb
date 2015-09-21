@@ -1,3 +1,10 @@
+// This source file was originally from:
+//   https://github.com/PeterScott/murmur3
+//
+// We've changed it for use with VoltDB:
+//   - We changed the functions declared below to return their hash by
+//     value, rather than accept a pointer to storage for the result
+
 //-----------------------------------------------------------------------------
 // MurmurHash3 was written by Austin Appleby, and is placed in the public
 // domain. The author hereby disclaims copyright to this source code.
@@ -37,6 +44,8 @@ inline int32_t MurmurHash3_x64_128 ( int64_t value, uint32_t seed) {
 inline int32_t MurmurHash3_x64_128 ( int64_t value) {
     return MurmurHash3_x64_128(value, 0);
 }
+
+uint32_t MurmurHash3_x86_32(const void* key, uint32_t len, uint32_t seed);
 
 //-----------------------------------------------------------------------------
 

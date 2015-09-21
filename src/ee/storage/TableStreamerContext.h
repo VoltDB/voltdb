@@ -137,7 +137,7 @@ public:
     /**
      * Tuple length accessor.
      */
-    int getMaxTupleLength() const
+    size_t getMaxTupleLength() const
     {
         return m_maxTupleLength;
     }
@@ -219,7 +219,7 @@ private:
     /**
      * Maximum serialized length of a tuple
      */
-    const int m_maxTupleLength;
+    const size_t m_maxTupleLength;
 
     /**
      * Serializer for tuples

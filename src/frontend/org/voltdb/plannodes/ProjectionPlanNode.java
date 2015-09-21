@@ -129,13 +129,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         NodeSchema new_schema = new NodeSchema();
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
-            if (col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_SUM ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MIN ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MAX ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_AVG)
-            {
+            if (col.getExpression().getExpressionType().isAggregateExpression()) {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
                                                          col.getTableAlias(),

@@ -135,10 +135,14 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D0, T_D2");
         validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D1, T_D2, T_D0");
         validateBruteForcePlan("SELECT * from Tmanykeys ORDER BY T_D0, T_D2, T_D1");
+        // This is order deterministic.  The primary key is T_D0, T_D1, T_D2. We
+        // are ordering by two of these, and the third is constrained to be a constant.
+        // So, there can only be one row with three different values for all three
+        // columns, and it must be order deterministic.
+        validateBruteForcePlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D2, T_D0");
 
         // Use index for filter.
         validateIndexedBruteForcePlan("SELECT * from Tmanykeys WHERE T_D0 = ? ORDER BY T_D2, T_D1");
-        validateIndexedBruteForcePlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D2, T_D0");
     }
 
     public void testOrderByTooManyToIndex()

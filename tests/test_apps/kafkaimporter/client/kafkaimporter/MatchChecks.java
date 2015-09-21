@@ -24,114 +24,156 @@
 package kafkaimporter.client.kafkaimporter;
 
 import java.io.IOException;
-import java.util.Timer;
-import java.util.TimerTask;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
-import org.voltcore.logging.VoltLogger;
+
 
 public class MatchChecks {
-
     static VoltLogger log = new VoltLogger("Benchmark.matchChecks");
 
-    final static String DELETE_ROWS = "DeleteRows";
-
-    static class DeleteCallback implements ProcedureCallback {
-        final String proc;
-        final long key;
-
-        DeleteCallback(String proc, long key) {
-            this.proc = proc;
-            this.key = key;
-        }
-
-        @Override
-        public void clientCallback(ClientResponse clientResponse) {
-
-            // Make sure the procedure succeeded. If not,
-            // report the error.
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                String msg = String.format("%s k: %12d, callback fault: %s", proc, key, clientResponse.getStatusString());
-                log.error(msg);
-              }
-         }
-    }
-
-    protected static Timer checkTimer(long interval, Client client) {
-        final Timer timer = new Timer("checkTimer", true);
-        final Client innerClient = client;
-        timer.scheduleAtFixedRate(new TimerTask() {
-            private long mirrorRowCount = 0;
-
-            @Override
-            public void run() {
-                mirrorRowCount = getMirrorTableRowCount(innerClient);
-                log.info("checkTimer: Delete rows: " + findAndDeleteMatchingRows(innerClient));
-                log.info("checkTimer: Mirror table row count: " + mirrorRowCount);
-                if (mirrorRowCount == 0) { // indicates everything matched and mirror table empty
-                    log.info("checkTimer: mirrorRowCount is 0. Stopping...");
-                    timer.cancel();
-                    timer.purge();
-                }
-            }
-        }, 0, interval);
-        return timer;
-    }
-
-    protected static long getMirrorTableRowCount(Client client) {
+    protected static long getMirrorTableRowCount(boolean alltypes, Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-        long mirrorRowCount = 0;
-        try {
-            VoltTable[] countQueryResult = client.callProcedure("CountMirror").getResults();
-            mirrorRowCount = countQueryResult[0].asScalarLong();
-        } catch (IOException | ProcCallException e) {
-            e.printStackTrace();
-        }
-        log.info("Mirror table row count: " + mirrorRowCount);
-        return mirrorRowCount;
+        String table = alltypes ? "KafkaMirrorTable1" : "KafkaMirrorTable2";
+        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
     }
 
-    protected static long findAndDeleteMatchingRows(Client client) {
-        long rows = 0;
-        VoltTable results = null;
-
-        try {
-            results = client.callProcedure("MatchRows").getResults()[0];
-        } catch (Exception e) {
-             e.printStackTrace();
-             System.exit(-1);
-        }
-
-        log.info("Matched row count: " + results.getRowCount());
-        while (results.advanceRow()) {
-            long key = results.getLong(0);
-            // System.out.println("Key: " + key);
+    static ClientResponse doAdHoc(Client client, String query) {
+        /* a very similar method is used in txnid2::txnidutils, try to keep them in sync */
+        Boolean sleep = false;
+        Boolean noConnections = false;
+        Boolean timedOutOnce = false;
+        while (true) {
             try {
-                client.callProcedure(new DeleteCallback(DELETE_ROWS, key), DELETE_ROWS, key);
+                ClientResponse cr = client.callProcedure("@AdHoc", query);
+                if (cr.getStatus() == ClientResponse.SUCCESS) {
+                    return cr;
+                } else {
+                    log.debug(cr.getStatusString());
+                    log.error("unexpected response");
+                    System.exit(-1);
+                }
+            } catch (NoConnectionsException e) {
+                noConnections = true;
             } catch (IOException e) {
-                e.printStackTrace();
+                log.error("IOException",e);
+                System.exit(-1);
+            } catch (ProcCallException e) {
+                ClientResponse cr = e.getClientResponse();
+                String ss = cr.getStatusString();
+                log.debug(ss);
+                if (!timedOutOnce && ss.matches("(?s).*No response received in the allotted time.*"))
+                    /* allow a generic timeout but only once so that we don't risk masking error conditions */
+                {   timedOutOnce = false; //false;
+                    sleep = true;
+                }
+                else if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
+                        (ss.matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
+                                ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
+                                ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
+                                ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
+                                ss.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*")
+                        )) {}
+                else if (ss.matches(".*Server is currently unavailable; try again later.*") ||
+                        ss.matches(".*Server is paused and is currently unavailable.*")) {
+                    sleep = true;
+                }
+                else {
+                    log.error("Unexpected ProcCallException", e);
+                    System.exit(-1);
+                }
             }
-            rows++;
+            if (sleep | noConnections) {
+                try { Thread.sleep(3000); } catch (Exception f) { }
+                sleep = false;
+                if (noConnections)
+                    while (client.getConnectedHostList().size() == 0);
+                noConnections = false;
+            }
         }
-        return rows;
     }
 
-    public static long getImportTableRowCount(Client client) {
+    protected static long getExportRowCount(Client client) {
+        // get the count of rows exported
+        ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
+    }
+
+    protected static long getImportRowCount(Client client) {
+        // get the count of rows imported
+        ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_DELETED) from importcounts order by 1;");
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
+    }
+
+    protected static long checkRowMismatch(Client client) {
+        // check if any rows failed column by colunn comparison so we can fail fast
+        ClientResponse response = doAdHoc(client, "select key from importcounts where value_mismatch = 1 limit 1;");
+        VoltTable[] result = response.getResults();
+        if (result[0].getRowCount() == 0) // || result[0].asScalarLong() == 0)
+            return 0;
+        return result[0].asScalarLong();
+    }
+
+    public static long getImportTableRowCount(boolean alltypes, Client client) {
         // check row count in import table
+        String table = alltypes ? "KafkaImportTable2" : "KafkaImportTable1";
+        ClientResponse response = doAdHoc(client, "select count(*) from " + table);
+        VoltTable[] countQueryResult = response.getResults();
+        VoltTable data = countQueryResult[0];
+        if (data.asScalarLong() == VoltType.NULL_BIGINT)
+            return 0;
+        return data.asScalarLong();
+    }
+
+    public static boolean checkPounderResults(long expected_rows, Client client) {
+        // make sure import table has expected number of rows, and without gaps
+        // we check the row count, then use min & max to infer the range is complete
         long importRowCount = 0;
-        try {
-            VoltTable[] countQueryResult = client.callProcedure("CountImport").getResults();
-            importRowCount = countQueryResult[0].asScalarLong();
-        } catch (IOException | ProcCallException e) {
-            e.printStackTrace();
+        long importMax = 0;
+        long importMin = 0;
+
+        ClientResponse response = doAdHoc(client, "select count(key), min(key), max(key) from kafkaimporttable1");
+        VoltTable countQueryResult = response.getResults()[0];
+        countQueryResult.advanceRow();
+        importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
+        importMin = (long) countQueryResult.get(1, VoltType.BIGINT);
+        importMax = (long) countQueryResult.get(2, VoltType.BIGINT);
+
+        if (importRowCount != expected_rows) {
+            log.error(expected_rows + " expected. " + importRowCount + " received.");
+            return false;
         }
-        log.info("Import table row count: " + importRowCount);
-        return importRowCount;
+
+        if (importMax == VoltType.NULL_BIGINT) {
+            importMax = 0;
+        }
+        if (importMin == VoltType.NULL_BIGINT) {
+            importMin = 0;
+        }
+        if ((importMax-importMin+1) != expected_rows) {
+            log.error(expected_rows + " expected. " + (importMax-importMin+1) + " rows received.");
+            return false;
+        }
+        return true;
     }
 }
 

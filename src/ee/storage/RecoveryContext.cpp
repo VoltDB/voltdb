@@ -73,7 +73,6 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
         //No tuple count added to message because completion message is only used in Java
         return false;
     }
-    DefaultTupleSerializer serializer;
     //Use allocated tuple count to size stuff at the other end
     uint32_t allocatedTupleCount = static_cast<uint32_t>(getTable().allocatedTupleCount());
     RecoveryProtoMsgBuilder message(
@@ -81,7 +80,7 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
             m_tableId,
             allocatedTupleCount,
             out,
-            &m_serializer,
+            &getSerializer(),
             getTable().schema());
     TableTuple tuple(getTable().schema());
     while (message.canAddMoreTuples() && m_iterator.next(tuple)) {

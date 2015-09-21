@@ -31,6 +31,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -64,7 +65,8 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
             try {
                 // Ten seconds should be long enough to detect a hang.
                 String toxicDDL = AsyncCompilerAgent.DEBUG_EXCEPTION_DDL + ";";
-                ((ClientImpl)m_client).callProcedureWithTimeout("@AdHoc", 10, TimeUnit.SECONDS, toxicDDL);
+                ((ClientImpl)m_client).callProcedureWithClientTimeout(
+                        BatchTimeoutOverrideType.NO_TIMEOUT, "@AdHoc", 10, TimeUnit.SECONDS, toxicDDL);
             }
             catch (ProcCallException pce) {
                 String message = pce.getLocalizedMessage();
@@ -115,7 +117,8 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
         String tableName = String.format("FOO%d", validDDLAttempt);
         String ddl = String.format("create table %s (id smallint not null);", tableName);
         try {
-            ClientResponse resp2 = client.callProcedureWithTimeout("@AdHoc", 20, TimeUnit.SECONDS, ddl);
+            ClientResponse resp2 = client.callProcedureWithClientTimeout(
+                    BatchTimeoutOverrideType.NO_TIMEOUT, "@AdHoc", 20, TimeUnit.SECONDS, ddl);
             assertTrue(String.format("Valid DDL attempt #%d failed.", validDDLAttempt),
                        resp2.getStatus() == ClientResponse.SUCCESS);
         }

@@ -49,6 +49,7 @@ using namespace std;
 namespace voltdb {
 class Pool;
 class StreamBlock;
+class Table;
 }
 
 class VoltDBIPC : public voltdb::Topend {
@@ -108,7 +109,7 @@ public:
 
     bool execute(struct ipc_command *cmd);
 
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
+    int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
     /**
      * Log a statement on behalf of the IPC log proxy at the specified log level
@@ -130,6 +131,9 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
+    int reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, voltdb::Table* input, voltdb::Table* output);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;
@@ -233,7 +237,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int64_t undoToken;
-    int32_t undo;
+    int32_t returnUniqueViolations;
     int32_t shouldDRStream;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
@@ -799,7 +803,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
     const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
-    const bool undo = loadTableCommand->undo != 0;
+    const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
@@ -808,7 +812,9 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         ReferenceSerializeInputBE serialize_in(offset, sz);
         m_engine->setUndoToken(undoToken);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, txnId, spHandle, lastCommittedSpHandle, uniqueId, undo, shouldDRStream);
+        bool success = m_engine->loadTable(tableId, serialize_in,
+                                           txnId, spHandle, lastCommittedSpHandle, uniqueId,
+                                           returnUniqueViolations, shouldDRStream);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -1532,21 +1538,32 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
         m_engine->resetReusedResultOutputBuffer(1);
-        m_engine->applyBinaryLog(ntohll(params->txnId),
-                                 ntohll(params->spHandle),
-                                 ntohll(params->lastCommittedSpHandle),
-                                 ntohll(params->uniqueId),
-                                 ntohll(params->undoToken),
-                                 params->log);
+        int64_t rows = m_engine->applyBinaryLog(ntohll(params->txnId),
+                                        ntohll(params->spHandle),
+                                        ntohll(params->lastCommittedSpHandle),
+                                        ntohll(params->uniqueId),
+                                        ntohll(params->undoToken),
+                                        params->log);
+        char response[9];
+        response[0] = kErrorCode_Success;
+        *reinterpret_cast<int64_t*>(&response[1]) = htonll(rows);
+        writeOrDie(m_fd, (unsigned char*)response, 9);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }
 }
 
-void VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
+int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();
     }
+    return -1;
+}
+
+int VoltDBIPC::reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            std::string tableName, voltdb::Table* input, voltdb::Table* output) {
+    return 0;
 }
 
 void *eethread(void *ptr) {

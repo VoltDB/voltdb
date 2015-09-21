@@ -570,7 +570,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
         }
 
         and: 'for a non-matching result, check if it is just a trim issue, and print details'
-        if (expectedResponse.result != qResult) {
+        if (qResult instanceof Map && expectedResponse.result instanceof Map && qResult != expectedResponse.result) {
             println "\nWARNING: query result does not match expected, for column(s):"
             boolean allDiffsCausedByTrim = true
             def expCols = expectedResponse.result.keySet()

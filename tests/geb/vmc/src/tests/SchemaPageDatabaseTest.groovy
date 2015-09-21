@@ -58,6 +58,8 @@ class SchemaPageDatabaseTest extends TestBase {
     }
     
     def "Size Worksheet Tab:Add table, search and delete"() {
+        boolean result = false
+        
         when: 'go to size worksheet tab'
         page.openSchemaPageSizeWorksheetTab()
         then: 'at size worksheet tab'
@@ -66,9 +68,45 @@ class SchemaPageDatabaseTest extends TestBase {
         String createQuery = page.getQueryToCreateTable()
         String deleteQuery = page.getQueryToDeleteTable()
         String tablename = page.getTablename()
-
+        
+        // Changes for handling the pause
+        when: 'go to Admin page'
+        page.openAdminPage()
+        then: 'at SQL Query page'
+        at AdminPage
+        
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
+            println("Resume button is displayed") 
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }  
+          
+        if (result == false) {
+            println("Resume VMC")
+            
+            try {
+                page.cluster.resumebutton.click()
+                waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.resumeok.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause button was not found")
+                assert false
+            }
+        }
+        //
+        
         when: 'go to SQL Query page'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL Query page'
         at SqlQueryPage
 
@@ -78,7 +116,7 @@ class SchemaPageDatabaseTest extends TestBase {
         page.runQuery()
 
         when: 'go to Schema page'
-        page.gotoSchema()
+        page.openSchemaPage()
         then: 'at Schema page'
         at SchemaPage
 
@@ -89,13 +127,13 @@ class SchemaPageDatabaseTest extends TestBase {
 
         when: 'tablename is searched'
         page.refreshbutton.click()
-        waitFor(30) { page.searchName.isDisplayed() }
-        page.searchName.value(tablename)
+        //waitFor(30) { page.searchName.isDisplayed() }
+        //page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { page.tablenamePresent.isDisplayed() }
 
         when: 'go to SQL Query page'
-        page.gotoSqlQuery()
+        page.openSqlQueryPage()
         then: 'at SQL Query page'
         at SqlQueryPage
 
@@ -105,7 +143,7 @@ class SchemaPageDatabaseTest extends TestBase {
         page.runQuery()
 
         when: 'go to Schema page'
-        page.gotoSchema()
+        page.openSchemaPage()
         then: 'at Schema page'
         at SchemaPage
 
@@ -116,8 +154,8 @@ class SchemaPageDatabaseTest extends TestBase {
 
         when: 'tablename is searched'
         page.refreshbutton.click()
-        waitFor(30) { page.searchName.isDisplayed() }
-        page.searchName.value(tablename)
+        //waitFor(30) { page.searchName.isDisplayed() }
+        //page.searchName.value(tablename)
         then: 'at least one table is present'
         waitFor(30) { !page.tablenamePresent.isDisplayed() }
 
@@ -130,9 +168,37 @@ class SchemaPageDatabaseTest extends TestBase {
             println()
             assert false
         }
+        
+        when:
+        if (result == false) {
+            println("Pause VMC")
+            
+            page.openAdminPage()
+            at AdminPage
+            
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.pauseok.click()
+                waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume button was not found")
+                assert false
+            }
+        }
+        then:
+        println()
     }
 	
 	def "Schema Tab:Add table, search and delete"() {
+		boolean result = false
+		
 		when: 'go to schema tab'
 		page.openSchemaPageSchemaTab()
 		then: 'at schema tab'
@@ -141,9 +207,45 @@ class SchemaPageDatabaseTest extends TestBase {
 		String createQuery = page.getQueryToCreateTable()
 		String deleteQuery = page.getQueryToDeleteTable()
 		String tablename = page.getTablename()
-		
+				
+		// Corrections
+		when: 'go to Admin page'
+        page.openAdminPage()
+        then: 'at SQL Query page'
+        at AdminPage
+        
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }  
+            println("Resume button is displayed") 
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }  
+          
+        if (result == false) {
+            println("Resume VMC")
+            
+            try {
+                page.cluster.resumebutton.click()
+                waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.resumeok.click()
+                waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause button was not found")
+                assert false
+            }
+        }
+        //
+        
 		when: 'go to SQL Query page'
-		page.gotoSqlQuery()
+		page.openSqlQueryPage()
 		then: 'at SQL Query page'
 		at SqlQueryPage
 		
@@ -153,7 +255,7 @@ class SchemaPageDatabaseTest extends TestBase {
 		page.runQuery()
 		
 		when: 'go to Schema page'
-		page.gotoSchema()
+		page.openSchemaPage()
 		then: 'at Schema page'
 		at SchemaPage
 		
@@ -164,13 +266,13 @@ class SchemaPageDatabaseTest extends TestBase {
 		
 		when: 'tablename is searched'
 		page.refreshbutton.click()
-		waitFor(30) { page.searchName.isDisplayed() }
-		page.searchName.value(tablename)
+		//waitFor(30) { page.searchName.isDisplayed() }
+		//page.searchName.value(tablename)
 		then: 'at least one table is present'
 		waitFor(30) { page.requiredId.isDisplayed() }
 		
 		when: 'go to SQL Query page'
-		page.gotoSqlQuery()
+		page.openSqlQueryPage()
 		then: 'at SQL Query page'
 		at SqlQueryPage
 		
@@ -180,7 +282,7 @@ class SchemaPageDatabaseTest extends TestBase {
 		page.runQuery()
 		
 		when: 'go to Schema page'
-		page.gotoSchema()
+		page.openSchemaPage()
 		then: 'at Schema page'
 		at SchemaPage
 		
@@ -191,8 +293,8 @@ class SchemaPageDatabaseTest extends TestBase {
 		
 		when: 'tablename is searched'
 		page.refreshbutton.click()
-		waitFor(30) { page.searchName.isDisplayed() }
-		page.searchName.value(tablename)
+		//waitFor(30) { page.searchName.isDisplayed() }
+		//page.searchName.value(tablename)
 		then: 'at least one table is present'
 		
 		try {
@@ -204,6 +306,32 @@ class SchemaPageDatabaseTest extends TestBase {
 			println("Schema Tab:Add table, search and delete-PASS")
 		}
 		println()
+		
+		when:
+        if (result == false) {
+            println("Pause VMC")
+            
+            page.openAdminPage()
+            at AdminPage
+            
+            try {
+                page.cluster.pausebutton.click()
+                waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Pause confirmation was not found")
+                assert false
+            }  
+            
+            try {
+                page.cluster.pauseok.click()
+                waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("Error: Resume button was not found")
+                assert false
+            }
+        }
+        then:
+        println()
 	}
 	
     def cleanup() {

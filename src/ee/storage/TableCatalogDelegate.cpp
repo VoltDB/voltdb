@@ -577,12 +577,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
                                            catalog::Table const &catalogTable,
                                            std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
-    std::cout << "Processing schema change....\n";
-    std::cout.flush();
-    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream());
-    if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-        DRTupleStreamDisableGuard guardReplicated(ExecutorContext::getExecutorContext()->drReplicatedStream());
-    }
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream(),
+            ExecutorContext::getExecutorContext()->drReplicatedStream());
 
     ///////////////////////////////////////////////
     // Create a new table so two tables exist

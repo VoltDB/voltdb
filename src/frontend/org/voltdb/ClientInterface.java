@@ -153,7 +153,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
-    public static final long IMPORTER_CID               = Long.MIN_VALUE + 5;
+    public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 
@@ -172,6 +172,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final SnapshotDaemon m_snapshotDaemon;
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter;
+    private final InternalConnectionHandler m_internalConnectionHandler;
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -1207,6 +1208,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+
+        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
+        bindAdapter(internalAdapter, null);
+        m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
+    }
+
+    public InternalConnectionHandler getInternalConnectionHandler() {
+        return m_internalConnectionHandler;
     }
 
     private void handlePartitionFailOver(BinaryPayloadMessage message) {
@@ -1527,6 +1536,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sql, stmtsArray, userParams, null, explainMode,
                 userPartitionKey == null, userPartitionKey,
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                task.getBatchTimeout(),
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
                 m_adhocCompletionHandler, user);
@@ -1739,32 +1749,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final CatalogContext catalogContext = m_catalogContext.get();
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
-        Procedure catProc = catalogContext.procedures.get(task.procName);
-        if (catProc == null) {
-            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(task.procName);
-        }
-
-        if (catProc == null) {
-            String proc = task.procName;
-            if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
-                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-                // configured differently for @AdHoc... variants this code will have to
-                // change in order to use the proper variant based on whether the work
-                // is single or multi partition and read-only or read-write.
-                proc = "@AdHoc_RW_MP";
-            }
-            else if (task.procName.equals("@UpdateClasses")) {
-                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
-                // permissions and replication policy for @UAC, and we'll deal with the
-                // parameter validation stuff separately (the different name will
-                // skip the @UAC-specific policy)
-                proc = "@UpdateApplicationCatalog";
-            }
-            Config sysProc = SystemProcedureCatalog.listing.get(proc);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-        }
+        Procedure catProc = getProcedureFromName(task.procName, catalogContext);
 
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
@@ -1792,8 +1777,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     new VoltTable[0], "Server is paused and is available in read-only mode - please try again later.",
                     task.clientHandle);
         }
-
-        final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
         ClientResponseImpl error = null;
         //Check permissions
@@ -1859,7 +1842,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                  * but doesn't initiate the invocation. It will fall through to
                  * the shared dispatch of sysprocs.
                  */
-                if (task.getType() == ProcedureInvocationType.REPLICATED) {
+                if (ProcedureInvocationType.isDeprecatedInternalDRType(task.getType())) {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
             }
@@ -1935,21 +1918,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         int partition = -1;
-        if (catProc.getSinglepartition()) {
-            // break out the Hashinator and calculate the appropriate partition
-            try {
-                partition =
-                        getPartitionForProcedure(
-                                ppi.index,
-                                ppi.type,
-                                task);
-            } catch (Exception e) {
-                // unable to hash to a site, return an error
-                return getMispartitionedErrorResponse(task, catProc, e);
-            }
+        try {
+            partition = getPartitionForProcedure(catProc, task);
+        } catch (Exception e) {
+            // unable to hash to a site, return an error
+            return getMispartitionedErrorResponse(task, catProc, e);
         }
-        boolean success =
-                createTransaction(handler.connectionId(),
+        boolean success = createTransaction(handler.connectionId(),
                         task,
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
@@ -1968,6 +1943,37 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
         return null;
+    }
+
+    public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
+        Procedure catProc = catalogContext.procedures.get(procName);
+        if (catProc == null) {
+            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(procName);
+        }
+
+        if (catProc == null) {
+            String proc = procName;
+            if (procName.equals("@AdHoc") || procName.equals("@AdHocSpForTest")) {
+                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+                // configured differently for @AdHoc... variants this code will have to
+                // change in order to use the proper variant based on whether the work
+                // is single or multi partition and read-only or read-write.
+                proc = "@AdHoc_RW_MP";
+            }
+            else if (procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                proc = "@UpdateApplicationCatalog";
+            }
+            Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
+            }
+        }
+
+        return catProc;
     }
 
     private boolean allowPauseModeExecution(ClientInputHandler handler, Procedure procedure, StoredProcedureInvocation invocation) {
@@ -2175,6 +2181,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
+        task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
@@ -2381,7 +2388,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else {
                     ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
-                                ClientResponseImpl.GRACEFUL_FAILURE,
+                                (result.errorCode == AsyncCompilerResult.UNINITIALIZED_ERROR_CODE) ? ClientResponse.GRACEFUL_FAILURE : result.errorCode,
                                 new VoltTable[0], result.errorMsg,
                                 result.clientHandle);
                     writeResponseToConnection(errorResponse);
@@ -2687,6 +2694,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_notifier.start();
     }
 
+    static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) throws Exception {
+        final CatalogContext.ProcedurePartitionInfo ppi = (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
+        if (procedure.getSinglepartition()) {
+            // break out the Hashinator and calculate the appropriate partition
+            return getPartitionForProcedure( ppi.index, ppi.type, task);
+        } else {
+            return -1;
+        }
+    }
     /**
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.

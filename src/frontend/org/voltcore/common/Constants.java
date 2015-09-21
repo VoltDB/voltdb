@@ -20,6 +20,6 @@ package org.voltcore.common;
 public class Constants
 {
     // The default heartbeat timeout value
-    public static int DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 90;
+    public static final int DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 90;
     public static final String VOLT_TMP_DIR = "volt.tmpdir";
 }

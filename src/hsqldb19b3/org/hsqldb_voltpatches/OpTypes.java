@@ -99,5 +99,8 @@ public interface OpTypes {
         LIMIT                = 95,
         ALTERNATIVE          = 96,
         MULTICOLUMN          = 97
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        , APPROX_COUNT_DISTINCT = 98
+        // End VoltDB extension
     ;
 }

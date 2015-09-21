@@ -242,10 +242,21 @@
                 .axisLabel('(%)')
                 .axisLabelDistance(10);
 
-            MonitorGraphUI.ChartCpu.tooltipContent(function (key, y, e, graph) {
-                return '<h3> CPU </h3>'
-                    + '<p>' + e + '% at ' + y + '</p>';
-            });
+
+
+            //
+            //            MonitorGraphUI.ChartCpu.tooltip.contentGenerator(function(d) {
+            //                console.log(d);
+            //                var html = '';
+            //                d.series.forEach(function (elem) {
+            //                    html += "<h3 style='color:" + elem.color + "'>"
+            //                        + elem.key + "</h3>";
+            //                });
+            //                html = html + "<h2>" + parseFloat(d.pointIndex).toFixed(2) + "% at " + d3.time.format('%d %b %X')(new Date(d.value)) + "</h2>";
+            //
+            //                return html;
+            //            });
+
 
             MonitorGraphUI.ChartCpu.margin({ left: 80 });
             MonitorGraphUI.ChartCpu.yAxis.scale().domain([0, 100]);
@@ -279,10 +290,12 @@
             MonitorGraphUI.ChartRam.margin({ left: 80 });
             MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
 
-            MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
-                return '<h3> RAM </h3>'
-                    + '<p>' + e + ' GB at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> RAM </h3>'
+            //                    + '<p>' + e + ' GB at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartRam.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationRam')
                 .datum(dataRam)
@@ -313,10 +326,12 @@
             MonitorGraphUI.ChartLatency.margin({ left: 80 });
             MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
 
-            MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Latency </h3>'
-                    + '<p>' + e + ' ms at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Latency </h3>'
+            //                    + '<p>' + e + ' ms at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartLatency.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationLatency')
                 .datum(dataLatency)
@@ -347,10 +362,12 @@
             MonitorGraphUI.ChartTransactions.margin({ left: 80 });
             MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
 
-            MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Transactions </h3>'
-                    + '<p>' + e + ' tps at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Transactions </h3>'
+            //                    + '<p>' + e + ' tps at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartTransactions.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationTransaction')
                 .datum(dataTransactions)
@@ -415,10 +432,12 @@
             MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
             MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
 
-            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Replication Rate </h3>'
-                    + '<p>' + e + ' KBps at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartDrReplicationRate.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Replication Rate </h3>'
+            //                    + '<p>' + e + ' KBps at ' + y + '</p>';
+            //            });
+
+            MonitorGraphUI.ChartDrReplicationRate.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualizationDrReplicationRate')
                 .datum(dataDrReplicationRate)
@@ -449,10 +468,12 @@
             MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
             MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
 
-            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
-                return '<h3> Command Log Statistic </h3>'
-                    + '<p>' + e + ' Pending at ' + y + '</p>';
-            });
+            //            MonitorGraphUI.ChartCommandlog.tooltipContent(function (key, y, e, graph) {
+            //                return '<h3> Command Log Statistic </h3>'
+            //                    + '<p>' + e + ' Pending at ' + y + '</p>';
+            //            });
+            //            
+            MonitorGraphUI.ChartCommandlog.interactiveLayer.tooltip.contentGenerator();
 
             d3.select('#visualisationCommandLog')
                 .datum(dataCommandLog)
@@ -727,6 +748,76 @@
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
+
+            MonitorGraphUI.ChartCpu.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+
+
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + "% at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+
+                return html;
+            });
+
+            MonitorGraphUI.ChartRam.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartLatency.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartTransactions.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " tps at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartCommandlog.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " Pending at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+            
+            MonitorGraphUI.ChartDrReplicationRate.tooltip.contentGenerator(function (d) {
+                var html = '';
+                d.series.forEach(function (elem) {
+                    html += "<h3 style='color:" + elem.color + "'>"
+                        + elem.key + "</h3>";
+                });
+                html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format(dateFormat)(new Date(d.point.x)) + "</h2>";
+
+                return html;
+            });
+
         };
 
         var dataView = {
@@ -831,11 +922,12 @@
             var dataMemMin = monitor.memDataMin;
             var dataMemDay = monitor.memDataDay;
             var memDetails = memoryDetails;
+
+            if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
+                return;
+
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
-
-            if ($.isEmptyObject(memDetails) || memDetails[currentServer].PHYSICALMEMORY == null || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].RSS == null || memDetails[currentServer].TIMESTAMP == null || memDetails[currentServer].TIMESTAMP == undefined)
-                return;
 
             if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
                 physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
@@ -891,11 +983,12 @@
             var datatransMin = monitor.tpsDataMin;
             var datatransDay = monitor.tpsDataDay;
             var transacDetail = transactionDetails;
+
+            if ($.isEmptyObject(transacDetail) || transacDetail == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["TimeStamp"] == undefined || transacDetail["currentTimerTick"] == undefined)
+                return;
+
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
-
-            if ($.isEmptyObject(transacDetail) || transacDetail["CurrentTimedTransactionCount"] == null || transacDetail["TimeStamp"] == null || transacDetail["TimeStamp"] == undefined || transacDetail["CurrentTimedTransactionCount"] == undefined || transacDetail["currentTimerTick"] == null || transacDetail["currentTimerTick"] == undefined)
-                return;
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
@@ -949,11 +1042,12 @@
             var cpuDataMin = monitor.cpuDataMin;
             var cpuDataDay = monitor.cpuDataHrs;
             var cpuDetail = cpuDetails;
+
+            if ($.isEmptyObject(cpuDetail) || cpuDetail == undefined || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == undefined)
+                return;
+
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
-
-            if ($.isEmptyObject(cpuDetail) || cpuDetail[currentServer].PERCENT_USED == null || cpuDetail[currentServer].PERCENT_USED == undefined || cpuDetail[currentServer].TIMESTAMP == null || cpuDetail[currentServer].TIMESTAMP == undefined)
-                return;
 
             if (percentageUsage < 0)
                 percentageUsage = 0;
@@ -1012,11 +1106,11 @@
             var partitionDataMin = monitor.partitionDataMin;
             var partitionDataDay = monitor.partitionDataDay;
             var partitionDetail = partitionDetails;
-            var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
 
-            if ($.isEmptyObject(partitionDetail) || partitionDetail["partitionDetail"]["timeStamp"] == null || partitionDetail["partitionDetail"]["timeStamp"] == undefined)
+            if ($.isEmptyObject(partitionDetail) || partitionDetail == undefined ||partitionDetail["partitionDetail"]["timeStamp"] == undefined)
                 return;
 
+            var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
             $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
                 $.each(datavalue, function (partitionKey, partitionValue) {
                     var keyValue = partitionKey;
@@ -1082,11 +1176,12 @@
             var drDataMin = monitor.drReplicationDataMin;
             var drDataDay = monitor.drReplicationDataDay;
             var drDetail = drDetails;
+
+            if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
+                return;
+
             var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
-
-            if ($.isEmptyObject(drDetail) || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == null || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == null || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
-                return;
 
             if (drSecCount >= 6 || monitor.drFirstData) {
                 drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
@@ -1131,7 +1226,7 @@
             var cmdLogDataDay = monitor.cmdLogDataDay;
             var cmdLogDetail = cmdLogDetails;
 
-            if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail[currentServer].OUTSTANDING_TXNS == null || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == null || cmdLogDetail[currentServer].TIMESTAMP == undefined)
+            if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;
 
             var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;

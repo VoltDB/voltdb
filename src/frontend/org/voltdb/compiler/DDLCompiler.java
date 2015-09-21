@@ -36,9 +36,9 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
@@ -51,15 +51,15 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
+import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -71,8 +71,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.FunctionExpression;
-import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.parser.HSQLLexer;
@@ -139,6 +137,21 @@ public class DDLCompiler {
     final ClassLoader m_classLoader;
 
     private final Set<String> tableLimitConstraintCounter = new HashSet<>();
+
+    // Addition columns for DR conflicts table
+    private static final String [] DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS = {
+        "VOLTDB_AUTOGEN_TABLE_NAME VARCHAR",  // actual size of this column will be calculated at runtime
+        "VOLTDB_AUTOGEN_CLUSTER_ID TINYINT",
+        "VOLTDB_AUTOGEN_TIMESTAMP BIGINT",
+        "VOLTDB_AUTOGEN_OPERATION_TYPE TINYINT"
+    };
+
+    private static final Pattern drConflictsTablePattern = Pattern.compile(
+            CatalogUtil.DR_CONFLICTS_TABLE_PREFIX +             /* table prefix */
+            "(" +                                               /* start of group 1 */
+            "[\\w]+" +                                          /* DR table name, have at least one character */
+            ")"                                                 /* end of group 1 */
+    );
 
     private class DDLStatement {
         public DDLStatement() {
@@ -218,6 +231,124 @@ public class DDLCompiler {
         m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
         // possibly save some memory
         m_classMatcher.clear();
+    }
+
+    private void createConflictExportTableDDL(StringBuilder sb, VoltXMLElement node, String tableName) {
+
+        sb.append("CREATE TABLE " + tableName + " (");
+        for (VoltXMLElement subnode : node.children) {
+            // Indexes and constraints are not needed for export table
+            if (subnode.name.equals("columns")) {
+                // Insert additional columns to DR conflicts table first
+                for (String column : DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS) {
+                    sb.append(column);
+                    if (column.startsWith("TABLE_NAME")) {
+                        sb.append("(" + node.attributes.get("name").length() + " BYTES" + ")");
+                    }
+                    sb.append(", ");
+                }
+                // Then duplicate all columns of the original table
+                int columnIdx = 0;
+                for (VoltXMLElement columnNode : subnode.children) {
+                    sb.append(columnNode.attributes.get("name") + " " + columnNode.attributes.get("valuetype"));
+                    if (columnNode.attributes.get("nullable").equals("false")) {
+                        sb.append(" NOT NULL");
+                    }
+                    columnIdx++;
+                    if (columnIdx != subnode.children.size()) {
+                        sb.append(", ");
+                    }
+                }
+            }
+        }
+        sb.append(");\n");
+        if (node.attributes.containsKey("partitioncolumn")) {
+            sb.append("PARTITION TABLE " + tableName + " ON COLUMN " + node.attributes.get("partitioncolumn") + ";\n");
+        }
+        sb.append("EXPORT TABLE " + tableName + " TO STREAM " + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + ";\n");
+    }
+
+    private void createDRConflictTables(StringBuilder sb, Database previousDBIfAny) {
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("table")
+                    && node.attributes.containsKey("drTable") && node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
+                boolean tableAlreadyExist = false;
+                String drConflictExportTableName = CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + node.attributes.get("name");
+                // Does the conflict export table already existed?
+                if (previousDBIfAny != null) {
+                    tableAlreadyExist = previousDBIfAny.getTables().get(drConflictExportTableName) != null;
+                } else {
+                    for (VoltXMLElement element : m_schema.children) {
+                        if (element.name.equals("table")
+                                && element.attributes.containsKey("export")
+                                && element.attributes.get("name").equals(drConflictExportTableName)) {
+                            tableAlreadyExist = true;
+                            break;
+                        }
+                    }
+                }
+                if (!tableAlreadyExist) {
+                    // If the conflict export table doesn't existed yet, create a new one.
+                    createConflictExportTableDDL(sb, node, drConflictExportTableName);
+                }
+            }
+        }
+    }
+
+    // Drop the dr conflicts table if corresponding dr table is not existed or A/A is disabled or dr is disabled.
+    private void dropDRConflictTablesIfNeeded(StringBuilder sb, Database currentDB) {
+        Matcher matcher;
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("table")
+                    && (matcher = drConflictsTablePattern.matcher(node.attributes.get("name"))).matches()) {
+                String drTable = matcher.group(1);
+                boolean remove = true;
+                if (currentDB.getIsactiveactivedred()) {
+                    for (VoltXMLElement element : m_schema.children) {
+                        if (element.name.equals("table")
+                                && element.attributes.containsKey("drTable")
+                                && element.attributes.get("drTable").equalsIgnoreCase("ENABLE")
+                                && element.attributes.get("name").equals(drTable)) {
+                            remove = false;
+                            break;
+                        }
+                    }
+                }
+                if (remove) {
+                    sb.append("DROP TABLE " + node.attributes.get("name") + ";\n");
+                }
+            }
+        }
+    }
+
+    // Generate DDL to create or drop the DR conflict table
+    // TODO:When DR table supports dynamic schema change, we need also change the schema of conflict table,
+    //       maybe dropping the old one and recreating a new one is the easiest way.
+    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
+        StringBuilder sb = new StringBuilder();
+        if (currentDB.getIsactiveactivedred()) {
+            createDRConflictTables(sb, previousDBIfAny);
+        }
+        dropDRConflictTablesIfNeeded(sb, currentDB);
+        return sb.toString();
+    }
+
+    /**
+     * Load auto generated DR conflicts table into current schema.
+     * DR conflict table will be generated by
+     * 1) compiling the catalog if DR table exist and A/A DR is on,
+     * 2) liveDDL to enable DR table and turn A/A DR on
+     * 3) @UpdateApplicationCatalog to enable DR table and turn A/A DR on
+     *
+     * @param db  current database
+     * @param previousDBIfAny  previous status of database, liveDDL needs it
+     * @param whichProcs  which type(s) of procedures to load
+     * @throws VoltCompilerException
+     */
+    public void loadAutogenExportTableSchema(Database db, Database previousDBIfAny, DdlProceduresToLoad whichProcs)
+            throws VoltCompilerException {
+        Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny));
+        loadSchema(reader, db, whichProcs);
     }
 
     private void applyDiff(VoltXMLDiff stmtDiff)

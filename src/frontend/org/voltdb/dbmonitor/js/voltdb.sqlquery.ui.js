@@ -285,7 +285,7 @@ $(document).ready(function () {
             defSrc = defSrcHeader + defSrc + defSrcFooter;
             
             var userProcHeader = "";
-            userProcHeader += '<h3 class="systemHeader">User Defined Stored Procedures</h3>';
+            userProcHeader += '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
             userProcHeader += '<div id="userProcedure" class="listView">';
             var userProcFooter = '</div>';
             var userSrc = userProcHeader + src + userProcFooter;

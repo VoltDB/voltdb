@@ -289,8 +289,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     private static final String INDENT = "  | ";
 
+    /**
+     * Return a node name to help out toString.  Subclasses
+     * can chime in if they have a notion to.  See TupleValueExpression,
+     * for example.
+     */
+    protected String getExpressionNodeNameForToString() {
+        return this.getClass().getSimpleName();
+    }
+
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String header = this.getClass().getSimpleName() + "[" + getExpressionType().toString() + "] : ";
+        String nodeName = getExpressionNodeNameForToString();
+        String header = getExpressionNodeNameForToString() + "[" + getExpressionType().toString() + "] : ";
         if (m_valueType != null) {
             header += m_valueType.toSQLString();
         }
@@ -903,6 +913,44 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 }
             }
         }
+        return false;
+    }
+
+    /**
+     * A predicate class for searching expression trees,
+     * to be used with hasAnySubexpressionWithPredicate, below.
+     */
+    public static interface SubexprFinderPredicate {
+        boolean matches(AbstractExpression expr);
+    }
+
+    /**
+     * Searches the expression tree rooted at this for nodes for which "pred"
+     * evaluates to true.
+     * @param pred  Predicate object instantiated by caller
+     * @return      true if the predicate ever returns true, false otherwise
+     */
+    public boolean hasAnySubexpressionWithPredicate(SubexprFinderPredicate pred) {
+        if (pred.matches(this)) {
+            return true;
+        }
+
+        if (m_left != null && m_left.hasAnySubexpressionWithPredicate(pred)) {
+            return true;
+        }
+
+        if (m_right != null && m_right.hasAnySubexpressionWithPredicate(pred)) {
+            return true;
+        }
+
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                if (argument.hasAnySubexpressionWithPredicate(pred)) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 

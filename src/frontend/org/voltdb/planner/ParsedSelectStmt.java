@@ -1684,9 +1684,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return orderByColumnsDetermineAllColumns(m_orderColumns, candidateColumns, outNonOrdered);
     }
 
-    static boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
-            List<ParsedColInfo> orderColumns,
-            List<AbstractExpression> nonOrdered)
+    boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
+                                                     List<ParsedColInfo> orderColumns,
+                                                     List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
@@ -1710,7 +1710,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return orderByColumnsDetermineAllColumns(orderColumns, candidateColumns, null);
     }
 
-    private static boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
+    private boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
                                                       List<ParsedColInfo> candidateColumns,
                                                       List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
@@ -1727,6 +1727,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 for (ParsedColInfo orderByCol : orderColumns) {
                     orderByExprs.add(orderByCol.expression);
                 }
+                addHonoraryOrderByExpressions(orderByExprs, candidateColumns);
             }
             if (orderByExprs.contains(candidateExpr)) {
                 continue;

@@ -25,11 +25,13 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -84,6 +86,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.AGGREGATE;
+    }
+
+    public List<ExpressionType> getAggregateTypes() {
+        return m_aggregateTypes;
     }
 
     @Override
@@ -371,6 +377,24 @@ public class AggregatePlanNode extends AbstractPlanNode {
             assert(aggInputExpr != null);
             m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
         }
+    }
+
+    public void updateAggregate(
+            int index,
+            ExpressionType aggType) {
+
+        // Create a new aggregate expression which we'll use to update the
+        // output schema (whose exprs are TVEs).
+        AggregateExpression aggExpr = new AggregateExpression(aggType);
+        aggExpr.finalizeValueTypes();
+
+        int outputSchemaIndex = m_aggregateOutputColumns.get(index);
+        SchemaColumn schemaCol = m_outputSchema.getColumns().get(outputSchemaIndex);
+        AbstractExpression schemaExpr = schemaCol.getExpression();
+        schemaExpr.setValueType(aggExpr.getValueType());
+        schemaExpr.setValueSize(aggExpr.getValueSize());
+
+        m_aggregateTypes.set(index, aggType);
     }
 
     public void addGroupByExpression(AbstractExpression expr)

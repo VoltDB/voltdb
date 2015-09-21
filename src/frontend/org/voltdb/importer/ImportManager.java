@@ -22,6 +22,7 @@ import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -38,6 +39,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.collect.FluentIterable;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
@@ -51,6 +56,8 @@ public class ImportManager implements ChannelChangeCallback {
      */
     private static final VoltLogger importLog = new VoltLogger("IMPORT");
 
+    private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
+
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
     private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
 
@@ -62,6 +69,8 @@ public class ImportManager implements ChannelChangeCallback {
     private final int m_myHostId;
     private Framework m_framework;
     private ChannelDistributer m_distributer;
+    private boolean m_serverStarted;
+
     /**
      * Get the global instance of the ImportManager.
      * @return The global single instance of the ImportManager.
@@ -69,6 +78,13 @@ public class ImportManager implements ChannelChangeCallback {
     public static ImportManager instance() {
         return m_self;
     }
+
+    private final static Function<String,String> appendVersion = new Function<String, String>() {
+        @Override
+        public String apply(String input) {
+            return input + ";version=1.0.0";
+        }
+    };
 
     protected ImportManager(int myHostId, HostMessenger messenger) throws IOException {
         m_myHostId = myHostId;
@@ -85,10 +101,24 @@ public class ImportManager implements ChannelChangeCallback {
             throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
         }
 
+        List<String> packages = ImmutableList.<String>builder()
+                .add("org.voltcore.network")
+                .add("org.voltdb.importer")
+                .add("org.apache.log4j")
+                .add("org.voltdb.client")
+                .add("org.slf4j")
+                .add("org.voltcore.utils")
+                .add("com.google_voltpatches.common.base")
+                .add("com.google_voltpatches.common.collect")
+                .add("com.google_voltpatches.common.net")
+                .add("com.google_voltpatches.common.io")
+                .add("com.google_voltpatches.common.util.concurrent")
+                .build();
+
+        String systemPackagesSpec = FluentIterable.from(packages).transform(appendVersion).join(COMMA_JOINER);
+
         m_frameworkProps = ImmutableMap.<String,String>builder()
-                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, "org.voltcore.network;version=1.0.0"
-                    + ",org.voltdb.importer;version=1.0.0,org.apache.log4j;version=1.0.0"
-                    + ",org.voltdb.client;version=1.0.0,org.slf4j;version=1.0.0,org.voltcore.utils;version=1.0.0")
+                .put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, systemPackagesSpec)
                 .put("org.osgi.framework.storage.clean", "onFirstInit")
                 .put("felix.cache.rootdir", f.getAbsolutePath())
                 .put("felix.cache.locking", Boolean.FALSE.toString())
@@ -138,9 +168,8 @@ public class ImportManager implements ChannelChangeCallback {
 
             ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-            newProcessor.setProcessorConfig(m_processorConfig);
+            newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);
-            importLog.info("Import Processor is configured.");
         } catch (final Exception e) {
             VoltDB.crashLocalVoltDB("Error creating import processor", true, e);
         }
@@ -165,11 +194,11 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void start(CatalogContext catalogContext, HostMessenger messenger) {
         m_self.create(m_myHostId, catalogContext);
-        m_self.readyForData(catalogContext, messenger);
+        m_self.readyForDataInternal(catalogContext, messenger);
     }
 
     //Call this method to restart the whole importer system. It takes current catalogcontext and hostmessenger
-    public synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
+    private synchronized void restart(CatalogContext catalogContext, HostMessenger messenger) {
         //Shutdown and recreate.
         m_self.close();
         assert(m_processor.get() == null);
@@ -181,6 +210,18 @@ public class ImportManager implements ChannelChangeCallback {
     }
 
     public synchronized void readyForData(CatalogContext catalogContext, HostMessenger messenger) {
+        m_serverStarted = true; // Note that server is ready, so that we know whether to process catalog updates
+        readyForDataInternal(catalogContext, messenger);
+    }
+
+    public synchronized void readyForDataInternal(CatalogContext catalogContext, HostMessenger messenger) {
+        if (!m_serverStarted) {
+            if (importLog.isDebugEnabled()) {
+                importLog.debug("Server not started. Not sending readyForData to ImportProcessor");
+            }
+            return;
+        }
+
         //If we dont have any processors we dont have any import configured.
         if (m_processor.get() == null) {
             return;

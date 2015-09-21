@@ -115,7 +115,7 @@ $(document).ready(function () {
     // Pop Slide Server Search
     $('#popServerSearch').keyup(function () {
         var searchText = $(this).val().toLowerCase();
-        $('ul.servers-list > li').each(function () {
+        $('#serversList > tbody > tr.filterClass').each(function () {
             var currentLiText = $(this).text().toLowerCase(),
                 showCurrentLi = currentLiText.indexOf(searchText) !== -1;
             $(this).toggle(showCurrentLi);
@@ -530,7 +530,7 @@ var loadPage = function (serverName, portid) {
             //hide loading icon
             $("#overlay").hide();
 
-            $('#serversList > li.active > a').click(function () {
+            $('#serversList >  tbody > tr > td.active > a').click(function () {
                 var clickedServer = $(this).html();
                 $('.activeServerName').html(clickedServer).attr('title', clickedServer);
 
@@ -587,7 +587,7 @@ var loadPage = function (serverName, portid) {
 
             $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').click(function () {
                 var clickedServer = $(this).html();
-                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').find("a").attr('data-hostid'));
+                var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').next().find("a").attr('data-hostid'));
                 var currentUrl = window.location.href.split('?')[0];
                 var urlArray = currentUrl.split('/');
                 var newUrl = '';
@@ -1221,10 +1221,10 @@ var loadPage = function (serverName, portid) {
     var replicationWarning = function (count) {
         if (count == 0 || count == undefined) {
             $('#drWarning').hide();
-            $('.alertIcon').hide();
+            $('#drAlertWarning').hide();
         } else {
             $('#drWarning').show();
-            $('.alertIcon').show();
+            $('#drAlertWarning').show();
             if (count == 1) {
                 $('#drPartitionWarningMsg').text(count + ' partition is uncovered.');
             } else {
@@ -1241,8 +1241,8 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
 
             voltDbRenderer.GetSnapshotStatus(function (snapshotDetails) {
-                cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
-                cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
+                //cmdLogDetails[getCurrentServer()].START_TIME = snapshotDetails[getCurrentServer()].START_TIME;
+                //cmdLogDetails[getCurrentServer()].END_TIME = snapshotDetails[getCurrentServer()].END_TIME;
                 cmdLogDetails[getCurrentServer()].SNAPSHOTS = snapshotDetails[getCurrentServer()];
                 MonitorGraphUI.RefreshCommandLog(cmdLogDetails, getCurrentServer(), graphView, currentTab);
             });
@@ -1264,12 +1264,12 @@ var loadPage = function (serverName, portid) {
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblCmdLog' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblCmdLog_info' role='grid'>" +
-                "<thead><tr role='row'><th id='Th1' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Server: activate to sort column descending'>Server</th>" +
-                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Pending (in bytes)</th>" +
-                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Pending (in transactions)</th>" +
-                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Total segments</th>" +
-                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Segments in use</th>" +
-                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Fsyncinterval</th>" +
+                "<thead><tr role='row'><th id='cmdServer' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Server: activate to sort column descending'>Server</th>" +
+                "<th id='cmdPendingBytes' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Pending (in bytes)</th>" +
+                "<th id='cmdPendingTrans' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Pending (in transactions)</th>" +
+                "<th id='cmdTotalSegments' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Total segments</th>" +
+                "<th id='cmdSegmentsInUse' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Segments in use</th>" +
+                "<th id='cmdFsyncInterval' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblCmdLog' rowspan='1' colspan='1' >Fsyncinterval</th>" +
                 "</thead><tbody>";
             $("#tblCmdLog_wrapper").find(".cmdLogContainer").html(content + htmlcontent + "</tbody></table>");
 
@@ -1383,11 +1383,11 @@ var loadPage = function (serverName, portid) {
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
-                "<thead><tr role='row'><th id='Th1' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
-                "<th id='Th2' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                "<th id='Th4' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
-                "<th id='Th5' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
-                "<th id='Th6' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
+                "<thead><tr role='row'><th id='partitionID' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                "<th id='status' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
+                "<th id='mbOnDisk' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
+                "<th id='replicaLatencyMs' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
+                "<th id='replicaLatencyTrans' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
             $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
 
             table = $("#tblDrMAster").DataTable({
@@ -1495,8 +1495,8 @@ var loadPage = function (serverName, portid) {
             if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
                 $("#tblDrReplica").DataTable().destroy();
             }
-            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='Th7' width='25%' data-name='none'>Server</th><th id='Th8' width='25%' data-name='none'>Status</th><th id='Th9' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
-                                               "<th id='Th10' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
+            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='replicaServer' width='25%' data-name='none'>Server</th><th id='replicaStatus' width='25%' data-name='none'>Status</th><th id='replicationRate1' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
+                                               "<th id='replicationRate5' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
                                         "<tbody>";
             $("#drReplicaSection").find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
 

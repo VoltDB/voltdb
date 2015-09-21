@@ -87,6 +87,9 @@ public enum ExpressionType {
         // LIKE operator (left LIKE right). both children must be string.
     COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
         // IN operator. left IN right. right must be VectorValue
+    // value 18 is assigned to OPERATOR_EXISTS
+    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT"),
+        // Not distinct operator between left and right
 
     // ----------------------------
     // Conjunction Operator
@@ -113,6 +116,9 @@ public enum ExpressionType {
     AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN"),
     AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX"),
     AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
+    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT"),
+    AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
+    AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
 
     // ----------------------------
     // Function
@@ -200,5 +206,9 @@ public enum ExpressionType {
 
     public String symbol() {
         return m_symbol;
+    }
+
+    public boolean isAggregateExpression() {
+        return getExpressionClass() == AggregateExpression.class;
     }
 }

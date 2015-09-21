@@ -1,4 +1,6 @@
 drop table t if exists;
+drop table t2 if exists;
+
 create table t ( c integer, d varchar(4) );
 create procedure p as
     select * from t where d between ? and ?;

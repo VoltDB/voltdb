@@ -192,18 +192,36 @@ public class TestImportSuite extends RegressionSuite {
     }
 
     private void verifyData(Client client, int count, int min) throws Exception {
-        ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            assertEquals(count, response.getResults()[0].asScalarLong());
+        //Wait 20 sec to get out of backpressure.
+        long end = System.currentTimeMillis() + 20000;
+        boolean success = false;
+        String error = "";
+        while (System.currentTimeMillis() < end) {
+            int scnt = 0;
+            ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from importTable");
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
-        response = client.callProcedure("@AdHoc", "select count(*) from log_events");
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        if (min<0) {
-            assertEquals(count, response.getResults()[0].asScalarLong());
-        } else {
-            long result = response.getResults()[0].asScalarLong();
-            assertTrue(result + " not between " + min + " and " + count, result>=min && result<=count);
+            if (count == response.getResults()[0].asScalarLong()) scnt++;
+
+            response = client.callProcedure("@AdHoc", "select count(*) from log_events");
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+            if (min<0) {
+                if (count == response.getResults()[0].asScalarLong()) scnt++;
+            } else {
+                long result = response.getResults()[0].asScalarLong();
+                if (result >= min && result <= count) {
+                    scnt++;
+                } else {
+                    error = result + " not between " + min + " and " + count;
+                }
+            }
+            if (scnt == 2) {
+                success = true;
+                break;
+            }
+            Thread.sleep(50);
         }
+        assertTrue(error, success);
     }
 
     public void testImportSimpleData() throws Exception {

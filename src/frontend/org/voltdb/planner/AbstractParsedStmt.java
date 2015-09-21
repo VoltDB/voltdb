@@ -29,8 +29,10 @@ import java.util.TreeMap;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -952,8 +954,8 @@ public abstract class AbstractParsedStmt {
         Table table = null;
         if (subqueryElement == null) {
             table = getTableFromDB(tableName);
-            m_tableList.add(table);
             assert(table != null);
+            m_tableList.add(table);
             tableScan = addTableToStmtCache(table, tableAlias);
         } else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
@@ -1385,19 +1387,44 @@ public abstract class AbstractParsedStmt {
         // the result is deterministic.
         // This holds regardless of whether the associated index is actually used in the selected plan,
         // so this check is plan-independent.
+        //
+        // baseTableAliases associates table aliases with the order by
+        // expressions which reference them.  Presumably by using
+        // table aliases we will map table scans to expressions rather
+        // than tables to expressions, and not confuse ourselves with
+        // different instances of the same table in self joins.
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<String, List<AbstractExpression> >();
         for (ParsedColInfo col : orderByColumns()) {
             AbstractExpression expr = col.expression;
-            List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
-            if (baseTVEs.size() != 1) {
+            //
+            // Compute the set of tables mentioned in the expression.
+            //   1. Search out all the TVEs.
+            //   2. Throw the aliases of the tables of each of these into a HashSet.
+            //      The table must have an alias.  It might not have a name.
+            //   3. If the HashSet has size > 1 we can't use this expression.
+            //
+            List<AbstractExpression> baseTVEExpressions = expr.findBaseTVEs();
+            Set<String> baseTableNames = new HashSet<String>();
+            for (AbstractExpression ae : baseTVEExpressions) {
+                assert(ae instanceof TupleValueExpression);
+                TupleValueExpression atve = (TupleValueExpression)ae;
+                String tableAlias = atve.getTableAlias();
+                assert(tableAlias != null);
+                baseTableNames.add(tableAlias);
+            }
+            if (baseTableNames.size() != 1) {
                 // Table-spanning ORDER BYs -- like ORDER BY A.X + B.Y are not helpful.
                 // Neither are (nonsense) constant (table-less) expressions.
                 continue;
             }
-            // This loops exactly once.
-            AbstractExpression baseTVE = baseTVEs.get(0);
+            // Everything in the baseTVEExpressions table is a column
+            // in the same table and has the same alias. So just grab the first one.
+            // All we really want is the alias.
+            AbstractExpression baseTVE = baseTVEExpressions.get(0);
             String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
+            // This was tested above.  But the assert above may prove to be over cautious
+            // and disappear.
             assert(nextTableAlias != null);
             List<AbstractExpression> perTable = baseTableAliases.get(nextTableAlias);
             if (perTable == null) {
@@ -1408,9 +1435,14 @@ public abstract class AbstractParsedStmt {
         }
 
         if (m_tableAliasMap.size() > baseTableAliases.size()) {
-            // FIXME: This would be one of the tricky cases where the goal would be to prove that the
-            // row with no ORDER BY component came from the right side of a 1-to-1 or many-to-1 join.
-            // like Unique Index nested loop join, etc.
+            // FIXME: There are more table aliases in the select list than tables
+            //        named in the order by clause.  So, some tables named in the
+            //        select list are not explicitly listed in the order by
+            //        clause.
+            //
+            //        This would be one of the tricky cases where the goal would be to prove that the
+            //        row with no ORDER BY component came from the right side of a 1-to-1 or many-to-1 join.
+            //        like Unique Index nested loop join, etc.
             return false;
         }
         boolean allScansAreDeterministic = true;
@@ -1479,6 +1511,116 @@ public abstract class AbstractParsedStmt {
             }
         }
         return true;
+    }
+
+    /**
+     * Given a set of order-by expressions and a select list, which is a list of
+     * columns, each with an expression and an alias, expand the order-by list
+     * with new expressions which could be on the order-by list without changing
+     * the sort order and which are otherwise helpful.
+     */
+    protected void addHonoraryOrderByExpressions(
+            HashSet<AbstractExpression> orderByExprs,
+            List<ParsedColInfo> candidateColumns) {
+        // If there is not exactly one table scan we will not proceed.
+        // We don't really know how to make indices work with joins,
+        // and there is nothing more to do with subqueries.  The processing
+        // of joins is the content of ticket ENG-8677.
+        if (m_tableAliasMap.size() != 1) {
+            return;
+        }
+        HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence = analyzeValueEquivalence();
+        for (ParsedColInfo colInfo : candidateColumns) {
+            AbstractExpression colExpr = colInfo.expression;
+            if (colExpr instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression)colExpr;
+                Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
+                if (tveEquivs != null) {
+                    for (AbstractExpression expr : tveEquivs) {
+                        if (expr instanceof ParameterValueExpression
+                                || expr instanceof ConstantValueExpression) {
+                            orderByExprs.add(colExpr);
+                        }
+                    }
+                }
+            }
+        }
+        // We know there's exactly one.
+        StmtTableScan scan = m_tableAliasMap.values().iterator().next();
+        // Get the table.  There's only one.
+        Table table = getTableFromDB(scan.getTableName());
+        // Maybe this is a subquery?  If we can't find the table
+        // there's no use to continue.
+        if (table == null) {
+            return;
+        }
+        // Now, look to see if there is a constraint which can help us.
+        // If there is a unique constraint on a set of columns, and all
+        // the constrained columns are in the order by list, then all
+        // the columns in the table can be added to the order by list.
+        //
+        // The indices we care about have columns, but the order by list has expressions.
+        // Extract the columns from the order by list.
+        Set<Column> orderByColumns = new HashSet<Column>();
+        for (AbstractExpression expr : orderByExprs) {
+            if (expr instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) expr;
+                Column col = table.getColumns().get(tve.getColumnName());
+                orderByColumns.add(col);
+            }
+        }
+        CatalogMap<Constraint> constraints = table.getConstraints();
+        // If we have no constraints, there's nothing more to do here.
+        if (constraints == null) {
+            return;
+        }
+        Set<Index> indices = new HashSet<Index>();
+        for (Constraint constraint : constraints) {
+            Index index = constraint.getIndex();
+            // Only use column indices for now.
+            if (index != null && index.getUnique() && index.getExpressionsjson().isEmpty()) {
+                indices.add(index);
+            }
+        }
+        for (ParsedColInfo colInfo : candidateColumns) {
+            AbstractExpression expr = colInfo.expression;
+            if (expr instanceof TupleValueExpression) {
+                TupleValueExpression tve = (TupleValueExpression) expr;
+                // If one of the indices is completely covered
+                // we will not have to process any other indices.
+                // So, we remember this and early-out.
+                for (Index index : indices) {
+                    CatalogMap<ColumnRef> columns = index.getColumns();
+                    // If all the columns in this index are in the current
+                    // honorary order by list, then we can add all the
+                    // columns in this table to the honorary order by list.
+                    boolean addAllColumns = true;
+                    for (ColumnRef cr : columns) {
+                        Column col = cr.getColumn();
+                        if (orderByColumns.contains(col) == false) {
+                            addAllColumns = false;
+                            break;
+                        }
+                    }
+                    if (addAllColumns) {
+                        for (Column addCol : table.getColumns()) {
+                            // We have to convert this to a TVE to add
+                            // it to the orderByExprs.  We will use -1
+                            // for the column index.  We don't have a column
+                            // alias.
+                            TupleValueExpression ntve = new TupleValueExpression(tve.getTableName(),
+                                                                                 tve.getTableAlias(),
+                                                                                 addCol.getName(),
+                                                                                 null,
+                                                                                 -1);
+                            orderByExprs.add(ntve);
+                        }
+                        // Don't forget to remember to forget the other indices.  (E. Presley, 1955)
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     /** May be true for DELETE or SELECT */

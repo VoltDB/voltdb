@@ -132,6 +132,40 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="featureNameType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="snapshots"/>
+      <xs:enumeration value="exportoverflow"/>
+      <xs:enumeration value="droverflow"/>
+      <xs:enumeration value="commandlog"/>
+      <xs:enumeration value="commandlogsnapshot"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="diskLimitType">
+      <xs:sequence>
+          <xs:element name="feature" minOccurs="1" maxOccurs="unbounded">
+             <xs:complexType>
+                <xs:attribute name="name" type="featureNameType"/>
+                <xs:attribute name="size" type="xs:string"/>
+             </xs:complexType>
+          </xs:element>
+      </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="resourceMonitorType">
+      <xs:all>
+        <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="size" type="xs:string" default="0"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="disklimit" type="diskLimitType"
+                    minOccurs="0" maxOccurs="1"/>
+      </xs:all>
+      <xs:attribute name="frequency" type="xs:int" default="60"/>
+  </xs:complexType>
+
   <!-- <systemsettings> -->
   <xs:complexType name="systemSettingsType">
     <xs:all>
@@ -156,7 +190,7 @@
                 <xs:attribute name="timeout" type="latencyType" default="0"/>
             </xs:complexType>
         </xs:element>
-
+        <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
     </xs:all>
   </xs:complexType>
 
@@ -338,6 +372,7 @@
 
   <xs:simpleType name="ServerImportEnum">
     <xs:restriction base="xs:token">
+      <xs:enumeration value="kafka"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -380,7 +415,7 @@
       <xs:simpleType>
         <xs:restriction base="xs:string">
           <!-- Only the most basic validation that this could possibly be a hostname -->
-          <xs:minLength value="1"/>
+          <xs:minLength value="0"/>
           <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
         </xs:restriction>
       </xs:simpleType>

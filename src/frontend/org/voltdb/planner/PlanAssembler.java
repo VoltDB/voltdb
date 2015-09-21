@@ -1896,8 +1896,6 @@ public class PlanAssembler {
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        AggregatePlanNode aggNode = null;
-
         /* Check if any aggregate expressions are present */
 
         /*
@@ -1905,7 +1903,8 @@ public class PlanAssembler {
          * expressions. Catch that case by checking the grouped flag
          */
         if (m_parsedSelect.hasAggregateOrGroupby()) {
-            AggregatePlanNode topAggNode = null;
+            AggregatePlanNode aggNode = null;
+            AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
             if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
@@ -2012,7 +2011,6 @@ public class PlanAssembler {
                                 top_expression_type = ExpressionType.AGGREGATE_SUM;
                             }
                         }
-
                         /*
                          * For min() and max(), the pushed-down aggregate node
                          * doesn't change. An extra aggregate node of the same
@@ -2020,9 +2018,14 @@ public class PlanAssembler {
                          * and the output schema of the top aggregate node is
                          * the same as the output schema of the pushed-down
                          * aggregate node.
+                         *
+                         * APPROX_COUNT_DISTINCT can be similarly pushed down, but
+                         * must be split into two different functions, which is
+                         * done later, from pushDownAggregate().
                          */
                         else if (agg_expression_type != ExpressionType.AGGREGATE_MIN &&
-                                 agg_expression_type != ExpressionType.AGGREGATE_MAX) {
+                                 agg_expression_type != ExpressionType.AGGREGATE_MAX &&
+                                 agg_expression_type != ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
                             /*
                              * Unsupported aggregate for push-down (AVG for example).
                              */
@@ -2036,7 +2039,7 @@ public class PlanAssembler {
                             boolean topDistinctFalse = false;
                             topAggNode.addAggregate(top_expression_type, topDistinctFalse, outputColumnIndex, tve);
                         }
-                    }
+                    } // end if we have a top agg node
                 }
                 else
                 {
@@ -2063,7 +2066,7 @@ public class PlanAssembler {
                 agg_schema.addColumn(schema_col);
                 top_agg_schema.addColumn(top_schema_col);
                 outputColumnIndex++;
-            }
+            } // end for each ParsedColInfo in m_aggResultColumns
 
             for (ParsedColInfo col : m_parsedSelect.m_groupByColumns) {
                 aggNode.addGroupByExpression(col.expression);
@@ -2231,6 +2234,47 @@ public class PlanAssembler {
     }
 
     /**
+     * This function is called once it's been determined that we can push down
+     * an aggregation plan node.
+     *
+     * If an APPROX_COUNT_DISTINCT aggregate is distributed, then we need to
+     * convert the distributed aggregate function to VALS_TO_HYPERLOGLOG,
+     * and the coordinating aggregate function to HYPERLOGLOGS_TO_CARD.
+     *
+     * @param distNode    The aggregate node executed on each partition
+     * @param coordNode   The aggregate node executed on the coordinator
+     */
+    private static void fixDistributedApproxCountDistinct(
+            AggregatePlanNode distNode,
+            AggregatePlanNode coordNode) {
+
+        assert (distNode != null);
+        assert (coordNode != null);
+
+        // Patch up any APPROX_COUNT_DISTINCT on the distributed node.
+        List<ExpressionType> distAggTypes = distNode.getAggregateTypes();
+        boolean hasApproxCountDistinct = false;
+        for (int i = 0; i < distAggTypes.size(); ++i) {
+            ExpressionType et = distAggTypes.get(i);
+            if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
+                hasApproxCountDistinct = true;
+                distNode.updateAggregate(i, ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG);
+            }
+        }
+
+        if (hasApproxCountDistinct) {
+            // Now, patch up any APPROX_COUNT_DISTINCT on the coordinating node.
+            List<ExpressionType> coordAggTypes = coordNode.getAggregateTypes();
+            for (int i = 0; i < coordAggTypes.size(); ++i) {
+                ExpressionType et = coordAggTypes.get(i);
+                if (et == ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT) {
+                    coordNode.updateAggregate(i, ExpressionType.AGGREGATE_HYPERLOGLOGS_TO_CARD);
+                }
+            }
+        }
+    }
+
+    /**
      * Push the given aggregate if the plan is distributed, then add the
      * coordinator node on top of the send/receive pair. If the plan
      * is not distributed, or coordNode is not provided, the distNode
@@ -2239,13 +2283,15 @@ public class PlanAssembler {
      * Note: this works in part because the push-down node is also an acceptable
      * top level node if the plan is not distributed. This wouldn't be true
      * if we started pushing down something like (sum, count) to calculate
-     * a distributed average.
+     * a distributed average.  (We already do something like this for
+     * APPROX_COUNT_DISTINCT, which must be split into two different functions for
+     * the pushed-down case.)
      *
      * @param root
      *            The root node
      * @param distNode
      *            The node to push down
-     * @param coordNode
+     * @param coordNode [may be null]
      *            The top node to put on top of the send/receive pair after
      *            push-down. If this is null, no push-down will be performed.
      * @return The new root node.
@@ -2254,7 +2300,6 @@ public class PlanAssembler {
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
                                        ParsedSelectStmt selectStmt) {
-        boolean noNeedCoordNode = selectStmt.hasPartitionColumnInGroupby();
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -2270,6 +2315,7 @@ public class PlanAssembler {
          * coordinator.
          */
         if (coordNode != null && root instanceof ReceivePlanNode) {
+            boolean noNeedCoordNode = selectStmt.hasPartitionColumnInGroupby();
             AbstractPlanNode accessPlanTemp = root;
             root = accessPlanTemp.getChild(0).getChild(0);
             root.clearParents();
@@ -2297,7 +2343,11 @@ public class PlanAssembler {
                 }
             }
             // Without including partition column in GROUP BY clause,
-            // there has to be a top GROUP BY plan node on coordinator
+            // there has to be a top GROUP BY plan node on coordinator.
+            //
+            // Now that we're certain the aggregate will be pushed down
+            // (no turning back now!), fix any APPROX_COUNT_DISTINCT aggregates.
+            fixDistributedApproxCountDistinct(distNode, coordNode);
 
             // Put the send/receive pair back into place
             accessPlanTemp.getChild(0).addAndLinkChild(distNode);

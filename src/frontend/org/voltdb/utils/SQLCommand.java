@@ -51,6 +51,7 @@ import jline.console.history.FileHistory;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -71,6 +72,9 @@ public class SQLCommand
     private static boolean m_interactive;
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
+
+    private static boolean m_hasBatchTimeout = false;
+    private static int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     private static final String m_readme = "SQLCommandReadme.txt";
 
@@ -95,6 +99,17 @@ public class SQLCommand
         return message;
     }
 
+    private static ClientResponse callProcedureHelper(String procName, Object... parameters)
+            throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse response = null;
+        if (m_hasBatchTimeout) {
+            response = m_client.callProcedureWithTimeout(m_batchTimeout, procName, parameters);
+        } else {
+            response = m_client.callProcedure(procName, parameters);
+        }
+        return response;
+    }
+
     private static void executeDDLBatch(String batchFileName, String statements) {
         try {
             if ( ! m_interactive ) {
@@ -113,6 +128,7 @@ public class SQLCommand
                 return;
             }
             ClientResponse response = m_client.callProcedure("@AdHoc", statements);
+
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 throw new Exception("Execution Error: " + response.getStatusString());
             }
@@ -759,7 +775,7 @@ public class SQLCommand
                         objectParams[0] = new String[] { (String)objectParams[0] };
                         objectParams[1] = new String[] { (String)objectParams[1] };
                     }
-                    printResponse(m_client.callProcedure(execCallResults.procedure, objectParams));
+                    printResponse(callProcedureHelper(execCallResults.procedure, objectParams));
                 }
                 return;
             }
@@ -807,7 +823,7 @@ public class SQLCommand
             }
 
             // All other commands get forwarded to @AdHoc
-            printResponse(m_client.callProcedure("@AdHoc", statement));
+            printResponse(callProcedureHelper("@AdHoc", statement));
 
         } catch (Exception exc) {
             stopOrContinue(exc);
@@ -971,6 +987,7 @@ public class SQLCommand
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
         + "              [--stop-on-error=(true|false)]\n"
+//        + "              [--query-timeout=number_of_milliseconds]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
         + "  List of servers to connect to.\n"
@@ -1009,6 +1026,9 @@ public class SQLCommand
         + "  Causes the utility to stop immediately or continue after detecting an error.\n"
         + "  In interactive mode, a value of \"true\" discards any unprocessed input\n"
         + "  and returns to the command prompt. Default: true.\n"
+        + "\n"
+//        + "[--query-timeout=millisecond_number]\n"
+//        + "  Read only queries timeout setting. Default: no timeout.\n"
         + "\n"
         );
         System.exit(exitCode);
@@ -1235,12 +1255,6 @@ public class SQLCommand
                     printUsage("Invalid value for --output-format");
                 }
             }
-            else if (arg.equals("--output-skip-metadata")) {
-                m_outputShowMetadata = false;
-            }
-            else if (arg.equals("--debug")) {
-                m_debug = true;
-            }
             else if (arg.startsWith("--stop-on-error=")) {
                 String optionName = extractArgInput(arg).toLowerCase();
                 if (optionName.equals("true")) {
@@ -1260,6 +1274,18 @@ public class SQLCommand
                 } catch (FileNotFoundException e) {
                     printUsage("DDL file not found at path:" + ddlFilePath);
                 }
+            }
+            else if (arg.startsWith("--query-timeout=")) {
+                m_hasBatchTimeout = true;
+                m_batchTimeout = Integer.valueOf(extractArgInput(arg));
+            }
+
+            // equals check starting here
+            else if (arg.equals("--output-skip-metadata")) {
+                m_outputShowMetadata = false;
+            }
+            else if (arg.equals("--debug")) {
+                m_debug = true;
             }
             else if (arg.equals("--help")) {
                 printHelp(System.out); // Print readme to the screen

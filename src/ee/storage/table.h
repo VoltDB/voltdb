@@ -45,9 +45,6 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
-#ifndef BTREE_DEBUG
-#define BTREE_DEBUG
-#endif
 #include <string>
 #include <vector>
 #include <set>
@@ -62,7 +59,6 @@
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
-#include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
@@ -245,7 +241,10 @@ class Table {
     // SERIALIZATION
     // ------------------------------------------------------------------
     int getApproximateSizeToSerialize() const;
+    size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
+    size_t getAccurateSizeToSerialize(bool includeTotalSize);
     bool serializeTo(SerializeOutput &serialize_out);
+    bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
     bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
 
     /*
@@ -438,4 +437,4 @@ protected:
 };
 
 }
-#endif
+#endif // HSTORETABLE_H

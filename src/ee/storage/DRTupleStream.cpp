@@ -44,7 +44,9 @@ DRTupleStream::DRTupleStream()
     : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
       m_enabled(true),
       m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
-      m_opened(false)
+      m_opened(false),
+      m_rowTarget(-1),
+      m_txnRowCount(0)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -67,22 +69,9 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
-    if (!m_enabled) return m_uso;
+    if (!m_enabled) return INVALID_DR_MARK;
 
-    // Transaction IDs for transactions applied to this tuple stream
-    // should always be moving forward in time.
-    if (spHandle < m_openSpHandle) {
-        throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
-    }
-
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
-    if (!m_opened) {
-        beginTransaction(m_openSequenceNumber, uniqueId);
-    }
-    assert(m_opened);
+    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -114,6 +103,9 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     // update uso.
     m_uso += io.position();
 
+    // update row count
+    m_txnRowCount += rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE);
+
     return startingUso;
 }
 
@@ -131,42 +123,23 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
                                   TableTuple &tuple,
                                   DRRecordType type,
-                                  const TableIndex *uniqueIndex /*= NULL*/,
-                                  uint32_t uniqueIndexCrc /*= 0*/)
+                                  const std::pair<const TableIndex*, uint32_t>& indexPair)
 {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
-    if (!m_enabled) return m_uso;
+    if (!m_enabled) return INVALID_DR_MARK;
 
     size_t rowHeaderSz = 0;
     size_t rowMetadataSz = 0;
     size_t tupleMaxLength = 0;
+    const std::vector<int>* interestingColumns;
 
-    // Transaction IDs for transactions applied to this tuple stream
-    // should always be moving forward in time.
-    if (spHandle < m_openSpHandle)
-    {
-        throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the truncate spHandle is %jd",
-                (intmax_t)m_openSpHandle, (intmax_t)spHandle
-                );
-    }
-
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
-    if (!m_opened) {
-        beginTransaction(m_openSequenceNumber, uniqueId);
-    }
-    assert(m_opened);
+    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
-    const std::vector<int>* interestingColumns = NULL;
-    if (DR_RECORD_DELETE == type && uniqueIndex) {
-        type = DR_RECORD_DELETE_BY_INDEX;
-        interestingColumns = &(uniqueIndex->getColumnIndices());
-    }
-    tupleMaxLength = computeOffsets(tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
+    tupleMaxLength = computeOffsets(type, indexPair, tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -182,34 +155,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
-    // initialize the full row header to 0. This also
-    // has the effect of setting each column non-null.
-    ::memset(m_currBlock->mutableDataPtr() + io.position(), 0, rowHeaderSz);
-
-    // the nullarray lives in rowheader after the 4 byte header length prefix
-    uint8_t *nullArray =
-        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + rowMetadataSz);
-
-    // Reserve the row header by moving the position beyond the row header.
-    // The row header includes the 4 byte length prefix and the null array.
-    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
-
-    // write the tuple's data
-    tuple.serializeToDR(io, 0, nullArray, interestingColumns);
-
-    // write the row size in to the row header
-    // rowlength does not include the 4 byte length prefix or record header
-    // but does include the null array.
-    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, rowMetadataSz);
-    // No need to subtract out the length of this size prefix itself, since it's
-    // balanced out by the checksum at the end
-    if (DR_RECORD_DELETE_BY_INDEX == type) {
-        // Do need to subtract out the length of the index checksum
-        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE - sizeof(int32_t)));
-        hdr.writeInt(uniqueIndexCrc);
-    } else {
-        hdr.writeInt((int32_t)(io.position() - TXN_RECORD_HEADER_SIZE));
-    }
+    writeRowTuple(tuple, rowHeaderSz, rowMetadataSz, interestingColumns, indexPair, io);
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
@@ -222,37 +168,175 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     // update uso.
     m_uso += io.position();
 
+    // update row count
+    m_txnRowCount += rowCostForDRRecord(type);
+
 //    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
     return startingUso;
 }
 
-size_t
-DRTupleStream::computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns)
-{
-    // round-up columncount to next multiple of 8 and divide by 8
-    const int columnCount = interestingColumns ? (int)interestingColumns->size() : tuple.sizeInValues();
+size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
+                                         char *tableHandle,
+                                         int64_t txnId,
+                                         int64_t spHandle,
+                                         int64_t uniqueId,
+                                         TableTuple &oldTuple,
+                                         TableTuple &newTuple,
+                                         const std::pair<const TableIndex*, uint32_t>& indexPair) {
+    size_t startingUso = m_uso;
+
+    //Drop the row, don't move the USO
+    if (!m_enabled) return INVALID_DR_MARK;
+
+    size_t oldRowHeaderSz = 0;
+    size_t oldRowMetadataSz = 0;
+    size_t newRowHeaderSz = 0;
+    size_t newRowMetadataSz = 0;
+    size_t maxLength = TXN_RECORD_HEADER_SIZE;
+    const std::vector<int>* oldRowInterestingColumns;
+    const std::vector<int>* dummyInterestingColumns;
+
+    transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
+
+    DRRecordType type = DR_RECORD_UPDATE;
+    maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
+    // No danger of replacing the second tuple by an index key, since if the type is going to change
+    // it has already done so in the above computeOffsets() call
+    maxLength += computeOffsets(type, indexPair, newTuple, newRowHeaderSz, newRowMetadataSz, dummyInterestingColumns);
+    assert(!dummyInterestingColumns);
+
+    if (!m_currBlock) {
+        extendBufferChain(m_defaultCapacity);
+    }
+
+    if (m_currBlock->remaining() < maxLength) {
+        extendBufferChain(maxLength);
+    }
+
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
+                                 m_currBlock->remaining());
+    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<int8_t>(type));
+    io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
+
+    writeRowTuple(oldTuple, oldRowHeaderSz, oldRowHeaderSz, oldRowInterestingColumns, indexPair, io);
+    writeRowTuple(newTuple, newRowHeaderSz, newRowHeaderSz, NULL, indexPair, io);
+
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
+    crc = vdbcrc::crc32cFinish(crc);
+    io.writeInt(crc);
+
+    // update m_offset
+    m_currBlock->consumed(io.position());
+
+    // update uso.
+    m_uso += io.position();
+
+    // update row count
+    m_txnRowCount += rowCostForDRRecord(type);
+
+//    std::cout << "Appending row " << io.position() << " at " << m_currBlock->offset() << std::endl;
+    return startingUso;
+}
+
+void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId) {
+    // Transaction IDs for transactions applied to this tuple stream
+    // should always be moving forward in time.
+    if (spHandle < m_openSpHandle) {
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %jd, while the truncate spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)spHandle
+                );
+    }
+
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
+    if (!m_opened) {
+        beginTransaction(m_openSequenceNumber, uniqueId);
+    }
+    assert(m_opened);
+}
+
+void DRTupleStream::writeRowTuple(TableTuple& tuple,
+        size_t rowHeaderSz,
+        size_t rowMetadataSz,
+        const std::vector<int> *interestingColumns,
+        const std::pair<const TableIndex*, uint32_t> &indexPair,
+        ExportSerializeOutput &io) {
+    size_t startPos = io.position();
+    // initialize the full row header to 0. This also
+    // has the effect of setting each column non-null.
+    ::memset(m_currBlock->mutableDataPtr() + io.position(), 0, rowHeaderSz);
+    // the nullarray lives in rowheader after the 4 byte header length prefix
+    uint8_t *nullArray =
+        reinterpret_cast<uint8_t*>(m_currBlock->mutableDataPtr() + io.position() + rowMetadataSz);
+
+    // Reserve the row header by moving the position beyond the row header.
+    // The row header includes the 4 byte length prefix and the null array.
+    const size_t lengthPrefixPosition = io.reserveBytes(rowHeaderSz);
+
+    tuple.serializeToDR(io, 0, nullArray, interestingColumns);
+
+    ExportSerializeOutput hdr(m_currBlock->mutableDataPtr() + lengthPrefixPosition, rowMetadataSz);
+    if (interestingColumns) {
+        // add the row length and a crc of the index used to the header
+        hdr.writeInt((int32_t)(io.position() - startPos - 2 * sizeof(int32_t)));
+        hdr.writeInt(indexPair.second);
+    } else {
+        // add the row length to the header
+        hdr.writeInt((int32_t)(io.position() - startPos - sizeof(int32_t)));
+    }
+}
+
+size_t DRTupleStream::computeOffsets(DRRecordType &type,
+        const std::pair<const TableIndex*, uint32_t> &indexPair,
+        TableTuple &tuple,
+        size_t &rowHeaderSz,
+        size_t &rowMetadataSz,
+        const std::vector<int> *&interestingColumns) {
+    interestingColumns = NULL;
+    rowMetadataSz = sizeof(int32_t);
+    int columnCount;
+    switch (type) {
+    case DR_RECORD_DELETE:
+    case DR_RECORD_UPDATE:
+        if (indexPair.first) {
+            // The index-optimized versions of these types have values exactly
+            // 5 larger than the unoptimized versions (asserted in test)
+            // DR_RECORD_DELETE => DR_RECORD_DELETE_BY_INDEX
+            // DR_RECORD_UPDATE => DR_RECORD_UPDATE_BY_INDEX
+            type = static_cast<DRRecordType>((int)type + 5);
+            interestingColumns = &(indexPair.first->getColumnIndices());
+            rowMetadataSz += sizeof(int32_t);
+            columnCount = static_cast<int>(interestingColumns->size());
+        } else {
+            columnCount = tuple.sizeInValues();
+        }
+        break;
+    default:
+        columnCount = tuple.sizeInValues();
+        break;
+    }
     int nullMaskLength = ((columnCount + 7) & -8) >> 3;
-
-    // row header is 32-bit length of row plus null mask
-    rowMetadataSz = sizeof(int32_t) + (/*index crc*/ interestingColumns ? sizeof(int32_t) : 0);
     rowHeaderSz = rowMetadataSz + nullMaskLength;
-
-    //Can return 0 for a single column varchar with null
-    size_t dataSz = tuple.maxDRSerializationSize(interestingColumns);
-
-    return rowHeaderSz + dataSz;
+    return rowHeaderSz + tuple.maxDRSerializationSize(interestingColumns);
 }
 
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
 void DRTupleStream::rollbackTo(size_t mark) {
+    if (mark == INVALID_DR_MARK) return;
     m_opened = false;
+    m_txnRowCount = 0;
     TupleStreamBase::rollbackTo(mark);
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
-    ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+    if (rowTarget >= 0) {
+        m_rowTarget = rowTarget;
+    }
 }
 
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
@@ -262,11 +346,11 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          extendBufferChain(m_defaultCapacity);
      }
 
-     m_currBlock->recordLastBeginTxnOffset();
-
      if (m_currBlock->remaining() < BEGIN_RECORD_SIZE) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
+
+     m_currBlock->recordLastBeginTxnOffset();
 
      if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
          m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
@@ -342,6 +426,12 @@ void DRTupleStream::endTransaction() {
      m_uso += io.position();
 
      m_opened = false;
+
+    size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
+    if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
+        extendBufferChain(0);
+    }
+    m_txnRowCount = 0;
 }
 
 // If partial transaction is going to span multiple buffer, first time move it to
@@ -402,11 +492,14 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     char tupleMemory[(2 + 1) * 8];
     TableTuple tuple(tupleMemory, schema);
 
+    const TableIndex* index = NULL;
+    std::pair<const TableIndex*, uint32_t> uniqueIndex = std::make_pair(index, -1);
     for (int ii = 0; ii < 100;) {
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
+
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT );
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
         stream.endTransaction();
         ii += 5;

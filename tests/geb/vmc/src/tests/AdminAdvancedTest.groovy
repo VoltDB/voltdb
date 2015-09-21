@@ -1,0 +1,1421 @@
+/**
+ * Created by anrai on 2/12/15.
+ */
+
+
+package vmcTest.tests
+
+import org.junit.Test
+import vmcTest.pages.*
+import geb.Page.*
+
+/**
+ * This class contains tests of the 'Admin' tab of the VoltDB Management
+ * Center (VMC) page, which is the VoltDB (new) web UI.
+ */
+
+class AdminAdvancedTest extends TestBase {
+    static String initialPrefix
+    static String initialFreq
+    static String initialFreqUnit
+    static String initialRetained
+
+    static String initialHeartTimeout
+    static String initialQueryTimeout
+    static String initialMemoryLimit = "-1"
+
+    static boolean revertHeartTimeout = false
+    static boolean revertQueryTimeout = false
+    static boolean revertMemorySize =false
+
+	int count = 0
+    def setup() { // called before each test
+        count = 0
+
+		while(count<numberOfTrials) {
+			count ++
+			try {
+				setup: 'Open VMC page'
+				to VoltDBManagementCenterPage
+				page.loginIfNeeded()
+				expect: 'to be on VMC page'
+				at VoltDBManagementCenterPage
+
+				when: 'click the Admin link (if needed)'
+				page.openAdminPage()
+				then: 'should be on Admin page'
+				at AdminPage
+
+				break
+			} catch (org.openqa.selenium.ElementNotVisibleException e) {
+				println("ElementNotVisibleException: Unable to Start the test")
+				println("Retrying")
+			}
+		}
+    }
+
+    def "check Advanced"() {
+        int count = 0
+        testStatus = false
+
+       	expect: 'at Admin Page'
+
+        while(count<numberOfTrials) {
+        	count ++
+        	try {
+		    	when:
+				waitFor(waitTime) {
+				   	overview.advanced.isDisplayed()
+            		overview.advanced.text().toLowerCase().equals("Advanced".toLowerCase())
+				}
+				then:
+				testStatus = true
+				break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    	println("RETRYING: WaitTimeoutException occured")
+		    } catch(org.openqa.selenium.StaleElementReferenceException e) {
+		    	println("RETRYING: StaleElementReferenceException occured")
+		    }
+        }
+        if(testStatus == true) {
+        	println("PASS")
+        }
+        else {
+        	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+        	assert false
+        }
+        println()
+    }
+
+    // overview: advanced expansion-Edits
+
+    def "Check click Heart Timeout edit and Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(waitTime) { page.overview.heartTimeoutCancel.click() }
+        then:
+        waitFor(waitTime) {
+            !page.overview.heartTimeoutField.isDisplayed()
+            !page.overview.heartTimeoutOk.isDisplayed()
+            !page.overview.heartTimeoutCancel.isDisplayed()
+        }
+    }
+
+    def "Check click Heart Timeout edit and click Ok and then Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value("10")
+        waitFor(waitTime) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutPopupOk.isDisplayed()
+            page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+
+        int count = 0
+        while(count<numberOfTrials) {
+            count++
+            println("Try")
+            try {
+                try {
+                    page.overview.heartTimeoutPopupCancel.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("PASS")
+                    break
+                }
+                page.overview.heartTimeoutEdit.isDisplayed()
+                !page.overview.heartTimeoutPopupOk.isDisplayed()
+                !page.overview.heartTimeoutPopupCancel.isDisplayed()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Try 2")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Try sele")
+            }
+        }
+    }
+
+    def "Check click Heart Timeout edit and click Ok and then Ok"() {
+        when:
+        String heartTimeout = 20
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.heartTimeoutValue.isDisplayed()
+        }
+        initialHeartTimeout = page.overview.heartTimeoutValue.text()
+        println("Initial Heartbeat time "+ initialHeartTimeout)
+        revertHeartTimeout = true
+
+        then:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value(heartTimeout)
+        waitFor(waitTime) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutPopupOk.isDisplayed()
+            page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+
+
+        waitFor(waitTime) {
+            try {
+                page.overview.heartTimeoutPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("retrying")
+            }
+
+            page.overview.heartTimeoutEdit.isDisplayed()
+            page.overview.heartTimeoutValue.text().equals(heartTimeout)
+            !page.overview.heartTimeoutPopupOk.isDisplayed()
+            !page.overview.heartTimeoutPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Heartbeat timeout> check error msg if empty data"() {
+        when:
+        String heartTimeout = ""
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value(heartTimeout)
+        waitFor(waitTime) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.errorMsgHeartbeat.isDisplayed()
+            page.overview.errorMsgHeartbeat.text().equals("Please enter a valid positive number.")
+        }
+
+    }
+
+    def "Heartbeat timeout > check error msg is value less then 1"() {
+        when:
+        String heartTimeout = "0"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.heartTimeoutField.isDisplayed()
+            page.overview.heartTimeoutOk.isDisplayed()
+            page.overview.heartTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.heartTimeoutField.value(heartTimeout)
+        waitFor(waitTime) {
+            page.overview.heartTimeoutOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.errorMsgHeartbeat.isDisplayed()
+            page.overview.errorMsgHeartbeat.text().equals("Please enter a positive number. Its minimum value should be 1.")
+        }
+
+    }
+
+    // query timeout
+
+    def "Check click Query Timeout edit and Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(waitTime) { page.overview.queryTimeoutCancel.click() }
+        then:
+        waitFor(waitTime) {
+            !page.overview.queryTimeoutField.isDisplayed()
+            !page.overview.queryTimeoutOk.isDisplayed()
+            !page.overview.queryTimeoutCancel.isDisplayed()
+        }
+    }
+
+    def "Check click Query Timeout edit and click Ok and then Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.queryTimeoutField.value("10")
+        then:
+        waitFor(waitTime) {
+            page.overview.queryTimeoutOk.click()
+            page.overview.queryTimeoutPopupOk.isDisplayed()
+            page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                try {
+                    page.overview.queryTimeoutPopupCancel.click()
+                } catch(org.openqa.selenium.ElementNotVisibleException e) {
+                    if(count > 0) {
+                        println("")
+                        break
+                    }
+                }
+
+                page.overview.queryTimeoutEdit.isDisplayed()
+                !page.overview.queryTimeoutPopupOk.isDisplayed()
+                !page.overview.queryTimeoutPopupCancel.isDisplayed()
+                println("")
+            }catch(org.openqa.selenium.ElementNotVisibleException f){
+                println("")
+            }catch(org.openqa.selenium.StaleElementReferenceException f){
+                println("")
+            }
+        }
+    }
+
+    def "Check click Query Timeout edit and click Ok and then Ok"() {
+        when:
+        String queryTimeout = 20
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.queryTimeoutValue.isDisplayed()
+        }
+        initialQueryTimeout = page.overview.queryTimeoutValue.text()
+        println("Initial Query Timeout " + initialQueryTimeout)
+        revertQueryTimeout = true
+
+        then:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.queryTimeoutField.value(queryTimeout)
+        waitFor(waitTime) {
+            page.overview.queryTimeoutOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.queryTimeoutPopupOk.isDisplayed()
+            page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+
+
+        waitFor(waitTime) {
+            try {
+                page.overview.queryTimeoutPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("retrying")
+            }
+
+            page.overview.queryTimeoutEdit.isDisplayed()
+            page.overview.queryTimeoutValue.text().equals(queryTimeout)
+            !page.overview.queryTimeoutPopupOk.isDisplayed()
+            !page.overview.queryTimeoutPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Query timeout> check error msg if empty data"() {
+        when:
+        String queryTimeout = ""
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.queryTimeoutField.isDisplayed()
+            page.overview.queryTimeoutOk.isDisplayed()
+            page.overview.queryTimeoutCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.queryTimeoutField.value(queryTimeout)
+        waitFor(waitTime) {
+            page.overview.queryTimeoutOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.errorQuery.isDisplayed()
+            page.overview.errorQuery.text().equals("Please enter a valid positive number.")
+        }
+
+    }
+
+    //Memory Limit
+    def "Check the memory limit edit button and then Cancel button"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitCancel.click() }
+        then:
+        waitFor(waitTime) {
+            !page.overview.memoryLimitField.isDisplayed()
+            !page.overview.memoryLimitOk.isDisplayed()
+            !page.overview.memoryLimitCancel.isDisplayed()
+            page.overview.memoryLimitEdit.isDisplayed()
+        }
+    }
+
+    def "Check memory limit edit and then click Ok and Cancel"() {
+        when:
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value("10")
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        int count = 0
+        while(count<numberOfTrials) {
+            count++
+            println("Try")
+            try {
+                try {
+                    page.overview.memoryLimitPopupCancel.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("MemoryLimitPopupCancel button clicked.")
+                    break
+                }
+                page.overview.memoryLimitEdit.isDisplayed()
+                !page.overview.memoryLimitPopupOk.isDisplayed()
+                !page.overview.memoryLimitPopupCancel.isDisplayed()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException, trying again.")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("StaleElementReferenceException, trying again.")
+            }
+        }
+    }
+
+    def "Check memory limit edit and then click Ok and confirm Ok(Using GB)"() {
+        when:
+        String memoryLimit = 20
+        String memoryLimitUnit = "GB"
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.memoryLimitValue.isDisplayed()
+        }
+        initialMemoryLimit = page.overview.memoryLimitValue.text()
+        println("Initial value of memory limit "+ initialMemoryLimit)
+        revertMemorySize = true
+
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(memoryLimit)
+        page.overview.memoryLimitDdlUnit.value(memoryLimitUnit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        waitFor(waitTime) {
+            try {
+                page.overview.memoryLimitPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Retrying")
+            }
+
+            page.overview.memoryLimitEdit.isDisplayed()
+            page.overview.memoryLimitValue.text().equals(memoryLimit)
+            !page.overview.memoryLimitPopupOk.isDisplayed()
+            !page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check memory limit edit and then click Ok and confirm Ok(Using %)"() {
+        when:
+        String memoryLimit = 50
+        String memoryLimitUnit = "%"
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.memoryLimitValue.isDisplayed()
+        }
+        if(initialMemoryLimit == "-1"){
+            initialMemoryLimit = page.overview.memoryLimitValue.text()
+            println("Initial value of memory limit "+ initialMemoryLimit)
+            revertMemorySize = true
+        }
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(memoryLimit)
+        page.overview.memoryLimitDdlUnit.value(memoryLimitUnit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        waitFor(waitTime) {
+            try {
+                page.overview.memoryLimitPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("Retrying")
+            }
+
+            page.overview.memoryLimitEdit.isDisplayed()
+            page.overview.memoryLimitValue.text().equals(memoryLimit)
+            !page.overview.memoryLimitPopupOk.isDisplayed()
+            !page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+    }
+
+    def "Check whether 'Not Enforced' and no unit are displayed when blank value is saved"(){
+        when:
+        String memoryLimit = ""
+        page.advanced.click()
+        waitFor(waitTime) {
+            page.overview.memoryLimitValue.isDisplayed()
+        }
+        if(initialMemoryLimit == "-1"){
+            initialMemoryLimit = page.overview.memoryLimitValue.text()
+            revertMemorySize = true
+        }
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(memoryLimit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitPopupOk.isDisplayed()
+            page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+
+        waitFor(waitTime) {
+            try {
+                page.overview.memoryLimitPopupOk.click()
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException, Retrying")
+            }
+            page.overview.memoryLimitEdit.isDisplayed()
+            page.overview.memoryLimitValue.text().equals("Not Enforced")
+            page.overview.memoryLimitUnit.text().equals("")
+            !page.overview.memoryLimitPopupOk.isDisplayed()
+            !page.overview.memoryLimitPopupCancel.isDisplayed()
+        }
+    }
+
+//    def "Check the error message for memory Limit when more than 4 digits are placed after decimal"() {
+//        when:
+//        String invalidMemoryLimit = "20.12345"
+//        String validMemoryLimit ="20.1234"
+//        page.advanced.click()
+//        then:
+//        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+//
+//        when:
+//        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+//        then:
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitField.isDisplayed()
+//            page.overview.memoryLimitOk.isDisplayed()
+//            page.overview.memoryLimitCancel.isDisplayed()
+//        }
+//
+//        when:
+//        page.overview.memoryLimitField.value(invalidMemoryLimit)
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitOk.click()
+//        }
+//        then:
+//        waitFor(waitTime) {
+//            page.overview.memoryLimitError.isDisplayed()
+//            page.overview.memoryLimitError.text().equals("Only four digits are allowed after decimal.")
+//        }
+//
+//        when:
+//        page.overview.memoryLimitField.value(validMemoryLimit)
+//        then:
+//        !page.overview.memoryLimitError.isDisplayed()
+//    }
+
+    def "Check the error message for memory limit when value is less than 0"() {
+        when:
+        String invalidMemoryLimit = "-1"
+        String validMemoryLimit = "1"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(invalidMemoryLimit)
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitError.isDisplayed()
+            page.overview.memoryLimitError.text().equals("Please enter a positive number.")
+        }
+        when:
+        page.overview.memoryLimitField.value(validMemoryLimit)
+        then:
+        !page.overview.memoryLimitError.isDisplayed()
+    }
+
+    def "Check memory limit, maximum limit validation when unit is %"(){
+        when:
+        String invalidMemoryLimitInPer = "100"
+        String validMemoryLimitInPer = "99"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+        when:
+        waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitField.isDisplayed()
+            page.overview.memoryLimitDdlUnit.isDisplayed()
+            page.overview.memoryLimitOk.isDisplayed()
+            page.overview.memoryLimitCancel.isDisplayed()
+        }
+
+        when:
+        page.overview.memoryLimitField.value(invalidMemoryLimitInPer)
+        page.overview.memoryLimitDdlUnit.value("%")
+        waitFor(waitTime) {
+            page.overview.memoryLimitOk.click()
+        }
+        then:
+        waitFor(waitTime) {
+            page.overview.memoryLimitError.isDisplayed()
+            page.overview.memoryLimitError.text().equals("Maximum value of percentage cannot be greater than 99.")
+        }
+        when:
+        page.overview.memoryLimitField.value(validMemoryLimitInPer)
+        then:
+        !page.overview.memoryLimitError.isDisplayed()
+    }
+
+   // Disk Limit
+
+    def "Check Disk Limit Click and check its value"() {
+        when:"Open Advanced"
+        page.advanced.click()
+        then:
+        waitFor(waitTime) { page.overview.diskLimit.isDisplayed() }
+        when:
+        page.overview.diskLimit.click()
+        then:
+        waitFor(waitTime) { page.noFeaturestxt.isDisplayed() }
+        if(page.noFeaturestxt.text()=="No features available.") {
+            println("Currently, No Features are available in Disk Limit")
+        } else {
+            println("Early presence of Features settings detected!")
+        }
+        page.overview.diskLimit.click()
+    }
+
+    def "Verify Add Disk Limit for SNAPSHOTS feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+         waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+    waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for COMMANDLOG feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("COMMANDLOG")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for EXPORTOVERFLOW feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("EXPORTOVERFLOW")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for DROVERFLOW feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("DROVERFLOW")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+    def "Verify Add Disk Limit for COMMANDLOGSNAPSHOT feature"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Provide values for the elements"
+        page.overview.featureName1.value("COMMANDLOGSNAPSHOT")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+        when: "expand Disk Limit"
+        waitFor(30){diskLimitExpanded.click()}
+        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+        then:
+        println("Add succeeded")
+        //snapShotName.text().equals("SNAPSHOTS")
+
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+
+        then:"check elements"
+        page.overview.deleteFirstFeature.isDisplayed()
+
+        when:"Delete Feature"
+        page.overview.deleteFirstFeature.click()
+
+        then:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitOk.isDisplayed()
+        page.overview.btnSaveDiskLimitOk.click()
+
+//        when: "expand Disk Limit"
+//        diskLimitExpanded.click()
+//        //waitFor(waitTime){ page.overview.expandDiskLimit()}
+//        then:
+//        snapShotName.isDisplayed()
+
+    }
+
+
+
+    def "Verify Error message for  Duplicate Features"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("GB")
+
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+
+        then:"Add another SNAPSHOT feature"
+        page.overview.featureName2.isDisplayed()
+        page.overview.featureValue2.isDisplayed()
+        page.overview.featureUnit2.isDisplayed()
+        page.overview.featureName2.value("SNAPSHOTS")
+        page.overview.featureValue2.value("13")
+        page.overview.featureUnit2.value("GB")
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errortxtName1.isDisplayed()
+        page.overview.errortxtName2.isDisplayed()
+    }
+
+    def "Verify Error Message for Features size"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errorValue1.isDisplayed()
+        page.overview.errorValue1.text().equals("This field is required")
+    }
+
+    def "Verify Error Message for Features unit"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("130")
+        page.overview.featureUnit1.value("%")
+
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errorValue1.isDisplayed()
+        page.overview.errorValue1.text().equals("Maximum value of percentage cannot be greater than 99.")
+    }
+
+    def "Verify Error Message for Feature's invalid Decimal value"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13.33")
+        page.overview.featureUnit1.value("%")
+
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        then: "Check for validation"
+        page.overview.errorValue1.isDisplayed()
+        page.overview.errorValue1.text().equals("Please enter a positive number without any decimal.")
+
+    }
+
+    def "Verify Add Disk Limit Cancel"(){
+        when:"Open Advanced"
+        page.advanced.click()
+        then:"Check if DiskLimit is displayed"
+        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        when:"Open Edit Disk Limit"
+        page.overview.openEditDiskLimitPopup()
+        then:"check elements"
+        page.overview.lnkAddNewFeature.isDisplayed()
+        when:"Add SNAPSHOT feature"
+        page.overview.lnkAddNewFeature.click()
+        then:"check elements and add values"
+        page.overview.featureName1.isDisplayed()
+        page.overview.featureValue1.isDisplayed()
+        page.overview.featureUnit1.isDisplayed()
+        page.overview.featureName1.value("SNAPSHOTS")
+        page.overview.featureValue1.value("13")
+        page.overview.featureUnit1.value("%")
+
+
+        when:"Save New Feature"
+        page.overview.btnAddDiskLimitSave.isDisplayed()
+        page.overview.btnAddDiskLimitSave.click()
+
+        page.overview.btnSaveDiskLimitCancel.isDisplayed()
+        page.overview.btnSaveDiskLimitCancel.click()
+
+        then: "Cancelled"
+       println("Confirmation popup has been cancelled")
+    }
+
+    def "Advanced Expand:Check Text"() {
+        when:
+        page.overview.advanced.click()
+        then:
+        waitFor(waitTime) {
+            page.overview.maxJavaHeap.text().equals("Max Java Heap")
+            !page.overview.maxJavaHeapValue.text().equals("")
+        }
+        waitFor(waitTime){
+            page.overview.heartbeatTimeout.text().equals("Heartbeat Timeout")
+            !page.overview.heartbeatTimeoutValue.text().equals("")
+        }
+        waitFor(waitTime){
+            page.overview.queryTimeout.text().equals("Query Timeout")
+            !page.overview.queryTimeoutValue.text().equals("")
+        }
+        waitFor(waitTime){
+            page.overview.maxTempTableMemory.text().equals("Max Temp Table Memory")
+            !page.overview.maxTempTableMemoryValue.text().equals("")
+        }
+        waitFor(waitTime){
+            page.overview.snapshotPriority.text().equals("Snapshot Priority")
+            !page.overview.snapshotPriorityValue.text().equals("")
+
+        }
+        waitFor(waitTime){
+            page.overview.memoryLimitSize.text().equals("Memory Limit")
+            !page.overview.memoryLimitSizeValue.text().equals("")
+
+            if(page.overview.memoryLimitSizeValue.text() == "Not Enforced"){
+                page.overview.memoryLimitSizeUnit.text().equals("")
+            } else {
+                !page.overview.memoryLimitSizeUnit.text().equals("")
+            }
+        }
+        waitFor(waitTime){
+            page.overview.diskLimit.text().equals("Disk Limit")
+        }
+    }
+
+    def cleanupSpec() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        String initialPrefix 	= "DEFAULT"
+        String initialFreq		= "10"
+        String initialFreqUnit 	= "Hrs"
+        String initialRetained 	= "10"
+
+        String initialHeartTimeout = "10"
+        String initialQueryTimeout = "10"
+
+        // heartbeat timeout revert
+
+        if (revertHeartTimeout==false) {
+            when:
+            page.advanced.click()
+            then:
+            waitFor(waitTime) { page.overview.heartTimeoutEdit.isDisplayed() }
+
+            when:
+            waitFor(waitTime) { page.overview.heartTimeoutEdit.click() }
+            then:
+            waitFor(waitTime) {
+                page.overview.heartTimeoutField.isDisplayed()
+                page.overview.heartTimeoutOk.isDisplayed()
+                page.overview.heartTimeoutCancel.isDisplayed()
+            }
+
+            when:
+            page.overview.heartTimeoutField.value(initialHeartTimeout)
+            waitFor(waitTime) {
+                page.overview.heartTimeoutOk.click()
+            }
+            then:
+            waitFor(waitTime) {
+                page.overview.heartTimeoutPopupOk.isDisplayed()
+                page.overview.heartTimeoutPopupCancel.isDisplayed()
+            }
+
+
+            waitFor(waitTime) {
+                try {
+                    page.overview.heartTimeoutPopupOk.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("retrying")
+                }
+
+                page.overview.heartTimeoutEdit.isDisplayed()
+                page.overview.heartTimeoutValue.text().equals(initialHeartTimeout)
+                !page.overview.heartTimeoutPopupOk.isDisplayed()
+                !page.overview.heartTimeoutPopupCancel.isDisplayed()
+            }
+        }
+
+        // query timeout revert
+
+        if (revertQueryTimeout==false) {
+            when:
+            page.advanced.click()
+            then:
+            waitFor(waitTime) { page.overview.queryTimeoutEdit.isDisplayed() }
+
+            when:
+            waitFor(waitTime) { page.overview.queryTimeoutEdit.click() }
+            then:
+            waitFor(waitTime) {
+                page.overview.queryTimeoutField.isDisplayed()
+                page.overview.queryTimeoutOk.isDisplayed()
+                page.overview.queryTimeoutCancel.isDisplayed()
+            }
+
+            when:
+            page.overview.queryTimeoutField.value(initialQueryTimeout)
+            waitFor(waitTime) {
+                page.overview.queryTimeoutOk.click()
+            }
+            then:
+            waitFor(waitTime) {
+                page.overview.queryTimeoutPopupOk.isDisplayed()
+                page.overview.queryTimeoutPopupCancel.isDisplayed()
+            }
+
+
+            waitFor(waitTime) {
+                try {
+                    page.overview.queryTimeoutPopupOk.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("retrying")
+                }
+
+                page.overview.queryTimeoutEdit.isDisplayed()
+                page.overview.queryTimeoutValue.text().equals(initialQueryTimeout)
+                !page.overview.queryTimeoutPopupOk.isDisplayed()
+                !page.overview.queryTimeoutPopupCancel.isDisplayed()
+            }
+        }
+
+        //memory limit revert
+        if(revertMemorySize == true){
+            when:
+            page.advanced.click()
+            then:
+            waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
+
+            when:
+            waitFor(waitTime) { page.overview.memoryLimitEdit.click() }
+            then:
+            waitFor(waitTime) {
+                page.overview.memoryLimitField.isDisplayed()
+                page.overview.memoryLimitOk.isDisplayed()
+                page.overview.memoryLimitCancel.isDisplayed()
+            }
+
+            when:
+            if(initialMemoryLimit == "Not Enforced")
+                initialMemoryLimit = ""
+            page.overview.memoryLimitField.value(initialMemoryLimit)
+            waitFor(waitTime) {
+                page.overview.memoryLimitOk.click()
+            }
+            then:
+            waitFor(waitTime) {
+                page.overview.memoryLimitPopupOk.isDisplayed()
+                page.overview.memoryLimitPopupCancel.isDisplayed()
+            }
+
+            waitFor(waitTime) {
+                try {
+                    page.overview.memoryLimitPopupOk.click()
+                } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                    println("retrying")
+                }
+
+                page.overview.memoryLimitEdit.isDisplayed()
+                if(initialMemoryLimit == "")
+                    initialMemoryLimit = "Not Enforced"
+                page.overview.memoryLimitValue.text().equals(initialMemoryLimit)
+                !page.overview.memoryLimitPopupOk.isDisplayed()
+                !page.overview.memoryLimitPopupCancel.isDisplayed()
+            }
+        }
+    }
+
+}

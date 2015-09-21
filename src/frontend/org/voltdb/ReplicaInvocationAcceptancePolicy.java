@@ -35,31 +35,8 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
 
     private ClientResponseImpl shouldAcceptHelper(AuthUser user, StoredProcedureInvocation invocation,
                                  boolean isReadOnly) {
-        // NOT a dragent invocation.
-        if (invocation.getType() == ProcedureInvocationType.ORIGINAL) {
-            if (!isOn) {
-                return null;
-            }
-
-            // This path is only executed before the AdHoc statement is run through the planner. After the
-            // Planner, the client interface will figure out what kind of statement this is.
-            if (invocation.procName.equals("@AdHoc")) {
-                return null;
-            }
-
-            if (isReadOnly) {
-                return null;
-            } else {
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0],
-                        "Write procedure " + invocation.procName +
-                        " is not allowed in replica cluster",
-                        invocation.clientHandle);
-            }
-        }
-
         // IS a dragent invocation
-        else {
+        if (ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             if (!isOn) {
                 return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
@@ -80,6 +57,28 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
                 return null;
             }
         }
+        // NOT a dragent invocation.
+        else {
+            if (!isOn) {
+                return null;
+            }
+
+            // This path is only executed before the AdHoc statement is run through the planner. After the
+            // Planner, the client interface will figure out what kind of statement this is.
+            if (invocation.procName.equals("@AdHoc")) {
+                return null;
+            }
+
+            if (isReadOnly) {
+                return null;
+            } else {
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0],
+                        "Write procedure " + invocation.procName +
+                        " is not allowed in replica cluster",
+                        invocation.clientHandle);
+            }
+        }
     }
 
     @Override
@@ -95,7 +94,7 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
             procName = "@UpdateApplicationCatalog";
         }
 
-        if (invocation.getType() == ProcedureInvocationType.ORIGINAL &&
+        if (!ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType()) &&
                 !procName.equalsIgnoreCase("@AdHoc")) {
             Config sysProc = SystemProcedureCatalog.listing.get(procName);
             if (sysProc != null && sysProc.allowedInReplica) {

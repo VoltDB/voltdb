@@ -244,6 +244,11 @@ public class TestCollector {
         writer.println("fake heapdump file");
         writer.close();
 
+        File f = new File(voltDbRootPath, "systemcheck");
+        f.createNewFile();
+        FileOutputStream fStream = new FileOutputStream(f);
+        fStream.write("fake text for test".getBytes());
+        fStream.close();
 
         File collectionDecompressed = collect(voltDbRootPath, false, 50);
 
@@ -257,6 +262,8 @@ public class TestCollector {
         File deploymentXml = new File(collectionDecompressed, subFolderPath + "deployment.xml");
         assertTrue(deploymentXml.exists());
 
+        File systemCheck = new File(collectionDecompressed, subFolderPath + "systemcheck");
+        assertTrue(systemCheck.exists());
 
         File dmesgdata = new File(collectionDecompressed, subFolderPath + "dmesgdata");
         assertTrue(dmesgdata.exists());

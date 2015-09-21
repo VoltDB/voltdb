@@ -174,10 +174,20 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJLjava/nio/ByteBuffer;)V");
+            "(IJJJLjava/nio/ByteBuffer;)J");
     if (m_pushDRBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushDRBufferMID != NULL);
+        throw std::exception();
+    }
+
+    m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "reportDRConflict",
+            "(IJJLjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+    if (m_reportDRConflictMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_reportDRConflictMID != NULL);
         throw std::exception();
     }
 
@@ -393,6 +403,9 @@ void JNITopend::crashVoltDB(FatalException e) {
 
 JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
+    m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
+    m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
+    m_jniEnv->DeleteGlobalRef(m_encoderClass);
 }
 
 int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
@@ -454,7 +467,8 @@ void JNITopend::pushExportBuffer(
     }
 }
 
-void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+    int64_t retval = -1;
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
@@ -462,7 +476,7 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
             throw std::exception();
         }
         //std::cout << "Block is length " << block->rawLength() << std::endl;
-        m_jniEnv->CallStaticVoidMethod(
+        retval = m_jniEnv->CallStaticLongMethod(
                 m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
                 partitionId,
@@ -472,5 +486,67 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }
+    return retval;
+}
+
+int JNITopend::reportDRConflict(int32_t partitionId,
+            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
+            string tableName, Table* input, Table* output) {
+    if (input != NULL && output != NULL) {
+        // prepare tablename
+        jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
+
+        // prepare input buffer
+        size_t serializeSize = input->getAccurateSizeToSerialize(false);
+        char* backingCharArray = new char[serializeSize];
+        ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+        input->serializeToWithoutTotalSize(conflictSerializeOutput);
+
+        jobject inputBuffer = m_jniEnv->NewDirectByteBuffer(
+            static_cast<void*>(backingCharArray),
+            static_cast<int32_t>(serializeSize));
+        if (inputBuffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+
+        // prepare output buffer
+        size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
+                                     sizeof(int32_t) + // tuple count placeholder
+                                     output->schema()->getMaxSerializedTupleSize();
+        char* outputBackingCharArray = new char[outputSerializeSize];
+        ReferenceSerializeOutput outputSerializeOutput(outputBackingCharArray, outputSerializeSize);
+        // NOTE passed-in output table should have only schema and no tuples
+        output->serializeToWithoutTotalSize(outputSerializeOutput);
+
+        jobject outputBuffer = m_jniEnv->NewDirectByteBuffer(
+            static_cast<void*>(outputBackingCharArray),
+            static_cast<int32_t>(outputSerializeSize));
+        if (outputBuffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+
+        int32_t retval = m_jniEnv->CallStaticIntMethod(
+            m_partitionDRGatewayClass,
+            m_reportDRConflictMID,
+            partitionId,
+            remoteSequenceNumber,
+            remoteUniqueId,
+            tableNameString,
+            inputBuffer,
+            outputBuffer);
+
+        ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
+        output->loadTuplesFrom(filledOutputSerializeInput);
+
+        m_jniEnv->DeleteLocalRef(tableNameString);
+        m_jniEnv->DeleteLocalRef(inputBuffer);
+        m_jniEnv->DeleteLocalRef(outputBuffer);
+
+        return retval;
+    }
+    // -1 indicates error in parameters provided, for now
+    return -1;
 }
 }

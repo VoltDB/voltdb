@@ -52,6 +52,9 @@ public class Tokens {
     public static final String T_ALTER            = "ALTER";
     static final String        T_AND              = "AND";
     static final String        T_ANY              = "ANY";
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    static final String        T_APPROX_COUNT_DISTINCT = "APPROX_COUNT_DISTINCT";
+    // End of VoltDB extension
     static final String        T_ARE              = "ARE";
     static final String        T_ARRAY            = "ARRAY";
     public static final String T_AS               = "AS";
@@ -862,6 +865,9 @@ public class Tokens {
     public static final int CORR                             = 49;
     public static final int CORRESPONDING                    = 50;
     public static final int COUNT                            = 51;
+    // A VoltDB extension APPROX_COUNT_DISTINCT
+    public static final int APPROX_COUNT_DISTINCT            = 1304;
+    // End of VoltDB extension
     public static final int COVAR_POP                        = 52;
     public static final int COVAR_SAMP                       = 53;
     public static final int CREATE                           = 54;
@@ -1600,6 +1606,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_ALTER, ALTER);
         reservedKeys.put(Tokens.T_AND, AND);
         reservedKeys.put(Tokens.T_ANY, ANY);
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        reservedKeys.put(Tokens.T_APPROX_COUNT_DISTINCT, APPROX_COUNT_DISTINCT);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_ARE, ARE);
         reservedKeys.put(Tokens.T_ARRAY, ARRAY);
         reservedKeys.put(Tokens.T_AS, AS);
@@ -2258,6 +2267,9 @@ public class Tokens {
             UNIQUE, USING, VALUES, VAR_POP, VAR_SAMP, WHEN, WHERE, WITH,
             // A VoltDB extension to support the assume unique index attribute.
             ASSUMEUNIQUE, // For VoltDB
+            // End of VoltDB extension
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            APPROX_COUNT_DISTINCT,
             // End of VoltDB extension
         };
 
