@@ -103,6 +103,8 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
+        public int m_dbId = 1001;
+
         public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -257,6 +259,7 @@ public class VoltDB {
                     continue;
                 }
 
+
                 // Handle request for help/usage
                 if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
                     // We used to print usage here but now we have too many ways to start
@@ -266,6 +269,11 @@ public class VoltDB {
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
                     System.out.flush();
                     System.exit(-1);
+                }
+
+                if (arg.equals("dbid")) {
+                    String idStr = args[++i];
+                    m_dbId = Integer.parseInt(idStr);
                 }
 
                 if (arg.equals("noloadlib")) {

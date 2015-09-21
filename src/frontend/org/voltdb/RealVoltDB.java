@@ -139,6 +139,7 @@ import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltcore.network.MulticastListener;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -168,6 +169,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
+    int m_configuredDatabaseId = 101;
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -346,6 +348,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         return m_licenseInformation;
     }
 
+    private MulticastListener m_mcastListener;
+
     /**
      * Initialize all the global components, then initialize all the m_sites.
      */
@@ -457,6 +461,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
             if (m_config.m_buildStringOverrideForTest != null) {
                 m_buildString = m_config.m_buildStringOverrideForTest;
+            }
+
+            try {
+                m_mcastListener = new MulticastListener();
+                Thread m_mct = new Thread(m_mcastListener);
+                m_mct.start();
+            } catch (Exception e) {
+                hostLog.error("mc listener exception", e);
+            }
+            try {
+                Thread.sleep((long) 5*1000); //FIVE_SECONDS);
+            } catch (InterruptedException e) {}
+            // poll for nodes
+            boolean foo=true;
+            for (int i=0; i<10; i++) {
+                try {
+                    m_mcastListener.query();
+                } catch (Exception e) {
+                    hostLog.error("query exception", e);
+                }
+                try {
+                    Thread.sleep((long) 5*1000); //FIVE_SECONDS);
+                } catch (InterruptedException e) {}
             }
 
             buildClusterMesh(isRejoin || m_joining);
