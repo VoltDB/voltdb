@@ -2170,8 +2170,8 @@ ul.helpSchemaList {
 .edit,
 .editDisabled,
 .arrow,
-.labelCollapsed,
-.labelExpanded,
+/*.labelCollapsed,*/
+/*.labelExpanded,*/
 a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
     background-image: url(images/admin-icons.png);
 }
@@ -2590,13 +2590,15 @@ ul.adminClusterList li a.shutdown {
 }
 
 .labelCollapsed {
-    background-position: -468px -11px;
+    /*background-position: -468px -11px;*/
     padding-left: 22px;
+    background: url("images/up.png")0 1px no-repeat; 
 }
 
 .labelExpanded {
-    background-position: -468px -55px;
+    /*background-position: -468px -55px;*/
     padding-left: 22px;
+    background: url("images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
