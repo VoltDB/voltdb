@@ -854,7 +854,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  *  Indexes and views have been destroyed first.
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
-    deleteTupleStorage(target); // also frees object columns
+    TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
+    deleteTupleStorage(target, block, true); // also frees object columns along with empty tuple block storage
 }
 
 /*
@@ -1594,6 +1595,20 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
 }
 
 void PersistentTableSurgeon::activateSnapshot() {
+    TBMapI blockIterator = m_table.m_data.begin();
+
+    // persistent table should have atleast one block in
+    // it's block map.
+    assert(m_table.m_data.begin() != m_table.m_data.end());
+
+    if ((m_table.m_data.size() == 1) && blockIterator.value()->isEmpty()) {
+        assert(m_table.activeTupleCount() == 0);
+        // The single empty block in an empty table does not need to be
+        // considered as pending block for snapshot(load).
+        // CopyOnWriteIterator may not and need not expect empty blocks.
+        return;
+    }
+
     //All blocks are now pending snapshot
     m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
     m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);

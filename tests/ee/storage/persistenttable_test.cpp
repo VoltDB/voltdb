@@ -37,7 +37,7 @@
 #include "storage/table.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
-
+#include "storage/tableutil.h"
 
 using voltdb::ExecutorContext;
 using voltdb::NValue;
@@ -51,6 +51,7 @@ using voltdb::VALUE_TYPE_BIGINT;
 using voltdb::VALUE_TYPE_VARCHAR;
 using voltdb::ValueFactory;
 using voltdb::VoltDBEngine;
+using voltdb::tableutil;
 
 
 class PersistentTableTest : public Test {
@@ -170,6 +171,7 @@ private:
     int64_t m_uniqueId;
 };
 
+
 TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     // Load a catalog where active/active DR is turned on for the database,
@@ -279,6 +281,28 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
         ++i;
     }
+}
+
+TEST_F(PersistentTableTest, TruncateTableTest) {
+    VoltDBEngine* engine = getEngine();
+    engine->loadCatalog(0, catalogPayload());
+    PersistentTable *table = dynamic_cast<PersistentTable*>(
+        engine->getTable("T"));
+    ASSERT_NE(NULL, table);
+
+    const int tuplesToInsert = 10;
+    (void) tuplesToInsert;  // to make compiler happy
+    ASSERT_EQ(1, table->allocatedBlockCount());
+
+    bool tupleInsertion = tableutil::addRandomTuples(table, tuplesToInsert);
+    ASSERT_EQ(true, tupleInsertion);
+    table->truncateTable(engine);
+
+    // refresh table pointer as during truncate operation old table
+    // gets swapped with new cloned empty table
+    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    ASSERT_NE(NULL, table);
+    ASSERT_EQ(1, table->allocatedBlockCount());
 }
 
 int main() {

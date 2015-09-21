@@ -177,6 +177,7 @@ TEST_F(TableTest, TupleInsert) {
     tableutil::setRandomTupleValues(m_table, &temp_tuple);
     m_table->deleteAllTuples(true);
     ASSERT_EQ(0, m_table->activeTupleCount());
+    ASSERT_EQ(1, m_table->allocatedBlockCount());
     ASSERT_EQ(true, m_table->insertTuple(temp_tuple));
     ASSERT_EQ(1, m_table->activeTupleCount());
 
