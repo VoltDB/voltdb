@@ -407,27 +407,19 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
-     * Returns true if the text of either of the two specified elements
-     * (containing query results and duration), has changed to a different
-     * value - even if it subsequently changed back to the same value.
-     *
-     * @param navResElem - a Navigator specifying the query result element
-     * to be checked for having changed.
-     * @param initResText - the original text of the query result element,
-     * before running a new query.
+     * Returns true if the text of the query duration element has changed to a
+     * different value - even if it subsequently changed back to the same value.
      * @param navDurElem - a Navigator specifying the query duration element
      * to be checked for having changed.
      * @param initDurText - the original text of the query duration element,
      * before running a new query.
-     * @return true if the text of either element has changed.
+     * @return true if the query duration text has changed.
      */
-    private boolean hasChanged(Navigator navResElem, String initResText,
-                               Navigator navDurElem, String initDurText) {
+    private boolean hasChanged(Navigator navDurElem, String initDurText) {
         if (textHasChanged) {
             return true
         }
-        if (navResElem.text() != initResText ||
-            navDurElem.text() != initDurText ) {
+        if (navDurElem.text() != initDurText ) {
             textHasChanged = true
          }
         return textHasChanged
@@ -438,16 +430,15 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * (by clicking the "Run" button).
      */
     def runQuery() {
-        String initQueryResultText   = queryRes.text()
         String initQueryDurationText = queryDur.text()
         runButton.click()
 
         // Wait for both the query result and duration to be displayed, with
-        // (non-null) non-empty text; and for something to have changed
+        // (non-null) non-empty text; and for the latter to have changed
         try {
             textHasChanged = false
             waitFor() {
-                hasChanged(queryRes, initQueryResultText, queryDur, initQueryDurationText) &&
+                hasChanged(queryDur, initQueryDurationText) &&
                 isDisplayed(queryRes) && queryRes.text() != null && !queryRes.text().isEmpty() &&
                 isDisplayed(queryDur) && queryDur.text() != null && !queryDur.text().isEmpty()
             }
