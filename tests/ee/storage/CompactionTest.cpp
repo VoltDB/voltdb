@@ -364,8 +364,8 @@ TEST_F(CompactionTest, BasicCompaction) {
     }
     m_table->doForcedCompaction();
 
-    // At any given point, persistent table will have atleast one block available
-    // with m_data even if that block is empty
+    // At any given point, persistent table should have one block
+    // available even if that block is empty
     ASSERT_EQ( m_table->m_data.size(), 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }

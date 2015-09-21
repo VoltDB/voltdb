@@ -1603,11 +1603,9 @@ void PersistentTableSurgeon::activateSnapshot() {
 
     if ((m_table.m_data.size() == 1) && blockIterator.value()->isEmpty()) {
         assert(m_table.activeTupleCount() == 0);
-        // table is empty at this point with no tuples in it. Snapshot
-        // not pending queue contains empty block and this will not be
-        // processed by COW iterator as it does not have tuple entries.
-        // So do not push only remaining empty block to pending list
-        // (doing so has side effects to COW iterator's logic)
+        // The single empty block in an empty table does not need to be
+        // considered as pending block for snapshot(load).
+        // CopyOnWriteIterator may not and need not expect empty blocks.
         return;
     }
 
