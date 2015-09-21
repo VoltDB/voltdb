@@ -70,7 +70,7 @@ public:
         std::clock_t start = std::clock();
         for (long ii = 0; ii < limit; ii++) {
             tempTuple.move(data + (25 * ii));
-            index->addEntry(&tempTuple);
+            index->addEntry(&tempTuple, NULL);
         }
         std::clock_t end = std::clock();
         return end - start;
@@ -84,7 +84,7 @@ public:
         for (long ii = 0; ii < limit; ii++) {
             long jj = ((ii % tmp) << (places/2)) + (ii / tmp);
             tempTuple.move(data + (25 * jj));
-            index->addEntry(&tempTuple);
+            index->addEntry(&tempTuple, NULL);
         }
         std::clock_t end = std::clock();
         return end - start;
@@ -229,11 +229,11 @@ TEST_F(CompactingTreeMultiIndexTest, SimpleDeleteTuple) {
     index = TableIndexFactory::getInstance(scheme);
 
     TableTuple *tuple1 = newTuple(schema, 0, 10);
-    index->addEntry(tuple1);
+    index->addEntry(tuple1, NULL);
     TableTuple *tuple2 = newTuple(schema, 0, 11);
-    index->addEntry(tuple2);
+    index->addEntry(tuple2, NULL);
     TableTuple *tuple3 = newTuple(schema, 0, 12);
-    index->addEntry(tuple3);
+    index->addEntry(tuple3, NULL);
 
     TableTuple *tuple4 = newTuple(schema, 0, 10);
     EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));

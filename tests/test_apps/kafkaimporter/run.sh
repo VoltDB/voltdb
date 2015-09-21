@@ -69,9 +69,13 @@ function jars-ifneeded() {
 }
 
 # run the voltdb server locally
+# note -- use something like this to create the Kafka topic, name
+# matching the name used in the deployment file:
+#   /home/opt/kafka/bin/kafka-topics.sh --zookeeper kafka2:2181 --topic A7_KAFKAEXPORTTABLE2 --partitions 2 --replication-factor 1 --create
 function server() {
     jars-ifneeded
     echo "Starting the VoltDB server."
+    echo "Remember -- the Kafka topic must exist before launching this test."
     echo "To perform this action manually, use the command line: "
     echo
     echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
@@ -139,7 +143,10 @@ function async-benchmark() {
         kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --ratelimit=20000 \
-        --duration=60 \
+        --duration=180 \
+        --alltypes=false \
+        --useexport=true \
+        --expected_rows=1194113 \
         --servers=localhost
 }
 
