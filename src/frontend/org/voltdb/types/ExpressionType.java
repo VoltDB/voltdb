@@ -27,7 +27,6 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
-import org.voltdb.expressions.HappenedAfterExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
@@ -35,6 +34,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
+import org.voltdb.expressions.TimestampFilterExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -137,7 +137,7 @@ public enum ExpressionType {
     // -----------------------------
     // Internals added for Selective Snapshot
     // -----------------------------
-    HAPPENED_AFTER      (HappenedAfterExpression.class, 260, "HAPPENED_AFTER"),
+    TIMESTAMP_FILTER      (TimestampFilterExpression.class, 260, "TIMESTAMP_FILTER"),
 
     // -----------------------------
     // Internals added for CASE WHEN expression.

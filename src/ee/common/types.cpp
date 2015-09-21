@@ -603,6 +603,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_HASH_RANGE: {
         return "HASH_RANGE";
     }
+    case EXPRESSION_TYPE_TIMESTAMP_FILTER: {
+        return "TIMESTAMP_FILTER";
+    }
     case EXPRESSION_TYPE_OPERATOR_CASE_WHEN: {
         return "OPERATOR_CASE_WHEN";
     }

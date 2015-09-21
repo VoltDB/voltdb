@@ -14,20 +14,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef VOLTDBHAPPENEDAFTEREXPRESSION_H
-#define VOLTDBHAPPENEDAFTEREXPRESSION_H
+#ifndef VOLTDBTIMESTAMPFILTEREXPRESSION_H
+#define VOLTDBTIMESTAMPFILTEREXPRESSION_H
 
 #include "expressions/abstractexpression.h"
 #include "common/tabletuple.h"
 
 namespace voltdb {
 
-class HappenedAfterExpression : public AbstractExpression {
+class TimestampFilterExpression : public AbstractExpression {
 public:
-    HappenedAfterExpression(int32_t clusterId, int64_t timestamp) :
-        AbstractExpression(EXPRESSION_TYPE_HAPPENED_AFTER), clusterId(clusterId),
+    TimestampFilterExpression(int32_t clusterId, int64_t timestamp) :
+        AbstractExpression(EXPRESSION_TYPE_TIMESTAMP_FILTER), clusterId(clusterId),
         lastSeenTimestamp(timestamp) {
-        VOLT_TRACE("HashRangeExpression %d %d", m_type, value_idx);
+        VOLT_TRACE("TimestampFilterExpression %d %d", m_type, value_idx);
     }
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -52,7 +52,7 @@ public:
 
     std::string debugInfo(const std::string &spacer) const {
             std::ostringstream buffer;
-            buffer << spacer << "Happened after expression ["
+            buffer << spacer << "Timestamp filter expression ["
                     << "clusterId " << clusterId
                     << "timestamp " << lastSeenTimestamp
                     << "]" << std::endl;

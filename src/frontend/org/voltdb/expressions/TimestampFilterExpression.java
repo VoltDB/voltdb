@@ -23,7 +23,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
-public class HappenedAfterExpression extends AbstractValueExpression {
+public class TimestampFilterExpression extends AbstractValueExpression {
 
     public enum Members {
         CLUSTERID,
@@ -33,8 +33,8 @@ public class HappenedAfterExpression extends AbstractValueExpression {
     int m_clusterId;
     long m_lastSeenTimestamp;
 
-    public HappenedAfterExpression(int clusterId, long lastSeenTimestamp) {
-        super(ExpressionType.HAPPENED_AFTER);
+    public TimestampFilterExpression(int clusterId, long lastSeenTimestamp) {
+        super(ExpressionType.TIMESTAMP_FILTER);
         m_clusterId = clusterId;
         m_lastSeenTimestamp = lastSeenTimestamp;
         //See the comment in ConjunctionExpression
@@ -72,10 +72,10 @@ public class HappenedAfterExpression extends AbstractValueExpression {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof HappenedAfterExpression == false) {
+        if (obj instanceof TimestampFilterExpression == false) {
             return false;
         }
-        HappenedAfterExpression expr = (HappenedAfterExpression) obj;
+        TimestampFilterExpression expr = (TimestampFilterExpression) obj;
         if (m_clusterId != expr.getClusterId()) {
             return false;
         }
@@ -97,7 +97,7 @@ public class HappenedAfterExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        return "happened after";
+        return "timestamp filter";
     }
 
     @Override
@@ -105,13 +105,13 @@ public class HappenedAfterExpression extends AbstractValueExpression {
         super.validate();
 
         if ((m_right != null) || (m_left != null))
-            throw new Exception("ERROR: A Happened After expression has child expressions for '" + this + "'");
+            throw new Exception("ERROR: A TimestampFilterExpression has child expressions for '" + this + "'");
 
        if (m_clusterId < 0)
-           throw new Exception("ERROR: A Happened After expression has no cluster id for '" + this + "'");
+           throw new Exception("ERROR: A TimestampFilterExpression has no cluster id for '" + this + "'");
 
        if (m_lastSeenTimestamp < 0) {
-           throw new Exception("ERROR: A Happened After expression has no timestamp for '" + this + "'");
+           throw new Exception("ERROR: A TimestampFilterExpression has no timestamp for '" + this + "'");
        }
     }
 

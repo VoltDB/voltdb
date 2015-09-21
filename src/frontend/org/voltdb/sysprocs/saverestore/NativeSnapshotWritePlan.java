@@ -26,9 +26,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
@@ -46,9 +44,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.HappenedAfterExpression;
+import org.voltdb.expressions.TimestampFilterExpression;
 import org.voltdb.sysprocs.SnapshotRegistry;
-import org.voltdb.sysprocs.saverestore.SelectiveSnapshotRequestConfig.PartitionTimestamp;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.collect.Maps;
@@ -93,14 +90,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
      * @return
      */
     static AbstractExpression createExpressionOnTable(SnapshotRequestConfig config, Table table, SystemProcedureExecutionContext context) {
-        if (config instanceof SelectiveSnapshotRequestConfig) {
+        if (config instanceof DeltaSnapshotRequestConfig) {
             int targetClusterId = context.getCluster().getDrclusterid();
             int targetPartitionId = context.getPartitionId();
-            for (SelectiveSnapshotRequestConfig.PartitionTimestamp pts : ((SelectiveSnapshotRequestConfig)config).m_lastSeenTimestamp) {
+            for (DeltaSnapshotRequestConfig.PartitionTimestamp pts : ((DeltaSnapshotRequestConfig)config).m_lastSeenTimestamp) {
                 if (pts.clusterId == targetClusterId) {
                     Long timestamp = pts.partitionTimestampMap.get(targetPartitionId);
                     if (timestamp != null) {
-                        return new HappenedAfterExpression(pts.clusterId, timestamp);
+                        return new TimestampFilterExpression(pts.clusterId, timestamp);
                     }
                 }
             }
@@ -130,30 +127,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
-        try {
-            Map<Integer, Long> ptMap = Maps.newHashMap();
-            ptMap.put(0, System.currentTimeMillis() - 10000);
-            PartitionTimestamp pt = new PartitionTimestamp(1, ptMap);
-
-            JSONStringer stringer = new JSONStringer();
-            stringer.object().key(Integer.toString(pt.clusterId)).object();
-            for (Map.Entry<Integer, Long> entry : pt.partitionTimestampMap.entrySet()) {
-                stringer.key(Integer.toString(entry.getKey())).value(entry.getValue());
-            }
-            stringer.endObject().endObject();
-
-            JSONObject jsObj = new JSONObject(stringer.toString());
-            jsData.put("partitiontimestamp", jsObj);
-            System.out.println(jsData.toString(4));
-        } catch (JSONException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-
         SnapshotRequestConfig config;
         if (jsData.has("partitiontimestamp")) {
-            config = new SelectiveSnapshotRequestConfig(jsData, context.getDatabase());
+            config = new DeltaSnapshotRequestConfig(jsData, context.getDatabase());
         } else {
             config = new SnapshotRequestConfig(jsData, context.getDatabase());
         }

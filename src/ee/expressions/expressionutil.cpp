@@ -83,7 +83,7 @@ happenedAfterFactory(PlannerDomValue obj) {
 
     PlannerDomValue timestampValue = obj.valueForKey("TIMESTAMP");
 
-    return new HappenedAfterExpression(clusterIdValue.asInt(), timestampValue.asInt64());
+    return new TimestampFilterExpression(clusterIdValue.asInt(), timestampValue.asInt64());
 }
 
 /** Parse JSON parameters to create a subquery expression */
@@ -642,7 +642,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
         break;
-    case (EXPRESSION_TYPE_HAPPENED_AFTER):
+    case (EXPRESSION_TYPE_TIMESTAMP_FILTER):
         ret = happenedAfterFactory(obj);
         break;
     case (EXPRESSION_TYPE_OPERATOR_CASE_WHEN):

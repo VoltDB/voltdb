@@ -31,7 +31,7 @@ import org.voltdb.catalog.Table;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
-public class SelectiveSnapshotRequestConfig extends SnapshotRequestConfig {
+public class DeltaSnapshotRequestConfig extends SnapshotRequestConfig {
 
     public static class PartitionTimestamp {
         public final int clusterId;
@@ -45,12 +45,12 @@ public class SelectiveSnapshotRequestConfig extends SnapshotRequestConfig {
 
     public Collection<PartitionTimestamp> m_lastSeenTimestamp;
 
-    public SelectiveSnapshotRequestConfig(List<Table> tables, Collection<PartitionTimestamp> timestampMap) {
+    public DeltaSnapshotRequestConfig(List<Table> tables, Collection<PartitionTimestamp> timestampMap) {
         super(tables);
         m_lastSeenTimestamp = ImmutableList.copyOf(timestampMap);
     }
 
-    public SelectiveSnapshotRequestConfig(JSONObject jsData, Database catalogDatabase) {
+    public DeltaSnapshotRequestConfig(JSONObject jsData, Database catalogDatabase) {
         super(jsData, catalogDatabase);
         m_lastSeenTimestamp = parseTimestampMap(jsData);
     }

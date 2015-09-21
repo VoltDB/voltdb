@@ -323,7 +323,7 @@ enum ExpressionType {
     // ---------------------------------------
     // Internals added for Selective Snapshot
     // ---------------------------------------
-    EXPRESSION_TYPE_HAPPENED_AFTER                  = 260,
+    EXPRESSION_TYPE_TIMESTAMP_FILTER                  = 260,
 
     // -----------------------------
     // Internals added for Case When
