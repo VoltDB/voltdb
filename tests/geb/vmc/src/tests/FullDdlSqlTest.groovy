@@ -166,11 +166,11 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     }
 
     /**
-     * Give a (DDL) SQL statement, or set of statements, returns a simpler name
+     * Given a (DDL) SQL statement, or set of statements, returns a simpler name
      * for the test that will run it in the VMC. The simpler name consists of
      * the first line of the SQL statement(s), with underscores (_) substituted
      * for spaces; also, if the SQL statement is a single line terminated with
-     * a semicolon (;), that is not included.
+     * a semicolon (;), the semicolon is not included.
      * @param statement - the complete (DDL) SQL statement that contains the name.
      * @return a simpler test name, based on the <i>statement</i>.
      */
@@ -214,28 +214,17 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     }
 
     /**
-     * Runs each (DDL) SQL statement specified in the fullDDL.sql file.
+     * Runs the specifed (DDL) SQL statement(s).
+     * @param statement - the (DDL) SQL statement(s) to be run.
+     * @return the error returned by running the statement(s), if any; normally
+     * <b>null</b>, assuming that no error was returned.
      */
-    @Unroll // performs this method for each statement in the fullDDL.sql file
-    def '#fullDdlSqlFileTestName'() {
-
-        setup: 'get the specified (DDL) SQL statement(s) in upper case'
+    private String runDdlSqlStatement(String statement) {
         String statementUpperCase = statement.toUpperCase()
-        def error = null
-        def duration = ''
-
-        when: 'run the specified (DDL) SQL statement(s)'
         runQuery(page, statement, ColumnHeaderCase.AS_IS)
-        error    = page.getQueryError()
-        duration = page.getQueryDuration()
-        if (error != null || duration == null || duration.isEmpty()) {
-            println '\nWARNING: error non-null or duration null/empty'
-            println 'Error   :' + error
-            println 'Duration:' + duration
-            println 'All result text:\n' + page.getQueryResultText()
-        }
+        String error = page.getQueryError()
 
-        and: 'keep track of certain (DDL) SQL statements'
+        // Keep track of certain (DDL) SQL statements
         // Keep track of CREATE ROLE statements
         if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('ROLE')) {
             newRoles.add(getTableOrRoleName(statement, 'ROLE'))
@@ -244,9 +233,57 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
             newExportTables.add(getTableOrRoleName(statement, 'TABLE'))
         }
 
+        return error
+    }
+
+    /**
+     * Runs each (DDL) SQL statement specified in the fullDDL.sql file.
+     */
+    @Unroll // performs this method for each statement in the fullDDL.sql file
+    def '#fullDdlSqlFileTestName'() {
+
+        setup: 'initializations'
+        String error = null
+        String duration = ''
+        boolean foundError = false
+
+        when: 'run the specified (DDL) SQL statement(s)'
+        // For a really long set of (DDL) SQL statements, break them into
+        // groups of 20 statements, then run each group individually
+        int maxNumStatementsPerGroup = 20
+        if ((statement =~ ';').count > maxNumStatementsPerGroup) {
+            int start = 0
+            int semicolon = 0
+            while (semicolon < statement.length()) {
+                for (int j = 0; j < maxNumStatementsPerGroup; j++) {
+                    semicolon = statement.indexOf(';', semicolon) + 1
+                    if (semicolon <= 0) {
+                        semicolon = statement.length()
+                        break
+                    }
+                }
+                error = runDdlSqlStatement(statement.substring(start, semicolon))
+                start = semicolon
+                duration = page.getQueryDuration()
+                if (error != null || duration == null || duration.isEmpty() || duration.contains('error')) {
+                    println '\nFAILURE: error non-null or duration null/empty/has error'
+                    println 'Error   :' + error
+                    println 'Duration:' + duration
+                    println 'All result text:\n' + page.getQueryResultText()
+                    foundError = true
+                }
+            }
+
+        // Usual case: run the entire (DDL) SQL statement(s), all together
+        } else {
+            error = runDdlSqlStatement(statement)
+            duration = page.getQueryDuration()
+        }
+
         then: 'make sure there was no error'
         error == null
-        duration != null && !duration.contains('error')
+        duration != null && !duration.isEmpty() && !duration.contains('error')
+        !foundError
 
         where: 'list of DDL SQL statements to test'
         statement << fullDdlSqlStatements
