@@ -29,73 +29,21 @@
     </appender>
     <!-- file appender captures all loggers messages. -->
     <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
-        <param name="file" value="log/volt.log"/>
+        <param name="file" value="log/dragent.log"/>
         <param name="DatePattern" value="'.'yyyy-MM-dd" />
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
         </layout>
     </appender>
 
-    <!-- logger name="AUTH">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="HOST">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="NETWORK">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="SQL">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="COMPILER">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="ADHOCPLANNERTHREAD">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="EXPORT">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="IV2TRACE">
-        <level value="TRACE"/>
-    </logger -->
-
-    <!-- logger name="IV2QUEUETRACE">
-        <level value="TRACE"/>
-    </logger -->
-
-    <!-- logger name="TM">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="REJOIN">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="SNAPSHOT">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- logger name="GC">
-        <level value="INFO"/>
-    </logger -->
-
-    <!-- Always let CSVLoader and its ilk to write to the console. -->
-    <logger name="CSVLOADER">
+    <!-- Always let dragent to write to the console. -->
+    <logger name="DRAGENT">
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>
 
-    <!-- logger to route specific informational messages to the console. -->
-    <logger name="CONSOLE">
+    <!-- Always let dragent to write to the console. -->
+    <logger name="DRSTATS">
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>
