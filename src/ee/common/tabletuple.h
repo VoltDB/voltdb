@@ -263,6 +263,11 @@ public:
         return getNValue(idx).isNull();
     }
 
+    /** Is the hidden column value null? */
+    inline bool isHiddenNull(const int idx) const {
+        return getHiddenNValue(idx).isNull();
+    }
+
     inline bool isNullTuple() const {
         return m_data == NULL;
     }
@@ -949,6 +954,12 @@ inline void TableTuple::setAllNulls() const {
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(ii);
         NValue value = NValue::getNullValue(columnInfo->getVoltType());
         setNValue(ii, value);
+    }
+
+    for (int jj = 0; jj < m_schema->hiddenColumnCount(); ++jj) {
+        const TupleSchema::ColumnInfo *hiddenColumnInfo = m_schema->getHiddenColumnInfo(jj);
+        NValue value = NValue::getNullValue(hiddenColumnInfo->getVoltType());
+        setHiddenNValue(jj, value);
     }
 }
 
