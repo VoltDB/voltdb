@@ -785,6 +785,24 @@ public enum VoltType {
         }
     }
 
+    /**
+     * Is this type an integer type? True for <code>TINYINT</code>, <code>SMALLINT</code>,
+     * <code>INTEGER</code>, <code>BIGINT</code>.
+     * @return True if integer type. False if not.
+     */
+    public boolean isAnyIntegerType() {
+        switch(this)  {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+
     public boolean isMaxValuePaddable() {
         switch (this) {
         case TINYINT:
