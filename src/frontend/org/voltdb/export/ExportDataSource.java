@@ -60,6 +60,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.util.BitSet;
 import org.voltdb.export.ExportGeneration.EnsureMailboxSetupTask;
 
 /**
@@ -792,12 +793,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                                     ackImpl(m_uso);
                                 }
                             } finally {
-                                if (m_runEveryWhere && m_isMaster) {
-                                    //Kick off replicas keep kicking as we dont know when they will start looking.
-                                    forwardAckToOtherReplicas(m_uso*-1);
-                                } else {
-                                    forwardAckToOtherReplicas(m_uso);
-                                }
+                                forwardAckToOtherReplicas(m_uso);
                             }
                         } catch (Exception e) {
                             exportLog.error("Error acking export buffer", e);
@@ -818,16 +814,19 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void forwardAckToOtherReplicas(long uso) {
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
+        BitSet bs = new BitSet(2);
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8)
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8;
+            // signaturesBytes.length + ackUSO:long(8) + 1 byte for runeverywhere+ifmaster
+            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
+            buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
+
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -837,9 +836,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void ack(final long uso) {
+    public void ack(final long uso, boolean runEveryWhere) {
         exportLog.info("Export generation " + getGeneration() + " ack request for " + getPartitionId() + " USO: " + uso + " Master: " + m_isMaster + " Replica run: " + m_replicaRunning + " Run everywhere:" + m_runEveryWhere);
-        if (m_runEveryWhere && !m_isMaster && uso < 0) {
+        if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
             //These are single threaded so no need to lock.
             exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
             if (!m_replicaRunning) {
@@ -859,8 +858,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                         if (!m_replicaRunning) {
                             ackImpl(uso);
                         } else {
-                            //we get -ve uso for replicas.
-                            m_lastAckUSO = uso*-1;
+                            m_lastAckUSO = uso;
                         }
                     }
                 } catch (Exception e) {

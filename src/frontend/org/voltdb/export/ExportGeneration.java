@@ -557,6 +557,7 @@ public class ExportGeneration {
                     buf.get(stringBytes);
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
+                    final boolean runEveryWhere = (buf.getShort() == (short )1);
 
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
@@ -574,7 +575,7 @@ public class ExportGeneration {
 
                     try {
                         exportLog.info("Rcvd ack for partition: " + partition);
-                        eds.ack(ackUSO);
+                        eds.ack(ackUSO, runEveryWhere);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }
