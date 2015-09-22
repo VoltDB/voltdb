@@ -1685,19 +1685,21 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
 }
 
 void VoltDBEngine::collectDRTupleStreamStateInfo() {
-    std::size_t size = 2 * sizeof(int64_t) + 1;
+    std::size_t size = 3 * sizeof(int64_t) + 1;
     if (m_drReplicatedStream) {
-        size += 2 * sizeof(int64_t);
+        size += 3 * sizeof(int64_t);
     }
     m_resultOutput.writeInt(static_cast<int32_t>(size));
-    std::pair<int64_t, int64_t> stateInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueId();
-    m_resultOutput.writeLong(stateInfo.first);
-    m_resultOutput.writeLong(stateInfo.second);
+    CommittedDrInfo drInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueIds();
+    m_resultOutput.writeLong(drInfo.seqNum);
+    m_resultOutput.writeLong(drInfo.spUniqueId);
+    m_resultOutput.writeLong(drInfo.mpUniqueId);
     if (m_drReplicatedStream) {
         m_resultOutput.writeByte(static_cast<int8_t>(1));
-        stateInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueId();
-        m_resultOutput.writeLong(stateInfo.first);
-        m_resultOutput.writeLong(stateInfo.second);
+        drInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueIds();
+        m_resultOutput.writeLong(drInfo.seqNum);
+        m_resultOutput.writeLong(drInfo.spUniqueId);
+        m_resultOutput.writeLong(drInfo.mpUniqueId);
     } else {
         m_resultOutput.writeByte(static_cast<int8_t>(0));
     }
