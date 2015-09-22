@@ -4,7 +4,7 @@ var IMainUI = (function(){
 
 var tab_counter = 1;
 var $tabs = null;
-var $volt_version = '4.6.8';
+var $volt_version = '4.6.9';
 
 this.InitWorkspace = function()
 {
