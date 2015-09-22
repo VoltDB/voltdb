@@ -676,12 +676,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         // for the snapshot save invocations
         JSONObject jsObj = new JSONObject();
         try {
+            assert truncReqId != null;
             String sData = "";
-            if (truncReqId != null) {
-                JSONObject jsData = new JSONObject();
-                jsData.put("truncReqId", truncReqId);
-                sData = jsData.toString();
-            }
+            JSONObject jsData = new JSONObject();
+            jsData.put("truncReqId", truncReqId);
+            sData = jsData.toString();
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());

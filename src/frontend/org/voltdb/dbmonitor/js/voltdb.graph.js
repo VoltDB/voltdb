@@ -259,7 +259,6 @@
                 var tooltip = MonitorGraphUI.ChartCpu.tooltip;
                 tooltip.gravity('s');
                 tooltip.contentGenerator(function (d) {
-                    console.log(d);
                     var html = '';
                     d.series.forEach(function (elem) {
                         html += "<h3>"
