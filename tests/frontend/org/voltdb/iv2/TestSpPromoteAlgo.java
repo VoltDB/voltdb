@@ -312,7 +312,7 @@ public class TestSpPromoteAlgo
             stops[i] = false;
             finalStreams.put((long)i, new ArrayList<TransactionInfoBaseMessage>());
         }
-        long maxBinaryLogUniqueId = Long.MIN_VALUE;
+        long maxBinaryLogSpUniqueId = Long.MIN_VALUE;
         for (int i = 0; i < 4000; i++) {
             // get next message, update the sphandle according to SpScheduler rules,
             // but only submit messages that would have been forwarded by the master
@@ -320,7 +320,7 @@ public class TestSpPromoteAlgo
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandle(sphandle.getTxnId());
             if (msg instanceof Iv2InitiateTaskMessage) {
-                maxBinaryLogUniqueId = Math.max(maxBinaryLogUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
+                maxBinaryLogSpUniqueId = Math.max(maxBinaryLogSpUniqueId, TestRepairLog.setBinaryLogUniqueId(msg, buig));
             }
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
@@ -369,7 +369,7 @@ public class TestSpPromoteAlgo
         RepairResult res = result.get();
         assertFalse(result.isCancelled());
         assertTrue(result.isDone());
-        assertEquals(maxBinaryLogUniqueId, res.m_binaryLogUniqueId);
+        assertEquals(maxBinaryLogSpUniqueId, res.m_binaryLogInfo.spUniqueId);
         // Unfortunately, it's painful to try to stub things to make repairSurvivors() work, so we'll
         // go and inspect the guts of SpPromoteAlgo instead.  This iteration is largely a copy of the inner loop
         // of repairSurvivors()

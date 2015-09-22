@@ -230,7 +230,7 @@ public class TestRepairLog
     // There should be only one FragmentTaskMessage per MP TxnID
     // There should be at most one FragmentTaskMessage uncovered by a CompleteTransactionMessage
     // There should be no CompleteTransactionMessages indicating restart
-    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff, long binaryLogUniqueId)
+    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff, long binaryLogSpUniqueId)
     {
         long prevHandle = Long.MIN_VALUE;
         Long mpTxnId = null;
@@ -252,7 +252,7 @@ public class TestRepairLog
                 }
             } else {
                 assertTrue(imsg.hasHashinatorConfig());
-                assertEquals(binaryLogUniqueId, imsg.getBinaryLogUniqueId());
+                assertEquals(binaryLogSpUniqueId, imsg.getBinaryLogInfo().spUniqueId);
             }
         }
     }
@@ -268,7 +268,7 @@ public class TestRepairLog
         if (taskMsg != null && taskMsg.getStoredProcedureName().startsWith("@ApplyBinaryLog")) {
             ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
             long uid = uig.getNextUniqueId();
-            when(params.toArray()).thenReturn(new Object[] {null, 0l, 0l, uid, null});
+            when(params.toArray()).thenReturn(new Object[] {null, 0l, 0l, uid, 0l, null});
             return uid;
         }
 

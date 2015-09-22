@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -49,8 +50,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
     private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
-    private long m_maxBinaryLogUniqueId = Long.MIN_VALUE;
-    private long m_maxBinaryLogSequenceNumber = Long.MIN_VALUE;
+    private DRLogSegmentId m_maxBinaryLogInfo = new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE);
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
@@ -177,8 +177,8 @@ public class MpPromoteAlgo implements RepairAlgo
                 assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
                         UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) ==  MpInitiator.MP_INIT_PID;
                 m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, response.getLocalDrUniqueId());
-                m_maxBinaryLogSequenceNumber = Math.max(m_maxBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
-                m_maxBinaryLogUniqueId = Math.max(m_maxBinaryLogUniqueId, response.getBinaryLogUniqueId());
+                m_maxBinaryLogInfo.drId = Math.max(m_maxBinaryLogInfo.drId, response.getBinaryLogInfo().drId);
+                m_maxBinaryLogInfo.mpUniqueId = Math.max(m_maxBinaryLogInfo.mpUniqueId, response.getBinaryLogInfo().mpUniqueId);
             }
 
             // Step 2: track hashinator versions
@@ -266,8 +266,7 @@ public class MpPromoteAlgo implements RepairAlgo
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId,
                                                m_maxSeenLocalMpUniqueId,
-                                               m_maxBinaryLogSequenceNumber,
-                                               m_maxBinaryLogUniqueId));
+                                               m_maxBinaryLogInfo));
     }
 
     //

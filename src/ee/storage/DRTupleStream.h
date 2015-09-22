@@ -30,7 +30,7 @@ class StreamBlock;
 class TableIndex;
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
-const int MAGIC_DR_TRANSACTION_PADDING = 69;
+const int MAGIC_DR_TRANSACTION_PADDING = 78;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
 
 class DRTupleStream : public voltdb::TupleStreamBase {
@@ -88,11 +88,15 @@ public:
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
-    void endTransaction();
+    void endTransaction(int64_t txnId, int64_t spHandle, int64_t uniqueId);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
+    void getLastCommittedSequenceNumberAndUniqueIds(int64_t &seqNum, int64_t &spUniqueId, int64_t &mpUniqueId) {
+        seqNum = m_committedSequenceNumber;
+        spUniqueId = m_lastCommittedSpUniqueId;
+        mpUniqueId = m_lastCommittedMpUniqueId;
+    }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
     bool m_enabled;
@@ -120,6 +124,8 @@ private:
     bool m_opened;
     int64_t m_rowTarget;
     size_t m_txnRowCount;
+    int64_t m_lastCommittedSpUniqueId;
+    int64_t m_lastCommittedMpUniqueId;
 };
 
 class MockDRTupleStream : public DRTupleStream {
