@@ -890,10 +890,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void setMaster() {
-        exportLog.info("Setting master for partition: " + getPartitionId());
+    /**
+     * Returns if replica was running.
+     * @return
+     */
+    public boolean setMaster() {
+        exportLog.info("Setting master for partition: " + getPartitionId() + " Replica running " + m_replicaRunning);
         m_isMaster = true;
+        boolean rval = m_replicaRunning;
         m_replicaRunning = false;
+        return rval;
     }
 
     //Is this a run everywhere source
