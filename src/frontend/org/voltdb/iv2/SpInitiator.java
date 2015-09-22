@@ -29,6 +29,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProducerDRGateway;
@@ -141,8 +142,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
-            long binaryLogDRId = Long.MIN_VALUE;
-            long binaryLogUniqueId = Long.MIN_VALUE;
             long localSpUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
@@ -162,11 +161,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
+                DRLogSegmentId drLogInfo = null;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    binaryLogDRId = res.m_binaryLogDRId;
-                    binaryLogUniqueId = res.m_binaryLogUniqueId;
+                    drLogInfo = res.m_binaryLogInfo;
                     localSpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
@@ -183,6 +182,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    // If we are a DR replica, inform that subsystem of any remote data we've seen
+                    if (m_consumerDRGateway != null && drLogInfo.drId >= 0) {
+                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localSpUniqueId);
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -197,10 +201,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
-            // If we are a DR replica, inform that subsystem of any remote data we've seen
-            if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, localSpUniqueId);
-            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
