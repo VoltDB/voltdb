@@ -2093,7 +2093,7 @@ right: -31px!important;
 h2.help {
     font: bold 15px Arial, Helvetica, sans-serif;
     padding-bottom: 10px;
-    border-bottom: 1px dashed #ddd;
+    /*border-bottom: 1px dashed #ddd;*/
 }
 
 .VDBMonitorHelp p {
