@@ -44,6 +44,8 @@ public class InternalConnectionHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final InternalClientResponseAdapter m_adapter;
 
+    private AuthSystem.AuthUser m_user;
+
     public InternalConnectionHandler(InternalClientResponseAdapter adapter) {
         m_adapter = adapter;
     }
@@ -64,6 +66,11 @@ public class InternalConnectionHandler {
 
     public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, String proc, Object... fieldList) {
         return callProcedure(caller, backPressureTimeout, new NullCallback(), proc, fieldList);
+    }
+
+    public boolean callProcedure(InternalConnectionContext caller, long backPressureTimeout, ProcedureCallback procCallback, AuthSystem.AuthUser user, String proc, Object... fieldList) {
+        m_user = user;
+        return callProcedure(caller, backPressureTimeout, procCallback, proc, fieldList);
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
@@ -108,6 +115,11 @@ public class InternalConnectionHandler {
             m_failedCount.incrementAndGet();
             return false;
         }
+
+        if ("@UpdateApplicationCatalog".equals(task.procName)) {
+            return m_adapter.dispatchUpdateApplicationCatalog(task, m_user, caller, procCallback);
+        }
+
         if (!m_adapter.createTransaction(caller, proc, catProc, procCallback, task, partition, System.nanoTime())) {
             m_failedCount.incrementAndGet();
             return false;
