@@ -119,10 +119,10 @@ PARTITION TABLE tableY ON COLUMN keyA;
 CREATE INDEX idx_y_keyI ON tableY(keyH,keyI);
 
 -- tree index on varbinary type
-CREATE TABLE blobTableTree (
+CREATE TABLE varbinaryTableTree (
     id INTEGER NOT NULL,
-    blob2 VARBINARY(2),
-    blob512 VARBINARY(512)
+    varb2 VARBINARY(2),
+    varb512 VARBINARY(512)
 );
-CREATE INDEX blobTableTree_INDEX_blob2 ON blobTableTree(blob2);
-CREATE INDEX blobTableTree_INDEX_blob512 ON blobTableTree(blob512);
+CREATE INDEX varbinaryTableTree_INDEX_varb2 ON varbinaryTableTree(varb2);
+CREATE INDEX varbinaryTableTree_INDEX_varb512 ON varbinaryTableTree(varb512);

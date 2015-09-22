@@ -1203,32 +1203,32 @@ public class TestIndexesSuite extends RegressionSuite {
         Client client = getClient();
         String sql, explainPlanStr;
 
-        client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (1, 'ABCD', '0A0BCD');");
-        client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (2, 'ABEF', '0A0BEF');");
-        client.callProcedure("@AdHoc", "insert into blobTableTree (id, blob2, blob512) values (3, NULL, NULL);");
+        client.callProcedure("@AdHoc", "insert into varbinaryTableTree (id, varb2, varb512) values (1, 'ABCD', '0A0BCD');");
+        client.callProcedure("@AdHoc", "insert into varbinaryTableTree (id, varb2, varb512) values (2, 'ABEF', '0A0BEF');");
+        client.callProcedure("@AdHoc", "insert into varbinaryTableTree (id, varb2, varb512) values (3, NULL, NULL);");
 
         //
         // inline varbinary
         //
 
-        explainPlanStr = "INDEX SCAN of \"BLOBTABLETREE\" using \"BLOBTABLETREE_INDEX_BLOB2\"";
+        explainPlanStr = "INDEX SCAN of \"VARBINARYTABLETREE\" using \"VARBINARYTABLETREE_INDEX_VARB2\"";
         // exactly match
-        sql = "select blob2 from blobTableTree where blob2 = x'ABCD'";
+        sql = "select varb2 from varbinaryTableTree where varb2 = x'ABCD'";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD"});
 
         // no match
-        sql = "select blob2 from blobTableTree where blob2 = x'0101'";
+        sql = "select varb2 from varbinaryTableTree where varb2 = x'0101'";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{});
 
         // greater than
-        sql = "select blob2 from blobTableTree where blob2 > x'0101' order by blob2";
+        sql = "select varb2 from varbinaryTableTree where varb2 > x'0101' order by varb2";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
 
         // ENG-9032 (when this ticket is fixed, uncomment the test case next)
-//        sql = "select blob2 from blobTableTree where blob2 < x'ACEF' order by blob2";
+//        sql = "select varb2 from varbinaryTableTree where varb2 < x'ACEF' order by varb2";
 //        checkQueryPlan(client, sql, explainPlanStr);
 //        validateTableColumnOfScalarVarbinary(client, sql, new String[]{"ABCD", "ABEF"});
 
@@ -1237,18 +1237,18 @@ public class TestIndexesSuite extends RegressionSuite {
         //
 
         // exactly match
-        sql = "select blob512 from blobTableTree where blob512 = x'0A0BCD'";
-        explainPlanStr = "INDEX SCAN of \"BLOBTABLETREE\" using \"BLOBTABLETREE_INDEX_BLOB512\"";
+        sql = "select varb512 from varbinaryTableTree where varb512 = x'0A0BCD'";
+        explainPlanStr = "INDEX SCAN of \"VARBINARYTABLETREE\" using \"VARBINARYTABLETREE_INDEX_VARB512\"";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD"});
 
         // no match
-        sql = "select blob512 from blobTableTree where blob512 = x'0A0B00'";
+        sql = "select varb512 from varbinaryTableTree where varb512 = x'0A0B00'";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{});
 
         // greater than
-        sql = "select blob512 from blobTableTree where blob512 > x'0A0B00' order by blob512";
+        sql = "select varb512 from varbinaryTableTree where varb512 > x'0A0B00' order by varb512";
         checkQueryPlan(client, sql, explainPlanStr);
         validateTableColumnOfScalarVarbinary(client, sql, new String[]{"0A0BCD", "0A0BEF"});
     }
