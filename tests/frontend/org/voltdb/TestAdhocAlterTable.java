@@ -1219,7 +1219,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertFalse(doesColumnExist("FOO", "NUM2"));
 
             //
-            // DROP a column not in the view failed (the last column dropped)
+            // DROP a column not in the view succeed (the last column dropped)
             //
             // -- JSON plans of the view query will not change
             checkAlterTableSucceed("alter table BAR drop column NUM2;");
@@ -1232,7 +1232,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(verifyTableColumnType("FOO", "VAL", "INTEGER"));
 
             //
-            // Add table to make sure the view is correct
+            // Add some data to make sure the view is correct
             //
             VoltTable vt;
             m_client.callProcedure("@AdHoc", "insert into FOO values(1, 1);");
@@ -1249,6 +1249,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             m_client.callProcedure("@AdHoc", "insert into BAR values(1, -2, 4);");
 
             vt = m_client.callProcedure("@AdHoc", "select val, total from barview order by 1, 2;").getResults()[0];
+            // BARVIEW has "where VAL >= 1" clause, so the "{-2, 1}" row is not here
             RegressionSuite.validateTableOfLongs(vt, new long[][]{{1,2}, {2,1}});
 
         }
