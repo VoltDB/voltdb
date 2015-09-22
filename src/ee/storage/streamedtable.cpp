@@ -15,11 +15,20 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sstream>
+#include <cassert>
+#include <cstdio>
+#include <algorithm>    // std::find
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
+
 #include "streamedtable.h"
+#include "persistenttable.h"
 #include "StreamedTableUndoAction.hpp"
 #include "ExportTupleStream.h"
 #include "common/executorcontext.hpp"
 #include "tableiterator.h"
+#include "ExportMaterializedViewMetadata.h"
 
 using namespace voltdb;
 
@@ -27,6 +36,8 @@ StreamedTable::StreamedTable(bool exportEnabled)
     : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
       m_sequenceNo(0)
 {
+//    std::cout << "Streamed Table create " << name() << " \n";
+//    std::cout.flush();
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         enableStream();
@@ -48,6 +59,112 @@ bool StreamedTable::enableStream() {
         return true;
     }
     return false;
+}
+
+void
+StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo)
+{
+    if (!target) {
+//    std::cout << "Found NULL target for streamed table\n";
+//    std::cout.flush();
+        return;
+    }
+    std::string targetName = target->name();
+//    std::cout << "Streamed Table with views " << targetName << " \n";
+//    std::cout.flush();
+
+    // find the materialized view that uses the table or its precursor (by the same name).
+    BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
+        PersistentTable* currTarget = currView->targetTable();
+
+        // found: target is alreafy set
+        if (currTarget == target) {
+            // The view is already up to date.
+            // but still need to update the index used for min/max
+            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
+                currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            }
+            return;
+        }
+
+        // found: this is the table to set the
+        std::string currName = currTarget->name();
+        if (currName == targetName) {
+            // A match on name only indicates that the target table has been re-defined since
+            // the view was initialized, so re-initialize the view.
+            currView->setTargetTable(target);
+            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            return;
+        }
+    }
+
+    // The connection needs to be made using a new MaterializedViewMetadata
+    // This is not a leak -- the materialized view is self-installing into srcTable.
+    new ExportMaterializedViewMetadata(this, target, targetMvInfo);
+}
+
+/*
+ * claim ownership of a view. table is responsible for this view*
+ */
+void StreamedTable::addMaterializedView(ExportMaterializedViewMetadata *view)
+{
+    std::cout << "Adding mat view \n";
+    std::cout.flush();
+    m_views.push_back(view);
+}
+
+void
+StreamedTable::segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
+                                            std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
+                                            std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
+                                            std::vector<ExportMaterializedViewMetadata*> &survivingViewsOut,
+                                            std::vector<ExportMaterializedViewMetadata*> &obsoleteViewsOut)
+{
+    //////////////////////////////////////////////////////////
+    // find all of the materialized views to remove or keep
+    //////////////////////////////////////////////////////////
+
+    // iterate through all of the existing views
+    BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
+        std::string currentViewId = currView->targetTable()->name();
+
+        // iterate through all of the catalog views, looking for a match.
+        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
+        bool viewfound = false;
+        for (viewIter = start; viewIter != end; ++viewIter) {
+            catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
+            if (currentViewId == catalogViewInfo->name()) {
+                viewfound = true;
+                //TODO: This MIGHT be a good place to identify the need for view re-definition.
+                survivingInfosOut.push_back(catalogViewInfo);
+                survivingViewsOut.push_back(currView);
+                break;
+            }
+        }
+
+
+        // if the table has a view that the catalog doesn't, then prepare to remove (or fail to migrate) the view
+        if (!viewfound) {
+            obsoleteViewsOut.push_back(currView);
+        }
+    }
+}
+
+void StreamedTable::dropMaterializedView(ExportMaterializedViewMetadata *targetView) {
+    assert( ! m_views.empty());
+    ExportMaterializedViewMetadata *lastView = m_views.back();
+    if (targetView != lastView) {
+        // iterator to vector element:
+        std::vector<ExportMaterializedViewMetadata*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        assert(toView != m_views.end());
+        // Use the last view to patch the potential hole.
+        *toView = lastView;
+    }
+    // The last element is now excess.
+    m_views.pop_back();
+    std::cout << "Deleting mat view  \n";
+    std::cout.flush();
+    delete targetView;
 }
 
 StreamedTable::~StreamedTable()
@@ -87,6 +204,10 @@ bool StreamedTable::insertTuple(TableTuple &source)
 {
     size_t mark = 0;
     if (m_wrapper) {
+        // handle any materialized views
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleInsert(source, false);
+        }
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,
@@ -115,6 +236,9 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
 {
     size_t mark = 0;
     if (m_wrapper) {
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(tuple, false);
+        }
         mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
                                       m_executorContext->currentSpHandle(),
                                       m_sequenceNo++,

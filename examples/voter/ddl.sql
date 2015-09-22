@@ -66,6 +66,7 @@ AS
 ;
 
 END_OF_BATCH
+export table votes to stream anish2;
 
 -- Update classes from jar so that the server will know about classes
 -- but not procedures yet.

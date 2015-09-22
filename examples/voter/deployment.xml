@@ -4,4 +4,11 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+    <export>
+        <configuration enabled="true" stream="anish2" type="file">
+            <property name="outdir">/tmp</property>
+            <property name="nonce">anish2</property>
+            <property name="type">csv</property>
+        </configuration>
+    </export>
 </deployment>

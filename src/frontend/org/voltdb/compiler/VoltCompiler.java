@@ -1690,11 +1690,11 @@ public class VoltCompiler {
             throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
             "the catalog.");
         }
-        if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
-            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
-                    "for a materialized view. Export only tables do not support views.");
-            throw new VoltCompilerException("Export table configured with materialized view.");
-        }
+//        if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
+//            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
+//                    "for a materialized view. Export only tables do not support views.");
+//            throw new VoltCompilerException("Export table configured with materialized view.");
+//        }
         if (tableref.getMaterializer() != null)
         {
             compilerLog.error("While configuring export, table " + tableName + " is a " +
