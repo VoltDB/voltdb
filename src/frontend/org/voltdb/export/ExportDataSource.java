@@ -837,7 +837,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void ack(final long uso, boolean runEveryWhere) {
-        exportLog.info("Export generation " + getGeneration() + " ack request for " + getPartitionId() + " USO: " + uso + " Master: " + m_isMaster + " Replica run: " + m_replicaRunning + " Run everywhere:" + m_runEveryWhere);
+        // If I am not master and run everywhere connector and I get ack to start replicating....do so and become a exporting replica.
         if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
             //These are single threaded so no need to lock.
             exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
