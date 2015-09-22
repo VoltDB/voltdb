@@ -42,7 +42,7 @@ CTX = BuildContext(sys.argv)
 #  specific targets
 CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
-            -Winit-self -Wno-sign-compare -Wno-unused-parameter -Wno-unused-local-typedef
+            -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default
@@ -55,6 +55,9 @@ if compiler_name == 'gcc':
 
 if (compiler_name == 'clang') and (compiler_major == 3 and compiler_minor >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
+
+if (compiler_name == 'clang') and (compiler_major == 7):
+    CTX.CPPFLAGS += " -Wno-unused-local-typedef"
 
 if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"

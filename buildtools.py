@@ -381,29 +381,49 @@ def runTests(CTX):
 
 def getCompilerVersion():
     vinfo = output = Popen(["gcc", "-v"], stderr=PIPE).communicate()[1]
+    compiler_name = "gcc"
+    major = 0
+    minor = 0
+    patch = 0
+    vvector = [0, 0, 0]
     # Apple now uses clang and has its own versioning system.
-    # Not sure we do anything that cares which version of clang yet.
+    # The version 7 compiler needs special compilation options.
     # This is pretty dumb code that could be improved as we support more
-    #  compilers and versions.
+    # compilers and versions.
     if output.find('clang') != -1:
         # this is a hacky way to find the real clang version from the output of
-        # gcc -v on the mac. The version is right after the string "based on LLVM ".
-        token = "based on LLVM "
-        pos = vinfo.find(token)
-        if pos != -1:
-            pos += len(token)
-            vinfo = vinfo[pos:pos+3]
-            vinfo = vinfo.split(".")
-            return "clang", vinfo, vinfo, 0
-        # if not the expected apple clang format
-        # this probably needs to be adjusted for clang on linux or from source
-        return "clang", 0, 0, 0
+        # gcc -v on the mac.  These strings are from:
+        #   Xcode previous to 10.11
+        #   Xcode version 10.11
+        #   Clang built not from apple.
+        compiler_name = 'clang'
+        tokens = ["based on LLVM ", "Apple LLVM version ", "clang version "]
+        for token in tokens:
+            pos = vinfo.find(token)
+            if pos != -1:
+                print("found clang!!")
+                pos += len(token)
+                vinfo = vinfo[pos:pos+3]
+                vvector = vinfo.split("[.]")
+                print("vvector = %s" % vvector)
+                break
+        # if not the expected apple clang format, then return version 0.0.0.
     else:
+        # This is gcc.
         vinfo = vinfo.strip().split("\n")
         vinfo = vinfo[-1]
         vinfo = vinfo.split()[2]
-        vinfo = vinfo.split(".")
-        return "gcc", int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
+        vvector = vinfo.split(".")
+    vlen = len(vvector)
+    if vlen > 0:
+        major = int(vvector[0])
+        if vlen > 1:
+            minor = int(vvector[1])
+            if vlen > 2:
+                patch = int(vvector[2])
+    print("[%s, %d, %d, %d]" % (compiler_name, major, minor, patch))
+    return compiler_name, major, minor, patch
+
 
 # get the version of gcc and make it avaliable
 compiler_name, compiler_major, compiler_minor, compiler_point = getCompilerVersion()
