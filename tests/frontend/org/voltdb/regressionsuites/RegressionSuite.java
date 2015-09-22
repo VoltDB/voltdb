@@ -844,8 +844,7 @@ public class RegressionSuite extends TestCase {
 
         for (String pattern : patterns) {
             if (! vtStr.contains(pattern)) {
-                System.err.println(vtStr);
-                fail("The above explain plan is expected to contain pattern: " + pattern);
+                fail("The explain plan \n" + vtStr + "\n is expected to contain pattern: " + pattern);
             }
         }
     }

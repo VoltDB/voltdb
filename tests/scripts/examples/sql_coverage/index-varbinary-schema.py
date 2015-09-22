@@ -23,7 +23,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "BLOB_TABLE": {
+    "R_VARBINARY_TABLE": {
         "columns": (
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("A", FastSerializer.VOLTTYPE_VARBINARY),
@@ -32,20 +32,18 @@
                     ("D", FastSerializer.VOLTTYPE_VARBINARY),
                     ("E", FastSerializer.VOLTTYPE_VARBINARY),
                     ("F", FastSerializer.VOLTTYPE_VARBINARY)
-                    ),
-        "partitions": (),
-        "indexes": ()
+                    )
     }
-#,
-#    "BLOB_TABLE": {
-#        "columns": (
-#                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
-#                    ("A", FastSerializer.VOLTTYPE_VARBINARY),
-#                    ("B", FastSerializer.VOLTTYPE_VARBINARY),
-#                    ("C", FastSerializer.VOLTTYPE_VARBINARY),
-#                    ("D", FastSerializer.VOLTTYPE_VARBINARY)
-#                    ),
-#        "partitions": (),
-#        "indexes": ("A",)
-#    }
+,
+    "P_VARBINARY_TABLE": {
+        "columns": (
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("A", FastSerializer.VOLTTYPE_VARBINARY),
+                    ("B", FastSerializer.VOLTTYPE_VARBINARY),
+                    ("C", FastSerializer.VOLTTYPE_VARBINARY),
+                    ("D", FastSerializer.VOLTTYPE_VARBINARY),
+                    ("E", FastSerializer.VOLTTYPE_VARBINARY),
+                    ("F", FastSerializer.VOLTTYPE_VARBINARY)
+                    )
+    }
 }

@@ -1332,7 +1332,7 @@ public class TestIndexesSuite extends RegressionSuite {
         // end of easy-to-disable code section */
 
         /*/ CONFIG #3: IPC -- keep this normally disabled with / * vs. //
-        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

@@ -85,7 +85,8 @@ def normalize_values(tuples, columns):
     # I assume t is a voltdbclient.VoltTable.
     if hasattr(tuples, "__iter__"):
         for i in xrange(len(tuples)):
-            # varbinary is array.array type and has __iter__ defined, but should a single value to be compareds
+            # varbinary is array.array type and has __iter__ defined, but should be considered
+            # as a single value to be compared.
             if hasattr(tuples[i], "__iter__") and type(tuples[i]) is not array.array:
                 normalize_values(tuples[i], columns)
             else:
