@@ -164,15 +164,16 @@ public class ExportGeneration {
     //This is maintained to detect if this is a continueing generation or not
     private final boolean m_isContinueingGeneration;
     private final SynchronizedStatesManager m_ssm;
-
+    private final int m_numOfReplicas;
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(SynchronizedStatesManager ssm, long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
+    public ExportGeneration(SynchronizedStatesManager ssm, long txnId, File exportOverflowDirectory, int numOfReplicas, boolean isRejoin) throws IOException {
         m_ssm = ssm;
         m_timestamp = txnId;
+        m_numOfReplicas = numOfReplicas;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
         if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
@@ -194,8 +195,9 @@ public class ExportGeneration {
      * @param catalogGen Generation from catalog.
      * @throws IOException
      */
-    public ExportGeneration(SynchronizedStatesManager ssm, File generationDirectory, long catalogGen) throws IOException {
+    public ExportGeneration(SynchronizedStatesManager ssm, File generationDirectory, long catalogGen, int numOfReplicas) throws IOException {
         m_ssm = ssm;
+        m_numOfReplicas = numOfReplicas;
         m_directory = generationDirectory;
         try {
             m_timestamp = Long.parseLong(generationDirectory.getName());
@@ -812,7 +814,7 @@ public class ExportGeneration {
                         m_timestamp,
                         table.getColumns(),
                         partColumn,
-                        m_directory.getPath());
+                        m_directory.getPath(), m_numOfReplicas);
                 m_numSources++;
                 exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                         " signature " + table.getSignature() + " partition id " + partition);

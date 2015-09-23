@@ -121,11 +121,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath
+            String overflowPath,
+            int noOfReplicas
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
-        m_numberOfReplicas = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor();
+        m_numberOfReplicas = noOfReplicas;
         m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {

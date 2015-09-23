@@ -418,6 +418,7 @@ public class ExportManager
             boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
+            final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
             ExportDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(m_loaderClass);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
@@ -434,7 +435,7 @@ public class ExportManager
             if (startup) {
                 initializePersistedGenerations(
                         exportOverflowDirectory,
-                        catalogContext, connectors);
+                        catalogContext, connectors, numOfReplicas);
             }
 
             /*
@@ -445,7 +446,7 @@ public class ExportManager
                 if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(m_exportStatesManager,
                             catalogContext.m_uniqueId,
-                            exportOverflowDirectory, isRejoin);
+                            exportOverflowDirectory, numOfReplicas, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
@@ -510,7 +511,7 @@ public class ExportManager
 
     private void initializePersistedGenerations(
             File exportOverflowDirectory, CatalogContext catalogContext,
-            CatalogMap<Connector> connectors) throws IOException {
+            CatalogMap<Connector> connectors, final int numOfReplicas) throws IOException {
         TreeSet<File> generationDirectories = new TreeSet<File>();
         for (File f : exportOverflowDirectory.listFiles()) {
             if (f.isDirectory()) {
@@ -523,7 +524,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(m_exportStatesManager, generationDirectory, catalogContext.m_uniqueId);
+            ExportGeneration generation = new ExportGeneration(m_exportStatesManager, generationDirectory, catalogContext.m_uniqueId, numOfReplicas);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
@@ -610,11 +611,12 @@ public class ExportManager
         }
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+        final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
         ExportGeneration newGeneration = null;
         try {
             newGeneration = new ExportGeneration(m_exportStatesManager,
-                    catalogContext.m_uniqueId, exportOverflowDirectory, false);
+                    catalogContext.m_uniqueId, exportOverflowDirectory, numOfReplicas, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             m_generations.put(catalogContext.m_uniqueId, newGeneration);
