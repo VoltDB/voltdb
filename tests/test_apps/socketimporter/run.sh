@@ -168,9 +168,9 @@ function async-benchmark() {
         --displayinterval=5 \
         --warmup=2 \
         --duration=30 \
-        # --perftest=true \
-        --servers=localhost \
-        --sockservers=localhost:7001
+        --perftest=true \
+        --servers=volt3a \
+        --sockservers=volt3a:7001
 }
 
 function simple-benchmark() {
