@@ -230,6 +230,11 @@ public class SynchronizedStatesManager {
         }
     };
 
+    public synchronized StateMachineInstance getStateMachine(int idx) throws InterruptedException {
+        assert(idx < m_registeredStateMachines.length);
+        return m_registeredStateMachines[idx];
+    }
+
     public synchronized void registerStateMachine(StateMachineInstance machine) throws InterruptedException {
         assert(m_registeredStateMachineInstances < m_registeredStateMachines.length);
 

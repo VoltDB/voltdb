@@ -538,7 +538,9 @@ public class ExportGeneration {
         try {
             if (m_task != null) {
                 m_task.setPartitions(localPartitions);
-                m_ssm.registerStateMachine(m_task);
+                if (m_ssm.getStateMachine(0) == null) {
+                    m_ssm.registerStateMachine(m_task);
+                }
                 m_task.attemptTask();
             }
         } catch (InterruptedException ex) {
