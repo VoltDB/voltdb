@@ -25,7 +25,11 @@
 #include "common/ValueFactory.hpp"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
+#include "storage/ConstraintFailureException.h"
+#include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
+
+#include "catalog/Database.h"
 
 #include<boost/unordered_map.hpp>
 #include<crc/crc32c.h>
@@ -71,6 +75,10 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
+    bool activeActiveDREnabled = false;
+    if (engine && engine->getDatabase()) {
+        activeActiveDREnabled = engine->getDatabase()->isActiveActiveDRed();
+    }
 
     size_t rowCount = 0;
     CachedIndexKeyTuple indexKeyTuple;
@@ -103,7 +111,26 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             ReferenceSerializeInputLE rowInput(rowData, rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
-            table->insertPersistentTuple(tempTuple, true);
+            try {
+                table->insertPersistentTuple(tempTuple, true);
+            } catch (ConstraintFailureException &e) {
+                if (activeActiveDREnabled) {
+                    TupleSchema* schema = TupleSchema::createTupleSchema(table->schema());
+                    Table* existingTable = TableFactory::getPersistentTable(0, table->name(), schema, table->getColumnNames(), NULL);
+                    Table* expectedTable = TableFactory::getPersistentTable(0, table->name(), schema, table->getColumnNames(), NULL);
+                    Table* newTable = TableFactory::getPersistentTable(0, table->name(), schema, table->getColumnNames(), NULL);
+                    ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
+                                                                                        sequenceNumber,
+                                                                                        DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
+                                                                                        DR_RECORD_INSERT,
+                                                                                        table->name(),
+                                                                                        existingTable,
+                                                                                        expectedTable,
+                                                                                        newTable,
+                                                                                        NULL);
+                }
+                throw;
+            }
             break;
         }
         case DR_RECORD_DELETE: {

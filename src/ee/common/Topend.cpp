@@ -68,7 +68,7 @@ namespace voltdb {
     }
 
     int DummyTopend::reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type,
+            int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
             std::string tableName, Table* existingTable, Table* expectedTable,
             Table* newTable, Table* output) {
         // TODO conform to return value contract of reportDRConflict()

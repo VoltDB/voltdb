@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "reportDRConflict",
-            "(IJILjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+            "(IJIILjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_reportDRConflictMID != NULL);
@@ -507,8 +507,8 @@ static char* serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
 
 int JNITopend::reportDRConflict(int32_t partitionId,
             int64_t remoteSequenceNumber, DRConflictType conflict_type,
-            string tableName, Table* existingRows, Table* expectedRows,
-            Table* newRows, Table* output) {
+            DRRecordType action_type, string tableName, Table* existingRows,
+            Table* expectedRows, Table* newRows, Table* output) {
     assert(existingRows != NULL);
     assert(expectedRows != NULL);
     assert(newRows != NULL);
@@ -548,6 +548,7 @@ int JNITopend::reportDRConflict(int32_t partitionId,
         partitionId,
         remoteSequenceNumber,
         conflict_type,
+        action_type,
         tableNameString,
         existingRowsBuffer,
         expectedRowsBuffer,

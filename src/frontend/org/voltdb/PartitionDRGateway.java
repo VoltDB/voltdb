@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -124,7 +125,21 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
-    public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
+    private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
+        @Override
+        protected AtomicLong initialValue() {
+            return new AtomicLong(-1);
+        }
+    };
+
+    private static final ThreadLocal<AtomicLong> lastCommittedSpHandleTL = new ThreadLocal<AtomicLong>() {
+        @Override
+        protected AtomicLong initialValue() {
+            return new AtomicLong(0);
+        }
+    };
+
+    public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType, DRRecordType drRecordType,
                                  String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
                                  ByteBuffer newTable, ByteBuffer output) {
         return 0;
@@ -146,14 +161,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
-    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType,
+    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType, int drRecordType,
                                        String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
                                        ByteBuffer newTable, ByteBuffer output) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber,DRConflictType.values()[drConflictType],
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, DRConflictType.values()[drConflictType], DRRecordType.values()[drRecordType],
                 tableName, existingTable, expectedTable, newTable, output);
     }
 }

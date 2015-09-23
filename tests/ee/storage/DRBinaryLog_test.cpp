@@ -393,6 +393,19 @@ public:
         return temp_tuple;
     }
 
+    void createPrimaryKey() {
+        vector<int> columnIndices;
+        columnIndices.push_back(1); // BIGINT
+        TableIndexScheme scheme = TableIndexScheme("primaryKeyIndex", BALANCED_TREE_INDEX,
+                                                    columnIndices,
+                                                    TableIndex::simplyIndexColumns(),
+                                                    true, true, m_schema);
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(scheme);
+        assert(pkeyIndex);
+        m_table->addIndex(pkeyIndex);
+        m_table->setPrimaryKeyIndex(pkeyIndex);
+    }
+
     void simpleDeleteTest() {
         std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
         std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
