@@ -182,7 +182,6 @@ public:
         m_singleColumnTable->setDR(true);
 
         // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
-        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
         std::vector<bool> exportColumnAllowNull(10, false);

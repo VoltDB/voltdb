@@ -121,7 +121,10 @@ class StreamedTable : public Table {
     // ------------------------------------------------------------------
     // TEST FUNCTIONS
     // ------------------------------------------------------------------
-    virtual void setExportStreamWrapper(ExportTupleStream* stream) { m_wrapper = stream; }
+    virtual void setExportStreamWrapper(ExportTupleStream* stream) {
+        delete m_wrapper;
+        m_wrapper = stream;
+    }
     virtual ExportTupleStream* getExportStreamWrapper() { return m_wrapper; }
 
 private:
