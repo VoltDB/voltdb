@@ -180,7 +180,8 @@ public class ExportGeneration {
             }
         }
         m_isContinueingGeneration = true;
-        if (!isRejoin) {
+        //null check is only for tests.
+        if (!isRejoin && m_ssm != null) {
             m_task = new EnsureMailboxSetupTask(m_ssm, "ExportGeneration", exportLog);
         }
 
