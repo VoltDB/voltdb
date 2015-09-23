@@ -75,6 +75,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_handle = spHandle;
         m_txnId = txnId;
         m_payload = payload;
+        m_binaryLogInfo = new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE);
     }
 
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
