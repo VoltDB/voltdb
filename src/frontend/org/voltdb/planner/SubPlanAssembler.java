@@ -1276,7 +1276,7 @@ public abstract class SubPlanAssembler {
             // MAY not pay that much attention to minimizing scale.
             // This was behind issue ENG-4606 -- failure to index on constant equality.
             // So, accept any pair of integer types.
-            if ( ! (keyType.isInteger() && otherType.isInteger()))  {
+            if ( ! (keyType.isBackendIntegerType() && otherType.isBackendIntegerType()))  {
                 return null;
             }
         }
