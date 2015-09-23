@@ -32,17 +32,6 @@
 
 namespace voltdb {
 
-const uint8_t MAX_CLUSTER_ID = static_cast<uint8_t>((1 << 8) - 1);
-const int64_t MAX_SEOUENCE_NUMBER = (1L << 55) - 1L;
-
-static uint8_t getClusterIdFromDRId(int64_t drId) {
-    return static_cast<uint8_t>((drId >> 55) & MAX_CLUSTER_ID);
-}
-
-static int64_t getSequenceNumberFromDRId(int64_t drId) {
-    return drId & MAX_SEOUENCE_NUMBER;
-}
-
 class CachedIndexKeyTuple {
 public:
     CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
@@ -304,21 +293,21 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 }
 
 void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTable, const DRRecordType &type, TableTuple &exportTuple) {
-    if (exportTable != NULL && exportTable->isExport()) {
-        TableTuple tempTuple = exportTable->tempTuple();
-        NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
-        int64_t drId = ValuePeeker::peekAsBigInt(hiddenColumn);
+    assert(exportTable != NULL);
+    assert(exportTable->isExport());
 
-        NValue tableName = ValueFactory::getStringValue(drTable->name());
-        tempTuple.setNValue(0, tableName);  // Table Name
-        tempTuple.setNValue(1, ValueFactory::getTinyIntValue(getClusterIdFromDRId(drId)));       // Cluster Id
-        tempTuple.setNValue(2, ValueFactory::getBigIntValue(getSequenceNumberFromDRId(drId)));   // Timestamp
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
-        tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
+    TableTuple tempTuple = exportTable->tempTuple();
+    NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
 
-        exportTable->insertTuple(tempTuple);
-        tableName.free();
-    }
+    NValue tableName = ValueFactory::getStringValue(drTable->name());
+    tempTuple.setNValue(0, tableName);  // Table Name
+    tempTuple.setNValue(1, ValueFactory::getTinyIntValue((ExecutorContext::getDRTimestampFromHiddenNValue(hiddenColumn))));       // Cluster Id
+    tempTuple.setNValue(2, ValueFactory::getBigIntValue(ExecutorContext::getClusterIdFromHiddenNValue(hiddenColumn)));   // Timestamp
+    tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
+    tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
+
+    exportTable->insertTuple(tempTuple);
+    tableName.free();
 }
 
 void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const char *end) {

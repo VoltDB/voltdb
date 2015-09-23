@@ -150,6 +150,12 @@ class TempTable : public Table {
     virtual std::string tableType() const;
     virtual voltdb::TableStats* getTableStats();
 
+    // ------------------------------------------------------------------
+    // TEST FUNCTIONS
+    // ------------------------------------------------------------------
+    virtual void setExportStreamWrapper(ExportTupleStream* stream) {};
+    virtual ExportTupleStream* getExportStreamWrapper() { return NULL; };
+
     // ptr to global integer tracking temp table memory allocated per frag
     TempTableLimits* m_limits;
 

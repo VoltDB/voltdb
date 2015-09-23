@@ -118,6 +118,12 @@ class StreamedTable : public Table {
         return m_sequenceNo;
     }
 
+    // ------------------------------------------------------------------
+    // TEST FUNCTIONS
+    // ------------------------------------------------------------------
+    virtual void setExportStreamWrapper(ExportTupleStream* stream) { m_wrapper = stream; }
+    virtual ExportTupleStream* getExportStreamWrapper() { return m_wrapper; }
+
 private:
     // Stats
     voltdb::TableStats *getTableStats();

@@ -49,11 +49,26 @@ using namespace voltdb;
 
 const int COLUMN_COUNT = 6;
 const int HIDDEN_COLUMN_COUNT = 1;
-const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
 
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
 }
+
+class MockExportTupleStream : public ExportTupleStream {
+public:
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId) : ExportTupleStream(partitionId, siteId) {}
+    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
+                                           int64_t spHandle,
+                                           int64_t seqNo,
+                                           int64_t uniqueId,
+                                           int64_t timestamp,
+                                           TableTuple &tuple,
+                                           ExportTupleStream::Type type) {
+        receivedTuples.push_back(tuple);
+        return 0;
+    }
+    std::vector<TableTuple> receivedTuples;
+};
 
 class DRBinaryLogTest : public Test {
 public:
@@ -167,22 +182,31 @@ public:
         m_singleColumnTable->setDR(true);
 
         // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
+        m_schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, columnInBytes, hiddenTypes, hiddenColumnLengths, hiddenColumnAllowNull, hiddenColumnInBytes);
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
-        std::vector<bool> exportColumnAllowNull(6, false);
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(13); /* length of 'OTHER_TABLE_2' */
+        std::vector<bool> exportColumnAllowNull(10, false);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(7); /* length of 'P_TABLE' */
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
-        string exportColumnNamesArray[6] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
-                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT"};
-        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 6);
+        exportColumnType.push_back(VALUE_TYPE_DECIMAL);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(15);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(300);
+        exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
 
-        m_exportTable = voltdb::TableFactory::getPersistentTable(0, DR_CONFLICT_TABLE_PREFIX + "OTHER_TABLE_2", m_exportSchema, exportColumnName,
+        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
+        string exportColumnNamesArray[10] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
+                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT", "C_DECIMAL",
+                                            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
+
+        m_exportTable = voltdb::TableFactory::getPersistentTable(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
+                                                                 m_exportSchema, exportColumnName,
                                                                  exportTableHandle, false, 0, true, true);
+        m_exportTable->setExportStreamWrapper(new MockExportTupleStream(1, 1));
     }
 
     virtual ~DRBinaryLogTest() {
@@ -520,20 +544,25 @@ TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
     ASSERT_FALSE(flush(98));
 
     // single row write transaction
-    TableTuple tempTuple = m_otherTableWithoutIndex->tempTuple();
-    tempTuple.setNValue(0, ValueFactory::getTinyIntValue(42));
-    tempTuple.setNValue(1, ValueFactory::getBigIntValue(555555555));
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
+    endTxn(true);
 
-    // single row write transaction
-    TableTuple otherTempTuple = m_otherTableWithoutIndex->tempTuple();
-    otherTempTuple.setNValue(0, ValueFactory::getTinyIntValue(123));
-    otherTempTuple.setNValue(1, ValueFactory::getBigIntValue(9999999999));
-
-    m_sink.exportDRConflict(m_otherTableWithoutIndex, m_exportTable, DR_RECORD_INSERT, tempTuple);
-    m_sink.exportDRConflict(m_otherTableWithoutIndex, m_exportTable, DR_RECORD_INSERT, otherTempTuple);
-
-    // Really have no idea what to test for now.
-    EXPECT_EQ(2, m_exportTable->activeTupleCount());
+    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportTable->getExportStreamWrapper())->receivedTuples.size());
+    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportTable->getExportStreamWrapper())->receivedTuples[0];
+    ASSERT_FALSE(received_tuple.isNullTuple());
+    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);
+    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 0);
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT);
+    // Now compare the rest of columns
+    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
 }
 
 

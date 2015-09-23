@@ -59,6 +59,7 @@
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
+#include "storage/ExportTupleStream.h"
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
@@ -343,6 +344,12 @@ class Table {
         throwFatalException("Validate partitioning unsupported on this table type");
         return 0;
     }
+
+    // ------------------------------------------------------------------
+    // TEST FUNCTIONS
+    // ------------------------------------------------------------------
+    virtual void setExportStreamWrapper(ExportTupleStream* stream) = 0;
+    virtual ExportTupleStream* getExportStreamWrapper() = 0;
 
 protected:
     /*
