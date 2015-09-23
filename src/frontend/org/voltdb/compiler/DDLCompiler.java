@@ -1824,7 +1824,7 @@ public class DDLCompiler {
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
-                if (! colType.isAnyIntegerType()) {
+                if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
                 }
@@ -1832,7 +1832,7 @@ public class DDLCompiler {
         } else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
-                if (! colType.isAnyIntegerType()) {
+                if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
                 }
