@@ -108,9 +108,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     /**
-     * VoltDB has an optimization to switch to IndexScan for aggregate queries from a sequential scan.
-     * However, for simplicity ,we should not match group by columns with an index that has a where clause.
+     * VoltDB has optimizations
+     *  - to switch to IndexScan for aggregate queries from a sequential scan
+     *  - to use Partial/Serial aggregation if appropriate instead of the default HASH aggregation.
+     * However, for simplicity , the first optimization do not consider partial indexes (an index that has a where clause).
      * In future, we may need to check more details on the where clause.
+     * The second optimization is available for all indexscans including ones with a partial index
      */
     public void testAggregateOptimizationWithIndex() {
         AbstractPlanNode p;
@@ -129,12 +132,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
         assertTrue(p.toExplainPlanString().contains("primary key index"));
 
-        // using the partial index
+        // using the partial index with serial aggregation
         pns = compileToFragments("SELECT A, count(B) from R2 where A > 5 and B > 3 group by A;");
         assertEquals(1, pns.size());
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
         assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
 
         // order by will help pick up the partial index
@@ -144,6 +147,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
+
+        // using the partial index with partial aggregation
+        pns = compileToFragments("SELECT C, A, MAX(B) FROM R2 WHERE A > 0 and B > 3 GROUP BY C, A");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
         assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
 
         // Partition IndexScan with HASH aggregate is optimized to use Partial aggregate -

@@ -2115,10 +2115,6 @@ public class PlanAssembler {
         if ( ! IndexType.isScannable(index.getType())) {
             return;
         }
-        if (! index.getPredicatejson().isEmpty()) {
-            // do not try to look at Partial/Sparse index
-            return;
-        }
 
         ArrayList<AbstractExpression> bindings = new ArrayList<>();
         gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
