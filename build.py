@@ -68,7 +68,8 @@ if CTX.PROFILE:
 
 # linker flags
 CTX.LDFLAGS += """ -g3"""
-CTX.LASTLDFLAGS = """ -ldl"""
+CTX.LASTLDFLAGS = """ """
+CTX.LASTIPCLDFLAGS = """ """
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -82,7 +83,7 @@ if CTX.PROFILE:
 
 # this is where the build will look for header files
 # - the test source will also automatically look in the test root dir
-CTX.INCLUDE_DIRS = ['src/ee']
+CTX.INCLUDE_DIRS = ['src/ee' ]
 CTX.SYSTEM_DIRS = ['third_party/cpp']
 
 # don't worry about checking for changes in header files in the following
@@ -358,6 +359,11 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
  sha1.cpp
 """
 
+###############################################################################
+# Some special handling for S2.
+###############################################################################
+CTX.INCLUDE_DIRS += ['%s/google-s2-geometry/include' % CTX.OUTPUT_PREFIX]
+CTX.LASTLDFLAGS += " -Lgoogle-s2-geometry/lib -ls2geo"
 
 ###############################################################################
 # SPECIFY THE TESTS

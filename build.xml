@@ -93,6 +93,10 @@
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <property name='debian.package.dir'          value='obj/debian' />
 <property name='rpm.package.dir'             value='obj/rpms' />
+<!-- S2 Geometry Definitions -->
+<property name='s2-geometry.src'             value='${vendor.cpp.dir}/google-s2-geometry' />
+<property name='s2-geometry.bin'             value='${build.dir}/google-s2-geometry' />
+<property name='s2-geometry.buildtype'       value='${build}' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -1438,8 +1442,72 @@ NATIVE EE STUFF
   </exec>
 </target>
 
+<!-- Build, test and clean the S2 library. -->
+<path id="cmakeant.lib" >
+  <pathelement location="${vendor.lib.dir}/cmakeant.jar" />
+</path>
+<!--
+    Cmake calls debug and release builds by different names.  It
+    would be possible to make them the same, but it's less work
+    to translate into Cmake's terminology here.
+
+    Which is not to say that it's not work.  Is there a better
+    way to do this?
+-->
+<condition property="s2-geometry.buildtype"
+           value="Debug">
+  <or>
+    <equals arg1="${build}" arg2="debug" />
+    <equals arg1="${build}" arg2="memcheck" />
+  </or>
+</condition>
+
+<condition property="s2-geometry.buildtype"
+           value="Release">
+  <equals arg1="${build}" arg2="release" />
+</condition>
+
+<target name="check-s2-config" >
+
+  <fail unless="s2-geometry.buildtype"
+        message="S2 library is not configured" />
+</target>
+
+<taskdef name="cmake"
+         classpathref="cmakeant.lib"
+         classname="org.iainhull.ant.CmakeBuilder" />
+
+<target name='build-s2-geometry' description="Build the S2 Geometry Library">
+  <echo message="Building the S2 Geometry Library" />
+  <echo message="Source = ${s2-geometry.src}" />
+  <echo message="Object = ${s2-geometry.bin}" />
+  <cmake srcdir="${s2-geometry.src}"
+         bindir="${s2-geometry.bin}"
+         buildtype="${s2-geometry.buildtype}">
+    <variable name="VOLTDB_THIRD_PARTY_CPP_DIR"
+              value="${vendor.cpp.dir}" />
+    <variable name="CMAKE_INSTALL_PREFIX"
+              value="${s2-geometry.bin}" />
+  </cmake>
+</target>
+
+<target name="test-s2-geometry"
+        description="Run the S2 Geometry Library Tests"
+        depends="build-s2-geometry">
+  <exec dir="${s2-geometry.bin}"
+        executable="make">
+    <arg value="test" />
+  </exec>
+</target>
+
+<target name="clean-s2-geometry"
+        description="Delete the S2 Geometry Library Object Files">
+  <delete dir="${s2-geometry.bin}" />
+</target>
+
+<!-- Build the jni library. -->
 <target name='jnicompile'
-    depends='compile, jnicompile_temp, uptodate_jni_h.check'
+    depends='compile, jnicompile_temp, uptodate_jni_h.check, build-s2-geometry'
     description="Build C++ JNI library."
     unless='uptodate_jni_h'>
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
