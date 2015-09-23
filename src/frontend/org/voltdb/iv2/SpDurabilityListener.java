@@ -125,7 +125,6 @@ public class SpDurabilityListener implements DurabilityListener {
                     m_spScheduler.offerPendingMPTasks(o.getTxnId());
                 }
             }
-            super.processChecks();
         }
 
         @Override
