@@ -444,7 +444,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static protected void validateTableOfLongs(VoltTable vt, long[][] expected) {
+    public static void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",
                         expected.length, vt.getRowCount());
