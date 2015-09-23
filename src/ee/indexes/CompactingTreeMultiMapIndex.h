@@ -121,6 +121,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
+    bool existsDo(const TableTuple *persistentTuple, TableTuple *conflictTuple) const
+    {
+        return ! findTuple(*persistentTuple).isEnd();
+    }
+
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
         cursor.m_forward = true;

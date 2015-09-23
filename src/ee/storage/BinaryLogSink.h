@@ -24,17 +24,52 @@ class PersistentTable;
 class Pool;
 class VoltDBEngine;
 class Table;
+class TempTable;
 class TableTuple;
+
 /*
  * Responsible for applying binary logs to table data
  */
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
-    void exportDRConflict(PersistentTable* srcTable, Table* dstTable, const DRRecordType &type, TableTuple &tuple);
+    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled = false);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
+
+    /**
+     * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
+     * All conflicting rows are put into @conflictRows.
+     */
+    void findConflictTuple(Table* table, TableTuple* searchTuple, TableTuple* expectedTuple, std::vector<TableTuple *>& conflictRows);
+
+    /**
+     * Report the DR conflict to frontend through conflict resolution API
+     */
+    DRResolutionType reportDRConflict(PersistentTable* table, int64_t partitionId, int64_t sequenceNumber, DRConflictType conflictType,
+            DRRecordType recordType, Table* existingRow, Table* expectedRow, Table* newRow, Table* outputRow);
+
+    /**
+     * Handle insert constraint violation
+     */
+    bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* conflictTuple, TableTuple* missingTuple, TableTuple* newTuple, int64_t uniqueId,
+            int64_t sequenceNumber, DRRecordType actionType, DRConflictType conflictType);
+
+    /**
+     * create conflict export tuple from the conflict tuple
+     */
+    void createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool,
+            TableTuple *tupleToBeWrote, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType reportType);
+
+    /**
+     * Divide update related conflict types into fine singularity
+     */
+    DRConflictType optimizeUpdateConflictType(PersistentTable* drTable, TableTuple* expectedTuple, TableTuple* newTuple, std::vector<TableTuple*> &existingRows, DRConflictType conflictType);
+
+    /**
+     * Export the conflict log to downstream
+     */
+    void exportDRConflict(Table *exportTable, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
 };
 
 

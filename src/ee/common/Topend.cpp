@@ -16,6 +16,9 @@
  */
 #include "common/Topend.h"
 #include "common/StreamBlock.h"
+#include "storage/table.h"
+#include "storage/persistenttable.h"
+#include "storage/tablefactory.h"
 
 namespace voltdb {
     DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1) {
@@ -67,11 +70,34 @@ namespace voltdb {
         return pushDRBufferRetval;
     }
 
-    int DummyTopend::reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type,
+
+    int DummyTopend::reportDRConflict(int64_t partitionId,
+            int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
             std::string tableName, Table* existingTable, Table* expectedTable,
             Table* newTable, Table* output) {
-        // TODO conform to return value contract of reportDRConflict()
+        this->conflictType = conflict_type;
+        this->actionType = action_type;
+        char signature[20];
+        this->existingTable = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTable->schema()), existingTable->getColumnNames(), signature));
+        this->expectedTable = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "expected", TupleSchema::createTupleSchema(expectedTable->schema()), expectedTable->getColumnNames(), signature));
+        this->newTable = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "new", TupleSchema::createTupleSchema(newTable->schema()), newTable->getColumnNames(), signature));
+        TableTuple tempTuple(existingTable->schema());
+        TableIterator iterator = existingTable->iterator();
+        while (iterator.next(tempTuple)) {
+            this->existingTable->insertTuple(tempTuple);
+        }
+
+        iterator = expectedTable->iterator();
+        while (iterator.next(tempTuple)) {
+            this->expectedTable->insertTuple(tempTuple);
+        }
+
+        iterator = newTable->iterator();
+        while (iterator.next(tempTuple)) {
+            this->newTable->insertTuple(tempTuple);
+        }
+
+        // TODO: implement a mock conflict resolver so we can test the resolution part of code in EE.
         return 0;
     }
 

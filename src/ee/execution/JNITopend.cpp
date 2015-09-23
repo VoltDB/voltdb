@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "reportDRConflict",
-            "(IJILjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+            "(IJIILjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_reportDRConflictMID != NULL);
@@ -505,10 +505,10 @@ static char* serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
    return backingCharArray;
 }
 
-int JNITopend::reportDRConflict(int32_t partitionId,
+int JNITopend::reportDRConflict(int64_t partitionId,
             int64_t remoteSequenceNumber, DRConflictType conflict_type,
-            string tableName, Table* existingRows, Table* expectedRows,
-            Table* newRows, Table* output) {
+            DRRecordType action_type, string tableName, Table* existingRows,
+            Table* expectedRows, Table* newRows, Table* output) {
     assert(existingRows != NULL);
     assert(expectedRows != NULL);
     assert(newRows != NULL);
@@ -520,9 +520,13 @@ int JNITopend::reportDRConflict(int32_t partitionId,
     jobject existingRowsBuffer;
     jobject expectedRowsBuffer;
     jobject newRowsBuffer;
+    std::cout << "serializing existing table" << std::endl;
     char* existingCharArray = serializeTable(m_jniEnv, existingRows, &existingRowsBuffer);
+    std::cout << "serializing expected table" << std::endl;
     char* expectedCharArray = serializeTable(m_jniEnv, expectedRows, &expectedRowsBuffer);
+    std::cout << "serializing new table" << std::endl;
     char* newCharArray = serializeTable(m_jniEnv, newRows, &newRowsBuffer);
+    std::cout << "serializing output table" << std::endl;
 
     // prepare output buffer
     size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
@@ -541,6 +545,7 @@ int JNITopend::reportDRConflict(int32_t partitionId,
         throw std::exception();
     }
 
+    std::cout << "sending report through JNI call" << std::endl;
     int32_t retval = -1;
     retval = m_jniEnv->CallStaticIntMethod(
         m_partitionDRGatewayClass,
@@ -548,12 +553,14 @@ int JNITopend::reportDRConflict(int32_t partitionId,
         partitionId,
         remoteSequenceNumber,
         conflict_type,
+        action_type,
         tableNameString,
         existingRowsBuffer,
         expectedRowsBuffer,
         newRowsBuffer,
         outputBuffer);
 
+    std::cout << "Get retval from JNI call: " << retval << std::endl;
     ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
     output->loadTuplesFrom(filledOutputSerializeInput);
 

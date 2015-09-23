@@ -139,11 +139,13 @@ public class DDLCompiler {
     private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     // Addition columns for DR conflicts table
-    private static final String [] DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS = {
-        "VOLTDB_AUTOGEN_TABLE_NAME VARCHAR",  // actual size of this column will be calculated at runtime
-        "VOLTDB_AUTOGEN_CLUSTER_ID TINYINT",
-        "VOLTDB_AUTOGEN_TIMESTAMP BIGINT",
-        "VOLTDB_AUTOGEN_OPERATION_TYPE TINYINT"
+    static final String [] DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS = {
+        "VOLTDB_AUTOGEN_DR_ROW_TYPE TINYINT",
+        "VOLTDB_AUTOGEN_DR_ACTION_TYPE TINYINT",
+        "VOLTDB_AUTOGEN_DR_CONFLICT_TYPE TINYINT",
+        "VOLTDB_AUTOGEN_DR_ROW_DECISION TINYINT",
+        "VOLTDB_AUTOGEN_DR_CLUSTER_ID TINYINT",
+        "VOLTDB_AUTOGEN_DR_TIMESTAMP BIGINT",
     };
 
     private static final Pattern drConflictsTablePattern = Pattern.compile(
@@ -241,11 +243,7 @@ public class DDLCompiler {
             if (subnode.name.equals("columns")) {
                 // Insert additional columns to DR conflicts table first
                 for (String column : DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS) {
-                    sb.append(column);
-                    if (column.startsWith("TABLE_NAME")) {
-                        sb.append("(" + node.attributes.get("name").length() + " BYTES" + ")");
-                    }
-                    sb.append(", ");
+                    sb.append(column).append(", ");
                 }
                 // Then duplicate all columns of the original table
                 int columnIdx = 0;

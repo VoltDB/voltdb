@@ -238,6 +238,7 @@ int Table::getApproximateSizeToSerialize() const {
  * performance critical path if table is large.
  */
 size_t Table::getAccurateSizeToSerialize(bool includeTotalSize) {
+    std::cout << "getAccurateSizeToSerialize() being called" << std::endl;
 
     // column header size
     size_t bytes = getColumnHeaderSizeToSerialize(includeTotalSize);
@@ -257,8 +258,10 @@ size_t Table::getAccurateSizeToSerialize(bool includeTotalSize) {
 }
 
 size_t Table::getColumnHeaderSizeToSerialize(bool includeTotalSize) const {
+    std::cout << "getColumnHeaderSizeToSerialize() being called" << std::endl;
     // table size
     size_t bytes = includeTotalSize ? sizeof(int32_t) : 0;
+    std::cout << "getColumnHeaderSizeToSerialize &m_columnHeaderData=" << &m_columnHeaderData << std::endl;
 
     // use a cache if possible
     if (m_columnHeaderData) {

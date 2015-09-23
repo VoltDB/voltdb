@@ -748,10 +748,12 @@ public class TestDDLCompiler extends TestCase {
             Table t = compiler.getCatalogDatabase().getTables().get(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + "T");
             assertNotNull(t);
             // verify table schema
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TABLE_NAME"));
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_CLUSTER_ID"));
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TIMESTAMP"));
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_OPERATION_TYPE"));
+            assertNotNull(t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[0]));
+            assertNotNull(t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[1]));
+            assertNotNull(t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[2]));
+            assertNotNull(t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[3]));
+            assertNotNull(t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[4]));
+            assertNotNull(t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[5]));
             assertNotNull(t.getColumns().get("D1"));
             assertNotNull(t.getColumns().get("D2"));
             assertNotNull(t.getColumns().get("D3"));

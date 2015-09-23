@@ -127,7 +127,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Table* getTable(int32_t tableId) const;
         Table* getTable(std::string name) const;
-        Table* getDRConflictTable(PersistentTable* drTable);
+        virtual Table* getDRConflictTable(PersistentTable* drTable);
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
 

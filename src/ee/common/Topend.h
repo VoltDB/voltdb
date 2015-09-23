@@ -65,8 +65,8 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
-    virtual int reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type,
+    virtual int reportDRConflict(int64_t partitionId,
+            int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
             std::string tableName, Table* existingTable, Table* expectedTable,
             Table* newTable, Table* output) = 0;
 
@@ -101,8 +101,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
-    int reportDRConflict(int32_t partitionId,
-                int64_t remoteSequenceNumber, DRConflictType conflict_type,
+    int reportDRConflict(int64_t partitionId,
+                int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
                 std::string tableName, Table* existingTable, Table* expectedTable,
                 Table* newTable, Table* output);
 
@@ -117,7 +117,11 @@ public:
     bool receivedDRBuffer;
     bool receivedExportBuffer;
     int64_t pushDRBufferRetval;
-
+    DRConflictType conflictType;
+    DRRecordType actionType;
+    boost::shared_ptr<Table> existingTable;
+    boost::shared_ptr<Table> expectedTable;
+    boost::shared_ptr<Table> newTable;
 };
 
 }
