@@ -882,4 +882,15 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    protected static void truncateTables(Client client, String[] tables) throws IOException, ProcCallException {
+        for (String tb : tables) {
+            truncateTables(client, tb);
+        }
+    }
+
+    protected static void truncateTables(Client client, String tb) throws IOException, ProcCallException {
+        client.callProcedure("@AdHoc", "Truncate table " + tb);
+        validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
+    }
+
 }
