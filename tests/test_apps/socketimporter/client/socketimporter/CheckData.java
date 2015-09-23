@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package socketimporter;
+package socketimporter.client.socketimporter;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,8 +43,8 @@ public class CheckData {
     private static final int VALUE = 1;
     private static final int KEY = 0;
 
-    private static final String MY_SELECT_PROCEDURE = "IMPORTTABLE.select";
-    private static final String MY_DELETE_PROCEDURE = "IMPORTTABLE.delete";
+    private static final String MY_SELECT_PROCEDURE = "IMPORTTABLE2.select";
+    private static final String MY_DELETE_PROCEDURE = "IMPORTTABLE2.delete";
 
     public CheckData(Queue<Pair<Long, Long>> q, Queue<Pair<Long, Long>> dq, Client c) {
         m_client = c;

@@ -34,12 +34,12 @@
  * the database has time to complete all socket importer input transactions.
  */
 
-package socketimporter;
-
-import com.google_voltpatches.common.net.HostAndPort;
+package socketimporter.client.socketimporter;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.util.HashMap;
@@ -51,10 +51,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class AsyncBenchmark {
 
@@ -63,18 +68,13 @@ public class AsyncBenchmark {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    // potential return codes (synced with Vote procedure)
-    static final long VOTE_SUCCESSFUL = 0;
-    static final long ERR_INVALID_CONTESTANT = 1;
-    static final long ERR_VOTER_OVER_VOTE_LIMIT = 2;
-
     // queue structure to hold data as it's written, so we can check it all get's into the database
     static Queue<Pair<Long,Long>> queue = new LinkedBlockingQueue<Pair<Long,Long>>();
     static Queue<Pair<Long,Long>> dqueue = new LinkedBlockingQueue<Pair<Long,Long>>();
     static boolean importerDone = false;
 
     // validated command line configuration
-    final Config config;
+    static Config config;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -92,6 +92,9 @@ public class AsyncBenchmark {
     static final AtomicLong socketWriteExceptions = new AtomicLong(0);
     static final AtomicLong finalInsertCount = new AtomicLong(0);
 
+    final ClientStatsContext periodicStatsContext;
+    final ClientStatsContext fullStatsContext;
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -107,10 +110,10 @@ public class AsyncBenchmark {
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for database queuries")
+        @Option(desc = "Comma separated list of the form server[:port] to connect to database for queuries")
         String servers = "localhost";
 
-        @Option(desc = "Comma separated list of the form server[:port] to connect to for streaming import")
+        @Option(desc = "Comma separated list of the form server[:port] to connect to socket stream")
         String sockservers = "localhost";
 
         @Option(desc = "Report latency for async benchmark run.")
@@ -119,11 +122,15 @@ public class AsyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Performance test only.")
+        boolean perftest = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (perftest && statsfile.equals("")) statsfile = "socketimporter.csv";
         }
     }
 
@@ -134,14 +141,16 @@ public class AsyncBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public AsyncBenchmark(Config config) {
-        this.config = config;
+        AsyncBenchmark.config = config;
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(config.getConfigDumpString());
         if(config.latencyreport) {
-            System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
+            System.out.println("NOTICE: Not implemented in this benchmark client.\n");
         }
     }
 
@@ -175,9 +184,10 @@ public class AsyncBenchmark {
      *
      * @param servers A comma separated list of servers using the hostname:port
      * syntax (where :port is optional).
+     * @param port
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    static void connect(String servers) throws InterruptedException {
+    static void connect(String servers, final boolean perftest) throws InterruptedException {
         System.out.println("Connecting to Socket Streaming Interface...");
 
         String[] serverArray = servers.split(",");
@@ -188,11 +198,17 @@ public class AsyncBenchmark {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    int port = 7001;
-                    HostAndPort hap = HostAndPort.fromString(server);
-                    if (hap.hasPort()) {
-                        port = hap.getPort();
+                    int port;
+                    if (perftest) {
+                        port = 7001;
+                    } else {
+                        port = 7002;
                     }
+                    HostAndPort hap = HostAndPort.fromString(server);
+                    //System.out.println(" hap--toString: " + hap.toString());
+//                    if (hap.hasPort()) {
+//                        port = hap.getPort();
+//                    }
                     OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), port);
                     haplist.put(hap, writer);
                     connections.countDown();
@@ -241,6 +257,21 @@ public class AsyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
+        try {
+            ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+            long thrup;
+
+            thrup = stats.getTxnThroughput();
+            long rows = 0;
+            System.out.println(String.format("Import Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
+                    thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
+                    stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
+        } catch (Exception e) {
+            System.out.println("Exception in printStatistics" + e);
+            StringWriter writer = new StringWriter();
+            e.printStackTrace( new PrintWriter(writer,true ));
+            System. out.println("exeption stack is :\n"+writer.toString());
+        }
     }
 
     /**
@@ -250,6 +281,9 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults() throws Exception {
+        ClientStats stats = fullStatsContext.fetch().getStats();
+        // Write stats to file if requested
+        client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**
@@ -277,11 +311,17 @@ public class AsyncBenchmark {
             System.out.println("Warming up...");
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
-                long t = System.currentTimeMillis();
                 long key = rnd.nextLong();
-                Pair<Long,Long> p = new Pair<Long,Long>(key, t);
-                queue.offer(p);
-                String s = key + "," + t + "\n";
+                String s;
+                if (config.perftest) {
+                    String valString = RandomStringUtils.randomAlphanumeric(16);
+                    s = key + "," + valString + "\n";
+                } else {
+                    long t = System.currentTimeMillis();
+                    Pair<Long,Long> p = new Pair<Long,Long>(key, t);
+                    queue.offer(p);
+                    s = key + "," + t + "\n";
+                }
                 writeFully(s, hap, warmupEndTime);
                 icnt++;
             }
@@ -290,25 +330,35 @@ public class AsyncBenchmark {
             benchmarkStartTS = System.currentTimeMillis();
             schedulePeriodicStats();
 
-
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
             System.out.println("\nRunning benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
-                long t = System.currentTimeMillis();
                 long key = rnd.nextLong();
-                Pair<Long,Long> p = new Pair<Long,Long>(key, t);
-                queue.offer(p);
-                String s = key + "," + t + "\n";
+                String s;
+                if (config.perftest) {
+                    String valString = RandomStringUtils.randomAlphanumeric(16);
+                    s = key + "," + valString + "\n";
+                } else {
+                    long t = System.currentTimeMillis();
+                    Pair<Long,Long> p = new Pair<Long,Long>(key, t);
+                    queue.offer(p);
+                    s = key + "," + t + "\n";
+                }
                 writeFully(s, hap, benchmarkEndTime);
                 icnt++;
             }
             haplist.get(hap).flush();
+        } catch (Exception e) {
+            System.out.println("Exception in printStatistics" + e);
+            StringWriter writer = new StringWriter();
+            e.printStackTrace( new PrintWriter(writer,true ));
+            System. out.println("exeption stack is :\n"+writer.toString());
         } finally {
             // cancel periodic stats printing
-            timer.cancel();
+            if (timer != null) timer.cancel();
             finalInsertCount.addAndGet(icnt);
             // print the summary results
             printResults();
@@ -323,6 +373,7 @@ public class AsyncBenchmark {
                 socketWrites.incrementAndGet();
                 return;
             } catch (IOException ex) {
+                System.out.println("Exception: " + ex);
                 OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
                 haplist.put(hap, writer);
                 socketWriteExceptions.incrementAndGet();
@@ -367,7 +418,7 @@ public class AsyncBenchmark {
         config.parse(AsyncBenchmark.class.getName(), args);
 
         // connect to one or more servers, loop until success
-        connect(config.sockservers);
+        connect(config.sockservers, config.perftest);
         dbconnect(config.servers);
 
         CountDownLatch cdl = new CountDownLatch(haplist.size());
@@ -376,20 +427,21 @@ public class AsyncBenchmark {
             BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, hap);
             runner.start();
         }
-
-        // start checking the table that's being populated by the socket injester(s)
-
-        System.out.println("Starting CheckData methods. Queue size: " + queue.size());
-        CheckData checkDB = new CheckData(queue, dqueue, client);
-        while (queue.size() == 0) {
-            try {
-                Thread.sleep(1000);                 //1000 milliseconds is one second.
-            } catch(InterruptedException ex) {
-                Thread.currentThread().interrupt();
+        CheckData checkDB = null;
+        if (!config.perftest) {
+            // start checking the table that's being populated by the socket injester(s)
+            System.out.println("Starting CheckData methods. Queue size: " + queue.size());
+            checkDB = new CheckData(queue, dqueue, client);
+            while (queue.size() == 0) {
+                try {
+                    Thread.sleep(1000);                 //1000 milliseconds is one second.
+                } catch(InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
             }
+            System.out.println("Starting CheckData methods. Queue size: " + queue.size());
+            checkDB.processQueue();
         }
-        System.out.println("Starting CheckData methods. Queue size: " + queue.size());
-        checkDB.processQueue();
         cdl.await();
 
         // close socket connections...
@@ -399,22 +451,25 @@ public class AsyncBenchmark {
              writer.close();
          }
 
-        System.out.println("...starting timed check looping... " + queue.size());
-        // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
-        final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
-        System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
-
-        while (queueEndTime > System.currentTimeMillis()) {
-            checkDB.processQueue();
+        if (!config.perftest) {
+            System.out.println("...starting timed check looping... " + queue.size());
+            // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
+            final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
+            System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
+            while (queueEndTime > System.currentTimeMillis()) {
+                checkDB.processQueue();
+            }
         }
         client.drain();
 
-        System.out.println("Queued tuples remaining: " + queue.size());
+        if (!config.perftest) {
+            System.out.println("Queued tuples remaining: " + queue.size());
+            System.out.println("Rows checked against database: " + rowsChecked.get());
+            System.out.println("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
+        }
         System.out.println("Total rows added by Socket Injester: " + finalInsertCount.get());
         System.out.println("Socket write count: " + socketWrites.get());
         System.out.println("Socket write exception count: " + socketWriteExceptions.get());
-        System.out.println("Rows checked against database: " + rowsChecked.get());
-        System.out.println("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
 
         System.exit(0);
     }
