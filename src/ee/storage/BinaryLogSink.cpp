@@ -301,8 +301,8 @@ void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTabl
 
     NValue tableName = ValueFactory::getStringValue(drTable->name());
     tempTuple.setNValue(0, tableName);  // Table Name
-    tempTuple.setNValue(1, ValueFactory::getTinyIntValue((ExecutorContext::getDRTimestampFromHiddenNValue(hiddenColumn))));       // Cluster Id
-    tempTuple.setNValue(2, ValueFactory::getBigIntValue(ExecutorContext::getClusterIdFromHiddenNValue(hiddenColumn)));   // Timestamp
+    tempTuple.setNValue(1, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenColumn))));       // Cluster Id
+    tempTuple.setNValue(2, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenColumn)));   // Timestamp
     tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
     tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
 

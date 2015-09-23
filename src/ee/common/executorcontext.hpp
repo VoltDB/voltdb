@@ -127,13 +127,12 @@ class ExecutorContext {
 
     static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        std::cout << "getDRTimestampForHiddenNValue hiddenValue=" << hiddenValue << std::endl;
         return ((hiddenValue & HIDDEN_VALUE_TIMESTAMP_MASK) >> 9);
     }
 
-    static int32_t getClusterIdFromHiddenNValue(NValue &value) {
+    static int8_t getClusterIdFromHiddenNValue(NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        return hiddenValue >> 49;
+        return static_cast<int8_t>(hiddenValue >> 49);
     }
 
     UndoQuantum *getCurrentUndoQuantum() {
