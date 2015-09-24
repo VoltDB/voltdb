@@ -558,4 +558,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getBatchTimeout() {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
+
+    @Override
+    public boolean setDRStreamState(boolean enabled) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
 }

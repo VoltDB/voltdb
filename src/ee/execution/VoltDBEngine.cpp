@@ -1909,6 +1909,18 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         }
         break;
     }
+    case TASK_TYPE_SET_DR_STREAM_STATE: {
+        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+        bool targetState = static_cast<bool>(taskInfo.readByte());
+        bool previousState = m_drStream->m_enabled;
+        m_drStream->m_enabled = targetState;
+        if (m_drReplicatedStream) {
+            assert(m_drReplicatedStream->m_enabled == previousState);
+            m_drReplicatedStream->m_enabled = targetState;
+        }
+        m_resultOutput.writeByte(static_cast<int8_t>(previousState));
+        break;
+    }
     default:
         throwFatalException("Unknown task type %d", taskType);
     }

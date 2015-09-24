@@ -180,6 +180,13 @@ public class SysProcFragmentId
     public static final long PF_matchesHashinator = 250;
     public static final long PF_matchesHashinatorResults = 251;
 
+    // @ApplyBinaryLogMP
     public static final long PF_applyBinaryLog = 260;
     public static final long PF_applyBinaryLogAggregate = 261;
+
+    // @ActiveActiveCoordinateSync
+    public static final long PF_activeActiveSyncBegin = 270;
+    public static final long PF_activeActiveSyncBeginAggregate = 271;
+    public static final long PF_activeActiveSyncEnd = 272;
+    public static final long PF_activeActiveSyncEndAggregate = 273;
 }

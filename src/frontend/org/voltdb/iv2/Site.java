@@ -1327,4 +1327,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getBatchTimeout() {
         return m_ee.getBatchTimeout();
     }
+
+    @Override
+    public boolean setDRStreamState(boolean enabled) {
+        ByteBuffer b = ByteBuffer.allocate(1);
+        b.put((byte)(enabled ? 1 : 0));
+        b = ByteBuffer.wrap(m_ee.executeTask(TaskType.SET_DR_STREAM_STATE, b));
+        return b.get() != 0;
+    }
 }
