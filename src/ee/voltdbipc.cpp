@@ -1562,8 +1562,10 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
 }
 
 int VoltDBIPC::reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
-            std::string tableName, voltdb::Table* input, voltdb::Table* output) {
+        int64_t remoteSequenceNumber, voltdb::DRConflictType conflict_type,
+        std::string tableName, voltdb::Table* exisitingTable,
+        voltdb::Table* expectedTable, voltdb::Table* newTable,
+        voltdb::Table* output) {
     return 0;
 }
 
