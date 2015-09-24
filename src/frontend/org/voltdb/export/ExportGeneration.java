@@ -61,6 +61,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.zk.StateMachineInstance;
 import org.voltcore.zk.SynchronizedStatesManager;
@@ -441,7 +442,7 @@ public class ExportGeneration {
     //The task is done when all partitions are seen.
     public class EnsureMailboxSetupTask extends StateMachineInstance {
         private boolean m_done = false;
-        private boolean m_requestPending = false;
+        private final AtomicBoolean m_requestPending = new AtomicBoolean(false);
         private boolean m_taskStarted = false;
         private final Set<Integer> m_partitions = new HashSet<Integer>();
         private final Set<Integer> m_done_partitions = new HashSet<Integer>();
@@ -469,12 +470,13 @@ public class ExportGeneration {
         public void setCompleted(int i) {
             m_partitions.remove(i);
             m_done_partitions.add(i);
-            if (m_partitions.isEmpty() && m_requestPending) {
+            if (m_partitions.isEmpty() && m_requestPending.compareAndSet(true, false)) {
                 if (!m_done) {
                     requestedTaskComplete(m_dummyBuffer);
+                    exportLog.info("EnsureMailboxSetupTask Task complete: " + m_partitions + " Done: " + m_done_partitions);
                 }
             } else {
-                exportLog.info("Task not complete: " + m_partitions + " Done: " + m_done_partitions);
+                exportLog.info("EnsureMailboxSetupTask Task not complete: " + m_partitions + " Done: " + m_done_partitions);
             }
         }
 
@@ -484,10 +486,11 @@ public class ExportGeneration {
 
         @Override
         protected void taskRequested(ByteBuffer proposedTask) {
-            m_requestPending = true;
             if (m_partitions.isEmpty()) {
                 requestedTaskComplete(m_dummyBuffer);
+                return;
             }
+            m_requestPending.set(true);
         }
 
         @Override
