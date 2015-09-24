@@ -202,7 +202,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             // For now, for partitioning purposes, leave constants for string columns as they are,
             // and process matches for integral columns via constant-to-string-to-bigInt conversion.
             String stringValue = ((ConstantValueExpression) constExpr).getValue();
-            if (voltType.isInteger()) {
+            if (voltType.isBackendIntegerType()) {
                 try {
                     return new Long(stringValue);
                 } catch (NumberFormatException nfe) {
@@ -344,7 +344,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return;
         }
 
-        if (neededType.isInteger()) {
+        if (neededType.isBackendIntegerType()) {
             long value = 0;
             try {
                 if (getValueType() == VoltType.VARBINARY) {
@@ -410,7 +410,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
             return;
         }
-        if (columnType.isInteger()) {
+        if (columnType.isBackendIntegerType()) {
             columnType = VoltTypeUtil.getNumericLiteralType(columnType, getValue());
 
             m_valueType = columnType;

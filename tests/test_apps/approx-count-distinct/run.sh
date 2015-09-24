@@ -76,7 +76,7 @@ rm -f *.jar
 rm -f procedures/approxcountdistinct/*.class
 rm -f client/approxcountdistinct/*.class
 
-javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/approxcountdistinct/*.java
+javac -classpath $APPCLASSPATH procedures/approxcountdistinct/*.java
 if (($? != 0)); then
     echo "Error compiling procedures"
     exit 1
@@ -89,7 +89,7 @@ if (($? != 0)); then
 fi
 
 
-javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/approxcountdistinct/*.java
+javac -classpath $CLIENTCLASSPATH client/approxcountdistinct/*.java
 if (($? != 0)); then
     echo "Error compiling client"
     exit 1

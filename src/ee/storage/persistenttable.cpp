@@ -864,8 +864,7 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  *  Indexes and views have been destroyed first.
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
-    TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
-    deleteTupleStorage(target, block, true); // also frees object columns along with empty tuple block storage
+    deleteTupleStorage(target); // also frees object columns
 }
 
 /*

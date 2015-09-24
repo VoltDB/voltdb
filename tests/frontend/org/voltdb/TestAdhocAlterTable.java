@@ -26,6 +26,7 @@ package org.voltdb;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocAlterTable extends AdhocDDLTestBase {
@@ -1122,4 +1123,158 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testAlterTableWithViews() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "NUM1 integer," +
+                "VAL integer, " +
+                "ID integer not null," +
+                "NUM2 integer," +
+                "constraint FOO_PK_TREE primary key (ID)" +
+                ");\n" +
+                "create view FOOVIEW (VAL, TOTAL) as " +
+                "select VAL, COUNT(*) from FOO group by VAL;" +
+
+                "create table BAR (" +
+                "NUM1 integer," +
+                "VAL integer, " +
+                "ID integer not null," +
+                "NUM2 integer," +
+                "constraint BAR_PK_TREE primary key (ID)" +
+                ");\n" +
+                "create view BARVIEW (VAL, TOTAL) as " +
+                "select VAL, COUNT(*) from BAR where VAL >= 1 group by VAL;"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            //
+            // Add a new column succeed
+            //
+            checkAlterTableSucceed("alter table FOO add column NEWCOL varchar(50);");
+            assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table FOO drop column NEWCOL;");
+            assertFalse(doesColumnExist("FOO", "NEWCOL"));
+
+            //
+            // Extend a column not in the view succeed
+            //
+            checkAlterTableSucceed("alter table FOO alter column NUM1 bigint;");
+            assertTrue(verifyTableColumnType("FOO", "NUM1", "BIGINT"));
+
+            //
+            // Extend a column in the view failed
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableFailed("alter table FOO alter column VAL bigint;", "dependent objects exist");
+            assertTrue(verifyTableColumnType("FOO", "VAL", "INTEGER"));
+
+            //
+            // DROP a column in the view failed (the first column dropped)
+            //
+            checkAlterTableFailed("alter table FOO drop column VAL;", "column is referenced in");
+            assertTrue(doesColumnExist("FOO", "VAL"));
+
+            //
+            // DROP a column not in the view failed (the first column dropped)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableSucceed("alter table FOO drop column NUM1;");
+            assertFalse(doesColumnExist("FOO", "NUM1"));
+
+            //
+            // DROP a column not in the view failed (the first column dropped)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableFailed("alter table BAR drop column NUM1;",
+                    "May not dynamically modify field 'predicate' of schema object 'MaterializedViewInfo{BARVIEW}'");
+            assertTrue(doesColumnExist("BAR", "NUM1"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table FOO drop column NUM2;");
+            assertFalse(doesColumnExist("FOO", "NUM2"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table BAR drop column NUM2;");
+            assertFalse(doesColumnExist("BAR", "NUM2"));
+
+            //
+            // Rename the source table failed
+            //
+            checkAlterTableFailed("alter table FOO rename to FOO1;", "AdHoc DDL ALTER/RENAME is not yet supported");
+            assertTrue(verifyTableColumnType("FOO", "VAL", "INTEGER"));
+
+            //
+            // Add some data to make sure the view is correct
+            //
+            VoltTable vt;
+            m_client.callProcedure("@AdHoc", "insert into FOO values(1, 1);");
+            m_client.callProcedure("@AdHoc", "insert into FOO values(1, 2);");
+            m_client.callProcedure("@AdHoc", "insert into FOO values(2, 3);");
+            m_client.callProcedure("@AdHoc", "insert into FOO values(-2, 4);");
+
+            vt = m_client.callProcedure("@AdHoc", "select val, total from fooview order by 1, 2;").getResults()[0];
+            RegressionSuite.validateTableOfLongs(vt, new long[][]{{-2, 1}, {1, 2}, {2, 1}});
+
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, 1, 1);");
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, 1, 2);");
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, 2, 3);");
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, -2, 4);");
+
+            vt = m_client.callProcedure("@AdHoc", "select val, total from barview order by 1, 2;").getResults()[0];
+            // BARVIEW has "where VAL >= 1" clause, so the "{-2, 1}" row is not here
+            RegressionSuite.validateTableOfLongs(vt, new long[][]{{1,2}, {2,1}});
+
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    private void checkAlterTableFailed(String sql, String errorMsg) throws Exception {
+        try {
+            m_client.callProcedure("@AdHoc", sql);
+            fail();
+        }
+        catch (ProcCallException pce) {
+            assertTrue(pce.getMessage().contains(errorMsg));
+        }
+    }
+
+    private void checkAlterTableSucceed(String sql) throws Exception {
+        try {
+            m_client.callProcedure("@AdHoc", sql);
+        }
+        catch (ProcCallException pce) {
+            fail(sql + " Should have succeed.");
+        }
+    }
+
 }
