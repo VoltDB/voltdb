@@ -88,11 +88,13 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -104,6 +106,7 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -1802,6 +1805,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Check param deserialization policy for sysprocs
         if ((error = m_invocationValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
             return error;
+        }
+
+        //Check individual query timeout value settings with privilege
+        int batchTimeout = task.getBatchTimeout();
+        if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
+            if (! user.hasPermission(Permission.ADMIN)) {
+                int systemTimeout = catalogContext.cluster.getDeployment().
+                        get("deployment").getSystemsettings().get("systemsettings").getQuerytimeout();
+                if (systemTimeout != ExecutionEngine.NO_BATCH_TIMEOUT_VALUE &&
+                        (batchTimeout > systemTimeout || batchTimeout == ExecutionEngine.NO_BATCH_TIMEOUT_VALUE)) {
+                    log.info("The attempted individual query timeout " + batchTimeout + " override was ignored "
+                            + "because the connection lacks ADMIN privileges.");
+                    task.setBatchTimeout(systemTimeout);
+                }
+            }
         }
 
         if (catProc.getSystemproc()) {
