@@ -59,6 +59,26 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     }
 
+    // Keep sync with EE DRConflictType at types.h
+    public static enum DRConflictType {
+        DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
+        DR_CONFLICT_MISSING_TUPLE,
+        DR_CONFLICT_TIMESTAMP_MISMATCH;
+
+        public static final ImmutableMap<Integer, DRConflictType> conversion;
+        static {
+            ImmutableMap.Builder<Integer, DRConflictType> b = ImmutableMap.builder();
+            for (DRConflictType t : DRConflictType.values()) {
+                b.put(t.ordinal(), t);
+            }
+            conversion = b.build();
+        }
+
+        public static DRConflictType valueOf(int ordinal) {
+            return conversion.get(ordinal);
+        }
+    }
+
     public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
 
     /**
@@ -144,7 +164,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     };
 
-    public int processDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType,
+    public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
                                  String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
                                  ByteBuffer newTable, ByteBuffer output) {
         BBContainer cont = DBBPool.wrapBB(existingTable);
@@ -291,7 +311,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, drConflictType,
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber,DRConflictType.valueOf(drConflictType),
                 tableName, existingTable, expectedTable, newTable, output);
     }
 }

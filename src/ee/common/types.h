@@ -523,7 +523,7 @@ enum TupleSerializationFormat { TUPLE_SERIALIZATION_NATIVE = 0, TUPLE_SERIALIZAT
 enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 
 // ------------------------------------------------------------------
-// Types of DR conflict
+// Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)
 // ------------------------------------------------------------------
 enum DRConflictType {
     DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
