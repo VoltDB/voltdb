@@ -144,11 +144,21 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     };
 
-    public int processDRConflict(int partitionId, long remoteSequenceNumber, long remoteUniqueId,
-                                 String tableName, ByteBuffer input, ByteBuffer output) {
-        final BBContainer cont = DBBPool.wrapBB(input);
+    public int processDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType,
+                                 String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
+                                 ByteBuffer newTable, ByteBuffer output) {
+        BBContainer cont = DBBPool.wrapBB(existingTable);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
+
+        cont = DBBPool.wrapBB(expectedTable);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
+
+        cont = DBBPool.wrapBB(newTable);
+        DBBPool.registerUnsafeMemory(cont.address());
+        cont.discard();
+
         return 0;
     }
 
@@ -274,12 +284,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
-    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, long remoteUniqueId,
-                                       String tableName, ByteBuffer input, ByteBuffer output) {
+    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType,
+                                       String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
+                                       ByteBuffer newTable, ByteBuffer output) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, remoteUniqueId, tableName, input, output);
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, drConflictType,
+                tableName, existingTable, expectedTable, newTable, output);
     }
 }
