@@ -38,6 +38,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
@@ -73,8 +74,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
-    private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
+    private final Map<Long, InternalCallback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, InternalCallback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
+    // Maintain internal connection ids per caller id. This is useful when collecting statistics
+    // so that information can be grouped per user of this Connection.
+    private final ConcurrentMap<String, Long> m_internalConnectionIds = new ConcurrentHashMap<>();
 
     private InternalConnectionContext m_context;
     private ProcedureCallback m_proccb;
@@ -235,6 +239,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
+        }
+
+        if (!m_internalConnectionIds.containsKey(context.getName())) {
+            m_internalConnectionIds.putIfAbsent(context.getName(), VoltProtocolHandler.getNextConnectionId());
         }
         ExecutorService executor = m_partitionExecutor.get(partition);
         try {
@@ -426,6 +434,17 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        InternalCallback callback = m_callbacks.get(clientHandle);
+        if (callback==null) {
+            m_logger.warn("Could not find caller details for client handle " + clientHandle + ". Using internal adapter name");
+            return getHostnameOrIP();
+        } else {
+            return callback.getInternalContext().getName();
+        }
+    }
+
+    @Override
     public int getRemotePort() {
         return -1;
     }
@@ -438,6 +457,23 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     @Override
     public long connectionId() {
         return m_connectionId;
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        InternalCallback callback = m_callbacks.get(clientHandle);
+        if (callback==null) {
+            m_logger.warn("Could not find caller details for client handle " + clientHandle + ". Using internal adapter level connection id");
+            return connectionId();
+        }
+
+        Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
+        if (internalId==null) {
+            m_logger.warn("Could not find internal connection id for client handle " + clientHandle + ". Using internal adapter level connection id");
+            return connectionId();
+        } else {
+            return internalId;
+        }
     }
 
     @Override
