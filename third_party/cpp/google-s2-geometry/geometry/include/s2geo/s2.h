@@ -12,12 +12,12 @@ using std::reverse;
 #include <unordered_map>
 using std::unordered_map;
 // To have template struct hash<T> defined
-#include "base/basictypes.h"
-#include "base/logging.h"
-#include "base/macros.h"
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
-#include "util/math/vector3-inl.h"
-#include "util/math/matrix3x3.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/macros.h"
+#include "s2geo/base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
+#include "s2geo/util/math/vector3-inl.h"
+#include "s2geo/util/math/matrix3x3.h"
 
 /// An S2Point represents a point on the unit sphere as a 3D vector.  Usually
 /// points are normalized to be unit length, but some methods do not require

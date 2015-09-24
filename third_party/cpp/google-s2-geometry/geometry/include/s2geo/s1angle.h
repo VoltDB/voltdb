@@ -7,8 +7,8 @@
 using std::ostream;
    /// to forward declare ostream
 #include <math.h>
-#include "base/basictypes.h"
-#include "util/math/mathutil.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/util/math/mathutil.h"
 #include "s2geo/s2.h"
 
 class S2LatLng;

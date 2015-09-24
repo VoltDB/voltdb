@@ -17,11 +17,11 @@ using std::multiset;
 using std::vector;
 
 
-#include "base/commandlineflags.h"
+#include "s2geo/base/commandlineflags.h"
 #include "s2geo/s2polygon.h"
 
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
-#include "util/coding/coder.h"
+#include "s2geo/base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
+#include "s2geo/util/coding/coder.h"
 #include "s2geo/s2edgeindex.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"

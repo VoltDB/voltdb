@@ -3,7 +3,7 @@
 #include <string>
 using std::string;
 
-#include "util/coding/varint.h"
+#include "s2geo/util/coding/varint.h"
 
 #ifndef COMPILER_MSVC
 const int Varint::kMax32;

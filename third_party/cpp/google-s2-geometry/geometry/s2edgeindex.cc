@@ -68,8 +68,8 @@ using std::pair;
 using std::make_pair;
 
 
-#include "base/commandlineflags.h"
-#include "base/logging.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2edgeutil.h"
 #include "s2geo/s2polyline.h"

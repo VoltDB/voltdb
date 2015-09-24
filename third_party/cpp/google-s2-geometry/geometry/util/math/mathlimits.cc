@@ -3,9 +3,9 @@
 ///
 ///
 
-#include "util/math/mathlimits.h"
+#include "s2geo/util/math/mathlimits.h"
 
-#include "base/integral_types.h"
+#include "s2geo/base/integral_types.h"
 
 /// MSVC++ 2005 thinks the header declaration was a definition, and
 /// erroneously flags these as a duplicate definition.

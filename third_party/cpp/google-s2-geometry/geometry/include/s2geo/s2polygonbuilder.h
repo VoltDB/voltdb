@@ -17,11 +17,11 @@ using std::make_pair;
 #include <vector>
 using std::vector;
 
-#include "base/basictypes.h"
-#include "base/scoped_ptr.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/scoped_ptr.h"
 #include "s2geo/s2.h"
 #include "s2geo/s1angle.h"
-#include "util/math/matrix3x3.h"
+#include "s2geo/util/math/matrix3x3.h"
 
 class S2Loop;
 class S2Polygon;

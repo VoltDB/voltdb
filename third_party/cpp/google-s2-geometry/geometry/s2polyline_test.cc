@@ -6,11 +6,11 @@
 using std::vector;
 
 
-#include "base/commandlineflags.h"
-#include "base/scoped_ptr.h"
-#include "base/stringprintf.h"
-#include "testing/base/public/gunit.h"
-#include "util/coding/coder.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/scoped_ptr.h"
+#include "s2geo/base/stringprintf.h"
+#include "s2geo/testing/base/public/gunit.h"
+#include "s2geo/util/coding/coder.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2latlng.h"
 #include "s2geo/s2testing.h"

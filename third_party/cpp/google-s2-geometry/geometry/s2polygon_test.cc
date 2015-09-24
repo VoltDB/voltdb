@@ -18,14 +18,14 @@ using std::string;
 using std::vector;
 
 
-#include "base/commandlineflags.h"
-#include "base/logging.h"
-#include "base/macros.h"
-#include "base/scoped_ptr.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/macros.h"
+#include "s2geo/base/scoped_ptr.h"
 #include "s2geo/strings/stringprintf.h"
-/// #include "testing/base/public/benchmark.h"
-#include "testing/base/public/gunit.h"
-#include "util/coding/coder.h"
+/// #include "s2geo/testing/base/public/benchmark.h"
+#include "s2geo/testing/base/public/gunit.h"
+#include "s2geo/util/coding/coder.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cellunion.h"
@@ -35,8 +35,8 @@ using std::vector;
 #include "s2geo/s2polyline.h"
 #include "s2geo/s2regioncoverer.h"
 #include "s2geo/s2testing.h"
-#include "util/math/matrix3x3.h"
-#include "util/math/matrix3x3-inl.h"
+#include "s2geo/util/math/matrix3x3.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
 
 DEFINE_int32(num_loops_per_polygon_for_bm,
              10,

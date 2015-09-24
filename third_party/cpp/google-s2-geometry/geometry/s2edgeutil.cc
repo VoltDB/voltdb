@@ -8,7 +8,7 @@ using std::reverse;
 
 #include "s2geo/s2edgeutil.h"
 
-#include "base/logging.h"
+#include "s2geo/base/logging.h"
 
 bool S2EdgeUtil::SimpleCrossing(S2Point const& a, S2Point const& b,
                                 S2Point const& c, S2Point const& d) {

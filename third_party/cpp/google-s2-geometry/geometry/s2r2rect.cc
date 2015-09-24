@@ -2,7 +2,7 @@
 
 #include "s2geo/s2r2rect.h"
 
-#include "base/logging.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/r1interval.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2cap.h"

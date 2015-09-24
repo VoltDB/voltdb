@@ -53,17 +53,17 @@ using namespace std;
 /// string headers depend on it.
 static const int kFastToBufferSize =       32;
 
-#include "base/basictypes.h"
-#include "base/logging.h"  // for CHECK
-#include "base/strtoint.h"
-#include "base/int128.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"  // for CHECK
+#include "s2geo/base/strtoint.h"
+#include "s2geo/base/int128.h"
 #include "ascii_ctype.h"
 ///#include "charset.h"
 ///#include "escaping.h"
 ///#include "host_port.h"
 #include "stringprintf.h"
-#include "base/stl_decl.h"
-#include "base/port.h"
+#include "s2geo/base/stl_decl.h"
+#include "s2geo/base/port.h"
 ///#include "endian.h"
 
 /// ----------------------------------------------------------------------

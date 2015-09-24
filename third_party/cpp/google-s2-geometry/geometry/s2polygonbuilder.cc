@@ -34,13 +34,13 @@ using std::multiset;
 using std::vector;
 
 
-#include "base/logging.h"
-#include "base/macros.h"
-#include "base/scoped_ptr.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/macros.h"
+#include "s2geo/base/scoped_ptr.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2cellid.h"
 #include "s2geo/s2polygon.h"
-#include "util/math/matrix3x3-inl.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
 
 void S2PolygonBuilderOptions::set_undirected_edges(bool undirected_edges) {
   undirected_edges_ = undirected_edges;

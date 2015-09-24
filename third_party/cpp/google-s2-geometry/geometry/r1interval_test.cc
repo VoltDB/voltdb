@@ -4,7 +4,7 @@
 
 #include "s2geo/r1interval.h"
 
-#include "testing/base/public/gunit.h"
+#include "s2geo/testing/base/public/gunit.h"
 
 static void TestIntervalOps(R1Interval const& x, R1Interval const& y,
                             const char* expected) {
@@ -101,8 +101,8 @@ TEST(R1Interval, TestBasic) {
   EXPECT_TRUE(R1Interval(0,-2).Union(R1Interval(5,3)).is_empty());
   R1Interval u{unit.Union(unit)};
   std::cout << "unit.Union(unit) == [" << u.lo() << ", " << u.hi() << "]\n";
-  EXPECT_EQ(0, unit.lo());
-  EXPECT_EQ(1, unit.hi());
+  EXPECT_EQ(0, u.lo());
+  EXPECT_EQ(1, u.hi());
   std::cout << "is equal: " << (unit == u ? "true" : "false") << "\n";
   EXPECT_EQ(unit, unit.Union(unit));
   EXPECT_EQ(R1Interval(-1, 1), unit.Union(negunit));

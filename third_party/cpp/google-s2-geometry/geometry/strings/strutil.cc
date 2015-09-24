@@ -42,12 +42,12 @@ using std::string;
 using std::vector;
 
 
-#include "base/logging.h"
-#include "base/scoped_ptr.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/scoped_ptr.h"
 ///#include "strutil-inl.h"
 ///#include "third_party/utf/utf.h"  // for runetochar
-///#include "util/gtl/stl_util-inl.h"  // for string_as_array
-///#include "util/hash/hash.h"
+///#include "s2geo/util/gtl/stl_util-inl.h"  // for string_as_array
+///#include "s2geo/util/hash/hash.h"
 #include "s2geo/strings/split.h"
 
 #ifdef OS_WINDOWS

@@ -1,7 +1,7 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "base/integral_types.h"
-#include "base/logging.h"
+#include "s2geo/base/integral_types.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"

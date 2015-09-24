@@ -1,8 +1,8 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
 #include "s2geo/s2pointregion.h"
-#include "base/logging.h"
-#include "util/coding/coder.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/util/coding/coder.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2latlngrect.h"

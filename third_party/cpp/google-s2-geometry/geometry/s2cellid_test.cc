@@ -17,16 +17,16 @@ using std::unordered_map;
 using std::vector;
 
 
-#include "base/commandlineflags.h"
-#include "base/integral_types.h"
-#include "base/logging.h"
-/// #include "base/malloc_interface.h"
-/// #include "base/sysinfo.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/integral_types.h"
+#include "s2geo/base/logging.h"
+/// #include "s2geo/base/malloc_interface.h"
+/// #include "s2geo/base/sysinfo.h"
+#include "s2geo/testing/base/public/gunit.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2latlng.h"
 #include "s2geo/s2testing.h"
-#include "util/math/mathutil.h"
+#include "s2geo/util/math/mathutil.h"
 
 /// #define int8 HTM_int8  // To avoid conflicts with our own 'int8'
 /// #include "third_party/htm/include/SpatialIndex.h"

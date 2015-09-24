@@ -27,7 +27,7 @@
 /// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 /// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "testing/base/public/googletest.h"
+#include "s2geo/testing/base/public/googletest.h"
 
 #ifdef OS_WIN
 #include <windows.h>
@@ -38,10 +38,10 @@
 #include <climits>
 #include <string>
 
-#include "base/file_util.h"
-#include "base/init.h"
-#include "base/logging.h"
-#include "base/util.h"
+#include "s2geo/base/file_util.h"
+#include "s2geo/base/init.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/util.h"
 
 DEFINE_string(test_srcdir, "",
               "A directory that contains the input data files for a test.");
@@ -54,7 +54,7 @@ DECLARE_string(program_invocation_name);
 namespace mozc {
 namespace {
 
-#include "testing/mozc_data_dir.h"
+#include "s2geo/testing/mozc_data_dir.h"
 
 #ifdef OS_WIN
 string GetProgramPath() {

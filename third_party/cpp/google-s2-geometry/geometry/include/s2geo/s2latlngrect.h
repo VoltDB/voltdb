@@ -9,8 +9,8 @@ using std::cout;
 using std::endl;
 
 
-#include "base/basictypes.h"
-#include "base/logging.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/s1angle.h"
 #include "s2geo/r1interval.h"
 #include "s2geo/s1interval.h"

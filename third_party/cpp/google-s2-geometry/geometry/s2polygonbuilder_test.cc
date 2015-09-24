@@ -7,16 +7,16 @@ using std::set;
 using std::multiset;
 
 
-#include "base/logging.h"
-#include "base/macros.h"
-#include "base/scoped_ptr.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/macros.h"
+#include "s2geo/base/scoped_ptr.h"
 #include "s2geo/strings/stringprintf.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/testing/base/public/gunit.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2polygon.h"
 #include "s2geo/s2polyline.h"
 #include "s2geo/s2testing.h"
-#include "util/math/matrix3x3-inl.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
 
 namespace {
 

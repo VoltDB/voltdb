@@ -6,8 +6,8 @@
 using std::vector;
 
 
-#include "base/scoped_ptr.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/base/scoped_ptr.h"
+#include "s2geo/testing/base/public/gunit.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2latlngrect.h"

@@ -1,11 +1,11 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
 #include "s2geo/s2latlng.h"
-#include "base/macros.h"
-#include "base/stringprintf.h"
+#include "s2geo/base/macros.h"
+#include "s2geo/base/stringprintf.h"
 #include "s2geo/strings/split.h"
-#include "testing/base/public/gunit.h"
-/// #include "testing/base/public/benchmark.h"
+#include "s2geo/testing/base/public/gunit.h"
+/// #include "s2geo/testing/base/public/benchmark.h"
 #include "s2geo/s2testing.h"
 
 TEST(S2LatLng, TestBasic) {

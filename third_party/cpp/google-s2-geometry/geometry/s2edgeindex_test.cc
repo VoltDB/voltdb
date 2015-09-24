@@ -13,19 +13,19 @@ using std::string;
 using std::vector;
 
 
-#include "base/commandlineflags.h"
-#include "base/stringprintf.h"
-#include "base/logging.h"
-/// #include "testing/base/public/benchmark.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/stringprintf.h"
+#include "s2geo/base/logging.h"
+/// #include "s2geo/testing/base/public/benchmark.h"
+#include "s2geo/testing/base/public/gunit.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2cellid.h"
 #include "s2geo/s2edgeutil.h"
 #include "s2geo/s2loop.h"
 #include "s2geo/s2testing.h"
-#include "util/math/vector3-inl.h"
-#include "util/math/matrix3x3-inl.h"
+#include "s2geo/util/math/vector3-inl.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
 
 DECLARE_bool(always_recurse_on_children);
 

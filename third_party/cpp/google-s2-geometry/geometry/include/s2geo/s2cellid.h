@@ -14,11 +14,11 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "base/basictypes.h"
-#include "base/logging.h"
-#include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
 #include "s2geo/s2.h"
-#include "util/math/vector2.h"
+#include "s2geo/util/math/vector2.h"
 
 class S2LatLng;
 

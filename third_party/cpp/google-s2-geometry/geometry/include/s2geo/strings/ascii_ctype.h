@@ -3,7 +3,7 @@
 #ifndef STRINGS_ASCII_CTYPE_H__
 #define STRINGS_ASCII_CTYPE_H__
 
-#include "base/basictypes.h"
+#include "s2geo/base/basictypes.h"
 
 /// ----------------------------------------------------------------------
 /// ascii_isalpha()

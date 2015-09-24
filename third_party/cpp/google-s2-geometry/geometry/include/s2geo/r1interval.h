@@ -16,9 +16,9 @@ using std::ostream;
 using std::cout;
 using std::endl;
 
-#include "base/basictypes.h"
-#include "base/logging.h"
-#include "util/math/vector2-inl.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/util/math/vector2-inl.h"
 
 /// An R1Interval represents a closed, bounded interval on the real line.
 /// It is capable of representing the empty interval (containing no points)

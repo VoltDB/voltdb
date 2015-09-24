@@ -3,8 +3,8 @@
 #ifndef UTIL_GEOMETRY_S2CAP_H_
 #define UTIL_GEOMETRY_S2CAP_H_
 
-#include "base/basictypes.h"
-#include "base/logging.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/s1angle.h"
 #include "s2geo/s2region.h"
 

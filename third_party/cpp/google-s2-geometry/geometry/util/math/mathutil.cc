@@ -1,11 +1,11 @@
 /// Copyright 2008 Google Inc. All Rights Reserved.
 
-#include "util/math/mathutil.h"
+#include "s2geo/util/math/mathutil.h"
 #include <vector>
 using std::vector;
 
-#include "base/integral_types.h"
-#include "base/logging.h"
+#include "s2geo/base/integral_types.h"
+#include "s2geo/base/logging.h"
 
 MathUtil::QuadraticRootType MathUtil::DegenerateQuadraticRoots(
     long double b,

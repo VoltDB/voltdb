@@ -40,12 +40,12 @@
 #include <cstring>
 #include <memory>
 
-#include "base/port.h"
-#include "base/logging.h"
-#include "base/pepper_file_util.h"
+#include "s2geo/base/port.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/pepper_file_util.h"
 #include "net/http_client_pepper.h"
-#include "testing/base/public/googletest.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/testing/base/public/googletest.h"
+#include "s2geo/testing/base/public/gunit.h"
 
 namespace pp {
 namespace {

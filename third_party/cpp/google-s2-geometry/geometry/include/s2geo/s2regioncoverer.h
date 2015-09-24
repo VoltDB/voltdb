@@ -13,8 +13,8 @@ using std::make_pair;
 #include <vector>
 using std::vector;
 
-#include "base/macros.h"
-#include "base/scoped_ptr.h"
+#include "s2geo/base/macros.h"
+#include "s2geo/base/scoped_ptr.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2cellid.h"
 

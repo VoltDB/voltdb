@@ -17,13 +17,13 @@ using std::setprecision;
 using std::vector;
 
 
-#include "base/integral_types.h"
-#include "base/logging.h"
+#include "s2geo/base/integral_types.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/strings/strutil.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2latlng.h"
-#include "util/math/mathutil.h"
-#include "util/math/vector2-inl.h"
+#include "s2geo/util/math/mathutil.h"
+#include "s2geo/util/math/vector2-inl.h"
 
 /// The following lookup tables are used to convert efficiently between an
 /// (i,j) cell index and the corresponding position along the Hilbert curve.

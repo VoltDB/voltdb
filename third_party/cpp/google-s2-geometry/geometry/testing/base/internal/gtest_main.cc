@@ -27,13 +27,13 @@
 /// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 /// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "base/base.h"
-#include "testing/base/public/googletest.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/base/base.h"
+#include "s2geo/testing/base/public/googletest.h"
+#include "s2geo/testing/base/public/gunit.h"
 
 #ifdef __native_client__
-#include "base/pepper_file_system_mock.h"
-#include "base/pepper_file_util.h"
+#include "s2geo/base/pepper_file_system_mock.h"
+#include "s2geo/base/pepper_file_util.h"
 #endif  // __native_client__
 
 int main(int argc, char **argv) {

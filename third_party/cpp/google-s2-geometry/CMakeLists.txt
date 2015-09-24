@@ -5,7 +5,9 @@ include(CheckCXXCompilerFlag)
 include(FindPackageHandleStandardArgs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-set(ENV{OPENSSL_ROOT_DIR} "/usr/local/opt/openssl/include")
+if (APPLE)
+    set(ENV{OPENSSL_ROOT_DIR} "/usr/local/opt/openssl/include")
+endif(APPLE)
 find_package(OpenSSL REQUIRED)
 
 message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")

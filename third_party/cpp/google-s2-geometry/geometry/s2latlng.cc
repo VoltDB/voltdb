@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "base/logging.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/strings/stringprintf.h"
 #include "s2geo/s2latlng.h"
 

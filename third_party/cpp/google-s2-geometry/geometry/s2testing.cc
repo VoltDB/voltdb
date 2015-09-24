@@ -8,10 +8,10 @@
 using std::vector;
 
 
-#include "base/integral_types.h"
-#include "base/logging.h"
-#include "base/stringprintf.h"
-#include "util/math/matrix3x3-inl.h"
+#include "s2geo/base/integral_types.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/base/stringprintf.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
 #include "s2geo/s2testing.h"
 #include "s2geo/s2loop.h"
 #include "s2geo/s2latlng.h"

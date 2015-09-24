@@ -5,9 +5,9 @@
 ///
 
 #include <errno.h>
-#include "base/port.h"
-#include "base/basictypes.h"
-#include "base/strtoint.h"
+#include "s2geo/base/port.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/strtoint.h"
 
 /// Replacement strto[u]l functions that have identical overflow and underflow
 /// characteristics for both ILP-32 and LP-64 platforms, including errno

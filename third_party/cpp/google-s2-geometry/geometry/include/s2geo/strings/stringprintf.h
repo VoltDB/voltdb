@@ -17,9 +17,9 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "base/stl_decl.h"
-#include "base/port.h"
-#include "base/stringprintf.h"
+#include "s2geo/base/stl_decl.h"
+#include "s2geo/base/port.h"
+#include "s2geo/base/stringprintf.h"
 
 /// This file formerly contained
 ///   StringPrintf, SStringPrintf, StringAppendF, and StringAppendV.

@@ -7,10 +7,10 @@
 using std::string;
 
 #include <ostream>
-#include "base/basictypes.h"
+#include "s2geo/base/basictypes.h"
 #include "s2geo/s1angle.h"
 #include "s2geo/s2.h"
-#include "util/math/vector2-inl.h"
+#include "s2geo/util/math/vector2-inl.h"
 
 /// This class represents a point on the unit sphere as a pair
 /// of latitude-longitude coordinates.  Like the rest of the "geometry"

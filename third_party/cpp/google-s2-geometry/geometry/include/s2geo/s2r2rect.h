@@ -3,11 +3,11 @@
 #ifndef UTIL_GEOMETRY_S2R2RECT_H_
 #define UTIL_GEOMETRY_S2R2RECT_H_
 
-#include "base/basictypes.h"
-#include "base/logging.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/r1interval.h"
 #include "s2geo/s2region.h"
-#include "util/math/vector2-inl.h"
+#include "s2geo/util/math/vector2-inl.h"
 
 class S2CellId;
 class S2Cell;

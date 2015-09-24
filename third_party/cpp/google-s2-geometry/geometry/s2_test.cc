@@ -10,11 +10,11 @@ using std::reverse;
 using std::unordered_set;
 
 #include "s2geo/s2.h"
-#include "base/logging.h"
+#include "s2geo/base/logging.h"
 #include "s2geo/s2latlng.h"
 #include "s2geo/s2testing.h"
-#include "util/math/matrix3x3-inl.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
+#include "s2geo/testing/base/public/gunit.h"
 
 static inline int SwapAxes(int ij) {
   return ((ij >> 1) & 1) + ((ij & 1) << 1);

@@ -2,7 +2,7 @@
 
 #include "s2geo/s1interval.h"
 
-#include "base/logging.h"
+#include "s2geo/base/logging.h"
 
 S1Interval S1Interval::FromPoint(double p) {
   if (p == -M_PI) p = M_PI;

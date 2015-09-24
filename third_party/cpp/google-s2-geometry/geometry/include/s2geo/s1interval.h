@@ -9,9 +9,9 @@ using std::cout;
 using std::endl;
 
 #include <math.h>
-#include "base/basictypes.h"
-#include "base/logging.h"
-#include "util/math/vector2-inl.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/util/math/vector2-inl.h"
 
 /// An S1Interval represents a closed interval on a unit circle (also known
 /// as a 1-dimensional sphere).  It is capable of representing the empty

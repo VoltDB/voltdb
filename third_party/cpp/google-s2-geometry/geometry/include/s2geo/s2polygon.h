@@ -11,8 +11,8 @@ using std::multimap;
 using std::vector;
 
 
-#include "base/basictypes.h"
-#include "base/macros.h"
+#include "s2geo/base/basictypes.h"
+#include "s2geo/base/macros.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2region.h"
 #include "s2geo/s2loop.h"

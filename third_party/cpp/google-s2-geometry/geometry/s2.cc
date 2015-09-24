@@ -2,11 +2,11 @@
 
 #include "s2geo/s2.h"
 
-#include "base/commandlineflags.h"
-#include "base/integral_types.h"
-#include "base/logging.h"
-#include "util/math/matrix3x3-inl.h"
-#include "util/math/vector2-inl.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/integral_types.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
+#include "s2geo/util/math/vector2-inl.h"
 
 /// Define storage for header file constants (the values are not needed
 /// here for integral constants).
@@ -190,7 +190,7 @@ int S2::RobustCCW(S2Point const& a, S2Point const& b, S2Point const& c) {
 /// OpenSSL Bignum library and therefore has a permissive BSD-style license).
 
 /// ExactFloat only supports exact calculations with floating-point numbers.
-#include "util/math/exactfloat/exactfloat.h"
+#include "s2geo/util/math/exactfloat/exactfloat.h"
 
 typedef Vector3<ExactFloat> Vector3_xf;
 

@@ -3123,7 +3123,7 @@ namespace swig {
 #include <set>
 #include <map>
 #include <string>
-#include "base/basictypes.h"
+#include "s2geo/base/basictypes.h"
 
 
 

@@ -7,12 +7,12 @@ using std::multiset;
 #include <vector>
 using std::vector;
 
-#include "base/commandlineflags.h"
-#include "base/logging.h"
-#include "util/math/matrix3x3-inl.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/util/math/matrix3x3-inl.h"
 #include "s2geo/s2polyline.h"
 
-#include "util/coding/coder.h"
+#include "s2geo/util/coding/coder.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2latlng.h"

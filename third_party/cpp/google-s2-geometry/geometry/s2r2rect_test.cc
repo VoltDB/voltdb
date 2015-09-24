@@ -6,7 +6,7 @@
 #include "s2geo/s2r2rect.h"
 
 #include "s2geo/strings/stringprintf.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/testing/base/public/gunit.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2cap.h"
 #include "s2geo/s2cell.h"

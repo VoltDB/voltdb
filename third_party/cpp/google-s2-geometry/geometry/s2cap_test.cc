@@ -2,9 +2,9 @@
 
 #include "s2geo/s2cap.h"
 
-#include "base/commandlineflags.h"
-#include "base/logging.h"
-#include "testing/base/public/gunit.h"
+#include "s2geo/base/commandlineflags.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/testing/base/public/gunit.h"
 #include "s2geo/s2.h"
 #include "s2geo/s2cell.h"
 #include "s2geo/s2latlng.h"

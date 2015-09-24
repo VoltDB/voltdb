@@ -3,8 +3,8 @@
 ///
 ///
 
-#include "base/logging.h"
-#include "util/coding/coder.h"
+#include "s2geo/base/logging.h"
+#include "s2geo/util/coding/coder.h"
 
 /// An initialization value used when we are allowed to 
 unsigned char Encoder::kEmptyBuffer = 0;
