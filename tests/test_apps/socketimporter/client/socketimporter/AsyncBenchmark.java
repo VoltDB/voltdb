@@ -289,8 +289,8 @@ public class AsyncBenchmark {
     		fw = new FileWriter(config.statsfile);
     		fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
     				"SocketImporter_"+ (config.partitioned ? "Partitioned" : "Replicated"),
-    				benchmarkStartTS,
-    				runCount.get() / ((checkDB.maxInsertTime()-benchmarkStartTS)/1000)));
+    				benchmarkStartTS/1000, // back to seconds
+    				runCount.get()/((checkDB.maxInsertTime()-benchmarkStartTS)/1000))); // throughput -- TPS
     		fw.close();
     	}
     }

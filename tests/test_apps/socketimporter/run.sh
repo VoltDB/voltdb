@@ -169,6 +169,7 @@ function async-benchmark() {
         --warmup=2 \
         --duration=30 \
         --perftest=true \
+        --partitioned=true \
         --servers=localhost \
         --sockservers=localhost:7001
 }
