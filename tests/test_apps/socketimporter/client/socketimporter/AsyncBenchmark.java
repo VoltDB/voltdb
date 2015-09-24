@@ -36,6 +36,7 @@
 
 package socketimporter.client.socketimporter;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -56,7 +57,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
 import com.google_voltpatches.common.net.HostAndPort;
@@ -72,13 +72,14 @@ public class AsyncBenchmark {
     static Queue<Pair<String,String>> queue = new LinkedBlockingQueue<Pair<String,String>>();
     static Queue<Pair<String,String>> dqueue = new LinkedBlockingQueue<Pair<String,String>>();
     static boolean importerDone = false;
+    static CheckData checkDB = null;
 
     // validated command line configuration
     static Config config;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
-    long benchmarkStartTS;
+    static long benchmarkStartTS;
 
     static final Map<HostAndPort, OutputStream> haplist = new HashMap<HostAndPort, OutputStream>();
     static Client client;
@@ -90,7 +91,8 @@ public class AsyncBenchmark {
     static final AtomicLong writers = new AtomicLong(0);
     static final AtomicLong socketWrites = new AtomicLong(0);
     static final AtomicLong socketWriteExceptions = new AtomicLong(0);
-    static final AtomicLong finalInsertCount = new AtomicLong(0);
+    static final AtomicLong runCount = new AtomicLong(0);
+    static final AtomicLong warmupCount = new AtomicLong(0);
 
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
@@ -123,14 +125,17 @@ public class AsyncBenchmark {
         String statsfile = "";
 
         @Option(desc = "Performance test only.")
-        boolean perftest = false;
+        boolean perftest = true;
+
+        @Option(desc = "If true, use the partitioned table for the benchmark; replicated otherwise.")
+        boolean partitioned = true;
 
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (perftest && statsfile.equals("")) statsfile = "socketimporter.csv";
+            if (perftest && statsfile.length() == 0) statsfile = "socketimporter.csv";
         }
     }
 
@@ -199,11 +204,6 @@ public class AsyncBenchmark {
                 @Override
                 public void run() {
                     int port = 7001; // default port; assumed in system test so keep sync'd if it's changed
-//                    if (perftest) {
-//                        port = 7001;
-//                    } else {
-//                        port = 7002;
-//                    }
                     HostAndPort hap = HostAndPort.fromString(server);
                     //System.out.println(" hap--toString: " + hap.toString());
                     if (hap.hasPort()) {
@@ -258,14 +258,16 @@ public class AsyncBenchmark {
      */
     public synchronized void printStatistics() {
         try {
-            ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+            //ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
             long thrup;
 
-            thrup = stats.getTxnThroughput();
-            long rows = 0;
-            System.out.println(String.format("Import Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
-                    thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
-                    stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
+            long max_insert_time = checkDB.maxInsertTime();
+            thrup = runCount.get() / ((max_insert_time-benchmarkStartTS)/1000);
+
+            //thrup = stats.getTxnThroughput();
+
+            System.out.println(String.format("Import Throughput %d/s, Total Rows %d",
+                    thrup, runCount.get()+warmupCount.get()));
         } catch (Exception e) {
             System.out.println("Exception in printStatistics" + e);
             StringWriter writer = new StringWriter();
@@ -275,15 +277,22 @@ public class AsyncBenchmark {
     }
 
     /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
+     * Prints the results to a csv file for charting
      *
      * @throws Exception if anything unexpected happens.
      */
-    public synchronized void printResults() throws Exception {
-        ClientStats stats = fullStatsContext.fetch().getStats();
-        // Write stats to file if requested
-        client.writeSummaryCSV(stats, config.statsfile);
+    public synchronized static void printResults() throws Exception {
+    	//ClientStats stats = fullStatsContext.fetch().getStats();
+    	FileWriter fw = null;
+
+    	if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+    		fw = new FileWriter(config.statsfile);
+    		fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
+    				"SocketImporter_"+ (config.partitioned ? "Partitioned" : "Replicated"),
+    				benchmarkStartTS,
+    				runCount.get() / ((checkDB.maxInsertTime()-benchmarkStartTS)/1000)));
+    		fw.close();
+    	}
     }
 
     /**
@@ -303,7 +312,7 @@ public class AsyncBenchmark {
 
         SecureRandom rnd = new SecureRandom();
         rnd.setSeed(Thread.currentThread().getId());
-        long icnt = 0;
+        //long icnt = 0;
         //  TODO: check if this removes discrepancy: long icnt = 0;
         try {
             // Run the benchmark loop for the requested warmup time
@@ -323,7 +332,8 @@ public class AsyncBenchmark {
                     s = key + "," + t + "\n";
                 }
                 writeFully(s, hap, warmupEndTime);
-                icnt++;
+                warmupCount.getAndIncrement();
+                //icnt++;
             }
 
             // print periodic statistics to the console
@@ -348,7 +358,8 @@ public class AsyncBenchmark {
                     s = key + "," + t + "\n";
                 }
                 writeFully(s, hap, benchmarkEndTime);
-                icnt++;
+                runCount.getAndIncrement();
+                //icnt++;
             }
             haplist.get(hap).flush();
         } catch (Exception e) {
@@ -359,9 +370,7 @@ public class AsyncBenchmark {
         } finally {
             // cancel periodic stats printing
             if (timer != null) timer.cancel();
-            finalInsertCount.addAndGet(icnt);
-            // print the summary results
-            printResults();
+            //insertCount.addAndGet(icnt); atomic version used above
         }
     }
 
@@ -427,14 +436,14 @@ public class AsyncBenchmark {
             BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, hap);
             runner.start();
         }
-        CheckData checkDB = null;
+        checkDB = new CheckData(queue, dqueue, client, config.partitioned);
+        //System.out.println("max in main:" + checkDB.maxInsertTime());
         if (!config.perftest) {
             // start checking the table that's being populated by the socket injester(s)
-            System.out.println("Starting CheckData methods. Queue size: " + queue.size());
-            checkDB = new CheckData(queue, dqueue, client);
+            //System.out.println("Starting CheckData methods. Queue size: " + queue.size());
             while (queue.size() == 0) {
                 try {
-                    Thread.sleep(1000);                 //1000 milliseconds is one second.
+                    Thread.sleep(1000);                 // one second.
                 } catch(InterruptedException ex) {
                     Thread.currentThread().interrupt();
                 }
@@ -450,6 +459,9 @@ public class AsyncBenchmark {
              writer.flush();
              writer.close();
          }
+
+        // print the summary results
+        printResults();
 
         if (!config.perftest) {
             System.out.println("...starting timed check looping... " + queue.size());
@@ -467,7 +479,7 @@ public class AsyncBenchmark {
             System.out.println("Rows checked against database: " + rowsChecked.get());
             System.out.println("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
         }
-        System.out.println("Total rows added by Socket Injester: " + finalInsertCount.get());
+        System.out.println("Total rows added by Socket Injester: " + (warmupCount.get()+runCount.get()));
         System.out.println("Socket write count: " + socketWrites.get());
         System.out.println("Socket write exception count: " + socketWriteExceptions.get());
 

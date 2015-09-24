@@ -33,23 +33,33 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
 public class CheckData {
-
     static Queue<Pair<String, String>> m_queue;
     static Queue<Pair<String, String>> m_delete_queue;
+    static String m_select;
+    static String m_delete;
+    static String m_max;
     Client m_client;
-    private static final int VALUE = 1;
     private static final int KEY = 0;
+    private static final int VALUE = 1;
 
-    private static final String MY_SELECT_PROCEDURE = "IMPORTTABLE.select";
-    private static final String MY_DELETE_PROCEDURE = "IMPORTTABLE.delete";
+    private static final String PARTITIONED_SELECT = "PARTITIONED.select";
+    private static final String PARTITIONED_DELETE = "PARTITIONED.delete";
+    private static final String REPLICATED_SELECT = "REPLICATED.select";
+    private static final String REPLICATED_DELETE = "REPLICATED.delete";
+    private static final String REPLICATED_MAX = "SelectMaxTimeReplicated";
+    private static final String PARTITIONED_MAX = "SelectMaxTimePartitioned";
 
-    public CheckData(Queue<Pair<String, String>> q, Queue<Pair<String, String>> dq, Client c) {
+    public CheckData(Queue<Pair<String, String>> q, Queue<Pair<String, String>> dq, Client c, boolean partitioned) {
         m_client = c;
         m_queue = q;
         m_delete_queue = dq;
+        m_select = partitioned ? PARTITIONED_SELECT : REPLICATED_SELECT;
+        m_delete = partitioned ? PARTITIONED_DELETE : REPLICATED_DELETE;
+        m_max = partitioned ? PARTITIONED_MAX : REPLICATED_MAX;
     }
 
     public void processQueue() {
@@ -59,14 +69,14 @@ public class CheckData {
             try {
                 if (p != null) {
                     String key = p.getFirst();
-                    boolean ret = m_client.callProcedure(new SelectCallback(m_queue, p, key), MY_SELECT_PROCEDURE, key);
+                    boolean ret = m_client.callProcedure(new SelectCallback(m_queue, p, key), m_select, key);
                     if (!ret) {
                         System.out.println("Select call failed!");
                     }
                 }
                 Pair<String, String> p2 = m_delete_queue.poll();
                 if (p2 != null) {
-                    boolean ret = m_client.callProcedure(new DeleteCallback(m_delete_queue, p2), MY_DELETE_PROCEDURE, p2.getFirst());
+                    boolean ret = m_client.callProcedure(new DeleteCallback(m_delete_queue, p2), m_delete, p2.getFirst());
                     if (!ret) {
                         System.out.println("Delete call failed!");
                     }
@@ -85,8 +95,28 @@ public class CheckData {
         }
     }
 
-    static class SelectCallback implements ProcedureCallback {
+    public long maxInsertTime() {
+    		ClientResponse response = null;
+			try {
+				response = m_client.callProcedure(m_max);
+			} catch (NoConnectionsException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (ProcCallException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+    		VoltTable[] countQueryResult = response.getResults();
+            VoltTable data = countQueryResult[0];
+            if (data.asScalarLong() == VoltType.NULL_BIGINT)
+                return 0;
+            return data.asScalarLong();
+    }
 
+    static class SelectCallback implements ProcedureCallback {
         private static final int KEY = 0;
         private static final int VALUE = 1;
 
@@ -143,7 +173,6 @@ public class CheckData {
             }
             return m_pair;
         }
-
     }
 
     static class DeleteCallback implements ProcedureCallback {
@@ -167,5 +196,4 @@ public class CheckData {
 
         }
     }
-
 }

@@ -4,26 +4,31 @@ file -inlinebatch END_OF_BATCH
 
 -- schema is the style of kvbenchmark, varbin to be done when
 -- importer supports it
-CREATE TABLE importtable1
+CREATE TABLE partitioned 
 (
   key      varchar(250) not null
 , value    varchar(1048576 BYTES) not null
+, insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 , PRIMARY KEY (key)
 );
 -- Partition on key
-PARTITION table importTable1 ON COLUMN key;
+PARTITION table partitioned  ON COLUMN key;
 
--- socketimporter classic schema
-CREATE TABLE importTable2
+CREATE TABLE replicated 
 (
-key BIGINT NOT NULL
-, value BIGINT NOT NULL
-, CONSTRAINT PK_importTable2 PRIMARY KEY
-  (
-    key
-  )
+  key      varchar(250) not null
+, value    varchar(1048576 BYTES) not null
+, insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+, PRIMARY KEY (key)
 );
--- Partition on key
-PARTITION table importTable2 ON COLUMN key;
 
+CREATE PROCEDURE InsertReplicated as insert into REPLICATED(key, value) VALUES(?, ?);
+
+CREATE PROCEDURE InsertPartitioned as insert into Partitioned(key, value) VALUES(?, ?);
+PARTITION PROCEDURE InsertPartitioned ON TABLE Partitioned COLUMN key;
+
+CREATE PROCEDURE SelectMaxTimeReplicated as select since_epoch(millis, max(insert_time)) from REPLICATED;
+
+CREATE PROCEDURE SelectMaxTimePartitioned as select since_epoch(millis, max(insert_time)) from PARTITIONED;
+PARTITION PROCEDURE SelectMaxTimePartitioned ON TABLE Partitioned COLUMN key;
 END_OF_BATCH
