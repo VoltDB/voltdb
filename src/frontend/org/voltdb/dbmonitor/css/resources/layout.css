@@ -625,7 +625,7 @@ ul.rightShowhideList {
         border: 1px solid #aaaaaa;
         height: 28px;
         line-height: 28px;
-        width: 150px;
+        width: 140px;
     }
 
 
@@ -2093,7 +2093,7 @@ right: -31px!important;
 h2.help {
     font: bold 15px Arial, Helvetica, sans-serif;
     padding-bottom: 10px;
-    border-bottom: 1px dashed #ddd;
+    /*border-bottom: 1px dashed #ddd;*/
 }
 
 .VDBMonitorHelp p {
@@ -2170,8 +2170,8 @@ ul.helpSchemaList {
 .edit,
 .editDisabled,
 .arrow,
-.labelCollapsed,
-.labelExpanded,
+/*.labelCollapsed,*/
+/*.labelExpanded,*/
 a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
     background-image: url(images/admin-icons.png);
 }
@@ -2590,13 +2590,15 @@ ul.adminClusterList li a.shutdown {
 }
 
 .labelCollapsed {
-    background-position: -468px -11px;
+    /*background-position: -468px -11px;*/
     padding-left: 22px;
+    background: url("images/up.png")0 1px no-repeat; 
 }
 
 .labelExpanded {
-    background-position: -468px -55px;
+    /*background-position: -468px -55px;*/
     padding-left: 22px;
+    background: url("images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
@@ -3625,7 +3627,9 @@ table.diskLimitTbl tr td { border: none;}
 
 /*********overlapping nv.d3.css*********/
 .nvtooltip{ padding: 5px!important;}
-svg.nvd3-svg { padding: 0 0 0 10px!important; }
+
+svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
+
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
