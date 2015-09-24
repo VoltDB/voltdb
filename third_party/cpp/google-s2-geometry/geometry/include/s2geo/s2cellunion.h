@@ -9,8 +9,8 @@ using std::vector;
 #include "base/integral_types.h"
 #include "base/logging.h"
 #include "base/macros.h"
-#include "s2region.h"
-#include "s2cellid.h"
+#include "s2geo/s2region.h"
+#include "s2geo/s2cellid.h"
 
 class S1Angle;
 class S2Cell;

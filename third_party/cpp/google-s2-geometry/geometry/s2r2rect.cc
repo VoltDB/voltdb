@@ -1,13 +1,13 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2r2rect.h"
+#include "s2geo/s2r2rect.h"
 
 #include "base/logging.h"
-#include "r1interval.h"
-#include "s2.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2latlngrect.h"
+#include "s2geo/r1interval.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2latlngrect.h"
 
 S2R2Rect S2R2Rect::FromCell(S2Cell const& cell) {
   /// S2Cells have a more efficient GetSizeST() method than S2CellIds.

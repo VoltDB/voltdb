@@ -5,9 +5,9 @@
 
 #include "base/basictypes.h"
 #include "base/logging.h"
-#include "s2.h"
-#include "s2cellid.h"
-#include "s2region.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2cellid.h"
+#include "s2geo/s2region.h"
 #include "util/math/vector2.h"
 
 /// An S2Cell is an S2Region object that represents a cell.  Unlike S2CellIds,

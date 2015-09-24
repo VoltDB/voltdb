@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2.h"
+#include "s2geo/s2.h"
 
 #include "base/commandlineflags.h"
 #include "base/integral_types.h"

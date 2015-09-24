@@ -1477,7 +1477,9 @@ NATIVE EE STUFF
          classpathref="cmakeant.lib"
          classname="org.iainhull.ant.CmakeBuilder" />
 
-<target name='build-s2-geometry' description="Build the S2 Geometry Library">
+<target name='build-s2-geometry'
+        description='Build the S2 Geometry Library'
+        depends='check-s2-config'>
   <echo message="Building the S2 Geometry Library" />
   <echo message="Source = ${s2-geometry.src}" />
   <echo message="Object = ${s2-geometry.bin}" />
@@ -1488,6 +1490,8 @@ NATIVE EE STUFF
               value="${vendor.cpp.dir}" />
     <variable name="CMAKE_INSTALL_PREFIX"
               value="${s2-geometry.bin}" />
+    <variable name="CMAKE_BUILD_TYPE"
+              value="${s2-geometry.buildtype}" />
   </cmake>
 </target>
 

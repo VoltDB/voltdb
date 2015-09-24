@@ -5,8 +5,8 @@
 
 #include "base/logging.h"
 #include "base/macros.h"
-#include "s2.h"
-#include "s2latlngrect.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2latlngrect.h"
 
 class S2LatLngRect;
 

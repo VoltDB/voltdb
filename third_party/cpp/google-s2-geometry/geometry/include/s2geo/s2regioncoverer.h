@@ -15,8 +15,8 @@ using std::vector;
 
 #include "base/macros.h"
 #include "base/scoped_ptr.h"
-#include "s2cell.h"
-#include "s2cellid.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2cellid.h"
 
 class S2CellUnion;
 

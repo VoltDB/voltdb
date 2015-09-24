@@ -13,10 +13,10 @@ using std::vector;
 
 #include "base/basictypes.h"
 #include "base/macros.h"
-#include "s2.h"
-#include "s2region.h"
-#include "s2loop.h"
-#include "s2polyline.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2region.h"
+#include "s2geo/s2loop.h"
+#include "s2geo/s2polyline.h"
 
 class S2CellUnion;
 

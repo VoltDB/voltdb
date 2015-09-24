@@ -2,7 +2,7 @@
 ///
 /// To run the benchmarks, use:
 
-#include "s2polygon.h"
+#include "s2geo/s2polygon.h"
 
 #include <algorithm>
 using std::min;
@@ -22,19 +22,19 @@ using std::vector;
 #include "base/logging.h"
 #include "base/macros.h"
 #include "base/scoped_ptr.h"
-#include "strings/stringprintf.h"
+#include "s2geo/strings/stringprintf.h"
 /// #include "testing/base/public/benchmark.h"
 #include "testing/base/public/gunit.h"
 #include "util/coding/coder.h"
-#include "s2.h"
-#include "s2cap.h"
-#include "s2cellunion.h"
-#include "s2latlng.h"
-#include "s2loop.h"
-#include "s2polygonbuilder.h"
-#include "s2polyline.h"
-#include "s2regioncoverer.h"
-#include "s2testing.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cellunion.h"
+#include "s2geo/s2latlng.h"
+#include "s2geo/s2loop.h"
+#include "s2geo/s2polygonbuilder.h"
+#include "s2geo/s2polyline.h"
+#include "s2geo/s2regioncoverer.h"
+#include "s2geo/s2testing.h"
 #include "util/math/matrix3x3.h"
 #include "util/math/matrix3x3-inl.h"
 

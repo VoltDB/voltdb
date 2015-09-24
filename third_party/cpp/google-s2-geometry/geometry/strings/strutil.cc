@@ -2,7 +2,7 @@
 /// Copyright (C) 1999-2005 Google, Inc.
 ///
 
-#include "strutil.h"
+#include "s2geo/strings/strutil.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -48,7 +48,7 @@ using std::vector;
 ///#include "third_party/utf/utf.h"  // for runetochar
 ///#include "util/gtl/stl_util-inl.h"  // for string_as_array
 ///#include "util/hash/hash.h"
-#include "split.h"
+#include "s2geo/strings/split.h"
 
 #ifdef OS_WINDOWS
 #include <pthread.h>        // for gmtime_r

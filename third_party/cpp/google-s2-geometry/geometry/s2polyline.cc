@@ -10,13 +10,13 @@ using std::vector;
 #include "base/commandlineflags.h"
 #include "base/logging.h"
 #include "util/math/matrix3x3-inl.h"
-#include "s2polyline.h"
+#include "s2geo/s2polyline.h"
 
 #include "util/coding/coder.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2latlng.h"
-#include "s2edgeutil.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2latlng.h"
+#include "s2geo/s2edgeutil.h"
 
 DECLARE_bool(s2debug);  // defined in s2.cc
 

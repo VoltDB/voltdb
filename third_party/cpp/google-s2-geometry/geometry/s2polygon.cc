@@ -18,17 +18,17 @@ using std::vector;
 
 
 #include "base/commandlineflags.h"
-#include "s2polygon.h"
+#include "s2geo/s2polygon.h"
 
 #include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
 #include "util/coding/coder.h"
-#include "s2edgeindex.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2cellunion.h"
-#include "s2latlngrect.h"
-#include "s2polygonbuilder.h"
-#include "s2polyline.h"
+#include "s2geo/s2edgeindex.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2cellunion.h"
+#include "s2geo/s2latlngrect.h"
+#include "s2geo/s2polygonbuilder.h"
+#include "s2geo/s2polyline.h"
 
 DECLARE_bool(s2debug);  // defined in s2.cc
 

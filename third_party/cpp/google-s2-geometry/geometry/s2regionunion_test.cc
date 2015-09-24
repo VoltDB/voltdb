@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2regionunion.h"
+#include "s2geo/s2regionunion.h"
 
 #include <vector>
 using std::vector;
@@ -8,11 +8,11 @@ using std::vector;
 
 #include "base/scoped_ptr.h"
 #include "testing/base/public/gunit.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2latlngrect.h"
-#include "s2pointregion.h"
-#include "s2regioncoverer.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2latlngrect.h"
+#include "s2geo/s2pointregion.h"
+#include "s2geo/s2regioncoverer.h"
 
 namespace {
 

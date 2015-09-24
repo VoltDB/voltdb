@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2cellunion.h"
+#include "s2geo/s2cellunion.h"
 
 #include <algorithm>
 using std::min;
@@ -14,11 +14,11 @@ using std::vector;
 
 #include "base/integral_types.h"
 #include "base/logging.h"
-#include "s2.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2cellid.h"
-#include "s2latlngrect.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2cellid.h"
+#include "s2geo/s2latlngrect.h"
 
 /// Returns true if the vector of cell_ids is sorted.  Used only in
 /// DCHECKs.

@@ -9,8 +9,8 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "s2.h"
-#include "s2cellid.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2cellid.h"
 
 class S2LatLngRect;
 class S2Loop;

@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s1interval.h"
+#include "s2geo/s1interval.h"
 
 #include "base/logging.h"
 

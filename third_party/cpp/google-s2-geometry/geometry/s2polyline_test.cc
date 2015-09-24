@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2polyline.h"
+#include "s2geo/s2polyline.h"
 
 #include <vector>
 using std::vector;
@@ -11,9 +11,9 @@ using std::vector;
 #include "base/stringprintf.h"
 #include "testing/base/public/gunit.h"
 #include "util/coding/coder.h"
-#include "s2cell.h"
-#include "s2latlng.h"
-#include "s2testing.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2latlng.h"
+#include "s2geo/s2testing.h"
 
 DECLARE_bool(s2debug);
 

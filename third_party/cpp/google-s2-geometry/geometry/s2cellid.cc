@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2cellid.h"
+#include "s2geo/s2cellid.h"
 
 #include <pthread.h>
 
@@ -19,9 +19,9 @@ using std::vector;
 
 #include "base/integral_types.h"
 #include "base/logging.h"
-#include "strings/strutil.h"
-#include "s2.h"
-#include "s2latlng.h"
+#include "s2geo/strings/strutil.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2latlng.h"
 #include "util/math/mathutil.h"
 #include "util/math/vector2-inl.h"
 

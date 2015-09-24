@@ -5,8 +5,8 @@
 
 #include "base/basictypes.h"
 #include "base/logging.h"
-#include "r1interval.h"
-#include "s2region.h"
+#include "s2geo/r1interval.h"
+#include "s2geo/s2region.h"
 #include "util/math/vector2-inl.h"
 
 class S2CellId;

@@ -11,11 +11,11 @@ using std::endl;
 
 #include "base/basictypes.h"
 #include "base/logging.h"
-#include "s1angle.h"
-#include "r1interval.h"
-#include "s1interval.h"
-#include "s2region.h"
-#include "s2latlng.h"
+#include "s2geo/s1angle.h"
+#include "s2geo/r1interval.h"
+#include "s2geo/s1interval.h"
+#include "s2geo/s2region.h"
+#include "s2geo/s2latlng.h"
 
 /// An S2LatLngRect represents a closed latitude-longitude rectangle.  It is
 /// capable of representing the empty and full rectangles as well as

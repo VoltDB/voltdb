@@ -9,7 +9,7 @@ using std::ostream;
 #include <math.h>
 #include "base/basictypes.h"
 #include "util/math/mathutil.h"
-#include "s2.h"
+#include "s2geo/s2.h"
 
 class S2LatLng;
 

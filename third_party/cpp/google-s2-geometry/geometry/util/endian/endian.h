@@ -9,13 +9,16 @@
 #define UTIL_ENDIAN_ENDIAN_H_
 
 #ifdef __APPLE__
-#include "byteswap.h"
+#include <libkern/OSByteOrder.h>
+#define __bswap_16 OSSwapInt16
+#define __bswap_32 OSSwapInt32
+#define __bswap_64 OSSwapInt64
+#include "s2geo/byteswap.h"
 #else
 #include <bits/byteswap.h>
 #endif
 
 
-#include <byteswap.h>
 #include "base/integral_types.h"
 #include "base/logging.h"
 #include "base/port.h"

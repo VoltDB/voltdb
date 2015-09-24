@@ -1,10 +1,10 @@
 /// Copyright 2006 Google Inc. All Rights Reserved.
 
-#include "s2regionintersection.h"
+#include "s2geo/s2regionintersection.h"
 
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2latlngrect.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2latlngrect.h"
 
 S2RegionIntersection::S2RegionIntersection() { }
 

@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2cellid.h"
+#include "s2geo/s2cellid.h"
 
 #include <algorithm>
 using std::min;
@@ -23,9 +23,9 @@ using std::vector;
 /// #include "base/malloc_interface.h"
 /// #include "base/sysinfo.h"
 #include "testing/base/public/gunit.h"
-#include "s2.h"
-#include "s2latlng.h"
-#include "s2testing.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2latlng.h"
+#include "s2geo/s2testing.h"
 #include "util/math/mathutil.h"
 
 /// #define int8 HTM_int8  // To avoid conflicts with our own 'int8'

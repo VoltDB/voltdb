@@ -17,7 +17,7 @@ using std::vector;
 #include "base/basictypes.h"
 #include "base/logging.h"
 #include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
-#include "s2.h"
+#include "s2geo/s2.h"
 #include "util/math/vector2.h"
 
 class S2LatLng;

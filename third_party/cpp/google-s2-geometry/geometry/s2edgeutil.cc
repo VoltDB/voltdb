@@ -6,7 +6,7 @@ using std::max;
 using std::swap;
 using std::reverse;
 
-#include "s2edgeutil.h"
+#include "s2geo/s2edgeutil.h"
 
 #include "base/logging.h"
 

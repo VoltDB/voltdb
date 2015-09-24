@@ -9,10 +9,10 @@ using std::reverse;
 #include <unordered_set>
 using std::unordered_set;
 
-#include "s2.h"
+#include "s2geo/s2.h"
 #include "base/logging.h"
-#include "s2latlng.h"
-#include "s2testing.h"
+#include "s2geo/s2latlng.h"
+#include "s2geo/s2testing.h"
 #include "util/math/matrix3x3-inl.h"
 #include "testing/base/public/gunit.h"
 

@@ -7,13 +7,13 @@ using std::swap;
 using std::reverse;
 
 
-#include "s2latlngrect.h"
+#include "s2geo/s2latlngrect.h"
 
 #include "base/logging.h"
 #include "util/coding/coder.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2edgeutil.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2edgeutil.h"
 #include "util/math/mathutil.h"
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;

@@ -1,12 +1,12 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s2latlng.h"
+#include "s2geo/s2latlng.h"
 #include "base/macros.h"
 #include "base/stringprintf.h"
-#include "strings/split.h"
+#include "s2geo/strings/split.h"
 #include "testing/base/public/gunit.h"
 /// #include "testing/base/public/benchmark.h"
-#include "s2testing.h"
+#include "s2geo/s2testing.h"
 
 TEST(S2LatLng, TestBasic) {
   S2LatLng ll_rad = S2LatLng::FromRadians(M_PI_4, M_PI_2);

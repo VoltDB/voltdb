@@ -1,6 +1,6 @@
 /// Copyright 2009 Google Inc. All Rights Reserved.
 
-#include "s2edgeindex.h"
+#include "s2geo/s2edgeindex.h"
 
 #include <set>
 using std::set;
@@ -18,12 +18,12 @@ using std::vector;
 #include "base/logging.h"
 /// #include "testing/base/public/benchmark.h"
 #include "testing/base/public/gunit.h"
-#include "s2cap.h"
-#include "s2cell.h"
-#include "s2cellid.h"
-#include "s2edgeutil.h"
-#include "s2loop.h"
-#include "s2testing.h"
+#include "s2geo/s2cap.h"
+#include "s2geo/s2cell.h"
+#include "s2geo/s2cellid.h"
+#include "s2geo/s2edgeutil.h"
+#include "s2geo/s2loop.h"
+#include "s2geo/s2testing.h"
 #include "util/math/vector3-inl.h"
 #include "util/math/matrix3x3-inl.h"
 

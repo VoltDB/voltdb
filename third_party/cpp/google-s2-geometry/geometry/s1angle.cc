@@ -7,8 +7,8 @@ using std::ostream;
 using std::cout;
 using std::endl;
 
-#include "s1angle.h"
-#include "s2latlng.h"
+#include "s2geo/s1angle.h"
+#include "s2geo/s2latlng.h"
 
 S1Angle::S1Angle(S2Point const& x, S2Point const& y)
     : radians_(x.Angle(y)) {

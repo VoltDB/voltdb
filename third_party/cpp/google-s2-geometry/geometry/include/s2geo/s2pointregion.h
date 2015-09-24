@@ -5,8 +5,8 @@
 
 #include "base/logging.h"
 #include "base/macros.h"
-#include "s2.h"
-#include "s2region.h"
+#include "s2geo/s2.h"
+#include "s2geo/s2region.h"
 
 /// An S2PointRegion is a region that contains a single point.  It is more
 /// expensive than the raw S2Point type and is useful mainly for completeness.

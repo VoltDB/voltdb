@@ -5,8 +5,8 @@
 
 #include "base/basictypes.h"
 #include "base/logging.h"
-#include "s1angle.h"
-#include "s2region.h"
+#include "s2geo/s1angle.h"
+#include "s2geo/s2region.h"
 
 /// This class represents a spherical cap, i.e. a portion of a sphere cut off
 /// by a plane.  The cap is defined by its axis and height.  This

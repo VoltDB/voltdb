@@ -1,6 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
-#include "s1angle.h"
+#include "s2geo/s1angle.h"
 
 #include <sstream>
 
@@ -8,8 +8,8 @@
 #include "base/integral_types.h"
 #include "base/logging.h"
 #include "testing/base/public/gunit.h"
-#include "s2latlng.h"
-#include "s2testing.h"
+#include "s2geo/s2latlng.h"
+#include "s2geo/s2testing.h"
 
 DEFINE_int32(iters, (DEBUG_MODE ? 100 : 1000) * (1000 * 1000),
              "Run timing tests with this many iterations");
