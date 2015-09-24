@@ -241,15 +241,15 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
         }
 
-        if (!m_internalConnectionIds.containsKey(context.getName())) {
-            m_internalConnectionIds.putIfAbsent(context.getName(), VoltProtocolHandler.getNextConnectionId());
-        }
         ExecutorService executor = m_partitionExecutor.get(partition);
         try {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
                     context.setBackPressure(hasBackPressure());
+                    if (!m_internalConnectionIds.containsKey(context.getName())) {
+                        m_internalConnectionIds.putIfAbsent(context.getName(), VoltProtocolHandler.getNextConnectionId());
+                    }
                     submitTransaction();
                 }
                 public boolean submitTransaction() {
@@ -437,7 +437,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public String getHostnameOrIP(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            m_logger.warn("Could not find caller details for client handle " + clientHandle + ". Using internal adapter name");
+            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+                    "Could not find caller details for client handle %d. Using internal adapter name", clientHandle);
             return getHostnameOrIP();
         } else {
             return callback.getInternalContext().getName();
@@ -463,13 +464,15 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public long connectionId(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            m_logger.warn("Could not find caller details for client handle " + clientHandle + ". Using internal adapter level connection id");
+            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+                    "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         }
 
         Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
         if (internalId==null) {
-            m_logger.warn("Could not find internal connection id for client handle " + clientHandle + ". Using internal adapter level connection id");
+            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+                "Could not find internal connection id for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         } else {
             return internalId;
