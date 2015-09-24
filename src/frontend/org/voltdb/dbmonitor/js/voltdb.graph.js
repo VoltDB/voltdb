@@ -1,4 +1,4 @@
-﻿
+
 (function (window) {
 
     var IMonitorGraphUI = (function () {
@@ -27,14 +27,14 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
+        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
         this.ChartLatency = nv.models.lineChart();
         this.ChartTransactions = nv.models.lineChart();
         this.ChartPartitionIdleTime = nv.models.lineChart();
-        this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
+        this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
 
@@ -259,7 +259,6 @@
                 var tooltip = MonitorGraphUI.ChartCpu.tooltip;
                 tooltip.gravity('s');
                 tooltip.contentGenerator(function (d) {
-                    console.log(d);
                     var html = '';
                     d.series.forEach(function (elem) {
                         html += "<h3>"
@@ -665,14 +664,14 @@
             transactionChart = transactinoChartObj;
             partitionChart = partitionChartObj;
             drReplicationChart = drReplicationCharObj;
-            cmdLogChart = cmdLogChartObj;            currentView = view;
+            cmdLogChart = cmdLogChartObj;            currentView = view;
             MonitorGraphUI.Monitors = {
                 'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
                 'latFirstData': true,
-                'tpsData': getEmptyDataOptimized(),
+                'latMaxTimeStamp': new Date('1970-11-11').getTime(),                'tpsData': getEmptyDataOptimized(),
                 'tpsDataMin': getEmptyDataForMinutesOptimized(),
                 'tpsDataDay': getEmptyDataForDaysOptimized(),
                 'tpsFirstData': true,
@@ -690,9 +689,8 @@
                 'partitionFirstData': true,
                 'drReplicationData': getEmptyDataOptimized(),
                 'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
-                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                //pm
-                'cmdLogData': getEmptyDataOptimized(),
-                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
+                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'cmdLogData': getEmptyDataOptimized(),
+                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
 
@@ -755,7 +753,7 @@
             if (partitionChart.is(":visible"))
                 MonitorGraphUI.ChartPartitionIdleTime.update();
 
-            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
+            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
 
             if (cmdLogChart.is(":visible"))
                 MonitorGraphUI.ChartCommandlog.update();
@@ -855,39 +853,42 @@
             var lat = maxLatency;
             if (lat < 0)
                 lat = 0;
+            if (monitor.latMaxTimeStamp < timeStamp) {
+                if (latSecCount >= 6 || monitor.latFirstData) {
+                    dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
+                    dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
+                    MonitorGraphUI.Monitors.latDataMin = dataLatMin;
+                    latSecCount = 0;
+                }
 
-            if (latSecCount >= 6 || monitor.latFirstData) {
-                dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
-                dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
-                MonitorGraphUI.Monitors.latDataMin = dataLatMin;
-                latSecCount = 0;
+                if (latMinCount >= 60 || monitor.latFirstData) {
+                    dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
+                    dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
+                    MonitorGraphUI.Monitors.latDataDay = dataLatDay;
+                    latMinCount = 0;
+                }
+
+                dataLat = sliceFirstData(dataLat, dataView.Seconds);
+                dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
+                MonitorGraphUI.Monitors.latData = dataLat;
+
+                if (graphView == 'Minutes')
+                    dataLatency[0]["values"] = dataLatMin;
+                else if (graphView == 'Days')
+                    dataLatency[0]["values"] = dataLatDay;
+                else
+                    dataLatency[0]["values"] = dataLat;
+
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && latencyChart.is(":visible")) {
+                    d3.select("#visualisationLatency")
+                        .datum(dataLatency)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartLatency);
+                }
+                monitor.latFirstData = false;
             }
-
-            if (latMinCount >= 60 || monitor.latFirstData) {
-                dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
-                dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
-                MonitorGraphUI.Monitors.latDataDay = dataLatDay;
-                latMinCount = 0;
-            }
-
-            dataLat = sliceFirstData(dataLat, dataView.Seconds);
-            dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
-            MonitorGraphUI.Monitors.latData = dataLat;
-
-            if (graphView == 'Minutes')
-                dataLatency[0]["values"] = dataLatMin;
-            else if (graphView == 'Days')
-                dataLatency[0]["values"] = dataLatDay;
-            else
-                dataLatency[0]["values"] = dataLat;
-
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && latencyChart.is(":visible")) {
-                d3.select("#visualisationLatency")
-                    .datum(dataLatency)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartLatency);
-            }
-            monitor.latFirstData = false;
+            if(timeStamp > monitor.latMaxTimeStamp)
+                monitor.latMaxTimeStamp = timeStamp;
             latSecCount++;
             latMinCount++;
         };
@@ -968,27 +969,30 @@
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
+                
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
 
                 if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
                     calculatedValue = 0;
 
-                if (tpsSecCount >= 6 || monitor.tpsFirstData) {
-                    datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
-                    datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                    MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
-                    tpsSecCount = 0;
+                if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
+                    if (tpsSecCount >= 6 || monitor.tpsFirstData) {
+                        datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
+                        datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
+                        MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
+                        tpsSecCount = 0;
+                    }
+                    if (tpsMinCount >= 60 || monitor.tpsFirstData) {
+                        datatransDay = sliceFirstData(datatransDay, dataView.Days);
+                        datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
+                        MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                        tpsMinCount = 0;
+                    }
+                    datatrans = sliceFirstData(datatrans, dataView.Seconds);
+                    datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
+                    MonitorGraphUI.Monitors.tpsData = datatrans;
+                    monitor.tpsFirstData = false;
                 }
-                if (tpsMinCount >= 60 || monitor.tpsFirstData) {
-                    datatransDay = sliceFirstData(datatransDay, dataView.Days);
-                    datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
-                    tpsMinCount = 0;
-                }
-                datatrans = sliceFirstData(datatrans, dataView.Seconds);
-                datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
-                MonitorGraphUI.Monitors.tpsData = datatrans;
-                monitor.tpsFirstData = false;
             }
 
             if (graphView == 'Minutes')

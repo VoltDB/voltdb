@@ -2148,7 +2148,11 @@ var getUserPreferences = function () {
         voltDbRenderer.userPreferences = {};
         var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "DrReplicationRate", "DRTables", "CommandLogStat", "CommandLogTables"];
         for (var i = 0; i < preferencesList.length; i++) {
-            voltDbRenderer.userPreferences[preferencesList[i]] = true;
+            if (preferencesList[i] == "ServerCPU" || preferencesList[i] == "ServerRAM" || preferencesList[i] == "ClusterLatency" || preferencesList[i] == "ClusterTransactions") {
+                voltDbRenderer.userPreferences[preferencesList[i]] = true;
+            } else {
+                voltDbRenderer.userPreferences[preferencesList[i]] = false;
+            }
         }
     }
     return voltDbRenderer.userPreferences;
