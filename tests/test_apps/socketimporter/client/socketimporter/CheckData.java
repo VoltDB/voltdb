@@ -37,16 +37,16 @@ import org.voltdb.client.ProcedureCallback;
 
 public class CheckData {
 
-    static Queue<Pair<Long, Long>> m_queue;
-    static Queue<Pair<Long, Long>> m_delete_queue;
+    static Queue<Pair<String, String>> m_queue;
+    static Queue<Pair<String, String>> m_delete_queue;
     Client m_client;
     private static final int VALUE = 1;
     private static final int KEY = 0;
 
-    private static final String MY_SELECT_PROCEDURE = "IMPORTTABLE2.select";
-    private static final String MY_DELETE_PROCEDURE = "IMPORTTABLE2.delete";
+    private static final String MY_SELECT_PROCEDURE = "IMPORTTABLE.select";
+    private static final String MY_DELETE_PROCEDURE = "IMPORTTABLE.delete";
 
-    public CheckData(Queue<Pair<Long, Long>> q, Queue<Pair<Long, Long>> dq, Client c) {
+    public CheckData(Queue<Pair<String, String>> q, Queue<Pair<String, String>> dq, Client c) {
         m_client = c;
         m_queue = q;
         m_delete_queue = dq;
@@ -54,17 +54,17 @@ public class CheckData {
 
     public void processQueue() {
         while (m_queue.size() > 0 || m_delete_queue.size() > 0) {
-            Pair<Long, Long> p = m_queue.poll();
+            Pair<String, String> p = m_queue.poll();
 
             try {
                 if (p != null) {
-                    Long key = p.getFirst();
+                    String key = p.getFirst();
                     boolean ret = m_client.callProcedure(new SelectCallback(m_queue, p, key), MY_SELECT_PROCEDURE, key);
                     if (!ret) {
                         System.out.println("Select call failed!");
                     }
                 }
-                Pair<Long, Long> p2 = m_delete_queue.poll();
+                Pair<String, String> p2 = m_delete_queue.poll();
                 if (p2 != null) {
                     boolean ret = m_client.callProcedure(new DeleteCallback(m_delete_queue, p2), MY_DELETE_PROCEDURE, p2.getFirst());
                     if (!ret) {
@@ -90,11 +90,11 @@ public class CheckData {
         private static final int KEY = 0;
         private static final int VALUE = 1;
 
-        Pair<Long, Long> m_pair;
-        Queue<Pair<Long, Long>> m_queue;
-        Long m_key;
+        Pair<String, String> m_pair;
+        Queue<Pair<String, String>> m_queue;
+        String m_key;
 
-        public SelectCallback(Queue<Pair<Long, Long>> q, Pair<Long, Long> p, Long key) {
+        public SelectCallback(Queue<Pair<String, String>> q, Pair<String, String> p, String key) {
             m_pair = p;
             m_queue = q;
             m_key = key;
@@ -108,8 +108,8 @@ public class CheckData {
                 return;
             }
 
-            List<Long> pair = getDataFromResponse(response);
-            Long key, value;
+            List<String> pair = getDataFromResponse(response);
+            String key, value;
             if (pair.size() == 2) {
                 key = pair.get(KEY);
                 value = pair.get(VALUE);
@@ -127,8 +127,8 @@ public class CheckData {
             }
         }
 
-        private List<Long> getDataFromResponse(ClientResponse response) {
-            List<Long> m_pair = new ArrayList<Long>();
+        private List<String> getDataFromResponse(ClientResponse response) {
+            List<String> m_pair = new ArrayList<String>();
             //Long[] m_pairString = new Long[0];
             VoltTable[] m_results = response.getResults();
             if (m_results.length == 0) {
@@ -138,8 +138,8 @@ public class CheckData {
             VoltTable recordset = m_results[0];
             if (recordset.advanceRow()) {
 
-                m_pair.add((Long) recordset.get(KEY, VoltType.BIGINT));
-                m_pair.add((Long) recordset.get(VALUE, VoltType.BIGINT));
+                m_pair.add((String) recordset.get(KEY, VoltType.STRING));
+                m_pair.add((String) recordset.get(VALUE, VoltType.STRING));
             }
             return m_pair;
         }
@@ -148,10 +148,10 @@ public class CheckData {
 
     static class DeleteCallback implements ProcedureCallback {
 
-        Pair<Long, Long> m_pair;
-        Queue<Pair<Long, Long>> m_queue;
+        Pair<String, String> m_pair;
+        Queue<Pair<String, String>> m_queue;
 
-        public DeleteCallback(Queue<Pair<Long, Long>> q, Pair<Long, Long> p) {
+        public DeleteCallback(Queue<Pair<String, String>> q, Pair<String, String> p) {
             m_pair = p;
             m_queue = q;
         }

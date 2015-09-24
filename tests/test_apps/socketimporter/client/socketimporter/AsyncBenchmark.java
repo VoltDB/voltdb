@@ -69,8 +69,8 @@ public class AsyncBenchmark {
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     // queue structure to hold data as it's written, so we can check it all get's into the database
-    static Queue<Pair<Long,Long>> queue = new LinkedBlockingQueue<Pair<Long,Long>>();
-    static Queue<Pair<Long,Long>> dqueue = new LinkedBlockingQueue<Pair<Long,Long>>();
+    static Queue<Pair<String,String>> queue = new LinkedBlockingQueue<Pair<String,String>>();
+    static Queue<Pair<String,String>> dqueue = new LinkedBlockingQueue<Pair<String,String>>();
     static boolean importerDone = false;
 
     // validated command line configuration
@@ -187,7 +187,7 @@ public class AsyncBenchmark {
      * @param port
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    static void connect(String servers, final boolean perftest) throws InterruptedException {
+    static void connect(String servers) throws InterruptedException {
         System.out.println("Connecting to Socket Streaming Interface...");
 
         String[] serverArray = servers.split(",");
@@ -198,17 +198,17 @@ public class AsyncBenchmark {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    int port;
-                    if (perftest) {
-                        port = 7001;
-                    } else {
-                        port = 7002;
-                    }
+                    int port = 7001; // default port; assumed in system test so keep sync'd if it's changed
+//                    if (perftest) {
+//                        port = 7001;
+//                    } else {
+//                        port = 7002;
+//                    }
                     HostAndPort hap = HostAndPort.fromString(server);
                     //System.out.println(" hap--toString: " + hap.toString());
-//                    if (hap.hasPort()) {
-//                        port = hap.getPort();
-//                    }
+                    if (hap.hasPort()) {
+                        port = hap.getPort();
+                    }
                     OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), port);
                     haplist.put(hap, writer);
                     connections.countDown();
@@ -311,14 +311,14 @@ public class AsyncBenchmark {
             System.out.println("Warming up...");
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
-                long key = rnd.nextLong();
+                String key = Long.toString(rnd.nextLong());
                 String s;
                 if (config.perftest) {
                     String valString = RandomStringUtils.randomAlphanumeric(16);
                     s = key + "," + valString + "\n";
                 } else {
-                    long t = System.currentTimeMillis();
-                    Pair<Long,Long> p = new Pair<Long,Long>(key, t);
+                    String t = Long.toString(System.currentTimeMillis());
+                    Pair<String,String> p = new Pair<String,String>(key, t);
                     queue.offer(p);
                     s = key + "," + t + "\n";
                 }
@@ -336,14 +336,14 @@ public class AsyncBenchmark {
             System.out.println("\nRunning benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
-                long key = rnd.nextLong();
+                String key = Long.toString(rnd.nextLong());
                 String s;
                 if (config.perftest) {
                     String valString = RandomStringUtils.randomAlphanumeric(16);
                     s = key + "," + valString + "\n";
                 } else {
-                    long t = System.currentTimeMillis();
-                    Pair<Long,Long> p = new Pair<Long,Long>(key, t);
+                    String t = Long.toString(System.currentTimeMillis());
+                    Pair<String,String> p = new Pair<String,String>(key, t);
                     queue.offer(p);
                     s = key + "," + t + "\n";
                 }
@@ -418,7 +418,7 @@ public class AsyncBenchmark {
         config.parse(AsyncBenchmark.class.getName(), args);
 
         // connect to one or more servers, loop until success
-        connect(config.sockservers, config.perftest);
+        connect(config.sockservers);
         dbconnect(config.servers);
 
         CountDownLatch cdl = new CountDownLatch(haplist.size());

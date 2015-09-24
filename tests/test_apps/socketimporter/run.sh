@@ -168,7 +168,7 @@ function async-benchmark() {
         --displayinterval=5 \
         --warmup=2 \
         --duration=30 \
-        # --perftest=true \
+        --perftest=true \
         --servers=localhost \
         --sockservers=localhost:7001
 }
