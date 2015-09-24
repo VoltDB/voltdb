@@ -33,6 +33,7 @@ CTX = BuildContext(sys.argv)
 #  and how the build will go down. It also checks the platform and parses
 #  command line args to determine target and build level.
 
+# print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
 ###############################################################################
 # SET GLOBAL CONTEXT VARIABLES FOR BUILDING
 ###############################################################################
@@ -49,14 +50,17 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
 
 # clang doesn't seem to want this
-if compiler_name == 'gcc':
+if CTX.compilerName() == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
 
-if (compiler_name == 'clang') and (compiler_major == 3 and compiler_minor >= 4):
+if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
-if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
+if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
+    CTX.CPPFLAGS += " -Wno-unused-local-typedef"
+
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 if CTX.PROFILE:

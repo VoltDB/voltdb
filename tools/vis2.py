@@ -117,7 +117,7 @@ class Plot:
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate, polarity):
     global mc
     plot_data = dict()
     for run in data:
@@ -153,14 +153,12 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
                 failed = 0
-                if k.startswith('lat'):
-                    polarity = 1
+                if polarity==1:
                     cv = np.nanmin(ma)
                     rp = (u[0][np.nanargmin(ma)], cv)
                     if b == 'master' and ma[-1] > cv * 1.05:
                         failed = 1
                 else:
-                    polarity = -1
                     cv = np.nanmax(ma)
                     rp = (u[0][np.nanargmax(ma)], cv)
                     if b == 'master' and ma[-1] < cv * 0.95:
@@ -185,7 +183,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     for pos in ['top', 'bottom', 'right', 'left']:
                         pl.ax.spines[pos].set_edgecolor(color)
                     pl.ax.set_axis_bgcolor(color)
-                    pl.ax.set_alpha(0.2)
+                    pl.ax.patch.set_alpha(0.1)
 
                 pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,-10*polarity),
                     textcoords='offset points', ha='center')
@@ -359,18 +357,20 @@ def main():
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
-        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
+        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label, polarity from charts where appname = '%s' order by chart_order" % app])
         conn.close()
 
         app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
 
-        legend = { 1 : dict(series="lat95", heading="95tile latency",            xlabel="Time",      ylabel="Latency (ms)"),
-                   2 : dict(series="lat99", heading="99tile latency",            xlabel="Time",      ylabel="Latency (ms)"),
-                   3 : dict(series="tppn",  heading="avg throughput per node",    xlabel="Time",      ylabel="ops/sec per node")
+        #chart polarity: -1 for tps (decreasing is bad), 1 for latencies (increasing is bad)
+
+        legend = { 1 : dict(series="lat95", heading="95tile latency",            xlabel="Time",      ylabel="Latency (ms)",      polarity=1),
+                   2 : dict(series="lat99", heading="99tile latency",            xlabel="Time",      ylabel="Latency (ms)",      polarity=1),
+                   3 : dict(series="tppn",  heading="avg throughput per node",    xlabel="Time",      ylabel="ops/sec per node", polarity=-1)
                  }
 
         for r in resp.tables[0].tuples:
-            legend[r[0]] = dict(series=r[1], heading=r[2], xlabel=r[3], ylabel=r[4])
+            legend[r[0]] = dict(series=r[1], heading=r[2], xlabel=r[3], ylabel=r[4], polarity=r[5])
 
         fns = [app]
         flags = dict()
@@ -378,7 +378,7 @@ def main():
             title = app + " " + r['heading']
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            f = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate, maxdate)
+            f = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate, maxdate, r['polarity'])
             flags.update(f)
 
         fns.append(iorder)

@@ -222,7 +222,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void forceAllBuffersToDiskForDRAndExport(final boolean nofsync)
+        public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }

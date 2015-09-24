@@ -458,4 +458,33 @@ public class TestVoltMessageSerialization extends TestCase {
         assertTrue(r1.hasHashinatorConfig());
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
     }
+
+    public void testInvalidTableCount() throws Exception
+    {
+        int size = 1 // version
+            + 8 // clientHandle
+            + 1 // present fields
+            + 1 // status
+            + 1 // app status
+            + 4 // cluster roundtrip time
+            + 2; // number of result tables
+        ByteBuffer buf = ByteBuffer.allocate(size);
+        buf.put((byte)0); //version
+        buf.putLong(1L);
+        byte presentFields = 0;
+        buf.put(presentFields);
+        buf.put(ClientResponse.SUCCESS);
+        buf.put(ClientResponse.SUCCESS);
+        buf.putInt(100);
+        buf.putShort( (short) (Short.MAX_VALUE + 1));
+        buf.flip();
+
+        ClientResponseImpl deserialized = new ClientResponseImpl();
+        try {
+            deserialized.initFromBuffer(buf);
+            fail("Must have failed for invalid table count");
+        } catch(IOException e) {
+            assertTrue(e.getMessage().contains("is negative"));
+        }
+    }
 }
