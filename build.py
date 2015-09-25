@@ -57,10 +57,11 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
     CTX.CPPFLAGS += " -Wno-varargs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
-    CTX.CPPFLAGS += " -Wno-unused-local-typedef -Wno-absolute-value"
+    CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
-if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3):
-    CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMinorVersion() == 5):
+    CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs"
+    CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable"
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"

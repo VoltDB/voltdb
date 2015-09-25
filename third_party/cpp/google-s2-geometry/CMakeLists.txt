@@ -78,11 +78,8 @@ enable_testing(true)
 
 cmake_policy(SET CMP0037 OLD) # allow underscores in targets
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  set(PTHREAD_LIBRARY_FOR_TESTS "pthread")
-  message("Using -lpthread in Linux Build")
-else()
-  set(PTHREAD_LIBRARY_FOR_TESTS "")
-  message("Not Using -lpthread in non-Linux Build")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpic")
+  set(PTHREAD_LIBRARY_FOR_TESTS pthread)
 endif()
 foreach( testsourcefile ${TestGlob} )
     get_filename_component(testname ${testsourcefile} NAME_WE)

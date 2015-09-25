@@ -32,15 +32,11 @@ namespace voltdb {
 void verifyS2Links() {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-
     S2LatLng  Bedford{S2LatLng::FromDegrees(42.4906, -71.2767)};
     S2LatLng  SantCruz{S2LatLng::FromDegrees(39.9719, -122.0264)};
     // The GetDistance function is out-of-line.  So, we can
     // see that it's linked in with nm.
     S1Angle d = Bedford.GetDistance(SantCruz);
-#pragma GCC diagnostic pop
 #pragma clang diagnostic pop
 
 }
