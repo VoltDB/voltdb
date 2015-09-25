@@ -171,13 +171,15 @@ public class TestQueryTimeout extends RegressionSuite {
         }
     }
 
+    final String PROMPTMSG = " is supposed to timed out, but succeed eventually!";
+
     private void checkTimeoutIncreasedProcSucceed(boolean sync, Client client, String procName, Object...params)
             throws IOException, ProcCallException, InterruptedException {
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
 
         try {
             client.callProcedure(procName, params);
-            fail(procName + " is supposed to timed out, but not actually!");
+            fail(procName + PROMPTMSG);
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -204,7 +206,7 @@ public class TestQueryTimeout extends RegressionSuite {
         // run the same procedure again to verify the global timeout value still applies
         try {
             client.callProcedure(procName, params);
-            fail(procName + " is supposed to timed out, but not actually!");
+            fail(procName + PROMPTMSG);
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -218,7 +220,7 @@ public class TestQueryTimeout extends RegressionSuite {
 
         try {
             client.callProcedure(procName, params);
-            fail(procName + " is supposed to timed out, but not actually!");
+            fail(procName + PROMPTMSG);
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -230,7 +232,7 @@ public class TestQueryTimeout extends RegressionSuite {
         if (sync) {
             try {
                 client.callProcedureWithTimeout(TIMEOUT*50, procName, params);
-                fail(procName + " is supposed to be timed out!");
+                fail(procName + PROMPTMSG);
             } catch(Exception ex) {
                 assertTrue(ex.getMessage().contains(ERRORMSG));
             }
@@ -246,7 +248,7 @@ public class TestQueryTimeout extends RegressionSuite {
         // run the same procedure again to verify the global timeout value still applies
         try {
             client.callProcedure(procName, params);
-            fail(procName + " is supposed to timed out, but not actually!");
+            fail(procName + PROMPTMSG);
         } catch(Exception ex) {
             assertTrue(ex.getMessage().contains(ERRORMSG));
         }
@@ -270,7 +272,7 @@ public class TestQueryTimeout extends RegressionSuite {
         if (sync) {
             try {
                 client.callProcedureWithTimeout(TIMEOUT / 500, procName, params);
-                fail(procName + " is supposed to timed out, but not actually!");
+                fail(procName + PROMPTMSG);
             } catch(Exception ex) {
                 assertTrue(ex.getMessage().contains(ERRORMSG));
             }

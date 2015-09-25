@@ -1028,7 +1028,7 @@ public class SQLCommand
         + "  and returns to the command prompt. Default: true.\n"
         + "\n"
         + "[--query-timeout=millisecond_number]\n"
-        + "  Read only queries timeout setting. Default: no timeout.\n"
+        + "  Read-only queries that take longer than this number of milliseconds will abort. Default: no timeout.\n"
         + "\n"
         );
         System.exit(exitCode);
