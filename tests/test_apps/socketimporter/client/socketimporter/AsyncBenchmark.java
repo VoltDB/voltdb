@@ -72,7 +72,7 @@ public class AsyncBenchmark {
     static Queue<Pair<String,String>> queue = new LinkedBlockingQueue<Pair<String,String>>();
     static Queue<Pair<String,String>> dqueue = new LinkedBlockingQueue<Pair<String,String>>();
     static boolean importerDone = false;
-    static CheckData checkDB = null;
+    static DataUtils checkDB = null;
 
     // validated command line configuration
     static Config config;
@@ -427,8 +427,12 @@ public class AsyncBenchmark {
         config.parse(AsyncBenchmark.class.getName(), args);
 
         // connect to one or more servers, loop until success
-        connect(config.sockservers);
         dbconnect(config.servers);
+        checkDB = new DataUtils(queue, dqueue, client, config.partitioned);
+
+        System.out.println("Setting up DDL");
+        checkDB.ddlSetup(config.partitioned);
+      	connect(config.sockservers);
 
         CountDownLatch cdl = new CountDownLatch(haplist.size());
         for (HostAndPort hap : haplist.keySet()) {
@@ -436,7 +440,7 @@ public class AsyncBenchmark {
             BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, hap);
             runner.start();
         }
-        checkDB = new CheckData(queue, dqueue, client, config.partitioned);
+
         //System.out.println("max in main:" + checkDB.maxInsertTime());
         if (!config.perftest) {
             // start checking the table that's being populated by the socket injester(s)
@@ -473,6 +477,7 @@ public class AsyncBenchmark {
             }
         }
         client.drain();
+        client.close();
 
         if (!config.perftest) {
             System.out.println("Queued tuples remaining: " + queue.size());

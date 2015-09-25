@@ -36,30 +36,21 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
-public class CheckData {
+public class DataUtils {
     static Queue<Pair<String, String>> m_queue;
     static Queue<Pair<String, String>> m_delete_queue;
-    static String m_select;
-    static String m_delete;
-    static String m_max;
     Client m_client;
     private static final int KEY = 0;
     private static final int VALUE = 1;
 
-    private static final String PARTITIONED_SELECT = "PARTITIONED.select";
-    private static final String PARTITIONED_DELETE = "PARTITIONED.delete";
-    private static final String REPLICATED_SELECT = "REPLICATED.select";
-    private static final String REPLICATED_DELETE = "REPLICATED.delete";
-    private static final String REPLICATED_MAX = "SelectMaxTimeReplicated";
-    private static final String PARTITIONED_MAX = "SelectMaxTimePartitioned";
+    private static final String m_select = "IMPORTTABLE.select";
+    private static final String m_delete = "IMPORTTABLE.delete";
+    private static final String m_max = "SelectMaxTime";
 
-    public CheckData(Queue<Pair<String, String>> q, Queue<Pair<String, String>> dq, Client c, boolean partitioned) {
+    public DataUtils(Queue<Pair<String, String>> q, Queue<Pair<String, String>> dq, Client c, boolean partitioned) {
         m_client = c;
         m_queue = q;
         m_delete_queue = dq;
-        m_select = partitioned ? PARTITIONED_SELECT : REPLICATED_SELECT;
-        m_delete = partitioned ? PARTITIONED_DELETE : REPLICATED_DELETE;
-        m_max = partitioned ? PARTITIONED_MAX : REPLICATED_MAX;
     }
 
     public void processQueue() {
@@ -116,7 +107,60 @@ public class CheckData {
             return data.asScalarLong();
     }
 
-    static class SelectCallback implements ProcedureCallback {
+    public void ddlSetup(boolean partitioned) {
+    	final String[] DDLStmts = {
+    			"CREATE TABLE importtable ( " +
+    			"  key      varchar(250) not null " +
+    			", value    varchar(1048576 BYTES) not null " +
+    			", insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
+    			", PRIMARY KEY (key))",
+    			"CREATE PROCEDURE InsertOnly as insert into importtable(key, value) VALUES(?, ?)",
+    			"CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE",
+    	};
+        final String[] PartitionStmts = {
+        		"PARTITION table IMPORTTABLE ON COLUMN key",
+    			"PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key"
+    			//"PARTITION PROCEDURE SelectMaxTime ON TABLE importtable COLUMN insert_time"
+        };
+    	dropTables();
+    	try {
+    	    for (int i = 0; i < DDLStmts.length; i++) {
+    	    	m_client.callProcedure("@AdHoc",
+    	    			DDLStmts[i]).getResults();
+    	    }
+    	} catch (Exception e) {
+    	    e.printStackTrace();
+    	}
+    	if (partitioned) {
+    		try {
+        	    for (int i = 0; i < PartitionStmts.length; i++) {
+        	    	m_client.callProcedure("@AdHoc",
+        	    			PartitionStmts[i]).getResults();
+        	    }
+        	} catch (Exception e) {
+        	    e.printStackTrace();
+        	}
+    	}
+    }
+
+    private void dropTables() {
+    	final String[] dropStmts = {
+    		"procedure InsertOnly IF EXISTS",
+    		"procedure SelectMaxTime IF EXISTS",
+    		"table importtable IF EXISTS"
+    	};
+    	try {
+			for (int i = 0; i < dropStmts.length; i++) {
+				m_client.callProcedure("@AdHoc",
+						"DROP " + dropStmts[i]);
+			}
+		} catch (IOException | ProcCallException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	static class SelectCallback implements ProcedureCallback {
         private static final int KEY = 0;
         private static final int VALUE = 1;
 
