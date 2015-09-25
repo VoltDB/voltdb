@@ -489,7 +489,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
     return retval;
 }
 
-static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
+static char* serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
    size_t serializeSize = table->getAccurateSizeToSerialize(false);
    char* backingCharArray = new char[serializeSize];
    ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
@@ -501,6 +501,7 @@ static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
        jniEngine->ExceptionDescribe();
        throw std::exception();
    }
+   return backingCharArray;
 }
 
 int JNITopend::reportDRConflict(int32_t partitionId,
@@ -518,9 +519,9 @@ int JNITopend::reportDRConflict(int32_t partitionId,
     jobject existingRowsBuffer;
     jobject expectedRowsBuffer;
     jobject newRowsBuffer;
-    serializeTable(m_jniEnv, existingRows, &existingRowsBuffer);
-    serializeTable(m_jniEnv, expectedRows, &expectedRowsBuffer);
-    serializeTable(m_jniEnv, newRows, &newRowsBuffer);
+    char* existingCharArray = serializeTable(m_jniEnv, existingRows, &existingRowsBuffer);
+    char* expectedCharArray = serializeTable(m_jniEnv, expectedRows, &expectedRowsBuffer);
+    char* newCharArray = serializeTable(m_jniEnv, newRows, &newRowsBuffer);
 
     // prepare output buffer
     size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
@@ -555,6 +556,10 @@ int JNITopend::reportDRConflict(int32_t partitionId,
     ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
     output->loadTuplesFrom(filledOutputSerializeInput);
 
+    delete [] existingCharArray;
+    delete [] expectedCharArray;
+    delete [] newCharArray;
+    delete [] outputBackingCharArray;
     m_jniEnv->DeleteLocalRef(tableNameString);
     m_jniEnv->DeleteLocalRef(existingRowsBuffer);
     m_jniEnv->DeleteLocalRef(expectedRowsBuffer);
