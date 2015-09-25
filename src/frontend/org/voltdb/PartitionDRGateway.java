@@ -167,18 +167,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
                                  String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
                                  ByteBuffer newTable, ByteBuffer output) {
-        BBContainer cont = DBBPool.wrapBB(existingTable);
-        DBBPool.registerUnsafeMemory(cont.address());
-        cont.discard();
-
-        cont = DBBPool.wrapBB(expectedTable);
-        DBBPool.registerUnsafeMemory(cont.address());
-        cont.discard();
-
-        cont = DBBPool.wrapBB(newTable);
-        DBBPool.registerUnsafeMemory(cont.address());
-        cont.discard();
-
         return 0;
     }
 
