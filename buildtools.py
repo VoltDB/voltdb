@@ -17,6 +17,8 @@ class BuildContext:
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
         self.INPUT = {}
+        self.SRC_INCLUDE_DIRS = []
+        self.OBJ_INCLUDE_DIRS = []
         self.THIRD_PARTY_INPUT = {}
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
@@ -135,14 +137,14 @@ def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
     jni_objname = "objects/" + replaceSuffix(relativepath, ".o")
     static_objname = "static_objects/" + replaceSuffix(relativepath, ".o")
-    return jni_objname, static_objname
+    return os.path.normpath(jni_objname), os.path.normpath(static_objname)
 
 def namesForTestCode(filename):
     relativepath = "/".join(filename.split("/")[2:])
     binname = "cpptests/" + relativepath
     sourcename = filename + ".cpp"
     objectname = "static_objects/" + filename.split("/")[-1] + ".o"
-    return binname, objectname, sourcename
+    return os.path.normpath(binname), os.path.normpath(objectname), os.path.normpath(sourcename)
 
 def formatList(list):
     str = ""
@@ -162,13 +164,18 @@ def buildMakefile(CTX):
     MAKECPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
         MAKECPPFLAGS += " -isystem ../../%s" % (dir)
-    for dir in CTX.INCLUDE_DIRS:
+    for dir in CTX.SRC_INCLUDE_DIRS:
         MAKECPPFLAGS += " -I../../%s" % (dir)
+    for dir in CTX.OBJ_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I%s" % (dir)
+    # I don't think these are used anywhere.
     LOCALCPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
         LOCALCPPFLAGS += " -isystem %s" % (dir)
-    for dir in CTX.INCLUDE_DIRS:
+    for dir in CTX.SRC_INCLUDE_DIRS:
         LOCALCPPFLAGS += " -I%s" % (dir)
+    for dir in CTX.OBJ_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I%s" % (dir)
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -351,7 +358,7 @@ def buildMakefile(CTX):
 
         # build the object file
         makefile.write("########################################################################\n")
-        makefile.write("#\n# %s\n#\n" % filename)
+        makefile.write("#\n# %s\n#\n" % sourcename)
         makefile.write("########################################################################\n")
         makefile.write("%s: ../../%s" % (objectname, sourcename))
         makefile.write("\n")
@@ -359,7 +366,7 @@ def buildMakefile(CTX):
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
         makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a\n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))

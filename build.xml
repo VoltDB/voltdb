@@ -1058,7 +1058,7 @@ CLEANING
 
 <target name='clean'
     description="Remove all compiled and generated files."
-    depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
+    depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen, clean-s2-geometry,
              clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -1493,6 +1493,10 @@ NATIVE EE STUFF
     <variable name="CMAKE_BUILD_TYPE"
               value="${s2-geometry.buildtype}" />
   </cmake>
+  <exec dir="${s2-geometry.bin}"
+        executable="make">
+    <arg value="install" />
+  </exec>
 </target>
 
 <target name="test-s2-geometry"

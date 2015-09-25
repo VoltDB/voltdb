@@ -41,7 +41,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-std=c++11 -Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
@@ -58,7 +58,7 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
     CTX.CPPFLAGS += " -Wno-varargs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
-    CTX.CPPFLAGS += " -Wno-unused-local-typedef"
+    CTX.CPPFLAGS += " -Wno-unused-local-typedef -Wno-absolute-value"
 
 if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
@@ -83,7 +83,7 @@ if CTX.PROFILE:
 
 # this is where the build will look for header files
 # - the test source will also automatically look in the test root dir
-CTX.INCLUDE_DIRS = ['src/ee' ]
+CTX.SRC_INCLUDE_DIRS += ['src/ee' ]
 CTX.SYSTEM_DIRS = ['third_party/cpp']
 
 # don't worry about checking for changes in header files in the following
@@ -362,7 +362,7 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
 ###############################################################################
 # Some special handling for S2.
 ###############################################################################
-CTX.INCLUDE_DIRS += ['%s/google-s2-geometry/include' % CTX.OUTPUT_PREFIX]
+CTX.OBJ_INCLUDE_DIRS += ['google-s2-geometry/include']
 CTX.LASTLDFLAGS += " -Lgoogle-s2-geometry/lib -ls2geo"
 
 ###############################################################################
