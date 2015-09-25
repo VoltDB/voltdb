@@ -163,19 +163,21 @@ def buildMakefile(CTX):
     CPPFLAGS = " ".join(CTX.CPPFLAGS.split())
     MAKECPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
-        MAKECPPFLAGS += " -isystem ../../%s" % (dir)
+        MAKECPPFLAGS += " -isystem $(ROOTDIR)/%s" % (dir)
     for dir in CTX.SRC_INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I../../%s" % (dir)
+        MAKECPPFLAGS += " -I$(ROOTDIR)/%s" % (dir)
     for dir in CTX.OBJ_INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I%s" % (dir)
+        MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
+    MAKECPPFLAGS += " -I${OBJDIR}"
     # I don't think these are used anywhere.
     LOCALCPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
         LOCALCPPFLAGS += " -isystem %s" % (dir)
     for dir in CTX.SRC_INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I%s" % (dir)
+        LOCALCPPFLAGS += " -I${ROOTDIR}/%s" % (dir)
     for dir in CTX.OBJ_INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I%s" % (dir)
+        LOCALCPPFLAGS += " -I${OBJDIR}/%s" % (dir)
+    LOCALCPPFLAGS += " -I${OBJDIR}"
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -211,6 +213,7 @@ def buildMakefile(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
 
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
+    makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
     makefile.write("CXX = %s\n" % CTX.CXX)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
@@ -218,10 +221,20 @@ def buildMakefile(CTX):
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
     makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
-    makefile.write("SRC = ../../%s\n" % (INPUT_PREFIX))
-    makefile.write("THIRD_PARTY_SRC = ../../%s\n" % (THIRD_PARTY_INPUT_PREFIX))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
+    makefile.write("#\n# Capture the name of the root directory, so that we can give\n")
+    makefile.write("# absolute pathnames later on.  Also, remember the obj directory,\n")
+    makefile.write("# which should be the directory we are currently in.\n#\n")
+    makefile.write('ROOTDIR=$(shell cd ../..; /bin/pwd)\n')
+    makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
+    makefile.write('#\n# This is the root of the cpp sources.\n#\n')
+    makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
+    makefile.write('#\n# This is the root of the third party sources.\n#\n')
+    makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
+    makefile.write("#\n# These are google S2 library's source and object directories.\n#\n")
+    makefile.write('GOOGLE_S2_SRC="${THIRD_PARTY_SRC}/google-s2-geometry"\n')
+    makefile.write('GOOGLE_S2_OBJ="${OBJDIR}/google-s2-geometry"\n')
     makefile.write("\n")
 
     if CTX.TARGET == "CLEAN":
@@ -231,7 +244,8 @@ def buildMakefile(CTX):
         makefile.close()
         return
 
-    makefile.write(".PHONY: main\n")
+    makefile.write(".PHONY: main\n\n")
+    makefile.write("main: build-s2-geometry\n\n")
     if CTX.TARGET == "VOLTRUN":
         makefile.write("main: prod/voltrun\n")
     elif CTX.TARGET == "TEST":
@@ -239,6 +253,10 @@ def buildMakefile(CTX):
     else:
         makefile.write("main: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % version)
     makefile.write("\n")
+
+    makefile.write("# Suppress display of executed commands.\n")
+    makefile.write(".PHONY: $(VERBOSE).SILENT\n")
+    makefile.write("$(VERBOSE).SILENT:\n\n")
 
     jni_objects = []
     static_objects = []
@@ -263,17 +281,20 @@ def buildMakefile(CTX):
 
     makefile.write("# main jnilib target\n")
     makefile.write("%s: %s\n" % (jnilibname, formatList(jni_objects)))
+    makefile.write("\t@echo Linking the JNI target %s\n" % jnilibname)
     makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ %s \n" % ( CTX.LASTLDFLAGS ) )
     makefile.write("\n")
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
-    makefile.write("prod/voltrun: $(SRC)/voltrun.cpp " + formatList(static_objects) + "\n")
+    makefile.write("prod/voltrun: $(SRCDIR)/voltrun.cpp " + formatList(static_objects) + "\n")
+    makefile.write("\t@echo Linking prod/voltrun\n")
     makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ %s\n" % ( CTX.LASTLDFLAGS ))
     makefile.write("\n")
     cleanobjs += ["prod/voltrun"]
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
-    makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
+    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp " + " objects/volt.a\n")
+    makefile.write("\t@echo Linking the IPC program: prod/voltdbipc\n")
     makefile.write("\t$(LINK.cpp) -o $@ $^ %s %s\n" % (CTX.LASTLDFLAGS, CTX.LASTIPCLDFLAGS))
     makefile.write("\n")
     cleanobjs += ["prod/voltdbipc"]
@@ -290,7 +311,9 @@ def buildMakefile(CTX):
     makefile.write("\n\n")
     makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
-    makefile.write("objects/harness.o: ../../" + TEST_PREFIX + "/harness.cpp\n")
+    harness_source = TEST_PREFIX + "/harness.cpp"
+    makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
+    makefile.write("\t@echo Compiling source file %s\n" % harness_source)
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $^\n")
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
@@ -303,17 +326,19 @@ def buildMakefile(CTX):
     makefile.write("########################################################################\n")
     for filename in input_paths:
         jni_objname, static_objname = outputNamesForSource(filename)
-        filename = filename.replace(INPUT_PREFIX, "$(SRC)")
-        jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
-        static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
+        filename = os.path.normpath(filename.replace(INPUT_PREFIX, "$(SRCDIR)"))
+        jni_targetpath = OUTPUT_PREFIX + "/".join(jni_objname.split("/")[:-1])
+        static_targetpath = OUTPUT_PREFIX + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % filename)
         makefile.write("########################################################################\n")
         makefile.write("%s: %s\n" % (jni_objname, filename))
+        makefile.write("\t@echo Compiling Volt source file for JNI: %s\n" % filename)
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
         makefile.write("%s: %s\n" % (static_objname, filename))
+        makefile.write("\t@echo Compiling Volt source file for IPC: %s\n" % filename)
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
         makefile.write("-include %s\n" % replaceSuffix(jni_objname, ".d"))
         makefile.write("-include %s\n" % replaceSuffix(static_objname, ".d"))
@@ -338,8 +363,10 @@ def buildMakefile(CTX):
         makefile.write("#\n# %s\n#\n" % filename)
         makefile.write("########################################################################\n")
         makefile.write("%s: %s\n" % (jni_objname, filename))
+        makefile.write("\t@echo Compiling 3pty source file for JNI: %s\n" % filename)
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
         makefile.write("%s: %s\n" % (static_objname, filename))
+        makefile.write("\t@echo Compiling 3pty source file for IPC: %s\n" % filename)
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
         makefile.write("-include %s\n" % replaceSuffix(jni_objname, ".d"))
         makefile.write("-include %s\n" % replaceSuffix(static_objname, ".d"))
@@ -349,6 +376,50 @@ def buildMakefile(CTX):
                       replaceSuffix(jni_objname, ".d")]
         makefile.write("\n")
     makefile.write("\n")
+
+    makefile.write("#\n# This target lets us print makefile variables, for debugging\n")
+    makefile.write("#\n# the makefile.\n#\n")
+    makefile.write("echo_makefile_config:\n")
+    makefile.write('\t@echo "ROOT_DIR = $(ROOTDIR)"\n')
+    makefile.write('\t@echo "OBJDIR = $(OBJDIR)"\n')
+    makefile.write('\t@echo "SRCDIR = $(SRCDIR)"\n')
+    makefile.write('\t@echo "THIRD_PARTY_SRC = $(THIRD_PARTY_SRC)"\n')
+    makefile.write('\t@echo "GOOGLE_S2_SRC = $(GOOGLE_S2_SRC)"\n')
+    makefile.write('\t@echo "GOOGLE_S2_OBJ = $(GOOGLE_S2_OBJ)"\n')
+
+    makefile.write("#\n# Google S2 uses cmake, which has different names for the\n")
+    makefile.write("# build types.  It's easier to translate them here than to\n")
+    makefile.write("# reconfigure cmake.\n#\n")
+    makefile.write('ifeq (${BUILD},debug)\n')
+    makefile.write('S2_BUILD_TYPE=Debug\n')
+    makefile.write('else ifeq (${BUILD},memcheck)\n')
+    makefile.write('S2_BUILD_TYPE=Debug\n')
+    makefile.write('else ifeq (${BUILD},memcheck_nofreelist)\n')
+    makefile.write('S2_BUILD_TYPE=Debug\n')
+    makefile.write('else ifeq (${BUILD},release)\n')
+    makefile.write('S2_BUILD_TYPE=Release\n')
+    makefile.write('endif\n')
+    makefile.write('ifeq (${S2_BUILD_TYPE},)\n')
+    makefile.write('$(error "Unknown build type for S2 ($BUILD should be debug, release, memcheck, memcheck_nofreelist")\n')
+    makefile.write('endif\n')
+    makefile.write('\n')
+    makefile.write('.PHONY: build-s2-geometry\n')
+    makefile.write('\n')
+    makefile.write('build-s2-geometry: google-s2-geometry\n')
+    makefile.write('\t@echo Building the S2 Library\n')
+    makefile.write('\tcd google-s2-geometry; make VERBOSE=${S2VERBOSE} install\n')
+    makefile.write('\n')
+    makefile.write('google-s2-geometry:\n')
+    makefile.write('\t@echo Configuring The S2 Library for building.\n')
+    makefile.write('\tmkdir google-s2-geometry\n')
+    makefile.write('\tcd google-s2-geometry; \\\n')
+    makefile.write('\t\tcmake -DVOLTDB_THIRD_PARTY_CPP_DIR=${THIRD_PARTY_SRC} -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=${S2_BUILD_TYPE} ${GOOGLE_S2_SRC}\n')
+    makefile.write('\n')
+    makefile.write('clean-s2-geometry:\n')
+    makefile.write("\t@echo Deleting the S2 library\\\'s object files\n")
+    makefile.write('\trm -rf google-s2-geometry\n')
+    makefile.write('\n')
+    
 
     makefile.write("########################################################################\n")
     makefile.write("#\n# %s\n#\n" % "Tests")
@@ -360,12 +431,13 @@ def buildMakefile(CTX):
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % sourcename)
         makefile.write("########################################################################\n")
-        makefile.write("%s: ../../%s" % (objectname, sourcename))
-        makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -MMD -MP -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("%s: $(ROOTDIR)/%s\n" % (objectname, sourcename))
+        makefile.write("\t@echo Compiling Test Source file %s\n" % sourcename)
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
         makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
+        makefile.write("\t@echo Linking test %s\n" % binname)
         makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
@@ -380,7 +452,8 @@ def buildMakefile(CTX):
     makefile.write("#\n# %s\n#\n" % "Cleaning")
     makefile.write("########################################################################\n")
     makefile.write("\n")
-    makefile.write("clean:\n")
+    makefile.write("clean: clean-s2-geometry \n")
+    makefile.write("\t@echo Deleting object files.\n")
     makefile.write("\t${RM} %s\n" % formatList(cleanobjs))
     makefile.close()
     return True
