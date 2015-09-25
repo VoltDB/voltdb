@@ -40,7 +40,7 @@ void verifyS2Links() {
 #pragma clang diagnostic pop
 
 }
-    
+
 static void throwInvalidWKT(const std::string& input)
 {
     std::ostringstream oss;
