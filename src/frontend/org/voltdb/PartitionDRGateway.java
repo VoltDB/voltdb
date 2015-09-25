@@ -32,7 +32,6 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
@@ -44,19 +43,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public enum DRRecordType {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
-
-        public static final ImmutableMap<Integer, DRRecordType> conversion;
-        static {
-            ImmutableMap.Builder<Integer, DRRecordType> b = ImmutableMap.builder();
-            for (DRRecordType t : DRRecordType.values()) {
-                b.put(t.ordinal(), t);
-            }
-            conversion = b.build();
-        }
-
-        public static DRRecordType valueOf(int ordinal) {
-            return conversion.get(ordinal);
-        }
     }
 
     // Keep sync with EE DRConflictType at types.h
@@ -64,19 +50,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
         DR_CONFLICT_MISSING_TUPLE,
         DR_CONFLICT_TIMESTAMP_MISMATCH;
-
-        public static final ImmutableMap<Integer, DRConflictType> conversion;
-        static {
-            ImmutableMap.Builder<Integer, DRConflictType> b = ImmutableMap.builder();
-            for (DRConflictType t : DRConflictType.values()) {
-                b.put(t.ordinal(), t);
-            }
-            conversion = b.build();
-        }
-
-        public static DRConflictType valueOf(int ordinal) {
-            return conversion.get(ordinal);
-        }
     }
 
     public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
@@ -190,7 +163,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                 int checksum = 0;
                 if (version != 0) log.trace("Remaining is " + buf.remaining());
 
-                DRRecordType recordType = DRRecordType.valueOf(type);
+                DRRecordType recordType = DRRecordType.values()[type];
                 switch (recordType) {
                 case INSERT:
                 case DELETE:
@@ -299,7 +272,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber,DRConflictType.valueOf(drConflictType),
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber,DRConflictType.values()[drConflictType],
                 tableName, existingTable, expectedTable, newTable, output);
     }
 }
