@@ -1,4 +1,5 @@
---IMPORT CLASS genqa.procedures.SampleRecord;
+-- DDL SQL file used to initialize the standard VoltDB server, which is used
+-- (by default) in the GEB tests of the VMC (VoltDB Management Center)
 
 -- Partitioned Data Table
 CREATE TABLE partitioned_table
@@ -188,24 +189,29 @@ CREATE TABLE export_skinny_partitioned_table
 );
 PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
 
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportSinglePartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
---CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
-
---PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
---  ON TABLE export_skinny_partitioned_table COLUMN rowid;
-
 EXPORT TABLE export_skinny_partitioned_table;
 EXPORT TABLE export_partitioned_table;
 EXPORT TABLE export_replicated_table;
 EXPORT TABLE export_done_table;
 
+-- Simple User-Defined Stored Procedures, to test CREATE PROCEDURE AS ...
+-- and the display of User-Defined Stored Procedures in the VMC
+CREATE PROCEDURE CountPartitionedTable AS
+  SELECT COUNT(*) FROM partitioned_table;
+CREATE PROCEDURE CountPartitionedTableByGroup AS
+  SELECT COUNT(*) FROM partitioned_table WHERE rowid_group=?;
+CREATE PROCEDURE InsertPartitionedTableZeroes AS
+  INSERT INTO partitioned_table VALUES
+  (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');
+
+CREATE PROCEDURE CountReplicatedTable AS
+  SELECT COUNT(*) FROM replicated_table;
+CREATE PROCEDURE CountReplicatedTableByGroup AS
+  SELECT COUNT(*) FROM replicated_table WHERE rowid_group=?;
+CREATE PROCEDURE InsertReplicatedTableZeroes AS
+  INSERT INTO replicated_table VALUES
+  (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');
+
 -- Load the classes used by FullDdlSqlTest, to test CREATE PROCEDURE FROM CLASS
+-- (as run in the VMC)
 load classes fullddlfeatures.jar;

@@ -4,14 +4,4 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="true" target="file">
-        <configuration>
-            <property name="type">csv</property>
-            <property name="with-schema">false</property>
-            <property name="batched">false</property>
-            <property name="nonce">vmctest</property>
-            <property name="period">1</property>
-            <property name="outdir">exportdata</property>
-        </configuration>
-    </export>
 </deployment>
