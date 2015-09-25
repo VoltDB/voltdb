@@ -987,7 +987,7 @@ public class SQLCommand
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
         + "              [--stop-on-error=(true|false)]\n"
-//        + "              [--query-timeout=number_of_milliseconds]\n"
+        + "              [--query-timeout=number_of_milliseconds]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
         + "  List of servers to connect to.\n"
@@ -1027,8 +1027,8 @@ public class SQLCommand
         + "  In interactive mode, a value of \"true\" discards any unprocessed input\n"
         + "  and returns to the command prompt. Default: true.\n"
         + "\n"
-//        + "[--query-timeout=millisecond_number]\n"
-//        + "  Read only queries timeout setting. Default: no timeout.\n"
+        + "[--query-timeout=millisecond_number]\n"
+        + "  Read only queries timeout setting. Default: no timeout.\n"
         + "\n"
         );
         System.exit(exitCode);
