@@ -13,10 +13,8 @@
 #define __bswap_16 OSSwapInt16
 #define __bswap_32 OSSwapInt32
 #define __bswap_64 OSSwapInt64
-#include "s2geo/byteswap.h"
-#else
-#include <bits/byteswap.h>
 #endif
+#include "s2geo/byteswap.h"
 
 
 #include "s2geo/base/integral_types.h"
