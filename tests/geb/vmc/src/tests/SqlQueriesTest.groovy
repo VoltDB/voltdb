@@ -41,24 +41,56 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     static final boolean DEFAULT_INSERT_JSON = false
 
     static final String SQL_QUERY_FILE = 'src/resources/sqlQueries.txt';
+
+    // Files used to determine the expected Tables, Views, and (Default and
+    // User-defiled) Stored Procedures, when running the Voter example app
+    static final String VOTER_TABLES_FILE = 'src/resources/expectedVoterTables.txt';
+    static final String VOTER_VIEWS_FILE  = 'src/resources/expectedVoterViews.txt';
+    static final String VOTER_DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedVoterDefaultStoredProcs.txt';
+    static final String VOTER_USER_STORED_PROCS_FILE    = 'src/resources/expectedVoterUserStoredProcs.txt';
+
+    // Files used to determine the expected Tables, Views, and (Default and
+    // User-defiled) Stored Procedures, when running the Genqa test app
+    static final String GENQA_TABLES_FILE = 'src/resources/expectedGenqaTables.txt';
+    static final String GENQA_VIEWS_FILE  = 'src/resources/expectedGenqaViews.txt';
+    static final String GENQA_DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedGenqaDefaultStoredProcs.txt';
+    static final String GENQA_USER_STORED_PROCS_FILE    = 'src/resources/expectedGenqaUserStoredProcs.txt';
+
+    // Files used to determine the expected Tables, Views, and (Default and
+    // User-defiled) Stored Procedures, when running the GEB VMC test server
+    // (which is the default; see voltdb/tests/geb/vmc/server/run_voltdb_server.sh)
     static final String TABLES_FILE = 'src/resources/expectedTables.txt';
     static final String VIEWS_FILE  = 'src/resources/expectedViews.txt';
-    static final String SYSTEM_STORED_PROCS_FILE  = 'src/resources/expectedSystemStoredProcs.txt';
     static final String DEFAULT_STORED_PROCS_FILE = 'src/resources/expectedDefaultStoredProcs.txt';
     static final String USER_STORED_PROCS_FILE    = 'src/resources/expectedUserStoredProcs.txt';
+    static final String SYSTEM_STORED_PROCS_FILE  = 'src/resources/expectedSystemStoredProcs.txt';
 
-    // Names of tables from the 'genqa' test app that are needed for testing
-    static final List<String> GENQA_TEST_TABLES = ['PARTITIONED_TABLE', 'REPLICATED_TABLE']
+    // Values used to determine which app we are running
+    static final List<String> VOTER_TEST_TABLES   = ['AREA_CODE_STATE', 'CONTESTANTS', 'VOTES']
+    //static final List<String> GENQA_TEST_TABLES   = ['EXPORT_MIRROR_PARTITIONED_TABLE', 'PARTITIONED_TABLE', 'REPLICATED_TABLE']
+    static final List<String> GENQA_TEST_TABLES   = ['EXPORT_MIRROR_PARTITIONED_TABLE']
+    // EXPORT_MIRROR_PARTITIONED_TABLE, EXPORT_MIRROR_PARTITIONED_TABLE2, EXPORT_PARTITIONED_TABLE, PARTITIONED_TABLE ???
+    static final List<String> GEB_VMC_TEST_TABLES = ['EXPORT_MIRROR_PARTITIONED_TABLE', 'PARTITIONED_TABLE', 'REPLICATED_TABLE']
+    static final List<String> GENQA_TEST_USER_STORED_PROCS = ['JiggleExportDoneTable', 'JiggleExportSinglePartition',
+        'JiggleSkinnyExportSinglePartition']
+    static final List<String> GEB_VMC_TEST_USER_STORED_PROCS = ['CountPartitionedTable', 'CountPartitionedTableByGroup',
+        'CountReplicatedTable', 'CountReplicatedTableByGroup', 'InsertPartitionedTableZeroes', 'InsertReplicatedTableZeroes']
+
+    // Names of standard tables that are needed for testing (these names
+    // originally came from the 'Genqa' test app, but are now also used
+    // by the default GEB VMC test server)
+    static final List<String> STANDARD_TEST_TABLES = ['PARTITIONED_TABLE', 'REPLICATED_TABLE']
     // Indicates the partitioning column (if any) for the corresponding table
-    static final List<String> GENQA_TEST_TABLE_PARTITION_COLUMN = ['rowid', null]
+    static final List<String> STANDARD_TEST_TABLE_PARTITION_COLUMN = ['rowid', null]
     // Indicates whether the corresponding table has been created
-    static List<Boolean> createdGenqaTestTable = [false, false]
-    // Names of *all* tables from the 'genqa' test app
-    static List<String> GENQA_ALL_TABLES = ['EXPORT_MIRROR_PARTITIONED_TABLE']
+    static List<Boolean> createdStandardTestTable = [false, false]
 
     static List<String> savedTables = []
     static List<String> savedViews = []
+    static Boolean initialized  = false;
+    static Boolean runningVoter = null;
     static Boolean runningGenqa = null;
+    static Boolean runningVmcTestSever = null;
 
     @Shared def sqlQueriesFile = new File(SQL_QUERY_FILE)
     @Shared def tablesFile = new File(TABLES_FILE)
@@ -85,10 +117,9 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     @Shared def slurper = new JsonSlurper()
 
     def setupSpec() { // called once, before any tests
-        // List of all 'genqa' tables should include the 'genqa' test tables
-        GENQA_ALL_TABLES.addAll(GENQA_TEST_TABLES)
-        // Move contents of the various files into memory
-        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false, (file == sqlQueriesFile ? '}' : ''))) }
+
+        // Move the contents of the various files into memory
+        readFiles(false)
 
         // Get the list of tests that we actually want to run
         // (if empty, run all tests)
@@ -111,14 +142,36 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     def setup() { // called before each test
         // SqlQueriesTestBase.setup gets called first (automatically)
 
-        // Create tables from the 'genqa' app, needed for testing (e.g.
-        // PARTITIONED_TABLE, REPLICATED_TABLE), if they don't already exist
+        // Initializations that can only occur after we are on a SqlQueryPage
+        // (which we are not, when running setupSpec)
+        if (!initialized) {
+            initialized = true
+            // Determine whether we are running against the Genqa test app or the Voter
+            // example app; otherwise, we assume we are running against the default GEB
+            // VMC test server (see voltdb/tests/geb/vmc/server/run_voltdb_server.sh)
+            if (isRunningVoter(page)) {
+                tablesFile = new File(VOTER_TABLES_FILE)
+                viewsFile  = new File(VOTER_VIEWS_FILE)
+                defaultStoredProcsFile = new File(VOTER_DEFAULT_STORED_PROCS_FILE)
+                userStoredProcsFile    = new File(VOTER_USER_STORED_PROCS_FILE)
+                readFiles()  // reinitialize the file data we just changed
+            } else if (isRunningGenqa(page)) {
+                tablesFile = new File(GENQA_TABLES_FILE)
+                viewsFile  = new File(GENQA_VIEWS_FILE)
+                defaultStoredProcsFile = new File(GENQA_DEFAULT_STORED_PROCS_FILE)
+                userStoredProcsFile    = new File(GENQA_USER_STORED_PROCS_FILE)
+                readFiles()  // reinitialize the file data we just changed
+            }
+        }
+
+        // Create standard tables, needed for testing (e.g. PARTITIONED_TABLE,
+        // REPLICATED_TABLE), if they don't already exist
         boolean createdNewTable = false;
-        for (int i=0; i < GENQA_TEST_TABLES.size(); i++) {
-            if (!createdGenqaTestTable.get(i)) {
-                createdGenqaTestTable.set(i, createTableIfDoesNotExist(page, GENQA_TEST_TABLES.get(i),
-                        GENQA_TEST_TABLE_PARTITION_COLUMN.get(i)))
-                createdNewTable = createdNewTable || createdGenqaTestTable.get(i)
+        for (int i=0; i < STANDARD_TEST_TABLES.size(); i++) {
+            if (!createdStandardTestTable.get(i)) {
+                createdStandardTestTable.set(i, createTableIfDoesNotExist(page, STANDARD_TEST_TABLES.get(i),
+                        STANDARD_TEST_TABLE_PARTITION_COLUMN.get(i)))
+                createdNewTable = createdNewTable || createdStandardTestTable.get(i)
             }
         }
         // If new table(s) created, refresh the page, and therby the list of tables
@@ -129,10 +182,10 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     def cleanupSpec() { // called once, after all the tests
         // Drop any tables that were created in setup()
-        for (int i=0; i < GENQA_TEST_TABLES.size(); i++) {
-            if (createdGenqaTestTable.get(i)) {
+        for (int i=0; i < STANDARD_TEST_TABLES.size(); i++) {
+            if (createdStandardTestTable.get(i)) {
                 ensureOnSqlQueryPage()
-                runQuery(page, 'Drop table ' + GENQA_TEST_TABLES.get(i) + ';')
+                runQuery(page, 'Drop table ' + STANDARD_TEST_TABLES.get(i) + ';')
             }
         }
     }
@@ -161,6 +214,33 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             savedViews = sqp.getViewNames()
         }
         return savedViews
+    }
+
+    /**
+     * Reads the contents of various input files, and loads their lines into
+     * memory, in the form of various list of lines from each file.
+     * @param clearValues - whether or not to empty the list of lines read from
+     * each file, before loading them (again); default is <b>true</b>.
+     */
+    def readFiles(clearValues=true) {
+        if (clearValues) {
+            sqlQueryLines = []
+            tableLines = []
+            viewLines  = []
+            systemStoredProcLines = []
+            defaultStoredProcLines = []
+            userStoredProcLines = []
+            fileLinesPairs = [
+                [sqlQueriesFile, sqlQueryLines],
+                [tablesFile, tableLines],
+                [viewsFile, viewLines],
+                [systemStoredProcsFile, systemStoredProcLines],
+                [defaultStoredProcsFile, defaultStoredProcLines],
+                [userStoredProcsFile, userStoredProcLines],
+            ]
+        }
+        // Move contents of the various files into memory
+        fileLinesPairs.each { file, lines -> lines.addAll(getFileLines(file, '#', false, (file == sqlQueriesFile ? '}' : ''))) }
     }
 
     /**
@@ -211,16 +291,47 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     }
 
     /**
-     * Returns whether or not we are currently running the 'genqa' test app,
+     * Returns whether or not we are currently running the 'voter' example app,
      * based on whether the expected tables are listed on the page.
+     * @param sqp - the SqlQueryPage from which to get the list of table names.
+     * @return true if we are currently running the 'voter' example app.
+     */
+    static boolean isRunningVoter(SqlQueryPage sqp) {
+        if (runningVoter == null) {
+            runningVoter = getTables(sqp).containsAll(VOTER_TEST_TABLES)
+        }
+        return runningVoter
+    }
+
+    /**
+     * Returns whether or not we are currently running the 'genqa' test app,
+     * based on whether the expected tables and stored procedures are listed
+     * on the page.
      * @param sqp - the SqlQueryPage from which to get the list of table names.
      * @return true if we are currently running the 'genqa' test app.
      */
     static boolean isRunningGenqa(SqlQueryPage sqp) {
         if (runningGenqa == null) {
-            runningGenqa = getTables(sqp).containsAll(GENQA_ALL_TABLES)
+            runningGenqa = getTables(sqp).containsAll(GENQA_TEST_TABLES) &&
+                    sqp.getUserStoredProcedures().containsAll(GENQA_TEST_USER_STORED_PROCS)
         }
         return runningGenqa
+    }
+
+    /**
+     * Returns whether or not we are currently running the standard GEB VMC
+     * test server (which is the default; see voltdb/tests/geb/vmc/server/...),
+     * based on whether the expected tables and stored procedures are listed
+     * on the page.
+     * @param sqp - the SqlQueryPage from which to get the list of table names.
+     * @return true if we are currently running the standard GEB VMC test server.
+     */
+    static boolean isRunningVmcTestSever(SqlQueryPage sqp) {
+        if (runningVmcTestSever == null) {
+            runningVmcTestSever = getTables(sqp).containsAll(GEB_VMC_TEST_TABLES) &&
+                    sqp.getUserStoredProcedures().containsAll(GEB_VMC_TEST_USER_STORED_PROCS)
+        }
+        return runningVmcTestSever
     }
 
     /**
@@ -507,7 +618,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkTables() {
         expect: 'List of displayed Tables should match expected list'
-        printAndCompare('Tables', TABLES_FILE, isRunningGenqa(page), tableLines, getTables(page))
+        printAndCompare('Tables', TABLES_FILE, true, tableLines, getTables(page))
     }
 
     /**
@@ -516,7 +627,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkViews() {
         expect: 'List of displayed Views should match expected list'
-        printAndCompare('Views', VIEWS_FILE, isRunningGenqa(page), viewLines, getViews(page))
+        printAndCompare('Views', VIEWS_FILE, true, viewLines, getViews(page))
     }
 
     /**
@@ -535,7 +646,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
-        printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, isRunningGenqa(page),
+        printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, true,
                 defaultStoredProcLines, page.getDefaultStoredProcedures())
     }
 
@@ -544,8 +655,8 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      * matches the expected list (for the 'genqa' test app).
      */
     def checkUserStoredProcs() {
-        expect: 'List of displayed User Stored Procedures should match expected list'
-        printAndCompare('User Stored Procedures', USER_STORED_PROCS_FILE, isRunningGenqa(page),
+        expect: 'List of displayed User-defined Stored Procedures should match expected list'
+        printAndCompare('User-defined Stored Procedures', USER_STORED_PROCS_FILE, true,
                 userStoredProcLines, page.getUserStoredProcedures())
     }
 
