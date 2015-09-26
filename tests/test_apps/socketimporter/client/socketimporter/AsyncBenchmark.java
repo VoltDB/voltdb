@@ -282,17 +282,17 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized static void printResults() throws Exception {
-    	//ClientStats stats = fullStatsContext.fetch().getStats();
-    	FileWriter fw = null;
+        //ClientStats stats = fullStatsContext.fetch().getStats();
+        FileWriter fw = null;
 
-    	if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
-    		fw = new FileWriter(config.statsfile);
-    		fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
-    				"SocketImporter_"+ (config.partitioned ? "Partitioned" : "Replicated"),
-    				benchmarkStartTS/1000, // back to seconds
-    				runCount.get()/((checkDB.maxInsertTime()-benchmarkStartTS)/1000))); // throughput -- TPS
-    		fw.close();
-    	}
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            fw = new FileWriter(config.statsfile);
+            fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
+                    (config.partitioned ? "Partitioned" : "Replicated"),
+                    benchmarkStartTS/1000, // back to seconds
+                    runCount.get()/((checkDB.maxInsertTime()-benchmarkStartTS)/1000))); // throughput -- TPS
+            fw.close();
+        }
     }
 
     /**
@@ -323,7 +323,7 @@ public class AsyncBenchmark {
                 String key = Long.toString(rnd.nextLong());
                 String s;
                 if (config.perftest) {
-                    String valString = RandomStringUtils.randomAlphanumeric(16);
+                    String valString = RandomStringUtils.randomAlphanumeric(1024);
                     s = key + "," + valString + "\n";
                 } else {
                     String t = Long.toString(System.currentTimeMillis());
@@ -428,11 +428,12 @@ public class AsyncBenchmark {
 
         // connect to one or more servers, loop until success
         dbconnect(config.servers);
-        checkDB = new DataUtils(queue, dqueue, client, config.partitioned);
 
         System.out.println("Setting up DDL");
+        checkDB = new DataUtils(queue, dqueue, client, config.partitioned);
         checkDB.ddlSetup(config.partitioned);
-      	connect(config.sockservers);
+
+        connect(config.sockservers);
 
         CountDownLatch cdl = new CountDownLatch(haplist.size());
         for (HostAndPort hap : haplist.keySet()) {

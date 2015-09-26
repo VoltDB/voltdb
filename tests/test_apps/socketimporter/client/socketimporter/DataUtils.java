@@ -87,20 +87,17 @@ public class DataUtils {
     }
 
     public long maxInsertTime() {
-    		ClientResponse response = null;
-			try {
-				response = m_client.callProcedure(m_max);
-			} catch (NoConnectionsException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ProcCallException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-    		VoltTable[] countQueryResult = response.getResults();
+            ClientResponse response = null;
+            try {
+                response = m_client.callProcedure(m_max);
+            } catch (NoConnectionsException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (ProcCallException e) {
+                e.printStackTrace();
+            }
+            VoltTable[] countQueryResult = response.getResults();
             VoltTable data = countQueryResult[0];
             if (data.asScalarLong() == VoltType.NULL_BIGINT)
                 return 0;
@@ -108,59 +105,62 @@ public class DataUtils {
     }
 
     public void ddlSetup(boolean partitioned) {
-    	final String[] DDLStmts = {
-    			"CREATE TABLE importtable ( " +
-    			"  key      varchar(250) not null " +
-    			", value    varchar(1048576 BYTES) not null " +
-    			", insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
-    			", PRIMARY KEY (key))",
-    			"CREATE PROCEDURE InsertOnly as insert into importtable(key, value) VALUES(?, ?)",
-    			"CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE",
-    	};
-        final String[] PartitionStmts = {
-        		"PARTITION table IMPORTTABLE ON COLUMN key",
-    			"PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key"
-    			//"PARTITION PROCEDURE SelectMaxTime ON TABLE importtable COLUMN insert_time"
+        final String[] DDLStmts = {
+                "CREATE TABLE IMPORTTABLE ( " +
+                "  key      varchar(250) not null " +
+                ", value    varchar(1048576 BYTES) not null " +
+                ", insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
+                ", PRIMARY KEY (key))",
+                "CREATE PROCEDURE InsertOnly as insert into IMPORTTABLE(key, value) VALUES(?, ?)",
+                "CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE",
         };
-    	dropTables();
-    	try {
-    	    for (int i = 0; i < DDLStmts.length; i++) {
-    	    	m_client.callProcedure("@AdHoc",
-    	    			DDLStmts[i]).getResults();
-    	    }
-    	} catch (Exception e) {
-    	    e.printStackTrace();
-    	}
-    	if (partitioned) {
-    		try {
-        	    for (int i = 0; i < PartitionStmts.length; i++) {
-        	    	m_client.callProcedure("@AdHoc",
-        	    			PartitionStmts[i]).getResults();
-        	    }
-        	} catch (Exception e) {
-        	    e.printStackTrace();
-        	}
-    	}
+        final String[] PartitionStmts = {
+                "PARTITION table IMPORTTABLE ON COLUMN key",
+                "PARTITION PROCEDURE InsertOnly ON TABLE IMPORTTABLE COLUMN key"
+                //"PARTITION PROCEDURE SelectMaxTime ON TABLE IMPORTTABLE COLUMN insert_time"
+        };
+        dropTables();
+        try {
+            for (int i = 0; i < DDLStmts.length; i++) {
+                m_client.callProcedure("@AdHoc",
+                        DDLStmts[i]).getResults();
+            }
+            m_client.callProcedure("@AdHoc",
+                "SHOW TABLES");
+            m_client.callProcedure("@AdHoc",
+                "SHOW PROC");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (partitioned) {
+            try {
+                for (int i = 0; i < PartitionStmts.length; i++) {
+                    m_client.callProcedure("@AdHoc",
+                            PartitionStmts[i]).getResults();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private void dropTables() {
-    	final String[] dropStmts = {
-    		"procedure InsertOnly IF EXISTS",
-    		"procedure SelectMaxTime IF EXISTS",
-    		"table importtable IF EXISTS"
-    	};
-    	try {
-			for (int i = 0; i < dropStmts.length; i++) {
-				m_client.callProcedure("@AdHoc",
-						"DROP " + dropStmts[i]);
-			}
-		} catch (IOException | ProcCallException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
+        final String[] dropStmts = {
+            "procedure InsertOnly IF EXISTS",
+            "procedure SelectMaxTime IF EXISTS",
+            "table IMPORTTABLE IF EXISTS"
+        };
+        try {
+            for (int i = 0; i < dropStmts.length; i++) {
+                m_client.callProcedure("@AdHoc",
+                        "DROP " + dropStmts[i]);
+            }
+        } catch (IOException | ProcCallException e) {
+            e.printStackTrace();
+        }
+    }
 
-	static class SelectCallback implements ProcedureCallback {
+    static class SelectCallback implements ProcedureCallback {
         private static final int KEY = 0;
         private static final int VALUE = 1;
 
