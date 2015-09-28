@@ -21,6 +21,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include "expressions/geofunctions.h"
+
 #include "s2geo/s2latlng.h"
 
 namespace voltdb {

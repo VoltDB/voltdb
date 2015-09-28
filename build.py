@@ -71,7 +71,7 @@ if CTX.PROFILE:
 
 # linker flags
 CTX.LDFLAGS += """ -g3"""
-CTX.LASTLDFLAGS = """ """
+CTX.LASTLDFLAGS = """ -ldl """
 CTX.LASTIPCLDFLAGS = """ """
 
 if CTX.COVERAGE:
@@ -365,8 +365,9 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
 ###############################################################################
 # Some special handling for S2.
 ###############################################################################
+CTX.S2GEO_LIBS += " -Lgoogle-s2-geometry/lib -ls2geo"
 CTX.OBJ_INCLUDE_DIRS += ['google-s2-geometry/include']
-CTX.LASTLDFLAGS += " -Lgoogle-s2-geometry/lib -ls2geo"
+CTX.LASTLDFLAGS += CTX.S2GEO_LIBS
 
 ###############################################################################
 # SPECIFY THE TESTS

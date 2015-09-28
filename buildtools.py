@@ -36,6 +36,7 @@ class BuildContext:
         self.MAJORVERSION = 0
         self.MINORVERSION = 0
         self.PATCHLEVEL   = 0
+        self.S2GEO_LIBS = ""
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -271,7 +272,6 @@ def buildMakefile(CTX):
     nmfilename = ("nativelibs/libvoltdb-%s.sym" % version)
     jnilibname = ("nativelibs/libvoltdb-%s.$(JNIEXT)" % version)
     cleanobjs += [nmfilename]
-    cleanobjs += ["prod/voltrun"]
     makefile.write("%s: %s\n" % (nmfilename, jnilibname))
     makefile.write("\t$(NM) $(NMFLAGS) %s > $@\n" % jnilibname)
     makefile.write("\n")
@@ -281,6 +281,7 @@ def buildMakefile(CTX):
     makefile.write("\t@echo Linking the JNI target %s\n" % jnilibname)
     makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ %s \n" % ( CTX.LASTLDFLAGS ) )
     makefile.write("\n")
+    cleanobjs += [ jnilibname ]
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
     makefile.write("prod/voltrun: $(SRCDIR)/voltrun.cpp " + formatList(static_objects) + "\n")
