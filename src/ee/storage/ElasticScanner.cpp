@@ -36,9 +36,6 @@ ElasticScanner::ElasticScanner(PersistentTable &table, TBMap &data) :
     m_scanComplete(false)
 {}
 
-ElasticScanner::~ElasticScanner()
-{}
-
 /**
  * Internal method that handles transitions between blocks and
  * returns true as long as tuples are available.
@@ -53,7 +50,6 @@ bool ElasticScanner::continueScan() {
                 // Shift to the next block.
                 m_tuplePtr = m_blockIterator.key();
                 m_currentBlockPtr = m_blockIterator.value();
-                m_scannedBlocks.insert(m_currentBlockPtr);
                 assert(m_currentBlockPtr->address() == m_tuplePtr);
                 m_blockIterator.setValue(TBPtr());
                 m_tupleIndex = 0;

@@ -18,8 +18,6 @@
 #ifndef ELASTICSCANNER_H_
 #define ELASTICSCANNER_H_
 
-#include <boost/shared_ptr.hpp>
-#include "storage/TupleIterator.h"
 #include "storage/TupleBlock.h"
 
 namespace voltdb
@@ -29,11 +27,11 @@ class PersistentTable;
 class TableTuple;
 
 /**
- * Tuple iterator that can perform a complete table scan even while mutations
- * are happening. Tuples moved by compaction are handled externally.
+ * Variant of tuple iterator that can perform a complete table scan even while
+ * mutations are happening. Tuples moved by compaction are handled externally.
  * NB: This is not a general purpose iterator. It is just for elastic indexing.
  */
-class ElasticScanner : public TupleIterator
+class ElasticScanner
 {
   public:
 
@@ -43,15 +41,10 @@ class ElasticScanner : public TupleIterator
     ElasticScanner(PersistentTable &table, TBMap &data);
 
     /**
-     * Destructor.
-     */
-    virtual ~ElasticScanner();
-
-    /**
      * Required TupleIterator override.
      * Get the next tuple or return false if none is available.
      */
-    virtual bool next(TableTuple &out);
+    bool next(TableTuple &out);
 
     /**
      * Block compaction hook.
@@ -96,9 +89,6 @@ class ElasticScanner : public TupleIterator
 
     /// Current tuple index (0-n within the block).
     uint32_t m_tupleIndex;
-
-    /// Already-processed blocks.
-    boost::unordered_set<TBPtr> m_scannedBlocks;
 
     /// Set to true after last tuple is returned.
     bool m_scanComplete;
