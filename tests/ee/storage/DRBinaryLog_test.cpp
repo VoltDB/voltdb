@@ -36,6 +36,7 @@
 #include "common/tabletuple.h"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 #include "storage/tableiterator.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -202,10 +203,10 @@ public:
                                             "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
 
-        m_exportTable = voltdb::TableFactory::getPersistentTable(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
-                                                                 m_exportSchema, exportColumnName,
-                                                                 exportTableHandle, false, 0, true, true);
-        m_exportTable->setExportStreamWrapper(new MockExportTupleStream(1, 1));
+        m_exportStream = new MockExportTupleStream(1, 1);
+        m_exportTable = voltdb::TableFactory::getStreamedTable(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
+                                                                m_exportSchema, exportColumnName,
+                                                                m_exportStream, true);
     }
 
     virtual ~DRBinaryLogTest() {
@@ -423,6 +424,7 @@ public:
 protected:
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
+    ExportTupleStream* m_exportStream;
 
     TupleSchema* m_schema;
     TupleSchema* m_replicatedSchema;
@@ -548,8 +550,8 @@ TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
     m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
     endTxn(true);
 
-    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportTable->getExportStreamWrapper())->receivedTuples.size());
-    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportTable->getExportStreamWrapper())->receivedTuples[0];
+    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
+    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
     ASSERT_FALSE(received_tuple.isNullTuple());
     ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
     ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);

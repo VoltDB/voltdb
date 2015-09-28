@@ -345,12 +345,6 @@ class Table {
         return 0;
     }
 
-    // ------------------------------------------------------------------
-    // TEST FUNCTIONS
-    // ------------------------------------------------------------------
-    virtual void setExportStreamWrapper(ExportTupleStream* stream) = 0;
-    virtual ExportTupleStream* getExportStreamWrapper() = 0;
-
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom

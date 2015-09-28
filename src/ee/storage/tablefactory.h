@@ -67,6 +67,7 @@ class TableColumn;
 class TableIndex;
 class ExecutorContext;
 class DRTupleStream;
+class ExportTupleStream;
 
 class TableFactory {
 public:
@@ -90,6 +91,15 @@ public:
         int tuplelimit = INT_MAX,
         int32_t compactionThreshold = 95,
         bool drEnabled = false);
+
+    static Table* getStreamedTable(
+                voltdb::CatalogId databaseId,
+                const std::string &name,
+                TupleSchema* schema,
+                const std::vector<std::string> &columnNames,
+                ExportTupleStream* mockWrapper = NULL,
+                bool exportEnabled = false,
+                int32_t compactionThreshold = 95);
 
     /**
     * Creates an empty temp table with given name and columns.

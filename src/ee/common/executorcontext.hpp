@@ -90,7 +90,7 @@ class ExecutorContext {
         m_lastCommittedSpHandle = lastCommittedSpHandle;
         m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
-        m_currentDRTimestamp = setDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
+        m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
 
     // data available via tick()
@@ -121,7 +121,7 @@ class ExecutorContext {
         assert(m_subqueryContextMap.empty());
     }
 
-    static int64_t setDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
+    static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
         return (clusterId << 49) | (uniqueId >> 14);
     }
 

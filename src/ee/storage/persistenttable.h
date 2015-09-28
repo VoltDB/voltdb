@@ -495,12 +495,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
     }
 
-    // ------------------------------------------------------------------
-    // TEST FUNCTIONS
-    // ------------------------------------------------------------------
-    virtual void setExportStreamWrapper(ExportTupleStream* stream) {};
-    virtual ExportTupleStream* getExportStreamWrapper() { return NULL; };
-
   private:
 
     // Zero allocation size uses defaults.

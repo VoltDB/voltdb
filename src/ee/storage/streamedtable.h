@@ -45,6 +45,7 @@ class StreamedTable : public Table {
 
   public:
     StreamedTable(bool exportEnabled);
+    StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
 
     //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
@@ -117,15 +118,6 @@ class StreamedTable : public Table {
     virtual int64_t activeTupleCount() const {
         return m_sequenceNo;
     }
-
-    // ------------------------------------------------------------------
-    // TEST FUNCTIONS
-    // ------------------------------------------------------------------
-    virtual void setExportStreamWrapper(ExportTupleStream* stream) {
-        delete m_wrapper;
-        m_wrapper = stream;
-    }
-    virtual ExportTupleStream* getExportStreamWrapper() { return m_wrapper; }
 
 private:
     // Stats
