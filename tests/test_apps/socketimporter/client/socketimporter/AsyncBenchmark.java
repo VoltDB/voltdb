@@ -282,17 +282,17 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized static void printResults() throws Exception {
-    	//ClientStats stats = fullStatsContext.fetch().getStats();
-    	FileWriter fw = null;
+        //ClientStats stats = fullStatsContext.fetch().getStats();
+        FileWriter fw = null;
 
-    	if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
-    		fw = new FileWriter(config.statsfile);
-    		fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
-    				"SocketImporter_"+ (config.partitioned ? "Partitioned" : "Replicated"),
-    				benchmarkStartTS/1000, // back to seconds
-    				runCount.get()/((checkDB.maxInsertTime()-benchmarkStartTS)/1000))); // throughput -- TPS
-    		fw.close();
-    	}
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            fw = new FileWriter(config.statsfile);
+            fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
+                    "SocketImporter_"+ (config.partitioned ? "Partitioned" : "Replicated"),
+                    benchmarkStartTS/1000, // back to seconds
+                    runCount.get()/((checkDB.maxInsertTime()-benchmarkStartTS)/1000))); // throughput -- TPS
+            fw.close();
+        }
     }
 
     /**
@@ -432,7 +432,7 @@ public class AsyncBenchmark {
 
         System.out.println("Setting up DDL");
         checkDB.ddlSetup(config.partitioned);
-      	connect(config.sockservers);
+        connect(config.sockservers);
 
         CountDownLatch cdl = new CountDownLatch(haplist.size());
         for (HostAndPort hap : haplist.keySet()) {
