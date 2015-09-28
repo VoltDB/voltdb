@@ -492,7 +492,8 @@ enum DRRecordType {
     DR_RECORD_BEGIN_TXN = 3,
     DR_RECORD_END_TXN = 4,
     DR_RECORD_TRUNCATE_TABLE = 5,
-    DR_RECORD_DELETE_BY_INDEX = 6
+    DR_RECORD_DELETE_BY_INDEX = 6,
+    DR_RECORD_UPDATE_BY_INDEX = 7
 };
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
@@ -501,6 +502,9 @@ inline size_t rowCostForDRRecord(DRRecordType type) {
     case DR_RECORD_DELETE:
     case DR_RECORD_DELETE_BY_INDEX:
         return 1;
+    case DR_RECORD_UPDATE:
+    case DR_RECORD_UPDATE_BY_INDEX:
+        return 2;
     case DR_RECORD_TRUNCATE_TABLE:
         return 100;
     default:
@@ -518,6 +522,14 @@ enum TupleSerializationFormat { TUPLE_SERIALIZATION_NATIVE = 0, TUPLE_SERIALIZAT
 // ------------------------------------------------------------------
 enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 
+// ------------------------------------------------------------------
+// Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)
+// ------------------------------------------------------------------
+enum DRConflictType {
+    DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
+    DR_CONFLICT_MISSING_TUPLE,
+    DR_CONFLICT_TIMESTAMP_MISMATCH
+};
 
 // ------------------------------------------------------------------
 // Utility functions.

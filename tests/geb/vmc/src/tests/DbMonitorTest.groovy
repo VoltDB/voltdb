@@ -46,20 +46,48 @@ class DbMonitorTest extends TestBase {
                 page.openDbMonitorPage()
                 then: 'should be on DB Monitor page'
                 at DbMonitorPage
-            break
+
+
+                ///Check all unchecked UserPreferences
+
+                expect: 'Display Preference button exists'
+                page.displayPreferenceDisplayed()
+
+                when: 'click Display Preference button'
+                page.openDisplayPreference()
+                then: 'display title and save button of preferences'
+                page.preferencesTitleDisplayed()
+                page.savePreferencesBtnDisplayed()
+                page.popupCloseDisplayed()
+
+                when: 'Stored Procedures checkbox is displayed'
+                page.storedProceduresCheckboxDisplayed()
+                page.dataTablesCheckboxDisplayed()
+                page.partitionIdleTimeCheckboxDisplayed()
+               // page.clusterTransactionsCheckboxDisplayed()
+                //page.clusterLatencyCheckboxDisplayed()
+
+
+                then: 'Add all the preferences'
+                page.storedProceduresCheckboxClick()
+                page.dataTablesCheckboxClick()
+                page.partitionIdleTimeCheckboxClick()
+              //  page.clusterTransactionsCheckboxClick()
+               // page.clusterLatencyCheckboxClick()
+
+
+                when: 'click close button'
+                page.savePreferences()
+                then: 'no Stored Procedures displayed'
+                page.storedProceduresDisplayed()
+
+
+                break
 			} catch (org.openqa.selenium.ElementNotVisibleException e) {
 				println("ElementNotVisibleException: Unable to Start the test")
 				println("Retrying")
 			}
 		}
-    }
-
-    def 'confirm Graph area and Data area open initially'() {
-        expect: 'Graph area open initially'
-        page.isGraphAreaOpen()
-
-        and: 'Data area open initially'
-        page.isDataAreaOpen()
     }
 
     def openAndCloseGraphArea() {
@@ -180,6 +208,10 @@ class DbMonitorTest extends TestBase {
         page.openServerList()
         then: 'Server list is open'
         page.isServerListOpen()
+        page.serverListHeader.isDisplayed()
+        page.serverNameHeader.isDisplayed()
+        page.serverIpAddressHeader.isDisplayed()
+        page.serverMemoryUsageHeader.isDisplayed()
 
         when: 'click Server button (to close list)'
         page.closeServerList()
@@ -207,7 +239,7 @@ class DbMonitorTest extends TestBase {
         debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
     }
 
-    // HEADER TESTS
+    //HEADER TESTS
 
     def "header banner exists" () {
         when:
@@ -275,7 +307,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    // HEADER TAB TESTS
+    //HEADER TAB TESTS
 
     def "header tab dbmonitor exists" () {
         when:
@@ -372,7 +404,7 @@ class DbMonitorTest extends TestBase {
     }
 
 
-    // LOGOUT TEST
+   // LOGOUT TEST
 
     def "logout button test close" ()  {
         when: 'click the Admin link (if needed)'
@@ -436,7 +468,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    // HELP POPUP TEST
+    //HELP POPUP TEST
 
     def "help popup existance" () {
         when:
@@ -464,7 +496,7 @@ class DbMonitorTest extends TestBase {
         waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
     }
 
-    // FOOTER TESTS
+    //FOOTER TESTS
 
     def "footer exists" () {
         when:
@@ -484,461 +516,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def clickGraphViewSeconds() {
-        expect: 'Graph view button exists'
-        page.graphViewDisplayed()
 
-        when: 'choose Seconds in Graph View'
-        page.chooseGraphView("Seconds")
-        then: 'display'
-
-        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
-        Date date = new Date();
-        String stringTwo = dateFormat.format(date)
-
-        String stringOne = timeOne.text()
-        int hourOne = page.changeToHour(stringOne)
-        int minuteOne = page.changeToMinute(stringOne)
-
-        int hourTwo = page.changeToHour(stringTwo)
-        int minuteTwo = page.changeToMinute(stringTwo)
-
-        int diff = minuteTwo - minuteOne
-
-        if ( hourOne == hourTwo && diff < 20 ) {
-            assert true
-        }
-        else if ( hourOne < hourTwo && minuteTwo < 20 ){
-            assert true
-        }
-        else {
-            assert false
-        }
-    }
-
-    def clickGraphViewMinute() {
-        int count = 0
-
-        expect: 'Graph view button exists'
-        page.graphViewDisplayed()
-
-        when: 'choose Minutes in Graph View'
-        // This loop is used to gain time.
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Minutes")
-            if(graphView.text().equals("")) {
-                break
-            }
-		}
-        then: 'display'
-
-        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
-        Date date = new Date();
-        String stringTwo = dateFormat.format(date)
-
-        String stringOne = timeOne.text()
-        int hourOne = page.changeToHour(stringOne)
-        int minuteOne = page.changeToMinute(stringOne)
-
-        int hourTwo = page.changeToHour(stringTwo)
-        int minuteTwo = page.changeToHour(stringTwo)
-
-        int hourDiff = hourTwo - hourOne
-
-        if ( hourDiff == 1 ) {
-            assert true
-        }
-        else if ( hourDiff > 1 && minuteTwo < 30 ){
-            assert true
-        }
-        else {
-            assert false
-        }
-    }
-
-    def clickGraphViewDays() {
-        int count = 0
-
-        expect: 'Graph view button exists'
-        page.graphViewDisplayed()
-
-        when: 'choose Days in Graph View'
-        // This loop is used to gain time.
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Days")
-            if(graphView.text().equals("")) {
-                break
-            }
-		}
-        then: 'display'
-        String stringOne = timeOne.text()
-        if ( stringOne.length() > 8 ) {
-            assert true
-        }
-        else {
-            assert false
-        }
-    }
-
-    def "click display preferences and close"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'click close button'
-        page.closePreferences()
-        then: 'all graph exist'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-    }
-
-    def "click display preferences remove Server Cpu and again add Server Cpu"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server CPU checkbox is displayed'
-        page.serverCpuCheckboxDisplayed()
-        then: 'Remove Server CPU'
-        page.serverCpuCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Server CPU displayed'
-        !page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server CPU checkbox is displayed'
-        page.serverCpuCheckboxDisplayed()
-        then: 'Add Server CPU'
-        page.serverCpuCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Server CPU displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-    }
-
-    def "click display preferences remove Server RAM and again add Server RAM"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server RAM checkbox is displayed'
-        page.serverRamCheckboxDisplayed()
-        then: 'Remove Server RAM'
-        page.serverRamCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Server RAM displayed'
-        page.serverCpuDisplayed()
-        !page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server RAM checkbox is displayed'
-        page.serverRamCheckboxDisplayed()
-        then: 'Add Server RAM'
-        page.serverRamCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Server RAM displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-    }
-
-    def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server Cluster Latency checkbox is displayed'
-        page.clusterLatencyCheckboxDisplayed()
-        then: 'Remove Cluster Latency'
-        page.clusterLatencyCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Cluster Latency displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        !page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server Cluster Latency is displayed'
-        page.clusterLatencyCheckboxDisplayed()
-        then: 'Add Cluster Latency'
-        page.clusterLatencyCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Cluster Latency displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-    }
-
-    def "click display preferences remove Cluster Transactions and again add Cluster Transactions"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server Cluster Transactions checkbox is displayed'
-        page.clusterTransactionsCheckboxDisplayed()
-        then: 'Remove Cluster Transactions'
-        page.clusterTransactionsCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Cluster Transactions displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        !page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Server Cluster Transactions is displayed'
-        page.clusterTransactionsCheckboxDisplayed()
-        then: 'Add Cluster Transactions'
-        page.clusterTransactionsCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Cluster Transactions displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-    }
-
-    def "click display preferences remove Partition Idle Time and again add Partition Idle Time"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Partition Idle Time checkbox is displayed'
-        page.partitionIdleTimeCheckboxDisplayed()
-        then: 'Remove Partition Idle Time'
-        page.partitionIdleTimeCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Partition Idle Time displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        !page.partitionIdleTimeDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Partition Idle Time is displayed'
-        page.partitionIdleTimeCheckboxDisplayed()
-        then: 'Add Partition Idle Time'
-        page.partitionIdleTimeCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Partition Idle Time displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-    }
-
-    def "click display preferences remove Stored Procedures and again add Stored Procedures"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Stored Procedures checkbox is displayed'
-        page.storedProceduresCheckboxDisplayed()
-        then: 'Remove Stored Procedures'
-        page.storedProceduresCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Stored Procedures displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        !page.storedProceduresDisplayed()
-        page.dataTablesDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Stored Procedures is displayed'
-        page.storedProceduresCheckboxDisplayed()
-        then: 'Add Stored Procedures'
-        page.storedProceduresCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Stored Procedures displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        page.storedProceduresDisplayed()
-        page.dataTablesDisplayed()
-    }
-
-    def "click display preferences remove Data Tables and again add Data Tables"() {
-        expect: 'Display Preference button exists'
-        page.displayPreferenceDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Data Tables checkbox is displayed'
-        page.dataTablesCheckboxDisplayed()
-        then: 'Remove Data Tables'
-        page.dataTablesCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'no Data Tables displayed'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        page.storedProceduresDisplayed()
-        !page.dataTablesDisplayed()
-
-        when: 'click Display Preference button'
-        page.openDisplayPreference()
-        then: 'display title and save button of preferences'
-        page.preferencesTitleDisplayed()
-        page.savePreferencesBtnDisplayed()
-        page.popupCloseDisplayed()
-
-        when: 'Data Tables is displayed'
-        page.dataTablesCheckboxDisplayed()
-        then: 'Add Data Tables'
-        page.dataTablesCheckboxClick()
-
-        when: 'click close button'
-        page.savePreferences()
-        then: 'Data Tables displayed along with others'
-        page.serverCpuDisplayed()
-        page.serverRamDisplayed()
-        page.clusterLatencyDisplayed()
-        page.clusterTransactionsDisplayed()
-        page.partitionIdleTimeDisplayed()
-        page.storedProceduresDisplayed()
-        page.dataTablesDisplayed()
-    }
 
     def "Add a table in Tables and check it"() {
 
@@ -1190,109 +768,7 @@ class DbMonitorTest extends TestBase {
 				assert false
     }
 
-    def "check if Min Latency is clickable"() {
-        String before = ""
-		String after  = ""
 
-		when: 'click min latency'
-			page.clickMinLatency()
-        then: 'check if max rows is in ascending'
-            if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
-
-		when: 'click min latency'
-			page.clickMinLatency()
-		then: 'check if max rows is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
-
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
-    }
-
-    def "check if Max Latency is clickable"() {
-        String before = ""
-		String after  = ""
-
-		when: 'click max latency'
-			page.clickMaxLatency()
-        then: 'check if min rows is in ascending'
-            if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
-
-		when: 'click max latency'
-			page.clickMaxLatency()
-		then: 'check if min rows is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
-
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
-    }
-
-    def "check if Avg Latency is clickable"() {
-        String before = ""
-		String after  = ""
-
-		when: 'click avg latency'
-			page.clickAvgLatency()
-        then: 'check if avg rows is in ascending'
-            if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
-
-		when: 'click avg latency'
-			page.clickAvgLatency()
-		then: 'check if avg rows is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
-
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
-    }
-
-    def "check if Time of Execution is clickable"() {
-        String before = ""
-		String after  = ""
-
-		when: 'click time of execution'
-			page.clickTimeOfExecution()
-        then: 'check if type is in ascending'
-            if ( page.tableInAscendingOrder() )
-				before = "ascending"
-			else
-				before = "descending"
-
-		when: 'click time of execution'
-			page.clickTimeOfExecution()
-		then: 'check if type is in descending'
-			if ( page.tableInDescendingOrder() )
-				after = "descending"
-			else
-				after = "ascending"
-
-			if ( before.equals("ascending") && after.equals("descending") )
-				assert true
-			else
-				assert false
-    }
 
     def "Check Data in Stored Procedures"() {
         when:
@@ -1338,11 +814,11 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    // ALERT
+   // ALERT
 
 	def "set alert and replace trigger alert"() {
 		int count = 0
-		
+
 		when: 'set alert threshold to zero'
 	    page.setAlertThreshold(00)
 		then: 'check at least one alert'
@@ -1354,7 +830,7 @@ class DbMonitorTest extends TestBase {
 		    } catch(geb.waiting.WaitTimeoutException e) {
 		    }
 		}
-		
+
 		int alert = page.getAlert()
 
 		if ( alert != 0 ) {
@@ -1463,7 +939,7 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-        
+
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
         println(intDateMax)
@@ -1531,7 +1007,7 @@ class DbMonitorTest extends TestBase {
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
@@ -1768,7 +1244,7 @@ class DbMonitorTest extends TestBase {
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
@@ -1829,7 +1305,7 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-		
+
 		int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
@@ -2025,19 +1501,38 @@ class DbMonitorTest extends TestBase {
 		}
     }
 
+
+
+    //Test Case relating to Graph
     //cluster latency
     def "check min value in cluster latency days"(){
         int count = 0
 
+//        when: "Check if Cluster Latency Graph is displayed"
+//
+//        if(!page.clusterLatencyDisplayed())
+//        {
+//println("Cluster Latency is not Displayed")
+//        }
+//
+//        then:
+
         when:
-        // This loop is used to gain time.
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Days")
-            if(graphView.text().equals("")) {
-                break
+        //if(page.clusterLatencyDisplayed()) {
+            // This loop is used to gain time.
+            while (count < numberOfTrials) {
+                count++
+                page.chooseGraphView("Days")
+                if (graphView.text().equals("")) {
+                    break
+                }
             }
-		}
+//        }
+//        else
+//        {
+//            println("Cluster Latency is not Displayed")
+//            assert true
+//        }
 		count = 0
 		then:
 		String stringMax = ""
@@ -2069,7 +1564,7 @@ class DbMonitorTest extends TestBase {
 
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
@@ -2130,10 +1625,10 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-        
+
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
@@ -2372,10 +1867,10 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-        
+
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
@@ -2445,10 +1940,10 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-        
+
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The maximum value is " + stringMax + " and the time is in Days")
@@ -2877,10 +2372,10 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-        
+
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
-        
+
 		if(monthMax.equals(monthMin)) {
 		    if(intDateMax > intDateMin) {
 		        println("The minimum value is " + stringMin + " and the time is in Days")
@@ -2941,7 +2436,7 @@ class DbMonitorTest extends TestBase {
 
 		String dateMax = page.changeToDate(stringMax)
 		String dateMin = page.changeToDate(stringMin)
-        
+
         int intDateMax = Integer.parseInt(dateMax)
         int intDateMin = Integer.parseInt(dateMin)
 
@@ -2967,7 +2462,7 @@ class DbMonitorTest extends TestBase {
 		    }
 		}
     }
-   
+
     def "Click display preferences remove Partition Idle Time and again Add Partition Idle Time"() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
@@ -3036,6 +2531,584 @@ class DbMonitorTest extends TestBase {
 
     }
 
+
+
+
+    def "check if Min Latency is clickable"() {
+        String before = ""
+        String after  = ""
+
+
+        when: 'click min latency'
+           println("Stored Procedure table is  displayed")
+           page.clickMinLatency()
+
+        then: 'check if max rows is in ascending'
+            if (page.tableInAscendingOrder())
+                before = "ascending"
+            else
+                before = "descending"
+        when: 'click min latency'
+            page.clickMinLatency()
+
+        then: 'check if max rows is in descending'
+            if (page.tableInDescendingOrder())
+                after = "descending"
+            else
+                after = "ascending"
+
+            if (before.equals("ascending") && after.equals("descending"))
+                assert true
+            else
+                assert false
+    }
+
+
+    def "check if Max Latency is clickable"() {
+        String before = ""
+        String after  = ""
+
+
+        when: 'click max latency'
+        page.clickMaxLatency()
+        then: 'check if min rows is in ascending'
+        if ( page.tableInAscendingOrder() )
+            before = "ascending"
+        else
+            before = "descending"
+
+        when: 'click max latency'
+        page.clickMaxLatency()
+        then: 'check if min rows is in descending'
+        if ( page.tableInDescendingOrder() )
+            after = "descending"
+        else
+            after = "ascending"
+
+        if ( before.equals("ascending") && after.equals("descending") )
+            assert true
+        else
+            assert false
+    }
+
+    def "check if Avg Latency is clickable"() {
+        String before = ""
+        String after  = ""
+
+        when: 'click avg latency'
+        page.clickAvgLatency()
+        then: 'check if avg rows is in ascending'
+        if ( page.tableInAscendingOrder() )
+            before = "ascending"
+        else
+            before = "descending"
+
+        when: 'click avg latency'
+        page.clickAvgLatency()
+        then: 'check if avg rows is in descending'
+        if ( page.tableInDescendingOrder() )
+            after = "descending"
+        else
+            after = "ascending"
+
+        if ( before.equals("ascending") && after.equals("descending") )
+            assert true
+        else
+            assert false
+    }
+
+    def "check if Time of Execution is clickable"() {
+        String before = ""
+        String after  = ""
+
+        when: 'click time of execution'
+        page.clickTimeOfExecution()
+        then: 'check if type is in ascending'
+        if ( page.tableInAscendingOrder() )
+            before = "ascending"
+        else
+            before = "descending"
+
+        when: 'click time of execution'
+        page.clickTimeOfExecution()
+        then: 'check if type is in descending'
+        if ( page.tableInDescendingOrder() )
+            after = "descending"
+        else
+            after = "ascending"
+
+        if ( before.equals("ascending") && after.equals("descending") )
+            assert true
+        else
+            assert false
+    }
+
+
+    def clickGraphViewSeconds() {
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Seconds in Graph View'
+        page.chooseGraphView("Seconds")
+        then: 'display'
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        Date date = new Date();
+        String stringTwo = dateFormat.format(date)
+
+        String stringOne = timeOne.text()
+        int hourOne = page.changeToHour(stringOne)
+        int minuteOne = page.changeToMinute(stringOne)
+
+        int hourTwo = page.changeToHour(stringTwo)
+        int minuteTwo = page.changeToMinute(stringTwo)
+
+        int diff = minuteTwo - minuteOne
+
+        if ( hourOne == hourTwo && diff < 20 ) {
+            assert true
+        }
+        else if ( hourOne < hourTwo && minuteTwo < 20 ){
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def clickGraphViewMinute() {
+        int count = 0
+
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Minutes in Graph View'
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+        }
+        then: 'display'
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+        Date date = new Date();
+        String stringTwo = dateFormat.format(date)
+
+        String stringOne = timeOne.text()
+        int hourOne = page.changeToHour(stringOne)
+        int minuteOne = page.changeToMinute(stringOne)
+
+        int hourTwo = page.changeToHour(stringTwo)
+        int minuteTwo = page.changeToHour(stringTwo)
+
+        int hourDiff = hourTwo - hourOne
+
+        if ( hourDiff == 1 ) {
+            assert true
+        }
+        else if ( hourDiff > 1 && minuteTwo < 30 ){
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def clickGraphViewDays() {
+        int count = 0
+
+        expect: 'Graph view button exists'
+        page.graphViewDisplayed()
+
+        when: 'choose Days in Graph View'
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+        }
+        then: 'display'
+        String stringOne = timeOne.text()
+        if ( stringOne.length() > 8 ) {
+            assert true
+        }
+        else {
+            assert false
+        }
+    }
+
+    def "click display preferences and close"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'click close button'
+        page.closePreferences()
+        then: 'all graph exist'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Server Cpu and again add Server Cpu"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server CPU checkbox is displayed'
+        page.serverCpuCheckboxDisplayed()
+        then: 'Remove Server CPU'
+        page.serverCpuCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Server CPU displayed'
+        !page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server CPU checkbox is displayed'
+        page.serverCpuCheckboxDisplayed()
+        then: 'Add Server CPU'
+        page.serverCpuCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Server CPU displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Server RAM and again add Server RAM"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server RAM checkbox is displayed'
+        page.serverRamCheckboxDisplayed()
+        then: 'Remove Server RAM'
+        page.serverRamCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Server RAM displayed'
+        page.serverCpuDisplayed()
+        !page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server RAM checkbox is displayed'
+        page.serverRamCheckboxDisplayed()
+        then: 'Add Server RAM'
+        page.serverRamCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Server RAM displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Cluster Latency and again add Cluster Latency"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Latency checkbox is displayed'
+        page.clusterLatencyCheckboxDisplayed()
+        then: 'Remove Cluster Latency'
+        page.clusterLatencyCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Cluster Latency displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        !page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Latency is displayed'
+        page.clusterLatencyCheckboxDisplayed()
+        then: 'Add Cluster Latency'
+        page.clusterLatencyCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Cluster Latency displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Cluster Transactions and again add Cluster Transactions"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Transactions checkbox is displayed'
+        page.clusterTransactionsCheckboxDisplayed()
+        then: 'Remove Cluster Transactions'
+        page.clusterTransactionsCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Cluster Transactions displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        !page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Server Cluster Transactions is displayed'
+        page.clusterTransactionsCheckboxDisplayed()
+        then: 'Add Cluster Transactions'
+        page.clusterTransactionsCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Cluster Transactions displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Partition Idle Time and again add Partition Idle Time"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time checkbox is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Remove Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Partition Idle Time displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        !page.partitionIdleTimeDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Partition Idle Time is displayed'
+        page.partitionIdleTimeCheckboxDisplayed()
+        then: 'Add Partition Idle Time'
+        page.partitionIdleTimeCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Partition Idle Time displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+    }
+
+    def "click display preferences remove Stored Procedures and again add Stored Procedures"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures checkbox is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Remove Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Stored Procedures displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        !page.storedProceduresDisplayed()
+        page.dataTablesDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedures is displayed'
+        page.storedProceduresCheckboxDisplayed()
+        then: 'Add Stored Procedures'
+        page.storedProceduresCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Stored Procedures displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        page.storedProceduresDisplayed()
+        page.dataTablesDisplayed()
+    }
+
+    def "click display preferences remove Data Tables and again add Data Tables"() {
+        expect: 'Display Preference button exists'
+        page.displayPreferenceDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Data Tables checkbox is displayed'
+        page.dataTablesCheckboxDisplayed()
+        then: 'Remove Data Tables'
+        page.dataTablesCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'no Data Tables displayed'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        page.storedProceduresDisplayed()
+        !page.dataTablesDisplayed()
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Data Tables is displayed'
+        page.dataTablesCheckboxDisplayed()
+        then: 'Add Data Tables'
+        page.dataTablesCheckboxClick()
+
+        when: 'click close button'
+        page.savePreferences()
+        then: 'Data Tables displayed along with others'
+        page.serverCpuDisplayed()
+        page.serverRamDisplayed()
+        page.clusterLatencyDisplayed()
+        page.clusterTransactionsDisplayed()
+        page.partitionIdleTimeDisplayed()
+        page.storedProceduresDisplayed()
+        page.dataTablesDisplayed()
+    }
+
+    def 'confirm Graph area and Data area open initially'() {
+        expect: 'Graph area open initially'
+        page.isGraphAreaOpen()
+
+        and: 'Data area open initially'
+        page.isDataAreaOpen()
+    }
+
+    /// Test cases relating to Graph end
     def cleanupSpec() {
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'

@@ -130,7 +130,7 @@ class MpRoSitePool {
         m_initiatorMailbox = initiatorMailbox;
         m_csp = csp;
         m_poolThreadFactory =
-            CoreUtils.getThreadFactory("RO MP Iv2ExecutionSite - " + CoreUtils.hsIdToString(m_siteId),
+            CoreUtils.getThreadFactory("RO MP Site - " + CoreUtils.hsIdToString(m_siteId),
                     CoreUtils.MEDIUM_STACK_SIZE);
 
         Integer poolSize = Integer.getInteger("mpiReadPoolSize");

@@ -98,6 +98,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -173,9 +174,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.6";
+    static final String m_defaultVersionString = "5.7beta1";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.7beta1\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -676,8 +677,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 try {
                     Class<?> ndrgwClass = null;
                     ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class, int.class);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
                     m_producerDRGateway = (ProducerDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
+                                                                                   getSnapshotPath(m_catalogContext),
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
@@ -2962,5 +2964,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         m_clusterCreateTime = clusterCreateTime;
         hostLog.info("The internal DR cluster timestamp being restored from a snapshot is " +
                 new Date(m_clusterCreateTime).toString() + ".");
+    }
+
+    private File getSnapshotPath(CatalogContext catalogContext) {
+        PathsType paths = catalogContext.getDeployment().getPaths();
+        File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
+        return CatalogUtil.getSnapshot(paths.getSnapshots(), voltDbRoot);
     }
 }

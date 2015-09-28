@@ -99,11 +99,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                      // not final to allow unit testing
     private static final long LONG_OP_THRESHOLD = 10000;
 
-    public final int INITIAL_BATCH_TIMEOUT_VALUE = 0;
+    public static final int NO_BATCH_TIMEOUT_VALUE = 0;
     /** Fragment or batch time out in milliseconds.
      *  By default 0 means no time out setting.
      */
-    private int m_batchTimeout = INITIAL_BATCH_TIMEOUT_VALUE;
+    private int m_batchTimeout = NO_BATCH_TIMEOUT_VALUE;
 
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
@@ -139,7 +139,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     private boolean shouldTimedOut (long latency) {
         if (m_readOnly
-                && m_batchTimeout > INITIAL_BATCH_TIMEOUT_VALUE
+                && m_batchTimeout > NO_BATCH_TIMEOUT_VALUE
                 && m_batchTimeout < latency) {
             return true;
         }

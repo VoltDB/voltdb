@@ -19,6 +19,7 @@
 #define TOPEND_H_
 #include "common/ids.h"
 #include "common/FatalException.hpp"
+#include "common/types.h"
 
 #include <string>
 #include <queue>
@@ -65,8 +66,9 @@ class Topend {
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
     virtual int reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
-            std::string tableName, Table* input, Table* output) = 0;
+            int64_t remoteSequenceNumber, DRConflictType conflict_type,
+            std::string tableName, Table* existingTable, Table* expectedTable,
+            Table* newTable, Table* output) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
 
@@ -100,8 +102,9 @@ public:
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
     int reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
-            std::string tableName, Table* input, Table* output);
+                int64_t remoteSequenceNumber, DRConflictType conflict_type,
+                std::string tableName, Table* existingTable, Table* expectedTable,
+                Table* newTable, Table* output);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 

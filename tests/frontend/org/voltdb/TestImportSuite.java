@@ -187,6 +187,15 @@ public class TestImportSuite extends RegressionSuite {
         latch.await();
     }
 
+    private static Map<String, String> expectedStatRows = new HashMap<>();
+    static {
+        expectedStatRows.put("SocketImporter", "importTable.insert");
+        expectedStatRows.put("Log4jSocketHandlerImporter", "log_events.insert");
+    };
+    private static final String CONN_HOST_COL = "CONNECTION_HOSTNAME";
+    private static final String PROC_NAME_COL = "PROCEDURE_NAME";
+    private static final String INVOCATIONS_COL = "INVOCATIONS";
+
     private void verifyData(Client client, int count) throws Exception {
         verifyData(client, count, -1);
     }
@@ -222,6 +231,27 @@ public class TestImportSuite extends RegressionSuite {
             Thread.sleep(50);
         }
         assertTrue(error, success);
+
+       ClientResponse response = client.callProcedure("@Statistics", "Initiator", 0);
+       VoltTable stats = response.getResults()[0];
+       int foundCount = 0;
+       for (int i=0; i<stats.getRowCount(); i++) {
+           VoltTableRow row = stats.fetchRow(i);
+           String name = row.getString(CONN_HOST_COL);
+           if (!expectedStatRows.containsKey(name)) {
+               continue;
+           }
+           foundCount++;
+           assertEquals(expectedStatRows.get(name), row.getString(PROC_NAME_COL));
+           long invocations = row.getLong(INVOCATIONS_COL);
+           if (min<0) {
+               assertEquals(count, invocations);
+           } else {
+               assertTrue(invocations>=min && invocations <= count);
+           }
+       }
+
+       assertEquals(expectedStatRows.size(), foundCount);
     }
 
     public void testImportSimpleData() throws Exception {
@@ -348,7 +378,7 @@ public class TestImportSuite extends RegressionSuite {
         props = new Properties();
         props.putAll(ImmutableMap.<String, String>of(
                 "port", "6060",
-                "procedure", "importTable.insert",
+                "procedure", "log_events.insert",
                 "log-event-table", "log_events"));
         project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 
