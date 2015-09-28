@@ -15,6 +15,7 @@ CURRENT_DIR=`pwd`
 EXTRA_PATH="$CURRENT_DIR/../../../../bin"
 DEPLOY="deployment.xml"
 DDL_DIR="."
+DDL_FILE="ddl.sql"
 
 # Using a -p arg means to use the "pro" version of VoltDB
 if [[ "$@" == *"-p"* ]]; then
@@ -29,6 +30,7 @@ if [[ "$@" == *"-g"* ]]; then
     EXTRA_PATH="$CURRENT_DIR/../../../../../pro/obj/pro/$SUBDIR/bin"
     DEPLOY="../../../test_apps/genqa/deployment.xml ../../../test_apps/genqa/genqa.jar"
     DDL_DIR="../../../test_apps/genqa/"
+    #DDL_FILE="/dev/null"
 # Using a -v arg means to run the "Voter" example app
 elif [[ "$@" == *"-v"* ]]; then
     DEPLOY="../../../../examples/voter/deployment.xml"
@@ -49,19 +51,19 @@ voltdb create -d $DEPLOY &
 cd $DDL_DIR
 echo "pwd         :" `pwd`
 echo "which sqlcmd:" `which sqlcmd`
-echo "Executing   : sqlcmd < ddl.sql 2>&1"
+echo "Executing   : sqlcmd < $DDL_FILE 2>&1"
 for i in {1..120}; do
     sleep 1
-    SQLCMD_RESPONSE=$(sqlcmd < ddl.sql 2>&1)
-    if [[ "$SQLCMD_RESPONSE" == *"command not found"* ]]; then
-        echo "sqlcmd response:" $SQLCMD_RESPONSE
+    SQLCMD_RESPONSE=$(sqlcmd < $DDL_FILE 2>&1)
+    if [[ "$SQLCMD_RESPONSE" == *"command not found"* || "$SQLCMD_RESPONSE" == *"not supported"* || "$SQLCMD_RESPONSE" == *"DDL Error:"* ]]; then
+        echo -e "\nsqlcmd response had error(s):\n" $SQLCMD_RESPONSE "\n"
         break
     elif [ "$SQLCMD_RESPONSE" != "Connection refused" ]; then
-        echo "Loaded ddl.sql (server started; sqlcmd ran after $i attempts)"
+        echo "Loaded $DDL_FILE (server started; sqlcmd ran after $i attempts)"
         cd $CURRENT_DIR
         exit 0
     fi
 done
 cd $CURRENT_DIR
-echo "Failed to load ddl.sql file via sqlcmd, after $i attempt(s)"
+echo "Failed to load $DDL_FILE file via sqlcmd, after $i attempt(s)"
 exit 1
