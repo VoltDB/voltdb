@@ -67,14 +67,9 @@ class SqlQueriesTest extends SqlQueriesTestBase {
 
     // Values used to determine which app we are running
     static final List<String> VOTER_TEST_TABLES   = ['AREA_CODE_STATE', 'CONTESTANTS', 'VOTES']
-    //static final List<String> GENQA_TEST_TABLES   = ['EXPORT_MIRROR_PARTITIONED_TABLE', 'PARTITIONED_TABLE', 'REPLICATED_TABLE']
-    static final List<String> GENQA_TEST_TABLES   = ['EXPORT_MIRROR_PARTITIONED_TABLE']
-    // EXPORT_MIRROR_PARTITIONED_TABLE, EXPORT_MIRROR_PARTITIONED_TABLE2, EXPORT_PARTITIONED_TABLE, PARTITIONED_TABLE ???
-    static final List<String> GEB_VMC_TEST_TABLES = ['EXPORT_MIRROR_PARTITIONED_TABLE', 'PARTITIONED_TABLE', 'REPLICATED_TABLE']
+    static final List<String> GENQA_TEST_TABLES   = ['EXPORT_MIRROR_PARTITIONED_TABLE', 'PARTITIONED_TABLE', 'REPLICATED_TABLE']
     static final List<String> GENQA_TEST_USER_STORED_PROCS = ['JiggleExportDoneTable', 'JiggleExportSinglePartition',
-        'JiggleSkinnyExportSinglePartition']
-    static final List<String> GEB_VMC_TEST_USER_STORED_PROCS = ['CountPartitionedTable', 'CountPartitionedTableByGroup',
-        'CountReplicatedTable', 'CountReplicatedTableByGroup', 'InsertPartitionedTableZeroes', 'InsertReplicatedTableZeroes']
+                                                              'JiggleSkinnyExportSinglePartition']
 
     // Names of standard tables that are needed for testing (these names
     // originally came from the 'Genqa' test app, but are now also used
@@ -91,6 +86,11 @@ class SqlQueriesTest extends SqlQueriesTestBase {
     static Boolean runningVoter = null;
     static Boolean runningGenqa = null;
     static Boolean runningVmcTestSever = null;
+
+    @Shared String tablesFileName = TABLES_FILE
+    @Shared String viewsFileName  = VIEWS_FILE
+    @Shared String defaultStoredProcsFileName = DEFAULT_STORED_PROCS_FILE
+    @Shared String userStoredProcsFileName    = USER_STORED_PROCS_FILE
 
     @Shared def sqlQueriesFile = new File(SQL_QUERY_FILE)
     @Shared def tablesFile = new File(TABLES_FILE)
@@ -150,16 +150,24 @@ class SqlQueriesTest extends SqlQueriesTestBase {
             // example app; otherwise, we assume we are running against the default GEB
             // VMC test server (see voltdb/tests/geb/vmc/server/run_voltdb_server.sh)
             if (isRunningVoter(page)) {
-                tablesFile = new File(VOTER_TABLES_FILE)
-                viewsFile  = new File(VOTER_VIEWS_FILE)
-                defaultStoredProcsFile = new File(VOTER_DEFAULT_STORED_PROCS_FILE)
-                userStoredProcsFile    = new File(VOTER_USER_STORED_PROCS_FILE)
+                tablesFileName = VOTER_TABLES_FILE
+                viewsFileName = VOTER_VIEWS_FILE
+                defaultStoredProcsFileName = VOTER_DEFAULT_STORED_PROCS_FILE
+                userStoredProcsFileName = VOTER_USER_STORED_PROCS_FILE
+                tablesFile = new File(tablesFileName)
+                viewsFile  = new File(viewsFileName)
+                defaultStoredProcsFile = new File(defaultStoredProcsFileName)
+                userStoredProcsFile    = new File(userStoredProcsFileName)
                 readFiles()  // reinitialize the file data we just changed
             } else if (isRunningGenqa(page)) {
-                tablesFile = new File(GENQA_TABLES_FILE)
-                viewsFile  = new File(GENQA_VIEWS_FILE)
-                defaultStoredProcsFile = new File(GENQA_DEFAULT_STORED_PROCS_FILE)
-                userStoredProcsFile    = new File(GENQA_USER_STORED_PROCS_FILE)
+                tablesFileName = GENQA_TABLES_FILE
+                viewsFileName = GENQA_VIEWS_FILE
+                defaultStoredProcsFileName = GENQA_DEFAULT_STORED_PROCS_FILE
+                userStoredProcsFileName = GENQA_USER_STORED_PROCS_FILE
+                tablesFile = new File(tablesFileName)
+                viewsFile  = new File(viewsFileName)
+                defaultStoredProcsFile = new File(defaultStoredProcsFileName)
+                userStoredProcsFile    = new File(userStoredProcsFileName)
                 readFiles()  // reinitialize the file data we just changed
             }
         }
@@ -312,26 +320,11 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     static boolean isRunningGenqa(SqlQueryPage sqp) {
         if (runningGenqa == null) {
-            runningGenqa = getTables(sqp).containsAll(GENQA_TEST_TABLES) &&
+            runningGenqa =
+                    //getTables(sqp).containsAll(GENQA_TEST_TABLES) &&
                     sqp.getUserStoredProcedures().containsAll(GENQA_TEST_USER_STORED_PROCS)
         }
         return runningGenqa
-    }
-
-    /**
-     * Returns whether or not we are currently running the standard GEB VMC
-     * test server (which is the default; see voltdb/tests/geb/vmc/server/...),
-     * based on whether the expected tables and stored procedures are listed
-     * on the page.
-     * @param sqp - the SqlQueryPage from which to get the list of table names.
-     * @return true if we are currently running the standard GEB VMC test server.
-     */
-    static boolean isRunningVmcTestSever(SqlQueryPage sqp) {
-        if (runningVmcTestSever == null) {
-            runningVmcTestSever = getTables(sqp).containsAll(GEB_VMC_TEST_TABLES) &&
-                    sqp.getUserStoredProcedures().containsAll(GEB_VMC_TEST_USER_STORED_PROCS)
-        }
-        return runningVmcTestSever
     }
 
     /**
@@ -618,7 +611,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkTables() {
         expect: 'List of displayed Tables should match expected list'
-        printAndCompare('Tables', TABLES_FILE, true, tableLines, getTables(page))
+        printAndCompare('Tables', tablesFileName, true, tableLines, getTables(page))
     }
 
     /**
@@ -627,7 +620,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkViews() {
         expect: 'List of displayed Views should match expected list'
-        printAndCompare('Views', VIEWS_FILE, true, viewLines, getViews(page))
+        printAndCompare('Views', viewsFileName, true, viewLines, getViews(page))
     }
 
     /**
@@ -646,7 +639,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
-        printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, true,
+        printAndCompare('Default Stored Procedures', defaultStoredProcsFileName, true,
                 defaultStoredProcLines, page.getDefaultStoredProcedures())
     }
 
@@ -656,7 +649,7 @@ class SqlQueriesTest extends SqlQueriesTestBase {
      */
     def checkUserStoredProcs() {
         expect: 'List of displayed User-defined Stored Procedures should match expected list'
-        printAndCompare('User-defined Stored Procedures', USER_STORED_PROCS_FILE, true,
+        printAndCompare('User-defined Stored Procedures', userStoredProcsFileName, true,
                 userStoredProcLines, page.getUserStoredProcedures())
     }
 
