@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
@@ -44,8 +45,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
     private long m_maxSeenLocalSpUniqueId;
-    private long m_maxSeenBinaryLogSequenceNumber;
-    private long m_maxSeenBinaryLogUniqueId;
+    private DRLogSegmentId m_maxBinaryLogInfo;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -121,8 +121,7 @@ public class SpPromoteAlgo implements RepairAlgo
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
-        m_maxSeenBinaryLogSequenceNumber = Long.MIN_VALUE;
-        m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
+        m_maxBinaryLogInfo = new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE);
     }
 
     @Override
@@ -185,8 +184,9 @@ public class SpPromoteAlgo implements RepairAlgo
                 assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
                         UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) !=  MpInitiator.MP_INIT_PID;
                 m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, response.getLocalDrUniqueId());
-                m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
-                m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
+                m_maxBinaryLogInfo.drId = Math.max(m_maxBinaryLogInfo.drId, response.getBinaryLogInfo().drId);
+                m_maxBinaryLogInfo.spUniqueId = Math.max(m_maxBinaryLogInfo.spUniqueId, response.getBinaryLogInfo().spUniqueId);
+                m_maxBinaryLogInfo.mpUniqueId = Math.max(m_maxBinaryLogInfo.mpUniqueId, response.getBinaryLogInfo().mpUniqueId);
             }
 
             if (response.getPayload() != null) {
@@ -255,7 +255,6 @@ public class SpPromoteAlgo implements RepairAlgo
         m_promotionResult.set(new RepairResult(
                 m_maxSeenTxnId,
                 m_maxSeenLocalSpUniqueId,
-                m_maxSeenBinaryLogSequenceNumber,
-                m_maxSeenBinaryLogUniqueId));
+                m_maxBinaryLogInfo));
     }
 }

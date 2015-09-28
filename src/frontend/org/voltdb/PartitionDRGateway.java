@@ -29,6 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -113,7 +114,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
-    public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber, long lastUniqueId, ByteBuffer buf) {
+    public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
+            long lastSpUniqueId, long lastMpUniqueId, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
@@ -147,14 +149,15 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             int partitionId,
             long startSequenceNumber,
             long lastSequenceNumber,
-            long lastUniqueId,
+            long lastSpUniqueId,
+            long lastMpUniqueId,
             ByteBuffer buf) {
         if (log.isTraceEnabled()) {
             log.trace("Received DR buffer size " + buf.remaining());
             AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
             buf.order(ByteOrder.LITTLE_ENDIAN);
-            //Magic header space for Java for implementing zero copy stuff
-            buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
+            //Magic header space for Java for implementing zero copy stuff (match with InvocationBuffer.MAGIC_DR_TRANSACTION_PADDING)
+            buf.position(8 /* stream block header */ + 78 /* txn metadata padding */);
             while (buf.hasRemaining()) {
                 int startPosition = buf.position();
                 byte version = buf.get();
@@ -212,28 +215,28 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                 }
                 case BEGIN_TXN: {
                     //Begin txn
-                    final long txnId = buf.getLong();
-                    final long spHandle = buf.getLong();
+                    final long uniqueId = buf.getLong();
+                    final long seqNum = buf.getLong();
                     if (haveOpenTransaction.get() != -1) {
-                        log.error("Have open transaction txnid " + txnId + " spHandle " + spHandle + " but already open transaction");
+                        log.error("Have open transaction SeqNum " + seqNum + " uniqueId " + UniqueIdGenerator.toShortString(uniqueId) + " but already open transaction");
                         break;
                     }
-                    haveOpenTransaction.set(spHandle);
+                    haveOpenTransaction.set(uniqueId);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type BEGIN_TXN " + " txnid " + txnId + " spHandle " + spHandle + " checksum " + checksum);
+                    log.trace("Version " + version + " type BEGIN_TXN " + " SeqNum " + seqNum + " uniqueId " + UniqueIdGenerator.toShortString(uniqueId) + " checksum " + checksum);
                     break;
                 }
                 case END_TXN: {
                     //End txn
-                    final long spHandle = buf.getLong();
+                    final long seqNum = buf.getLong();
                     if (haveOpenTransaction.get() == -1 ) {
-                        log.error("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandleTL.get().get());
+                        log.error("Have end transaction seqNum " + seqNum + " but no open transaction and its less then last committed " + lastCommittedSpHandleTL.get().get());
                         break;
                     }
                     haveOpenTransaction.set(-1);
-                    lastCommittedSpHandleTL.get().set(spHandle);
+                    lastCommittedSpHandleTL.get().set(seqNum);
                     checksum = buf.getInt();
-                    log.trace("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
+                    log.trace("Version " + version + " type END_TXN " + " SeqNum " + seqNum + " checksum " + checksum);
                     break;
                 }
                 case TRUNCATE_TABLE: {
@@ -260,7 +263,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastUniqueId, buf);
+        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastSpUniqueId, lastMpUniqueId, buf);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}

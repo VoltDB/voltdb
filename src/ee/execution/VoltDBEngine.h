@@ -295,10 +295,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_undoLog.release(undoToken);
 
             if (m_drStream) {
-                m_drStream->endTransaction();
+                m_drStream->endTransaction(m_executorContext->currentTxnId(),
+                        m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
             }
             if (m_drReplicatedStream) {
-                m_drReplicatedStream->endTransaction();
+                m_drReplicatedStream->endTransaction(m_executorContext->currentTxnId(),
+                        m_executorContext->currentSpHandle(), m_executorContext->currentUniqueId());
             }
         }
 

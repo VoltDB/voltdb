@@ -180,6 +180,10 @@ public:
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
+        m_currTxnId = txnId;
+        m_currTxnSpHandle = spHandle;
+        m_currTxnUniqueId = addPartitionId(uniqueId);
+
         UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken);
         m_context->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                 addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
@@ -190,8 +194,8 @@ public:
             m_undoLog.undo(m_undoToken);
         } else {
             m_undoLog.release(m_undoToken++);
-            m_drStream.endTransaction();
-            m_drReplicatedStream.endTransaction();
+            m_drStream.endTransaction(m_currTxnId, m_currTxnSpHandle, m_currTxnUniqueId);
+            m_drReplicatedStream.endTransaction(m_currTxnId, m_currTxnSpHandle, m_currTxnUniqueId);
         }
     }
 
@@ -402,6 +406,9 @@ protected:
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
+    int64_t m_currTxnId;
+    int64_t m_currTxnSpHandle;
+    int64_t m_currTxnUniqueId;
 
     DummyTopend m_topend;
     Pool m_pool;
@@ -485,9 +492,13 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     ASSERT_FALSE(tuple.isNullTuple());
     tuple = m_tableReplica->lookupTupleByValues(second_tuple);
     ASSERT_TRUE(tuple.isNullTuple());
-
-    EXPECT_EQ(3, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
-    EXPECT_EQ(-1, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    int64_t commitedSeqNum;
+    int64_t commitedSpUniqueId;
+    int64_t commitedMpUniqueId;
+    m_drStream.getLastCommittedSequenceNumberAndUniqueIds(commitedSeqNum, commitedSpUniqueId, commitedMpUniqueId);
+    EXPECT_EQ(3, commitedSeqNum);
+    m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds(commitedSeqNum, commitedSpUniqueId, commitedMpUniqueId);
+    EXPECT_EQ(-1, commitedSeqNum);
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
@@ -502,7 +513,11 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     // it would flush itself out now
     ASSERT_FALSE(flush(99));
 
-    EXPECT_EQ(-1, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    int64_t commitedSeqNum;
+    int64_t commitedSpUniqueId;
+    int64_t commitedMpUniqueId;
+    m_drStream.getLastCommittedSequenceNumberAndUniqueIds(commitedSeqNum, commitedSpUniqueId, commitedMpUniqueId);
+    EXPECT_EQ(-1, commitedSeqNum);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 
     beginTxn(100, 100, 99, 71);
@@ -522,7 +537,8 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
-    EXPECT_EQ(0, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    m_drStream.getLastCommittedSequenceNumberAndUniqueIds(commitedSeqNum, commitedSpUniqueId, commitedMpUniqueId);
+    EXPECT_EQ(0, commitedSeqNum);
 }
 
 TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
@@ -572,8 +588,13 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
-    EXPECT_EQ(0, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
-    EXPECT_EQ(2, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    int64_t commitedSeqNum;
+    int64_t commitedSpUniqueId;
+    int64_t commitedMpUniqueId;
+    m_drStream.getLastCommittedSequenceNumberAndUniqueIds(commitedSeqNum, commitedSpUniqueId, commitedMpUniqueId);
+    EXPECT_EQ(0, commitedSeqNum);
+    m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds(commitedSeqNum, commitedSpUniqueId, commitedMpUniqueId);
+    EXPECT_EQ(2, commitedSeqNum);
 }
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
