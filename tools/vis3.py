@@ -120,33 +120,56 @@ class Plot:
         plt.savefig(self.filename, format="png", transparent=False)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, data, info):
+def plot(title, xbranch, ybranch, filename, width, height, data, root_path):
     global mc
+
+    xlabel = "%s Thpt tx/sec" % xbranch
+    ylabel = "%s Thpt tx/sec" % ybranch
 
     pl = Plot(title, xlabel, ylabel, filename, width, height, 1)
 
+    seq = []
+
     if len(data) > 0:
         for k,v in data.iteritems():
+            if v["y"]['tps'] == 0.0:
+                continue
             diff = (float(v["y"]['tps'])-float(v["x"]['tps']))/float(v["y"]['tps']) * 100.
             acolor = ['g','r'][diff<0]
             pl.plot(v["x"]['tps'], v["y"]['tps'], acolor, MARKERS[0], "")
+            test_case = "%s %d %s" % (k[2],k[3],["node","nodes"][k[3]>1])
+            seq.append([test_case, round(diff,2), round(v["y"]['tps'],2), round(v["x"]['tps'],2), acolor])
             if abs(diff) > 5.:
-                atxt = "%s %d %s (%.2f%%)" % (k[2],k[3],["node","nodes"][k[3]>1],diff)
+                atxt = "%s (%.2f%%)" % (test_case, diff)
                 pl.ax.annotate(atxt, xy=(v["x"]['tps'], v["y"]['tps']), xycoords='data',
                         xytext=(10*[1,-1][diff>0], -5), textcoords='offset points', ha=["left","right"][diff>0],
                         size=10, color=acolor) #, arrowprops=dict(arrowstyle="->"))
 
-    if len(info) > 1:
-        _at = AnchoredText("\n".join(info), loc=2, prop=dict(size=10))
-        pl.ax.add_artist(_at)
+    #if len(info) > 1:
+    #    _at = AnchoredText("\n".join(info), loc=2, prop=dict(size=10))
+    #    pl.ax.add_artist(_at)
 
     pl.close()
 
-def generate_index_file(filenames):
+    seq = sorted(seq, key=lambda t: t[1])
+    seq.insert(0, ['test','% diff', ybranch, xbranch,'flag'])
+    with open(filename.replace('png','html'), "w+") as f:
+        f.write(get_html_tbl(reduce(lambda x,y: x+y, seq, []), 5))
+
+def get_html_tbl(seq, col_count):
+    if len(seq) % col_count:
+        seq.extend([''] * (col_count - len(seq) % col_count))
+    tbl_template = '<table>%s</table>' % ('<tr>%s</tr>' % ('<td>%s</td>' * col_count) * (len(seq)/col_count))
+    return tbl_template % tuple(seq)
+
+def generate_index_file(root, filenames):
     row = """
       <tr>
         <td><a href="%s"><img src="%s" width="400" height="400"/></a></td>
       </tr4
+"""
+    table = """
+%s
 """
 
     sep = """
@@ -200,6 +223,11 @@ def generate_index_file(filenames):
             rows.append(sep % (i[0], i[0]))
             last_app = i[0]
         rows.append(row % (i[1], i[1]))
+        try:
+            with open(sys.argv[1]+"/"+str(i[1].replace('png','html')), 'r') as f:
+                rows.append(table % f.read())
+        except:
+            pass
 
     return  full_content % ''.join(rows)
 
@@ -245,17 +273,19 @@ def main():
 
     for bg in bc:
         merged = {}
-        missing = ['Cases missing from %s:' % bg[1]['branch']]
+        #missing = ['Cases missing from %s:' % bg[1]['branch']]
         for group,data in stats.iteritems():
+            if group[1].startswith('Security'):
+                continue
             if bg[0]['branch'] == group[0]:
                 k = (bg[1]['branch'],group[1],group[2])
                 if k in stats:
                     m = stats[k]
                     merged[(bg[0]['branch'],bg[1]['branch'])+(group[1],group[2])] = {"y": data[0], "x": stats[k][0]}
-                else:
-                    missing.append("%s %d %s" % (group[1],group[2],["node","nodes"][group[2]>1]))
+                #else:
+                #    missing.append("%s %d %s" % (group[1],group[2],["node","nodes"][group[2]>1]))
 
-        app = "%s vs %s" % (bg[0]['branch'],bg[1]['branch'])
+        app = "%s vs %s" % (bg[0]['branch'], bg[1]['branch'])
         title = "%s as of %s vs %s as of %s" % (bg[0]['branch'],bg[0]['sampledate'],bg[1]['branch'],bg[1]['sampledate'])
         app_filename = app.replace(' ', '_')
         """
@@ -277,13 +307,13 @@ def main():
              data, 'lat99')
         """
 
-        plot(title+" throughput", "%s Thpt tx/sec" % bg[1]['branch'], "%s Thpt tx/sec" % bg[0]['branch'],
-                    path + "-throughput-" + app_filename + ".png", width, height, merged, missing)
+        plot(title+" throughput", bg[1]['branch'], bg[0]['branch'],
+                    path + "-throughput-" + app_filename + ".png", width, height, merged, root_path)
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')
     #sorted_filenames = sorted(filenames, key=lambda f: f[0].lower()+str(f[1]))
-    index_file.write(generate_index_file(filenames))
+    index_file.write(generate_index_file(root_path, filenames))
     index_file.close()
 
 if __name__ == "__main__":
