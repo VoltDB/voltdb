@@ -107,10 +107,10 @@ public class AsyncBenchmark {
         long displayinterval = 5;
 
         @Option(desc = "Benchmark duration, in seconds.")
-        int duration = 2000;
+        int duration = 300;
 
         @Option(desc = "Warmup duration in seconds.")
-        int warmup = 2;
+        int warmup = 20;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to database for queuries")
         String servers = "localhost";
@@ -125,10 +125,10 @@ public class AsyncBenchmark {
         String statsfile = "";
 
         @Option(desc = "Performance test only.")
-        boolean perftest = true;
+        boolean perftest = false;
 
         @Option(desc = "If true, use the partitioned table for the benchmark; replicated otherwise.")
-        boolean partitioned = true;
+        boolean partitioned = false;
 
         @Override
         public void validate() {
