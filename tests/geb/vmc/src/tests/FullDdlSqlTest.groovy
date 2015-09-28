@@ -70,12 +70,11 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         // Get the list of tests that we actually want to run
         // (if empty, run all tests)
         String sqlTestsProperty = System.getProperty('sqlTests', '')
-        debugPrint '\nsqlTestsProperty: ' + sqlTestsProperty
         def sqlTests = []
         if (sqlTestsProperty) {
             sqlTests = Arrays.asList(sqlTestsProperty.split(','))
+            debugPrint '\nsqlTests:\n' + sqlTests
         }
-        debugPrint 'sqlTests:\n' + sqlTests
         debugPrint 'sqlTests.isEmpty(): ' + sqlTests.isEmpty()
 
         // Get the lines of the fullDDL.sql file (ignoring comment lines
@@ -109,7 +108,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         // If specific test names to run were specified, prune out all others
         if (sqlTests) {
             fullDdlSqlStatements.retainAll { sqlTests.contains(getSqlStatementTestName(it)) }
-            debugPrint '\nfullDdlSqlStatements:\n' + fullDdlSqlStatements
+            //debugPrint '\nfullDdlSqlStatements:\n' + fullDdlSqlStatements
         }
 
         // Get the list of TestDDLFeatures.java test methods
@@ -131,7 +130,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
             }
         }
         if (sqlTests) {
-            debugPrint '\ntestDdlFeaturesTestMethods:\n' + testDdlFeaturesTestMethods
+            debugPrint '\ntestDdlFeaturesTestMethods:\n[' + (testDdlFeaturesTestMethods.collect { it.getName() }).join(', ') + ']'
         }
     }
 
