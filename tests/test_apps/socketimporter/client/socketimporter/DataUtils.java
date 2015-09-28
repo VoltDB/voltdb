@@ -123,20 +123,19 @@ public class DataUtils {
 
     public void ddlSetup(boolean partitioned) {
         final String[] DDLStmts = {
-                "CREATE TABLE importtable ( " +
+                "CREATE TABLE IMPORTTABLE ( " +
                 "  key      varchar(250) not null " +
                 ", value    varchar(1048576 BYTES) not null " +
                 ", insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
                 ", PRIMARY KEY (key))",
-                "CREATE PROCEDURE InsertOnly as insert into importtable(key, value) VALUES(?, ?)",
                 "CREATE PROCEDURE SelectOnly as select * from importtable where key = ?",
+                "CREATE PROCEDURE InsertOnly as insert into IMPORTTABLE(key, value) VALUES(?, ?)",
                 "CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE",
         };
         final String[] PartitionStmts = {
                 "PARTITION table IMPORTTABLE ON COLUMN key",
                 "PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key",
                 "PARTITION PROCEDURE SelectOnly ON TABLE importtable COLUMN key"
-                //"PARTITION PROCEDURE SelectMaxTime ON TABLE importtable COLUMN insert_time"
         };
         dropTables();
         try {
@@ -163,7 +162,7 @@ public class DataUtils {
         final String[] dropStmts = {
             "procedure InsertOnly IF EXISTS",
             "procedure SelectMaxTime IF EXISTS",
-            "table importtable IF EXISTS"
+            "table IMPORTTABLE IF EXISTS"
         };
         try {
             for (int i = 0; i < dropStmts.length; i++) {
@@ -171,7 +170,6 @@ public class DataUtils {
                         "DROP " + dropStmts[i]);
             }
         } catch (IOException | ProcCallException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
