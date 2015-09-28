@@ -54,7 +54,10 @@ if CTX.compilerName() == 'gcc':
     CTX.LDFLAGS += " -rdynamic"
     if (CTX.compilerMajorVersion() >= 4):
         CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs"
-        CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable"
+	if (CTX.compilerMinorVersion() == 9):
+            CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable"
+        elif (CTX.compilerMinorVersion() == 8):
+	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
@@ -154,7 +157,7 @@ if CTX.PLATFORM == "Darwin":
     CTX.JNIFLAGS = "-framework JavaVM,1.7"
 
 if CTX.PLATFORM == "Linux":
-    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
+    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
 
 ###############################################################################
