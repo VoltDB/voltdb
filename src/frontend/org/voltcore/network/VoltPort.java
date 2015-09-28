@@ -425,6 +425,11 @@ public class VoltPort implements Connection
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        return getHostnameOrIP();
+    }
+
+    @Override
     public String getHostnameAndIPAndPort() {
         return m_remoteHostAndAddressAndPort;
     }
@@ -442,6 +447,11 @@ public class VoltPort implements Connection
     @Override
     public long connectionId() {
         return m_handler.connectionId();
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        return connectionId();
     }
 
     @Override

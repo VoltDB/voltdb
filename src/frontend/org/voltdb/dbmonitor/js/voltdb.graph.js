@@ -1,4 +1,4 @@
-﻿
+
 (function (window) {
 
     var IMonitorGraphUI = (function () {
@@ -27,14 +27,14 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
+        var drReplicationChart;        var cmdLogChart;        var cmdLogOverlay = [];        var physicalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
         this.ChartLatency = nv.models.lineChart();
         this.ChartTransactions = nv.models.lineChart();
         this.ChartPartitionIdleTime = nv.models.lineChart();
-        this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
+        this.ChartDrReplicationRate = nv.models.lineChart();        this.ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
 
@@ -663,14 +663,14 @@
             transactionChart = transactinoChartObj;
             partitionChart = partitionChartObj;
             drReplicationChart = drReplicationCharObj;
-            cmdLogChart = cmdLogChartObj;            currentView = view;
+            cmdLogChart = cmdLogChartObj;            currentView = view;
             MonitorGraphUI.Monitors = {
                 'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
                 'latFirstData': true,
-                'latMaxTimeStamp': new Date('1970-11-11').getTime(),                'tpsData': getEmptyDataOptimized(),
+                'latMaxTimeStamp': new Date('1970-11-11').getTime(),                'tpsData': getEmptyDataOptimized(),
                 'tpsDataMin': getEmptyDataForMinutesOptimized(),
                 'tpsDataDay': getEmptyDataForDaysOptimized(),
                 'tpsFirstData': true,
@@ -688,8 +688,8 @@
                 'partitionFirstData': true,
                 'drReplicationData': getEmptyDataOptimized(),
                 'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
-                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'cmdLogData': getEmptyDataOptimized(),
-                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
+                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'cmdLogData': getEmptyDataOptimized(),
+                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
 
@@ -752,7 +752,7 @@
             if (partitionChart.is(":visible"))
                 MonitorGraphUI.ChartPartitionIdleTime.update();
 
-            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
+            if (drReplicationChart.is(":visible"))                MonitorGraphUI.ChartDrReplicationRate.update();
 
             if (cmdLogChart.is(":visible"))
                 MonitorGraphUI.ChartCommandlog.update();

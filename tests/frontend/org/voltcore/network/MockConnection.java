@@ -59,6 +59,11 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        return getHostnameOrIP();
+    }
+
+    @Override
     public int getRemotePort() {
         throw new UnsupportedOperationException();
     }
@@ -71,6 +76,11 @@ public class MockConnection implements Connection {
     @Override
     public long connectionId() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        return connectionId();
     }
 
     @Override

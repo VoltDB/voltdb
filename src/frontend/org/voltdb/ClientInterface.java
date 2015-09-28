@@ -948,8 +948,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Log initiator stats
              */
             cihm.m_acg.logTransactionCompleted(
-                    cihm.connection.connectionId(),
-                    cihm.connection.getHostnameOrIP(),
+                    cihm.connection.connectionId(clientData.m_clientHandle),
+                    cihm.connection.getHostnameOrIP(clientData.m_clientHandle),
                     clientData.m_procName,
                     delta,
                     clientResponse.getStatus());
@@ -1213,7 +1213,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
-        bindAdapter(internalAdapter, null);
+        bindAdapter(internalAdapter, null, true);
         m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
     }
 
@@ -1305,9 +1305,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Tell the clientInterface about a connection adapter.
      */
     public ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
+        return bindAdapter(adapter, repairCallback, false);
+    }
+
+    private ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback, boolean addAcg) {
         if (m_cihm.get(adapter.connectionId()) == null) {
-            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
-                        AdmissionControlGroup.getDummy());
+            AdmissionControlGroup acg = AdmissionControlGroup.getDummy();
+            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback, acg);
+            if (addAcg) {
+                m_allACGs.add(acg);
+            }
             m_cihm.put(adapter.connectionId(), cihm);
         }
         return m_cihm.get(adapter.connectionId());
@@ -2859,6 +2866,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public String getHostnameOrIP(long clientHandle) {
+            return getHostnameOrIP();
+        }
+
+        @Override
         public int getRemotePort() {
             return -1;
         }
@@ -2877,6 +2889,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public long connectionId()
         {
             return Long.MIN_VALUE;
+        }
+
+        @Override
+        public long connectionId(long clientHandle) {
+            return connectionId();
         }
 
         @Override
