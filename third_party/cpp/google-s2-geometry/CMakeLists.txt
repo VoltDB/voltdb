@@ -22,7 +22,7 @@ if (NOT DEFINED VOLTDB_THIRD_PARTY_CPP_DIR)
 endif (NOT DEFINED VOLTDB_THIRD_PARTY_CPP_DIR)
 set(VOLTDB_GOOGLE_TEST_SRC_DIR "${VOLTDB_THIRD_PARTY_CPP_DIR}/googletest/googletest")
 
-ADD_DEFINITIONS (-Wno-deprecated-declarations -DNDEBUG -std=c++11)
+ADD_DEFINITIONS (-Wno-deprecated-declarations -Wno-conversion -DNDEBUG -std=c++11)
 
 include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(geometry)
@@ -76,7 +76,10 @@ include_directories(${GTEST_INCLUDE_DIRECTORIES})
 add_library(gtest ${GTEST_DIR}/src/gtest-all.cc ${GTEST_DIR}/src/gtest_main.cc)
 enable_testing(true)
 
-cmake_policy(SET CMP0037 OLD) # allow underscores in targets
+if (${CMAKE_VERSION} VERSION_GREATER 2.8.12.999)
+  cmake_policy(SET CMP0037 OLD) # allow underscores in targets
+endif()
+
 if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpic")
   set(PTHREAD_LIBRARY_FOR_TESTS pthread)
