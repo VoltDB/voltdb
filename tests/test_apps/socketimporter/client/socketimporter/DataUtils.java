@@ -20,6 +20,23 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+/* 
+ * DDL in the Java client?
+ *
+ * It's because there can't be two different socket import streams
+ * in the deployment file.
+ *
+ * So the strategy is the create the target table, importtable partitioned,
+ * run the test, then it's possible to drop the table and its SP's and recreate
+ * it without partitioning.
+ *
+ * If at some point this limitation is eliminated -- ENG-9074, then the
+ * DDL in the client could be eliminated.
+ *
+ * However it might be a useful test variant since there's not much DDL
+ * in the system test client.
+ */
 package socketimporter.client.socketimporter;
 
 import java.io.IOException;
@@ -43,7 +60,7 @@ public class DataUtils {
     private static final int KEY = 0;
     private static final int VALUE = 1;
 
-    private static final String m_select = "IMPORTTABLE.select";
+    private static final String m_select = "SelectOnly"; // would use default IMPORTTABLE.select but it's not created on replicated table
     private static final String m_delete = "IMPORTTABLE.delete";
     private static final String m_max = "SelectMaxTime";
 
@@ -91,13 +108,10 @@ public class DataUtils {
 			try {
 				response = m_client.callProcedure(m_max);
 			} catch (NoConnectionsException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} catch (ProcCallException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
     		VoltTable[] countQueryResult = response.getResults();
@@ -115,11 +129,13 @@ public class DataUtils {
     			", insert_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL " +
     			", PRIMARY KEY (key))",
     			"CREATE PROCEDURE InsertOnly as insert into importtable(key, value) VALUES(?, ?)",
+    			"CREATE PROCEDURE SelectOnly as select * from importtable where key = ?",
     			"CREATE PROCEDURE SelectMaxTime as select since_epoch(millis, max(insert_time)) from IMPORTTABLE",
     	};
         final String[] PartitionStmts = {
         		"PARTITION table IMPORTTABLE ON COLUMN key",
-    			"PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key"
+    			"PARTITION PROCEDURE InsertOnly ON TABLE importtable COLUMN key",
+    			"PARTITION PROCEDURE SelectOnly ON TABLE importtable COLUMN key"
     			//"PARTITION PROCEDURE SelectMaxTime ON TABLE importtable COLUMN insert_time"
         };
     	dropTables();
