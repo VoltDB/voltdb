@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -260,6 +261,7 @@ public class InitiateResponseMessage extends VoltMessage {
         sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
         sb.append("\n SP HANDLE: ").append(m_spHandle);
+        sb.append("\n EXECUTION HSID: ").append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append("\n INITIATOR HSID: ").append(CoreUtils.hsIdToString(m_initiatorHSId));
         sb.append("\n COORDINATOR HSID: ").append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append("\n CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
