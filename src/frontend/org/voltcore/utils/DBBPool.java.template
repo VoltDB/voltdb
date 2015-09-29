@@ -350,7 +350,7 @@ public final class DBBPool {
         ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
         if (pooledBuffers == null) {
             pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
-            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
+            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) != null) {
                 pooledBuffers = m_pooledBuffers.get(capacity);
             }
         }
@@ -502,9 +502,8 @@ public final class DBBPool {
             HOST.fatal("Second:", t);
             System.exit(-1);
         }
-#else
-        nativeDeleteCharArrayMemory(pointer);
 #endif
+        nativeDeleteCharArrayMemory(pointer);
     }
 
     private static native void nativeDeleteCharArrayMemory(long pointer);

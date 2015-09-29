@@ -169,6 +169,9 @@ public class JDBC4ClientConnection implements Closeable {
         }
 
         if (!connectedAnything) {
+            try {
+                clientTmp.close();
+            } catch (InterruptedException ie) {}
             throw new IOException("Unable to connect to VoltDB cluster with servers: " + this.servers);
         }
 

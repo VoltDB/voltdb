@@ -169,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.6";
+    static final String m_defaultVersionString = "4.6.8";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.6.8\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1434,7 +1434,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_catalogContext = new CatalogContext(
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
-                            catalog, null, deploymentHash, 0, -1);
+                            catalog, new byte[] {}, deploymentHash, 0);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
             if (numberOfNodes <= 0) {
@@ -1938,7 +1938,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_latencyStats = null;
                 m_latencyHistogramStats = null;
 
-                AdHocCompilerCache.clearVersionCache();
+                AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 // probably unnecessary

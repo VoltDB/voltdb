@@ -34,6 +34,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
@@ -50,20 +51,21 @@ public class PlannerTool {
     final Database m_database;
     final Cluster m_cluster;
     final HSQLInterface m_hsql;
-    final int m_catalogVersion;
+    final byte[] m_catalogHash;
     final AdHocCompilerCache m_cache;
     static PlannerStatsCollector m_plannerStats;
 
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
-    public PlannerTool(final Cluster cluster, final Database database, int catalogVersion) {
+    public PlannerTool(final Cluster cluster, final Database database, byte[] catalogHash)
+    {
         assert(cluster != null);
         assert(database != null);
 
         m_database = database;
         m_cluster = cluster;
-        m_catalogVersion = catalogVersion;
-        m_cache = AdHocCompilerCache.getCacheForCatalogVersion(catalogVersion);
+        m_catalogHash = catalogHash;
+        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
@@ -101,14 +103,18 @@ public class PlannerTool {
 
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
-        return planSql(sqlIn, infer);
+        return planSql(sqlIn, infer, false, null);
     }
 
-    AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning) {
+    AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning,
+            boolean isExplainMode, final Object[] userParams) {
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
         }
+        boolean hasUserQuestionMark = false;
+        boolean wrongNumberParameters = false;
+
         try {
             if ((sqlIn == null) || (sqlIn.length() == 0)) {
                 throw new RuntimeException("Can't plan empty or null SQL.");
@@ -157,7 +163,22 @@ public class PlannerTool {
             try {
                 planner.parse();
                 parsedToken = planner.parameterize();
-                if (partitioning.isInferred()) {
+
+                // check the parameters count
+                // check user input question marks with input parameters
+                int inputParamsLengh = userParams == null ? 0: userParams.length;
+                if (planner.getAdhocUserParamsCount() != inputParamsLengh) {
+                    wrongNumberParameters = true;
+                    if (!isExplainMode) {
+                        throw new PlanningErrorException(String.format(
+                                "Incorrect number of parameters passed: expected %d, passed %d",
+                                planner.getAdhocUserParamsCount(), inputParamsLengh));
+                    }
+                }
+                hasUserQuestionMark  = planner.getAdhocUserParamsCount() > 0;
+
+                // do not put wrong parameter explain query into cache
+                if (!wrongNumberParameters && partitioning.isInferred()) {
                     // if cacheable, check the cache for a matching pre-parameterized plan
                     // if plan found, build the full plan using the parameter data in the
                     // QueryPlanner.
@@ -175,13 +196,24 @@ public class PlannerTool {
                         }
                         if (matched != null) {
                             CorePlan core = matched.core;
-                            ParameterSet params = planner.extractedParamValues(core.parameterTypes);
+
+                            ParameterSet params = null;
+                            if (planner.compiledAsParameterizedPlan()) {
+                                params = planner.extractedParamValues(core.parameterTypes);
+                            } else if (hasUserQuestionMark) {
+                                params = ParameterSet.fromArrayNoCopy(userParams);
+                            } else {
+                                // No constants AdHoc queries
+                                params = ParameterSet.emptyParameterSet();
+                            }
+
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    null);
                             ahps.setBoundConstants(matched.constants);
-                            m_cache.put(sql, parsedToken, ahps, extractedLiterals);
+                            // parameterized plan from the cache does not have exception
+                            m_cache.put(sql, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, false);
                             cacheUse = CacheUse.HIT2;
                             return ahps;
                         }
@@ -202,10 +234,11 @@ public class PlannerTool {
             //////////////////////
             // OUTPUT THE RESULT
             //////////////////////
-            CorePlan core = new CorePlan(plan, m_catalogVersion);
+            CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
-            if (partitioning.isInferred()) {
+            // do not put wrong parameter explain query into cache
+            if (!wrongNumberParameters && partitioning.isInferred()) {
 
                 // Note either the parameter index (per force to a user-provided parameter) or
                 // the actual constant value of the partitioning key inferred from the plan.
@@ -214,11 +247,10 @@ public class PlannerTool {
                 core.setPartitioningParamIndex(partitioning.getInferredParameterIndex());
                 core.setPartitioningParamValue(partitioning.getInferredPartitioningValue());
 
-                if (planner.compiledAsParameterizedPlan()) {
-                    assert(parsedToken != null);
-                    // Again, plans with inferred partitioning are the only ones supported in the cache.
-                    m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals);
-                }
+
+                assert(parsedToken != null);
+                // Again, plans with inferred partitioning are the only ones supported in the cache.
+                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
             }
             return ahps;
         }

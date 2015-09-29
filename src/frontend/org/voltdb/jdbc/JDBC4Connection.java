@@ -315,7 +315,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isValid(int timeout) throws SQLException
     {
-        return isClosed;
+        return !isClosed;
     }
 
     // Converts the given SQL statement into the system's native SQL grammar.

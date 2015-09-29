@@ -1163,7 +1163,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("invalid format for a constant"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 3, passed 0"));
         }
         // test that missing parameters don't work (ENG-1000)
         try {
@@ -1171,7 +1171,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("Number of arguments provided was 0 where 4 was expected"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 4, passed 0"));
         }
         //VoltTable results = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];
         //System.out.println(results.toJSONString());
@@ -1726,6 +1726,47 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     }
 
+
+    public void testENG6926() throws Exception {
+        // Aggregation of a joined table was not ordered
+        // according to ORDER BY clause when the OB column
+        // was not first in the select list.
+
+        Client client = getClient();
+
+        String insStmt = "insert into eng6926_ipuser(ip, countrycode, province) values (?, ?, ?)";
+        client.callProcedure("@AdHoc", insStmt, "23.101.135.101", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.142.5", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.143.89", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.138.62", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "69.67.23.26", "US", "Minnesota");
+        client.callProcedure("@AdHoc", insStmt, "198.179.137.202", "US", "Minnesota");
+        client.callProcedure("@AdHoc", insStmt, "23.99.35.61", "US", "Washington");
+
+        insStmt = "insert into eng6926_hits(ip, week) values (?, ?)";
+        client.callProcedure("@AdHoc", insStmt, "23.101.135.101", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.142.5", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.143.89", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.138.62", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "69.67.23.26", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "198.179.137.202", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.99.35.61", 20140914);
+
+        String query = "select count(ip.ip), ip.province as state " +
+                "from eng6926_hits as h, eng6926_ipuser as ip " +
+                "where ip.ip=h.ip and ip.countrycode='US' " +
+                    "group by ip.province " + "order by count(ip.ip) desc";
+
+        VoltTable vt = client.callProcedure("@AdHoc", query).getResults()[0];
+        long[] col0Expected = new long[] {4, 2, 1};
+        String[] col1Expected = new String[] {"District of Columbia", "Minnesota", "Washington"};
+        int i = 0;
+        while (vt.advanceRow()) {
+            assertEquals(col0Expected[i], vt.getLong(0));
+            assertEquals(col1Expected[i], vt.getString(1));
+            ++i;
+        }
+    }
 
     //
     // JUnit / RegressionSuite boilerplate

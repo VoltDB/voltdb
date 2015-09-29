@@ -22,6 +22,7 @@ import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -245,9 +246,18 @@ public class MeshArbiter {
     }
 
     /**
+     * Convenience wrapper for tests that don't care about unknown sites
+     */
+    Map<Long, Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
+        return reconfigureOnFault(hsIds, fm, new HashSet<Long>());
+    }
+
+    /**
      * Process the fault message, and if necessary start arbitration.
      * @param hsIds pre-failure mesh ids
      * @param fm a {@link FaultMessage}
+     * @param unknownFaultedSites Sites that we don't know about, but are informed
+     * have failed; tracked here so that we can remove the associated hosts
      * @return a map where the keys are the sites we need to disconnect from, and
      *   the values the last know safe zookeeper transaction ids for the sites
      *   we need to disconnect from. A map with entries indicate that an
@@ -255,7 +265,7 @@ public class MeshArbiter {
      *   indicate either a stale message, or that an agreement has not been
      *   reached
      */
-    public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
+    public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm, Set<Long> unknownFaultedSites) {
         boolean proceed = false;
         do {
             Discard ignoreIt = mayIgnore(hsIds,fm);
@@ -267,6 +277,9 @@ public class MeshArbiter {
                 ignoreIt.log(fm);
             }
 
+            if (Discard.Unknown == ignoreIt) {
+                unknownFaultedSites.add(fm.failedSite);
+            }
             fm = (FaultMessage)m_mailbox.recv(justFailures);
         } while (fm != null);
 

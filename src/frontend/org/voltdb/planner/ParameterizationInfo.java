@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
@@ -73,6 +74,35 @@ class ParameterizationInfo {
                 paramValues.toArray(new String[paramValues.size()]));
         }
         return info;
+    }
+
+    public static void findUserParametersRecursively(final VoltXMLElement xmlSQL, Set<Integer> paramIds) {
+        if (xmlSQL.name.equals("union")) {
+            // UNION has its parameters on the individual selects level
+            for (VoltXMLElement xmlChildSQL : xmlSQL.children) {
+                findUserParametersRecursively(xmlChildSQL, paramIds);
+            }
+        } else {
+            // find the parameters xml node
+            for (VoltXMLElement child : xmlSQL.children) {
+                if (! child.name.equals("parameters")) {
+                    continue;
+                }
+
+                // "parameters" element contains all the parameter information for the query
+                // also including its subqueries if it has.
+                for (VoltXMLElement node : child.children) {
+                    String idStr = node.attributes.get("id");
+                    assert(idStr != null);
+                    // ID attribute is assumed to be global unique per query.
+                    // but for UNION query, "parameters" are copied to each query level.
+                    paramIds.add(Integer.parseInt(idStr));
+                }
+
+                // there is ONLY one parameters element per query
+                break;
+            }
+        }
     }
 
     public static void parameterizeRecursively(VoltXMLElement parameterizedXmlSQL,

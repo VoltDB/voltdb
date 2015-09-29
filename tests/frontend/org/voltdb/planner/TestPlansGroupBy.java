@@ -1203,6 +1203,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
+    public void testENG6962DistinctCasesDisabledUntilENG6436isFixed() {
+        String sql;
+        sql = "select distinct A1, B1 from R1";
+        failToCompile(sql, "DISTINCT columns");
+        sql = "select distinct A1+B1 from R1";
+        failToCompile(sql, "DISTINCT of an expression");
+    }
+
     public void testENG389_Having() {
         boolean asItWas = AbstractExpression.disableVerboseExplainForDebugging();
         //      CREATE VIEW V_P1 (V_A1, V_B1, V_CNT, V_SUM_C1, V_SUM_D1)
