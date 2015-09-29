@@ -284,7 +284,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (m instanceof Iv2InitiateTaskMessage) {
                 // Send IGNORED response for all SPs
                 Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
-                final InitiateResponseMessage response = new InitiateResponseMessage(task);
+                final InitiateResponseMessage response = new InitiateResponseMessage(task, m_mailbox.getHSId());
                 response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                             new VoltTable[0],
                             ClientResponseImpl.IGNORED_TRANSACTION));
@@ -344,7 +344,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // If it's a DR sentinel, send an acknowledgement
             if (sentinel && !commandLog) {
                 MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage) message;
-                final InitiateResponseMessage response = new InitiateResponseMessage(mppm);
+                final InitiateResponseMessage response = new InitiateResponseMessage(mppm, m_mailbox.getHSId());
                 ClientResponseImpl clientResponse =
                         new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                 new VoltTable[0], ClientResponseImpl.IGNORED_TRANSACTION);

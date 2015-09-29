@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -38,6 +37,8 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * Implements the Multi-partition procedure ProcedureTask.
@@ -123,7 +124,7 @@ public class MpProcedureTask extends ProcedureTask
                 !spName.startsWith("@LoadMultipartitionTable") &&
                 !spName.equals("@UpdateApplicationCatalog"))
         {
-            InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
+            InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg, m_initiator.getHSId());
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                         new VoltTable[] {},
                         "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +

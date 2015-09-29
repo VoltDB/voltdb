@@ -62,7 +62,7 @@ abstract public class ProcedureTask extends TransactionTask
     protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task,
             SiteProcedureConnection siteConnection)
     {
-        final InitiateResponseMessage response = new InitiateResponseMessage(task);
+        final InitiateResponseMessage response = new InitiateResponseMessage(task, m_initiator.getHSId());
 
         try {
             Object[] callerParams = null;

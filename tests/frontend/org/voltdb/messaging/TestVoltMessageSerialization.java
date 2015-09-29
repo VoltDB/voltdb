@@ -26,7 +26,6 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import com.google_voltpatches.common.collect.Sets;
 import junit.framework.TestCase;
 
 import org.voltcore.messaging.HeartbeatMessage;
@@ -40,6 +39,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
+
+import com.google_voltpatches.common.collect.Sets;
 
 public class TestVoltMessageSerialization extends TestCase {
 
@@ -120,7 +121,7 @@ public class TestVoltMessageSerialization extends TestCase {
         );
         table.addRow("howmanylicksdoesittaketogettothecenterofatootsiepop");
 
-        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
+        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask, 23);
         iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                 new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
@@ -143,7 +144,7 @@ public class TestVoltMessageSerialization extends TestCase {
         );
         table.addRow("howmanylicksdoesittaketogettothecenterofatootsiepop");
 
-        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
+        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask, 8);
         iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                 new VoltTable[] { table, table }, "knockknockbananna"));
         iresponse.setClientHandle(99);
@@ -162,7 +163,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
 
-        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
+        InitiateResponseMessage iresponse = new InitiateResponseMessage(itask, 23);
         iresponse.setMispartitioned(true, spi, Pair.of(3l, new byte[] {1, 2, 3}));
         iresponse.setClientHandle(99);
 

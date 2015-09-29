@@ -103,7 +103,7 @@ public class SpProcedureTask extends ProcedureTask
 
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response =
-            new InitiateResponseMessage(txnState.m_initiationMsg);
+            new InitiateResponseMessage(txnState.m_initiationMsg, m_initiator.getHSId());
         response.m_sourceHSId = m_initiator.getHSId();
         response.setRecovering(true);
 
