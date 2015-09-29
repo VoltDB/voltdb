@@ -21,10 +21,8 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -32,6 +30,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
@@ -40,6 +39,8 @@ import com.google_voltpatches.common.base.Charsets;
  */
 public class PartitionDRGateway implements DurableUniqueIdListener {
     private static final VoltLogger log = new VoltLogger("DR");
+
+    private static boolean ENABLE_DR_BUFFER_TRACE = Boolean.getBoolean("ENABLE_DR_BUFFER_TRACE");
 
     public enum DRRecordType {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
@@ -52,8 +53,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         DR_CONFLICT_TIMESTAMP_MISMATCH;
     }
 
-    public static final Map<Integer, PartitionDRGateway> m_partitionDRGateways = new NonBlockingHashMap<>();
-
+    public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -85,7 +85,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
-        m_partitionDRGateways.put(partitionId,  pdrg);
+
+        // Regarding apparent lack of thread safety: this is called serially
+        // while looping over the SPIs during database initialization
+        assert !m_partitionDRGateways.containsKey(partitionId);
+        ImmutableMap.Builder<Integer, PartitionDRGateway> builder = ImmutableMap.builder();
+        builder.putAll(m_partitionDRGateways);
+        builder.put(partitionId, pdrg);
+        m_partitionDRGateways = builder.build();
 
         return pdrg;
     }
@@ -143,115 +150,116 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         return 0;
     }
 
-    public static synchronized long pushDRBuffer(
+    public static long pushDRBuffer(
             int partitionId,
             long startSequenceNumber,
             long lastSequenceNumber,
             long lastUniqueId,
             ByteBuffer buf) {
-        if (log.isTraceEnabled()) {
-            log.trace("Received DR buffer size " + buf.remaining());
-            AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
-            buf.order(ByteOrder.LITTLE_ENDIAN);
-            //Magic header space for Java for implementing zero copy stuff
-            buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
-            while (buf.hasRemaining()) {
-                int startPosition = buf.position();
-                byte version = buf.get();
-                int type = buf.get();
+        if (ENABLE_DR_BUFFER_TRACE && log.isTraceEnabled()) {
+            synchronized (PartitionDRGateway.class) {
+                log.trace("Received DR buffer size " + buf.remaining());
+                AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
+                buf.order(ByteOrder.LITTLE_ENDIAN);
+                //Magic header space for Java for implementing zero copy stuff
+                buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
+                while (buf.hasRemaining()) {
+                    int startPosition = buf.position();
+                    byte version = buf.get();
+                    int type = buf.get();
 
-                int checksum = 0;
-                if (version != 0) log.trace("Remaining is " + buf.remaining());
+                    int checksum = 0;
+                    if (version != 0) log.trace("Remaining is " + buf.remaining());
 
-                DRRecordType recordType = DRRecordType.values()[type];
-                switch (recordType) {
-                case INSERT:
-                case DELETE:
-                case DELETE_BY_INDEX: {
-                    //Insert
-                    if (haveOpenTransaction.get() == -1) {
-                        log.error("Have insert/delete but no open transaction");
+                    DRRecordType recordType = DRRecordType.values()[type];
+                    switch (recordType) {
+                    case INSERT:
+                    case DELETE:
+                    case DELETE_BY_INDEX: {
+                        //Insert
+                        if (haveOpenTransaction.get() == -1) {
+                            log.error("Have insert/delete but no open transaction");
+                            break;
+                        }
+                        final long tableHandle = buf.getLong();
+                        final int lengthPrefix = buf.getInt();
+                        final int indexCrc;
+                        if (recordType == DRRecordType.DELETE_BY_INDEX) {
+                            indexCrc = buf.getInt();
+                        } else {
+                            indexCrc = 0;
+                        }
+                        buf.position(buf.position() + lengthPrefix);
+                        checksum = buf.getInt();
+                        log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
+                                  (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
                         break;
                     }
-                    final long tableHandle = buf.getLong();
-                    final int lengthPrefix = buf.getInt();
-                    final int indexCrc;
-                    if (recordType == DRRecordType.DELETE_BY_INDEX) {
-                        indexCrc = buf.getInt();
-                    } else {
-                        indexCrc = 0;
-                    }
-                    buf.position(buf.position() + lengthPrefix);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
-                              (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
-                    break;
-                }
-                case UPDATE:
-                case UPDATE_BY_INDEX: {
-                    if (haveOpenTransaction.get() == -1) {
-                        log.error("Have update but no open transaction");
+                    case UPDATE:
+                    case UPDATE_BY_INDEX: {
+                        if (haveOpenTransaction.get() == -1) {
+                            log.error("Have update but no open transaction");
+                            break;
+                        }
+                        final long tableHandle = buf.getLong();
+                        final int oldRowLengthPrefix = buf.getInt();
+                        final int oldRowIndexCrc;
+                        if (recordType == DRRecordType.UPDATE_BY_INDEX) {
+                            oldRowIndexCrc = buf.getInt();
+                        } else {
+                            oldRowIndexCrc = 0;
+                        }
+                        buf.position(buf.position() + oldRowLengthPrefix);
+                        final int newRowLengthPrefix = buf.getInt();
+                        buf.position(buf.position() + newRowLengthPrefix);
+                        checksum = buf.getInt();
+                        log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " old row length " + oldRowLengthPrefix +
+                                  " new row length " + newRowLengthPrefix + " checksum " + checksum +
+                                  (recordType == DRRecordType.UPDATE_BY_INDEX ? (" index checksum " + oldRowIndexCrc) : ""));
                         break;
                     }
-                    final long tableHandle = buf.getLong();
-                    final int oldRowLengthPrefix = buf.getInt();
-                    final int oldRowIndexCrc;
-                    if (recordType == DRRecordType.UPDATE_BY_INDEX) {
-                        oldRowIndexCrc = buf.getInt();
-                    } else {
-                        oldRowIndexCrc = 0;
-                    }
-                    buf.position(buf.position() + oldRowLengthPrefix);
-                    final int newRowLengthPrefix = buf.getInt();
-                    buf.position(buf.position() + newRowLengthPrefix);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " old row length " + oldRowLengthPrefix +
-                              " new row length " + newRowLengthPrefix + " checksum " + checksum +
-                              (recordType == DRRecordType.UPDATE_BY_INDEX ? (" index checksum " + oldRowIndexCrc) : ""));
-                    break;
-                }
-                case BEGIN_TXN: {
-                    //Begin txn
-                    final long txnId = buf.getLong();
-                    final long spHandle = buf.getLong();
-                    if (haveOpenTransaction.get() != -1) {
-                        log.error("Have open transaction txnid " + txnId + " spHandle " + spHandle + " but already open transaction");
+                    case BEGIN_TXN: {
+                        //Begin txn
+                        final long txnId = buf.getLong();
+                        final long spHandle = buf.getLong();
+                        if (haveOpenTransaction.get() != -1) {
+                            log.error("Have open transaction txnid " + txnId + " spHandle " + spHandle + " but already open transaction");
+                            break;
+                        }
+                        haveOpenTransaction.set(spHandle);
+                        checksum = buf.getInt();
+                        log.trace("Version " + version + " type BEGIN_TXN " + " txnid " + txnId + " spHandle " + spHandle + " checksum " + checksum);
                         break;
                     }
-                    haveOpenTransaction.set(spHandle);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type BEGIN_TXN " + " txnid " + txnId + " spHandle " + spHandle + " checksum " + checksum);
-                    break;
-                }
-                case END_TXN: {
-                    //End txn
-                    final long spHandle = buf.getLong();
-                    if (haveOpenTransaction.get() == -1 ) {
-                        log.error("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandleTL.get().get());
+                    case END_TXN: {
+                        //End txn
+                        final long spHandle = buf.getLong();
+                        if (haveOpenTransaction.get() == -1 ) {
+                            log.error("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandleTL.get().get());
+                            break;
+                        }
+                        haveOpenTransaction.set(-1);
+                        lastCommittedSpHandleTL.get().set(spHandle);
+                        checksum = buf.getInt();
+                        log.trace("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
                         break;
                     }
-                    haveOpenTransaction.set(-1);
-                    lastCommittedSpHandleTL.get().set(spHandle);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
-                    break;
+                    case TRUNCATE_TABLE: {
+                        final long tableHandle = buf.getLong();
+                        final byte tableNameBytes[] = new byte[buf.getInt()];
+                        buf.get(tableNameBytes);
+                        final String tableName = new String(tableNameBytes, Charsets.UTF_8);
+                        checksum = buf.getInt();
+                        log.trace("Version " + version + " type TRUNCATE_TABLE table handle " + tableHandle + " table name " + tableName);
+                        break;
+                    }
+                    }
+                    int calculatedChecksum = DBBPool.getBufferCRC32C(buf, startPosition, buf.position() - startPosition - 4);
+                    if (calculatedChecksum != checksum) {
+                        log.error("Checksum " + calculatedChecksum + " didn't match " + checksum);
+                        break;
+                    }
                 }
-                case TRUNCATE_TABLE: {
-                    final long tableHandle = buf.getLong();
-                    final byte tableNameBytes[] = new byte[buf.getInt()];
-                    buf.get(tableNameBytes);
-                    final String tableName = new String(tableNameBytes, Charsets.UTF_8);
-                    checksum = buf.getInt();
-                    log.trace("Version " + version + " type TRUNCATE_TABLE table handle " + tableHandle + " table name " + tableName);
-                    break;
-                }
-                }
-                int calculatedChecksum = DBBPool.getBufferCRC32C(buf, startPosition, buf.position() - startPosition - 4);
-                if (calculatedChecksum != checksum) {
-                    log.error("Checksum " + calculatedChecksum + " didn't match " + checksum);
-                    break;
-                }
-
             }
             buf.order(ByteOrder.BIG_ENDIAN);
         }
