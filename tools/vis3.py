@@ -70,7 +70,7 @@ def get_stats(hostname, port, days):
 
     # keyed on app name, value is a list of runs sorted chronologically
     stats = dict()
-    run_stat_keys = ['app', 'branch', 'nodes', 'date', 'tps', 'lat95', 'lat99']
+    run_stat_keys = ['app', 'branch', 'nodes', 'date', 'tps', 'lat95', 'lat99', 'count']
     for row in resp.tables[0].tuples:
         group = (row[1],row[0],row[2])
         app_stats = []
@@ -138,7 +138,7 @@ def plot(title, xbranch, ybranch, filename, width, height, data, root_path):
             acolor = ['g','r'][diff<0]
             pl.plot(v["x"]['tps'], v["y"]['tps'], acolor, MARKERS[0], "")
             test_case = "%s %d %s" % (k[2],k[3],["node","nodes"][k[3]>1])
-            seq.append([test_case, round(diff,2), round(v["y"]['tps'],2), round(v["x"]['tps'],2), acolor])
+            seq.append([test_case, round(diff,2), round(v["y"]['tps'],2), v["y"]['count'], round(v["x"]['tps'], 2), v["x"]["count"],  acolor])
             if abs(diff) > 5.:
                 atxt = "%s (%.2f%%)" % (test_case, diff)
                 pl.ax.annotate(atxt, xy=(v["x"]['tps'], v["y"]['tps']), xycoords='data',
@@ -152,9 +152,9 @@ def plot(title, xbranch, ybranch, filename, width, height, data, root_path):
     pl.close()
 
     seq = sorted(seq, key=lambda t: t[1])
-    seq.insert(0, ['test','% diff', ybranch, xbranch,'flag'])
+    seq.insert(0, ['test #nodes','% diff', ybranch, '#samples', xbranch, '#samples', 'flag'])
     with open(filename.replace('png','html'), "w+") as f:
-        f.write(get_html_tbl(reduce(lambda x,y: x+y, seq, []), 5))
+        f.write(get_html_tbl(reduce(lambda x,y: x+y, seq, []), 7))
 
 def get_html_tbl(seq, col_count):
     if len(seq) % col_count:
