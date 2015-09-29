@@ -576,7 +576,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                     }
                 }
                 if (probeException != null) {
-                    warn(probeException, "Failed to query all brokers for the offeset coordinator for " + m_topicAndPartition);
+                    warn(probeException, "Failed to query all brokers for the offset coordinator for " + m_topicAndPartition);
                 }
                 backoffSleep(attempts+1);
             }
@@ -831,7 +831,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 closeConsumer(m_offsetManager.getAndSet(null));
             }
             m_dead.compareAndSet(false, true);
-            info("Partition fecher stopped for " + m_topicAndPartition
+            info("Partition fetcher stopped for " + m_topicAndPartition
                     + " Last commit point is: " + m_lastCommittedOffset
                     + " Callback Rcvd: " + cbcnt.get()
                     + " Submitted: " + submitCount);
@@ -1000,7 +1000,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             //We wait for shutdown task to release.
             m_done.acquire();
         } catch (Exception ex) {
-            error("Kafka Importer finished with exeception ", ex);
+            error("Kafka Importer finished with exception ", ex);
         }
     }
 
