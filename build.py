@@ -74,7 +74,7 @@ if CTX.PROFILE:
 
 # linker flags
 CTX.LDFLAGS += """ -g3"""
-CTX.LASTLDFLAGS = """ """
+CTX.LASTLDFLAGS = """ -ldl """
 CTX.LASTIPCLDFLAGS = """ """
 
 if CTX.COVERAGE:
