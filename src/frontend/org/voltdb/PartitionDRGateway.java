@@ -39,14 +39,47 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
     }
 
-    // Keep sync with EE DRConflictType at types.h
-    public static enum DRConflictType {
-        DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
-        DR_CONFLICT_MISSING_TUPLE,
-        DR_CONFLICT_TIMESTAMP_MISMATCH;
+    public static enum DRRowType {
+        EXISTING_ROW,
+        EXPECTED_ROW,
+        NEW_ROW
     }
 
+    public static enum DRRowDecision {
+        CONFLICT_KEEP_ROW,
+        CONFLICT_DELETE_ROW;
+    }
+
+    // Keep sync with EE DRConflictType at types.h
+    public static enum DRConflictType {
+        CONFLICT_NEW_ROW_UNIQUE_CONSTRIANT_VIOLATION,
+        CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_ON_PK_UPDATE,
+        CONFLICT_EXPECTED_ROW_MISSING,
+        CONFLICT_EXPECTED_ROW_MISSING_ON_PK_UPDATE,
+        CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH,
+        CONFLICT_EXPECTED_ROW_TIMESTAMP_AND_NEW_ROW_CONSTRAINT,
+        CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT,
+        CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT_ON_PK,
+    }
+
+    // Keep sync with EE DRConflictType at types.h
+    public static enum DRResolutionType {
+        CONFLICT_DO_NOTHING,         // Use existing rows for Constraint or TimeStamp; Ignore New if Missing Row
+        CONFLICT_APPLY_NEW,          // Delete all existing and apply the new row
+        CONFLICT_DELETE_EXISTING,    // Delete some existing rows and do not apply the new row
+        CONFLICT_APPLY_GENERATED,    // Ignore the new row and use the generated instead (possibly delete existing rows)
+        BREAK_REPLICATION;
+    }
+
+    public static String DR_ROW_TYPE_COLUMN_NAME = "@DR_ROW_TYPE";
+    public static String DR_LOG_ACTION_COLUMN_NAME = "@DR_ACTION_TYPE";
+    public static String DR_CONFLICT_COLUMN_NAME = "@DR_CONFLICT_TYPE";
+    public static String DR_ROW_DECISION_COLUMN_NAME = "@DR_ROW_DECISION";
+    public static String DR_CLUSTER_ID_COLUMN_NAME = "@DR_CLUSTER_ID";
+    public static String DR_TIMESTAMP_COLUMN_NAME = "@DR_TIMESTAMP";
+
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
+
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -125,8 +158,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
     public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
-                                 String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
-                                 ByteBuffer newTable, ByteBuffer output) {
+                                 DRRecordType action, String tableName, ByteBuffer existingTable,
+                                 ByteBuffer expectedTable, ByteBuffer newTable, ByteBuffer output) {
         return 0;
     }
 
@@ -146,14 +179,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
-    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType,
+    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType, int action,
                                        String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
                                        ByteBuffer newTable, ByteBuffer output) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber,DRConflictType.values()[drConflictType],
-                tableName, existingTable, expectedTable, newTable, output);
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, DRConflictType.values()[drConflictType],
+                DRRecordType.values()[action], tableName, existingTable, expectedTable, newTable, output);
     }
 }
