@@ -1155,7 +1155,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         final InitiateTaskMessage itask = (InitiateTaskMessage)task;
         final ProcedureRunner runner = m_loadedProcedures.procs.get(itask.getStoredProcedureName());
 
-        final InitiateResponseMessage response = new InitiateResponseMessage(itask);
+        final InitiateResponseMessage response = new InitiateResponseMessage(itask, m_mailbox.getHSId());
 
         // feasible to receive a transaction initiated with an earlier catalog.
         if (runner == null) {

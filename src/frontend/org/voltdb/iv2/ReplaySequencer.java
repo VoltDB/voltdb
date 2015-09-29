@@ -222,6 +222,12 @@ public class ReplaySequencer
     // sequencer must be removed using drain()
     boolean m_mustDrain = false;
 
+    long m_mailboxHSId;
+
+    public void SetMailboxHSId(long mailboxHSId) {
+        m_mailboxHSId = mailboxHSId;
+    }
+
     /**
      * Dedupe initiate task messages. Check if the initiate task message is seen before.
      *
@@ -244,7 +250,7 @@ public class ReplaySequencer
                     procName.equalsIgnoreCase("@LoadMultipartitionTable")) &&
                     inTxnId <= m_lastSeenTxnId) {
                 // already sequenced
-                final InitiateResponseMessage resp = new InitiateResponseMessage(init);
+                final InitiateResponseMessage resp = new InitiateResponseMessage(init, m_mailboxHSId);
                 resp.setResults(new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                         new VoltTable[0],
                         ClientResponseImpl.IGNORED_TRANSACTION));

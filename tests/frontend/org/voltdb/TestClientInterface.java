@@ -647,7 +647,7 @@ public class TestClientInterface {
         assertEquals(1, initMsg.getStoredProcedureInvocation().getParameterAtIndex(0));
 
         // fake a restart response
-        InitiateResponseMessage respMsg = new InitiateResponseMessage(initMsg);
+        InitiateResponseMessage respMsg = new InitiateResponseMessage(initMsg, 1);
         respMsg.setMispartitioned(true, initMsg.getStoredProcedureInvocation(),
                                   Pair.of(newHashinatorVersion, hashinatorConfig.getSecond()));
 

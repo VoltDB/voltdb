@@ -35,8 +35,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.voltdb.SnapshotCompletionMonitor;
-
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
@@ -50,6 +48,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
@@ -148,7 +147,7 @@ public class TestSpSchedulerDedupe extends TestCase
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
         verify(mbox, times(0)).send(new long[] {anyLong()}, (VoltMessage)anyObject());
-        InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
+        InitiateResponseMessage resp = new InitiateResponseMessage(sptask, primary_hsid);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(primary_hsid), eq(resp));
     }
@@ -165,7 +164,7 @@ public class TestSpSchedulerDedupe extends TestCase
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
         verify(mbox, times(0)).send(new long[] {anyLong()}, (VoltMessage)anyObject());
-        InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
+        InitiateResponseMessage resp = new InitiateResponseMessage(sptask, dut_hsid);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(dut_hsid), eq(resp));
     }
@@ -201,7 +200,7 @@ public class TestSpSchedulerDedupe extends TestCase
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
         verify(mbox, times(0)).send(new long[] {anyLong()}, (VoltMessage)anyObject());
-        InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
+        InitiateResponseMessage resp = new InitiateResponseMessage(sptask, primary_hsid);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(primary_hsid), eq(resp));
     }
@@ -244,10 +243,10 @@ public class TestSpSchedulerDedupe extends TestCase
         ArgumentCaptor<Iv2InitiateTaskMessage> replmsg = ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
         verify(mbox, times(1)).send(eq(new long[] {2}), replmsg.capture());
         assertEquals(dut_hsid, replmsg.getValue().getInitiatorHSId());
-        InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
+        InitiateResponseMessage resp = new InitiateResponseMessage(sptask, primary_hsid);
         ClientResponseImpl cr = mock(ClientResponseImpl.class);
         resp.setResults(cr);
-        InitiateResponseMessage replresp = new InitiateResponseMessage(replmsg.getValue());
+        InitiateResponseMessage replresp = new InitiateResponseMessage(replmsg.getValue(), primary_hsid);
         replresp.setResults(cr);
         dut.deliver(resp);
         dut.deliver(replresp);

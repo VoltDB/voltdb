@@ -19,6 +19,7 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -36,6 +37,7 @@ public class InitiateResponseMessage extends VoltMessage {
 
     private long m_txnId;
     private long m_spHandle;
+    private long m_executionHSId;
     private long m_initiatorHSId;
     private long m_coordinatorHSId;
     private long m_clientInterfaceHandle;
@@ -55,17 +57,20 @@ public class InitiateResponseMessage extends VoltMessage {
     {
         m_initiatorHSId = -1;
         m_coordinatorHSId = -1;
+        m_executionHSId = -1;
         m_subject = Subject.DEFAULT.getId();
     }
 
     /**
      * IV2 constructor
      */
-    public InitiateResponseMessage(Iv2InitiateTaskMessage task) {
+    public InitiateResponseMessage(Iv2InitiateTaskMessage task, long executionHSId) {
         m_txnId = task.getTxnId();
         m_spHandle = task.getSpHandle();
+        m_executionHSId = executionHSId;
         m_initiatorHSId = task.getInitiatorHSId();
         m_coordinatorHSId = task.getCoordinatorHSId();
+
         m_subject = Subject.DEFAULT.getId();
         m_clientInterfaceHandle = task.getClientInterfaceHandle();
         m_connectionId = task.getConnectionId();
@@ -76,9 +81,10 @@ public class InitiateResponseMessage extends VoltMessage {
      * IV2 constructor for sentinel response
      * @param sentinel
      */
-    public InitiateResponseMessage(MultiPartitionParticipantMessage sentinel) {
+    public InitiateResponseMessage(MultiPartitionParticipantMessage sentinel, long executionHSId) {
         m_txnId = sentinel.getTxnId();
         m_spHandle = sentinel.getSpHandle();
+        m_executionHSId = executionHSId;
         m_initiatorHSId = sentinel.getInitiatorHSId();
         m_coordinatorHSId = sentinel.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
@@ -92,9 +98,10 @@ public class InitiateResponseMessage extends VoltMessage {
      * @param task The initiation request object to collect the
      * metadata from.
      */
-    public InitiateResponseMessage(InitiateTaskMessage task) {
+    public InitiateResponseMessage(InitiateTaskMessage task, long executionHSId) {
         m_txnId = task.getTxnId();
         m_spHandle = task.getSpHandle();
+        m_executionHSId = executionHSId;
         m_initiatorHSId = task.getInitiatorHSId();
         m_coordinatorHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
@@ -183,6 +190,7 @@ public class InitiateResponseMessage extends VoltMessage {
         int msgsize = super.getSerializedSize();
         msgsize += 8 // txnId
             + 8 // m_spHandle
+            + 8 // execution (local) HSId
             + 8 // initiator HSId
             + 8 // coordinator HSId
             + 8 // client interface handle
@@ -208,6 +216,7 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put(VoltDbMessageFactory.INITIATE_RESPONSE_ID);
         buf.putLong(m_txnId);
         buf.putLong(m_spHandle);
+        buf.putLong(m_executionHSId);
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_clientInterfaceHandle);
@@ -231,6 +240,7 @@ public class InitiateResponseMessage extends VoltMessage {
     {
         m_txnId = buf.getLong();
         m_spHandle = buf.getLong();
+        m_executionHSId = buf.getLong();
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_clientInterfaceHandle = buf.getLong();
@@ -260,6 +270,7 @@ public class InitiateResponseMessage extends VoltMessage {
         sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
         sb.append("\n SP HANDLE: ").append(m_spHandle);
+        sb.append("\n EXECUTION HSID: ").append(CoreUtils.hsIdToString(m_executionHSId));
         sb.append("\n INITIATOR HSID: ").append(CoreUtils.hsIdToString(m_initiatorHSId));
         sb.append("\n COORDINATOR HSID: ").append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append("\n CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);

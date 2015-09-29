@@ -25,7 +25,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
@@ -135,6 +134,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setMailbox(Mailbox mailbox)
     {
         m_mailbox = mailbox;
+        m_replaySequencer.SetMailboxHSId(mailbox.getHSId());
     }
 
     public void setLeaderState(boolean isLeader)
