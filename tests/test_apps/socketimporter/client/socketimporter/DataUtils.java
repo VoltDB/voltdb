@@ -162,12 +162,13 @@ public class DataUtils {
         final String[] dropStmts = {
             "procedure InsertOnly IF EXISTS",
             "procedure SelectMaxTime IF EXISTS",
+            "procedure SelectOnly IF EXISTS",
             "table IMPORTTABLE IF EXISTS"
         };
         try {
             for (int i = 0; i < dropStmts.length; i++) {
                 m_client.callProcedure("@AdHoc",
-                        "DROP " + dropStmts[i]);
+                        "DROP " + dropStmts[i]).getResults();
             }
         } catch (IOException | ProcCallException e) {
             e.printStackTrace();
