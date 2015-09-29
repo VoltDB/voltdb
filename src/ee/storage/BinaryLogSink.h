@@ -25,16 +25,21 @@ class Pool;
 class VoltDBEngine;
 class Table;
 class TableTuple;
+
 /*
  * Responsible for applying binary logs to table data
  */
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
+    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled = false);
     void exportDRConflict(PersistentTable* srcTable, Table* dstTable, const DRRecordType &type, TableTuple &tuple);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
+
+    int reportDRConflict(Table* table, int64_t partitionId, int64_t sequenceNumber, DRConflictType conflictType,
+            DRRecordType recordType, TableTuple* existingRow, TableTuple* expectedRow, TableTuple* newRow,
+            TableTuple* outputRow);
 };
 
 

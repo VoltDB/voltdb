@@ -16,6 +16,7 @@
  */
 #include "common/Topend.h"
 #include "common/StreamBlock.h"
+#include "storage/table.h"
 
 namespace voltdb {
     DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1) {
@@ -72,6 +73,9 @@ namespace voltdb {
             std::string tableName, Table* existingTable, Table* expectedTable,
             Table* newTable, Table* output) {
         // TODO conform to return value contract of reportDRConflict()
+        std::cout << "\nDummyTopend::reportDRConflict() being called " << tableName
+                << " conflict_type: " << conflict_type << " actionType:" << action_type
+                << std::endl;
         return 0;
     }
 

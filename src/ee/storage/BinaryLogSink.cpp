@@ -23,10 +23,12 @@
 #include "common/tabletuple.h"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
+#include "common/UniqueId.hpp"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
 #include "storage/tablefactory.h"
+#include "storage/table.h"
 #include "indexes/tableindex.h"
 
 #include "catalog/Database.h"
@@ -69,16 +71,11 @@ private:
 
 BinaryLogSink::BinaryLogSink() {}
 
-
-int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
+int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
     int64_t __attribute__ ((unused)) sequenceNumber = -1;
-    bool activeActiveDREnabled = false;
-    if (engine && engine->getDatabase()) {
-        activeActiveDREnabled = engine->getDatabase()->isActiveActiveDRed();
-    }
 
     size_t rowCount = 0;
     CachedIndexKeyTuple indexKeyTuple;
@@ -91,6 +88,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
         rowCount += rowCostForDRRecord(type);
+        int retval = 0;
 
         switch (type) {
         case DR_RECORD_INSERT: {
@@ -114,22 +112,18 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             try {
                 table->insertPersistentTuple(tempTuple, true);
             } catch (ConstraintFailureException &e) {
-                if (activeActiveDREnabled) {
-                    TupleSchema* schema = TupleSchema::createTupleSchema(table->schema());
-                    Table* existingTable = TableFactory::getPersistentTable(0, table->name(), schema, table->getColumnNames(), NULL);
-                    Table* expectedTable = TableFactory::getPersistentTable(0, table->name(), schema, table->getColumnNames(), NULL);
-                    Table* newTable = TableFactory::getPersistentTable(0, table->name(), schema, table->getColumnNames(), NULL);
-                    ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(engine->getPartitionId(),
-                                                                                        sequenceNumber,
-                                                                                        DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
-                                                                                        DR_RECORD_INSERT,
-                                                                                        table->name(),
-                                                                                        existingTable,
-                                                                                        expectedTable,
-                                                                                        newTable,
-                                                                                        NULL);
+                // Conflict detection handling
+                if (isActiveActiveDREnabled && table->isDREnabled()) {
+                    retval = reportDRConflict(table, UniqueId::pid(uniqueId), sequenceNumber,
+                            DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION, DR_RECORD_INSERT,
+                            e.getSourceTuple(), NULL, e.getConflictTuple(), NULL);
                 }
-                throw;
+                if (retval != 0) {
+                    throw;
+                } else {
+                    //delete the tuple and insert a new tuple based on retval
+                    break;
+                }
             }
             break;
         }
@@ -154,8 +148,18 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
             if (deleteTuple.isNullTuple()) {
-                throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                if (isActiveActiveDREnabled && table->isDREnabled()) {
+                    retval = reportDRConflict(table, UniqueId::pid(uniqueId), sequenceNumber,
+                            DR_CONFLICT_MISSING_TUPLE, DR_RECORD_DELETE,
+                            NULL, NULL, &tempTuple, NULL);
+                }
+                if (retval != 0) {
+                    throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
                                              type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+                } else {
+                    // the only choice for delete missing tuple resolution is just do nothing
+                    break;
+                }
             }
             table->deleteTuple(deleteTuple, true);
             break;
@@ -183,8 +187,25 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             TableTuple oldTuple = table->lookupTupleByValues(tempTuple);
             if (oldTuple.isNullTuple()) {
-                throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                if (isActiveActiveDREnabled && table->isDREnabled()) {
+                    // create tuple to accommodate new row
+                    TableTuple newTuple(table->schema());
+                    char * data = new char[tempTuple.tupleLength()];
+                    newTuple.move(data);
+                    ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
+                    newTuple.deserializeFromDR(newRowInput, pool);
+                    retval = reportDRConflict(table, UniqueId::pid(uniqueId), sequenceNumber,
+                            DR_CONFLICT_MISSING_TUPLE, DR_RECORD_UPDATE,
+                            NULL, &tempTuple, &newTuple, NULL);
+                    delete [] data;
+                }
+                if (retval != 0) {
+                    throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
                                              type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+                } else {
+                    // either do nothing or insert the new tuple.
+                    break;
+                }
             }
 
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
@@ -251,15 +272,47 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             index->moveToKey(&tempTuple, indexCursor);
             TableTuple oldTuple = index->nextValueAtKey(indexCursor);
             if (oldTuple.isNullTuple()) {
-                throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+                if (isActiveActiveDREnabled && table->isDREnabled()) {
+                    // create tuple to accommodate new row
+                    TableTuple newTuple(table->schema());
+                    char * data = new char[tempTuple.tupleLength()];
+                    newTuple.move(data);
+                    ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
+                    newTuple.deserializeFromDR(newRowInput, pool);
+                    retval = reportDRConflict(table, UniqueId::pid(uniqueId), sequenceNumber,
+                            DR_CONFLICT_MISSING_TUPLE, DR_RECORD_UPDATE,
+                            NULL, &tempTuple, &newTuple, NULL);
+                    delete [] data;
+                }
+                if (retval != 0) {
+                    throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                                                type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+                } else {
+                    // either do nothing or insert the new tuple.
+                    break;
+                }
             }
 
             tempTuple = table->tempTuple();
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
             tempTuple.deserializeFromDR(newRowInput, pool);
 
-            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+            try {
+                table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+            } catch (ConstraintFailureException &e) {
+                if (isActiveActiveDREnabled && table->isDREnabled()) {
+                    // we only use first three DR record types to represent the action, so here we use DR_RECORD_UPDATE
+                    retval = reportDRConflict(table, UniqueId::pid(uniqueId), sequenceNumber,
+                            DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION, DR_RECORD_UPDATE,
+                            e.getSourceTuple(), &oldTuple, e.getConflictTuple(), NULL);
+                }
+                if (retval != 0) {
+                    throw;
+                } else {
+                    //delete the tuple and insert a new tuple based on retval
+                    break;
+                }
+            }
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
@@ -346,6 +399,45 @@ void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const
         throwFatalException("CRC mismatch of DR log data %d and %d", checksum, recalculatedCRC);
     }
 }
+
+int BinaryLogSink::reportDRConflict(Table* table, int64_t partitionId, int64_t sequenceNumber, DRConflictType conflictType,
+        DRRecordType recordType, TableTuple* existingRow, TableTuple* expectedRow, TableTuple* newRow,
+        TableTuple* outputRow) {
+    char signature[20];
+    Table* existingTable = TableFactory::getPersistentTable(0, "existingRow",
+            TupleSchema::createTupleSchema(table->schema()), table->getColumnNames(), signature);
+    if (existingRow) {
+        existingTable->insertTuple(*existingRow);
+    }
+    Table* expectedTable = TableFactory::getPersistentTable(0, "expectedRow",
+            TupleSchema::createTupleSchema(table->schema()), table->getColumnNames(), signature);
+    if (expectedRow) {
+        expectedTable->insertTuple(*expectedRow);
+    }
+    Table* newTable = TableFactory::getPersistentTable(0, "newRow",
+            TupleSchema::createTupleSchema(table->schema()), table->getColumnNames(), signature);
+    if (newRow) {
+        newTable->insertTuple(*newRow);
+    }
+    newTable->insertTuple(*newRow);
+    Table* outputTable = TableFactory::getPersistentTable(0, "outputRow",
+            TupleSchema::createTupleSchema(table->schema()), table->getColumnNames(), signature);
+    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(partitionId,
+                                                                      sequenceNumber,
+                                                                      conflictType,
+                                                                      recordType,
+                                                                      table->name(),
+                                                                      existingTable,
+                                                                      expectedTable,
+                                                                      newTable,
+                                                                      outputTable);
+    delete existingTable;
+    delete expectedTable;
+    delete newTable;
+    delete outputTable;
+    return retval;
+}
+
 }
 
 #endif

@@ -131,9 +131,9 @@ public:
         const vector<string> columnNames(columnNamesArray, columnNamesArray + COLUMN_COUNT);
 
         m_table = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schema, columnNames, tableHandle, false, 0));
-        m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schemaReplica, columnNames, tableHandle, false, 0));
+        m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
         m_replicatedTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE", m_replicatedSchema, columnNames, replicatedTableHandle, false, -1));
-        m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1));
+        m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1));
 
         m_table->setDR(true);
         m_tableReplica->setDR(true);
@@ -301,7 +301,15 @@ public:
         return m_topend.receivedDRBuffer;
     }
 
-    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
+    void flushButDontApply(int64_t lastCommittedSpHandle) {
+        flush(lastCommittedSpHandle);
+        for (int i = static_cast<int>(m_topend.blocks.size()); i > 0; i--) {
+            m_topend.blocks.pop_back();
+            m_topend.data.pop_back();
+        }
+    }
+
+    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true, bool isActiveActiveDREnabled = false) {
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
         m_context->setupForPlanFragments(m_undoLog.generateUndoQuantum(m_undoToken));
@@ -321,7 +329,7 @@ public:
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[startPos], tables, &m_pool, NULL);
+            m_sink.apply(&data[startPos], tables, &m_pool, NULL, isActiveActiveDREnabled);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -393,17 +401,17 @@ public:
         return temp_tuple;
     }
 
-    void createPrimaryKey() {
+    void createPrimaryKey(Table* table, int indexColumn) {
         vector<int> columnIndices;
-        columnIndices.push_back(1); // BIGINT
+        columnIndices.push_back(indexColumn); // BIGINT
         TableIndexScheme scheme = TableIndexScheme("primaryKeyIndex", BALANCED_TREE_INDEX,
                                                     columnIndices,
                                                     TableIndex::simplyIndexColumns(),
-                                                    true, true, m_schema);
+                                                    true, true, table->schema());
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(scheme);
         assert(pkeyIndex);
-        m_table->addIndex(pkeyIndex);
-        m_table->setPrimaryKeyIndex(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        table->setPrimaryKeyIndex(pkeyIndex);
     }
 
     void simpleDeleteTest() {
@@ -648,7 +656,6 @@ TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
     ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
     ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
 }
-
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
@@ -987,6 +994,132 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
 
 TEST_F(DRBinaryLogTest, UpdateWithNulls) {
     updateWithNullsTest();
+}
+
+/*
+ * Conflict detection test case - Insert Unique Constraint Violation
+ * Operations like insert/insert, insert/update.
+ */
+TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
+    createPrimaryKey(m_table, 1);
+    createPrimaryKey(m_tableReplica, 1);
+    ASSERT_FALSE(flush(98));
+
+    // single row write transaction on replica
+    beginTxn(99, 99, 98, 70);
+    insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 55555,
+            "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    endTxn(true);
+    flushButDontApply(99);
+
+    // insert the same row again on both side
+    beginTxn(100, 100, 99, 71);
+    insertTuple(m_table, prepareTempTuple(m_table, 99, 55555/*causes a constraint violation*/,
+            "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(true);
+
+    flushAndApply(100, true/*success*/, true/*isActiveActiveDREnabled*/);
+}
+
+/*
+ * Conflict detection test case - Update Unique Constraint Violation
+ * Operations like update/update, update/insert.
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
+    createPrimaryKey(m_table, 0);
+    createPrimaryKey(m_tableReplica, 0);
+    ASSERT_FALSE(flush(98));
+
+    // insert row on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24,
+            2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    endTxn(true);
+    flushAndApply(99);
+
+    EXPECT_EQ(1, m_table->activeTupleCount());
+    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+
+    // insert new row on replica side
+    beginTxn(100, 100, 99, 71);
+    insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 55555, "349508345.34583", "a thing",
+            "a totally different thing altogether", 5433));
+    endTxn(true);
+    flushButDontApply(100);
+
+    EXPECT_EQ(1, m_table->activeTupleCount());
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+
+    // update row on master to create a conflict
+    beginTxn(101, 101, 100, 72);
+    // update the non-index column only
+    updateTuple(m_table, first_tuple, 42/*causes a constraint violation*/, "not that");
+    endTxn(true);
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(1, m_table->activeTupleCount());
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+}
+
+/*
+ * Conflict detection test case - Delete Missing Tuple
+ * Operations like delete/update, delete/delete
+ */
+TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
+    // insert rows on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+    flushAndApply(99);
+
+    EXPECT_EQ(3, m_tableReplica->activeTupleCount());
+
+    // delete row on replica
+    beginTxn(100, 100, 99, 71);
+    deleteTuple(m_tableReplica, first_tuple);
+    endTxn(true);
+    flushButDontApply(100);
+
+    EXPECT_EQ(3, m_table->activeTupleCount());
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+
+    // delete the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    deleteTuple(m_table, first_tuple);
+    endTxn(true);
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+}
+
+/*
+ * Conflict detection test case - Update Missing Tuple
+ * Operations like update/update, update/delete
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
+    // insert rows on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+    flushAndApply(99);
+
+    EXPECT_EQ(3, m_tableReplica->activeTupleCount());
+
+    // update one row on replica
+    beginTxn(100, 100, 99, 71);
+    updateTuple(m_tableReplica, first_tuple, 42/*causes a constraint violation*/, "not that");
+    endTxn(true);
+    flushButDontApply(100);
+
+    // update the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    updateTuple(m_table, first_tuple, 42/*causes a constraint violation*/, "not that");
+    endTxn(true);
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
 }
 
 TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
