@@ -129,8 +129,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertEquals(1, pns.size());
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
-        assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-        assertTrue(p.toExplainPlanString().contains("primary key index"));
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("PARTIAL_IDX_R2"));
 
         // using the partial index with serial aggregation
         pns = compileToFragments("SELECT A, count(B) from R2 where A > 5 and B > 3 group by A;");
