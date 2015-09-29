@@ -380,7 +380,7 @@ public class AsyncBenchmark {
                 writer.write(data.getBytes());
                 socketWrites.incrementAndGet();
                 return;
-            } catch (IOException ex) {
+            } catch (Exception ex) {
                 System.out.println("Exception: " + ex);
                 OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
                 haplist.put(hap, writer);
