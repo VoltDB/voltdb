@@ -32,6 +32,13 @@
  * The checking proceeds in parallel as the socket writers write to the
  * socket importers, and continues on until all pairs have been checked and
  * the database has time to complete all socket importer input transactions.
+ *
+ * The "perftest" option skips the queuing/checking functions to max out and measure
+ * import speed.
+ *
+ * Opton "partitioned" designates the target table and related SP's are partitioned.
+ *
+ * If this option is omitted, the table is replicated.
  */
 
 package socketimporter.client.socketimporter;
@@ -146,7 +153,8 @@ public class AsyncBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public AsyncBenchmark(Config config) {
-        AsyncBenchmark.config = config;
+        this.config = config;
+        //AsyncBenchmark.config = config;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
@@ -205,7 +213,6 @@ public class AsyncBenchmark {
                 public void run() {
                     int port = 7001; // default port; assumed in system test so keep sync'd if it's changed
                     HostAndPort hap = HostAndPort.fromString(server);
-                    //System.out.println(" hap--toString: " + hap.toString());
                     if (hap.hasPort()) {
                         port = hap.getPort();
                     }
@@ -258,13 +265,10 @@ public class AsyncBenchmark {
      */
     public synchronized void printStatistics() {
         try {
-            //ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
             long thrup;
 
             long max_insert_time = checkDB.maxInsertTime();
             thrup = runCount.get() / ((max_insert_time-benchmarkStartTS)/1000);
-
-            //thrup = stats.getTxnThroughput();
 
             System.out.println(String.format("Import Throughput %d/s, Total Rows %d",
                     thrup, runCount.get()+warmupCount.get()));
@@ -282,7 +286,6 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized static void printResults() throws Exception {
-        //ClientStats stats = fullStatsContext.fetch().getStats();
         FileWriter fw = null;
 
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
@@ -312,7 +315,6 @@ public class AsyncBenchmark {
 
         SecureRandom rnd = new SecureRandom();
         rnd.setSeed(Thread.currentThread().getId());
-        //long icnt = 0;
         //  TODO: check if this removes discrepancy: long icnt = 0;
         try {
             // Run the benchmark loop for the requested warmup time
@@ -333,7 +335,6 @@ public class AsyncBenchmark {
                 }
                 writeFully(s, hap, warmupEndTime);
                 warmupCount.getAndIncrement();
-                //icnt++;
             }
 
             // print periodic statistics to the console
@@ -359,7 +360,6 @@ public class AsyncBenchmark {
                 }
                 writeFully(s, hap, benchmarkEndTime);
                 runCount.getAndIncrement();
-                //icnt++;
             }
             haplist.get(hap).flush();
         } catch (Exception e) {
@@ -370,7 +370,6 @@ public class AsyncBenchmark {
         } finally {
             // cancel periodic stats printing
             if (timer != null) timer.cancel();
-            //insertCount.addAndGet(icnt); atomic version used above
         }
     }
 
@@ -442,10 +441,8 @@ public class AsyncBenchmark {
             runner.start();
         }
 
-        //System.out.println("max in main:" + checkDB.maxInsertTime());
         if (!config.perftest) {
             // start checking the table that's being populated by the socket injester(s)
-            //System.out.println("Starting CheckData methods. Queue size: " + queue.size());
             while (queue.size() == 0) {
                 try {
                     Thread.sleep(1000);                 // one second.
@@ -470,7 +467,6 @@ public class AsyncBenchmark {
 
         if (!config.perftest) {
             System.out.println("...starting timed check looping... " + queue.size());
-            // final long queueEndTime = System.currentTimeMillis() + ((config.duration > WAIT_FOR_A_WHILE) ? WAIT_FOR_A_WHILE : config.duration);
             final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
             System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
             while (queueEndTime > System.currentTimeMillis()) {

@@ -218,7 +218,6 @@ public class DataUtils {
 
         private List<String> getDataFromResponse(ClientResponse response) {
             List<String> m_pair = new ArrayList<String>();
-            //Long[] m_pairString = new Long[0];
             VoltTable[] m_results = response.getResults();
             if (m_results.length == 0) {
                 System.out.println("zero length results");
