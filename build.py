@@ -40,7 +40,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS += """-std=c++11 -Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
@@ -71,6 +71,27 @@ if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.com
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
+
+# Set the compiler version and C++ standard flag.
+# GCC before 4.3 is too old.
+# GCC 4.4 up to but not including 4.7 use -std=c++0x
+# GCC 4.7 and later use -std=c++11
+# Clang uses -std=c++11
+# This should match the calculation in CMakeLists.txt
+if CTX.compilerName() == 'gcc':
+    if (CTX.compilerMajorVersion() < 4) or (CTX.compilerMajorVersion() == 4) and (CTX.compilerMinorVersion() < 4):
+	print("GCC Version %d.%d.%d is too old\n" 
+	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel())); 
+	sys.exit(-1);
+    if CTX.compilerMinorVersion() == 4:
+	CTX.CXX_VERSION_FLAG = "--std=c++0x"
+	print("Building with C++ 0x\n")
+    else:
+	CTX.CXX_VERSION_FLAG ="--std=c++11"
+	print("Building with C++11")
+elif CTX.compilerName() == clang:
+    CTX.CXX_VERSION_FLAG="--std=c++11"
+CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
 
 # linker flags
 CTX.LDFLAGS += """ -g3"""

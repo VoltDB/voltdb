@@ -22,7 +22,11 @@ if (NOT DEFINED VOLTDB_THIRD_PARTY_CPP_DIR)
 endif (NOT DEFINED VOLTDB_THIRD_PARTY_CPP_DIR)
 set(VOLTDB_GOOGLE_TEST_SRC_DIR "${VOLTDB_THIRD_PARTY_CPP_DIR}/googletest/googletest")
 
-ADD_DEFINITIONS (-Wno-deprecated-declarations -Wno-conversion -DNDEBUG -std=c++11)
+if ("${CXX_VERSION_FLAG}" STREQUAL "")
+  message(FATAL_ERROR "No CXX_VERSION Flag set!!")
+endif()
+
+ADD_DEFINITIONS (-Wno-deprecated-declarations -Wno-conversion -DNDEBUG ${CXX_VERSION_FLAG})
 
 include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(geometry)
