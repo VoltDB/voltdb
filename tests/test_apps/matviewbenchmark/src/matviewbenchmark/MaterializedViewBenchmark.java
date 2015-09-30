@@ -296,7 +296,8 @@ public class MaterializedViewBenchmark {
 
     private boolean isMinMatViewCase(String matView) {
         return matView.toLowerCase().endsWith("minmatview") ||
-               matView.toLowerCase().endsWith("minmatviewopt");
+               matView.toLowerCase().endsWith("minmatviewopt") ||
+               matView.toLowerCase().endsWith("minmatviewbestopt");
     }
 
     /**
@@ -348,6 +349,11 @@ public class MaterializedViewBenchmark {
                 systemStr = "multi groups min opt";
                 csvStr = "multi groups opt";
                 procStr = "idsWithMultiGroupsMinMatViewOpt";
+                break;
+            case "MultiGroupsMinMatViewBestOpt":
+                systemStr = "multi groups min best opt";
+                csvStr = "multi groups best opt";
+                procStr = "idsWithMultiGroupsMinMatViewBestOpt";
                 break;
             default:
                 throw new RuntimeException("Benchmark " + matView + " not found!");
@@ -588,6 +594,11 @@ public class MaterializedViewBenchmark {
                                     i,
                                     i, i,
                                     i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatViewBestOpt_insert",
+                                    i,
+                                    i, i,
+                                    i);
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
@@ -615,6 +626,9 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                     "idsWithMultiGroupsMinMatViewOpt_delete",
                                     i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatViewBestOpt_delete",
+                                    i);
             }
             client.drain();
         }
@@ -626,10 +640,10 @@ public class MaterializedViewBenchmark {
 
         System.out.println("\nRunning benchmark...\n");
 
-        runEachBenchmark("matView", "noMatView", fw);
-        runEachBenchmark("minMatView", "minMatViewOpt", fw);
-        runEachBenchmark("4MinMatView", "4MinMatViewOpt", fw);
-        runEachBenchmark("MultiGroupsMinMatView", "MultiGroupsMinMatViewOpt", fw);
+        runEachBenchmark(fw, "matView", "noMatView");
+        runEachBenchmark(fw, "minMatView", "minMatViewOpt");
+        runEachBenchmark(fw, "4MinMatView", "4MinMatViewOpt");
+        runEachBenchmark(fw, "MultiGroupsMinMatView", "MultiGroupsMinMatViewOpt", "MultiGroupsMinMatViewBestOpt");
 
         benchmarkActive = false;
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
@@ -640,12 +654,12 @@ public class MaterializedViewBenchmark {
         client.close();
     }
 
-    private void runEachBenchmark(String name1, String name2, FileWriter fw) throws Exception {
+    private void runEachBenchmark(FileWriter fw, String... names) throws Exception {
         insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
-        runHalf(name1, fw);
-        System.out.print(HORIZONTAL_RULE);
-        runHalf(name2, fw);
-        System.out.print(HORIZONTAL_RULE);
+        for (String name: names) {
+            runHalf(name, fw);
+            System.out.print(HORIZONTAL_RULE);
+        }
     }
 
     /**
