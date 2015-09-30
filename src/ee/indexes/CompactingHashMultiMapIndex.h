@@ -123,6 +123,10 @@ class CompactingHashMultiMapIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
+    bool existsDo(const TableTuple *persistentTuple, TableTuple *conflictTuple) const {
+       return ! findTuple(*persistentTuple).isEnd();
+   }
+
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);

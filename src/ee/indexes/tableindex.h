@@ -243,6 +243,13 @@ public:
     bool exists(const TableTuple* values) const;
 
     /**
+     * Unlike the previous function, this function returns also the full row
+     * if the search value is already stored. No modification.
+     * It is NOT SUPPORTED for non-unique index.
+     */
+    bool exists(const TableTuple* values, TableTuple *conflictTuple) const;
+
+    /**
      * This method moves to the first tuple equal to given key.  To
      * iterate through all entries with the key (if non-unique index)
      * or all entries that follow the entry, use nextValueAtKey() and
@@ -531,6 +538,7 @@ protected:
     virtual bool replaceEntryNoKeyChangeDo(const TableTuple &destinationTuple,
                                          const TableTuple &originalTuple) = 0;
     virtual bool existsDo(const TableTuple* values) const = 0;
+    virtual bool existsDo(const TableTuple* values, TableTuple *conflictTuple) const = 0;
     virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
 
 private:

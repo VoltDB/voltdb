@@ -56,8 +56,8 @@ public:
     virtual const std::string message() const;
     virtual ~ConstraintFailureException();
 
-    TableTuple* getSourceTuple() { return &m_tuple; }
-    TableTuple* getConflictTuple() { return &m_otherTuple; }
+    TableTuple* getConflictTuple() { return &m_tuple; }
+    TableTuple* getOriginalTuple() { return &m_otherTuple; }
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
 

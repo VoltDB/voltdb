@@ -505,7 +505,7 @@ static char* serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
    return backingCharArray;
 }
 
-int JNITopend::reportDRConflict(int32_t partitionId,
+int JNITopend::reportDRConflict(int64_t partitionId,
             int64_t remoteSequenceNumber, DRConflictType conflict_type,
             DRRecordType action_type, string tableName, Table* existingRows,
             Table* expectedRows, Table* newRows, Table* output) {

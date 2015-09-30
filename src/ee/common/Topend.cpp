@@ -17,9 +17,11 @@
 #include "common/Topend.h"
 #include "common/StreamBlock.h"
 #include "storage/table.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
-    DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1) {
+    DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1),
+            existingRowCount(0), expectedRowCount(0), newRowCount(0) {
 
     }
 
@@ -68,14 +70,15 @@ namespace voltdb {
         return pushDRBufferRetval;
     }
 
-    int DummyTopend::reportDRConflict(int32_t partitionId,
+    int DummyTopend::reportDRConflict(int64_t partitionId,
             int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
             std::string tableName, Table* existingTable, Table* expectedTable,
             Table* newTable, Table* output) {
-        // TODO conform to return value contract of reportDRConflict()
-        std::cout << "\nDummyTopend::reportDRConflict() being called " << tableName
-                << " conflict_type: " << conflict_type << " actionType:" << action_type
-                << std::endl;
+        this->conflictType = conflict_type;
+        this->actionType = action_type;
+        this->existingRowCount = existingTable->activeTupleCount();
+        this->expectedRowCount = expectedTable->activeTupleCount();
+        this->newRowCount = newTable->activeTupleCount();
         return 0;
     }
 

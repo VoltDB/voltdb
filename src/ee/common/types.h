@@ -528,9 +528,34 @@ enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 // Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)
 // ------------------------------------------------------------------
 enum DRConflictType {
-    DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
-    DR_CONFLICT_MISSING_TUPLE,
-    DR_CONFLICT_TIMESTAMP_MISMATCH
+    CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION,
+    CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_ON_PK_UPDATE,
+    CONFLICT_EXPECTED_ROW_MISSING,
+    CONFLICT_EXPECTED_ROW_MISSING_ON_PK_UPDATE,
+    CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH,
+    CONFLICT_EXPECTED_ROW_TIMESTAMP_AND_NEW_ROW_CONSTRAINT,
+    CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT,
+    CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT_ON_PK,
+};
+
+enum DRConflictRowType {
+    CONFLICT_EXISTING_ROW,
+    CONFLICT_EXPECTED_ROW,
+    CONFLICT_NEW_ROW,
+    CONFLICT_CUSTOM_ROW,
+};
+
+enum DRRowDecision {
+   CONFLICT_KEEP_ROW,
+   CONFLICT_DELETE_ROW
+};
+
+enum DRResolutionType {
+    CONFLICT_DO_NOTHING,         // Use existing rows for Constraint or TimeStamp; Ignore New if Missing Row
+    CONFLICT_APPLY_NEW,          // Delete all existing and apply the new row
+    CONFLICT_DELETE_EXISTING,    // Delete some existing rows and do not apply the new row
+    CONFLICT_APPLY_GENERATED,    // Ignore the new row and use the generated instead (possibly delete existing rows)
+    BREAK_REPLICATION,
 };
 
 // ------------------------------------------------------------------

@@ -128,6 +128,17 @@ class CompactingTreeUniqueIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
+    bool existsDo(const TableTuple *persistentTuple, TableTuple *conflictTuple) const
+    {
+        MapConstIterator mapiter = findTuple(*persistentTuple);
+        if (mapiter.isEnd()) {
+            return false;
+        }
+        conflictTuple->setSchema(getTupleSchema());
+        conflictTuple->move(const_cast<void *>(mapiter.value()));
+        return true;
+    }
+
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
         cursor.m_forward = true;
