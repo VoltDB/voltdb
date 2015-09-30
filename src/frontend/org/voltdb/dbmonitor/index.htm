@@ -429,7 +429,7 @@
                             <!--<div id="drMasterSection" class="masterWrapper" style="display:block;">-->
                             <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
                                 <div class="tabs-filter-wrapperDR">
-                                    <div class="drTitle icon-command" id="drCLPTitle">Command Log</div>
+                                    <div class="drTitle icon-command" id="drCLPTitle">Command Log Data</div>
                                     <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                     <div class="clear"></div>
                                 </div>
@@ -1077,12 +1077,12 @@
                         Partition Idle Time
                         <input type="checkbox" id="PartitionIdleTime" name="" value="transaction" checked="checked" />
                     </li>
-                    <li class="pref-graph" id="liDrReplication" style="display:none">
-                        Data Replication (DR)
+                    <li class="pref-graph " id="liDrReplication" style="display:block;">
+                        <span>Data Replication (DR)</span>
                         <input type="checkbox" id="DrReplicationRate" name="" value="drReplication" checked="checked" />
                     </li>
-                    <li class="pref-graph" id="liCommandLogStat" style="display:none">
-                        Command Log Statistics
+                    <li class="pref-graph" id="liCommandLogStat" style="display:block">
+                        <span>Command Log Statistics</span>
                         <input type="checkbox" id="CommandLogStat" name="" value="commandLogStat" checked="checked" />
                     </li>
                     <li class="pref-storedProc">
@@ -1093,12 +1093,12 @@
                         Database Tables
                         <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" />
                     </li>
-                    <li class="pref-tables" id="liCommandLogTables">
-                        Command Log Tables
+                    <li class="pref-tables" id="liCommandLogTables" style="display:block;">
+                        <span>Command Log Data</span>
                         <input type="checkbox" id="CommandLogTables" name="" value="table" checked="checked" />
                     </li>
-                    <li class="pref-tables" id="liDrTables" style="display:none">
-                        Data Replication Tables
+                    <li class="pref-tables" id="liDrTables" style="display:block">
+                        <span>Data Replication Tables</span>
                         <input type="checkbox" id="DRTables" name="" value="table" checked="checked" />
                     </li>
                 </ul>
