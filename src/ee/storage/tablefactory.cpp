@@ -104,7 +104,8 @@ Table* TableFactory::getPersistentTable(
     return table;
 }
 
-Table* TableFactory::getStreamedTable(
+// This is a convenient wrapper for test only.
+Table* TableFactory::getStreamedTableForTest(
             voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,

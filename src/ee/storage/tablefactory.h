@@ -92,7 +92,7 @@ public:
         int32_t compactionThreshold = 95,
         bool drEnabled = false);
 
-    static Table* getStreamedTable(
+    static Table* getStreamedTableForTest(
                 voltdb::CatalogId databaseId,
                 const std::string &name,
                 TupleSchema* schema,

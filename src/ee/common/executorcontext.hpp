@@ -127,7 +127,7 @@ class ExecutorContext {
 
     static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        return ((hiddenValue & HIDDEN_VALUE_TIMESTAMP_MASK) >> 9);
+        return hiddenValue & HIDDEN_VALUE_TIMESTAMP_MASK;
     }
 
     static int8_t getClusterIdFromHiddenNValue(NValue &value) {

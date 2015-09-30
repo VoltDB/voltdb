@@ -204,7 +204,7 @@ public:
         const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
 
         m_exportStream = new MockExportTupleStream(1, 1);
-        m_exportTable = voltdb::TableFactory::getStreamedTable(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
+        m_exportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
                                                                 m_exportSchema, exportColumnName,
                                                                 m_exportStream, true);
     }
