@@ -90,1416 +90,1416 @@ class DbMonitorTest extends TestBase {
 		}
     }
 
-//    def openAndCloseGraphArea() {
-//        when: 'ensure the Graph area is open'
-//        if (!page.isGraphAreaOpen()) {
-//            page.openGraphArea()
-//        }
-//        then: 'Graph area is open (initially)'
-//        page.isGraphAreaOpen()
-//
-//        when: 'click Show/Hide Graph (to close)'
-//        page.closeGraphArea()
-//        then: 'Graph area is closed'
-//        !page.isGraphAreaOpen()
-//
-//        when: 'click Show/Hide Graph (to open)'
-//        page.openGraphArea()
-//        then: 'Graph area is open (again)'
-//        page.isGraphAreaOpen()
-//
-//        when: 'click Show/Hide Graph (to close again)'
-//        page.closeGraphArea()
-//        then: 'Graph area is closed (again)'
-//        !page.isGraphAreaOpen()
-//    }
-//
-//    def openAndCloseDataArea() {
-//        when: 'ensure the Data area is open'
-//        if (!page.isDataAreaOpen()) {
-//            page.openDataArea()
-//        }
-//        then: 'Data area is open (to start test)'
-//        page.isDataAreaOpen()
-//
-//        when: 'click Show/Hide Data (to close)'
-//        page.closeDataArea()
-//        then: 'Data area is closed'
-//        !page.isDataAreaOpen()
-//
-//        when: 'click Show/Hide Data (to open again)'
-//        page.openDataArea()
-//        then: 'Data area is open (again)'
-//        page.isDataAreaOpen()
-//
-//        when: 'click Show/Hide Data (to close again)'
-//        page.closeDataArea()
-//        then: 'Data area is closed (again)'
-//        !page.isDataAreaOpen()
-//    }
-//
-//    def checkActiveMissingJoining() {
-//        expect: '1 Active server (at least)'
-//        page.getActive() >= 1
-//
-//        and: '0 Missing servers (initially)'
-//        page.getMissing() == 0
-//
-//        and: 'Joining servers not shown (for now)'
-//        page.getJoining() == -1
-//    }
-//
-//    def openAndCloseServerList() {
-//        boolean result = false
-//        int count = 0
-//        when: 'click the Admin link (if needed)'
-//        page.openAdminPage()
-//        then: 'should be on Admin page'
-//        at AdminPage
-//        try {
-//            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
-//            println("Resume button is displayed")
-//            result = false
-//        } catch(geb.waiting.WaitTimeoutException e) {
-//            println("Resume button is not displayed")
-//            result = true
-//        }
-//
-//        if (result == false) {
-//            println("Resume VMC")
-//
-//            count = 0
-//            while(count<numberOfTrials) {
-//                try {
-//                    count++
-//                    page.cluster.resumebutton.click()
-//                    waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
-//                    break
-//                } catch(geb.waiting.WaitTimeoutException e) {
-//                    println("Error: Resume confirmation was not found")
-//                    assert false
-//                }
-//            }
-//
-//            count = 0
-//            while(count<numberOfTrials) {
-//                try {
-//                    count++
-//                    page.cluster.resumeok.click()
-//                    waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
-//                    break
-//                } catch(geb.waiting.WaitTimeoutException e) {
-//                    println("Error: Pause button was not found")
-//                }
-//            }
-//        }
-//        then:
-//        println()
-//
-//        when: 'click the DB Monitor link (if needed)'
-//        page.openDbMonitorPage()
-//        then: 'should be on DB Monitor page'
-//        at DbMonitorPage
-//
-//        expect: 'Server list closed initially'
-//        !page.isServerListOpen()
-//
-//        when: 'click Server button (to open list)'
-//        page.openServerList()
-//        then: 'Server list is open'
-//        page.isServerListOpen()
-//        page.serverListHeader.isDisplayed()
-//        page.serverNameHeader.isDisplayed()
-//        page.serverIpAddressHeader.isDisplayed()
-//        page.serverMemoryUsageHeader.isDisplayed()
-//
-//        when: 'click Server button (to close list)'
-//        page.closeServerList()
-//        then: 'Server list is closed (again)'
-//        !page.isServerListOpen()
-//    }
-//
-//    def triggerAlert() {
-//        expect: 'no Alerts shown, initially'
-//        page.getAlert() == -1
-//
-//        // TODO: add more testing here, setting threshold
-//    }
-//
-//    def checkServerNamesAndMemoryUsage() {
-//        expect: 'Server list closed initially'
-//        !page.isServerListOpen()
-//
-//        // TODO: make this a real test, not just printing values
-//        List<String> serverNames = page.getServerNames()
-//        debugPrint "Server Names            : " + serverNames
-//        debugPrint "Memory Usages           : " + page.getMemoryUsages()
-//        debugPrint "Memory Usage Percents   : " + page.getMemoryUsagePercents()
-//        debugPrint "Memory Usage (0)        : " + page.getMemoryUsage(serverNames.get(0))
-//        debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
-//    }
+    def openAndCloseGraphArea() {
+        when: 'ensure the Graph area is open'
+        if (!page.isGraphAreaOpen()) {
+            page.openGraphArea()
+        }
+        then: 'Graph area is open (initially)'
+        page.isGraphAreaOpen()
 
-    // HEADER TESTS
+        when: 'click Show/Hide Graph (to close)'
+        page.closeGraphArea()
+        then: 'Graph area is closed'
+        !page.isGraphAreaOpen()
 
-//    def "header banner exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.banner.isDisplayed() }
-//    }
-//
-//
-//    def "header image exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.image.isDisplayed() }
-//    }
-//
-//    def "header username exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.usernameInHeader.isDisplayed() }
-//    }
-//
-//    def "header logout exists" () {
-//        when: 'click the Admin link (if needed)'
-//        page.openAdminPage()
-//        then: 'should be on Admin page'
-//        at AdminPage
-//
-//        when:'Check Security Enabled'
-//        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
-//        String security = page.overview.securityValue.text();
-//        then:
-//        if(page.overview.securityValue.text().equals("Off"))
-//        {
-//            println("PASS")
-//        }
-//
-//        when: 'click the DB Monitor link (if needed)'
-//        page.openDbMonitorPage()
-//        then: 'should be on DB Monitor page'
-//        at DbMonitorPage
-//        if(security=="On") {
-//            waitFor(30) {  header.logout.isDisplayed() }
-//        }
-//    }
-//
-//    def "header help exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { page.header.help.isDisplayed() }
-//        int count = 0
-//        while(count<5) {
-//            count++
-//            try {
-//                interact {
-//                    moveToElement(page.header.help)
-//                }
-//                waitFor(30) { page.header.showHelp.isDisplayed() }
-//                break
-//            } catch (geb.waiting.WaitTimeoutException e) {
-//                println("Already tried")
-//            }
-//        }
-//    }
+        when: 'click Show/Hide Graph (to open)'
+        page.openGraphArea()
+        then: 'Graph area is open (again)'
+        page.isGraphAreaOpen()
 
-    // HEADER TAB TESTS
+        when: 'click Show/Hide Graph (to close again)'
+        page.closeGraphArea()
+        then: 'Graph area is closed (again)'
+        !page.isGraphAreaOpen()
+    }
 
-//    def "header tab dbmonitor exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            header.tabDBMonitor.isDisplayed()
-//            header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
-//        }
-//    }
-//
-//    def "header tab admin exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            header.tabAdmin.isDisplayed()
-//            header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
-//        }
-//    }
-//
-//    def "header tab schema exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            header.tabSchema.isDisplayed()
-//            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
-//
-//        }
-//    }
-//
-//    def "header tab sql query exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.tabSQLQuery.isDisplayed()
-//            header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
-//        }
-//    }
-//
-//    def "header username check" () {
-//        when: 'click the Admin link (if needed)'
-//        page.openAdminPage()
-//        then: 'should be on Admin page'
-//        at AdminPage
-//
-//        when:'Check Security Enabled'
-//        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
-//        String security = page.overview.securityValue.text();
-//        then:
-//        if(page.overview.securityValue.text().equals("Off"))
-//        {
-//            println("PASS")
-//        }
-//        when: 'click the DB Monitor link (if needed)'
-//        page.openDbMonitorPage()
-//        then:
-//        at DbMonitorPage
-//        String username = page.getUsername()
-//        if(security=="On") {
-//            waitFor(30) {  header.usernameInHeader.isDisplayed()
-//                header.usernameInHeader.text().equals(username) }
-//        }
-//    }
-//
-//
-//    def "header username click and close" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.usernameInHeader.isDisplayed() }
-//        header.usernameInHeader.click()
-//        waitFor(30) {
-//            header.logoutPopupOkButton.isDisplayed()
-//            header.logoutPopupCancelButton.isDisplayed()
-//            header.popupClose.isDisplayed()
-//        }
-//        header.popupClose.click()
-//    }
-//
-//    def "header username click and cancel" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { header.usernameInHeader.isDisplayed() }
-//        header.usernameInHeader.click()
-//        waitFor(30) {
-//            header.logoutPopupOkButton.isDisplayed()
-//            header.logoutPopupCancelButton.isDisplayed()
-//            header.popupClose.isDisplayed()
-//        }
-//        header.logoutPopupCancelButton.click()
-//    }
+    def openAndCloseDataArea() {
+        when: 'ensure the Data area is open'
+        if (!page.isDataAreaOpen()) {
+            page.openDataArea()
+        }
+        then: 'Data area is open (to start test)'
+        page.isDataAreaOpen()
+
+        when: 'click Show/Hide Data (to close)'
+        page.closeDataArea()
+        then: 'Data area is closed'
+        !page.isDataAreaOpen()
+
+        when: 'click Show/Hide Data (to open again)'
+        page.openDataArea()
+        then: 'Data area is open (again)'
+        page.isDataAreaOpen()
+
+        when: 'click Show/Hide Data (to close again)'
+        page.closeDataArea()
+        then: 'Data area is closed (again)'
+        !page.isDataAreaOpen()
+    }
+
+    def checkActiveMissingJoining() {
+        expect: '1 Active server (at least)'
+        page.getActive() >= 1
+
+        and: '0 Missing servers (initially)'
+        page.getMissing() == 0
+
+        and: 'Joining servers not shown (for now)'
+        page.getJoining() == -1
+    }
+
+    def openAndCloseServerList() {
+        boolean result = false
+        int count = 0
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+        try {
+            waitFor(waitTime) { page.cluster.resumebutton.isDisplayed() }
+            println("Resume button is displayed")
+            result = false
+        } catch(geb.waiting.WaitTimeoutException e) {
+            println("Resume button is not displayed")
+            result = true
+        }
+
+        if (result == false) {
+            println("Resume VMC")
+
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.resumebutton.click()
+                    waitFor(waitTime) { page.cluster.resumeok.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Resume confirmation was not found")
+                    assert false
+                }
+            }
+
+            count = 0
+            while(count<numberOfTrials) {
+                try {
+                    count++
+                    page.cluster.resumeok.click()
+                    waitFor(waitTime) { page.cluster.pausebutton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Error: Pause button was not found")
+                }
+            }
+        }
+        then:
+        println()
+
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then: 'should be on DB Monitor page'
+        at DbMonitorPage
+
+        expect: 'Server list closed initially'
+        !page.isServerListOpen()
+
+        when: 'click Server button (to open list)'
+        page.openServerList()
+        then: 'Server list is open'
+        page.isServerListOpen()
+        page.serverListHeader.isDisplayed()
+        page.serverNameHeader.isDisplayed()
+        page.serverIpAddressHeader.isDisplayed()
+        page.serverMemoryUsageHeader.isDisplayed()
+
+        when: 'click Server button (to close list)'
+        page.closeServerList()
+        then: 'Server list is closed (again)'
+        !page.isServerListOpen()
+    }
+
+    def triggerAlert() {
+        expect: 'no Alerts shown, initially'
+        page.getAlert() == -1
+
+        // TODO: add more testing here, setting threshold
+    }
+
+    def checkServerNamesAndMemoryUsage() {
+        expect: 'Server list closed initially'
+        !page.isServerListOpen()
+
+        // TODO: make this a real test, not just printing values
+        List<String> serverNames = page.getServerNames()
+        debugPrint "Server Names            : " + serverNames
+        debugPrint "Memory Usages           : " + page.getMemoryUsages()
+        debugPrint "Memory Usage Percents   : " + page.getMemoryUsagePercents()
+        debugPrint "Memory Usage (0)        : " + page.getMemoryUsage(serverNames.get(0))
+        debugPrint "Memory Usage Percent (0): " + page.getMemoryUsagePercent(serverNames.get(0))
+    }
+
+    //HEADER TESTS
+
+    def "header banner exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.banner.isDisplayed() }
+    }
 
 
-    // LOGOUT TEST
+    def "header image exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.image.isDisplayed() }
+    }
 
-//    def "logout button test close" ()  {
-//        when: 'click the Admin link (if needed)'
-//        page.openAdminPage()
-//        then: 'should be on Admin page'
-//        at AdminPage
-//
-//        when:'Check Security Enabled'
-//        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
-//        String security = page.overview.securityValue.text();
-//        then:
-//        if(page.overview.securityValue.text().equals("Off"))
-//        {
-//            println("PASS")
-//        }
-//        when: 'click the DB Monitor link (if needed)'
-//        page.openDbMonitorPage()
-//        then:
-//        at DbMonitorPage
-//        String username = page.getUsername()
-//        if(security=="On") {
-//            waitFor(30) { header.logout.isDisplayed() }
-//            header.logout.click()
-//            waitFor(30) {
-//                header.logoutPopupOkButton.isDisplayed()
-//                header.logoutPopupCancelButton.isDisplayed()
-//                header.popupClose.isDisplayed()
-//            }
-//            header.popupClose.click()
-//        }
-//    }
-//
-//    def "logout button test cancel" ()  {
-//        when: 'click the Admin link (if needed)'
-//        page.openAdminPage()
-//        then: 'should be on Admin page'
-//        at AdminPage
-//
-//        when:'Check Security Enabled'
-//        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
-//        String security = page.overview.securityValue.text();
-//        then:
-//        if(page.overview.securityValue.text().equals("Off"))
-//        {
-//            println("PASS")
-//        }
-//        when: 'click the DB Monitor link (if needed)'
-//        page.openDbMonitorPage()
-//        then:
-//        at DbMonitorPage
-//        String username = page.getUsername()
-//        if(security=="On") {
-//            waitFor(30) { header.logout.isDisplayed() }
-//            header.logout.click()
-//            waitFor(30) {
-//                header.logoutPopupOkButton.isDisplayed()
-//                header.logoutPopupCancelButton.isDisplayed()
-//                header.popupClose.isDisplayed()
-//            }
-//            header.logoutPopupCancelButton.click()
-//        }
-//    }
+    def "header username exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+    }
 
-    // HELP POPUP TEST
+    def "header logout exists" () {
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
 
-//    def "help popup existance" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(waitTime) { page.header.help.isDisplayed() }
-//        int count = 0
-//        while(count<5) {
-//            count++
-//            try {
-//                interact {
-//                    moveToElement(page.header.help)
-//                }
-//                waitFor(30) { page.header.showHelp.isDisplayed() }
-//                break
-//            } catch (geb.waiting.WaitTimeoutException e) {
-//                println("Already tried")
-//            }
-//        }
-//
-//        when:
-//        page.header.showHelp.click()
-//        then:
-//        waitFor(waitTime) { page.header.popupClose.isDisplayed() }
-//        waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
-//    }
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
 
-    // FOOTER TESTS
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then: 'should be on DB Monitor page'
+        at DbMonitorPage
+        if(security=="On") {
+            waitFor(30) {  header.logout.isDisplayed() }
+        }
+    }
 
-//    def "footer exists" () {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) { footer.banner.isDisplayed() }
-//    }
-//
-//    def "footer text exists and valid"() {
-//        when:
-//        at DbMonitorPage
-//        then:
-//        waitFor(30) {
-//            footer.banner.isDisplayed()
-//            footer.text.isDisplayed()
-//            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
-//        }
-//    }
+    def "header help exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
+    }
+
+    //HEADER TAB TESTS
+
+    def "header tab dbmonitor exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            header.tabDBMonitor.isDisplayed()
+            header.tabDBMonitor.text().toLowerCase().equals("DB Monitor".toLowerCase())
+        }
+    }
+
+    def "header tab admin exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            header.tabAdmin.isDisplayed()
+            header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
+        }
+    }
+
+    def "header tab schema exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            header.tabSchema.isDisplayed()
+            header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
+
+        }
+    }
+
+    def "header tab sql query exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.tabSQLQuery.isDisplayed()
+            header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
+        }
+    }
+
+    def "header username check" () {
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then:
+        at DbMonitorPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(30) {  header.usernameInHeader.isDisplayed()
+                header.usernameInHeader.text().equals(username) }
+        }
+    }
 
 
+    def "header username click and close" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
+        header.popupClose.click()
+    }
 
-//    def "Add a table in Tables and check it"() {
-//
-//        String createQuery = page.getQueryToCreateTable()
-//        String deleteQuery = page.getQueryToDeleteTable()
-//        String tablename = page.getTablename()
-//
-//        when: 'sql query tab is clicked'
-//        page.gotoSqlQuery()
-//        then: 'at sql query'
-//        at SqlQueryPage
-//
-//        when: 'set query in the box'
-//        page.setQueryText(createQuery)
-//        then: 'run the query'
-//        page.runQuery()
-//
-//        when: 'Db Monitor tab is clicked'
-//        page.gotoDbMonitor()
-//        then: 'at DbMonitor Page'
-//        at DbMonitorPage
-//
-//        when:
-//        page.searchDatabaseTable(tablename)
-//        then:
-//        waitFor(30) {
-//            !page.databaseTableCurrentPage.text().equals("0")
-//            !page.databaseTableTotalPage.text().equals("0")
-//        }
-//        if ( !page.databaseTableCurrentPage.text().equals("0") && !page.databaseTableTotalPage.text().equals("0") ){
-//            println("The table was successfully created")
-//        }
-//        else {
-//            println("Table not found after creation")
-//            assert false
-//        }
-//        when: 'sql query tab is clicked'
-//        page.gotoSqlQuery()
-//        then: 'at sql query'
-//        at SqlQueryPage
-//
-//        when: 'set query in the box'
-//        page.setQueryText(deleteQuery)
-//        then: 'run the query'
-//        page.runQuery()
-//
-//        when: 'Db Monitor tab is clicked'
-//        page.gotoDbMonitor()
-//        then: 'at DbMonitor Page'
-//        at DbMonitorPage
-//
-//        when:
-//        page.searchDatabaseTable(tablename)
-//        then:
-//        waitFor(30) {
-//            page.databaseTableCurrentPage.text().equals("0")
-//            page.databaseTableTotalPage.text().equals("0")
-//        }
-//        if ( page.databaseTableCurrentPage.text().equals("0") && page.databaseTableTotalPage.text().equals("0") ) {
-//            println("The table was successfully removed")
-//        }
-//        else {
-//            println("Table found after deletion")
-//            assert false
-//        }
-//    }
-//
-//    def "check if Row Count is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click row count'
-//			page.clickRowcount()
-//        then: 'check if row count is in ascending'
-//            if ( page.tableInAscendingOrder() )
-//				before = "ascending"
-//			else
-//				before = "descending"
-//
-//		when: 'click row count'
-//			page.clickRowcount()
-//		then: 'check if row count is in descending'
-//			if ( page.tableInDescendingOrder() )
-//				after = "descending"
-//			else
-//				after = "ascending"
-//
-//			if ( before.equals("ascending") && after.equals("descending") )
-//				assert true
-//			else
-//				assert false
-//    }
-//
-//    def "check if Max Rows is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click max rows'
-//			page.clickMaxRows()
-//        then: 'check if max rows is in ascending'
-//            if ( page.tableInAscendingOrder() )
-//				before = "ascending"
-//			else
-//				before = "descending"
-//
-//		when: 'click max rows'
-//			page.clickMaxRows()
-//		then: 'check if max rows is in descending'
-//			if ( page.tableInDescendingOrder() )
-//				after = "descending"
-//			else
-//				after = "ascending"
-//
-//			if ( before.equals("ascending") && after.equals("descending") )
-//				assert true
-//			else
-//				assert false
-//    }
-//
-//    def "check if Min Rows is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click min rows'
-//			page.clickMinRows()
-//        then: 'check if min rows is in ascending'
-//            if ( page.tableInAscendingOrder() )
-//				before = "ascending"
-//			else
-//				before = "descending"
-//
-//		when: 'click min rows'
-//			page.clickMinRows()
-//		then: 'check if min rows is in descending'
-//			if ( page.tableInDescendingOrder() )
-//				after = "descending"
-//			else
-//				after = "ascending"
-//
-//			if ( before.equals("ascending") && after.equals("descending") )
-//				assert true
-//			else
-//				assert false
-//    }
-//
-//    def "check if Avg Rows is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click avg rows'
-//			page.clickAvgRows()
-//        then: 'check if avg rows is in ascending'
-//            if ( page.tableInAscendingOrder() )
-//				before = "ascending"
-//			else
-//				before = "descending"
-//
-//		when: 'click avg rows'
-//			page.clickAvgRows()
-//		then: 'check if avg rows is in descending'
-//			if ( page.tableInDescendingOrder() )
-//				after = "descending"
-//			else
-//				after = "ascending"
-//
-//			if ( before.equals("ascending") && after.equals("descending") )
-//				assert true
-//			else
-//				assert false
-//    }
-//
-//    def "check if Type is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click type'
-//			page.clickTabletype()
-//        then: 'check if type is in ascending'
-//            if ( page.tableInAscendingOrder() )
-//				before = "ascending"
-//			else
-//				before = "descending"
-//
-//		when: 'click type'
-//			page.clickTabletype()
-//		then: 'check if type is in descending'
-//			if ( page.tableInDescendingOrder() )
-//				after = "descending"
-//			else
-//				after = "ascending"
-//
-//			if ( before.equals("ascending") && after.equals("descending") )
-//				assert true
-//			else
-//				assert false
-//    }
-//
-//	// stored procedure ascending descending
-//
-//	    def "check if stored procedure is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click stored procedure'
-//		    try {
-//                page.tableInAscendingOrder()
-//                before = "ascending"
-//            } catch(geb.error.RequiredPageContentNotPresent e) {
-//				before = "descending"
-//		    }
-//			waitFor(30) { page.clickStoredProcedure() }
-//        then: 'check if table is in ascending'
-//            try {
-//                page.tableInAscendingOrder()
-//                before = "ascending"
-//            } catch(geb.error.RequiredPageContentNotPresent e) {
-//				before = "descending"
-//		    }
-//
-//			if ( !before.equals(after)  )
-//				assert true
-//			else
-//				assert false
-//    }
-//
-//    def "check if Invocations is clickable"() {
-//        String before = ""
-//		String after  = ""
-//
-//		when: 'click row count'
-//			page.clickInvocations()
-//        then: 'check if row count is in ascending'
-//            if ( page.tableInAscendingOrder() )
-//				before = "ascending"
-//			else
-//				before = "descending"
-//
-//		when: 'click row count'
-//			page.clickInvocations()
-//		then: 'check if row count is in descending'
-//			if ( page.tableInDescendingOrder() )
-//				after = "descending"
-//			else
-//				after = "ascending"
-//
-//			if ( before.equals("ascending") && after.equals("descending") )
-//				assert true
-//			else
-//				assert false
-//    }
+    def "header username click and cancel" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { header.usernameInHeader.isDisplayed() }
+        header.usernameInHeader.click()
+        waitFor(30) {
+            header.logoutPopupOkButton.isDisplayed()
+            header.logoutPopupCancelButton.isDisplayed()
+            header.popupClose.isDisplayed()
+        }
+        header.logoutPopupCancelButton.click()
+    }
+
+
+   // LOGOUT TEST
+
+    def "logout button test close" ()  {
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then:
+        at DbMonitorPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(30) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(30) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.popupClose.click()
+        }
+    }
+
+    def "logout button test cancel" ()  {
+        when: 'click the Admin link (if needed)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when:'Check Security Enabled'
+        waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
+        String security = page.overview.securityValue.text();
+        then:
+        if(page.overview.securityValue.text().equals("Off"))
+        {
+            println("PASS")
+        }
+        when: 'click the DB Monitor link (if needed)'
+        page.openDbMonitorPage()
+        then:
+        at DbMonitorPage
+        String username = page.getUsername()
+        if(security=="On") {
+            waitFor(30) { header.logout.isDisplayed() }
+            header.logout.click()
+            waitFor(30) {
+                header.logoutPopupOkButton.isDisplayed()
+                header.logoutPopupCancelButton.isDisplayed()
+                header.popupClose.isDisplayed()
+            }
+            header.logoutPopupCancelButton.click()
+        }
+    }
+
+    //HELP POPUP TEST
+
+    def "help popup existance" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(waitTime) { page.header.help.isDisplayed() }
+        int count = 0
+        while(count<5) {
+            count++
+            try {
+                interact {
+                    moveToElement(page.header.help)
+                }
+                waitFor(30) { page.header.showHelp.isDisplayed() }
+                break
+            } catch (geb.waiting.WaitTimeoutException e) {
+                println("Already tried")
+            }
+        }
+
+        when:
+        page.header.showHelp.click()
+        then:
+        waitFor(waitTime) { page.header.popupClose.isDisplayed() }
+        waitFor(waitTime) { page.header.popupTitle.text().toLowerCase().contains("help".toLowerCase()) }
+    }
+
+    //FOOTER TESTS
+
+    def "footer exists" () {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) { footer.banner.isDisplayed() }
+    }
+
+    def "footer text exists and valid"() {
+        when:
+        at DbMonitorPage
+        then:
+        waitFor(30) {
+            footer.banner.isDisplayed()
+            footer.text.isDisplayed()
+            footer.text.text().toLowerCase().contains("VoltDB. All rights reserved.".toLowerCase())
+        }
+    }
 
 
 
-//    def "Check Data in Stored Procedures"() {
-//        when:
-//        page.storedProceduresTableDisplayed()
-//        then:
-//        if(page.storedProceduresMsg.text().equals("No data to be displayed")) {
-//            println("No data displayed-PASS")
-//            println()
-//            assert true
-//        }
-//        else if(!page.storedProceduresMsg.text().equals("")) {
-//            println("Data displayed-PASS")
-//            println(page.storedProceduresMsg.text())
-//            println()
-//            assert true
-//        }
-//        else {
-//            println("FAIL")
-//            println()
-//            assert false
-//        }
-//    }
-//
-//    def "Check Data in Database Tables"() {
-//        when:
-//        page.databaseTableDisplayed()
-//        then:
-//        if(page.databaseTableMsg.text().equals("No data to be displayed")) {
-//            println("No data displayed-PASS")
-//            println()
-//            assert true
-//        }
-//        else if(!page.databaseTableMsg.text().equals("")) {
-//            println("Data displayed-PASS")
-//            println(page.databaseTableMsg.text())
-//            println()
-//            assert true
-//        }
-//        else {
-//            println("FAIL")
-//            println()
-//            assert false
-//        }
-//    }
+    def "Add a table in Tables and check it"() {
 
-    // ALERT
+        String createQuery = page.getQueryToCreateTable()
+        String deleteQuery = page.getQueryToDeleteTable()
+        String tablename = page.getTablename()
 
-//	def "set alert and replace trigger alert"() {
-//		int count = 0
-//
-//		when: 'set alert threshold to zero'
-//	    page.setAlertThreshold(00)
-//		then: 'check at least one alert'
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) { page.alertCount.isDisplayed() }
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		    }
-//		}
-//
-//		int alert = page.getAlert()
-//
-//		if ( alert != 0 ) {
-//			println("PASS:There is at least one server on alert")
-//		}
-//		else {
-//			println("FAIL:There are no server on alert")
-//			assert false
-//		}
-//
-//		when: 'set alert threshold to hundred'
-//		page.setAlertThreshold(100)
-//		then: 'check no alert'
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) { !page.alertCount.isDisplayed() }
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		    }
-//		}
-//	}
-//
-//    // server search
-//    def "check server search on dbmonitor matched"(){
-//        when:'clicked server button'
-//        at DbMonitorPage
-//        String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")
-//        page.clusterserverbutton.click()
-//        waitFor(5){page.serversearch.value(serverNamevalid)
-//        }
-//
-//        then:
-//        at DbMonitorPage
-//        waitFor(5){page.clusterserverbutton.isDisplayed()}
-//        page.clusterserverbutton.click()
-//        println("server searched matched")
-//    }
-//
-//    def "check server search on dbmonitor not matched"(){
-//
-//        when:'clicked server button'
-//        at DbMonitorPage
-//        String serverNameinvalid = page.getInvalidPath() // taking local server invalid name from serversearch.txt file ("/src/resources/serversearch.txt")
-//        page.clusterserverbutton.click()
-//        waitFor(5){page.serversearch.value(serverNameinvalid)}
-//
-//
-//        then:
-//        at DbMonitorPage
-//        waitFor(5){page.clusterserverbutton.isDisplayed()}
-//        page.clusterserverbutton.click()
-//        println("server searched unmatched")
-//    }
-//
-//    def "check server title on dbmonitor"(){
-//        when:
-//        at DbMonitorPage
-//        waitFor(5){page.clusterserverbutton.isDisplayed()}
-//        page.clusterserverbutton.click()
-//        then:
-//        at DbMonitorPage
-//        page.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
-//        page.clusterserverbutton.click()
-//        println("server title matched");
-//    }
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set query in the box'
+        page.setQueryText(createQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+
+        when:
+        page.searchDatabaseTable(tablename)
+        then:
+        waitFor(30) {
+            !page.databaseTableCurrentPage.text().equals("0")
+            !page.databaseTableTotalPage.text().equals("0")
+        }
+        if ( !page.databaseTableCurrentPage.text().equals("0") && !page.databaseTableTotalPage.text().equals("0") ){
+            println("The table was successfully created")
+        }
+        else {
+            println("Table not found after creation")
+            assert false
+        }
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set query in the box'
+        page.setQueryText(deleteQuery)
+        then: 'run the query'
+        page.runQuery()
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+
+        when:
+        page.searchDatabaseTable(tablename)
+        then:
+        waitFor(30) {
+            page.databaseTableCurrentPage.text().equals("0")
+            page.databaseTableTotalPage.text().equals("0")
+        }
+        if ( page.databaseTableCurrentPage.text().equals("0") && page.databaseTableTotalPage.text().equals("0") ) {
+            println("The table was successfully removed")
+        }
+        else {
+            println("Table found after deletion")
+            assert false
+        }
+    }
+
+    def "check if Row Count is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click row count'
+			page.clickRowcount()
+        then: 'check if row count is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click row count'
+			page.clickRowcount()
+		then: 'check if row count is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Max Rows is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click max rows'
+			page.clickMaxRows()
+        then: 'check if max rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click max rows'
+			page.clickMaxRows()
+		then: 'check if max rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Min Rows is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click min rows'
+			page.clickMinRows()
+        then: 'check if min rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click min rows'
+			page.clickMinRows()
+		then: 'check if min rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Avg Rows is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click avg rows'
+			page.clickAvgRows()
+        then: 'check if avg rows is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click avg rows'
+			page.clickAvgRows()
+		then: 'check if avg rows is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Type is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click type'
+			page.clickTabletype()
+        then: 'check if type is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click type'
+			page.clickTabletype()
+		then: 'check if type is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+	// stored procedure ascending descending
+
+	    def "check if stored procedure is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click stored procedure'
+		    try {
+                page.tableInAscendingOrder()
+                before = "ascending"
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+				before = "descending"
+		    }
+			waitFor(30) { page.clickStoredProcedure() }
+        then: 'check if table is in ascending'
+            try {
+                page.tableInAscendingOrder()
+                before = "ascending"
+            } catch(geb.error.RequiredPageContentNotPresent e) {
+				before = "descending"
+		    }
+
+			if ( !before.equals(after)  )
+				assert true
+			else
+				assert false
+    }
+
+    def "check if Invocations is clickable"() {
+        String before = ""
+		String after  = ""
+
+		when: 'click row count'
+			page.clickInvocations()
+        then: 'check if row count is in ascending'
+            if ( page.tableInAscendingOrder() )
+				before = "ascending"
+			else
+				before = "descending"
+
+		when: 'click row count'
+			page.clickInvocations()
+		then: 'check if row count is in descending'
+			if ( page.tableInDescendingOrder() )
+				after = "descending"
+			else
+				after = "ascending"
+
+			if ( before.equals("ascending") && after.equals("descending") )
+				assert true
+			else
+				assert false
+    }
+
+
+
+    def "Check Data in Stored Procedures"() {
+        when:
+        page.storedProceduresTableDisplayed()
+        then:
+        if(page.storedProceduresMsg.text().equals("No data to be displayed")) {
+            println("No data displayed-PASS")
+            println()
+            assert true
+        }
+        else if(!page.storedProceduresMsg.text().equals("")) {
+            println("Data displayed-PASS")
+            println(page.storedProceduresMsg.text())
+            println()
+            assert true
+        }
+        else {
+            println("FAIL")
+            println()
+            assert false
+        }
+    }
+
+    def "Check Data in Database Tables"() {
+        when:
+        page.databaseTableDisplayed()
+        then:
+        if(page.databaseTableMsg.text().equals("No data to be displayed")) {
+            println("No data displayed-PASS")
+            println()
+            assert true
+        }
+        else if(!page.databaseTableMsg.text().equals("")) {
+            println("Data displayed-PASS")
+            println(page.databaseTableMsg.text())
+            println()
+            assert true
+        }
+        else {
+            println("FAIL")
+            println()
+            assert false
+        }
+    }
+
+   // ALERT
+
+	def "set alert and replace trigger alert"() {
+		int count = 0
+
+		when: 'set alert threshold to zero'
+	    page.setAlertThreshold(00)
+		then: 'check at least one alert'
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) { page.alertCount.isDisplayed() }
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    }
+		}
+
+		int alert = page.getAlert()
+
+		if ( alert != 0 ) {
+			println("PASS:There is at least one server on alert")
+		}
+		else {
+			println("FAIL:There are no server on alert")
+			assert false
+		}
+
+		when: 'set alert threshold to hundred'
+		page.setAlertThreshold(100)
+		then: 'check no alert'
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) { !page.alertCount.isDisplayed() }
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		    }
+		}
+	}
+
+    // server search
+    def "check server search on dbmonitor matched"(){
+        when:'clicked server button'
+        at DbMonitorPage
+        String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")
+        page.clusterserverbutton.click()
+        waitFor(5){page.serversearch.value(serverNamevalid)
+        }
+
+        then:
+        at DbMonitorPage
+        waitFor(5){page.clusterserverbutton.isDisplayed()}
+        page.clusterserverbutton.click()
+        println("server searched matched")
+    }
+
+    def "check server search on dbmonitor not matched"(){
+
+        when:'clicked server button'
+        at DbMonitorPage
+        String serverNameinvalid = page.getInvalidPath() // taking local server invalid name from serversearch.txt file ("/src/resources/serversearch.txt")
+        page.clusterserverbutton.click()
+        waitFor(5){page.serversearch.value(serverNameinvalid)}
+
+
+        then:
+        at DbMonitorPage
+        waitFor(5){page.clusterserverbutton.isDisplayed()}
+        page.clusterserverbutton.click()
+        println("server searched unmatched")
+    }
+
+    def "check server title on dbmonitor"(){
+        when:
+        at DbMonitorPage
+        waitFor(5){page.clusterserverbutton.isDisplayed()}
+        page.clusterserverbutton.click()
+        then:
+        at DbMonitorPage
+        page.checkserverTitle.text().toLowerCase().equals("Servers".toLowerCase())
+        page.clusterserverbutton.click()
+        println("server title matched");
+    }
 
     //server cpu
-//    def "check min value in server cpu days"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Days")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax = ""
-//		String stringMin = ""
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.servercpumax.isDisplayed()
-//		        }
-//		        stringMax = page.servercpumax.text()
-//		        stringMin = page.servercpumin.text()
-//
-//		        println(stringMax)
-//		        println(stringMin)
-//
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String monthMax = page.changeToMonth(stringMax)
-//		String monthMin = page.changeToMonth(stringMin)
-//
-//		String dateMax = page.changeToDate(stringMax)
-//		String dateMin = page.changeToDate(stringMin)
-//
-//        int intDateMax = Integer.parseInt(dateMax)
-//        int intDateMin = Integer.parseInt(dateMin)
-//        println(intDateMax)
-//        println(intDateMin)
-//		if(monthMax.equals(monthMin)) {
-//		    if(intDateMax > intDateMin) {
-//		        println("The minimum value is " + stringMin + " and the time is in Days")
-//		    }
-//		    else {
-//		        printsln("FAIL: Date of Max is less than that of date of Min for same month")
-//		        assert false
-//		    }
-//		}
-//		else {
-//		    if (intDateMax < intDateMin) {
-//		        println("Success")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is more than that of date of Min for new month")
-//		        assert false
-//		    }
-//		}
-//    }
-//
-//    def "check max value in server cpu days"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Days")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax = ""
-//		String stringMin = ""
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.servercpumax.isDisplayed()
-//		        }
-//		        stringMax = page.servercpumax.text()
-//		        stringMin = page.servercpumin.text()
-//
-//		        println(stringMax)
-//		        println(stringMin)
-//
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String monthMax = page.changeToMonth(stringMax)
-//		String monthMin = page.changeToMonth(stringMin)
-//
-//		String dateMax = page.changeToDate(stringMax)
-//		String dateMin = page.changeToDate(stringMin)
-//
-//        int intDateMax = Integer.parseInt(dateMax)
-//        int intDateMin = Integer.parseInt(dateMin)
-//
-//		if(monthMax.equals(monthMin)) {
-//		    if(intDateMax > intDateMin) {
-//		        println("The maximum value is " + stringMax + " and the time is in Days")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is less than that of date of Min for same month")
-//		        assert false
-//		    }
-//		}
-//		else {
-//		    if (intDateMax < intDateMin) {
-//		        println("Success")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is more than that of date of Min for new month")
-//		        assert false
-//		    }
-//		}
-//    }
-//
-//    def "check min value in server cpu minutes"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Minutes")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.servercpumax.isDisplayed()
-//		        }
-//		        stringMax = page.servercpumax.text()
-//		        stringMin = page.servercpumin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("minutes")) {
-//		    println("The minimum value is " + stringMin + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in minutes")
-//		    assert false
-//		}
-//    }
-//
-//    def "check max value in server cpu minutes"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Minutes")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.servercpumax.isDisplayed()
-//		        }
-//		        stringMax = page.servercpumax.text()
-//		        stringMin = page.servercpumin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("minutes")) {
-//		    println("The maximum value is " + stringMax + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in minutes")
-//		    assert false
-//		}
-//    }
-//
-//    def "check min value in server cpu seconds"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Seconds")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.servercpumax.isDisplayed()
-//		        }
-//		        stringMax = page.servercpumax.text()
-//		        stringMin = page.servercpumin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("seconds")) {
-//		    println("The minimum value is " + stringMin + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in seconds")
-//		    assert false
-//		}
-//    }
-//
-//    def "check max value in server cpu seconds"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Seconds")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.servercpumax.isDisplayed()
-//		        }
-//		        stringMax = page.servercpumax.text()
-//		        stringMin = page.servercpumin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("seconds")) {
-//		    println("The maximum value is " + stringMax + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in seconds")
-//		    assert false
-//		}
-//    }
-//
-//    //for server ram
-//    def "check min value in server ram days"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Days")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax = ""
-//		String stringMin = ""
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.serverrammax.isDisplayed()
-//		        }
-//		        stringMax = page.serverrammax.text()
-//		        stringMin = page.serverrammin.text()
-//
-//		        println(stringMax)
-//		        println(stringMin)
-//
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String monthMax = page.changeToMonth(stringMax)
-//		String monthMin = page.changeToMonth(stringMin)
-//
-//		String dateMax = page.changeToDate(stringMax)
-//		String dateMin = page.changeToDate(stringMin)
-//
-//        int intDateMax = Integer.parseInt(dateMax)
-//        int intDateMin = Integer.parseInt(dateMin)
-//
-//		if(monthMax.equals(monthMin)) {
-//		    if(intDateMax > intDateMin) {
-//		        println("The minimum value is " + stringMin + " and the time is in Days")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is less than that of date of Min for same month")
-//		        assert false
-//		    }
-//		}
-//		else {
-//		    if (intDateMax < intDateMin) {
-//		        println("Success")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is more than that of date of Min for new month")
-//		        assert false
-//		    }
-//		}
-//    }
-//
-//    def "check max value in server ram days"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Days")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax = ""
-//		String stringMin = ""
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.serverrammax.isDisplayed()
-//		        }
-//		        stringMax = page.serverrammax.text()
-//		        stringMin = page.serverrammin.text()
-//
-//		        println(stringMax)
-//		        println(stringMin)
-//
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String monthMax = page.changeToMonth(stringMax)
-//		String monthMin = page.changeToMonth(stringMin)
-//
-//		String dateMax = page.changeToDate(stringMax)
-//		String dateMin = page.changeToDate(stringMin)
-//
-//		int intDateMax = Integer.parseInt(dateMax)
-//        int intDateMin = Integer.parseInt(dateMin)
-//
-//		if(monthMax.equals(monthMin)) {
-//		    if(intDateMax > intDateMin) {
-//		        println("The maximum value is " + stringMax + " and the time is in Days")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is less than that of date of Min for same month")
-//		        assert false
-//		    }
-//		}
-//		else {
-//		    if (intDateMax < intDateMin) {
-//		        println("Success")
-//		    }
-//		    else {
-//		        println("FAIL: Date of Max is more than that of date of Min for new month")
-//		        assert false
-//		    }
-//		}
-//    }
-//
-//    def "check min value in server ram minutes"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Minutes")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.serverrammax.isDisplayed()
-//		        }
-//		        stringMax = page.serverrammax.text()
-//		        stringMin = page.serverrammin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("minutes")) {
-//		    println("The minimum value is " + stringMin + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in minutes")
-//		    assert false
-//		}
-//    }
-//
-//    def "check max value in server ram minutes"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Minutes")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.serverrammax.isDisplayed()
-//		        }
-//		        stringMax = page.serverrammax.text()
-//		        stringMin = page.serverrammin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("minutes")) {
-//		    println("The maximum value is " + stringMax + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in minutes")
-//		    assert false
-//		}
-//    }
-//
-//    def "check min value in server ram seconds"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Seconds")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.serverrammax.isDisplayed()
-//		        }
-//		        stringMax = page.serverrammax.text()
-//		        stringMin = page.serverrammin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("seconds")) {
-//		    println("The minimum value is " + stringMin + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in seconds")
-//		    assert false
-//		}
-//    }
-//
-//    def "check max value in server ram seconds"(){
-//        int count = 0
-//
-//        when:
-//        // This loop is used to gain time.
-//        while(count<numberOfTrials) {
-//            count++
-//            page.chooseGraphView("Seconds")
-//            if(graphView.text().equals("")) {
-//                break
-//            }
-//		}
-//		count = 0
-//		then:
-//		String stringMax
-//		String stringMin
-//
-//		while(count<numberOfTrials) {
-//		    count++
-//		    try {
-//		        waitFor(waitTime) {
-//		            page.serverrammax.isDisplayed()
-//		        }
-//		        stringMax = page.serverrammax.text()
-//		        stringMin = page.serverrammin.text()
-//		        break
-//		    } catch(geb.waiting.WaitTimeoutException e) {
-//		        println("WaitTimeoutException")
-//		    }
-//		}
-//
-//		String result = page.compareTime(stringMax, stringMin)
-//
-//		if(result.equals("seconds")) {
-//		    println("The maximum value is " + stringMax + " and the time is in " + result )
-//		    assert true
-//		}
-//		else {
-//		    println("FAIL: It is not in seconds")
-//		    assert false
-//		}
-//    }
+    def "check min value in server cpu days"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+
+		        println(stringMax)
+		        println(stringMin)
+
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+        println(intDateMax)
+        println(intDateMin)
+		if(monthMax.equals(monthMin)) {
+		    if(intDateMax > intDateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        printsln("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (intDateMax < intDateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+
+    def "check max value in server cpu days"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+
+		        println(stringMax)
+		        println(stringMin)
+
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+
+		if(monthMax.equals(monthMin)) {
+		    if(intDateMax > intDateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (intDateMax < intDateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+
+    def "check min value in server cpu minutes"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("minutes")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
+    }
+
+    def "check max value in server cpu minutes"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("minutes")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
+    }
+
+    def "check min value in server cpu seconds"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
+    }
+
+    def "check max value in server cpu seconds"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.servercpumax.isDisplayed()
+		        }
+		        stringMax = page.servercpumax.text()
+		        stringMin = page.servercpumin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
+    }
+
+    //for server ram
+    def "check min value in server ram days"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+
+		        println(stringMax)
+		        println(stringMin)
+
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+
+        int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+
+		if(monthMax.equals(monthMin)) {
+		    if(intDateMax > intDateMin) {
+		        println("The minimum value is " + stringMin + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (intDateMax < intDateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+
+    def "check max value in server ram days"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Days")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax = ""
+		String stringMin = ""
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+
+		        println(stringMax)
+		        println(stringMin)
+
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String monthMax = page.changeToMonth(stringMax)
+		String monthMin = page.changeToMonth(stringMin)
+
+		String dateMax = page.changeToDate(stringMax)
+		String dateMin = page.changeToDate(stringMin)
+
+		int intDateMax = Integer.parseInt(dateMax)
+        int intDateMin = Integer.parseInt(dateMin)
+
+		if(monthMax.equals(monthMin)) {
+		    if(intDateMax > intDateMin) {
+		        println("The maximum value is " + stringMax + " and the time is in Days")
+		    }
+		    else {
+		        println("FAIL: Date of Max is less than that of date of Min for same month")
+		        assert false
+		    }
+		}
+		else {
+		    if (intDateMax < intDateMin) {
+		        println("Success")
+		    }
+		    else {
+		        println("FAIL: Date of Max is more than that of date of Min for new month")
+		        assert false
+		    }
+		}
+    }
+
+    def "check min value in server ram minutes"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("minutes")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
+    }
+
+    def "check max value in server ram minutes"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Minutes")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("minutes")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in minutes")
+		    assert false
+		}
+    }
+
+    def "check min value in server ram seconds"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("seconds")) {
+		    println("The minimum value is " + stringMin + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
+    }
+
+    def "check max value in server ram seconds"(){
+        int count = 0
+
+        when:
+        // This loop is used to gain time.
+        while(count<numberOfTrials) {
+            count++
+            page.chooseGraphView("Seconds")
+            if(graphView.text().equals("")) {
+                break
+            }
+		}
+		count = 0
+		then:
+		String stringMax
+		String stringMin
+
+		while(count<numberOfTrials) {
+		    count++
+		    try {
+		        waitFor(waitTime) {
+		            page.serverrammax.isDisplayed()
+		        }
+		        stringMax = page.serverrammax.text()
+		        stringMin = page.serverrammin.text()
+		        break
+		    } catch(geb.waiting.WaitTimeoutException e) {
+		        println("WaitTimeoutException")
+		    }
+		}
+
+		String result = page.compareTime(stringMax, stringMin)
+
+		if(result.equals("seconds")) {
+		    println("The maximum value is " + stringMax + " and the time is in " + result )
+		    assert true
+		}
+		else {
+		    println("FAIL: It is not in seconds")
+		    assert false
+		}
+    }
 
 
 
@@ -3109,23 +3109,23 @@ class DbMonitorTest extends TestBase {
     }
 
     /// Test cases relating to Graph end
-//    def cleanupSpec() {
-//        if (!(page instanceof VoltDBManagementCenterPage)) {
-//            when: 'Open VMC page'
-//            ensureOnVoltDBManagementCenterPage()
-//            then: 'to be on VMC page'
-//            at VoltDBManagementCenterPage
-//        }
-//
-//        page.loginIfNeeded()
-//
-//        when: 'click the Schema link (if needed)'
-//        page.openSqlQueryPage()
-//        then: 'should be on DB Monitor page'
-//        at SqlQueryPage
-//        String deleteQuery = page.getQueryToDeleteTable()
-//        page.setQueryText(deleteQuery)
-//
-//        page.runQuery()
-//    }
+    def cleanupSpec() {
+        if (!(page instanceof VoltDBManagementCenterPage)) {
+            when: 'Open VMC page'
+            ensureOnVoltDBManagementCenterPage()
+            then: 'to be on VMC page'
+            at VoltDBManagementCenterPage
+        }
+
+        page.loginIfNeeded()
+
+        when: 'click the Schema link (if needed)'
+        page.openSqlQueryPage()
+        then: 'should be on DB Monitor page'
+        at SqlQueryPage
+        String deleteQuery = page.getQueryToDeleteTable()
+        page.setQueryText(deleteQuery)
+
+        page.runQuery()
+    }
 }

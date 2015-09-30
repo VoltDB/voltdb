@@ -297,6 +297,12 @@ public class StoredProcedureInvocation implements JSONString {
                 batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
             } else {
                 batchTimeout = in.readInt();
+                // Client side have already checked the batchTimeout value, but,
+                // on server side, we should check non-negative batchTimeout value again
+                // in case of someone is using a non-standard client.
+                if (batchTimeout < 0) {
+                    throw new IllegalArgumentException("Timeout value can't be negative." );
+                }
             }
         }
 
@@ -389,5 +395,9 @@ public class StoredProcedureInvocation implements JSONString {
 
     public int getBatchTimeout() {
         return batchTimeout;
+    }
+
+    public void setBatchTimeout(int timeout) {
+        batchTimeout = timeout;
     }
 }

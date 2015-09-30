@@ -69,6 +69,7 @@ h1, h2, h3, h4, h5, h6 {
 .errorValue {
     color: #c70000;
 }
+.notActive {-moz-opacity:0.5; -khtml-opacity: 0.5; filter: alpha(opacity=50); opacity: 0.5; }
 
 /*****Global Ends******/
 /******sprite*************/
@@ -1627,6 +1628,7 @@ div.popup {
     margin-bottom: 5px;
     height: 30px;
     line-height: 35px;
+   
 }
 
     .user-preferences li.last {
@@ -1638,7 +1640,7 @@ div.popup {
     .user-preferences li input[type='checkbox'] {
         float: right;
         position: relative;
-        top: 8px;
+        top: 10px;
     }
 
 .msg-pop-info {
@@ -4407,7 +4409,7 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
 
     .graphPop {
         height: 110px;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     /*.restoreInfo .overlay-content { height:200px;}
 		.restoreCont {height:200px;}*/
