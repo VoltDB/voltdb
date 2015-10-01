@@ -554,9 +554,9 @@ TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
     TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
     ASSERT_FALSE(received_tuple.isNullTuple());
     ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
-    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);
-    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 0);
-    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT);
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
+    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
     // Now compare the rest of columns
     ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
     ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
