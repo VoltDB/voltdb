@@ -53,11 +53,11 @@ if CTX.compilerName() == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
     if (CTX.compilerMajorVersion() >= 4):
-        CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas -Wno-unused-local-typedefs"
+        CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas"
 	if (CTX.compilerMinorVersion() == 9):
-            CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable"
+            CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
         elif (CTX.compilerMinorVersion() == 8):
-	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable"
+	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
