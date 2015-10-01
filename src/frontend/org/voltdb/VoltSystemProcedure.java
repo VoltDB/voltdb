@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -256,11 +255,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     public void registerPlanFragment(long fragmentId) {
         assert(m_runner != null);
         m_loadedProcedureSet.registerPlanFragment(fragmentId, m_runner);
-    }
-
-    protected void noteOperationalFailure(String errMsg) {
-        m_runner.m_statusCode = ClientResponse.OPERATIONAL_FAILURE;
-        m_runner.m_statusString = errMsg;
     }
 
     protected void registerUndoAction(UndoAction action) {

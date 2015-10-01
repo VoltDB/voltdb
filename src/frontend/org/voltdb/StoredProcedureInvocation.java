@@ -28,6 +28,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.BatchTimeoutOverrideType;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
@@ -400,4 +401,10 @@ public class StoredProcedureInvocation implements JSONString {
     public void setBatchTimeout(int timeout) {
         batchTimeout = timeout;
     }
+
+    public ClientResponseImpl gracefulFailure(String reason) {
+        return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                new VoltTable[0], reason, clientHandle);
+    }
+
 }

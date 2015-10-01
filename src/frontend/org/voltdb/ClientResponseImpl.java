@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.network.Connection;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
@@ -35,14 +36,19 @@ import org.voltdb.utils.SerializationHelper;
  *
  */
 public class ClientResponseImpl implements ClientResponse, JSONString {
-    private boolean setProperly = false;
+    /// The two paths to a properly set response are construction
+    /// without parameters followed by deserialization with initFromBuffer
+    /// or construction with all parameters.
+    /// Any instance that has not been initialized in one of these two ways is
+    /// considered suspect and should never be serialized via flattenToBuffer.
+    private boolean m_debugSetProperly = false;
     private byte status = 0;
     private String statusString = null;
     private byte encodedStatusString[];
     private byte appStatus = Byte.MIN_VALUE;
     private String appStatusString = null;
     private byte encodedAppStatusString[];
-    private VoltTable[] results = new VoltTable[0];
+    private VoltTable[] results;
     private Integer m_hash = null;
 
     private int clusterRoundTripTime = 0;
@@ -91,22 +97,17 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle) {
         this.appStatus = appStatus;
         this.appStatusString = appStatusString;
-        setResults(status, results, statusString);
         clientHandle = handle;
-    }
-
-    private void setResults(byte status, VoltTable[] results, String statusString) {
         assert results != null;
         for (VoltTable result : results) {
             // null values are not permitted in results. If there is one, it will cause an
             // exception in writeExternal. This throws the exception sooner.
             assert result != null;
         }
-
         this.status = status;
         this.results = results;
         this.statusString = statusString;
-        this.setProperly = true;
+        m_debugSetProperly = true;
     }
 
     public void setHash(Integer hash) {
@@ -179,7 +180,25 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             buf.limit(originalLimit);
             results[i] = new VoltTable(slice, false);
         }
-        setProperly = true;
+        m_debugSetProperly = true;
+    }
+
+    public static void writeAsClientResponse(byte status, VoltTable[] results, String statusString, long handle, Connection conn) {
+        new ClientResponseImpl(status, results, statusString, handle)
+        .writeResponseToConnection(conn);
+    }
+
+    public final void writeResponseToConnection(Connection conn) {
+        ByteBuffer buf = fillBuffer();
+        conn.writeStream().enqueue(buf);
+    }
+
+    public final ByteBuffer fillBuffer() {
+        int size = getSerializedSize();
+        ByteBuffer buf = ByteBuffer.allocate(size + 4);
+        buf.putInt(size);
+        flattenToBuffer(buf).flip();
+        return buf;
     }
 
     public int getSerializedSize() {
@@ -213,7 +232,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
      * @return buf to allow call chaining.
      */
     public ByteBuffer flattenToBuffer(ByteBuffer buf) {
-        assert setProperly;
+        assert m_debugSetProperly;
         buf.put((byte)0); //version
         buf.putLong(clientHandle);
         byte presentFields = 0;
