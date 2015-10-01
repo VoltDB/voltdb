@@ -342,22 +342,25 @@ public class MaterializedViewBenchmark {
                 break;
             case "MultiGroupsMinMatView":
                 systemStr = "multi groups min";
-                csvStr = "2groups";
+                csvStr = "2g";
                 procStr = "idsWithMultiGroupsMinMatView";
                 break;
             case "MultiGroupsMinMatViewOpt":
                 systemStr = "multi groups min opt";
-                csvStr = "2groups opt";
+                csvStr = "2g opt";
                 procStr = "idsWithMultiGroupsMinMatViewOpt";
                 break;
             case "MultiGroupsMinMatViewBestOpt":
                 systemStr = "multi groups min best opt";
-                csvStr = "2groups best opt";
+                csvStr = "2g b opt";
                 procStr = "idsWithMultiGroupsMinMatViewBestOpt";
                 break;
             default:
                 throw new RuntimeException("Benchmark " + matView + " not found!");
         }
+
+        // apprunner has a file name length limit
+        assert(csvStr.length() <= 9);
 
         int grp = 1;
 
