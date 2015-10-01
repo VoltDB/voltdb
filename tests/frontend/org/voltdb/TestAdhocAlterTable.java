@@ -1124,7 +1124,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
     }
 
-    public void testAlterTableWithViews() throws Exception
+    public void testAlterTableWithSimpleMatViews() throws Exception
     {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
@@ -1197,9 +1197,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(doesColumnExist("FOO", "VAL"));
 
             //
-            // DROP a column not in the view failed (the first column dropped)
+            // DROP a column not in the view succeed (the first column dropped)
             //
-            // -- JSON plans of the view query will change
+            // -- JSON plans of the view query will not change
             checkAlterTableSucceed("alter table FOO drop column NUM1;");
             assertFalse(doesColumnExist("FOO", "NUM1"));
 
@@ -1274,6 +1274,190 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         }
         catch (ProcCallException pce) {
             fail(sql + " Should have succeed.");
+        }
+    }
+
+
+    public void testAlterTableWithMinMatViews() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "NUM1 integer," +
+                "VAL integer, " +
+                "DEP integer not null," +
+                "ID integer not null," +
+                "NUM2 integer" +
+                ");\n" +
+                "create index foo_idx on FOO (VAL, ID, DEP); " +
+                "create view FOOVIEW (VAL, TOTAL, MINID) as " +
+                "select VAL, COUNT(*), MIN(ID) from FOO group by VAL;" +
+
+                "create table BAR (" +
+                "NUM1 integer," +
+                "VAL integer, " +
+                "DEP integer not null," +
+                "ID integer not null," +
+                "NUM2 integer" +
+                ");\n" +
+                "create index bar_idx on BAR (VAL, ID, DEP); " +
+                "create view BARVIEW (VAL, TOTAL, MINID) as " +
+                "select VAL, COUNT(*), MIN(ID) from BAR where VAL >= 1 group by VAL;" +
+
+                // have an unused column in between groupby/agg columns and predicate columns
+                "create table BAZ (" +
+                "NUM1 integer," +
+                "VAL integer, " +
+                "ID integer not null," +
+                "DUM integer not null," +
+                "DEP integer not null," +
+                "NUM2 integer" +
+                ");\n" +
+                "create index baz_idx on BAZ (VAL, ID, DEP); " +
+                "create view BAZVIEW (VAL, TOTAL, MINID) as " +
+                "select VAL, COUNT(*), MIN(ID) from BAZ where DEP >= 1 group by VAL;"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            //
+            // Add a new column succeed
+            //
+            checkAlterTableSucceed("alter table FOO add column NEWCOL varchar(50);");
+            assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table FOO drop column NEWCOL;");
+            assertFalse(doesColumnExist("FOO", "NEWCOL"));
+
+            //
+            // Extend a column not in the view succeed
+            //
+            checkAlterTableSucceed("alter table FOO alter column NUM1 bigint;");
+            assertTrue(verifyTableColumnType("FOO", "NUM1", "BIGINT"));
+
+            //
+            // Extend a column not in the view succeed (the middle column)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableSucceed("alter table BAZ alter column DUM bigint;");
+            assertTrue(verifyTableColumnType("BAZ", "DUM", "BIGINT"));
+
+            //
+            // Extend a column in the view failed
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableFailed("alter table FOO alter column VAL bigint;", "dependent objects exist");
+            assertTrue(verifyTableColumnType("FOO", "VAL", "INTEGER"));
+
+            //
+            // DROP a column in the view failed (the first column dropped)
+            //
+            checkAlterTableFailed("alter table FOO drop column VAL;", "column is referenced in");
+            assertTrue(doesColumnExist("FOO", "VAL"));
+
+            //
+            // DROP a column not in the view succeed (the first column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table FOO drop column NUM1;");
+            assertFalse(doesColumnExist("FOO", "NUM1"));
+
+            //
+            // DROP a column not in the view failed (the first column dropped)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableFailed("alter table BAR drop column NUM1;",
+                    "May not dynamically modify field 'predicate' of schema object 'MaterializedViewInfo{BARVIEW}'");
+            assertTrue(doesColumnExist("BAR", "NUM1"));
+
+            //
+            // DROP a column not in the view failed (the middle column dropped)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableFailed("alter table BAZ drop column DUM;",
+                    "May not dynamically modify field 'predicate' of schema object 'MaterializedViewInfo{BAZVIEW}'");
+            assertTrue(doesColumnExist("BAZ", "DUM"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table FOO drop column NUM2;");
+            assertFalse(doesColumnExist("FOO", "NUM2"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table BAR drop column NUM2;");
+            assertFalse(doesColumnExist("BAR", "NUM2"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table BAZ drop column NUM2;");
+            assertFalse(doesColumnExist("BAZ", "NUM2"));
+
+            //
+            // Rename the source table failed
+            //
+            checkAlterTableFailed("alter table FOO rename to FOO1;", "AdHoc DDL ALTER/RENAME is not yet supported");
+            assertTrue(verifyTableColumnType("FOO", "VAL", "INTEGER"));
+
+            //
+            // Add some data to make sure the view is correct
+            //
+            VoltTable vt;
+            //                                                     VAL,DEP,ID
+            m_client.callProcedure("@AdHoc", "insert into FOO values(1, 0, 1);");
+            m_client.callProcedure("@AdHoc", "insert into FOO values(1, 0, 2);");
+            m_client.callProcedure("@AdHoc", "insert into FOO values(2, 0, 3);");
+            m_client.callProcedure("@AdHoc", "insert into FOO values(-2, 0, 4);");
+
+            vt = m_client.callProcedure("@AdHoc", "select val, total, minid from fooview order by 1, 2;").getResults()[0];
+            RegressionSuite.validateTableOfLongs(vt, new long[][]{{-2, 1, 4}, {1, 2, 1}, {2, 1, 3}});
+
+            //                                                    NUM1,VAL,DEP,ID
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, 1,  0,  1);");
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, 1,  0,  2);");
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1, 2,  0,  3);");
+            m_client.callProcedure("@AdHoc", "insert into BAR values(1,-2,  0,  4);");
+
+            vt = m_client.callProcedure("@AdHoc", "select val, total, minid from barview order by 1, 2;").getResults()[0];
+            // BARVIEW has "where VAL >= 1" clause, so the "{-2, 1, 4}" row is not here
+            RegressionSuite.validateTableOfLongs(vt, new long[][]{{1, 2, 1}, {2, 1, 3}});
+
+            //                                                    NUM1,VAL,ID,DUM,DEP
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1, 1, 1, 0,  1);");
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1, 1, 2, 0,  1);");
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1, 2, 3, 0,  2);");
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1,-2, 4, 0,  -2);");
+
+            vt = m_client.callProcedure("@AdHoc", "select val, total, minid from bazview order by 1, 2;").getResults()[0];
+            // BAZVIEW has "where DEP >= 1" clause, so the "{-2, 1, 4}" row is not here
+            RegressionSuite.validateTableOfLongs(vt, new long[][]{{1, 2, 1}, {2, 1, 3}});
+
+        }
+        finally {
+            teardownSystem();
         }
     }
 
