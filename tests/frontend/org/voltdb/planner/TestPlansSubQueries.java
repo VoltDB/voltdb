@@ -1019,7 +1019,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
 
         // (3) Sub-query with replicated table group by
@@ -1166,7 +1166,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
         // single partition filter outside subquery
         planNodes = compileToFragments(
