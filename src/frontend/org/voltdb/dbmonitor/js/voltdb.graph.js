@@ -670,7 +670,7 @@
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
                 'latFirstData': true,
-                'latMaxTimeStamp': new Date('1970-11-11').getTime(),                'tpsData': getEmptyDataOptimized(),
+                'latMaxTimeStamp': null,                'tpsData': getEmptyDataOptimized(),
                 'tpsDataMin': getEmptyDataForMinutesOptimized(),
                 'tpsDataDay': getEmptyDataForDaysOptimized(),
                 'tpsFirstData': true,
@@ -834,7 +834,6 @@
                 var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
                 var latStats = convert2Histogram(strLatStats);
-
                 var singlelat = 0;
                 if (!monitor.latHistogram.hasOwnProperty(id))
                     singlelat = latStats.getValueAtPercentile(99);
