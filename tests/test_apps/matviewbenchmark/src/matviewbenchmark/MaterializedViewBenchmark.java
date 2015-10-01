@@ -342,17 +342,17 @@ public class MaterializedViewBenchmark {
                 break;
             case "MultiGroupsMinMatView":
                 systemStr = "multi groups min";
-                csvStr = "multi groups";
+                csvStr = "2groups";
                 procStr = "idsWithMultiGroupsMinMatView";
                 break;
             case "MultiGroupsMinMatViewOpt":
                 systemStr = "multi groups min opt";
-                csvStr = "multi groups opt";
+                csvStr = "2groups opt";
                 procStr = "idsWithMultiGroupsMinMatViewOpt";
                 break;
             case "MultiGroupsMinMatViewBestOpt":
                 systemStr = "multi groups min best opt";
-                csvStr = "multi groups best opt";
+                csvStr = "2groups best opt";
                 procStr = "idsWithMultiGroupsMinMatViewBestOpt";
                 break;
             default:
