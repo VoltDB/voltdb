@@ -819,7 +819,6 @@ var loadPage = function (serverName, portid) {
         showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled, graphView, currentTab);
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
-            debugger;
             if (getCurrentServer() != undefined) {
                 var currentServer = getCurrentServer();
                 if (replicaDetail.hasOwnProperty(currentServer))
