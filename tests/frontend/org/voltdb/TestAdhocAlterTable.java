@@ -1197,9 +1197,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(doesColumnExist("FOO", "VAL"));
 
             //
-            // DROP a column not in the view failed (the first column dropped)
+            // DROP a column not in the view succeed (the first column dropped)
             //
-            // -- JSON plans of the view query will change
+            // -- JSON plans of the view query will not change
             checkAlterTableSucceed("alter table FOO drop column NUM1;");
             assertFalse(doesColumnExist("FOO", "NUM1"));
 
@@ -1305,7 +1305,20 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 ");\n" +
                 "create index bar_idx on BAR (VAL, ID, DEP); " +
                 "create view BARVIEW (VAL, TOTAL, MINID) as " +
-                "select VAL, COUNT(*), MIN(ID) from BAR where VAL >= 1 group by VAL;"
+                "select VAL, COUNT(*), MIN(ID) from BAR where VAL >= 1 group by VAL;" +
+
+                // have an unused column in between groupby/agg columns and predicate columns
+                "create table BAZ (" +
+                "NUM1 integer," +
+                "VAL integer, " +
+                "ID integer not null," +
+                "DUM integer not null," +
+                "DEP integer not null," +
+                "NUM2 integer" +
+                ");\n" +
+                "create index baz_idx on BAZ (VAL, ID, DEP); " +
+                "create view BAZVIEW (VAL, TOTAL, MINID) as " +
+                "select VAL, COUNT(*), MIN(ID) from BAZ where DEP >= 1 group by VAL;"
                 );
         builder.addPartitionInfo("FOO", "ID");
         builder.setUseDDLSchema(true);
@@ -1340,6 +1353,13 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(verifyTableColumnType("FOO", "NUM1", "BIGINT"));
 
             //
+            // Extend a column not in the view succeed (the middle column)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableSucceed("alter table BAZ alter column DUM bigint;");
+            assertTrue(verifyTableColumnType("BAZ", "DUM", "BIGINT"));
+
+            //
             // Extend a column in the view failed
             //
             // -- JSON plans of the view query will change
@@ -1353,9 +1373,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(doesColumnExist("FOO", "VAL"));
 
             //
-            // DROP a column not in the view failed (the first column dropped)
+            // DROP a column not in the view succeed (the first column dropped)
             //
-            // -- JSON plans of the view query will change
+            // -- JSON plans of the view query will not change
             checkAlterTableSucceed("alter table FOO drop column NUM1;");
             assertFalse(doesColumnExist("FOO", "NUM1"));
 
@@ -1366,6 +1386,14 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             checkAlterTableFailed("alter table BAR drop column NUM1;",
                     "May not dynamically modify field 'predicate' of schema object 'MaterializedViewInfo{BARVIEW}'");
             assertTrue(doesColumnExist("BAR", "NUM1"));
+
+            //
+            // DROP a column not in the view failed (the middle column dropped)
+            //
+            // -- JSON plans of the view query will change
+            checkAlterTableFailed("alter table BAZ drop column DUM;",
+                    "May not dynamically modify field 'predicate' of schema object 'MaterializedViewInfo{BAZVIEW}'");
+            assertTrue(doesColumnExist("BAZ", "DUM"));
 
             //
             // DROP a column not in the view succeed (the last column dropped)
@@ -1380,6 +1408,13 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             // -- JSON plans of the view query will not change
             checkAlterTableSucceed("alter table BAR drop column NUM2;");
             assertFalse(doesColumnExist("BAR", "NUM2"));
+
+            //
+            // DROP a column not in the view succeed (the last column dropped)
+            //
+            // -- JSON plans of the view query will not change
+            checkAlterTableSucceed("alter table BAZ drop column NUM2;");
+            assertFalse(doesColumnExist("BAZ", "NUM2"));
 
             //
             // Rename the source table failed
@@ -1408,6 +1443,16 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
             vt = m_client.callProcedure("@AdHoc", "select val, total, minid from barview order by 1, 2;").getResults()[0];
             // BARVIEW has "where VAL >= 1" clause, so the "{-2, 1, 4}" row is not here
+            RegressionSuite.validateTableOfLongs(vt, new long[][]{{1, 2, 1}, {2, 1, 3}});
+
+            //                                                    NUM1,VAL,ID,DUM,DEP
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1, 1, 1, 0,  1);");
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1, 1, 2, 0,  1);");
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1, 2, 3, 0,  2);");
+            m_client.callProcedure("@AdHoc", "insert into BAZ values(1,-2, 4, 0,  -2);");
+
+            vt = m_client.callProcedure("@AdHoc", "select val, total, minid from bazview order by 1, 2;").getResults()[0];
+            // BAZVIEW has "where DEP >= 1" clause, so the "{-2, 1, 4}" row is not here
             RegressionSuite.validateTableOfLongs(vt, new long[][]{{1, 2, 1}, {2, 1, 3}});
 
         }
