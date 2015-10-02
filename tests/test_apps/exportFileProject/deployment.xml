@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="2" kfactor="1" sitesperhost="1"/>
+   <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+   <export>
+        <configuration enabled="true" stream="stuff" type="file">
+            <property name="type">csv</property>
+            <property name="replicated">true</property>
+            <property name="skipinternals">true</property>
+            <property name="nonce">2048000</property>
+        </configuration>
+   </export>
+</deployment>
