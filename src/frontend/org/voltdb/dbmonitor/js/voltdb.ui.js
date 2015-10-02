@@ -778,7 +778,8 @@ var loadPage = function (serverName, portid) {
             logStatSpanSelector.html('Command Log Statistics (not active)');
             logStatSpanSelector.addClass("notActive");
             logStatInputSelector.attr("disabled", true);
-            logStatInputSelector.attr("title","This feature is not active.");
+            logStatInputSelector.attr("title", "This feature is not active.");
+            logStatInputSelector.attr("checked", false);
             $("#chartCommandLogging").hide();
             $("#divCommandLog").hide();
             
@@ -786,6 +787,7 @@ var loadPage = function (serverName, portid) {
             logTableSpanSelector.addClass("notActive");
             logTableInputSelector.attr("disabled", true);
             logTableInputSelector.attr("title", "This feature is not active.");
+            logTableInputSelector.attr("checked", false);
         }
     };
 
@@ -846,7 +848,6 @@ var loadPage = function (serverName, portid) {
                                 if (userPreference["DRTables"]) {
                                     $("#divDrReplication").show();
                                 }
-                                debugger;
                              
 
                                 if (drTablesSpanSelector != undefined) {
@@ -886,6 +887,7 @@ var loadPage = function (serverName, portid) {
                                     drReplicationSpanSelector.addClass("notActive");
                                     drReplicationInputSelector.attr("disabled", true);
                                     drReplicationInputSelector.attr("title", "This feature is not active.");
+                                    drReplicationInputSelector.attr("checked", false);
                                     $("#ChartDrReplicationRate").hide();
                                     //to show DR Mode
                                     if (VoltDbUI.drMasterEnabled) {
@@ -902,10 +904,12 @@ var loadPage = function (serverName, portid) {
                                 drReplicationSpanSelector.addClass("notActive");
                                 drReplicationInputSelector.attr("disabled", true);
                                 drReplicationInputSelector.attr("title", "This feature is not active.");
+                                drReplicationInputSelector.attr("checked", false);
                                 drTablesSpanSelector.html('Data Replication Tables (not active)');
                                 drTablesSpanSelector.addClass("notActive");
                                 drTablesInputSelector.attr("disabled", true);
                                 drTablesInputSelector.attr("title", "This feature is not active.");
+                                drTablesInputSelector.attr("checked", false);
                                 $("#divDrWrapperAdmin").show();
                             }
                         } else {
@@ -915,10 +919,12 @@ var loadPage = function (serverName, portid) {
                             drReplicationSpanSelector.addClass("notActive");
                             drReplicationInputSelector.attr("disabled", true);
                             drReplicationInputSelector.attr("title", "This feature is not active.");
+                            drReplicationInputSelector.attr("checked", false);
                             drTablesSpanSelector.html('Data Replication Tables (not active)');
                             drTablesSpanSelector.addClass("notActive");
                             drTablesInputSelector.attr("disabled", true);
                             drTablesInputSelector.attr("title", "This feature is not active.");
+                            drTablesInputSelector.attr("checked", false);
                             $("#ChartDrReplicationRate").hide();
                             $("#divDrWrapperAdmin").hide();
                         }
