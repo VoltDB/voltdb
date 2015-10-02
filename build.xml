@@ -1438,6 +1438,7 @@ NATIVE EE STUFF
   </exec>
 </target>
 
+<!-- Build the jni library. -->
 <target name='jnicompile'
     depends='compile, jnicompile_temp, uptodate_jni_h.check'
     description="Build C++ JNI library."
