@@ -4410,7 +4410,6 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
     .graphPop {
         height: 110px;
         margin-bottom: 10px;
-        min-width: auto;
     }
     /*.restoreInfo .overlay-content { height:200px;}
 		.restoreCont {height:200px;}*/
