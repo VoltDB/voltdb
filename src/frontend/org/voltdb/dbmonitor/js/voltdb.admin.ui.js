@@ -78,6 +78,7 @@ function loadAdminPage() {
         exportOverflow: $('#exportOverflow'),
         commandLogPath: $('#commandlogpath'),
         commandLogSnapshotPath: $('#commandlogsnapshotpath'),
+        drOverflowPath: $('#droverflowpath'),
         clusterClientPort: $('#clusterClientport'),
         clusterAdminPort: $('#clusterAdminport'),
         clusterHttpPort: $('#clusterHttpport'),
@@ -4062,6 +4063,7 @@ function loadAdminPage() {
             adminDOMObjects.exportOverflow.text(directoryConfigValues.exportOverflow);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
+            adminDOMObjects.drOverflowPath.text(directoryConfigValues.drOverflowPath);
         };
 
         var configurePromoteAction = function (adminConfigValues) {
