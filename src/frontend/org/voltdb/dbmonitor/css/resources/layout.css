@@ -1362,8 +1362,8 @@ ul.catalogNav {
     border-top: none;
 }
 
-tr.trLicenseInfo td {
-    border: none !important;
+td.trLicenseInfo{
+    padding-top: 20px!important;
 }
 
 
