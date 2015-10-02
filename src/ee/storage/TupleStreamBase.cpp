@@ -243,7 +243,6 @@ void TupleStreamBase::rollbackTo(size_t mark, size_t)
         if (m_currBlock == NULL) {
             extendBufferChain(m_defaultCapacity);
         }
-        m_currBlock->recordCompletedTxnForDR(m_committedSequenceNumber, m_committedUniqueId);
     }
     if (m_uso == m_committedUso) {
         m_openSequenceNumber = m_committedSequenceNumber;

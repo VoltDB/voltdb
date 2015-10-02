@@ -774,9 +774,13 @@ TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
 }
 
 TEST_F(DRBinaryLogTest, PartialTxnRollback) {
+    beginTxn(98, 98, 97, 69);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(true);
+
     beginTxn(99, 99, 98, 70);
 
-    TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
 
     // Simulate a second batch within the same txn
     UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
@@ -789,10 +793,12 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
 
     endTxn(true);
 
-    flushAndApply(99);
+    flushAndApply(100);
 
-    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
