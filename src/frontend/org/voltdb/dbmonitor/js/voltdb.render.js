@@ -774,6 +774,9 @@ function alertNodeClicked(obj) {
 
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
+                    
+                    if (data.paths.droverflow != null)
+                        adminConfigValues['drOverflowPath'] = data.paths.droverflow.path;
                 }
 
                 //dr
