@@ -89,7 +89,7 @@ if CTX.compilerName() == 'gcc':
     else:
 	CTX.CXX_VERSION_FLAG ="--std=c++11"
 	print("Building with C++11")
-elif CTX.compilerName() == clang:
+elif CTX.compilerName() == 'clang':
     CTX.CXX_VERSION_FLAG="--std=c++11"
 CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
 
