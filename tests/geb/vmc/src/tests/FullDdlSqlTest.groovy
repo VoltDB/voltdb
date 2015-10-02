@@ -27,7 +27,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import org.voltdb.fullddlfeatures.TestDDLFeatures
-////import org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 import spock.lang.*
 import vmcTest.pages.SqlQueryPage
 import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase
@@ -35,13 +34,16 @@ import vmcTest.pages.VoltDBManagementCenterPage.ColumnHeaderCase
 /**
  * This class tests the 'fullDDL.sql' file in the VMC, by running its queries
  * on the 'SQL Query' tab of the VoltDB Management Center (VMC) page, and
- * validating the results.
+ * validates the results by running the test methods in the TestDDLFeatures
+ * class.
  */
 class FullDdlSqlTest extends SqlQueriesTestBase {
     static final String FULL_DDL_FILE = '../../frontend/org/voltdb/fullddlfeatures/fullDDL.sql';
 
     @Shared def fullDdlFile = new File(FULL_DDL_FILE)
-    @Shared def fullDdlLines = []
+    @Shared def fullDdlSqlStatements = []
+    @Shared def testDdlFeatures = null
+    @Shared def testDdlFeaturesTestMethods = []
     @Shared def existingTables = []
     @Shared def existingViews = []
     @Shared def existingStoredProcs = []
@@ -49,8 +51,6 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     @Shared def newRoles = []
     @Shared def errors = [:]
 
-    @Shared def ignoreTheseTestMethods = ['testCreateProcedureFromClass']
-    
     def setupSpec() { // called once, before any tests
         // Make sure we're on the SQL Query page
         when: 'click the SQL Query link (if needed)'
@@ -66,6 +66,72 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         debugPrint '\nExisting Tables:\n' + existingTables
         debugPrint '\nExisting Views:\n' + existingViews
         debugPrint '\nExisting User Stored Procedures:\n' + existingStoredProcs
+
+        // Get the list of tests that we actually want to run
+        // (if empty, run all tests)
+        String sqlTestsProperty = System.getProperty('sqlTests', '')
+        def sqlTests = []
+        if (sqlTestsProperty) {
+            sqlTests = Arrays.asList(sqlTestsProperty.split(','))
+            debugPrint '\nsqlTests:\n' + sqlTests
+        }
+        debugPrint 'sqlTests.isEmpty(): ' + sqlTests.isEmpty()
+
+        // Get the lines of the fullDDL.sql file (ignoring comment lines
+        // starting with '--', and blank lines)
+        def lines = getFileLines(fullDdlFile, '--', false)
+
+        // Break the lines into statements, based on ending with ';'
+        int startStatementAtLine = 0
+        lines.eachWithIndex { line, i ->
+            if (line.trim().endsWith(';')) {
+                def statement = lines[startStatementAtLine]
+                for (int j=startStatementAtLine+1; j <= i; j++) {
+                    statement += '\n' + lines[j]
+                }
+                startStatementAtLine = i + 1
+                // DDL statements that do not include certain key phrases
+                // ("CREATE TABLE", "CREATE ROLE", "CREATE PROCEDURE", "EXPORT TABLE")
+                // should be combined with the previous statement; otherwise, we
+                // end up with a huge number of tests, which slows things down)
+                String statementUpper = statement.toUpperCase()
+                if (fullDdlSqlStatements && !statementUpper.contains('CREATE TABLE') &&
+                        !statementUpper.contains('CREATE ROLE') &&
+                        !statementUpper.contains('EXPORT TABLE')) {
+                    int len = fullDdlSqlStatements.size()
+                    fullDdlSqlStatements.set(len-1, fullDdlSqlStatements[len-1] + '\n' + statement)
+                } else {
+                    fullDdlSqlStatements.add(statement)
+                }
+            }
+        }
+        // If specific test names to run were specified, prune out all others
+        if (sqlTests) {
+            fullDdlSqlStatements.retainAll { sqlTests.contains(getSqlStatementTestName(it)) }
+            //debugPrint '\nfullDdlSqlStatements:\n' + fullDdlSqlStatements
+        }
+
+        // Get the list of TestDDLFeatures.java test methods
+        testDdlFeatures = new TestDDLFeatures();
+        // The first method to run should be TestDDLFeatures.startClient()
+        // (even though that is not an @Test method)
+        testDdlFeaturesTestMethods.add(testDdlFeatures.getClass().getMethod('startClient'))
+        def allMethods = testDdlFeatures.getClass().getMethods()
+        allMethods.each {
+            // If specific test names to run were specified, include only those
+            if (!sqlTests || sqlTests.contains(it.getName())) {
+                // Include only methods with an @Test annotation
+                Annotation[] annotations = it.getAnnotations()
+                for (Annotation annotation : annotations) {
+                    if (annotation.annotationType().equals(org.junit.Test.class)) {
+                        testDdlFeaturesTestMethods.add(it)
+                    }
+                }
+            }
+        }
+        if (sqlTests) {
+            debugPrint '\ntestDdlFeaturesTestMethods:\n[' + (testDdlFeaturesTestMethods.collect { it.getName() }).join(', ') + ']'
+        }
     }
 
     def cleanupSpec() { // called once, after all the tests
@@ -99,6 +165,26 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     }
 
     /**
+     * Given a (DDL) SQL statement, or set of statements, returns a simpler name
+     * for the test that will run it in the VMC. The simpler name consists of
+     * the first line of the SQL statement(s), with underscores (_) substituted
+     * for spaces; also, if the SQL statement is a single line terminated with
+     * a semicolon (;), the semicolon is not included.
+     * @param statement - the complete (DDL) SQL statement that contains the name.
+     * @return a simpler test name, based on the <i>statement</i>.
+     */
+    private String getSqlStatementTestName(String statement) {
+        int nameEnd = statement.indexOf('\n')
+        if (nameEnd < 1) {
+            nameEnd = statement.indexOf(';')
+        }
+        if (nameEnd < 1) {
+            nameEnd = statement.length()
+        }
+        return statement.substring(0, nameEnd).replace(' ', '_')
+    }
+
+    /**
      * Returns the 'name' within a specified (DDL) query, following a specified
      * part of that query; for example, the name of the role in a CREATE ROLE
      * query, or the name of the table in an EXPORT TABLE query.
@@ -108,7 +194,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
      * @return the next identifier that follows <i>afterThis</i>, within the
      * <i>query</i>.
      */
-    private String getName(String query, String afterThis) {
+    private String getTableOrRoleName(String query, String afterThis) {
         int start = query.toUpperCase().indexOf(afterThis) + afterThis.length()
         int end = query.length();
         for (int i=start; i < end; i++) {
@@ -127,83 +213,99 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
     }
 
     /**
-     * Tests all the SQL queries specified in the fullDDL.sql file; and runs
-     * the related JUnit tests in TestDDLFeatures.java.
+     * Runs the specifed (DDL) SQL statement(s).
+     * @param statement - the (DDL) SQL statement(s) to be run.
+     * @return the error returned by running the statement(s), if any; normally
+     * <b>null</b>, assuming that no error was returned.
      */
-    def runFullDdlSqlFile() {
-        // Get the lines of the fullDDL.sql file (ignoring comment lines
-        // starting with '--', and blank lines)
-        def lines = getFileLines(fullDdlFile, '--', false)
+    private String runDdlSqlStatement(String statement) {
+        String statementUpperCase = statement.toUpperCase()
+        runQuery(page, statement, ColumnHeaderCase.AS_IS)
+        String error = page.getQueryError()
 
-        // Break the lines into commands, based on ending with ';'
-        def commands = []
-        int startCommandAtLine = 0
-        lines.eachWithIndex { line, i ->
-            if (line.trim().endsWith(';')) {
-                def command = lines[startCommandAtLine]
-                for (int j=startCommandAtLine+1; j <= i; j++) {
-                    command += '\n' + lines[j]
-                }
-                commands.add(command)
-                startCommandAtLine = i + 1
-            }
+        // Keep track of certain (DDL) SQL statements
+        // Keep track of CREATE ROLE statements
+        if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('ROLE')) {
+            newRoles.add(getTableOrRoleName(statement, 'ROLE'))
+        // Keep track of EXPORT TABLE statements
+        } else if (statementUpperCase.contains('EXPORT') && statementUpperCase.contains('TABLE')) {
+            newExportTables.add(getTableOrRoleName(statement, 'TABLE'))
         }
 
-        // Execute each (DDL) SQL command
-        commands.each {
-            String commandUpperCase = it.toUpperCase()
+        return error
+    }
 
-            // Skip any 'CREATE PROCEDURE ... FROM CLASS ...' commands: there
-            // is currently no way to load these, in this client-side test
-            if (commandUpperCase.contains('CREATE') && commandUpperCase.contains('PROCEDURE') &&
-                commandUpperCase.contains('FROM') && commandUpperCase.contains('CLASS')) {
-                println '\nSkipping command:\n' + it
-            } else {
-                def qResults = runQuery(page, it, ColumnHeaderCase.AS_IS)
-            }
+    /**
+     * Runs each (DDL) SQL statement specified in the fullDDL.sql file.
+     */
+    @Unroll // performs this method for each statement in the fullDDL.sql file
+    def '#fullDdlSqlFileTestName'() {
 
-            // Keep track of CREATE ROLE commands
-            if (commandUpperCase.contains('CREATE') && commandUpperCase.contains('ROLE')) {
-                newRoles.add(getName(it, 'ROLE'))
-            // Keep track of EXPORT TABLE commands
-            } else if (commandUpperCase.contains('EXPORT') && commandUpperCase.contains('TABLE')) {
-                newExportTables.add(getName(it, 'TABLE'))
-            }
-        }
+        setup: 'initializations'
+        String error = null
+        String duration = ''
+        boolean foundError = false
 
-        // Do validation that the (DDL) SQL commands worked, by running the
-        // JUnit tests of the TestDDLFeatures class
-        TestDDLFeatures tdf = new TestDDLFeatures();
-        tdf.startClient()
-        Method[] methods = tdf.getClass().getMethods()
-        for (Method method : methods) {
-            Annotation[] annotations = method.getAnnotations()
-            for (Annotation annotation : annotations) {
-                if (annotation.annotationType().equals(org.junit.Test.class)) {
-                    if (ignoreTheseTestMethods.contains(method.getName())) {
-                        debugPrint '\nSkipping JUnit Method: TestDDLFeatures.' + method.getName()
-                    } else {
-                        debugPrint '\nInvoking JUnit Method: TestDDLFeatures.' + method.getName()
-                        try {
-                            method.invoke(tdf)
-                        } catch (InvocationTargetException e) {
-                            errors.put(method.getName(), e.toString() + ':\n' + e.getCause()?.toString())
-                            println 'Caught InvocationTargetException, running TestDDLFeatures.' + method.getName() + ':'
-                            e.printStackTrace(System.out);
-                        }
+        when: 'run the specified (DDL) SQL statement(s)'
+        // For a really long set of (DDL) SQL statements, break them into
+        // smaller groups of statements, then run each group individually
+        int maxNumStatementsPerGroup = 10
+        if ((statement =~ ';').count > maxNumStatementsPerGroup) {
+            int start = 0
+            int semicolon = 0
+            while (semicolon < statement.length()) {
+                for (int j = 0; j < maxNumStatementsPerGroup; j++) {
+                    semicolon = statement.indexOf(';', semicolon) + 1
+                    if (semicolon <= 0) {
+                        semicolon = statement.length()
+                        break
                     }
                 }
+                error = runDdlSqlStatement(statement.substring(start, semicolon))
+                start = semicolon
+                duration = page.getQueryDuration()
+                if (error != null || duration == null || duration.isEmpty() || duration.contains('error')) {
+                    println '\nFAILURE: error non-null or duration null/empty/has error'
+                    println 'Error   :' + error
+                    println 'Duration:' + duration
+                    println 'All result text:\n' + page.getQueryResultText()
+                    foundError = true
+                }
             }
+
+        // Usual case: run the entire (DDL) SQL statement(s), all together
+        } else {
+            error = runDdlSqlStatement(statement)
+            duration = page.getQueryDuration()
         }
 
-        // List any errors that were found
-        for (String key : errors.keySet()) {
-            println '\nAction that caused Error:\n' + key
-            println '\nError:\n' + errors.get(key)
-        }
+        then: 'make sure there was no error'
+        error == null
+        duration != null && !duration.isEmpty() && !duration.contains('error')
+        !foundError
 
-        expect: 'There should be no errors'
-        errors.isEmpty()
+        where: 'list of DDL SQL statements to test'
+        statement << fullDdlSqlStatements
+        fullDdlSqlFileTestName = getSqlStatementTestName(statement)
+    }
+
+    /**
+     * Runs each JUnit test in TestDDLFeatures.java. (Note: the corresponding
+     * SQL DDL statements in the fullDDL.sql file must be run first.)
+     */
+    @Unroll // performs this method for each JUnit test in TestDDLFeatures.java
+    def '#testDdlFeaturesTestName'() {
+        when: 'run the specified JUnit test method'
+        debugPrint '\nInvoking JUnit Method: TestDDLFeatures.' + testDdlFeaturesTestName
+        testMethod.invoke(testDdlFeatures)
+        debugPrint 'JUnit Method passed  : TestDDLFeatures.' + testDdlFeaturesTestName
+
+        then: 'test passes if you reach this point without an AssertionFailedError'
+        true
+
+        where: 'list of TestDDLFeatures.java JUnit test methods'
+        testMethod << testDdlFeaturesTestMethods
+        testDdlFeaturesTestName = testMethod.getName()
     }
 
 }
