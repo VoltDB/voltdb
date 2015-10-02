@@ -235,7 +235,7 @@ class AdminTest extends TestBase {
 		    	when:
 				waitFor(waitTime) {
 				   	directories.commandLogSnapshotTitle.isDisplayed()
-           			directories.commandLogSnapshotTitle.text().toLowerCase().equals("Dr Overflow".toLowerCase())
+           			directories.commandLogSnapshotTitle.text().toLowerCase().equals("Command Log Snapshots".toLowerCase())
 				}
 				then:
 				testStatus = true
