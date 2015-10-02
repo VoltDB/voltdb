@@ -608,10 +608,12 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    // handle any materialized views
+    // handle any materialized views, hide the tuple from sequential scan temporarily.
+    targetTupleToUpdate.setPendingDeleteTrue();
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
+    targetTupleToUpdate.setPendingDeleteFalse();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
@@ -774,10 +776,12 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    // handle any materialized views
+    // handle any materialized views, hide the tuple from sequential scan temporarily.
+    target.setPendingDeleteTrue();
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(target, fallible);
     }
+    target.setPendingDeleteFalse();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
@@ -1088,6 +1092,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // The view is already up to date.
             // but still need to update the index used for min/max
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            // Fallback executor vectors must be set after indexForMinMax
+            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
 
@@ -1098,6 +1104,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // the view was initialized, so re-initialize the view.
             currView->setTargetTable(target);
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            // Fallback executor vectors must be set after indexForMinMax
+            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
     }
