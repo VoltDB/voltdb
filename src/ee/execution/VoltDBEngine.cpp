@@ -1781,7 +1781,7 @@ void VoltDBEngine::reportProgressToTopend() {
 
     //Update stats in java and let java determine if we should cancel this query.
     m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
-    m_tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
+    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
                                         (m_lastAccessedExec == NULL) ?
                                         dummy_last_accessed_plan_node_name :
                                         planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
@@ -1791,15 +1791,17 @@ void VoltDBEngine::reportProgressToTopend() {
                                         m_currExecutorVec->limits().getAllocated(),
                                         m_currExecutorVec->limits().getPeakMemoryInBytes());
     m_tuplesProcessedSinceReport = 0;
-    if (m_tupleReportThreshold < 0) {
+
+    if (tupleReportThreshold < 0) {
         VOLT_DEBUG("Interrupt query.");
         char buff[100];
         snprintf(buff, 100,
                 "A SQL query was terminated after %.2f seconds because it exceeded the query timeout period.",
-                static_cast<double>(m_tupleReportThreshold) / -1000.0);
+                static_cast<double>(tupleReportThreshold) / -1000.0);
 
         throw InterruptException(std::string(buff));
     }
+    m_tupleReportThreshold = tupleReportThreshold;
 }
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
