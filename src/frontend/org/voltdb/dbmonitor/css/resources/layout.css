@@ -1362,8 +1362,8 @@ ul.catalogNav {
     border-top: none;
 }
 
-tr.trLicenseInfo td {
-    border: none !important;
+td.trLicenseInfo{
+    padding-top: 20px!important;
 }
 
 
@@ -2916,7 +2916,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
 .overviewTbl {
-    overflow: auto;
+    /*overflow: auto;*/
     width: auto;
 }
 
@@ -4173,8 +4173,8 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
     }
 
     .overviewTbl {
-        overflow: auto;
-        width: auto;
+         overflow: auto;
+       width: auto;
     }
 
     .adminLeft {
@@ -4290,6 +4290,12 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
 @media (min-width: 768px) and (max-width: 800px) {
      .server-info-heading .servIp{margin-left: 14%;}
     ul.servers-list li span.servIpNum {margin-left: 3%;}
+}
+@media (min-width: 700px) and (max-width: 902px) {
+    .overviewTbl {
+    overflow: auto;
+    width: auto;
+}
 }
 
 @media (max-width: 980px) {

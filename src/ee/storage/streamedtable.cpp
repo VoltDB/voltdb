@@ -33,6 +33,16 @@ StreamedTable::StreamedTable(bool exportEnabled)
     }
 }
 
+StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
+    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(wrapper),
+    m_sequenceNo(0)
+{
+    // In StreamedTable, a non-null m_wrapper implies export enabled.
+    if (exportEnabled) {
+        enableStream();
+    }
+}
+
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     StreamedTable * st = new StreamedTable(true);
