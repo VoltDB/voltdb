@@ -17,15 +17,13 @@
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
         <delete file="${jar.dir}/${ant.project.name}-client.jar"/>
+        <delete file="${basedir}/deployment.xml"/>
         <delete file="${basedir}/catalog-report.html"/>
     </target>
 
     <path id="build-classpath">
        <fileset dir="${basedir}/../../../voltdb">
          <include name="voltdbclient*.jar"/>
-       </fileset>
-       <fileset dir="${basedir}/../../../lib">
-         <include name="commons-lang3*.jar"/>
        </fileset>
     </path>
 
@@ -36,7 +34,12 @@
         </javac>
     </target>
 
-    <target name="client" depends="client-compile">
+    <target name="deployment">
+        <copy file="${basedir}/deployment.xml.template" tofile="${basedir}/deployment.xml"/>
+        <replace file="${basedir}/deployment.xml" token="__PATH_MARKER__" value="${basedir}/../../../bundles"/>
+    </target>
+
+    <target name="client" depends="client-compile, deployment">
         <mkdir dir="${jar.dir}"/>
         <jar destfile="${jar.dir}/${ant.project.name}-client.jar" basedir="${clientclasses.dir}">
         </jar>

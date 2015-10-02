@@ -39,7 +39,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 CLIENTCLASSPATH=socketstream-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-lang3-3.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -63,8 +62,7 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    rm -rf felix-cache
-    if [ ! -e socketstream-client.jar ]; then
+    if [ ! -e socketstream.jar ] || [ ! -e socketstream-client.jar ]; then
         jars;
     fi
 }
@@ -78,39 +76,6 @@ function server() {
     echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
     voltdb create -d deployment.xml -l $LICENSE -H $HOST
-}
-
-#kafka importer
-function kafka() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
-}
-
-#log4j importer
-function log4j() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-log4j.xml -l $LICENSE -H $HOST
-}
-
-#all importer
-function all() {
-    jars-ifneeded
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-all.xml -l $LICENSE -H $HOST"
-    echo
-    voltdb create -d deployment-all.xml -l $LICENSE -H $HOST
 }
 
 # load schema and procedures
@@ -146,11 +111,6 @@ function client() {
     async-benchmark
 }
 
-# run the client that drives the example
-function sclient() {
-    simple-benchmark
-}
-
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
@@ -164,28 +124,13 @@ function async-benchmark-help() {
 function async-benchmark() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        socketimporter.client.socketimporter.AsyncBenchmark \
+        socketimporter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=2 \
-        --duration=30 \
-        --perftest=true \
-        --partitioned=true \
+        --duration=5 \
         --servers=localhost \
-        --sockservers=localhost:7001
+        --dbservers=localhost
 }
-
-function simple-benchmark() {
-    jars-ifneeded
-    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        socketimporter.client.socketimporter.SimpleAsyncBenchmark \
-        --displayinterval=5 \
-        --warmup=2 \
-        --duration=90 \
-        --servers=localhost \
-        --sockservers=localhost:7001 \
-        --statsfile=abc.csv
-}
-
 
 # The following two demo functions are used by the Docker package. Don't remove.
 # compile the jars for procs and client code
