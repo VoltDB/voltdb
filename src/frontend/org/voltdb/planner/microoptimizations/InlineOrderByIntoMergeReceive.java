@@ -26,6 +26,8 @@ import java.util.Queue;
 import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -33,7 +35,9 @@ import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class InlineOrderByIntoMergeReceive extends MicroOptimization {
 
@@ -132,12 +136,29 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
 
         assert(receive.getChildCount() == 1);
         AbstractPlanNode partitionRoot = receive.getChild(0);
-        if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
-            // Partition results are not ordered
-            return orderbyNode;
-        }
 
         // At this point we confirmed that the optimization is applicable.
+        if (!partitionRoot.isOutputOrdered(orderbyNode.getSortExpressions(), orderbyNode.getSortDirections())) {
+            // Partition results are not ordered and require an ORDER BY node to be pushed down
+            // Assumption: all sort expressions can be resolved at the lower fragment.
+            // Enforced by the canPushOrderByDown assertion call
+            OrderByPlanNode partitionOrderBy = new OrderByPlanNode();
+            List<AbstractExpression> sortExprs = orderbyNode.getSortExpressions();
+            List<SortDirectionType> sortDirs = orderbyNode.getSortDirections();
+            assert(sortExprs.size() == sortDirs.size());
+            for (int i = 0; i < sortExprs.size(); i++) {
+                partitionOrderBy.addSort(sortExprs.get(i), sortDirs.get(i));
+            }
+            assert(partitionRoot instanceof SendPlanNode);
+            assert(partitionRoot.getChildCount() == 1);
+            AbstractPlanNode rootChild = partitionRoot.getChild(0);
+            rootChild.disconnectParents();
+            partitionOrderBy.addAndLinkChild(rootChild);
+            // Make sure all ORDER BY sort expressions can be resolved at the partition level
+            assert(canPushOrderByDown(partitionOrderBy));
+            partitionRoot.addAndLinkChild(partitionOrderBy);
+        }
+
         // Short circuit the current ORDER BY parent (if such exists) and
         // the new MERGERECIEVE node.. All in-between nodes will be inlined
         assert (orderbyNode.getParentCount() <= 1);
@@ -220,4 +241,25 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         return aggregateNode;
     }
 
+    /**
+     * Verify that the coordinator's ORDER BY node can be pushed down to the lower fragment -
+     * all TVE from the sort expressions must be able to resolve their column indexes
+     *
+     * @param orderByNode
+     * @return true if the order by node can be pushed down
+     */
+    private boolean canPushOrderByDown(OrderByPlanNode orderByNode) {
+        orderByNode.generateOutputSchema(m_parsedStmt.m_db);
+        orderByNode.resolveColumnIndexes();
+        List<TupleValueExpression> sort_tves = new ArrayList<TupleValueExpression>();
+        for (AbstractExpression sort_exps : orderByNode.getSortExpressions()) {
+            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
+        }
+        for (TupleValueExpression tve : sort_tves) {
+            if (tve.getColumnIndex() == -1) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
