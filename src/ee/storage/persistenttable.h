@@ -134,7 +134,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark);
+    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -836,14 +836,14 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 }
 
 inline void
-PersistentTableSurgeon::DRRollback(size_t drMark) {
+PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
     if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
         if (m_table.m_partitionColumn == -1) {
             if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark);
+                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
             }
         } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
         }
     }
 }

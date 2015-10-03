@@ -850,6 +850,35 @@ TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     simpleUpdateTest();
 }
 
+TEST_F(DRBinaryLogTest, PartialTxnRollback) {
+    beginTxn(98, 98, 97, 69);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(true);
+
+    beginTxn(99, 99, 98, 70);
+
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+
+    // Simulate a second batch within the same txn
+    UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
+    m_context->setupForPlanFragments(uq, addPartitionId(99), addPartitionId(99),
+                                     addPartitionId(98), addPartitionId(70));
+
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+
+    m_undoLog.undo(m_undoToken + 1);
+
+    endTxn(true);
+
+    flushAndApply(100);
+
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

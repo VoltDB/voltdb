@@ -58,7 +58,7 @@ public:
     // for test purpose
     virtual void setSecondaryCapacity(size_t capacity);
 
-    virtual void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark, size_t drRowCost);
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
@@ -141,7 +141,7 @@ public:
 
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
 
-    void rollbackTo(size_t mark) {}
+    void rollbackTo(size_t mark, size_t drRowCost) {}
 
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
