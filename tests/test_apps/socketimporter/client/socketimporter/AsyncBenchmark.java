@@ -157,13 +157,7 @@ public class AsyncBenchmark {
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
-        if(config.latencyreport) {
-            System.out.println("NOTICE: Not implemented in this benchmark client.\n");
-        }
+
     }
 
     /**
@@ -267,7 +261,7 @@ public class AsyncBenchmark {
             long thrup;
 
             long max_insert_time = checkDB.maxInsertTime();
-            thrup = runCount.get() / ((max_insert_time-benchmarkStartTS)/1000);
+            thrup = (long) (runCount.get() / ((max_insert_time-benchmarkStartTS)/1000.0));
 
             System.out.println(String.format("Import Throughput %d/s, Total Rows %d",
                     thrup, runCount.get()+warmupCount.get()));
@@ -423,6 +417,13 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Command Line Configuration");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(config.getConfigDumpString());
+        if(config.latencyreport) {
+            System.out.println("NOTICE: Not implemented in this benchmark client.\n");
+        }
 
         // connect to one or more servers, loop until success
         dbconnect(config.servers);
