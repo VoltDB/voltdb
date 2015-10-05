@@ -137,7 +137,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         //validateTableOfLongs(client, sql, new long[][] {{4,     Long.MIN_VALUE,     2}});
 
         // Non-Null constant results in parameterized plan
-        sql = "SELECT * FROM S2 A WHERE  A.WAGE is  distinct from 1000.01;";
+        sql = "SELECT * FROM S2 A WHERE  A.WAGE is  distinct from 1000.01 order by A.ID;";
         validateTableOfLongs(client, sql, new long[][] {{1,     1000,               2},
                                                         {4,     Long.MIN_VALUE,     2},
                                                         {5,     5253,               3}});
@@ -147,7 +147,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         sql = "Select S1.ID ID," +
                 "S1.Wage, S1.Dept, " +
                 "S2.WAGE, S2.Dept " +
-                "from S1, S2 where S1.ID is not distinct from S2.ID;";
+                "from S1, S2 where S1.ID is not distinct from S2.ID order by S1.ID;";
         //vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         //System.out.println("\n\nsql: " + sql + "\nResult: " + (vt.toString()) + " row Count: "+ vt.getRowCount() + "\n\n");
         validateTableOfLongs(client, sql, new long[][] {{1, 1000, 1, 1000, 2},
@@ -157,7 +157,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         sql = "Select S1.Wage," +
                 "S1.ID, S1.Dept, " +
                 "S2.ID, S2.Dept " +
-                "from S1, S2 where S1.WAGE is not distinct from S2.WAGE;";
+                "from S1, S2 where S1.WAGE is not distinct from S2.WAGE order by S1.ID;";
         validateTableOfLongs(client, sql, new long[][] {{1000,              1,  1,  1,  2},
                                                         {Long.MIN_VALUE,    10, 2,  4,  2}});
 
@@ -166,7 +166,7 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         sql = "Select S1.ID ID," +
                 "S1.Wage, S1.Dept, " +
                 "S2.WAGE, S2.Dept " +
-                "from S1, S2 where S1.WAGE is distinct from S2.WAGE;";
+                "from S1, S2 where S1.WAGE is distinct from S2.WAGE order by S1.ID;";
 
         validateTableOfLongs(client, sql, new long[][] {{1, 1000,           1,  Long.MIN_VALUE, 2},
                                                         {1, 1000,           1,  5253,           3},
