@@ -538,7 +538,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     ASSERT_FALSE(tuple.isNullTuple());
     tuple = m_tableReplica->lookupTupleByValues(second_tuple);
     ASSERT_TRUE(tuple.isNullTuple());
-    CommittedDrInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(-1, committed.seqNum);
@@ -583,7 +583,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     // it would flush itself out now
     ASSERT_FALSE(flush(99));
 
-    CommittedDrInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(-1, committed.seqNum);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 
@@ -655,7 +655,7 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
-    CommittedDrInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(0, committed.seqNum);
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(2, committed.seqNum);
