@@ -70,7 +70,10 @@ public:
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
-    /** write a tuple to the stream */
+    /**
+     * write an insert or delete record to the stream
+     * for active-active conflict detection purpose, write full row image for delete records.
+     * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int64_t txnId,
@@ -78,8 +81,13 @@ public:
                        int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair,
+                       bool needFullImage);
 
+    /**
+     * write an update record to the stream
+     * for active-active conflict detection purpose, write full before image for update records.
+     * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int64_t txnId,
@@ -87,7 +95,8 @@ public:
                        int64_t uniqueId,
                        TableTuple &oldTuple,
                        TableTuple &newTuple,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair,
+                       bool needFullImage);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -126,7 +135,8 @@ private:
             TableTuple &tuple,
             size_t &rowHeaderSz,
             size_t &rowMetadataSz,
-            const std::vector<int> *&interestingColumns);
+            const std::vector<int> *&interestingColumns,
+            bool needFullImage);
 
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
@@ -147,7 +157,8 @@ public:
                            int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type,
-                           const std::pair<const TableIndex*, uint32_t>& indexPair) {
+                           const std::pair<const TableIndex*, uint32_t>& indexPair,
+                           bool needFullImage) {
         return 0;
     }
 
