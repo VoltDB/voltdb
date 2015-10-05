@@ -3628,9 +3628,12 @@ a:hover.changePsd {
 table.diskLimitTbl tr td { border: none;}
 
 /*********overlapping nv.d3.css*********/
-.nvtooltip{ padding: 5px!important;}
+.nvtooltip{border: 1px solid #CCCCCC !important;}
+
 
 svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
+.nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
+.nvtooltip table tr td { border: none !important;}
 
 /*********************************************media Qu********************/
 

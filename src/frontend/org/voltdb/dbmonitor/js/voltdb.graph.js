@@ -255,7 +255,7 @@
                 return MonitorGraphUI.ChartCpu;
             },
             callback: function (p) {
-                MonitorGraphUI.ChartRam.useInteractiveGuideline(false);
+                MonitorGraphUI.ChartCpu.useInteractiveGuideline(true);
                 var tooltip = MonitorGraphUI.ChartCpu.tooltip;
                 tooltip.gravity('s');
                 tooltip.contentGenerator(function (d) {
@@ -299,7 +299,7 @@
                 nv.utils.windowResize(MonitorGraphUI.ChartRam.update);
             },
             callback: function (p) {
-                MonitorGraphUI.ChartRam.useInteractiveGuideline(false);
+                MonitorGraphUI.ChartRam.useInteractiveGuideline(true);
                 var tooltip = MonitorGraphUI.ChartRam.tooltip;
 
                 tooltip.contentGenerator(function (d) {
@@ -312,6 +312,23 @@
 
                     return html;
                 });
+                
+
+                //tooltip.contentGenerator(function (d) {
+                //    var html = '';
+                //    d.series.forEach(function (elem) {
+                //        html += "<table><thead><tr><td class='key'>"
+                //            + elem.key + "</td></tr></thead>";
+                //    });
+                //    html = html + "<tr><td>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</td></tr></table>";
+
+                //    //html = "<div class='nvtooltip xy-tooltip nv-pointer-events-none' id='nvtooltip-18219' style='top: 0px; left: 0px; opacity: 1; -webkit-transform: translate(1237px, 481px); '>" +
+                //    //    "<table><thead><tr><td colspan='3'><strong class='x-value'>11:29:16</strong></td></tr></thead><tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(164, 136, 5); '>" +
+                //    //    "</div></td><td class='key'>RAM</td><td class='value'>0.5180</td></tr></tbody></table></div>";
+
+                //    return html;
+                //});
+
                 return MonitorGraphUI.ChartCpu;
             }
         });
@@ -343,7 +360,7 @@
                 nv.utils.windowResize(MonitorGraphUI.ChartLatency.update);
             },
             callback: function(p) {
-                MonitorGraphUI.ChartLatency.useInteractiveGuideline(false);
+                MonitorGraphUI.ChartLatency.useInteractiveGuideline(true);
                 var tooltip = MonitorGraphUI.ChartLatency.tooltip;
                
                 tooltip.contentGenerator(function (d) {
@@ -354,6 +371,11 @@
                     });
                     html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
+                    //d.series.forEach(function (elem) {
+                    //    html += "<table><tr><td colspan='3'><strong class='x=value'>" + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</strong></td></tr></thead>" +
+                    //        "<tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(27,135,200);'</div></td><td class='key'>Latency</td><td class='value'>" + parseFloat(d.point.y).toFixed(2) + "</td></tr></tbody>";
+                    //});
+    
                     return html;
                 });
                 return MonitorGraphUI.ChartLatency;
@@ -389,7 +411,7 @@
                nv.utils.windowResize(MonitorGraphUI.ChartTransactions.update);
            },
            callback: function(p) {
-               MonitorGraphUI.ChartTransactions.useInteractiveGuideline(false);
+               MonitorGraphUI.ChartTransactions.useInteractiveGuideline(true);
                var tooltip = MonitorGraphUI.ChartTransactions.tooltip;
                tooltip.contentGenerator(function (d) {
                    var html = '';
@@ -468,9 +490,10 @@
                 nv.utils.windowResize(MonitorGraphUI.ChartDrReplicationRate.update);
             },
             callback: function() {
-                MonitorGraphUI.ChartDrReplicationRate.useInteractiveGuideline(false);
+                MonitorGraphUI.ChartDrReplicationRate.useInteractiveGuideline(true);
                 var tooltip = MonitorGraphUI.ChartDrReplicationRate.tooltip;
                 tooltip.contentGenerator(function (d) {
+                    debugger;
                     var html = '';
                     d.series.forEach(function (elem) {
                         html += "<h3>"
@@ -513,7 +536,7 @@
                 nv.utils.windowResize(MonitorGraphUI.ChartCommandlog.update);
            },
             callback:function() {
-               MonitorGraphUI.ChartCommandlog.useInteractiveGuideline(false);
+               MonitorGraphUI.ChartCommandlog.useInteractiveGuideline(true);
                var tooltip = MonitorGraphUI.ChartCommandlog.tooltip;
                tooltip.contentGenerator(function (d) {
                    var html = '';
