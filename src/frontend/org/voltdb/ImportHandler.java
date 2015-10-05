@@ -23,8 +23,10 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImportContext;
+import org.voltdb.importer.ImporterStatsCollector;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -40,14 +42,16 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
+    private final ImporterStatsCollector m_statsCollector;
 
     public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
-    public ImportHandler(ImportContext importContext) {
+    public ImportHandler(ImportContext importContext, ImporterStatsCollector statsCollector) {
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
+        m_statsCollector = statsCollector;
     }
 
     /**
@@ -108,12 +112,21 @@ public class ImportHandler {
     }
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
+        StatsCollectionCallback statsCallback = new StatsCollectionCallback(ic.getName(), proc, procCallback);
         return getInternalConnectionHandler()
-                .callProcedure(ic, ic.getBackpressureTimeout(), procCallback, proc, fieldList);
+                .callProcedure(ic, ic.getBackpressureTimeout(), statsCallback, proc, fieldList);
     }
 
     private InternalConnectionHandler getInternalConnectionHandler() {
         return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
+    }
+
+    public void reportFailure(String importerName, String procName, boolean decrementPending) {
+        m_statsCollector.reportFailure(importerName, procName, decrementPending);
+    }
+
+    public void reportQueued(String importerName, String procName) {
+        m_statsCollector.reportQueued(importerName, procName);
     }
 
 
@@ -175,6 +188,39 @@ public class ImportHandler {
 
     public void rateLimitedWarn(Throwable t, String format, Object...args) {
         m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
+    }
+
+    private class StatsCollectionCallback implements ProcedureCallback {
+        private final String m_importerName;
+        private final String m_procName;
+        private final ProcedureCallback m_clientCallback;
+
+        public StatsCollectionCallback(String importerName, String procName, ProcedureCallback clientCallback) {
+            m_importerName = importerName;
+            m_procName = procName;
+            m_clientCallback = clientCallback;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception
+        {
+            switch(clientResponse.getStatus()) {
+            case ClientResponse.RESPONSE_UNKNOWN :
+                m_statsCollector.reportRetry(m_importerName, m_procName);
+                break;
+            case ClientResponse.SUCCESS:
+                m_statsCollector.reportSuccess(m_importerName, m_procName);
+                break;
+            default:
+                m_statsCollector.reportFailure(m_importerName, m_procName);
+            }
+
+            // call the actual callback
+            if (m_clientCallback!=null) {
+                m_clientCallback.clientCallback(clientResponse);
+            }
+        }
+
     }
 
 }

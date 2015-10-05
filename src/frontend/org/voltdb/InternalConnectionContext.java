@@ -19,7 +19,8 @@ package org.voltdb;
 
 
 /**
- * TODO:
+ * This should give information about the caller of InternalConnectionHandler.
+ * This may also be used by the handler to report events for stats collection and such.
  */
 public interface InternalConnectionContext
 {

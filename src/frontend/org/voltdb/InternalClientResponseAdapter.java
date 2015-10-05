@@ -263,6 +263,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                             task.getSerializedSize(), nowNanos);
                     if (!bval) {
+                        // Supposedly this will never happen and is OK to ignore from stats collection perspective.
+                        // Hence it is OK that this is not getting reported to callbacks.
                         m_logger.error("Failed to submit transaction.");
                         m_callbacks.remove(handle);
                     }

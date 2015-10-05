@@ -53,6 +53,8 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     private Method m_debug_enabled;
     private Method m_trace_enabled;
     private Method m_info_enabled;
+    private Method m_statsFailureCall;
+    private Method m_statsQueuedCall;
 
     @Override
     public boolean canContinue() {
@@ -69,29 +71,14 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         }
     }
 
-    /**
-     * This calls real handler using reflection.
-     * @param ic
-     * @param proc
-     * @param fieldList
-     * @return
-     */
-    @Override
-    public boolean callProcedure(String proc, Object... fieldList) {
-        try {
-            return (Boolean )m_callProcMethod.invoke(m_handler, this, proc, fieldList);
-        } catch (Exception ex) {
-            return false;
-        }
-    }
-
     @Override
     public boolean callProcedure(Invocation invocation) {
         try {
-            Object params[] = invocation.getParams();
-            return (Boolean )m_callProcMethod.invoke(m_handler, this, invocation.getProcedure(), params);
+            boolean result = (Boolean )m_callProcMethod.invoke(m_handler, this, invocation.getProcedure(), invocation.getParams());
+            reportStat(result, invocation.getProcedure());
+            return result;
         } catch (Exception ex) {
-            ex.printStackTrace();
+            reportFailureStat(invocation.getProcedure());
             return false;
         }
     }
@@ -100,9 +87,36 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     public boolean callProcedure(ProcedureCallback cb, Invocation invocation) {
         try {
             Object params[] = invocation.getParams();
-            return (Boolean )m_asyncCallProcMethod.invoke(m_handler, this, cb, invocation.getProcedure(), params);
+            boolean result = (Boolean )m_asyncCallProcMethod.invoke(m_handler, this, cb, invocation.getProcedure(), params);
+            reportStat(result, invocation.getProcedure());
+            return result;
         } catch (Exception ex) {
+            reportFailureStat(invocation.getProcedure());
             return false;
+        }
+    }
+
+    private void reportStat(boolean result, String procName) {
+        try {
+            if (result) {
+                m_statsQueuedCall.invoke(m_handler, getName(), procName);
+            } else {
+                m_statsFailureCall.invoke(m_handler, getName(), procName, false);
+            }
+        } catch(InvocationTargetException e) {
+            warn(e, "Error trying to report importer status to statistics collector");
+        } catch(IllegalAccessException e) {
+            warn(e, "Error trying to report importer status to statistics collector");
+        }
+    }
+
+    private void reportFailureStat(String procName) {
+        try {
+            m_statsFailureCall.invoke(m_handler, getName(), procName, false);
+        } catch(InvocationTargetException e) {
+            warn(e, "Error trying to report importer failure to statistics collector");
+        } catch(IllegalAccessException e) {
+            warn(e, "Error trying to report importer failure to statistics collector");
         }
     }
 
@@ -123,6 +137,8 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         m_info_enabled = m_handler.getClass().getMethod("isInfoEnabled", (Class<?>[] )null);
         m_trace_enabled = m_handler.getClass().getMethod("isTraceEnabled", (Class<?>[] )null);
         m_warn_log_rateLimited = m_handler.getClass().getMethod("rateLimitedWarn", Throwable.class, String.class, Object[].class);
+        m_statsFailureCall = m_handler.getClass().getMethod("reportFailure", String.class, String.class, boolean.class);
+        m_statsQueuedCall = m_handler.getClass().getMethod("reportQueued", String.class, String.class);
     }
 
     @Override
