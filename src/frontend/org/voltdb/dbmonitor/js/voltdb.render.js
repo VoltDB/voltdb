@@ -2284,7 +2284,8 @@ function alertNodeClicked(obj) {
                 if (!replicationDetails.hasOwnProperty(hostName)) {
                     replicationDetails[hostName] = {};
                 }
-                replicationDetails[hostName]["CLUSTER_ID"] = info[colIndex["CLUSTER_ID"]];
+                var clusterId = (info[colIndex["CLUSTER_ID"]] == undefined ? "N/A" : info[colIndex["CLUSTER_ID"]]);
+                replicationDetails[hostName]["CLUSTER_ID"] = clusterId;
             });
         };
 
