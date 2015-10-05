@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -246,12 +247,14 @@ public class ParameterConverter {
     public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
     throws VoltTypeException
     {
-        // uncomment for debugging
-        /*System.err.printf("Converting %s of type %s to type %s\n",
+        /* uncomment for debugging
+        System.err.printf("Converting %s of type %s to type %s\n",
+
                 String.valueOf(param),
                 param == null ? "NULL" : param.getClass().getName(),
-                paramType.getName());
-        System.err.flush();*/
+                expectedClz.getName());
+        System.err.flush();
+        // */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
@@ -492,6 +495,8 @@ public class ParameterConverter {
                         inputClz.getName(), expectedClz.getName()));
             }
         } else if (expectedClz == PointType.class && inputClz == PointType.class) {
+            return param;
+        } else if (expectedClz == GeographyValue.class && inputClz == GeographyValue.class) {
             return param;
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;

@@ -1550,6 +1550,11 @@ public class DDLCompiler {
                             " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
                 }
                 maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
+            }
+            else if (t == VoltType.GEOGRAPHY) {
+                // For now GEOGRAPHY columns do not accept a size in their declarations.
+                // Assume the max size.
+                maxRowSize += 4 + VoltType.MAX_VALUE_LENGTH;
             } else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
@@ -1825,7 +1830,7 @@ public class DDLCompiler {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
 
-                if (! VoltType.isIndexable(colType)) {
+                if (! colType.isIndexable()) {
                     String emsg = colType.getName() + " values are not currently supported as index keys: '" + colNames[i] + "'";
                     throw this.m_compiler.new VoltCompilerException(emsg);
                 }
@@ -1839,7 +1844,7 @@ public class DDLCompiler {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
 
-                if (! VoltType.isIndexable(colType)) {
+                if (! colType.isIndexable()) {
                     String emsg = colType.getName() + " expressions are not currently supported as index keys.";
                     throw this.m_compiler.new VoltCompilerException(emsg);
                 }

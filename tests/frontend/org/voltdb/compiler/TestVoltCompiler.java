@@ -2826,6 +2826,83 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
+    public void testCreateTableWithGeographyType() throws Exception {
+        String ddl =
+                "create table polygons ("
+                + "  id integer,"
+                + "  poly geography"
+                + ");";
+        Database db = goodDDLAgainstSimpleSchema(ddl);
+        assertNotNull(db);
+
+        Table polygonsTable = db.getTables().getIgnoreCase("polygons");
+        assertNotNull(polygonsTable);
+
+        Column geographyCol = polygonsTable.getColumns().getIgnoreCase("poly");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+    }
+
+    public void testGeographyNegative() throws Exception {
+
+        // GEOGRAPHY cannot be a partition column
+        badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
+                "create table geogs ("
+                + "  geog geography not null"
+                + ");"
+                + "partition table geogs on column geog;"
+                );
+
+        // GEOGRAPHY columns cannot yet be indexed
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*",
+                "create table geogs ("
+                + "  geog geography not null"
+                + ");  "
+                + "create index geogidx on geogs(geog);"
+                );
+
+        // GEOGRAPHY columns cannot use unique/pk constraints which
+        // are implemented as indexes.
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*",
+                "create table geogs ("
+                + "  geog GEOGRAPHY primary key"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*",
+                "create table geogs ("
+                + "  geog geography, "
+                + "  primary key (geog)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*",
+                "create table geogs ("
+                + "  geog geography, "
+                + "  constraint uniq_geog unique (geog)"
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY values are not currently supported as index keys.*",
+                "create table geogs ("
+                + "  geog GEOGRAPHY unique, "
+                + ");  "
+                );
+
+        // Default values are not yet supported
+        badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*",
+                "create table geogs ("
+                + "  geog geography default 'polygon((3.0 9.0, 3.0 0.0, 0.0 9.0, 3.0 9.0)', "
+                + ");  "
+                );
+
+        badDDLAgainstSimpleSchema(".*unexpected token.*",
+                "create table geogs ("
+                + "  geog geography "
+                + "    default polygonfromtext('polygon((3.0 9.0, 3.0 0.0, 0.0 9.0, 3.0 9.0)'), "
+                + ");  "
+                );
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
