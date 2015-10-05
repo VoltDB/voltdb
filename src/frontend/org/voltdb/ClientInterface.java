@@ -1822,12 +1822,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         get("deployment").getSystemsettings().get("systemsettings").getQuerytimeout();
                 if (systemTimeout != ExecutionEngine.NO_BATCH_TIMEOUT_VALUE &&
                         (batchTimeout > systemTimeout || batchTimeout == ExecutionEngine.NO_BATCH_TIMEOUT_VALUE)) {
-                    String errorMessage = "The attempted individual query timeout " + batchTimeout +
-                            " override was ignored because the connection lacks ADMIN privileges.";
+                    String errorMessage = "The attempted individual query timeout value " + batchTimeout +
+                            " milliseconds override was ignored because the connection lacks ADMIN privileges.";
                     RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
                             60, TimeUnit.SECONDS,
                             log,
-                            Level.INFO, errorMessage + ". This message is rate limited to once every 60 seconds.");
+                            Level.INFO, errorMessage + " This message is rate limited to once every 60 seconds.");
 
                     task.setBatchTimeout(systemTimeout);
                 }

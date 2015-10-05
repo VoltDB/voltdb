@@ -324,11 +324,22 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
-void DRTupleStream::rollbackTo(size_t mark) {
-    if (mark == INVALID_DR_MARK) return;
-    m_opened = false;
-    m_txnRowCount = 0;
-    TupleStreamBase::rollbackTo(mark);
+void DRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
+    if (mark == INVALID_DR_MARK) {
+        return;
+    }
+    if (drRowCost <= m_txnRowCount) {
+        m_txnRowCount -= drRowCost;
+    } else {
+        // convenience to let us just throw away everything at once
+        assert(drRowCost == SIZE_MAX);
+        m_txnRowCount = 0;
+    }
+    if (mark == m_committedUso) {
+        assert(m_txnRowCount == 0);
+        m_opened = false;
+    }
+    TupleStreamBase::rollbackTo(mark, drRowCost);
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
