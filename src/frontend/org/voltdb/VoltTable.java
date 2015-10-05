@@ -32,6 +32,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -770,8 +771,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 m_buffer.putDouble(VoltType.NULL_FLOAT);
                 break;
             case STRING:
-                m_buffer.putInt(NULL_STRING_INDICATOR);
-                break;
+            case GEOGRAPHY:
             case VARBINARY:
                 m_buffer.putInt(NULL_STRING_INDICATOR);
                 break;
@@ -902,6 +902,18 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                                     "Value in VoltTable.addRow(...) larger than allowed max " +
                                             VoltType.humanReadableSize(maxColSize));
                         writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
+                    }
+                    else {
+                        throw new ClassCastException();
+                    }
+                    break;
+                }
+
+                case GEOGRAPHY: {
+                    if (value instanceof GeographyValue) {
+                        GeographyValue gv = (GeographyValue)value;
+                        m_buffer.putInt(gv.getLengthInBytes());
+                        gv.flattenToBuffer(m_buffer);
                     }
                     else {
                         throw new ClassCastException();
@@ -1300,6 +1312,15 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     }
                     else {
                         buffer.append(pt.toString());
+                    }
+                    break;
+                case GEOGRAPHY:
+                    GeographyValue gv = r.getGeographyValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(gv.toString());
                     }
                     break;
                 default:

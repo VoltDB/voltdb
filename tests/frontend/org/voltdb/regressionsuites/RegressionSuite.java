@@ -30,6 +30,7 @@ import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Pattern;
@@ -49,6 +50,8 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.PointType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
@@ -721,6 +724,102 @@ public class RegressionSuite extends TestCase {
             i++;
         }
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
+    }
+
+    private static void assertEquals(String msg, PointType expected, PointType actual) {
+        assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), 0.001);
+        assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), 0.001);
+    }
+
+    private static void assertEquals(String msg, GeographyValue expected, GeographyValue actual) {
+        if (expected == actual) {
+            return;
+        }
+
+        // caller checks for null in the expected value
+        assert (expected != null);
+
+        if (actual == null) {
+            fail(msg + " found null value when non-null expected");
+        }
+
+        List<List<PointType>> expectedLoops = expected.getLoops();
+        List<List<PointType>> actualLoops = actual.getLoops();
+
+        assertEquals(msg + "wrong number of loops, expected " + expectedLoops.size() + ", "
+                + "got " + actualLoops.size(),
+                expectedLoops.size(), actualLoops.size());
+
+        int loopCtr = 0;
+        Iterator<List<PointType>> expectedLoopIt = expectedLoops.iterator();
+        for (List<PointType> actualLoop : actualLoops) {
+            List<PointType> expectedLoop = expectedLoopIt.next();
+            assertEquals(msg + loopCtr + "th loop should have " + expectedLoop.size()
+                    + " vertices, but has " + actualLoop.size(),
+                    expectedLoop.size(), actualLoop.size());
+
+            int vertexCtr = 0;
+            Iterator<PointType> expectedVertexIt = expectedLoop.iterator();
+            for (PointType actualPt : actualLoop) {
+                PointType expectedPt = expectedVertexIt.next();
+                String prefix = msg + "at loop " + loopCtr + ", vertex " + vertexCtr;
+                assertEquals(prefix, expectedPt, actualPt);
+                ++vertexCtr;
+            }
+
+            ++loopCtr;
+        }
+    }
+
+    private static void assertContentOfRow(int row, Object[] expectedRow, VoltTable actualRow) {
+        for (int i = 0; i < expectedRow.length; ++i) {
+            String msg = "Row " + row + ", col " + i + ": ";
+            Object expectedObj = expectedRow[i];
+            if (expectedObj == null) {
+                VoltType vt = actualRow.getColumnType(i);
+                actualRow.get(i,  vt);
+                assertTrue(msg, actualRow.wasNull());
+            }
+            else if (expectedObj instanceof PointType) {
+                assertEquals(msg, (PointType)expectedObj, actualRow.getPoint(i));
+            }
+            else if (expectedObj instanceof GeographyValue) {
+                assertEquals(msg, (GeographyValue)expectedObj, actualRow.getGeographyValue(i));
+            }
+            else if (expectedObj instanceof Long) {
+                long val = ((Long)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof Integer) {
+                long val = ((Integer)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof String) {
+                String val = (String)expectedObj;
+                assertEquals(msg, val, actualRow.getString(i));
+            }
+            else {
+                fail("Unexpected type in expected row: " + expectedObj.getClass().getSimpleName());
+            }
+        }
+    }
+
+    /**
+     * Accept expected table contents as 2-dimensional array of objects, to make it easy to write tests.
+     * Currently only handles some data types.  Feel free to add more as needed.
+     */
+    public static void assertContentOfTable(Object[][] expectedTable, VoltTable actualTable) {
+        for (int i = 0; i < expectedTable.length; ++i) {
+            assertTrue("Fewer rows than expected: "
+                    + "expected: " + expectedTable.length + ", "
+                    + "actual: " + i,
+                    actualTable.advanceRow());
+            assertContentOfRow(i, expectedTable[i], actualTable);
+        }
+        assertFalse("More rows than expected: "
+                + "expected " + expectedTable.length + ", "
+                + "actual: " + actualTable.getRowCount(),
+                actualTable.advanceRow());
     }
 
     static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {

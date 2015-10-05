@@ -25,6 +25,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -195,6 +196,19 @@ public class SerializationHelper {
             }
             return retval;
         }
+        else if (type == GeographyValue.class) {
+            final GeographyValue[] retval = new GeographyValue[count];
+            for (int i = 0; i < count; ++i) {
+                int len = buf.getInt(); // length prefix
+                if (len == VoltType.NULL_STRING_LENGTH) {
+                    retval[i] = null;
+                }
+                else {
+                    retval[i] = GeographyValue.unflattenFromBuffer(buf);
+                }
+            }
+            return retval;
+        }
         else if (type == VoltTable.class) {
             final VoltTable[] retval = new VoltTable[count];
             for (int i = 0; i < count; ++i) {
@@ -357,6 +371,25 @@ public class SerializationHelper {
                 values[i].flattenToBuffer(buf);
             }
         }
+    }
+
+    public static void writeArray(GeographyValue[] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putShort((short) values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                buf.putInt(VoltType.NULL_STRING_LENGTH);
+            }
+            else {
+                buf.putInt(values[i].getLengthInBytes());
+                values[i].flattenToBuffer(buf);
+            }
+        }
+
+
     }
 
 }

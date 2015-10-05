@@ -130,6 +130,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_BIN                    = 20030;
 
         static final int FUNC_VOLT_POINTFROMTEXT        = 20031;
+        static final int FUNC_VOLT_POLYGONFROMTEXT      = 20032;
 
         private static final FunctionId[] instances = {
 
@@ -227,6 +228,9 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("pointfromtext", Type.VOLT_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+            new FunctionId("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET })
         };
