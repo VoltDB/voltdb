@@ -45,6 +45,7 @@
 
 #include "VoltDBEngine.h"
 
+#include "ExecutorVector.h"
 #include "catalog/catalog.h"
 #include "catalog/catalogmap.h"
 #include "catalog/cluster.h"
@@ -103,6 +104,8 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
+// table name prefix of DR conflict table
+const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
 
 namespace voltdb {
 
@@ -112,194 +115,6 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
-
-/**
- * A list of executors for runtime.
- */
-class ExecutorVector {
-public:
-    /**
-     * This is the static factory method for creating instances of
-     * this class from a plan serialized to JSON.
-     */
-    static boost::shared_ptr<ExecutorVector> fromJsonPlan(VoltDBEngine* engine,
-                                                          const std::string& jsonPlan,
-                                                          int64_t fragId) {
-        PlanNodeFragment *pnf = NULL;
-        try {
-            pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
-        }
-        catch (SerializableEEException &seee) {
-            throw;
-        }
-        catch (...) {
-            char msg[1024 * 100];
-            snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
-                     (intmax_t)fragId, jsonPlan.c_str());
-            VOLT_ERROR("%s", msg);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-        }
-        VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-        assert(pnf->getRootNode());
-
-        if (!pnf->getRootNode()) {
-            char msg[1024];
-            snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
-                     (intmax_t)fragId);
-            VOLT_ERROR("%s", msg);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-        }
-
-        int64_t tempTableLogLimit = engine->tempTableLogLimit();
-        int64_t tempTableMemoryLimit = engine->tempTableMemoryLimit();
-
-        // ENG-1333 HACK.  If the plan node fragment has a delete node,
-        // then turn off the governors
-        if (pnf->hasDelete()) {
-            tempTableLogLimit = DEFAULT_TEMP_TABLE_MEMORY;
-            tempTableMemoryLimit = -1;
-        }
-
-        // Note: the executor vector takes ownership of the plan node
-        // fragment here.
-        boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
-                                                                tempTableLogLimit,
-                                                                tempTableMemoryLimit,
-                                                                pnf));
-        ev->init(engine);
-        return ev;
-    }
-
-    /** Build the list of executors from its plan node fragment */
-    void init(VoltDBEngine* engine) {
-        // Initialize each node!
-        for (PlanNodeFragment::PlanNodeMapIterator it = m_fragment->executeListBegin();
-             it != m_fragment->executeListEnd(); ++it) {
-            assert(it->second != NULL);
-            const std::vector<AbstractPlanNode*>& planNodeList = *it->second;
-            std::auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
-            BOOST_FOREACH (AbstractPlanNode* planNode, planNodeList) {
-                initPlanNode(engine, planNode);
-                executorList->push_back(planNode->getExecutor());
-            }
-            m_subplanExecListMap.insert(make_pair(it->first, executorList.get()));
-            executorList.release();
-        }
-    }
-
-    /** Accessor function to satisfy boost::multi_index::const_mem_fun template. */
-    int64_t getFragId() const { return m_fragId; }
-
-    const TempTableLimits& limits() const { return m_limits; }
-
-    /** Return a std::string with helpful info about this object. */
-    std::string debug() const {
-        std::ostringstream oss;
-        std::map<int, std::vector<AbstractExecutor*>* >::const_iterator it;
-        oss << "Fragment ID: " << m_fragId << ", ";
-        oss << "Temp table memory in bytes: " << m_limits.getAllocated() << std::endl;
-        for (it = m_subplanExecListMap.begin(); it != m_subplanExecListMap.end(); ++it) {
-            std::vector<AbstractExecutor*>& executorList = *it->second;
-           oss << "Statement id:" << it->first << ", list size: " << executorList.size() << ", ";
-            BOOST_FOREACH (AbstractExecutor* ae, executorList) {
-                oss << ae->getPlanNode()->debug(" ") << "\n";
-            }
-        }
-        return oss.str();
-    }
-
-    void setupContext(ExecutorContext* executorContext)
-    { executorContext->setupForExecutors(&m_subplanExecListMap); }
-
-    void resetLimitStats() { m_limits.resetPeakMemory(); }
-
-    ~ExecutorVector();
-
-private:
-
-    /**
-     * This method is private.  Please use static factory method
-     * fromJsonPlan to construct an instance of ExecutorVector.
-     *
-     * Construct an ExecutorVector instance.  Object will not be
-     * initialized until its init method is called.  (Initialization
-     * has been placed there to avoid throwing an exception in the
-     * constructor.)
-     *
-     * Note: This constructed instance of ExecutorVector takes
-     * ownership of the PlanNodeFragment here; it will be released
-     * (automatically via boost::scoped_ptr) when this instance goes
-     * away.
-     */
-    ExecutorVector(int64_t fragmentId,
-                   int64_t logThreshold,
-                   int64_t memoryLimit,
-                   PlanNodeFragment* fragment)
-        : m_fragId(fragmentId)
-        , m_limits(memoryLimit, logThreshold)
-        , m_fragment(fragment)
-    { }
-
-    void initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node)
-    {
-        assert(node);
-        assert(node->getExecutor() == NULL);
-
-        // Executor is created here. An executor is *devoted* to this
-        // plannode so that it can cache anything for the plannode
-        AbstractExecutor* executor = getNewExecutor(engine, node);
-        if (executor == NULL) {
-            char message[256];
-            snprintf(message, sizeof(message), "Unexpected error. "
-                     "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
-                     (intmax_t)m_fragId, (int)node->getPlanNodeType());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
-        node->setExecutor(executor);
-
-        // If this PlanNode has an internal PlanNode (e.g.,
-        // AbstractScanPlanNode can have internal Projections), set
-        // that internal node's executor as well.
-        std::map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
-        for (internal_it = node->getInlinePlanNodes().begin();
-             internal_it != node->getInlinePlanNodes().end(); internal_it++) {
-            AbstractPlanNode* inline_node = internal_it->second;
-            initPlanNode(engine, inline_node);
-        }
-
-        // Now use the plannode to initialize the executor for execution later on
-        if (executor->init(engine, &m_limits)) {
-            return;
-        }
-
-        char msg[1024 * 10];
-        snprintf(msg, sizeof(msg),
-                 "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
-                 node->debug().c_str(), (intmax_t)m_fragId);
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-    }
-
-    // Get the executors list for a given subplan. The default plan id = 0
-    // represents the top level parent plan
-    std::vector<AbstractExecutor*>& getExecutorList(int planId = 0) {
-        assert(m_subplanExecListMap.find(planId) != m_subplanExecListMap.end());
-        return *(m_subplanExecListMap.find(planId)->second);
-    }
-
-    const int64_t m_fragId;
-    std::map<int, std::vector<AbstractExecutor*>* > m_subplanExecListMap;
-    TempTableLimits m_limits;
-    boost::scoped_ptr<PlanNodeFragment> m_fragment;
-};
-
-ExecutorVector::~ExecutorVector()
-{
-    typedef  std::map<int, std::vector<AbstractExecutor*>*>::value_type MapEntry;
-    BOOST_FOREACH(MapEntry &entry, m_subplanExecListMap) {
-        delete entry.second;
-    }
-}
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -470,6 +285,21 @@ Table* VoltDBEngine::getTable(std::string name) const
 {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_tablesByName);
+}
+
+Table* VoltDBEngine::getDRConflictTable(PersistentTable* drTable)
+{
+    Table* exportTable;
+    boost::unordered_map<PersistentTable*, Table*>::iterator it = m_cachedDRConflictLookupTable.find(drTable);
+    if (it == m_cachedDRConflictLookupTable.end()) {
+        exportTable = getTable(DR_CONFLICT_TABLE_PREFIX + drTable->name());  // cache table miss, back to full search
+        if (exportTable) {
+            m_cachedDRConflictLookupTable[drTable] = exportTable;
+        }
+    } else {
+        exportTable = it->second;
+    }
+    return exportTable;
 }
 
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
@@ -1241,6 +1071,7 @@ void VoltDBEngine::rebuildTableCollections()
     m_tables.clear();
     m_tablesByName.clear();
     m_tablesBySignatureHash.clear();
+    m_cachedDRConflictLookupTable.clear();
 
     // need to re-map all the table ids / indexes
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);

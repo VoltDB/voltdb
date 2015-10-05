@@ -26,6 +26,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "harness.h"
+#include "execution/VoltDBEngine.h"
 #include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/debuglog.h"
@@ -35,6 +36,7 @@
 #include "common/tabletuple.h"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 #include "storage/tableiterator.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -53,6 +55,22 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
 }
 
+class MockExportTupleStream : public ExportTupleStream {
+public:
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId) : ExportTupleStream(partitionId, siteId) {}
+    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
+                                           int64_t spHandle,
+                                           int64_t seqNo,
+                                           int64_t uniqueId,
+                                           int64_t timestamp,
+                                           TableTuple &tuple,
+                                           ExportTupleStream::Type type) {
+        receivedTuples.push_back(tuple);
+        return 0;
+    }
+    std::vector<TableTuple> receivedTuples;
+};
+
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
@@ -66,6 +84,7 @@ public:
         *reinterpret_cast<int64_t*>(replicatedTableHandle) = 24;
         *reinterpret_cast<int64_t*>(otherTableHandleWithIndex) = 43;
         *reinterpret_cast<int64_t*>(otherTableHandleWithoutIndex) = 44;
+        *reinterpret_cast<int64_t*>(exportTableHandle) = 55;
 
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
@@ -162,6 +181,32 @@ public:
                                                                                                           singleColumnName,
                                                                                                           tableHandle + 1, false, 0));
         m_singleColumnTable->setDR(true);
+
+        // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
+        std::vector<ValueType> exportColumnType;
+        std::vector<int32_t> exportColumnLength;
+        std::vector<bool> exportColumnAllowNull(10, false);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(7); /* length of 'P_TABLE' */
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_DECIMAL);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(15);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(300);
+        exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
+
+        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
+        string exportColumnNamesArray[10] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
+                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT", "C_DECIMAL",
+                                            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
+
+        m_exportStream = new MockExportTupleStream(1, 1);
+        m_exportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
+                                                                m_exportSchema, exportColumnName,
+                                                                m_exportStream, true);
     }
 
     virtual ~DRBinaryLogTest() {
@@ -177,6 +222,7 @@ public:
         delete m_otherTableWithoutIndex;
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
+        delete m_exportTable;
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
@@ -378,6 +424,7 @@ public:
 protected:
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
+    ExportTupleStream* m_exportStream;
 
     TupleSchema* m_schema;
     TupleSchema* m_replicatedSchema;
@@ -388,6 +435,7 @@ protected:
     TupleSchema* m_otherSchemaWithIndexReplica;
     TupleSchema* m_otherSchemaWithoutIndexReplica;
     TupleSchema* m_singleColumnSchema;
+    TupleSchema* m_exportSchema;
 
     PersistentTable* m_table;
     PersistentTable* m_replicatedTable;
@@ -399,6 +447,7 @@ protected:
     PersistentTable* m_otherTableWithoutIndexReplica;
     // This table does not exist on the replica
     PersistentTable* m_singleColumnTable;
+    Table* m_exportTable;
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
@@ -411,6 +460,7 @@ protected:
     char replicatedTableHandle[20];
     char otherTableHandleWithIndex[20];
     char otherTableHandleWithoutIndex[20];
+    char exportTableHandle[20];
 
     vector<NValue> m_cachedStringValues;//To free at the end of the test
 };
@@ -489,6 +539,33 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     EXPECT_EQ(3, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
     EXPECT_EQ(-1, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
 }
+
+// TODO: when we implement conflict detection, the testcase should rewrite to manually create a conflict
+TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
+    ASSERT_FALSE(flush(98));
+
+    // single row write transaction
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
+    endTxn(true);
+
+    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
+    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
+    ASSERT_FALSE(received_tuple.isNullTuple());
+    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
+    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
+    // Now compare the rest of columns
+    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
+}
+
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
