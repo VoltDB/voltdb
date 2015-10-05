@@ -149,7 +149,8 @@ public class TestReportMaker extends TestCase {
     // Under active/active DR, create a DRed table without index will trigger warning
     public void testTableWithIndexNoWarning() throws IOException {
         final String tableName = "TABLE_WITH_INDEX";
-        final String indexDDL =
+
+        final String nonUniqueIndexDDL =
                 "CREATE TABLE " + tableName +" ( " +
                 "p1 INTEGER, " +
                 "p2 TIMESTAMP, " +
@@ -158,7 +159,19 @@ public class TestReportMaker extends TestCase {
                 "CREATE INDEX tableIndex ON table_with_index ( p1 ); " +
                 "DR TABLE " + tableName + ";" +
                 "SET DR=ACTIVE;";
-        String report = compileAndGenerateCatalogReport(indexDDL);
+        String report = compileAndGenerateCatalogReport(nonUniqueIndexDDL);
+        assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+
+        final String uniqueIndexDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER, " +
+                "p2 TIMESTAMP, " +
+                "p3 VARCHAR(32) " +
+                ");" +
+                "CREATE UNIQUE INDEX tableIndex ON table_with_index ( p1 ); " +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        report = compileAndGenerateCatalogReport(uniqueIndexDDL);
         assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String primayKeyDDL =
