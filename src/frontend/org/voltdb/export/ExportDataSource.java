@@ -340,7 +340,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleaseOffset = releaseOffset;
-        m_firstUnpolledUso = Math.max(getFirstUnpolledUso(), lastUso);
+        if (!m_replicaRunning) {
+            m_firstUnpolledUso = Math.max(getFirstUnpolledUso(), lastUso);
+        } else {
+            m_firstUnpolledUso = Math.min(getFirstUnpolledUso(), lastUso);
+        }
     }
 
     public String getDatabase() {
