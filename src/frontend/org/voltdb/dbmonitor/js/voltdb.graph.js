@@ -851,23 +851,35 @@
             var lat = maxLatency;
             if (lat < 0)
                 lat = 0;
-            if (monitor.latMaxTimeStamp < timeStamp) {
+            if (monitor.latMaxTimeStamp <= timeStamp) {
                 if (latSecCount >= 6 || monitor.latFirstData) {
                     dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
-                    dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
+                    if (monitor.latMaxTimeStamp == timeStamp) {
+                        dataLatMin.push({ 'x': new Date(timeStamp), 'y': dataLatMin[dataLatMin.length - 1].y });
+                    } else {
+                        dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
+                    }
                     MonitorGraphUI.Monitors.latDataMin = dataLatMin;
                     latSecCount = 0;
                 }
 
                 if (latMinCount >= 60 || monitor.latFirstData) {
                     dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
-                    dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
+                    if (monitor.latMaxTimeStamp == timeStamp) {
+                        dataLatDay.push({ 'x': new Date(timeStamp), 'y': dataLatDay[dataLatDay.length - 1].y });
+                    } else {
+                        dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
+                    }
                     MonitorGraphUI.Monitors.latDataDay = dataLatDay;
                     latMinCount = 0;
                 }
 
                 dataLat = sliceFirstData(dataLat, dataView.Seconds);
-                dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
+                if (monitor.latMaxTimeStamp == timeStamp) {
+                    dataLat.push({ 'x': new Date(timeStamp), 'y': dataLat[dataLat.length - 1].y });
+                } else {
+                    dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
+                }
                 MonitorGraphUI.Monitors.latData = dataLat;
 
                 if (graphView == 'Minutes')
