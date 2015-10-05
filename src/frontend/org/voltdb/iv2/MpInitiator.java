@@ -121,7 +121,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
-                DRLogSegmentId drLogInfo;
+                DRLogSegmentId drLogInfo = null;
                 long localMpUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
@@ -131,7 +131,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
-                    drLogInfo = new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE);
                 }
                 if (success) {
                     m_initiatorMailbox.setLeaderState(txnid);

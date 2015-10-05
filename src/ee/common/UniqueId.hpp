@@ -33,7 +33,7 @@ public:
     const static int64_t COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
     const static int64_t PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
     const static int64_t PARTITION_ID_MASK = (1 << 14) - 1;
-    const static int64_t MP_PARTITION_ID = PARTITION_ID_MASK;
+    const static int64_t MP_INIT_PID = PARTITION_ID_MASK;
 
     static UniqueId makeIdFromComponents(int64_t ts, int64_t seqNo, int64_t partitionId) {
         // compute the time in millis since VOLT_EPOCH
@@ -58,7 +58,7 @@ public:
     }
 
     static bool isMpUniqueId(UniqueId uid) {
-        return pid(uid) == MP_PARTITION_ID;
+        return pid(uid) == MP_INIT_PID;
     }
 
     const int64_t uid;

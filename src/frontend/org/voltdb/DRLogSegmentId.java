@@ -92,7 +92,7 @@ public class DRLogSegmentId {
             mpUniqueId = Long.MIN_VALUE;
         }
 
-        public DRLogSegmentId ToImmutable() {
+        public DRLogSegmentId toImmutable() {
             return new DRLogSegmentId(drId, spUniqueId, mpUniqueId);
         }
 

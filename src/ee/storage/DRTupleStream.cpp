@@ -369,8 +369,8 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
          throwFatalException(
              "Appending begin transaction message to a DR buffer without closing the previous transaction."
-             " Last closed DR sequence number (%jd), last closed Unique IDs (%jd, %jd)."
-             " Current DR sequence number (%jd), current unique ID (%jd)",
+             " Last closed DR sequence number (%jd), last closed UniqueIds (%jd, %jd)."
+             " Current DR sequence number (%jd), current UniqueId (%jd)",
              (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(),
              (intmax_t)m_currBlock->lastMpUniqueId(), (intmax_t)sequenceNumber, (intmax_t)uniqueId);
      }
@@ -410,15 +410,15 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
     if (m_currBlock->startDRSequenceNumber() == std::numeric_limits<int64_t>::max()) {
         throwFatalException(
             "Appending end transaction message to a DR buffer with no matching begin transaction message."
-            " DR sequence number (%jd), unique ID (%jd)",
+            " DR sequence number (%jd), UniqueId (%jd)",
             (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
     }
     if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
             m_currBlock->lastDRSequenceNumber() > m_openSequenceNumber) {
         throwFatalException(
             "Appending end transaction message to a DR buffer with a greater DR sequence number."
-            " Buffer end DR sequence number (%jd), buffer end unique IDs (%jd, %jd)."
-            " Current DR sequence number (%jd), current unique ID (%jd)",
+            " Buffer end DR sequence number (%jd), buffer end UniqueIds (%jd, %jd)."
+            " Current DR sequence number (%jd), current UniqueId (%jd)",
             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(),
             (intmax_t)m_currBlock->lastMpUniqueId(), (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
     }

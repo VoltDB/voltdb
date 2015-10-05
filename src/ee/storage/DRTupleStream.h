@@ -36,12 +36,12 @@ const size_t INVALID_DR_MARK = SIZE_MAX;
 const int MAGIC_DR_TRANSACTION_PADDING = 78;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
 
-struct CommittedDrInfo{
+struct DRCommittedInfo{
     int64_t seqNum;
     int64_t spUniqueId;
     int64_t mpUniqueId;
 
-    CommittedDrInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
+    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
 };
 
 class DRTupleStream : public voltdb::TupleStreamBase {
@@ -103,8 +103,8 @@ public:
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    CommittedDrInfo getLastCommittedSequenceNumberAndUniqueIds() {
-        return CommittedDrInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
+    DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
+        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 

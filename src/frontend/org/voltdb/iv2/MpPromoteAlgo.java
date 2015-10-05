@@ -266,7 +266,7 @@ public class MpPromoteAlgo implements RepairAlgo
 
         m_promotionResult.set(new RepairResult(m_maxSeenTxnId,
                                                m_maxSeenLocalMpUniqueId,
-                                               m_maxBinaryLogInfo.ToImmutable()));
+                                               m_maxBinaryLogInfo.toImmutable()));
     }
 
     //

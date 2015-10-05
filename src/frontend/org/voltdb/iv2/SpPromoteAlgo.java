@@ -255,6 +255,6 @@ public class SpPromoteAlgo implements RepairAlgo
         m_promotionResult.set(new RepairResult(
                 m_maxSeenTxnId,
                 m_maxSeenLocalSpUniqueId,
-                m_maxBinaryLogInfo.ToImmutable()));
+                m_maxBinaryLogInfo.toImmutable()));
     }
 }

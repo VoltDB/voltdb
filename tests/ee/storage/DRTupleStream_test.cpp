@@ -632,7 +632,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     for (int i = 1; i <= 10; i++)
     {
          appendTuple(i-1, i);
-         m_wrapper.endTransaction();
+         m_wrapper.endTransaction(addPartitionId(i));
     }
 
     const int64_t expectedSequenceNumber = m_wrapper.m_openSequenceNumber;
@@ -658,7 +658,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
 
     // Append one more tuple after the rollback
     appendTuple(12, 13);
-    m_wrapper.endTransaction();
+    m_wrapper.endTransaction(addPartitionId(13));
 
     m_wrapper.periodicFlush(-1, addPartitionId(14));
 

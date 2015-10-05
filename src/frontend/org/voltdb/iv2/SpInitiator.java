@@ -142,7 +142,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
-            DRLogSegmentId drLogInfo = new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE);
             long localSpUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
@@ -162,6 +161,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
+                DRLogSegmentId drLogInfo = null;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
@@ -182,6 +182,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    // If we are a DR replica, inform that subsystem of any remote data we've seen
+                    if (m_consumerDRGateway != null && drLogInfo.drId >= 0) {
+                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localSpUniqueId);
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -196,10 +201,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
-            // If we are a DR replica, inform that subsystem of any remote data we've seen
-            if (m_consumerDRGateway != null && drLogInfo.drId >= 0) {
-                m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localSpUniqueId);
-            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

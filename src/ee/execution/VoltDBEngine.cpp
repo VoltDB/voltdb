@@ -1690,7 +1690,7 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
         size += 3 * sizeof(int64_t);
     }
     m_resultOutput.writeInt(static_cast<int32_t>(size));
-    CommittedDrInfo drInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueIds();
+    DRCommittedInfo drInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueIds();
     m_resultOutput.writeLong(drInfo.seqNum);
     m_resultOutput.writeLong(drInfo.spUniqueId);
     m_resultOutput.writeLong(drInfo.mpUniqueId);
