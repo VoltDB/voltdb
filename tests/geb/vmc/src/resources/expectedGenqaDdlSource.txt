@@ -1,6 +1,4 @@
-# Expected DDL Source: (when running the default GEB VMC
-# test server; see ../../server/run_voltdb_server.sh)
-
+# Expected DDL Source: (when running the Genqa test app)
 CREATE TABLE EXPORT_DONE_TABLE (
    TXNID bigint NOT NULL
 );
@@ -165,26 +163,38 @@ CREATE VIEW REPLICATED_TABLE_GROUP (
    SELECT ROWID_GROUP,COUNT(*)FROM REPLICATED_TABLE GROUP BY ROWID_GROUP;
 
 
-CREATE PROCEDURE CountPartitionedTable
-   AS
-   SELECT COUNT(*) FROM partitioned_table;
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE EXPORT_DONE_TABLE COLUMN TXNID
+   FROM CLASS genqa.procedures.JiggleExportDoneTable;
 
-CREATE PROCEDURE CountPartitionedTableByGroup
-   AS
-   SELECT COUNT(*) FROM partitioned_table WHERE rowid_group=?;
+CREATE PROCEDURE 
+   FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 
-CREATE PROCEDURE CountReplicatedTable
-   AS
-   SELECT COUNT(*) FROM replicated_table;
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE EXPORT_PARTITIONED_TABLE COLUMN ROWID
+   FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 
-CREATE PROCEDURE CountReplicatedTableByGroup
-   AS
-   SELECT COUNT(*) FROM replicated_table WHERE rowid_group=?;
+CREATE PROCEDURE 
+   FROM CLASS genqa.procedures.JiggleMultiPartition;
 
-CREATE PROCEDURE InsertPartitionedTableZeroes
-   AS
-   INSERT INTO partitioned_table VALUES   (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');
+CREATE PROCEDURE 
+   FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
 
-CREATE PROCEDURE InsertReplicatedTableZeroes
-   AS
-   INSERT INTO replicated_table VALUES   (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '0', '0', '0');
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE PARTITIONED_TABLE COLUMN ROWID
+   FROM CLASS genqa.procedures.JiggleSinglePartition;
+
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE PARTITIONED_TABLE COLUMN ROWID
+   FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
+
+CREATE PROCEDURE 
+   PARTITION ON TABLE EXPORT_SKINNY_PARTITIONED_TABLE COLUMN ROWID
+   FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
+
+CREATE PROCEDURE 
+   FROM CLASS genqa.procedures.WaitMultiPartition;
+
+CREATE PROCEDURE --Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement
+--   PARTITION ON TABLE PARTITIONED_TABLE COLUMN ROWID
+   FROM CLASS genqa.procedures.WaitSinglePartition;
