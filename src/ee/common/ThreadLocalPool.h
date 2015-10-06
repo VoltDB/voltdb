@@ -47,7 +47,33 @@ public:
 
     static const int POOLED_MAX_VALUE_LENGTH;
 
-    /**
+    /// This generic packaging of fixed-size allocation hides the underlying pool.
+    static void* allocateExactSize(std::size_t size)
+    { return getExact(size)->malloc(); }
+
+    /// This generic packaging of fixed-size deallocation hides the underlying pool.
+    static void freeExactSizeAllocation(std::size_t size, void* allocated)
+    { getExact(size)->free(allocated); }
+
+    /// This generic packaging of variable approximate-size allocation hides the underlying pool.
+    /// It also encapsulates the disabling of the StringPool when MEMCHECK is enabled.
+    static char* allocateString(std::size_t size)
+#ifdef MEMCHECK
+    { return new char[size]; }
+#else
+    { return getStringPool()->get(size)->malloc(); }
+#endif
+
+    /// This generic packaging of variable approximate-size deallocation hides the underlying pool.
+    /// It also encapsulates the disabling of the StringPool when MEMCHECK is enabled.
+    static void freeStringAllocation(std::size_t size, char* allocated)
+#ifdef MEMCHECK
+    { delete[] allocated; }
+#else
+    { getStringPool()->get(size)->free(allocated); }
+#endif
+
+     /**
      * Return the nearest power-of-two-plus-or-minus buffer size that
      * will be allocated for an object of the given length
      */
@@ -67,8 +93,10 @@ public:
 
     static std::size_t getPoolAllocationSize();
 
+private:
     static CompactingStringStorage* getStringPool();
 };
+
 }
 
 #endif /* THREADLOCALPOOL_H_ */

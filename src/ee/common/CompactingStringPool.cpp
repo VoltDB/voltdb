@@ -17,8 +17,6 @@
 
 #include "CompactingStringPool.h"
 
-#include "StringRef.h"
-
 using namespace voltdb;
 using namespace std;
 
@@ -38,12 +36,13 @@ void
 CompactingStringPool::free(void* element)
 {
     bool mutated = m_pool.free(element);
-    if (mutated)
-    {
-        // use the backpointer to the StringRef object in the moved
-        // data to update that object with the new string location
-        StringRef* back_ptr = *reinterpret_cast<StringRef**>(element);
-        back_ptr->updateStringLocation(element);
+    if (mutated) {
+        // Use the back pointer copied from the moved string
+        // to locate the forward pointer to that string
+        // and update it to point to the new string location
+        void*** back_ptr = reinterpret_cast<void***>(element);
+        void** forward_ptr = *back_ptr;
+        *forward_ptr = element;
     }
 }
 

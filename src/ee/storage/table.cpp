@@ -120,27 +120,14 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     m_columnCount = schema->columnCount();
 
     m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
-#ifdef MEMCHECK
-    m_tuplesPerBlock = 1;
-    m_tableAllocationSize = m_tupleLength;
-#else
     m_tuplesPerBlock = m_tableAllocationTargetSize / m_tupleLength;
-#ifdef USE_MMAP
-    if (m_tuplesPerBlock < 1) {
-        m_tuplesPerBlock = 1;
-        m_tableAllocationSize = nexthigher(m_tupleLength);
-    } else {
-        m_tableAllocationSize = nexthigher(m_tableAllocationTargetSize);
-    }
-#else
     if (m_tuplesPerBlock < 1) {
         m_tuplesPerBlock = 1;
         m_tableAllocationSize = m_tupleLength;
-    } else {
+    }
+    else {
         m_tableAllocationSize = m_tableAllocationTargetSize;
     }
-#endif
-#endif
 
     // initialize column names
     m_columnNames.resize(m_columnCount);

@@ -19,13 +19,11 @@
 
 #include "Pool.hpp"
 #include "ThreadLocalPool.h"
-#include "CompactingStringStorage.h"
 
-using namespace voltdb;
-using namespace std;
+namespace voltdb
+{
 
-size_t
-StringRef::computeStringMemoryUsed(size_t length)
+std::size_t StringRef::computeStringMemoryUsed(size_t length)
 {
     // CompactingStringPool will allocate a chunk of this size for storage.
     // This size is the actual length plus the 4-byte length storage
@@ -44,95 +42,41 @@ StringRef::computeStringMemoryUsed(size_t length)
     return alloc_size;
 }
 
-StringRef*
-StringRef::create(size_t size, Pool* dataPool)
+StringRef* StringRef::create(size_t size, Pool* tempPool)
 {
-    StringRef* retval;
-    if (dataPool != NULL)
-    {
-        retval =
-            new(dataPool->allocate(sizeof(StringRef))) StringRef(size, dataPool);
+    if (tempPool) {
+        return new (tempPool->allocate(sizeof(StringRef) + size)) StringRef();
     }
-    else
-    {
-#ifdef MEMCHECK
-        retval = new StringRef(size);
-#else
-        retval = new(ThreadLocalPool::get(sizeof(StringRef))->malloc()) StringRef(size);
-#endif
-    }
-    return retval;
+    return new (ThreadLocalPool::allocateExactSize(sizeof(StringRef))) StringRef(size);
 }
 
-void
-StringRef::destroy(StringRef* sref)
-{
-#ifdef MEMCHECK
-    delete sref;
-#else
-    bool temp_pool = sref->m_tempPool;
-    sref->~StringRef();
-    if (!temp_pool)
-    {
-        ThreadLocalPool::get(sizeof(StringRef))->free(sref);
-    }
-#endif
-}
+void StringRef::operator delete(void* victim)
+{ ThreadLocalPool::freeExactSizeAllocation(sizeof(StringRef), victim); }
 
 StringRef::StringRef(size_t size)
+  : m_size(size + sizeof(StringRef*))
+  , m_stringPtr(ThreadLocalPool::allocateString(m_size))
 {
-    m_size = size + sizeof(StringRef*);
-    m_tempPool = false;
-#ifdef MEMCHECK
-    m_stringPtr = new char[m_size];
-#else
-    m_stringPtr =
-        reinterpret_cast<char*>(ThreadLocalPool::getStringPool()->get(m_size)->malloc());
-#endif
-    setBackPtr();
-}
-
-StringRef::StringRef(std::size_t size, Pool* dataPool)
-{
-    m_tempPool = true;
-    m_stringPtr =
-        reinterpret_cast<char*>(dataPool->allocate(size + sizeof(StringRef*)));
-    setBackPtr();
+    // Sanity check that this persistent string instance will not
+    // be misidentified as a temp string.
+    assert(!wasTempPoolAllocated());
+    // Enable relocation of the referent string when its pool is compacted.
+    char*** backptr = reinterpret_cast<char***>(m_stringPtr);
+    *backptr = &m_stringPtr;
 }
 
 StringRef::~StringRef()
+{ ThreadLocalPool::freeStringAllocation(m_size, m_stringPtr); }
+
+void StringRef::destroy(StringRef* sref)
 {
-    if (!m_tempPool)
-    {
-#ifdef MEMCHECK
-        delete[] m_stringPtr;
-#else
-        ThreadLocalPool::getStringPool()->get(m_size)->free(m_stringPtr);
-#endif
+    // Temp Pool StringRefs and their referents just leak into the Pool until it is purged.
+    // By-pass the destructor to avoid trying to free the referent which is not even a
+    // separate allocation.
+    if (sref->wasTempPoolAllocated()) {
+        return;
     }
+    delete sref;
 }
 
-char*
-StringRef::get()
-{
-    return m_stringPtr + sizeof(StringRef*);
-}
-
-const char*
-StringRef::get() const
-{
-    return m_stringPtr + sizeof(StringRef*);
-}
-
-void
-StringRef::updateStringLocation(void* location)
-{
-    m_stringPtr = reinterpret_cast<char*>(location);
-}
-
-void
-StringRef::setBackPtr()
-{
-    StringRef** backptr = reinterpret_cast<StringRef**>(m_stringPtr);
-    *backptr = this;
 }
