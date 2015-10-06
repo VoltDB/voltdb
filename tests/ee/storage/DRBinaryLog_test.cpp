@@ -370,8 +370,8 @@ public:
     }
 
     void simpleDeleteTest() {
-        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
         ASSERT_FALSE(indexPair.first == NULL);
         ASSERT_FALSE(indexPairReplica.first == NULL);
         EXPECT_EQ(indexPair.second, indexPairReplica.second);
@@ -796,8 +796,8 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndex) {
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
 
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getUniqueIndexForDR();
     ASSERT_FALSE(indexPair1.first == NULL);
     ASSERT_TRUE(indexPair2.first == NULL);
 
@@ -865,8 +865,8 @@ TEST_F(DRBinaryLogTest, BasicUpdate) {
 
 TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
     ASSERT_FALSE(indexPair.first == NULL);
     ASSERT_FALSE(indexPairReplica.first == NULL);
     EXPECT_EQ(indexPair.second, indexPairReplica.second);

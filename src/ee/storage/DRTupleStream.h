@@ -81,8 +81,7 @@ public:
                        int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair,
-                       bool needFullImage);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
 
     /**
      * write an update record to the stream
@@ -95,8 +94,7 @@ public:
                        int64_t uniqueId,
                        TableTuple &oldTuple,
                        TableTuple &newTuple,
-                       const std::pair<const TableIndex*, uint32_t>& indexPair,
-                       bool needFullImage);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -135,8 +133,7 @@ private:
             TableTuple &tuple,
             size_t &rowHeaderSz,
             size_t &rowMetadataSz,
-            const std::vector<int> *&interestingColumns,
-            bool needFullImage);
+            const std::vector<int> *&interestingColumns);
 
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
@@ -157,8 +154,7 @@ public:
                            int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type,
-                           const std::pair<const TableIndex*, uint32_t>& indexPair,
-                           bool needFullImage) {
+                           const std::pair<const TableIndex*, uint32_t>& indexPair) {
         return 0;
     }
 

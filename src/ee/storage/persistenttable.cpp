@@ -496,8 +496,8 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex, false);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -646,9 +646,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        bool isActiveAcitve = ec->getEngine()->getIsActiveActiveDREnabled();
-        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex, isActiveAcitve);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -811,9 +810,8 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        bool isActiveActive = ec->getEngine()->getIsActiveActiveDREnabled();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex, isActiveActive);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
     }
 
     if (fallible) {
@@ -1642,6 +1640,20 @@ void PersistentTableSurgeon::activateSnapshot() {
     for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
         assert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
     }
+}
+
+std::pair<const TableIndex*, uint32_t> PersistentTable::getUniqueIndexForDR() {
+    // In active-active we always send full tuple instead of just index tuple.
+    bool isActiveActive = ExecutorContext::getExecutorContext()->getEngine()->getIsActiveActiveDREnabled();
+    if (isActiveActive) {
+        TableIndex* nullIndex = NULL;
+        return std::make_pair(nullIndex, 0);
+    }
+
+    if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
+        computeSmallestUniqueIndex();
+    }
+    return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
 }
 
 void PersistentTable::computeSmallestUniqueIndex() {
