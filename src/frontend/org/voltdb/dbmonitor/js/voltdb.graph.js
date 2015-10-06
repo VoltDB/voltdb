@@ -705,6 +705,7 @@
                 'cpuDataMin': getEmptyDataForMinutesOptimized(),
                 'cpuDataHrs': getEmptyDataForDaysOptimized(),
                 'cpuFirstData': true,
+                'cpuMaxTimeStamp':null,
                 'partitionData': getEmptyDataForPartition(),
                 'partitionDataMin': getEmptyDataForPartitionForMinutes(),
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
@@ -1072,43 +1073,59 @@
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
 
-            if (percentageUsage < 0)
-                percentageUsage = 0;
-            else if (percentageUsage > 100)
-                percentageUsage = 100;
+            if (timeStamp >= monitor.cpuMaxTimeStamp) {
+                if (percentageUsage < 0)
+                    percentageUsage = 0;
+                else if (percentageUsage > 100)
+                    percentageUsage = 100;
 
-            if (cpuSecCount >= 6 || monitor.cpuFirstData) {
-                cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
-                cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
-                cpuSecCount = 0;
-            }
-            if (cpuMinCount >= 60 || monitor.cpuFirstData) {
-                cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
-                cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
-                cpuMinCount = 0;
-            }
-            cpuData = sliceFirstData(cpuData, dataView.Seconds);
-            cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
-            MonitorGraphUI.Monitors.cpuData = cpuData;
-            monitor.cpuFirstData = false;
+                if (cpuSecCount >= 6 || monitor.cpuFirstData) {
+                    cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
+                    if (timeStamp == monitor.cpuMaxTimeStamp) {
+                        cpuDataMin.push({ "x": new Date(timeStamp), "y": cpuDataMin[cpuDataMin.length - 1].y });
+                    } else {
+                        cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                    }
+                    MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
+                    cpuSecCount = 0;
+                }
+                if (cpuMinCount >= 60 || monitor.cpuFirstData) {
+                    cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
+                    if (timeStamp == monitor.cpuMaxTimeStamp) {
+                        cpuDataDay.push({ "x": new Date(timeStamp), "y": cpuDataDay[cpuDataDay.length - 1].y });
+                    } else {
+                        cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                    }
+                    MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
+                    cpuMinCount = 0;
+                }
+                cpuData = sliceFirstData(cpuData, dataView.Seconds);
+                if (timeStamp == monitor.cpuMaxTimeStamp) {
+                    cpuData.push({ "x": new Date(timeStamp), "y": cpuData[cpuData.length - 1].y });
+                } else {
+                    cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                }
+                MonitorGraphUI.Monitors.cpuData = cpuData;
+                monitor.cpuFirstData = false;
 
-            if (graphView == 'Minutes')
-                dataCpu[0]["values"] = cpuDataMin;
-            else if (graphView == 'Days')
-                dataCpu[0]["values"] = cpuDataDay;
-            else {
-                dataCpu[0]["values"] = cpuData;
+                if (graphView == 'Minutes')
+                    dataCpu[0]["values"] = cpuDataMin;
+                else if (graphView == 'Days')
+                    dataCpu[0]["values"] = cpuDataDay;
+                else {
+                    dataCpu[0]["values"] = cpuData;
 
-            }
+                }
 
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cpuChart.is(":visible")) {
-                d3.select('#visualisationCpu')
-                    .datum(dataCpu)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCpu);
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cpuChart.is(":visible")) {
+                    d3.select('#visualisationCpu')
+                        .datum(dataCpu)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartCpu);
+                }
             }
+            if (timeStamp > monitor.cpuMaxTimeStamp)
+                monitor.cpuMaxTimeStamp = timeStamp;
             cpuSecCount++;
             cpuMinCount++;
         };
