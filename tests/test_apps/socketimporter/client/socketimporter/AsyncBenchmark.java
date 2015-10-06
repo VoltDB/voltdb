@@ -44,7 +44,6 @@
 package socketimporter.client.socketimporter;
 
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -84,7 +83,7 @@ public class AsyncBenchmark {
     // validated command line configuration
     static Config config;
     // Timer for periodic stats printing
-    Timer timer;
+    static Timer timer;
     // Benchmark start time
     static long benchmarkStartTS;
 
@@ -158,13 +157,7 @@ public class AsyncBenchmark {
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
-        if(config.latencyreport) {
-            System.out.println("NOTICE: Not implemented in this benchmark client.\n");
-        }
+
     }
 
     /**
@@ -248,7 +241,7 @@ public class AsyncBenchmark {
      * Create a Timer task to display performance data on the Vote procedure
      * It calls printStatistics() every displayInterval seconds
      */
-    public void schedulePeriodicStats() {
+    public static void schedulePeriodicStats() {
         timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
@@ -263,12 +256,12 @@ public class AsyncBenchmark {
      * Prints a one line update on performance that can be printed
      * periodically during a benchmark.
      */
-    public synchronized void printStatistics() {
+    public synchronized static void printStatistics() {
         try {
             long thrup;
 
             long max_insert_time = checkDB.maxInsertTime();
-            thrup = runCount.get() / ((max_insert_time-benchmarkStartTS)/1000);
+            thrup = (long) (runCount.get() / ((max_insert_time-benchmarkStartTS)/1000.0));
 
             System.out.println(String.format("Import Throughput %d/s, Total Rows %d",
                     thrup, runCount.get()+warmupCount.get()));
@@ -339,7 +332,7 @@ public class AsyncBenchmark {
 
             // print periodic statistics to the console
             benchmarkStartTS = System.currentTimeMillis();
-            schedulePeriodicStats();
+            // schedulePeriodicStats();
 
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
@@ -424,6 +417,13 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Command Line Configuration");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(config.getConfigDumpString());
+        if(config.latencyreport) {
+            System.out.println("NOTICE: Not implemented in this benchmark client.\n");
+        }
 
         // connect to one or more servers, loop until success
         dbconnect(config.servers);
@@ -440,6 +440,7 @@ public class AsyncBenchmark {
             BenchmarkRunner runner = new BenchmarkRunner(benchmark, cdl, hap);
             runner.start();
         }
+        schedulePeriodicStats();
 
         if (!config.perftest) {
             // start checking the table that's being populated by the socket injester(s)

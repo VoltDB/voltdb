@@ -18,6 +18,7 @@
 #define PERSISTENTTABLEUNDOTRUNCATETABLEACTION_H_
 
 #include "common/UndoAction.h"
+#include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
@@ -40,7 +41,7 @@ private:
      *
      */
     virtual void undo() {
-        m_emptyTableSurgeon->DRRollback(m_drMark);
+        m_emptyTableSurgeon->DRRollback(m_drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE));
         m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
     }
 

@@ -1,4 +1,5 @@
-# System Stored Procedures:
+# Expected System Stored Procedures: (when running any VoltDB server;
+# this list does not change)
 @Explain
 @ExplainProc
 @Pause

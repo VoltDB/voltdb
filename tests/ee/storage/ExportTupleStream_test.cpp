@@ -391,7 +391,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // we have a good buffer
     size_t mark = m_wrapper->bytesUsed();
     appendTuple(1, 2);
-    m_wrapper->rollbackTo(mark);
+    m_wrapper->rollbackTo(mark, 0);
 
     // so flush and make sure we got something sane
     m_wrapper->periodicFlush(-1, 1);
@@ -428,7 +428,7 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple)
 
     appendTuple(1, 2);
     // rollback the first tuple
-    m_wrapper->rollbackTo(0);
+    m_wrapper->rollbackTo(0, 0);
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
@@ -459,7 +459,7 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple)
     // add another and roll it back and flush
     size_t mark = m_wrapper->bytesUsed();
     appendTuple(10, 11);
-    m_wrapper->rollbackTo(mark);
+    m_wrapper->rollbackTo(mark, 0);
     m_wrapper->periodicFlush(-1, 10);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -488,7 +488,7 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
     {
         appendTuple(10, 11);
     }
-    m_wrapper->rollbackTo(mark);
+    m_wrapper->rollbackTo(mark, 0);
     m_wrapper->periodicFlush(-1, 10);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);

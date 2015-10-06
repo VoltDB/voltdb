@@ -20,8 +20,8 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -104,10 +104,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         final Table[] tableArray;
         if (config.tables.length == 0) {
             tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
-        }
-        else {
+        } else {
             tableArray = config.tables;
         }
+
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -197,7 +197,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                         drTupleStreamInfo,
                         hashinatorData,
                         timestamp,
-                        newPartitionCount);
+                        newPartitionCount,
+                        tables);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
@@ -314,9 +315,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
             HashinatorSnapshotData hashinatorData,
-            long timestamp, int newPartitionCount) throws IOException
+            long timestamp, int newPartitionCount,
+            Table[] tables) throws IOException
     {
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
         long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
@@ -324,7 +325,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 context.getCatalogCRC(),
                 file_path,
                 file_nonce,
-                tables,
+                Arrays.asList(tables),
                 context.getHostId(),
                 exportSequenceNumbers,
                 drTupleStreamInfo,

@@ -506,7 +506,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
     size_t mark = appendTuple(1, 2);
-    m_wrapper.rollbackTo(mark);
+    m_wrapper.rollbackTo(mark, rowCostForDRRecord(DR_RECORD_INSERT));
 
     // so flush and make sure we got something sane
     m_wrapper.periodicFlush(-1, addPartitionId(1));
@@ -543,7 +543,7 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 
     appendTuple(1, 2);
     // rollback the first tuple
-    m_wrapper.rollbackTo(0);
+    m_wrapper.rollbackTo(0, rowCostForDRRecord(DR_RECORD_INSERT));
 
     // write a new tuple and then flush the buffer
     appendTuple(2, 3);
@@ -576,7 +576,7 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
 
     // add another and roll it back and flush
     size_t mark = appendTuple(10, 11);
-    m_wrapper.rollbackTo(mark);
+    m_wrapper.rollbackTo(mark, rowCostForDRRecord(DR_RECORD_INSERT));
     m_wrapper.periodicFlush(-1, addPartitionId(11));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -610,7 +610,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     }
     for (int i = tuples_to_fill-1; i >= 0; i--)
     {
-        m_wrapper.rollbackTo(marks[i]);
+        m_wrapper.rollbackTo(marks[i], rowCostForDRRecord(DR_RECORD_INSERT));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(11));
 
@@ -651,8 +651,8 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
     EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
 
-    m_wrapper.rollbackTo(mark2);
-    m_wrapper.rollbackTo(mark1);
+    m_wrapper.rollbackTo(mark2, rowCostForDRRecord(DR_RECORD_INSERT));
+    m_wrapper.rollbackTo(mark1, rowCostForDRRecord(DR_RECORD_INSERT));
     EXPECT_EQ(expectedSequenceNumber, m_wrapper.m_openSequenceNumber);
     EXPECT_EQ(expectedUniqueId, m_wrapper.m_openUniqueId);
 

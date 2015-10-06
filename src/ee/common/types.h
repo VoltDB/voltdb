@@ -497,6 +497,8 @@ enum DRRecordType {
 };
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
+    // Warning: Currently, the PersistentTableUndo*Actions rely on
+    // DR_RECORD_{0}_BY_INDEX costing the same as DR_RECORD_{0}
     switch (type) {
     case DR_RECORD_INSERT:
     case DR_RECORD_DELETE:

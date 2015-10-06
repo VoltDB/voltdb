@@ -3202,7 +3202,8 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 + "    WHERE NUM = Z.NUM "
                 + "    AND Z.ID >= 10"
                 + ") "
-                + "AND NUM IS NOT NULL")
+                + "AND NUM IS NOT NULL "
+                + "ORDER BY ID")
                 .getResults()[0];
         i = 8;
         while (vt.advanceRow()) {
