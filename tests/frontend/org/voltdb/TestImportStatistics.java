@@ -264,6 +264,10 @@ public class TestImportStatistics extends RegressionSuite {
             assertEquals(count-expectedFailures, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
             assertEquals(0, row.getLong(ImporterStatsCollector.PENDING_COUNT_COL));
             assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
+            assertNotNull(row.getLong("TIMESTAMP"));
+            assertNotNull(row.getLong(VoltSystemProcedure.CNAME_HOST_ID));
+            assertNotNull(row.getString("HOSTNAME"));
+            assertNotNull(row.getLong(VoltSystemProcedure.CNAME_SITE_ID));
         }
 
         assertTrue(foundSocket && foundLog4j);
@@ -308,6 +312,10 @@ public class TestImportStatistics extends RegressionSuite {
             }
             assertEquals(0, row.getLong(ImporterStatsCollector.PENDING_COUNT_COL));
             assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
+            assertNotNull(row.getLong("TIMESTAMP"));
+            assertNotNull(row.getLong(VoltSystemProcedure.CNAME_HOST_ID));
+            assertNotNull(row.getString("HOSTNAME"));
+            assertNotNull(row.getLong(VoltSystemProcedure.CNAME_SITE_ID));
         }
 
         assertTrue(foundSocket && foundLog4j);

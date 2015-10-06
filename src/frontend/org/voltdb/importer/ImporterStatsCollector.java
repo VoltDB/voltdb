@@ -36,10 +36,10 @@ public class ImporterStatsCollector extends SiteStatsSource {
 
     public static final String IMPORTER_NAME_COL = "IMPORTER_NAME";
     public static final String PROC_NAME_COL = "PROCEDURE_NAME";
-    public static final String SUCCESS_COUNT_COL = "SUCCESS_COUNT";
-    public static final String FAILURE_COUNT_COL = "FAILURE_COUNT";
-    public static final String PENDING_COUNT_COL = "PENDING_COUNT";
-    public static final String RETRY_COUNT_COL = "RETRY_COUNT";
+    public static final String SUCCESS_COUNT_COL = "SUCCESSES";
+    public static final String FAILURE_COUNT_COL = "FAILURES";
+    public static final String PENDING_COUNT_COL = "OUTSTANDING_REQUESTS";
+    public static final String RETRY_COUNT_COL = "RETRIES";
 
     // Holds stats info for each known importer-procname combination
     private ConcurrentMap<String, ConcurrentMap<String, StatsInfo>> m_importerStats = new ConcurrentHashMap<>();
