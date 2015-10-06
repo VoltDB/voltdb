@@ -3631,7 +3631,7 @@ table.diskLimitTbl tr td { border: none;}
 .nvtooltip{border: 1px solid #CCCCCC !important;}
 
 
-svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
+svg.nvd3-svg { width:95% !important; }
 .nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
 .nvtooltip table tr td { border: none !important;}
 

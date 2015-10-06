@@ -234,14 +234,14 @@
 
                 MonitorGraphUI.ChartCpu.xAxis.rotateLabels(-20);
 
-                MonitorGraphUI.ChartCpu.yAxis
+               MonitorGraphUI.ChartCpu.yAxis
                     .tickFormat(d3.format(',.2f'));
 
                 MonitorGraphUI.ChartCpu.yAxis
                     .axisLabel('(%)')
                     .axisLabelDistance(10);
                 
-                MonitorGraphUI.ChartCpu.margin({ left: 80 });
+                MonitorGraphUI.ChartCpu.margin({ left: 100 });
                 MonitorGraphUI.ChartCpu.yAxis.scale().domain([0, 100]);
                 MonitorGraphUI.ChartCpu.lines.forceY([0, 100]);
 
@@ -256,18 +256,18 @@
             },
             callback: function (p) {
                 MonitorGraphUI.ChartCpu.useInteractiveGuideline(true);
-                var tooltip = MonitorGraphUI.ChartCpu.tooltip;
-                tooltip.gravity('s');
-                tooltip.contentGenerator(function (d) {
-                    var html = '';
-                    d.series.forEach(function (elem) {
-                        html += "<h3>"
-                            + elem.key + "</h3>";
-                    });
-                    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + "% at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
+                //var tooltip = MonitorGraphUI.ChartCpu.tooltip;
+                //tooltip.gravity('s');
+                //tooltip.contentGenerator(function (d) {
+                //    var html = '';
+                //    d.series.forEach(function (elem) {
+                //        html += "<h3>"
+                //            + elem.key + "</h3>";
+                //    });
+                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + "% at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
-                    return html;
-                });
+                //    return html;
+                //});
                 return MonitorGraphUI.ChartCpu;
             }
         });
@@ -288,7 +288,7 @@
                     .axisLabel('(GB)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartRam.margin({ left: 80 });
+                MonitorGraphUI.ChartRam.margin({ left: 100 });
                 MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
 
                 d3.select('#visualisationRam')
@@ -300,31 +300,15 @@
             },
             callback: function (p) {
                 MonitorGraphUI.ChartRam.useInteractiveGuideline(true);
-                var tooltip = MonitorGraphUI.ChartRam.tooltip;
-
-                tooltip.contentGenerator(function (d) {
-                    var html = '';
-                    d.series.forEach(function (elem) {
-                        html += "<h3>"
-                            + elem.key + "</h3>";
-                    });
-                    html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
-
-                    return html;
-                });
-                
+                //var tooltip = MonitorGraphUI.ChartRam.tooltip;
 
                 //tooltip.contentGenerator(function (d) {
                 //    var html = '';
                 //    d.series.forEach(function (elem) {
-                //        html += "<table><thead><tr><td class='key'>"
-                //            + elem.key + "</td></tr></thead>";
+                //        html += "<h3>"
+                //            + elem.key + "</h3>";
                 //    });
-                //    html = html + "<tr><td>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</td></tr></table>";
-
-                //    //html = "<div class='nvtooltip xy-tooltip nv-pointer-events-none' id='nvtooltip-18219' style='top: 0px; left: 0px; opacity: 1; -webkit-transform: translate(1237px, 481px); '>" +
-                //    //    "<table><thead><tr><td colspan='3'><strong class='x-value'>11:29:16</strong></td></tr></thead><tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(164, 136, 5); '>" +
-                //    //    "</div></td><td class='key'>RAM</td><td class='value'>0.5180</td></tr></tbody></table></div>";
+                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(4) + " GB at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
                 //    return html;
                 //});
@@ -349,7 +333,7 @@
                     .axisLabel('(ms)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartLatency.margin({ left: 80 });
+                MonitorGraphUI.ChartLatency.margin({ left: 100 });
                 MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
 
                 d3.select('#visualisationLatency')
@@ -361,23 +345,23 @@
             },
             callback: function(p) {
                 MonitorGraphUI.ChartLatency.useInteractiveGuideline(true);
-                var tooltip = MonitorGraphUI.ChartLatency.tooltip;
+                //var tooltip = MonitorGraphUI.ChartLatency.tooltip;
                
-                tooltip.contentGenerator(function (d) {
-                    var html = '';
-                    d.series.forEach(function (elem) {
-                        html += "<h3>"
-                            + elem.key + "</h3>";
-                    });
-                    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
+                //tooltip.contentGenerator(function (d) {
+                //    var html = '';
+                //    d.series.forEach(function (elem) {
+                //        html += "<h3>"
+                //            + elem.key + "</h3>";
+                //    });
+                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " ms at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
-                    //d.series.forEach(function (elem) {
-                    //    html += "<table><tr><td colspan='3'><strong class='x=value'>" + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</strong></td></tr></thead>" +
-                    //        "<tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(27,135,200);'</div></td><td class='key'>Latency</td><td class='value'>" + parseFloat(d.point.y).toFixed(2) + "</td></tr></tbody>";
-                    //});
+                //    //d.series.forEach(function (elem) {
+                //    //    html += "<table><tr><td colspan='3'><strong class='x=value'>" + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</strong></td></tr></thead>" +
+                //    //        "<tbody><tr><td class='legend-color-guide'><div style='background-color: rgb(27,135,200);'</div></td><td class='key'>Latency</td><td class='value'>" + parseFloat(d.point.y).toFixed(2) + "</td></tr></tbody>";
+                //    //});
     
-                    return html;
-                });
+                //    return html;
+                //});
                 return MonitorGraphUI.ChartLatency;
             }
         });
@@ -400,7 +384,7 @@
                    .axisLabel('(Transactions/s)')
                    .axisLabelDistance(10);
 
-               MonitorGraphUI.ChartTransactions.margin({ left: 80 });
+               MonitorGraphUI.ChartTransactions.margin({ left: 100 });
                MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
 
                d3.select('#visualisationTransaction')
@@ -412,17 +396,17 @@
            },
            callback: function(p) {
                MonitorGraphUI.ChartTransactions.useInteractiveGuideline(true);
-               var tooltip = MonitorGraphUI.ChartTransactions.tooltip;
-               tooltip.contentGenerator(function (d) {
-                   var html = '';
-                   d.series.forEach(function (elem) {
-                       html += "<h3>"
-                           + elem.key + "</h3>";
-                   });
-                   html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " tps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
+               //var tooltip = MonitorGraphUI.ChartTransactions.tooltip;
+               //tooltip.contentGenerator(function (d) {
+               //    var html = '';
+               //    d.series.forEach(function (elem) {
+               //        html += "<h3>"
+               //            + elem.key + "</h3>";
+               //    });
+               //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " tps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
-                   return html;
-               });
+               //    return html;
+               //});
                return MonitorGraphUI.ChartTransactions;
            }
         });
@@ -445,7 +429,7 @@
                     .axisLabel('(%)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 80 });
+                MonitorGraphUI.ChartPartitionIdleTime.margin({ left: 100 });
                 MonitorGraphUI.ChartPartitionIdleTime.yAxis.scale().domain([0, 100]);
                 MonitorGraphUI.ChartPartitionIdleTime.lines.forceY([0, 100]);
 
@@ -479,7 +463,7 @@
                     .axisLabel('(KBps)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartDrReplicationRate.margin({ left: 80 });
+                MonitorGraphUI.ChartDrReplicationRate.margin({ left: 100 });
                 MonitorGraphUI.ChartDrReplicationRate.lines.forceY([0, 1]);
 
                 d3.select('#visualizationDrReplicationRate')
@@ -491,18 +475,18 @@
             },
             callback: function() {
                 MonitorGraphUI.ChartDrReplicationRate.useInteractiveGuideline(true);
-                var tooltip = MonitorGraphUI.ChartDrReplicationRate.tooltip;
-                tooltip.contentGenerator(function (d) {
-                    debugger;
-                    var html = '';
-                    d.series.forEach(function (elem) {
-                        html += "<h3>"
-                            + elem.key + "</h3>";
-                    });
-                    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
+                //var tooltip = MonitorGraphUI.ChartDrReplicationRate.tooltip;
+                //tooltip.contentGenerator(function (d) {
+                //    debugger;
+                //    var html = '';
+                //    d.series.forEach(function (elem) {
+                //        html += "<h3>"
+                //            + elem.key + "</h3>";
+                //    });
+                //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " KBps at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
-                    return html;
-                });
+                //    return html;
+                //});
                 return MonitorGraphUI.ChartDrReplicationRate;
             }
         });
@@ -525,7 +509,7 @@
                     .axisLabel('(Pending Transactions)')
                     .axisLabelDistance(10);
 
-                MonitorGraphUI.ChartCommandlog.margin({ left: 80 });
+                MonitorGraphUI.ChartCommandlog.margin({ left: 100 });
                 MonitorGraphUI.ChartCommandlog.lines.forceY([0, 0.1]);
 
                 d3.select('#visualisationCommandLog')
@@ -537,17 +521,17 @@
            },
             callback:function() {
                MonitorGraphUI.ChartCommandlog.useInteractiveGuideline(true);
-               var tooltip = MonitorGraphUI.ChartCommandlog.tooltip;
-               tooltip.contentGenerator(function (d) {
-                   var html = '';
-                   d.series.forEach(function (elem) {
-                       html += "<h3>"
-                           + elem.key + "</h3>";
-                   });
-                   html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " Pending at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
+               //var tooltip = MonitorGraphUI.ChartCommandlog.tooltip;
+               //tooltip.contentGenerator(function (d) {
+               //    var html = '';
+               //    d.series.forEach(function (elem) {
+               //        html += "<h3>"
+               //            + elem.key + "</h3>";
+               //    });
+               //    html = html + "<h2>" + parseFloat(d.point.y).toFixed(2) + " Pending at " + d3.time.format('%d %b %X')(new Date(d.point.x)) + "</h2>";
 
-                   return html;
-               });
+               //    return html;
+               //});
                return MonitorGraphUI.ChartCommandlog;
            }
         });
