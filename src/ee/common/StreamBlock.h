@@ -48,7 +48,8 @@ namespace voltdb
               m_rowCountForDR(0),
               m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
-              m_lastUniqueId(std::numeric_limits<int64_t>::max()),
+              m_lastSpUniqueId(0),
+              m_lastMpUniqueId(0),
               m_type(voltdb::NORMAL_STREAM_BLOCK)
         {
         }
@@ -65,7 +66,8 @@ namespace voltdb
               m_rowCountForDR(other->m_rowCountForDR),
               m_startDRSequenceNumber(other->m_startDRSequenceNumber),
               m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
-              m_lastUniqueId(other->m_lastUniqueId),
+              m_lastSpUniqueId(other->m_lastSpUniqueId),
+              m_lastMpUniqueId(other->m_lastMpUniqueId),
               m_type(other->m_type)
         {
         }
@@ -137,13 +139,24 @@ namespace voltdb
             return m_lastDRSequenceNumber;
         }
 
-        int64_t lastUniqueId() const {
-            return m_lastUniqueId;
+        int64_t lastSpUniqueId() const {
+            return m_lastSpUniqueId;
         }
 
-        void recordCompletedTxnForDR(int64_t lastDRSequenceNumber, int64_t lastUniqueId) {
+        int64_t lastMpUniqueId() const {
+            return m_lastMpUniqueId;
+        }
+
+        void recordCompletedSequenceNumForDR(int64_t lastDRSequenceNumber) {
             m_lastDRSequenceNumber = lastDRSequenceNumber;
-            m_lastUniqueId = lastUniqueId;
+        }
+
+        void recordCompletedSpTxnForDR(int64_t lastSpUniqueId) {
+            m_lastSpUniqueId = lastSpUniqueId;
+        }
+
+        void recordCompletedMpTxnForDR(int64_t lastMpUniqueId) {
+            m_lastMpUniqueId = lastMpUniqueId;
         }
 
         size_t updateRowCountForDR(size_t rowsToCommit) {
@@ -212,7 +225,8 @@ namespace voltdb
         size_t m_rowCountForDR;
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
-        int64_t m_lastUniqueId;
+        int64_t m_lastSpUniqueId;
+        int64_t m_lastMpUniqueId;
         StreamBlockType m_type;
 
         friend class TupleStreamBase;

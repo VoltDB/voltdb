@@ -60,6 +60,7 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
@@ -142,9 +143,9 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-        Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+        Map<Integer, DRLogSegmentId> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
-        Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+        Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
         InstanceId instanceId,
         long timestamp,
         long clusterCreateTime,
@@ -206,14 +207,15 @@ public class SnapshotUtil {
 
                 stringer.key("remoteDCLastIds");
                 stringer.object();
-                for (Map.Entry<Integer, Map<Integer, Pair<Long, Long>>> e : remoteDCLastIds.entrySet()) {
+                for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> e : remoteDCLastIds.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
-                    for (Map.Entry<Integer, Pair<Long, Long>> e2 : e.getValue().entrySet()) {
+                    for (Map.Entry<Integer, DRLogSegmentId> e2 : e.getValue().entrySet()) {
                         stringer.key(e2.getKey().toString());
                         stringer.object();
-                        stringer.key("drId").value(e2.getValue().getFirst());
-                        stringer.key("uniqueId").value(e2.getValue().getSecond());
+                        stringer.key("drId").value(e2.getValue().drId);
+                        stringer.key("spUniqueId").value(e2.getValue().spUniqueId);
+                        stringer.key("mpUniqueId").value(e2.getValue().mpUniqueId);
                         stringer.endObject();
                     }
                     stringer.endObject();
@@ -221,11 +223,12 @@ public class SnapshotUtil {
                 stringer.endObject();
                 stringer.key("drTupleStreamStateInfo");
                 stringer.object();
-                for (Map.Entry<Integer, Pair<Long, Long>> e : drTupleStreamInfo.entrySet()) {
+                for (Map.Entry<Integer, DRLogSegmentId> e : drTupleStreamInfo.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
-                    stringer.key("sequenceNumber").value(e.getValue().getFirst());
-                    stringer.key("uniqueId").value(e.getValue().getSecond());
+                    stringer.key("sequenceNumber").value(e.getValue().drId);
+                    stringer.key("spUniqueId").value(e.getValue().spUniqueId);
+                    stringer.key("mpUniqueId").value(e.getValue().mpUniqueId);
                     stringer.endObject();
                 }
                 stringer.endObject();

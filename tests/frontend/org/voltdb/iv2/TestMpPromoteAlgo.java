@@ -48,6 +48,7 @@ import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -114,7 +115,7 @@ public class TestMpPromoteAlgo
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId,
             ofTotal, handle, handle, versionedHashinatorConfig,
-            Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE);
+            Long.MIN_VALUE, new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE));
         m.m_sourceHSId = sourceHSId;
         return m;
     }
