@@ -58,7 +58,6 @@
 #include "stats/StatsAgent.h"
 #include "storage/DRTupleStream.h"
 #include "storage/BinaryLogSink.h"
-#include "catalog/database.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -78,6 +77,7 @@
 
 namespace catalog {
 class Catalog;
+class Database;
 class Table;
 }
 

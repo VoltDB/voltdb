@@ -125,8 +125,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
                                   TableTuple &tuple,
                                   DRRecordType type,
-                                  const std::pair<const TableIndex*, uint32_t>& indexPair,
-                                  bool needFullImage)
+                                  const std::pair<const TableIndex*, uint32_t>& indexPair)
 {
     size_t startingUso = m_uso;
 
@@ -142,7 +141,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
-    tupleMaxLength = computeOffsets(type, indexPair, tuple, rowHeaderSz, rowMetadataSz, interestingColumns, needFullImage) + TXN_RECORD_HEADER_SIZE;
+    tupleMaxLength = computeOffsets(type, indexPair, tuple, rowHeaderSz, rowMetadataSz, interestingColumns) + TXN_RECORD_HEADER_SIZE;
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -185,8 +184,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
                                          int64_t uniqueId,
                                          TableTuple &oldTuple,
                                          TableTuple &newTuple,
-                                         const std::pair<const TableIndex*, uint32_t>& indexPair,
-                                         bool needFullImage) {
+                                         const std::pair<const TableIndex*, uint32_t>& indexPair) {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
@@ -203,10 +201,10 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     transactionChecks(lastCommittedSpHandle, txnId, spHandle, uniqueId);
 
     DRRecordType type = DR_RECORD_UPDATE;
-    maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns, needFullImage);
+    maxLength += computeOffsets(type, indexPair, oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns);
     // No danger of replacing the second tuple by an index key, since if the type is going to change
     // it has already done so in the above computeOffsets() call
-    maxLength += computeOffsets(type, indexPair, newTuple, newRowHeaderSz, newRowMetadataSz, dummyInterestingColumns, needFullImage);
+    maxLength += computeOffsets(type, indexPair, newTuple, newRowHeaderSz, newRowMetadataSz, dummyInterestingColumns);
     assert(!dummyInterestingColumns);
 
     if (!m_currBlock) {
@@ -297,15 +295,14 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
         TableTuple &tuple,
         size_t &rowHeaderSz,
         size_t &rowMetadataSz,
-        const std::vector<int> *&interestingColumns,
-        bool needFullImage) {
+        const std::vector<int> *&interestingColumns) {
     interestingColumns = NULL;
     rowMetadataSz = sizeof(int32_t);
     int columnCount;
     switch (type) {
     case DR_RECORD_DELETE:
     case DR_RECORD_UPDATE:
-        if (indexPair.first && !needFullImage) {
+        if (indexPair.first) {
             // The index-optimized versions of these types have values exactly
             // 5 larger than the unoptimized versions (asserted in test)
             // DR_RECORD_DELETE => DR_RECORD_DELETE_BY_INDEX
@@ -530,7 +527,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
 
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex, false);
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
         stream.endTransaction(uid);
         ii += 5;
