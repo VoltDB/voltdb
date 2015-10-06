@@ -48,6 +48,7 @@ public class RepairLog
     private static final boolean IS_MP = false;
 
     VoltLogger tmLog = new VoltLogger("TM");
+    VoltLogger CONSOLE = new VoltLogger("CONSOLE");
 
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
     // transactions it should never have seen
@@ -189,6 +190,7 @@ public class RepairLog
                     StoredProcedureInvocation spi = initiateTask.getStoredProcedureInvocation();
                     // params[3] is the end sequence number id from the original cluster
                     Object[] params = spi.getParams().toArray();
+                    CONSOLE.info("Delivered @ApplyBinaryLogMP to the repair log: " + ((Number)params[2]).longValue());
                     m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
                     m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)params[3]).longValue());
                     m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, m.getUniqueId());
