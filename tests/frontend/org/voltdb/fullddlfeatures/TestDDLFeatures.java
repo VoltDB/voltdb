@@ -144,7 +144,19 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         ClientResponse resp;
         VoltTable vt;
 
-        m_client.callProcedure("@AdHoc", "insert into T4 values (1, 2, 3, 4, 5.5, 6.6, \'test\', \'010101\', 1000, 1111);");
+        m_client.callProcedure("@AdHoc", "insert into T4 values "
+                + "(1, "
+                + "2, "
+                + "3, "
+                + "4, "
+                + "5.5, "
+                + "6.6, "
+                + "\'test\', "
+                + "\'010101\', "
+                + "1000, "
+                + "1111, "
+                + "pointfromtext('point(0 0)'),"
+                + "polygonfromtext('polygon((0 0, 1 1, 2 2, 0 0))'));");
 
         resp = m_client.callProcedure("@AdHoc", "select * from T4;");
         vt = resp.getResults()[0];

@@ -27,18 +27,17 @@
 namespace voltdb {
 /**
  * A class for representing instances of geo-spatial points.
- * Stored as a pair of floats, so it fits into an 8-byte word.
  */
 class Point {
 public:
 
-    typedef float Coord;
+    typedef double Coord;
 
     /** Constructor for a null point,
-     * with both lat and lng init'd to NaN */
+     * with both lat and lng init'd to the null coordinate */
     Point()
-        : m_latitude(std::numeric_limits<Coord>::quiet_NaN())
-        , m_longitude(std::numeric_limits<Coord>::quiet_NaN())
+        : m_latitude(nullCoord())
+        , m_longitude(nullCoord())
     {
     }
 
@@ -46,13 +45,24 @@ public:
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
+        assert (m_latitude >= -90.0 && m_latitude <= 90.0);
+        assert (m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
-    /** Null values are represented as either lat or lng being NaN. */
+    // Use the number 360.0 for the null coordinate.
+    static Coord nullCoord() {
+        // A static const member could be used for this, but clang
+        // wants the constexpr keyword to be used with floating-point
+        // constants, and constexpr isn't supported until gcc 4.6.
+        // Creating a static function seems nicer than suppressing the
+        // warning or using the conditional compilation.
+        return 360.0;
+    }
+
+    // The null point has 360 for both lat and long.
     bool isNull() const {
-        // NaN will not compare equal to itself.
-        return (m_latitude != m_latitude) ||
-            (m_longitude != m_longitude);
+        return (m_latitude == nullCoord()) &&
+            (m_longitude == nullCoord());
     }
 
     Coord getLatitude() const {
@@ -64,6 +74,11 @@ public:
     }
 
     int compareWith(const Point& rhs) const {
+
+        // Caller guarantees that neither side is null
+        assert(! isNull());
+        assert(! rhs.isNull());
+
         Coord lhsLat = getLatitude();
         Coord rhsLat = rhs.getLatitude();
         if (lhsLat < rhsLat) {
@@ -90,15 +105,19 @@ public:
 
     template<class Deserializer>
     static Point deserializeFrom(Deserializer& input) {
-        Coord lat = input.readFloat();
-        Coord lng = input.readFloat();
+        Coord lat = input.readDouble();
+        Coord lng = input.readDouble();
+        if (lat == nullCoord() && lng == nullCoord()) {
+            return Point();
+        }
+
         return Point(lat, lng);
     }
 
     template<class Serializer>
     void serializeTo(Serializer& output) const {
-        output.writeFloat(getLatitude());
-        output.writeFloat(getLongitude());
+        output.writeDouble(getLatitude());
+        output.writeDouble(getLongitude());
     }
 
     void hashCombine(std::size_t& seed) const {

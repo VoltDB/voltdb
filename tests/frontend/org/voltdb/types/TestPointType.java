@@ -23,28 +23,75 @@
 
 package org.voltdb.types;
 
+import java.nio.ByteBuffer;
+
 import junit.framework.TestCase;
 
 public class TestPointType extends TestCase {
 
-    public void testBasic() {
-        PointType point = new PointType();
-        assertTrue(point.isNull());
-
-        PointType otherPoint = new PointType();
-        assertTrue(point.equals(otherPoint));
-
-        assertFalse(point.equals(6));
+    private void assertConstructorThrows(String expectedMessage, double lat, double lng) {
+        try {
+            new PointType(lat, lng);
+            fail("Expected constructor to throw an exception");
+        }
+        catch (IllegalArgumentException iae) {
+            assertTrue("Didn't find expected message in exception thrown by PointType constructor",
+                    iae.getMessage().contains(expectedMessage));
+        }
     }
 
     public void testPointCtor() {
-        PointType point = new PointType(10.333f, 20.666f);
-        assertEquals(10.333f, point.getLatitude(), 0.001);
-        assertEquals(20.666f, point.getLongitude(), 0.001);
+        assertEquals(16, PointType.getLengthInBytes());
+
+        PointType point = new PointType(10.333, 20.666);
+        assertEquals(10.333, point.getLatitude(), 0.001);
+        assertEquals(20.666, point.getLongitude(), 0.001);
 
         assertTrue(point.equals(point));
-        assertFalse(point.isNull());
+        assertFalse(point.equals(new PointType(0.0, 10.0)));
 
         assertEquals("POINT (10.333 20.666)", point.toString());
+
+        // Make sure that it's not possible to create points
+        // with bogus latitude or longitude.
+        assertConstructorThrows("Latitude out of range", -91.0, 100);
+        assertConstructorThrows("Latitude out of range", 91.0, 100);
+        assertConstructorThrows("Longitude out of range", 45.0, 181.0);
+        assertConstructorThrows("Longitude out of range", 45.0, -181.0);
+    }
+
+    public void testPointSerialization() {
+
+        int len = PointType.getLengthInBytes();
+        assertEquals(16, len);
+
+        ByteBuffer bb = ByteBuffer.allocate(len);
+        bb.putDouble(33.0);
+        bb.putDouble(45.0);
+
+        // Test deserialization
+        bb.position(0);
+        PointType pt = PointType.unflattenFromBuffer(bb);
+        assertEquals("POINT (33.0 45.0)", pt.toString());
+
+        // Test deserialization with offset argument
+        bb.position(0);
+        pt = PointType.unflattenFromBuffer(bb, 0);
+        assertEquals("POINT (33.0 45.0)", pt.toString());
+
+        // Test serialization
+        pt = new PointType(-64.0, -77.0);
+        bb.position(0);
+        pt.flattenToBuffer(bb);
+        bb.position(0);
+        assertEquals(-64.0, bb.getDouble());
+        assertEquals(-77.0, bb.getDouble());
+
+        // Null serialization puts 360.0 in both lat and long
+        bb.position(0);
+        PointType.serializeNull(bb);
+        bb.position(0);
+        assertEquals(360.0, bb.getDouble());
+        assertEquals(360.0, bb.getDouble());
     }
 }

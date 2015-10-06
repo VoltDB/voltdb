@@ -21,52 +21,46 @@ import java.nio.ByteBuffer;
 
 public class PointType {
 
-    // Internal representation of a geospatial point
-    // is subject to change.  For now, just use two floats.
-    // This matches the EE representation.
-    private final float m_latitude;
-    private final float m_longitude;
+    private final double m_latitude;
+    private final double m_longitude;
 
-    // In the default constructor, initialize to the null point
-    // (defined as either value being NaN)
-    public PointType() {
-        m_latitude = Float.NaN;
-        m_longitude = Float.NaN;
-    }
+    private static final int BYTES_IN_A_COORD = Double.SIZE / 8;
 
-    public PointType(float latitude, float longitude) {
+    // We use this value to represent a null point.
+    // (Only for sending data over the wire.  The client
+    // should receive a null when retrieving null points from a
+    // VoltTable.)
+    private static final double NULL_COORD = 360.0;
+
+    public PointType(double latitude, double longitude) {
         m_latitude = latitude;
         m_longitude = longitude;
+
+        if (m_latitude < -90.0 || m_latitude > 90.0) {
+            throw new IllegalArgumentException("Latitude out of range in PointType constructor");
+        }
+
+
+        if (m_longitude < -180.0 || m_longitude > 180.0) {
+            throw new IllegalArgumentException("Longitude out of range in PointType constructor");
+        }
     }
 
-    public boolean isNull() {
-        return Float.isNaN(m_latitude) || Float.isNaN(m_longitude);
-    }
-
-    public float getLatitude() {
+    public double getLatitude() {
         return m_latitude;
     }
 
-    public float getLongitude() {
+    public double getLongitude() {
         return m_longitude;
     }
 
     @Override
     public String toString() {
-        if (isNull()) {
-            return "NULL";
-        }
-
         return "POINT (" + m_latitude + " " + m_longitude + ")";
     }
 
     // Returns true for two points that have the same latitude and
-    // longitude.  For NULL points (defined as either lat or lng being NaN),
-    // Return true if both points are null.
-    //
-    // In SQL two null values should not compare as equal, but in Java
-    // (say for inserting unique values into a hash table), we really want
-    // any two null points to be considered as equal.
+    // longitude.
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof PointType)) {
@@ -74,10 +68,6 @@ public class PointType {
         }
 
         PointType that = (PointType)o;
-
-        if (isNull() && that.isNull()) {
-            return true;
-        }
 
         if (that.getLatitude() != getLatitude()) {
             return false;
@@ -90,7 +80,7 @@ public class PointType {
      * The number of bytes an instance of this class requires in serialized form.
      */
     static public int getLengthInBytes() {
-        return 8;
+        return BYTES_IN_A_COORD * 2;
     }
 
     /**
@@ -98,8 +88,8 @@ public class PointType {
      * @param buffer
      */
     public void flattenToBuffer(ByteBuffer buffer) {
-        buffer.putFloat(getLatitude());
-        buffer.putFloat(getLongitude());
+        buffer.putDouble(getLatitude());
+        buffer.putDouble(getLongitude());
     }
 
     /**
@@ -109,8 +99,13 @@ public class PointType {
      * @return a new instance of PointType
      */
     public static PointType unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
-        float lat = inBuffer.getFloat(offset);
-        float lng = inBuffer.getFloat(offset + 4);
+        double lat = inBuffer.getDouble(offset);
+        double lng = inBuffer.getDouble(offset + BYTES_IN_A_COORD);
+        if (lat == 360.0 && lng == 360.0) {
+            // This is a null point.
+            return null;
+        }
+
         return new PointType(lat, lng);
     }
 
@@ -121,8 +116,13 @@ public class PointType {
      * @return a new instance of PointType
      */
     public static PointType unflattenFromBuffer(ByteBuffer inBuffer) {
-        float lat = inBuffer.getFloat();
-        float lng = inBuffer.getFloat();
+        double lat = inBuffer.getDouble();
+        double lng = inBuffer.getDouble();
+        if (lat == 360.0 && lng == 360.0) {
+            // This is a null point.
+            return null;
+        }
+
         return new PointType(lat, lng);
     }
 
@@ -131,7 +131,7 @@ public class PointType {
      * @param buffer
      */
     public static void serializeNull(ByteBuffer buffer) {
-        buffer.putFloat(Float.NaN);
-        buffer.putFloat(Float.NaN);
+        buffer.putDouble(NULL_COORD);
+        buffer.putDouble(NULL_COORD);
     }
 }

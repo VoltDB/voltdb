@@ -245,7 +245,7 @@ public class GeographyValue {
                         throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
                     }
                     double lng = tokenizer.nval;
-                    currentLoop.add(new PointType((float)lat, (float)lng));
+                    currentLoop.add(new PointType(lat, lng));
 
                     token = tokenizer.nextToken();
                     if (token != ',') {
