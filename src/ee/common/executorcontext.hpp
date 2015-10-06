@@ -35,7 +35,6 @@ class AbstractExecutor;
 class DRTupleStream;
 class VoltDBEngine;
 
-
 /*
  * EE site global data required by executors at runtime.
  *

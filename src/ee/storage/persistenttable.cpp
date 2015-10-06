@@ -647,7 +647,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        bool isActiveAcitve = ec->getEngine()->getDatabase()->isActiveActiveDRed();
+        bool isActiveAcitve = ec->getEngine()->getIsActiveActiveDREnabled();
         drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex, isActiveAcitve);
     }
 
@@ -812,7 +812,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        bool isActiveActive = ec->getEngine()->getDatabase()->isActiveActiveDRed();
+        bool isActiveActive = ec->getEngine()->getIsActiveActiveDREnabled();
         drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex, isActiveActive);
     }
 

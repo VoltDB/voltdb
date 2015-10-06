@@ -71,13 +71,26 @@ public:
     std::vector<TableTuple> receivedTuples;
 };
 
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+    void setIsActiveActiveDREnabled(bool enabled) { m_isActiveActiveEnabled = enabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
       : m_undoToken(0)
-      , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
-            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0))
     {
+        m_engine = new MockVoltDBEngine(false);
+        m_context.reset(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
+                                    NULL, m_engine, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0));
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
@@ -213,6 +226,7 @@ public:
         for (vector<NValue>::const_iterator cit = m_cachedStringValues.begin(); cit != m_cachedStringValues.end(); ++cit) {
             (*cit).free();
         }
+        delete m_engine;
         delete m_table;
         delete m_replicatedTable;
         delete m_tableReplica;
@@ -459,6 +473,7 @@ protected:
     Pool m_pool;
     BinaryLogSink m_sink;
     boost::scoped_ptr<ExecutorContext> m_context;
+    MockVoltDBEngine* m_engine;
     char tableHandle[20];
     char replicatedTableHandle[20];
     char otherTableHandleWithIndex[20];

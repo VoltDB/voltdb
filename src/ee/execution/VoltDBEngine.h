@@ -58,6 +58,7 @@
 #include "stats/StatsAgent.h"
 #include "storage/DRTupleStream.h"
 #include "storage/BinaryLogSink.h"
+#include "catalog/database.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -77,7 +78,6 @@
 
 namespace catalog {
 class Catalog;
-class Database;
 class Table;
 }
 
@@ -134,6 +134,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         TableCatalogDelegate* getTableDelegate(std::string name) const;
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(std::string name) const;
+        virtual bool getIsActiveActiveDREnabled() const { return getDatabase()->isActiveActiveDRed(); }
 
         // -------------------------------------------------
         // Execution Functions

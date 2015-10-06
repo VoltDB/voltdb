@@ -42,6 +42,7 @@
 #include "storage/tableiterator.h"
 #include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
+#include "catalog/database.h"
 
 using namespace voltdb;
 using namespace std;
@@ -50,12 +51,23 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 44;
 }
 
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
             NValueArray* noParams = NULL;
-            VoltDBEngine* noEngine = NULL;
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            mockEngine = new MockVoltDBEngine(false);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -302,6 +314,7 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         ExecutorContext *engine;
+        MockVoltDBEngine *mockEngine;
         DRTupleStream drStream;
         DRTupleStream drReplicatedStream;
         DummyTopend topend;
