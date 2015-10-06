@@ -693,7 +693,8 @@
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
                 'latFirstData': true,
-                'latMaxTimeStamp': null,                'tpsData': getEmptyDataOptimized(),
+                'latMaxTimeStamp': null,
+                'tpsData': getEmptyDataOptimized(),
                 'tpsDataMin': getEmptyDataForMinutesOptimized(),
                 'tpsDataDay': getEmptyDataForDaysOptimized(),
                 'tpsFirstData': true,
@@ -701,18 +702,27 @@
                 'memDataMin': getEmptyDataForMinutesOptimized(),
                 'memDataDay': getEmptyDataForDaysOptimized(),
                 'memFirstData': true,
+                'memMaxTimeStamp': null,
                 'cpuData': getEmptyDataOptimized(),
                 'cpuDataMin': getEmptyDataForMinutesOptimized(),
                 'cpuDataHrs': getEmptyDataForDaysOptimized(),
                 'cpuFirstData': true,
+                'cpuMaxTimeStamp':null,
                 'partitionData': getEmptyDataForPartition(),
                 'partitionDataMin': getEmptyDataForPartitionForMinutes(),
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
                 'partitionFirstData': true,
                 'drReplicationData': getEmptyDataOptimized(),
                 'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
-                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'cmdLogData': getEmptyDataOptimized(),
-                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
+                'drReplicationDataDay': getEmptyDataForDaysOptimized(),
+                'drMaxTimeStamp': null,
+                'cmdLogData': getEmptyDataOptimized(),
+                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),
+                'cmdLogDataDay': getEmptyDataForDaysOptimized(),
+                'cmdLogFirstData': true,
+                'cmdLogMaxTimeStamp': null,
+                'drFirstData': true,
+                'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
 
@@ -935,54 +945,70 @@
 
             if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
                 return;
-
-            var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
 
-            if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
-                physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
+            if (memTimeStamp >= monitor.memMaxTimeStamp) {
+                var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
 
-                MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
-                MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
+                if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
+                    physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
+
+                    MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
+                    MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
+                }
+
+                if (memRss < 0)
+                    memRss = 0;
+                else if (physicalMemory != -1 && memRss > physicalMemory)
+                    memRss = physicalMemory;
+
+                if (memSecCount >= 6 || monitor.memFirstData) {
+                    dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
+                    if (memTimeStamp == monitor.memMaxTimeStamp) {
+                        dataMemMin.push({ "x": new Date(memTimeStamp), "y": dataMemMin[dataMemMin.length - 1].y });
+                    } else {
+                        dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                    }
+                    MonitorGraphUI.Monitors.memDataMin = dataMemMin;
+                    memSecCount = 0;
+                }
+
+                if (memMinCount >= 60 || monitor.memFirstData) {
+                    dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
+                    if (memTimeStamp == monitor.memMaxTimeStamp) {
+                        dataMemDay.push({ "x": new Date(memTimeStamp), "y": dataMemDay[dataMemDay.length - 1].y });
+                    } else {
+                        dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                    }
+                    MonitorGraphUI.Monitors.memDataDay = dataMemDay;
+                    memMinCount = 0;
+                }
+
+                dataMem = sliceFirstData(dataMem, dataView.Seconds);
+                if (memTimeStamp == monitor.memMaxTimeStamp) {
+                    dataMem.push({ "x": new Date(memTimeStamp), "y": dataMem[dataMem.length - 1].y });
+                } else {
+                    dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                }
+                MonitorGraphUI.Monitors.memData = dataMem;
+
+                if (graphView == 'Minutes')
+                    dataRam[0]["values"] = dataMemMin;
+                else if (graphView == 'Days')
+                    dataRam[0]["values"] = dataMemDay;
+                else
+                    dataRam[0]["values"] = dataMem;
+
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && ramChart.is(":visible")) {
+                    d3.select('#visualisationRam')
+                        .datum(dataRam)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartRam);
+                }
+                monitor.memFirstData = false;
             }
-
-            if (memRss < 0)
-                memRss = 0;
-            else if (physicalMemory != -1 && memRss > physicalMemory)
-                memRss = physicalMemory;
-
-            if (memSecCount >= 6 || monitor.memFirstData) {
-                dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
-                dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                MonitorGraphUI.Monitors.memDataMin = dataMemMin;
-                memSecCount = 0;
-            }
-
-            if (memMinCount >= 60 || monitor.memFirstData) {
-                dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
-                dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                MonitorGraphUI.Monitors.memDataDay = dataMemDay;
-                memMinCount = 0;
-            }
-
-            dataMem = sliceFirstData(dataMem, dataView.Seconds);
-            dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-            MonitorGraphUI.Monitors.memData = dataMem;
-
-            if (graphView == 'Minutes')
-                dataRam[0]["values"] = dataMemMin;
-            else if (graphView == 'Days')
-                dataRam[0]["values"] = dataMemDay;
-            else
-                dataRam[0]["values"] = dataMem;
-
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && ramChart.is(":visible")) {
-                d3.select('#visualisationRam')
-                    .datum(dataRam)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartRam);
-            }
-            monitor.memFirstData = false;
+            if (memTimeStamp > monitor.memMaxTimeStamp)
+                monitor.memMaxTimeStamp = memTimeStamp;
             memSecCount++;
             memMinCount++;
         };
@@ -1072,43 +1098,59 @@
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
 
-            if (percentageUsage < 0)
-                percentageUsage = 0;
-            else if (percentageUsage > 100)
-                percentageUsage = 100;
+            if (timeStamp >= monitor.cpuMaxTimeStamp) {
+                if (percentageUsage < 0)
+                    percentageUsage = 0;
+                else if (percentageUsage > 100)
+                    percentageUsage = 100;
 
-            if (cpuSecCount >= 6 || monitor.cpuFirstData) {
-                cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
-                cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
-                cpuSecCount = 0;
-            }
-            if (cpuMinCount >= 60 || monitor.cpuFirstData) {
-                cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
-                cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
-                MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
-                cpuMinCount = 0;
-            }
-            cpuData = sliceFirstData(cpuData, dataView.Seconds);
-            cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
-            MonitorGraphUI.Monitors.cpuData = cpuData;
-            monitor.cpuFirstData = false;
+                if (cpuSecCount >= 6 || monitor.cpuFirstData) {
+                    cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
+                    if (timeStamp == monitor.cpuMaxTimeStamp) {
+                        cpuDataMin.push({ "x": new Date(timeStamp), "y": cpuDataMin[cpuDataMin.length - 1].y });
+                    } else {
+                        cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                    }
+                    MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
+                    cpuSecCount = 0;
+                }
+                if (cpuMinCount >= 60 || monitor.cpuFirstData) {
+                    cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
+                    if (timeStamp == monitor.cpuMaxTimeStamp) {
+                        cpuDataDay.push({ "x": new Date(timeStamp), "y": cpuDataDay[cpuDataDay.length - 1].y });
+                    } else {
+                        cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                    }
+                    MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
+                    cpuMinCount = 0;
+                }
+                cpuData = sliceFirstData(cpuData, dataView.Seconds);
+                if (timeStamp == monitor.cpuMaxTimeStamp) {
+                    cpuData.push({ "x": new Date(timeStamp), "y": cpuData[cpuData.length - 1].y });
+                } else {
+                    cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                }
+                MonitorGraphUI.Monitors.cpuData = cpuData;
+                monitor.cpuFirstData = false;
 
-            if (graphView == 'Minutes')
-                dataCpu[0]["values"] = cpuDataMin;
-            else if (graphView == 'Days')
-                dataCpu[0]["values"] = cpuDataDay;
-            else {
-                dataCpu[0]["values"] = cpuData;
+                if (graphView == 'Minutes')
+                    dataCpu[0]["values"] = cpuDataMin;
+                else if (graphView == 'Days')
+                    dataCpu[0]["values"] = cpuDataDay;
+                else {
+                    dataCpu[0]["values"] = cpuData;
 
-            }
+                }
 
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cpuChart.is(":visible")) {
-                d3.select('#visualisationCpu')
-                    .datum(dataCpu)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCpu);
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cpuChart.is(":visible")) {
+                    d3.select('#visualisationCpu')
+                        .datum(dataCpu)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartCpu);
+                }
             }
+            if (timeStamp > monitor.cpuMaxTimeStamp)
+                monitor.cpuMaxTimeStamp = timeStamp;
             cpuSecCount++;
             cpuMinCount++;
         };
@@ -1203,41 +1245,57 @@
             if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
                 return;
 
-            var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
+            if (timeStamp >= monitor.drMaxTimeStamp) {
+                var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
 
-            if (drSecCount >= 6 || monitor.drFirstData) {
-                drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
-                drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
-                drSecCount = 0;
-            }
-            if (drMinCount >= 60 || monitor.drFirstData) {
-                drDataDay = sliceFirstData(drDataDay, dataView.Days);
-                drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
-                drMinCount = 0;
-            }
-            drData = sliceFirstData(drData, dataView.Seconds);
-            drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
-            MonitorGraphUI.Monitors.drReplicationData = drData;
-            monitor.drFirstData = false;
+                if (drSecCount >= 6 || monitor.drFirstData) {
+                    drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                    if (timeStamp == monitor.drMaxTimeStamp) {
+                        drDataMin.push({ "x": new Date(timeStamp), "y": drDataMin[drDataMin.length - 1].y });
+                    } else {
+                        drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                    }
+                    MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
+                    drSecCount = 0;
+                }
+                if (drMinCount >= 60 || monitor.drFirstData) {
+                    drDataDay = sliceFirstData(drDataDay, dataView.Days);
+                    if (timeStamp == monitor.drMaxTimeStamp) {
+                        drDataDay.push({ "x": new Date(timeStamp), "y": drDataDay[drDataDay.length - 1].y });
+                    } else {
+                        drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                    }
+                    MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
+                    drMinCount = 0;
+                }
+                drData = sliceFirstData(drData, dataView.Seconds);
+                if (timeStamp == monitor.drMaxTimeStamp) {
+                    drData.push({ "x": new Date(timeStamp), "y": drData[drData.length - 1].y });
+                } else {
+                    drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                }
+                MonitorGraphUI.Monitors.drReplicationData = drData;
+                monitor.drFirstData = false;
 
-            if (graphView == 'Minutes')
-                dataDrReplicationRate[0]["values"] = drDataMin;
-            else if (graphView == 'Days')
-                dataDrReplicationRate[0]["values"] = drDataDay;
-            else {
-                dataDrReplicationRate[0]["values"] = drData;
+                if (graphView == 'Minutes')
+                    dataDrReplicationRate[0]["values"] = drDataMin;
+                else if (graphView == 'Days')
+                    dataDrReplicationRate[0]["values"] = drDataDay;
+                else {
+                    dataDrReplicationRate[0]["values"] = drData;
 
-            }
+                }
 
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
-                d3.select('#visualizationDrReplicationRate')
-                    .datum(dataDrReplicationRate)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartDrReplicationRate);
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
+                    d3.select('#visualizationDrReplicationRate')
+                        .datum(dataDrReplicationRate)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartDrReplicationRate);
+                }
             }
+            if (timeStamp > monitor.drMaxTimeStamp)
+                monitor.drMaxTimeStamp = timeStamp;
             drSecCount++;
             drMinCount++;
         };
@@ -1252,85 +1310,101 @@
             if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;
 
-            var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;
             var timeStamp = cmdLogDetail[currentServer].TIMESTAMP;
+            if (timeStamp >= monitor.cmdLogMaxTimeStamp) {
+                var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;
 
-            if (cmdLogSecCount >= 6 || monitor.cmdLogFirstData) {
-                cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
-                cmdLogDataMin.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                MonitorGraphUI.Monitors.cmdLogDataMin = cmdLogDataMin;
-                cmdLogSecCount = 0;
-            }
-            if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
-                cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
-                cmdLogDataDay.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                MonitorGraphUI.Monitors.cmdLogDataDay = cmdLogDataDay;
-                cmdLogMinCount = 0;
-            }
-            cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
-            cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-            MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
-            if (monitor.cmdLogFirstData) {
-                $(".cmdLogLegend").css("display", "block");
-            }
-            monitor.cmdLogFirstData = false;
-
-            if (graphView == 'Minutes')
-                dataCommandLog[0]["values"] = cmdLogDataMin;
-            else if (graphView == 'Days')
-                dataCommandLog[0]["values"] = cmdLogDataDay;
-            else {
-                dataCommandLog[0]["values"] = cmdLogData;
-            }
-
-
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
-                d3.select('#visualisationCommandLog')
-                    .datum(dataCommandLog)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCommandlog);
-            }
-
-            var isDuplicate = false;
-            if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
-                for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
-                    $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
-                        var x1 = partitionValue.x;
-                        if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
-                            isDuplicate = true;
-                        else
-                            isDuplicate = false;
-                    });
-                    if (!isDuplicate)
-                        cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                if (cmdLogSecCount >= 6 || monitor.cmdLogFirstData) {
+                    cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
+                    if (timeStamp == monitor.cmdLogMaxTimeStamp) {
+                        cmdLogDataMin.push({ "x": new Date(timeStamp), "y": cmdLogDataMin[cmdLogDataMin.length - 1].y });
+                    } else {
+                        cmdLogDataMin.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                    }
+                    MonitorGraphUI.Monitors.cmdLogDataMin = cmdLogDataMin;
+                    cmdLogSecCount = 0;
                 }
-            }
-            d3.select('#visualisationCommandLog .nv-y')
-                .append('rect')
-                .attr('x', 2)
-                .attr('width', 560)
-                .style('fill', 'white')
-                .style('opacity', 1)
-                .attr('y', 0)
-                .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
-
-            $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
-                var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
-                var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
-                var opacity = 1;
-                if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
-                    opacity = ((x2 - x1) > 4) ? 0.2 : 1;
-                    d3.select('#visualisationCommandLog .nv-y')
-                        .append('rect')
-                        .attr('x', x1)
-                        .attr('width', (x2 - x1))
-                        .style('fill', 'red')
-                        .style('opacity', opacity)
-                        .attr('y', 0)
-                        .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
+                    cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
+                    if (timeStamp == monitor.cmdLogMaxTimeStamp) {
+                        cmdLogDataDay.push({ "x": new Date(timeStamp), "y": cmdLogDataDay[cmdLogDataDay.length - 1].y });
+                    } else {
+                        cmdLogDataDay.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                    }
+                    MonitorGraphUI.Monitors.cmdLogDataDay = cmdLogDataDay;
+                    cmdLogMinCount = 0;
                 }
-            });
+                cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
+                if (timeStamp == monitor.cmdLogMaxTimeStamp) {
+                    cmdLogData.push({ "x": new Date(timeStamp), "y": cmdLogData[cmdLogData.length - 1].y });
+                } else {
+                    cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                }
+                MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
+                if (monitor.cmdLogFirstData) {
+                    $(".cmdLogLegend").css("display", "block");
+                }
+                monitor.cmdLogFirstData = false;
 
+                if (graphView == 'Minutes')
+                    dataCommandLog[0]["values"] = cmdLogDataMin;
+                else if (graphView == 'Days')
+                    dataCommandLog[0]["values"] = cmdLogDataDay;
+                else {
+                    dataCommandLog[0]["values"] = cmdLogData;
+                }
+
+
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
+                    d3.select('#visualisationCommandLog')
+                        .datum(dataCommandLog)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartCommandlog);
+                }
+
+                var isDuplicate = false;
+                if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
+                    for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                        $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
+                            var x1 = partitionValue.x;
+                            if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                                isDuplicate = true;
+                            else
+                                isDuplicate = false;
+                        });
+                        if (!isDuplicate)
+                            cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                    }
+                }
+                d3.select('#visualisationCommandLog .nv-y')
+                    .append('rect')
+                    .attr('x', 2)
+                    .attr('width', 560)
+                    .style('fill', 'white')
+                    .style('opacity', 1)
+                    .attr('y', 0)
+                    .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+
+                $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
+                    var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
+                    var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
+                    var opacity = 1;
+                    if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
+                        opacity = ((x2 - x1) > 4) ? 0.2 : 1;
+                        d3.select('#visualisationCommandLog .nv-y')
+                            .append('rect')
+                            .attr('x', x1)
+                            .attr('width', (x2 - x1))
+                            .style('fill', 'red')
+                            .style('opacity', opacity)
+                            .attr('y', 0)
+                            .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                    }
+                });
+            }
+            if (timeStamp > monitor.cmdLogMaxTimeStamp) {
+                monitor.cmdLogMaxTimeStamp = timeStamp;
+            }
             cmdLogSecCount++;
             cmdLogMinCount++;
         };
