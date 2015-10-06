@@ -493,7 +493,6 @@
                 MonitorGraphUI.ChartDrReplicationRate.useInteractiveGuideline(true);
                 var tooltip = MonitorGraphUI.ChartDrReplicationRate.tooltip;
                 tooltip.contentGenerator(function (d) {
-                    debugger;
                     var html = '';
                     d.series.forEach(function (elem) {
                         html += "<h3>"
@@ -712,6 +711,7 @@
                 'partitionDataMin': getEmptyDataForPartitionForMinutes(),
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
                 'partitionFirstData': true,
+                'partitionMaxTimeStamp':null,
                 'drReplicationData': getEmptyDataOptimized(),
                 'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
                 'drReplicationDataDay': getEmptyDataForDaysOptimized(),
@@ -1176,61 +1176,76 @@
                 return;
 
             var timeStamp = partitionDetails["partitionDetail"]["timeStamp"];
-            $.each(partitionDetail["partitionDetail"], function (datatype, datavalue) {
-                $.each(datavalue, function (partitionKey, partitionValue) {
-                    var keyValue = partitionKey;
-                    var percentValue = partitionValue;
+            if (timeStamp >= monitor.partitionMaxTimeStamp) {
+                $.each(partitionDetail["partitionDetail"], function(datatype, datavalue) {
+                    $.each(datavalue, function(partitionKey, partitionValue) {
+                        var keyValue = partitionKey;
+                        var percentValue = partitionValue;
 
-                    if (percentValue < 0)
-                        percentValue = 0;
-                    else if (percentValue > 100)
-                        percentValue = 100;
-
-                    if (partitionSecCount >= 6 || monitor.partitionFirstData) {
-                        if (!partitionDataMin.hasOwnProperty(keyValue)) {
-                            var keyIndex = dataMapperMin[keyValue];
-                            partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
-                            partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                            MonitorGraphUI.Monitors.partitionDataMin = partitionDataMin;
+                        if (percentValue < 0)
+                            percentValue = 0;
+                        else if (percentValue > 100)
+                            percentValue = 100;
+                        if (partitionSecCount >= 6 || monitor.partitionFirstData) {
+                            if (!partitionDataMin.hasOwnProperty(keyValue)) {
+                                var keyIndex = dataMapperMin[keyValue];
+                                partitionDataMin[keyIndex]["values"] = sliceFirstData(partitionDataMin[keyIndex]["values"], dataView.Minutes);
+                                if (timeStamp == monitor.partitionMaxTimeStamp) {
+                                    partitionDataMin[keyIndex]["values"].push({ "x": new Date(timeStamp), "y": partitionDataMin[keyIndex]["values"][partitionDataMin[keyIndex]["values"].length - 1].y });
+                                } else {
+                                    partitionDataMin[keyIndex]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
+                                }
+                                MonitorGraphUI.Monitors.partitionDataMin = partitionDataMin;
+                            }
                         }
-                    }
 
-                    if (partitionMinCount >= 60 || monitor.partitionFirstData) {
-                        var keyIndexDay = dataMapperDay[keyValue];
-                        partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
-                        partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
-                        MonitorGraphUI.Monitors.partitionDataDay = partitionDataDay;
-                    }
-                    var keyIndexSec = dataMapperSec[keyValue];
-                    partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
-                    partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
-                    MonitorGraphUI.Monitors.partitionData = partitionData;
+                        if (partitionMinCount >= 60 || monitor.partitionFirstData) {
+                            var keyIndexDay = dataMapperDay[keyValue];
+                            partitionDataDay[keyIndexDay]["values"] = sliceFirstData(partitionDataDay[keyIndexDay]["values"], dataView.Days);
+                            if (timeStamp == monitor.partitionMaxTimeStamp) {
+                                partitionDataDay[keyIndexDay]["values"].push({ "x": new Date(timeStamp), "y": partitionDataDay[keyIndexDay]["values"][partitionDataDay[keyIndexDay]["values"].length - 1].y });
+                            } else {
+                                partitionDataDay[keyIndexDay]["values"].push({ 'x': new Date(timeStamp), 'y': percentValue });
+                            }
+                            MonitorGraphUI.Monitors.partitionDataDay = partitionDataDay;
+                        }
+                        var keyIndexSec = dataMapperSec[keyValue];
+                        partitionData[keyIndexSec]["values"] = sliceFirstData(partitionData[keyIndexSec]["values"], dataView.Seconds);
+                        if (timeStamp == monitor.partitionMaxTimeStamp) {
+                            partitionData[keyIndexSec]["values"].push({ "x": new Date(timeStamp), "y": partitionData[keyIndexSec]["values"][partitionData[keyIndexSec]["values"].length - 1].y });
+                        } else {
+                            partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
+                        }
+                        MonitorGraphUI.Monitors.partitionData = partitionData;
+                    });
                 });
-            });
-            if (monitor.partitionFirstData) {
-                $(".legend").css("display", "block");
-            }
-            monitor.partitionFirstData = false;
-            if (partitionSecCount >= 6)
-                partitionSecCount = 0;
-            if (partitionMinCount >= 60)
-                partitionMinCount = 0;
+                if (monitor.partitionFirstData) {
+                    $(".legend").css("display", "block");
+                }
+                monitor.partitionFirstData = false;
+                if (partitionSecCount >= 6)
+                    partitionSecCount = 0;
+                if (partitionMinCount >= 60)
+                    partitionMinCount = 0;
 
-            if (graphView == 'Minutes')
-                dataPartitionIdleTime = partitionDataMin;
-            else if (graphView == 'Days')
-                dataPartitionIdleTime = partitionDataDay;
-            else {
-                dataPartitionIdleTime = partitionData;
-            }
+                if (graphView == 'Minutes')
+                    dataPartitionIdleTime = partitionDataMin;
+                else if (graphView == 'Days')
+                    dataPartitionIdleTime = partitionDataDay;
+                else {
+                    dataPartitionIdleTime = partitionData;
+                }
 
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && partitionChart.is(":visible")) {
-                d3.select('#visualisationPartitionIdleTime')
-                    .datum(dataPartitionIdleTime)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartPartitionIdleTime);
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && partitionChart.is(":visible")) {
+                    d3.select('#visualisationPartitionIdleTime')
+                        .datum(dataPartitionIdleTime)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartPartitionIdleTime);
+                }
             }
-
+            if (timeStamp > monitor.partitionMaxTimeStamp)
+                monitor.partitionMaxTimeStamp = timeStamp;
+            
             partitionSecCount++;
             partitionMinCount++;
         };
