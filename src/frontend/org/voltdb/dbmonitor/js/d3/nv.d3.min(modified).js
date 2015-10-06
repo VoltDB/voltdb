@@ -545,7 +545,71 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
 
         //By default, the tooltip model renders a beautiful table inside a DIV.
         //You can override this function if a custom tooltip is desired.
-        var contentGenerator = function(d) {
+        //var contentGenerator = function(d) {
+        //    if (d === null) {
+        //        return '';
+        //    }
+
+        //    if (d.series[0].value == null) {
+        //        return '';
+        //    }
+            
+        //    var table = d3.select(document.createElement("table"));
+        //        if (headerEnabled) {
+        //            var theadEnter = table.selectAll("thead")
+        //                .data([d])
+        //                .enter().append("thead");
+
+        //            theadEnter.append("tr")
+        //                .append("td")
+        //                .attr("colspan", 3)
+        //                .append("strong")
+        //                .classed("x-value", true)
+        //                .html(headerFormatter(d.value));
+        //        }
+
+        //        var tbodyEnter = table.selectAll("tbody")
+        //            .data([d])
+        //            .enter().append("tbody");
+
+        //        var trowEnter = tbodyEnter.selectAll("tr")
+        //            .data(function(p) { return p.series })
+        //            .enter()
+        //            .append("tr")
+        //            .classed("highlight", function(p) { return p.highlight });
+
+        //        trowEnter.append("td")
+        //            .classed("legend-color-guide", true)
+        //            .append("div")
+        //            .style("background-color", function(p) { return p.color });
+
+        //        trowEnter.append("td")
+        //            .classed("key", true)
+        //            .html(function(p, i) { return keyFormatter(p.key, i) });
+
+        //        trowEnter.append("td")
+        //            .classed("value", true)
+        //            .html(function(p, i) { return valueFormatter(p.value, i) });
+
+
+        //        trowEnter.selectAll("td").each(function(p) {
+        //            if (p.highlight) {
+        //                var opacityScale = d3.scale.linear().domain([0, 1]).range(["#fff", p.color]);
+        //                var opacity = 0.6;
+        //                d3.select(this)
+        //                    .style("border-bottom-color", opacityScale(opacity))
+        //                    .style("border-top-color", opacityScale(opacity));
+        //            }
+        //        });
+
+        //        var html = table.node().outerHTML;
+        //        if (d.footer !== undefined)
+        //            html += "<div class='footer'>" + d.footer + "</div>";
+        //    return html;
+
+        //};
+        
+        var contentGenerator = function (d) {
             if (d === null) {
                 return '';
             }
@@ -553,59 +617,83 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
             if (d.series[0].value == null) {
                 return '';
             }
-            
             var table = d3.select(document.createElement("table"));
-                if (headerEnabled) {
-                    var theadEnter = table.selectAll("thead")
-                        .data([d])
-                        .enter().append("thead");
-
-                    theadEnter.append("tr")
-                        .append("td")
-                        .attr("colspan", 3)
-                        .append("strong")
-                        .classed("x-value", true)
-                        .html(headerFormatter(d.value));
-                }
-
-                var tbodyEnter = table.selectAll("tbody")
+            if (headerEnabled) {
+                var theadEnter = table.selectAll("thead")
                     .data([d])
-                    .enter().append("tbody");
+                    .enter().append("thead");
 
-                var trowEnter = tbodyEnter.selectAll("tr")
-                    .data(function(p) { return p.series })
-                    .enter()
-                    .append("tr")
-                    .classed("highlight", function(p) { return p.highlight });
+                theadEnter.append("tr")
+                    .append("td")
+                    .attr("colspan", 4)
+                    .append("strong")
+                    .classed("x-value", true)
+                    .html(d.series[0].key);
+                var unit = '';
+                if (d.series[0].key == "CPU") {
+                    unit = '%';
+                }
+                else if (d.series[0].key == "RAM") {
+                    unit = 'GB';
+                }
+                else if (d.series[0].key == "Latency") {
+                    unit = 'ms';
+                }
+                else if (d.series[0].key == "Transactions") {
+                    unit = 'tps';
+                }
+                else if (d.series[0].key == "Command Log Statistics") {
+                    unit = 'Pending';
+                }
+                else if (d.series[0].key == "Replication Rate") {
+                    unit = 'KBps';
+                }
+                else {
+                    unit = '%';
+                }
+            }
 
-                trowEnter.append("td")
-                    .classed("legend-color-guide", true)
-                    .append("div")
-                    .style("background-color", function(p) { return p.color });
+            var tbodyEnter = table.selectAll("tbody")
+                .data([d])
+                .enter().append("tbody");
 
-                trowEnter.append("td")
-                    .classed("key", true)
-                    .html(function(p, i) { return keyFormatter(p.key, i) });
+            var trowEnter = tbodyEnter.selectAll("tr")
+                .data(function (p) { return p.series })
+                .enter()
+                .append("tr")
+                .classed("highlight", function (p) { return p.highlight });
 
-                trowEnter.append("td")
-                    .classed("value", true)
-                    .html(function(p, i) { return valueFormatter(p.value, i) });
+            trowEnter.append("td")
+                .classed("legend-color-guide", true)
+                .append("div")
+                .style("background-color", function (p) { return p.color });
 
+            //trowEnter.append("td")
+            //    .classed("key", true)
+            //    .html(function (p, i) { return keyFormatter(p.key, i) });
 
-                trowEnter.selectAll("td").each(function(p) {
-                    if (p.highlight) {
-                        var opacityScale = d3.scale.linear().domain([0, 1]).range(["#fff", p.color]);
-                        var opacity = 0.6;
-                        d3.select(this)
-                            .style("border-bottom-color", opacityScale(opacity))
-                            .style("border-top-color", opacityScale(opacity));
-                    }
-                });
-
-                var html = table.node().outerHTML;
-                if (d.footer !== undefined)
-                    html += "<div class='footer'>" + d.footer + "</div>";
+            trowEnter.append("td")
+                .classed("value", true)
+                .html(function (p, i) { return valueFormatter(p.value, i) +unit });
             
+            trowEnter.append("td")
+                .classed("key", true)
+                .html("at " + d.value);
+
+
+            trowEnter.selectAll("td").each(function (p) {
+                if (p.highlight) {
+                    var opacityScale = d3.scale.linear().domain([0, 1]).range(["#fff", p.color]);
+                    var opacity = 0.6;
+                    d3.select(this)
+                        .style("border-bottom-color", opacityScale(opacity))
+                        .style("border-top-color", opacityScale(opacity));
+                }
+            });
+
+            var html = table.node().outerHTML;
+            if (d.footer !== undefined)
+                html += "<div class='footer'>" + d.footer + "</div>";
             return html;
 
         };
@@ -624,7 +712,7 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
             return false;
         };
 
-        var calcTooltipPosition = function(pos) {
+        var calcTooltipPosition = function (pos) {
             if (!tooltipElem) return;
 
             nv.dom.read(function() {
@@ -662,9 +750,9 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                     } while( Elem );
                     return offsetLeft;
                 };
-
                 // calculate position based on gravity
                 var tLeft, tTop;
+                gravity = 'w';
                 switch (gravity) {
                     case 'e':
                         left = pos[0] - width - distance;
@@ -723,7 +811,6 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 var translateInterpolator = d3.interpolateString(old_translate, new_translate);
 
                 var is_hidden = tooltip.style('opacity') < 0.1;
-
                 // delay hiding a bit to avoid flickering
                 if (hidden) {
                     tooltip
@@ -732,17 +819,19 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                         .duration(0)
                         .style('opacity', 0);
                 } else {
+                    
                     tooltip
                         .interrupt() // cancel running transitions
                         .transition()
                         .duration(is_hidden ? 0 : duration)
                         // using tween since some versions of d3 can't auto-tween a translate on a div
-                        .styleTween('transform', function (d) {
+                        .styleTween('transform', function(d) {
                             return translateInterpolator;
                         }, 'important')
                         // Safari has its own `-webkit-transform` and does not support `transform` 
                         // transform tooltip without transition only in Safari
                         .style('-webkit-transform', new_translate)
+                        
                         .style('opacity', 1);
                 }
 
