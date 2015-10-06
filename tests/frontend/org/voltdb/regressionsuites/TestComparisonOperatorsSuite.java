@@ -166,21 +166,21 @@ public class TestComparisonOperatorsSuite  extends RegressionSuite {
         sql = "Select S1.ID ID," +
                 "S1.Wage, S1.Dept, " +
                 "S2.WAGE, S2.Dept " +
-                "from S1, S2 where S1.WAGE is distinct from S2.WAGE order by S1.ID;";
+                "from S1, S2 where S1.WAGE is distinct from S2.WAGE order by S1.ID, S2.WAGE ASC;";
 
         validateTableOfLongs(client, sql, new long[][] {{1, 1000,           1,  Long.MIN_VALUE, 2},
                                                         {1, 1000,           1,  5253,           3},
-                                                        {3,  3000,          1,  1000,           2},
                                                         {3,  3000,          1,  Long.MIN_VALUE, 2},
+                                                        {3,  3000,          1,  1000,           2},
                                                         {3,  3000,          1,  5253,           3},
-                                                        {5,  2553,          3,  1000,           2},
                                                         {5,  2553,          3,  Long.MIN_VALUE, 2},
+                                                        {5,  2553,          3,  1000,           2},
                                                         {5,  2553,          3,  5253,           3},
-                                                        {7,  4552,          2,  1000,           2},
                                                         {7,  4552,          2,  Long.MIN_VALUE, 2},
+                                                        {7,  4552,          2,  1000,           2},
                                                         {7,  4552,          2,  5253,           3},
-                                                        {9,  5152,          2,  1000,           2},
                                                         {9,  5152,          2,  Long.MIN_VALUE, 2},
+                                                        {9,  5152,          2,  1000,           2},
                                                         {9,  5152,          2,  5253,           3},
                                                         {10, Long.MIN_VALUE,2,  1000,           2},
                                                         {10, Long.MIN_VALUE,2,  5253,           3}});
