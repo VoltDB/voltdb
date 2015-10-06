@@ -119,6 +119,6 @@ public class TestStatisticsCommandLogStats extends StatisticsTestSuiteBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        return StatisticsTestSuiteBase.suite(TestStatisticsCommandLogStats.class);
+        return StatisticsTestSuiteBase.suite(TestStatisticsCommandLogStats.class, true);
     }
 }

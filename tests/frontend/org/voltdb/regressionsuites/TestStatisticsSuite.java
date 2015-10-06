@@ -35,15 +35,12 @@ import junit.framework.Test;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
@@ -489,69 +486,6 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        VoltServerConfig config = null;
-
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestStatisticsSuite.class);
-
-        // Not really using TPCC functionality but need a database.
-        // The testLoadMultipartitionTable procedure assumes partitioning
-        // on warehouse id.
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(
-                        "CREATE TABLE WAREHOUSE (\n" +
-                        "  W_ID SMALLINT DEFAULT '0' NOT NULL,\n" +
-                        "  W_NAME VARCHAR(16) DEFAULT NULL,\n" +
-                        "  W_STREET_1 VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_STREET_2 VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_CITY VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_STATE VARCHAR(2) DEFAULT NULL,\n" +
-                        "  W_ZIP VARCHAR(9) DEFAULT NULL,\n" +
-                        "  W_TAX FLOAT DEFAULT NULL,\n" +
-                        "  W_YTD FLOAT DEFAULT NULL,\n" +
-                        "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
-                        ");\n" +
-                        "CREATE TABLE ITEM (\n" +
-                        "  I_ID INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  I_IM_ID INTEGER DEFAULT NULL,\n" +
-                        "  I_NAME VARCHAR(32) DEFAULT NULL,\n" +
-                        "  I_PRICE FLOAT DEFAULT NULL,\n" +
-                        "  I_DATA VARCHAR(64) DEFAULT NULL,\n" +
-                        "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
-                        ");\n" +
-                        "CREATE TABLE NEW_ORDER (\n" +
-                        "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
-                        ");\n");
-
-        project.addPartitionInfo("WAREHOUSE", "W_ID");
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addProcedures(PROCEDURES);
-
-        // Enable asynchronous logging for test of commandlog test
-        if (MiscUtils.isPro()) {
-            project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
-        }
-
-        /*
-         * Create a cluster configuration.
-         * Some of the sysproc results come back a little strange when applied to a cluster that is being
-         * simulated through LocalCluster -- all the hosts have the same HOSTNAME, just different host ids.
-         * So, these tests shouldn't rely on the usual uniqueness of host names in a cluster.
-         */
-        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
-                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
-                BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-
-        if (MiscUtils.isPro()) {
-            ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-            ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
-        }
-
-        boolean success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        return StatisticsTestSuiteBase.suite(TestStatisticsSuite.class, false);
     }
 }

@@ -184,7 +184,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     // helpers to allow multiple backends.
     // JUnit magic that uses the regression suite helper classes.
     //
-    static public Test suite(Class classzz) throws IOException {
+    static public Test suite(Class classzz, boolean isCommandLogTest) throws IOException {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder
@@ -224,7 +224,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         project.addProcedures(PROCEDURES);
 
         // Enable asynchronous logging for test of commandlog test
-        if (MiscUtils.isPro()) {
+        if (MiscUtils.isPro() && isCommandLogTest) {
             project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
         }
 
@@ -239,7 +239,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
 
-        if (MiscUtils.isPro()) {
+        if (MiscUtils.isPro() && isCommandLogTest) {
             ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
             ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
         }
