@@ -715,7 +715,9 @@
                 'drReplicationData': getEmptyDataOptimized(),
                 'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
                 'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'cmdLogData': getEmptyDataOptimized(),
-                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),                'cmdLogDataDay': getEmptyDataForDaysOptimized(),                'cmdLogFirstData': true,                'drFirstData': true,                'lastTimedTransactionCount': -1,
+                'cmdLogDataMin': getEmptyDataForMinutesOptimized(), 'cmdLogDataDay': getEmptyDataForDaysOptimized(),
+                'cmdLogFirstData': true, 'cmdLogMaxTimeStamp': null,
+                'drFirstData': true, 'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
 
@@ -1287,85 +1289,101 @@
             if ($.isEmptyObject(cmdLogDetail) || cmdLogDetail == undefined || cmdLogDetail[currentServer].OUTSTANDING_TXNS == undefined || cmdLogDetail[currentServer].TIMESTAMP == undefined)
                 return;
 
-            var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;
             var timeStamp = cmdLogDetail[currentServer].TIMESTAMP;
+            if (timeStamp >= monitor.cmdLogMaxTimeStamp) {
+                var outStandingTxn = parseFloat(cmdLogDetail[currentServer].OUTSTANDING_TXNS).toFixed(1) * 1;
 
-            if (cmdLogSecCount >= 6 || monitor.cmdLogFirstData) {
-                cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
-                cmdLogDataMin.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                MonitorGraphUI.Monitors.cmdLogDataMin = cmdLogDataMin;
-                cmdLogSecCount = 0;
-            }
-            if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
-                cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
-                cmdLogDataDay.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-                MonitorGraphUI.Monitors.cmdLogDataDay = cmdLogDataDay;
-                cmdLogMinCount = 0;
-            }
-            cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
-            cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
-            MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
-            if (monitor.cmdLogFirstData) {
-                $(".cmdLogLegend").css("display", "block");
-            }
-            monitor.cmdLogFirstData = false;
-
-            if (graphView == 'Minutes')
-                dataCommandLog[0]["values"] = cmdLogDataMin;
-            else if (graphView == 'Days')
-                dataCommandLog[0]["values"] = cmdLogDataDay;
-            else {
-                dataCommandLog[0]["values"] = cmdLogData;
-            }
-
-
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
-                d3.select('#visualisationCommandLog')
-                    .datum(dataCommandLog)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCommandlog);
-            }
-
-            var isDuplicate = false;
-            if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
-                for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
-                    $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
-                        var x1 = partitionValue.x;
-                        if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
-                            isDuplicate = true;
-                        else
-                            isDuplicate = false;
-                    });
-                    if (!isDuplicate)
-                        cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                if (cmdLogSecCount >= 6 || monitor.cmdLogFirstData) {
+                    cmdLogDataMin = sliceFirstData(cmdLogDataMin, dataView.Minutes);
+                    if (timeStamp == monitor.cmdLogMaxTimeStamp) {
+                        cmdLogDataMin.push({ "x": new Date(timeStamp), "y": cmdLogDataMin[cmdLogDataMin.length - 1].y });
+                    } else {
+                        cmdLogDataMin.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                    }
+                    MonitorGraphUI.Monitors.cmdLogDataMin = cmdLogDataMin;
+                    cmdLogSecCount = 0;
                 }
-            }
-            d3.select('#visualisationCommandLog .nv-y')
-                .append('rect')
-                .attr('x', 2)
-                .attr('width', 560)
-                .style('fill', 'white')
-                .style('opacity', 1)
-                .attr('y', 0)
-                .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
-
-            $.each(cmdLogOverlay, function (partitionKey, partitionValue) {
-                var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
-                var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
-                var opacity = 1;
-                if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
-                    opacity = ((x2 - x1) > 4) ? 0.2 : 1;
-                    d3.select('#visualisationCommandLog .nv-y')
-                        .append('rect')
-                        .attr('x', x1)
-                        .attr('width', (x2 - x1))
-                        .style('fill', 'red')
-                        .style('opacity', opacity)
-                        .attr('y', 0)
-                        .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
+                    cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
+                    if (timeStamp == monitor.cmdLogMaxTimeStamp) {
+                        cmdLogDataDay.push({ "x": new Date(timeStamp), "y": cmdLogDataDay[cmdLogDataDay.length - 1].y });
+                    } else {
+                        cmdLogDataDay.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                    }
+                    MonitorGraphUI.Monitors.cmdLogDataDay = cmdLogDataDay;
+                    cmdLogMinCount = 0;
                 }
-            });
+                cmdLogData = sliceFirstData(cmdLogData, dataView.Seconds);
+                if (timeStamp == monitor.cmdLogMaxTimeStamp) {
+                    cmdLogData.push({ "x": new Date(timeStamp), "y": cmdLogData[cmdLogData.length - 1].y });
+                } else {
+                    cmdLogData.push({ "x": new Date(timeStamp), "y": outStandingTxn });
+                }
+                MonitorGraphUI.Monitors.cmdLogData = cmdLogData;
+                if (monitor.cmdLogFirstData) {
+                    $(".cmdLogLegend").css("display", "block");
+                }
+                monitor.cmdLogFirstData = false;
 
+                if (graphView == 'Minutes')
+                    dataCommandLog[0]["values"] = cmdLogDataMin;
+                else if (graphView == 'Days')
+                    dataCommandLog[0]["values"] = cmdLogDataDay;
+                else {
+                    dataCommandLog[0]["values"] = cmdLogData;
+                }
+
+
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cmdLogChart.is(":visible")) {
+                    d3.select('#visualisationCommandLog')
+                        .datum(dataCommandLog)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartCommandlog);
+                }
+
+                var isDuplicate = false;
+                if (!$.isEmptyObject(cmdLogDetail[currentServer].SNAPSHOTS)) {
+                    for (var i = 0; i < cmdLogDetail[currentServer].SNAPSHOTS.length; i++) {
+                        $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
+                            var x1 = partitionValue.x;
+                            if (x1 == cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME)
+                                isDuplicate = true;
+                            else
+                                isDuplicate = false;
+                        });
+                        if (!isDuplicate)
+                            cmdLogOverlay.push({ "x": cmdLogDetail[currentServer].SNAPSHOTS[i].START_TIME, "y": cmdLogDetail[currentServer].SNAPSHOTS[i].END_TIME });
+                    }
+                }
+                d3.select('#visualisationCommandLog .nv-y')
+                    .append('rect')
+                    .attr('x', 2)
+                    .attr('width', 560)
+                    .style('fill', 'white')
+                    .style('opacity', 1)
+                    .attr('y', 0)
+                    .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+
+                $.each(cmdLogOverlay, function(partitionKey, partitionValue) {
+                    var x1 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.x);
+                    var x2 = MonitorGraphUI.ChartCommandlog.xScale()(partitionValue.y);
+                    var opacity = 1;
+                    if (x1 > 3 && x1 < 560 && (x2 - x1 > 0)) {
+                        opacity = ((x2 - x1) > 4) ? 0.2 : 1;
+                        d3.select('#visualisationCommandLog .nv-y')
+                            .append('rect')
+                            .attr('x', x1)
+                            .attr('width', (x2 - x1))
+                            .style('fill', 'red')
+                            .style('opacity', opacity)
+                            .attr('y', 0)
+                            .attr('height', MonitorGraphUI.ChartCommandlog.yAxis.range()[0]);
+                    }
+                });
+            }
+            if (timeStamp > monitor.cmdLogMaxTimeStamp) {
+                monitor.cmdLogMaxTimeStamp = timeStamp;
+            }
             cmdLogSecCount++;
             cmdLogMinCount++;
         };
