@@ -693,7 +693,8 @@
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
                 'latFirstData': true,
-                'latMaxTimeStamp': null,                'tpsData': getEmptyDataOptimized(),
+                'latMaxTimeStamp': null,
+                'tpsData': getEmptyDataOptimized(),
                 'tpsDataMin': getEmptyDataForMinutesOptimized(),
                 'tpsDataDay': getEmptyDataForDaysOptimized(),
                 'tpsFirstData': true,
@@ -701,6 +702,7 @@
                 'memDataMin': getEmptyDataForMinutesOptimized(),
                 'memDataDay': getEmptyDataForDaysOptimized(),
                 'memFirstData': true,
+                'memMaxTimeStamp': null,
                 'cpuData': getEmptyDataOptimized(),
                 'cpuDataMin': getEmptyDataForMinutesOptimized(),
                 'cpuDataHrs': getEmptyDataForDaysOptimized(),
@@ -936,54 +938,70 @@
 
             if ($.isEmptyObject(memDetails) || memDetails == undefined || memDetails[currentServer].PHYSICALMEMORY == undefined || memDetails[currentServer].RSS == undefined || memDetails[currentServer].TIMESTAMP == undefined)
                 return;
-
-            var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
 
-            if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
-                physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
+            if (memTimeStamp >= monitor.memMaxTimeStamp) {
+                var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
 
-                MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
-                MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
+                if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
+                    physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
+
+                    MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
+                    MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
+                }
+
+                if (memRss < 0)
+                    memRss = 0;
+                else if (physicalMemory != -1 && memRss > physicalMemory)
+                    memRss = physicalMemory;
+
+                if (memSecCount >= 6 || monitor.memFirstData) {
+                    dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
+                    if (memTimeStamp == monitor.memMaxTimeStamp) {
+                        dataMemMin.push({ "x": new Date(memTimeStamp), "y": dataMemMin[dataMemMin.length - 1].y });
+                    } else {
+                        dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                    }
+                    MonitorGraphUI.Monitors.memDataMin = dataMemMin;
+                    memSecCount = 0;
+                }
+
+                if (memMinCount >= 60 || monitor.memFirstData) {
+                    dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
+                    if (memTimeStamp == monitor.memMaxTimeStamp) {
+                        dataMemDay.push({ "x": new Date(memTimeStamp), "y": dataMemDay[dataMemDay.length - 1].y });
+                    } else {
+                        dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                    }
+                    MonitorGraphUI.Monitors.memDataDay = dataMemDay;
+                    memMinCount = 0;
+                }
+
+                dataMem = sliceFirstData(dataMem, dataView.Seconds);
+                if (memTimeStamp == monitor.memMaxTimeStamp) {
+                    dataMem.push({ "x": new Date(memTimeStamp), "y": dataMem[dataMem.length - 1].y });
+                } else {
+                    dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                }
+                MonitorGraphUI.Monitors.memData = dataMem;
+
+                if (graphView == 'Minutes')
+                    dataRam[0]["values"] = dataMemMin;
+                else if (graphView == 'Days')
+                    dataRam[0]["values"] = dataMemDay;
+                else
+                    dataRam[0]["values"] = dataMem;
+
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && ramChart.is(":visible")) {
+                    d3.select('#visualisationRam')
+                        .datum(dataRam)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartRam);
+                }
+                monitor.memFirstData = false;
             }
-
-            if (memRss < 0)
-                memRss = 0;
-            else if (physicalMemory != -1 && memRss > physicalMemory)
-                memRss = physicalMemory;
-
-            if (memSecCount >= 6 || monitor.memFirstData) {
-                dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
-                dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                MonitorGraphUI.Monitors.memDataMin = dataMemMin;
-                memSecCount = 0;
-            }
-
-            if (memMinCount >= 60 || monitor.memFirstData) {
-                dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
-                dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-                MonitorGraphUI.Monitors.memDataDay = dataMemDay;
-                memMinCount = 0;
-            }
-
-            dataMem = sliceFirstData(dataMem, dataView.Seconds);
-            dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
-            MonitorGraphUI.Monitors.memData = dataMem;
-
-            if (graphView == 'Minutes')
-                dataRam[0]["values"] = dataMemMin;
-            else if (graphView == 'Days')
-                dataRam[0]["values"] = dataMemDay;
-            else
-                dataRam[0]["values"] = dataMem;
-
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && ramChart.is(":visible")) {
-                d3.select('#visualisationRam')
-                    .datum(dataRam)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartRam);
-            }
-            monitor.memFirstData = false;
+            if (memTimeStamp > monitor.memMaxTimeStamp)
+                monitor.memMaxTimeStamp = memTimeStamp;
             memSecCount++;
             memMinCount++;
         };
