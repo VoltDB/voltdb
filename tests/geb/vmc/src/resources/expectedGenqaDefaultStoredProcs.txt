@@ -1,5 +1,4 @@
-# Expected Default Stored Procedures: (when running the default GEB VMC
-# test server; see ../../server/run_voltdb_server.sh)
+# Expected Default Stored Procedures: (when running the Genqa test app)
 EXPORT_MIRROR_PARTITIONED_TABLE.delete
 EXPORT_MIRROR_PARTITIONED_TABLE.insert
 EXPORT_MIRROR_PARTITIONED_TABLE.select
