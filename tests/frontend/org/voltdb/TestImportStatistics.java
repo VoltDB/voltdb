@@ -35,7 +35,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -65,12 +64,10 @@ public class TestImportStatistics extends RegressionSuite {
 
     private Boolean m_socketHandlerInitialized = false;
     private long m_expectedSocketFailures;
-    private long m_expectedLog4jFailures;
 
     private long m_lastSocketSuccesses = -1;
     private long m_lastSocketFailures = -1;
     private long m_lastLog4jSuccesses = -1;
-    private long m_lastLog4jFailures = -1;
 
     @Override
     public void setUp() throws Exception
@@ -106,11 +103,13 @@ public class TestImportStatistics extends RegressionSuite {
         private final CountDownLatch m_latch;
         private final int m_failureDivisor;
         private long m_expectedFailures;
+        private final boolean m_goSlow;
 
-        public DataPusher(int count, CountDownLatch latch, int failureDivisor) {
+        public DataPusher(int count, CountDownLatch latch, int failureDivisor, boolean goSlow) {
             m_count = count;
             m_latch = latch;
             m_failureDivisor = failureDivisor;
+            m_goSlow = goSlow;
         }
 
         protected abstract void initialize();
@@ -124,7 +123,8 @@ public class TestImportStatistics extends RegressionSuite {
             try {
                 for (int icnt = 0; icnt < m_count; icnt++) {
                     long millis = System.currentTimeMillis();
-                    String s = String.valueOf(System.nanoTime() + icnt) + "," + millis + "\n";
+                    String s = String.valueOf(System.nanoTime() + icnt) + "," + millis + "," +
+                        (m_goSlow ? 1 : 0) + "\n";
                     if (millis%m_failureDivisor == 0) {
                         m_expectedFailures++;
                     }
@@ -150,8 +150,8 @@ public class TestImportStatistics extends RegressionSuite {
         private final int m_port;
         private OutputStream m_sout;
 
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, int failureDivisor) {
-            super(count, latch, failureDivisor);
+        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, int failureDivisor, boolean goSlow) {
+            super(count, latch, failureDivisor, goSlow);
             m_server = server;
             m_port = port;
         }
@@ -182,7 +182,7 @@ public class TestImportStatistics extends RegressionSuite {
         private final Random random = new Random();
 
         public Log4jDataPusher(int count, CountDownLatch latch, int failureDivisor) {
-            super(count, latch, failureDivisor);
+            super(count, latch, failureDivisor, false);
         }
 
         @Override
@@ -201,11 +201,15 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     private void pushDataToImporters(int count, int loops) throws Exception {
+        pushDataToImporters(count, loops, false);
+    }
+
+    private void pushDataToImporters(int count, int loops, boolean goSlow) throws Exception {
         CountDownLatch latch = new CountDownLatch(2*loops);
         List<DataPusher> socketDataPushers = new ArrayList<>();
         List<DataPusher> log4jDataPushers = new ArrayList<>();
         for (int i=0; i<loops; i++) {
-            SocketDataPusher socketPusher = new SocketDataPusher("localhost", 7001, count, latch, 7);
+            SocketDataPusher socketPusher = new SocketDataPusher("localhost", 7001, count, latch, 7, goSlow);
             socketDataPushers.add(socketPusher);
             socketPusher.start();
             Log4jDataPusher log4jPusher = (new Log4jDataPusher(count, latch, 11));
@@ -214,77 +218,102 @@ public class TestImportStatistics extends RegressionSuite {
         }
         latch.await();
 
-        //m_expectedSocketFailures = 0;
         for (DataPusher pusher : socketDataPushers) {
             m_expectedSocketFailures += pusher.getExpectedFailures();
         }
     }
 
+    private void waitForLogEvents(Client client, int count) throws Exception {
+        //Wait 20 sec to get out of backpressure.
+        long end = System.currentTimeMillis() + 20000;
+        while (System.currentTimeMillis() < end) {
+            ClientResponse response = client.callProcedure("@AdHoc", "select count(*) from log_events");
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+            if (count == response.getResults()[0].asScalarLong()) {
+                break;
+            }
+            Thread.sleep(50);
+        }
+    }
+
     private void verifyTotal(Client client, int count) throws Exception {
-       ClientResponse response = client.callProcedure("@Statistics", "Importer", 0);
-       VoltTable stats = response.getResults()[0];
-       for (int i=0; i<stats.getRowCount(); i++) {
-           VoltTableRow row = stats.fetchRow(i);
-           String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
-           long expectedFailures = 0;
-           String procName = null;
-           if (name.equals("SocketImporter")) {
-               expectedFailures = m_expectedSocketFailures;
-               procName = "TestImportStatistics$TestStatsProcedure7";
-           } else if (name.equals("Log4jSocketHandlerImporter")) {
-               expectedFailures = m_expectedLog4jFailures;
-               procName = "TestImportStatistics$TestStatsProcedure11";
-           } else {
-               continue;
-           }
-           assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
-           assertEquals(expectedFailures, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
-           assertEquals(count-expectedFailures, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
-           assertEquals(0, row.getLong(ImporterStatsCollector.PENDING_COUNT_COL));
-           assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
-       }
+        waitForLogEvents(client, count);
+
+        ClientResponse response = client.callProcedure("@Statistics", "Importer", 0);
+        VoltTable stats = response.getResults()[0];
+        boolean foundSocket = false;
+        boolean foundLog4j = false;
+        for (int i=0; i<stats.getRowCount(); i++) {
+            VoltTableRow row = stats.fetchRow(i);
+            String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
+            long expectedFailures = 0;
+            String procName = null;
+            if (name.equals("SocketImporter")) {
+                expectedFailures = m_expectedSocketFailures;
+                procName = "TestImportStatistics$TestStatsProcedure7";
+                foundSocket = true;
+            } else if (name.equals("Log4jSocketHandlerImporter")) {
+                expectedFailures = 0;
+                procName = "log_events.insert";
+                foundLog4j = true;
+            } else {
+                continue;
+            }
+            assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
+            assertEquals(expectedFailures, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
+            assertEquals(count-expectedFailures, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
+            assertEquals(0, row.getLong(ImporterStatsCollector.PENDING_COUNT_COL));
+            assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
+        }
+
+        assertTrue(foundSocket && foundLog4j);
     }
 
     private void verifyInterval(Client client, int count) throws Exception {
-       ClientResponse response = client.callProcedure("@Statistics", "Importer", 1);
-       VoltTable stats = response.getResults()[0];
-       for (int i=0; i<stats.getRowCount(); i++) {
-           VoltTableRow row = stats.fetchRow(i);
-           String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
-           long expectedFailures = 0;
-           long lastFailures = 0;
-           long lastSuccesses = 0;
-           String procName = null;
-           if (name.equals("SocketImporter")) {
-               expectedFailures = m_expectedSocketFailures;
-               procName = "TestImportStatistics$TestStatsProcedure7";
-               lastFailures = (m_lastSocketFailures < 0) ? 0 : m_lastSocketFailures;
-               lastSuccesses = (m_lastSocketSuccesses < 0) ? 0 : m_lastSocketSuccesses;
-           } else if (name.equals("Log4jSocketHandlerImporter")) {
-               expectedFailures = m_expectedLog4jFailures;
-               procName = "TestImportStatistics$TestStatsProcedure11";
-               lastFailures = (m_lastLog4jFailures < 0) ? 0 : m_lastLog4jFailures;
-               lastSuccesses = (m_lastLog4jSuccesses < 0) ? 0 : m_lastLog4jSuccesses;
-           } else {
-               continue;
-           }
-           assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
-           assertEquals(expectedFailures-lastFailures, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
-           assertEquals(count-expectedFailures-lastSuccesses, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
-           if (name.equals("SocketImporter")) {
-               m_lastSocketFailures = expectedFailures;
-               m_lastSocketSuccesses = count-expectedFailures;
-           } else if (name.equals("Log4jSocketHandlerImporter")) {
-               m_lastLog4jFailures = expectedFailures;
-               m_lastLog4jSuccesses = count-expectedFailures;
-           }
-           assertEquals(0, row.getLong(ImporterStatsCollector.PENDING_COUNT_COL));
-           assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
-       }
+        ClientResponse response = client.callProcedure("@Statistics", "Importer", 1);
+        VoltTable stats = response.getResults()[0];
+        boolean foundSocket = false;
+        boolean foundLog4j = false;
+        for (int i=0; i<stats.getRowCount(); i++) {
+            VoltTableRow row = stats.fetchRow(i);
+            String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
+            long expectedFailures = 0;
+            long lastFailures = 0;
+            long lastSuccesses = 0;
+            String procName = null;
+            if (name.equals("SocketImporter")) {
+                expectedFailures = m_expectedSocketFailures;
+                procName = "TestImportStatistics$TestStatsProcedure7";
+                lastFailures = (m_lastSocketFailures < 0) ? 0 : m_lastSocketFailures;
+                lastSuccesses = (m_lastSocketSuccesses < 0) ? 0 : m_lastSocketSuccesses;
+                foundSocket = true;
+            } else if (name.equals("Log4jSocketHandlerImporter")) {
+                expectedFailures = 0;
+                procName = "log_events.insert";
+                lastFailures = 0;
+                lastSuccesses = (m_lastLog4jSuccesses < 0) ? 0 : m_lastLog4jSuccesses;
+                foundSocket = true;
+                foundLog4j = true;
+            } else {
+                continue;
+            }
+            assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
+            assertEquals(expectedFailures-lastFailures, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
+            assertEquals(count-expectedFailures-lastSuccesses, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
+            if (name.equals("SocketImporter")) {
+                m_lastSocketFailures = expectedFailures;
+                m_lastSocketSuccesses = count-expectedFailures;
+            } else if (name.equals("Log4jSocketHandlerImporter")) {
+                m_lastLog4jSuccesses = count;
+            }
+            assertEquals(0, row.getLong(ImporterStatsCollector.PENDING_COUNT_COL));
+            assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
+        }
+
+        assertTrue(foundSocket && foundLog4j);
     }
 
     public void testImportSingleClient() throws Exception {
-        m_expectedLog4jFailures = 0;
         m_expectedSocketFailures = 0;
 
         Client client = getClient();
@@ -312,7 +341,6 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     public void testImportMultipleClientsInParallel() throws Exception {
-        m_expectedLog4jFailures = 0;
         m_expectedSocketFailures = 0;
 
         Client client = getClient();
@@ -337,6 +365,76 @@ public class TestImportStatistics extends RegressionSuite {
         verifyInterval(client, 300*2);
 
         client.close();
+    }
+
+    // leave this disabled because this is not perfectly reliable and is slow. Enable and run manually as needed.
+    public void donttestPending() throws Exception {
+        Client client = getClient();
+        while (!((ClientImpl) client).isHashinatorInitialized()) {
+            Thread.sleep(1000);
+            System.out.println("Waiting for hashinator to be initialized...");
+        }
+
+        pushDataToImporters(100, 1, true);
+        waitForLogEvents(client, 100);
+
+        long lastPending = 0;
+        ClientResponse response = client.callProcedure("@Statistics", "Importer", 0);
+        VoltTable stats = response.getResults()[0];
+        boolean found = false;
+        for (int i=0; i<stats.getRowCount(); i++) {
+            VoltTableRow row = stats.fetchRow(i);
+            String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
+            String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
+            if (!name.equals("SocketImporter")) {
+                continue;
+            }
+            assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
+            assertEquals(0, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
+            long pending = row.getLong(ImporterStatsCollector.PENDING_COUNT_COL);
+            if (pending > 0) {
+                found = true;
+            }
+            assertEquals(100-pending, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
+            assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
+            lastPending = pending;
+        }
+
+        assertTrue(found);
+
+        // try to see if pending goes down for 10 seconds or so
+        long endTime = System.currentTimeMillis() + 10000;
+        while (System.currentTimeMillis() <= endTime) {
+            response = client.callProcedure("@Statistics", "Importer", 0);
+            stats = response.getResults()[0];
+            found = false;
+            for (int i=0; i<stats.getRowCount(); i++) {
+                VoltTableRow row = stats.fetchRow(i);
+                String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
+                String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
+                if (!name.equals("SocketImporter")) {
+                    continue;
+                }
+                assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
+                assertEquals(0, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
+                long pending = row.getLong(ImporterStatsCollector.PENDING_COUNT_COL);
+                if (pending < lastPending) {
+                    lastPending = pending;
+                    found = true;
+                    assertEquals(100-pending, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
+                    assertEquals(0, row.getLong(ImporterStatsCollector.RETRY_COUNT_COL));
+                    break;
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch(InterruptedException e) { }
+            }
+            if (found) {
+                break;
+            }
+        }
+
+        assertTrue(found);
     }
 
     /**
@@ -370,7 +468,6 @@ public class TestImportStatistics extends RegressionSuite {
 
     static public junit.framework.Test suite() throws Exception
     {
-
         LocalCluster config;
         Map<String, String> additionalEnv = new HashMap<String, String>();
         //Specify bundle location
@@ -395,6 +492,14 @@ public class TestImportStatistics extends RegressionSuite {
         project.addImport(true, "custom", "csv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
+        // configure log4j socket handler importer
+        props = new Properties();
+        props.putAll(ImmutableMap.<String, String>of(
+                "port", "6060",
+                "procedure", "log_events.insert",
+                "log-event-table", "log_events"));
+        project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
+
         config = new LocalCluster("import-stats-ddl-cluster-rep.jar", 4, 1, 0,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
@@ -406,21 +511,13 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     public static class TestStatsProcedure7 extends VoltProcedure {
-        private AtomicLong failedCount = new AtomicLong(0);
-
-        public long run(long pkvalue, long colvalue) {
-            if (colvalue%7==0) {
-                throw new RuntimeException("Sending back failure from test proc");
-            }
-
-            return 0;
-        }
-    }
-
-    public static class TestStatsProcedure11 extends VoltProcedure {
-
-        public long run(long pkvalue, long colvalue) {
-            if (colvalue%11==0) {
+        public long run(long pkvalue, long colvalue, int goslow) {
+            if (goslow > 0) {
+                // sleep a bit to slow things down
+                try {
+                    Thread.sleep(1000);
+                } catch(InterruptedException e) { }
+            } else if (colvalue%7==0) {
                 throw new RuntimeException("Sending back failure from test proc");
             }
 

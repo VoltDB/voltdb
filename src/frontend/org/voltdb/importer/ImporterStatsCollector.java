@@ -18,8 +18,8 @@
 package org.voltdb.importer;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,8 +41,8 @@ public class ImporterStatsCollector extends SiteStatsSource {
     public static final String PENDING_COUNT_COL = "PENDING_COUNT";
     public static final String RETRY_COUNT_COL = "RETRY_COUNT";
 
-    // Holds stats info for each known importer
-    private ConcurrentMap<String, StatsInfo> m_importerStats = new ConcurrentHashMap<>();
+    // Holds stats info for each known importer-procname combination
+    private ConcurrentMap<String, ConcurrentMap<String, StatsInfo>> m_importerStats = new ConcurrentHashMap<>();
     private boolean m_isInterval;
 
     public ImporterStatsCollector(long siteId)
@@ -84,11 +84,18 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     private StatsInfo getStatsInfo(String importerName, String procName) {
-        StatsInfo statsInfo = m_importerStats.get(importerName);
+        ConcurrentMap<String, StatsInfo> statsByProc = m_importerStats.get(importerName);
+        if (statsByProc==null) {
+            statsByProc = new ConcurrentHashMap<String, StatsInfo>();
+            ConcurrentMap<String, StatsInfo> existing = m_importerStats.putIfAbsent(importerName, statsByProc);
+            if (existing!=null) {
+                statsByProc = existing;
+            }
+        }
+        StatsInfo statsInfo = statsByProc.get(procName);
         if (statsInfo==null) {
-            StatsInfo newValue = new StatsInfo();
-            newValue.m_procName = procName;
-            StatsInfo existing = m_importerStats.putIfAbsent(importerName, newValue);
+            StatsInfo newValue = new StatsInfo(importerName, procName);
+            StatsInfo existing = statsByProc.putIfAbsent(procName, newValue);
             if (existing!=null) {
                 statsInfo = existing;
             } else {
@@ -101,9 +108,9 @@ public class ImporterStatsCollector extends SiteStatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
-        StatsInfo stats = m_importerStats.get(rowKey);
-        rowValues[columnNameToIndex.get(IMPORTER_NAME_COL)] = rowKey;
-        rowValues[columnNameToIndex.get(PROC_NAME_COL)] = (stats==null) ? null : stats.m_procName;
+        StatsInfo stats = (StatsInfo) rowKey;
+        rowValues[columnNameToIndex.get(IMPORTER_NAME_COL)] = stats.m_importerName;
+        rowValues[columnNameToIndex.get(PROC_NAME_COL)] = stats.m_procName;
         rowValues[columnNameToIndex.get(SUCCESS_COUNT_COL)] = getSuccessCountUpdateLast(stats);
         rowValues[columnNameToIndex.get(FAILURE_COUNT_COL)] = getFailureCountUpdateLast(stats);
         rowValues[columnNameToIndex.get(PENDING_COUNT_COL)] = getPendingCountUpdateLast(stats);
@@ -113,10 +120,6 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     private long getSuccessCountUpdateLast(StatsInfo stats) {
-        if (stats==null) {
-            return 0;
-        }
-
         long currentSuccess = stats.m_successCount.get();
         long successValue = currentSuccess;
         if (m_isInterval) {
@@ -128,10 +131,6 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     private long getFailureCountUpdateLast(StatsInfo stats) {
-        if (stats==null) {
-            return 0;
-        }
-
         long current = stats.m_failureCount.get();
         long value = current;
         if (m_isInterval) {
@@ -143,10 +142,6 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     private long getRetryCountUpdateLast(StatsInfo stats) {
-        if (stats==null) {
-            return 0;
-        }
-
         long current = stats.m_retryCount.get();
         long value = current;
         if (m_isInterval) {
@@ -158,10 +153,6 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     private long getPendingCountUpdateLast(StatsInfo stats) {
-        if (stats==null) {
-            return 0;
-        }
-
         long current = stats.m_pendingCount.get();
         current = (current<0) ? 0 : current; // pending could be -ve if we get callback responses
                                              // before callProcedure returns to ImportHandlerProxy
@@ -178,7 +169,40 @@ public class ImporterStatsCollector extends SiteStatsSource {
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         m_isInterval = interval;
-        return new HashSet<Object>(m_importerStats.keySet()).iterator();
+        return new Iterator<Object>() {
+            private Iterator<Map.Entry<String, ConcurrentMap<String, StatsInfo>>> m_outerItr = m_importerStats.entrySet().iterator();
+            private Iterator<Map.Entry<String, StatsInfo>> m_innerItr;
+
+            @Override
+            public boolean hasNext() {
+                if (m_innerItr == null || !m_innerItr.hasNext()) {
+                    if (!m_outerItr.hasNext()) {
+                        return false;
+                    } else {
+                        m_innerItr = m_outerItr.next().getValue().entrySet().iterator();
+                    }
+                }
+
+                return m_innerItr.hasNext();
+            }
+
+            @Override
+            public Object next() {
+                // If next is called when there are no more next elements,
+                // this will throw error, which is the expected correct behaviour.
+
+                if (m_innerItr == null || !m_innerItr.hasNext()) {
+                    m_innerItr = m_outerItr.next().getValue().entrySet().iterator();
+                }
+
+                return m_innerItr.next().getValue();
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException("Remove operation is not supported for ImporterStats iterator implementation");
+            }
+        };
     }
 
     @Override
@@ -194,6 +218,7 @@ public class ImporterStatsCollector extends SiteStatsSource {
 
     private class StatsInfo
     {
+        String m_importerName;
         String m_procName;
         AtomicLong m_successCount = new AtomicLong(0);
         AtomicLong m_failureCount = new AtomicLong(0);
@@ -203,5 +228,15 @@ public class ImporterStatsCollector extends SiteStatsSource {
         long m_lastFailureCount = 0;
         long m_lastPendingCount = 0;
         long m_lastRetryCount = 0;
+
+        public StatsInfo(String importerName, String procName) {
+            m_importerName = importerName;
+            m_procName = procName;
+        }
+
+        @Override
+        public String toString() {
+            return "StatsInfo(" + m_importerName + "." + m_procName + ")";
+        }
     }
 }
