@@ -246,6 +246,10 @@ public abstract class CatalogSizing {
                 csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
                 break;
             }
+            case GEOGRAPHY:
+                csize.widthMin += 4; // a null value
+                csize.widthMax += VoltType.MAX_VALUE_LENGTH;
+                break;
             default: {
                 // Fixed type - use the fixed size.
                 csize.widthMin += ctype.getLengthInBytesForFixedTypes();

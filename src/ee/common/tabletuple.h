@@ -187,8 +187,7 @@ public:
                 // peekObjectLength is unhappy with non-varchar
                 const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
                 voltdb::ValueType columnType = columnInfo->getVoltType();
-                if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
-                    !columnInfo->inlined)
+                if (isVariableLengthType(columnType) && !columnInfo->inlined)
                 {
                     const NValue val = getNValue(i);
                     if (!val.isNull())
@@ -442,6 +441,7 @@ private:
               return 18;
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
+          case VALUE_TYPE_GEOGRAPHY:
               // 32 bit length preceding value and
               // actual character data without null string terminator.
               if (!isNull(colIndex))
@@ -464,10 +464,9 @@ private:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
 
-        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+        if (isVariableLengthType(columnType)) {
             // Null variable length value doesn't take any bytes in
-            // export table, so here needs a special handle for VARCHAR
-            // and VARBINARY
+            // export table.
             if (isNull(colIndex)) {
                 return sizeof(int32_t);
             }

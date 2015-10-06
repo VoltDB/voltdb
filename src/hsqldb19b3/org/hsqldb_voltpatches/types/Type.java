@@ -638,6 +638,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                                      DTIType.maxFractionPrecision);
 
     public static final VoltPointType VOLT_POINT = new VoltPointType();
+    public static final VoltGeographyType VOLT_GEOGRAPHY = new VoltGeographyType();
 
     public static Type getDefaultType(int type) {
 
@@ -925,6 +926,9 @@ public abstract class Type implements SchemaObject, Cloneable {
             case Types.VOLT_POINT :
                 return VOLT_POINT;
 
+            case Types.VOLT_GEOGRAPHY :
+                return VOLT_GEOGRAPHY;
+
             case Types.OTHER :
                 return OTHER;
 
@@ -965,6 +969,7 @@ public abstract class Type implements SchemaObject, Cloneable {
         typeNames.put("VARBINARY", Types.SQL_VARBINARY);
 
         typeNames.put("POINT", Types.VOLT_POINT);
+        typeNames.put("GEOGRAPHY", Types.VOLT_GEOGRAPHY);
 
         typeAliases = new IntValueHashMap(64);
 

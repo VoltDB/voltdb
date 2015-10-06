@@ -89,8 +89,7 @@ public:
     }
 
     static inline int32_t peekObjectLength_withoutNull(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        assert(isVariableLengthType(value.getValueType()));
         return value.getObjectLength_withoutNull();
     }
 

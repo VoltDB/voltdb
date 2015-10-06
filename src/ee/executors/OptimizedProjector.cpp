@@ -286,7 +286,9 @@ static uint32_t getNumBytesForMemcpy(const TupleSchema::ColumnInfo* colInfo) {
         // FALL THROUGH
 
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
         if (colInfo->inlined) {
+            assert (colInfo->getVoltType() != VALUE_TYPE_GEOGRAPHY);
             return colInfo->length + 1;
         }
         else {

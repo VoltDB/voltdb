@@ -21,6 +21,7 @@
 #include <limits>
 #include <sstream>
 
+#include "common/MiscUtil.h"
 #include "common/value_defs.h"
 
 namespace voltdb {
@@ -30,15 +31,18 @@ namespace voltdb {
  */
 class Point {
 public:
+
+    typedef float Coord;
+
     /** Constructor for a null point,
      * with both lat and lng init'd to NaN */
     Point()
-        : m_latitude(std::numeric_limits<float>::quiet_NaN())
-        , m_longitude(std::numeric_limits<float>::quiet_NaN())
+        : m_latitude(std::numeric_limits<Coord>::quiet_NaN())
+        , m_longitude(std::numeric_limits<Coord>::quiet_NaN())
     {
     }
 
-    Point(float latitude, float longitude)
+    Point(Coord latitude, Coord longitude)
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
@@ -51,17 +55,17 @@ public:
             (m_longitude != m_longitude);
     }
 
-    float getLatitude() const {
+    Coord getLatitude() const {
         return m_latitude;
     }
 
-    float getLongitude() const {
+    Coord getLongitude() const {
         return m_longitude;
     }
 
     int compareWith(const Point& rhs) const {
-        float lhsLat = getLatitude();
-        float rhsLat = rhs.getLatitude();
+        Coord lhsLat = getLatitude();
+        Coord rhsLat = rhs.getLatitude();
         if (lhsLat < rhsLat) {
             return VALUE_COMPARE_LESSTHAN;
         }
@@ -71,8 +75,8 @@ public:
         }
 
         // latitude is equal; compare longitude
-        float lhsLng = getLongitude();
-        float rhsLng = rhs.getLongitude();
+        Coord lhsLng = getLongitude();
+        Coord rhsLng = rhs.getLongitude();
         if (lhsLng < rhsLng) {
             return VALUE_COMPARE_LESSTHAN;
         }
@@ -86,8 +90,8 @@ public:
 
     template<class Deserializer>
     static Point deserializeFrom(Deserializer& input) {
-        float lat = input.readFloat();
-        float lng = input.readFloat();
+        Coord lat = input.readFloat();
+        Coord lng = input.readFloat();
         return Point(lat, lng);
     }
 
@@ -98,15 +102,8 @@ public:
     }
 
     void hashCombine(std::size_t& seed) const {
-        // This might not be a good enough.  See notes on hashing in
-        // NValue::hashCombine, with respect to doubles returning
-        // different hashes for identical inputs.
-        //
-        // Since we expect internal representation to change, it's
-        // good enough for now.  If we decide to use floating point
-        // numbers to store lat/lng long term, we'll need to revisit
-        // this.
-        boost::hash_combine(seed, toString());
+        MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
+        MiscUtil::hashCombineFloatingPoint(seed, m_longitude);
     }
 
     std::string toString() const {
@@ -116,8 +113,8 @@ public:
     }
 
 private:
-    float m_latitude;
-    float m_longitude;
+    Coord m_latitude;
+    Coord m_longitude;
 };
 
 } // end namespace

@@ -245,6 +245,7 @@ static const int FUNC_VOLT_HEX                         = 20029;
 static const int FUNC_VOLT_BIN                         = 20030;
 
 static const int FUNC_VOLT_POINTFROMTEXT               = 20031;
+static const int FUNC_VOLT_POLYGONFROMTEXT             = 20032;
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

@@ -37,6 +37,8 @@
 #include "common/ExportSerializeIo.h"
 #include "common/FatalException.hpp"
 #include "common/Point.hpp"
+#include "common/Geography.hpp"
+#include "common/MiscUtil.h"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
 #include "common/StringRef.h"
@@ -765,7 +767,7 @@ private:
      */
     int32_t getObjectLength_withoutNull() const {
         assert(isNull() == false);
-        assert(getValueType() == VALUE_TYPE_VARCHAR || getValueType() == VALUE_TYPE_VARBINARY);
+        assert(isVariableLengthType(getValueType()));
         // now safe to read and return the length preceding value.
         return *reinterpret_cast<const int32_t *>(&m_data[8]);
     }
@@ -958,6 +960,16 @@ private:
 
         assert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<const Point*>(m_data);
+    }
+
+    const Geography getGeography() const {
+        assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+
+        if (isNull()) {
+            return Geography();
+        }
+
+        return Geography(getObjectValue_withoutNull());
     }
 
     bool isBooleanNULL() const ;
@@ -1547,7 +1559,7 @@ private:
         else {
             const int32_t objLength = getObjectLength_withoutNull();
             const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-            checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+            checkTooWideForVariableLengthType(m_valueType, ptr, objLength, maxLength, isInBytes);
 
             // Always reset all the bits regardless of the actual length of the value
             // 1 additional byte for the length prefix
@@ -1585,24 +1597,32 @@ private:
     }
 
     /**
-     * Assuming non-null NValue, validate the size of the varchar or varbinary
+     * Assuming non-null NValue, validate the size of the variable length data
      */
-    static inline void checkTooNarrowVarcharAndVarbinary(ValueType type, const char* ptr,
+    static inline void checkTooWideForVariableLengthType(ValueType type, const char* ptr,
             int32_t objLength, int32_t maxLength, bool isInBytes) {
         if (maxLength == 0) {
             throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(type));
         }
 
-        if (type == VALUE_TYPE_VARBINARY) {
+        switch (type) {
+        case VALUE_TYPE_VARBINARY:
+        case VALUE_TYPE_GEOGRAPHY:
             if (objLength > maxLength) {
-                char msg[1024];
-                snprintf(msg, 1024,
-                        "The size %d of the value exceeds the size of the VARBINARY(%d) column.",
-                        objLength, maxLength);
+                std::ostringstream oss;
+                oss <<  "The size " << objLength << " of the value exceeds the size of ";
+                if (type == VALUE_TYPE_VARBINARY) {
+                    oss << "the VARBINARY(" << maxLength << ") column.";
+                }
+                else {
+                    oss << "the GEOGRAPHY column (" << maxLength << " bytes).";
+                }
+
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                        msg);
+                                   oss.str().c_str());
             }
-        } else if (type == VALUE_TYPE_VARCHAR) {
+            break;
+        case VALUE_TYPE_VARCHAR:
             if (isInBytes) {
                 if (objLength > maxLength) {
                     std::string inputValue;
@@ -1636,8 +1656,9 @@ private:
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                         msg);
             }
-        } else {
-            throwFatalLogicErrorStreamed("NValue::checkTooNarrowVarcharAndVarbinary, "
+            break;
+        default:
+            throwFatalLogicErrorStreamed("NValue::checkTooWideForVariableLengthType, "
                     "Invalid object type " << valueToString(type));
         }
     }
@@ -1963,6 +1984,23 @@ private:
         switch (rhs.getValueType()) {
         case VALUE_TYPE_POINT:
             return getPoint().compareWith(rhs.getPoint());
+        default:
+            std::ostringstream oss;
+            oss << "Type " << valueToString(rhs.getValueType())
+                << " cannot be cast for comparison to type "
+                << valueToString(getValueType());
+            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                               oss.str().c_str());
+            // Not reached
+            return 0;
+        }
+    }
+
+    int compareGeographyValue (const NValue rhs) const {
+        assert(m_valueType == VALUE_TYPE_GEOGRAPHY);
+        switch (rhs.getValueType()) {
+        case VALUE_TYPE_GEOGRAPHY:
+            return getGeography().compareWith(rhs.getGeography());
         default:
             std::ostringstream oss;
             oss << "Type " << valueToString(rhs.getValueType())
@@ -2404,6 +2442,7 @@ inline void NValue::free() const {
     {
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
     case VALUE_TYPE_ARRAY:
         {
             assert(!m_sourceInlined);
@@ -2449,6 +2488,7 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
         return sizeof(double);
       case VALUE_TYPE_VARCHAR:
       case VALUE_TYPE_VARBINARY:
+      case VALUE_TYPE_GEOGRAPHY:
         return sizeof(char*);
       case VALUE_TYPE_DECIMAL:
         return sizeof(TTInt);
@@ -2516,6 +2556,8 @@ inline int NValue::compare_withoutNull(const NValue rhs) const {
         return compareDecimalValue(rhs);
     case VALUE_TYPE_POINT:
         return comparePointValue(rhs);
+    case VALUE_TYPE_GEOGRAPHY:
+        return compareGeographyValue(rhs);
     default: {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
@@ -2574,6 +2616,7 @@ inline void NValue::setNull() {
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
         *reinterpret_cast<void**>(m_data) = NULL;
         break;
     case VALUE_TYPE_DECIMAL:
@@ -2615,11 +2658,13 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
     {
         //Potentially non-inlined type requires special handling
         if (isInlined) {
             //If it is inlined the storage area contains the actual data so copy a reference
             //to the storage area
+            assert (type != VALUE_TYPE_GEOGRAPHY);
             const char* inline_data = reinterpret_cast<const char*>(storage);
             *reinterpret_cast<const char**>(retval.m_data) = inline_data;
             retval.setSourceInlined(true);
@@ -2758,8 +2803,10 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
         //Potentially non-inlined type requires special handling
         if (isInlined) {
+            assert (type != VALUE_TYPE_GEOGRAPHY);
             inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
@@ -2769,7 +2816,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
             else {
                 int32_t objLength = getObjectLength_withoutNull();
                 const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+                checkTooWideForVariableLengthType(m_valueType, ptr, objLength, maxLength, isInBytes);
 
                 const int8_t lengthLength = getObjectLengthLength();
                 const int32_t minlength = lengthLength + objLength;
@@ -2828,19 +2875,22 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
         //Potentially non-inlined type requires special handling
         if (isInlined) {
+            assert(type != VALUE_TYPE_GEOGRAPHY);
             inlineCopyObject(storage, maxLength, isInBytes);
         }
         else {
             if (!isNull()) {
                 int objLength = getObjectLength_withoutNull();
                 const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+                checkTooWideForVariableLengthType(m_valueType, ptr, objLength, maxLength, isInBytes);
             }
 
             // copy the StringRef pointers, even for NULL case.
             if (m_sourceInlined) {
+                assert(type != VALUE_TYPE_GEOGRAPHY);
                 // create a non-const temp here for the outlined value
                 NValue outlinedValue = *this;
                 outlinedValue.allocateObjectFromInlinedValue(getTempStringPool());
@@ -2899,12 +2949,14 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
     {
         const int32_t length = input.readInt();
 
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         // the NULL SQL string is a NULL C pointer
         if (isInlined) {
+            assert (type != VALUE_TYPE_GEOGRAPHY);
             // Always reset the bits regardless of how long the actual value is.
             ::memset(storage, 0, lengthLength + maxLength);
 
@@ -2913,7 +2965,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 break;
             }
             const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-            checkTooNarrowVarcharAndVarbinary(type, data, length, maxLength, isInBytes);
+            checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
 
             ::memcpy( storage + lengthLength, data, length);
         } else {
@@ -2922,13 +2974,18 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 return;
             }
             const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-            checkTooNarrowVarcharAndVarbinary(type, data, length, maxLength, isInBytes);
+            checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
 
             const int32_t minlength = lengthLength + length;
             StringRef* sref = StringRef::create(minlength, dataPool);
             char* copy = sref->get();
             setObjectLengthToLocation( length, copy);
-            ::memcpy(copy + lengthLength, data, length);
+            if (type != VALUE_TYPE_GEOGRAPHY) {
+                ::memcpy(copy + lengthLength, data, length);
+            }
+            else {
+                Geography::deserializeFrom(input, copy + lengthLength, length);
+            }
             *reinterpret_cast<StringRef**>(storage) = sref;
         }
         break;
@@ -3022,6 +3079,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
     {
         const int32_t length = input.readInt();
         // the NULL SQL string is a NULL C pointer
@@ -3030,8 +3088,14 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
             break;
         }
         char* storage = allocateValueStorage(length, dataPool);
-        const char *str = (const char*) input.getRawPointer(length);
-        ::memcpy(storage, str, length);
+        if (type != VALUE_TYPE_GEOGRAPHY) {
+            const char *str = (const char*) input.getRawPointer(length);
+            ::memcpy(storage, str, length);
+        }
+        else {
+            // We need to do byteswapping to serialize here.
+            Geography::deserializeFrom(input, storage, length);
+        }
         break;
     }
     case VALUE_TYPE_DECIMAL: {
@@ -3065,6 +3129,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     switch (type) {
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
     {
         if (isNull()) {
             output.writeInt(OBJECTLENGTH_NULL);
@@ -3076,8 +3141,15 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         }
         output.writeInt(static_cast<int32_t>(length));
 
-        // Not a null string: write it out
-        output.writeBytes(getObjectValue_withoutNull(), length);
+        if (type != VALUE_TYPE_GEOGRAPHY) {
+            // Not a null string: write it out
+            output.writeBytes(getObjectValue_withoutNull(), length);
+        }
+        else {
+            // geography gets its own serialization to deal with
+            // byteswapping and endianness
+            getGeography().serializeTo(output);
+        }
 
         break;
     }
@@ -3166,6 +3238,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
          getPoint().serializeTo(io);
          return;
      }
+     case VALUE_TYPE_GEOGRAPHY:
      case VALUE_TYPE_INVALID:
      case VALUE_TYPE_NULL:
      case VALUE_TYPE_BOOLEAN:
@@ -3354,46 +3427,35 @@ inline void NValue::hashCombine(std::size_t &seed) const {
     case VALUE_TYPE_TIMESTAMP:
         boost::hash_combine( seed, getBigInt()); break;
     case VALUE_TYPE_DOUBLE:
-        // This method was observed to fail on Centos 5 / GCC 4.1.2, returning different hashes
-        // for identical inputs, so the conditional was added,
-        // mutated from the one in boost/type_traits/intrinsics.hpp,
-        // and the broken overload for "double" was by-passed in favor of the more reliable
-        // one for int64 -- even if this may give sub-optimal hashes for typical collections of double.
-        // This conditional can be dropped when Centos 5 support is dropped.
-#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && !defined(__GCCXML__))) && !defined(BOOST_CLANG)
-        boost::hash_combine( seed, getDouble()); break;
-#else
-        {
-            const int64_t proxyForDouble =  *reinterpret_cast<const int64_t*>(m_data);
-            boost::hash_combine( seed, proxyForDouble); break;
+        MiscUtil::hashCombineFloatingPoint(seed, getDouble()); break;
+    case VALUE_TYPE_VARCHAR: {
+        if (isNull()) {
+            boost::hash_combine( seed, std::string(""));
+        } else {
+            const int32_t length = getObjectLength_withoutNull();
+            boost::hash_combine( seed, std::string( reinterpret_cast<const char*>(getObjectValue_withoutNull()), length ));
         }
-#endif
-      case VALUE_TYPE_VARCHAR: {
-          if (isNull()) {
-              boost::hash_combine( seed, std::string(""));
-          } else {
-              const int32_t length = getObjectLength_withoutNull();
-              boost::hash_combine( seed, std::string( reinterpret_cast<const char*>(getObjectValue_withoutNull()), length ));
-          }
-          break;
-      }
-      case VALUE_TYPE_VARBINARY: {
-          if (isNull()) {
-              boost::hash_combine( seed, std::string(""));
-          } else {
-              const int32_t length = getObjectLength_withoutNull();
-              char* data = reinterpret_cast<char*>(getObjectValue_withoutNull());
-              for (int32_t i = 0; i < length; i++)
-                  boost::hash_combine(seed, data[i]);
-          }
-          break;
-      }
-      case VALUE_TYPE_DECIMAL:
-          getDecimal().hash(seed); break;
-      case VALUE_TYPE_POINT:
-          getPoint().hashCombine(seed); break;
-      default:
-          throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
+        break;
+    }
+    case VALUE_TYPE_VARBINARY: {
+        if (isNull()) {
+            boost::hash_combine( seed, std::string(""));
+        } else {
+            const int32_t length = getObjectLength_withoutNull();
+            char* data = reinterpret_cast<char*>(getObjectValue_withoutNull());
+            for (int32_t i = 0; i < length; i++)
+                boost::hash_combine(seed, data[i]);
+        }
+        break;
+    }
+    case VALUE_TYPE_DECIMAL:
+        getDecimal().hash(seed); break;
+    case VALUE_TYPE_POINT:
+        getPoint().hashCombine(seed); break;
+    case VALUE_TYPE_GEOGRAPHY:
+        getGeography().hashCombine(seed); break;
+    default:
+        throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
     }
 }
 
