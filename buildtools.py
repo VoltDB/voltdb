@@ -338,7 +338,14 @@ def runTests(CTX):
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
         return -1
+    TESTOBJECTS_DIR = os.environ['TEST_DIR']
+    TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
+    OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
 
+    tests = []
+    for dir in CTX.TESTS.keys():
+        input = CTX.TESTS[dir].split()
+        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
     successes = 0
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
