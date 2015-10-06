@@ -3656,6 +3656,7 @@ svg.nvd3-svg { width:95% !important; }
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+	.downloadConfig { margin-bottom:5px;}
 
   
 }
@@ -4119,7 +4120,8 @@ svg.nvd3-svg { width:95% !important; }
         width: 100%;
         position: absolute;
         right: -1px;
-        top: 205px;
+       /* top: 205px;*/
+	   top:151px;
     }
 
     .partitionHeight {
@@ -4261,9 +4263,9 @@ svg.nvd3-svg { width:95% !important; }
     /* .configWrapper {
         width: 380px;
     }*/
-    .popup_cont {
+    /*.popup_cont {
         width: 380px;
-    }
+    }*/
 }
 
 @media (width: 768px) {
@@ -4406,6 +4408,7 @@ svg.nvd3-svg { width:95% !important; }
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
+		
     }
 }
 
