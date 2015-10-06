@@ -278,6 +278,7 @@ class TableAndIndexTest : public Test {
 
         ~TableAndIndexTest() {
             delete engine;
+            delete mockEngine;
             delete districtTable;
             delete districtTableReplica;
             delete districtTempTable;
