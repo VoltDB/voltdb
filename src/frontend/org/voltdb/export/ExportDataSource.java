@@ -340,11 +340,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleaseOffset = releaseOffset;
-        if (!m_replicaRunning) {
-            m_firstUnpolledUso = Math.max(getFirstUnpolledUso(), lastUso);
-        } else {
-            m_firstUnpolledUso = Math.min(getFirstUnpolledUso(), lastUso);
-        }
+        m_firstUnpolledUso = Math.max(getFirstUnpolledUso(), lastUso);
     }
 
     public String getDatabase() {
@@ -695,6 +691,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return fut;
     }
 
+    //If replica we poll from lowest of ack rcvd or last poll point.
     private long getFirstUnpolledUso() {
         if (m_isMaster) {
             return m_firstUnpolledUso;
@@ -703,12 +700,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return auso;
     }
 
+    //This is our poll point.
     private void setFirstUnpolledUso(long uso) {
-        if (m_isMaster) {
-            m_firstUnpolledUso = uso;
-        } else {
-            m_lastAckUSO = uso;
-        }
+        m_firstUnpolledUso = uso;
     }
 
     private void pollImpl(SettableFuture<BBContainer> fut) {
