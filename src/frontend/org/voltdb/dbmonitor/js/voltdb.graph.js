@@ -714,10 +714,15 @@
                 'partitionFirstData': true,
                 'drReplicationData': getEmptyDataOptimized(),
                 'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
-                'drReplicationDataDay': getEmptyDataForDaysOptimized(),                'cmdLogData': getEmptyDataOptimized(),
-                'cmdLogDataMin': getEmptyDataForMinutesOptimized(), 'cmdLogDataDay': getEmptyDataForDaysOptimized(),
-                'cmdLogFirstData': true, 'cmdLogMaxTimeStamp': null,
-                'drFirstData': true, 'lastTimedTransactionCount': -1,
+                'drReplicationDataDay': getEmptyDataForDaysOptimized(),
+                'drMaxTimeStamp': null,
+                'cmdLogData': getEmptyDataOptimized(),
+                'cmdLogDataMin': getEmptyDataForMinutesOptimized(),
+                'cmdLogDataDay': getEmptyDataForDaysOptimized(),
+                'cmdLogFirstData': true,
+                'cmdLogMaxTimeStamp': null,
+                'drFirstData': true,
+                'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
 
@@ -1240,41 +1245,57 @@
             if ($.isEmptyObject(drDetail) || drDetail == undefined || drDetail["DR_GRAPH"].REPLICATION_RATE_1M == undefined || drDetail["DR_GRAPH"].TIMESTAMP == undefined)
                 return;
 
-            var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
             var timeStamp = drDetail["DR_GRAPH"].TIMESTAMP;
+            if (timeStamp >= monitor.drMaxTimeStamp) {
+                var plottingPoint = parseFloat(drDetail["DR_GRAPH"].REPLICATION_RATE_1M).toFixed(1) * 1;
 
-            if (drSecCount >= 6 || monitor.drFirstData) {
-                drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
-                drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
-                drSecCount = 0;
-            }
-            if (drMinCount >= 60 || monitor.drFirstData) {
-                drDataDay = sliceFirstData(drDataDay, dataView.Days);
-                drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
-                MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
-                drMinCount = 0;
-            }
-            drData = sliceFirstData(drData, dataView.Seconds);
-            drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
-            MonitorGraphUI.Monitors.drReplicationData = drData;
-            monitor.drFirstData = false;
+                if (drSecCount >= 6 || monitor.drFirstData) {
+                    drDataMin = sliceFirstData(drDataMin, dataView.Minutes);
+                    if (timeStamp == monitor.drMaxTimeStamp) {
+                        drDataMin.push({ "x": new Date(timeStamp), "y": drDataMin[drDataMin.length - 1].y });
+                    } else {
+                        drDataMin.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                    }
+                    MonitorGraphUI.Monitors.drReplicationDataMin = drDataMin;
+                    drSecCount = 0;
+                }
+                if (drMinCount >= 60 || monitor.drFirstData) {
+                    drDataDay = sliceFirstData(drDataDay, dataView.Days);
+                    if (timeStamp == monitor.drMaxTimeStamp) {
+                        drDataDay.push({ "x": new Date(timeStamp), "y": drDataDay[drDataDay.length - 1].y });
+                    } else {
+                        drDataDay.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                    }
+                    MonitorGraphUI.Monitors.drReplicationDataDay = drDataDay;
+                    drMinCount = 0;
+                }
+                drData = sliceFirstData(drData, dataView.Seconds);
+                if (timeStamp == monitor.drMaxTimeStamp) {
+                    drData.push({ "x": new Date(timeStamp), "y": drData[drData.length - 1].y });
+                } else {
+                    drData.push({ "x": new Date(timeStamp), "y": plottingPoint });
+                }
+                MonitorGraphUI.Monitors.drReplicationData = drData;
+                monitor.drFirstData = false;
 
-            if (graphView == 'Minutes')
-                dataDrReplicationRate[0]["values"] = drDataMin;
-            else if (graphView == 'Days')
-                dataDrReplicationRate[0]["values"] = drDataDay;
-            else {
-                dataDrReplicationRate[0]["values"] = drData;
+                if (graphView == 'Minutes')
+                    dataDrReplicationRate[0]["values"] = drDataMin;
+                else if (graphView == 'Days')
+                    dataDrReplicationRate[0]["values"] = drDataDay;
+                else {
+                    dataDrReplicationRate[0]["values"] = drData;
 
-            }
+                }
 
-            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
-                d3.select('#visualizationDrReplicationRate')
-                    .datum(dataDrReplicationRate)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartDrReplicationRate);
+                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
+                    d3.select('#visualizationDrReplicationRate')
+                        .datum(dataDrReplicationRate)
+                        .transition().duration(500)
+                        .call(MonitorGraphUI.ChartDrReplicationRate);
+                }
             }
+            if (timeStamp > monitor.drMaxTimeStamp)
+                monitor.drMaxTimeStamp = timeStamp;
             drSecCount++;
             drMinCount++;
         };
