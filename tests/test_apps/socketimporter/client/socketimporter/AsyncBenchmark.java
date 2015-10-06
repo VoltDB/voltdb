@@ -57,6 +57,7 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import java.io.IOException;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.voltcore.utils.Pair;
@@ -64,10 +65,13 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatsContext;
+import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
 public class AsyncBenchmark {
+
+    static VoltLogger log = new VoltLogger("Benchmark");
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -194,7 +198,7 @@ public class AsyncBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     static void connect(String servers) throws InterruptedException {
-        System.out.println("Connecting to Socket Streaming Interface...");
+        log.info("Connecting to Socket Streaming Interface...");
 
         String[] serverArray = servers.split(",");
         final CountDownLatch connections = new CountDownLatch(serverArray.length);
@@ -204,12 +208,10 @@ public class AsyncBenchmark {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    int port = 7001; // default port; assumed in system test so keep sync'd if it's changed
-                    HostAndPort hap = HostAndPort.fromString(server);
-                    if (hap.hasPort()) {
-                        port = hap.getPort();
-                    }
-                    OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), port);
+                    // default port; assumed in system test so keep sync'd if it's changed
+                    HostAndPort hap = HostAndPort.fromString(server).withDefaultPort(7001);
+                    //port = hap.getPort();
+                    OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
                     haplist.put(hap, writer);
                     connections.countDown();
                 }
@@ -227,12 +229,12 @@ public class AsyncBenchmark {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     static void dbconnect(String servers) throws InterruptedException, Exception {
-        System.out.println("Connecting to VoltDB Interface...");
+        log.info("Connecting to VoltDB Interface...");
 
         String[] serverArray = servers.split(",");
         client = ClientFactory.createClient();
         for (String server : serverArray) {
-            System.out.println("..." + server);
+            log.info("..." + server);
             client.createConnection(server);
         }
     }
@@ -263,10 +265,10 @@ public class AsyncBenchmark {
             long max_insert_time = checkDB.maxInsertTime();
             thrup = (long) (runCount.get() / ((max_insert_time-benchmarkStartTS)/1000.0));
 
-            System.out.println(String.format("Import Throughput %d/s, Total Rows %d",
+            log.info(String.format("Import Throughput %d/s, Total Rows %d",
                     thrup, runCount.get()+warmupCount.get()));
         } catch (Exception e) {
-            System.out.println("Exception in printStatistics" + e);
+            log.info("Exception in printStatistics" + e);
             StringWriter writer = new StringWriter();
             e.printStackTrace( new PrintWriter(writer,true ));
             System. out.println("exeption stack is :\n"+writer.toString());
@@ -299,12 +301,12 @@ public class AsyncBenchmark {
      */
     public void runBenchmark(HostAndPort hap) throws Exception {
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(" Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Starting Benchmark");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(" Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
         SecureRandom rnd = new SecureRandom();
         rnd.setSeed(Thread.currentThread().getId());
@@ -312,7 +314,7 @@ public class AsyncBenchmark {
         try {
             // Run the benchmark loop for the requested warmup time
             // The throughput may be throttled depending on client configuration
-            System.out.println("Warming up...");
+            log.info("Warming up...");
             final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
             while (warmupEndTime > System.currentTimeMillis()) {
                 String key = Long.toString(rnd.nextLong());
@@ -337,7 +339,7 @@ public class AsyncBenchmark {
             // Run the benchmark loop for the requested duration
             // The throughput may be throttled depending on client configuration
             // Save the key/value pairs so they can be verified through the database
-            System.out.println("\nRunning benchmark...");
+            log.info("\nRunning benchmark...");
             final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
             while (benchmarkEndTime > System.currentTimeMillis()) {
                 String key = Long.toString(rnd.nextLong());
@@ -356,7 +358,7 @@ public class AsyncBenchmark {
             }
             haplist.get(hap).flush();
         } catch (Exception e) {
-            System.out.println("Exception in printStatistics" + e);
+            log.info("Exception in runBenchmark" + e);
             StringWriter writer = new StringWriter();
             e.printStackTrace( new PrintWriter(writer,true ));
             System. out.println("exeption stack is :\n"+writer.toString());
@@ -373,8 +375,8 @@ public class AsyncBenchmark {
                 writer.write(data.getBytes());
                 socketWrites.incrementAndGet();
                 return;
-            } catch (Exception ex) {
-                System.out.println("Exception: " + ex);
+            } catch (IOException ex) {
+                log.info("Exception: " + ex);
                 OutputStream writer = connectToOneServerWithRetry(hap.getHostText(), hap.getPort());
                 haplist.put(hap, writer);
                 socketWriteExceptions.incrementAndGet();
@@ -413,22 +415,23 @@ public class AsyncBenchmark {
      * @see {@link VoterConfig}
      */
     public static void main(String[] args) throws Exception {
+        VoltLogger log = new VoltLogger("Benchmark.main");
         final long WAIT_FOR_A_WHILE = 100 * 1000; // 5 minutes in milliseconds
         // create a configuration from the arguments
         Config config = new Config();
         config.parse(AsyncBenchmark.class.getName(), args);
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
+        log.info(" Command Line Configuration");
+        log.info(HORIZONTAL_RULE);
+        log.info(config.getConfigDumpString());
         if(config.latencyreport) {
-            System.out.println("NOTICE: Not implemented in this benchmark client.\n");
+            log.info("NOTICE: Not implemented in this benchmark client.\n");
         }
 
         // connect to one or more servers, loop until success
         dbconnect(config.servers);
 
-        System.out.println("Setting up DDL");
+        log.info("Setting up DDL");
         checkDB = new DataUtils(queue, dqueue, client, config.partitioned);
         checkDB.ddlSetup(config.partitioned);
 
@@ -451,7 +454,7 @@ public class AsyncBenchmark {
                     Thread.currentThread().interrupt();
                 }
             }
-            System.out.println("Starting CheckData methods. Queue size: " + queue.size());
+            log.info("Starting CheckData methods. Queue size: " + queue.size());
             checkDB.processQueue();
         }
         cdl.await();
@@ -467,9 +470,9 @@ public class AsyncBenchmark {
         printResults();
 
         if (!config.perftest) {
-            System.out.println("...starting timed check looping... " + queue.size());
+            log.info("...starting timed check looping... " + queue.size());
             final long queueEndTime = System.currentTimeMillis() + WAIT_FOR_A_WHILE;
-            System.out.println("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
+            log.info("Continue checking for " + (queueEndTime-System.currentTimeMillis())/1000 + " seconds.");
             while (queueEndTime > System.currentTimeMillis()) {
                 checkDB.processQueue();
             }
@@ -478,13 +481,13 @@ public class AsyncBenchmark {
         client.close();
 
         if (!config.perftest) {
-            System.out.println("Queued tuples remaining: " + queue.size());
-            System.out.println("Rows checked against database: " + rowsChecked.get());
-            System.out.println("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
+            log.info("Queued tuples remaining: " + queue.size());
+            log.info("Rows checked against database: " + rowsChecked.get());
+            log.info("Mismatch rows (value imported <> value in DB): " + rowsMismatch.get());
         }
-        System.out.println("Total rows added by Socket Injester: " + (warmupCount.get()+runCount.get()));
-        System.out.println("Socket write count: " + socketWrites.get());
-        System.out.println("Socket write exception count: " + socketWriteExceptions.get());
+        log.info("Total rows added by Socket Injester: " + (warmupCount.get()+runCount.get()));
+        log.info("Socket write count: " + socketWrites.get());
+        log.info("Socket write exception count: " + socketWriteExceptions.get());
 
         System.exit(0);
     }
