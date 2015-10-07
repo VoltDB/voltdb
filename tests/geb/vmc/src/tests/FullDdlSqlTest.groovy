@@ -223,7 +223,7 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         runQuery(page, statement, ColumnHeaderCase.AS_IS)
         String error = page.getQueryError()
 
-        // Keep track of certain (DDL) SQL statements
+        // Keep track of certain (DDL) SQL statements:
         // Keep track of CREATE ROLE statements
         if (statementUpperCase.contains('CREATE') && statementUpperCase.contains('ROLE')) {
             newRoles.add(getTableOrRoleName(statement, 'ROLE'))
@@ -265,9 +265,9 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
                 start = semicolon
                 duration = page.getQueryDuration()
                 if (error != null || duration == null || duration.isEmpty() || duration.contains('error')) {
-                    println '\nFAILURE: error non-null or duration null/empty/has error'
-                    println 'Error   :' + error
-                    println 'Duration:' + duration
+                    println '\nFAILURE: error non-null or duration null/empty/has error:'
+                    println 'Error   : ' + error
+                    println 'Duration: ' + duration
                     println 'All result text:\n' + page.getQueryResultText()
                     foundError = true
                 }
@@ -277,6 +277,21 @@ class FullDdlSqlTest extends SqlQueriesTestBase {
         } else {
             error = runDdlSqlStatement(statement)
             duration = page.getQueryDuration()
+            // If there is a problem, refresh the page and give it a second try
+            if (error != null || duration == null || duration.isEmpty() || duration.contains('error')) {
+                println '\nWARNING: error non-null or duration null/empty/has error; ' +
+                        'will refresh page and make a second attempt to run the SQL:'
+                println 'Error   : ' + error
+                println 'Duration: ' + duration
+                println 'All result text:\n' + page.getQueryResultText()
+                driver.navigate().refresh()
+                error = runDdlSqlStatement(statement)
+                duration = page.getQueryDuration()
+                println '\nResult of second attempt to run the SQL:'
+                println 'Error   : ' + error
+                println 'Duration: ' + duration
+                println 'All result text:\n' + page.getQueryResultText()
+            }
         }
 
         then: 'make sure there was no error'
