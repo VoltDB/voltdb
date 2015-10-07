@@ -1,4 +1,4 @@
-import os, sys, threading, shutil
+import os, sys, threading, shutil, re
 from subprocess import Popen, PIPE, STDOUT
 
 class BuildContext:
@@ -16,30 +16,11 @@ class BuildContext:
         self.THIRD_PARTY_INPUT_PREFIX = ""
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
-        # We define input files in sets, where a
-        # set is all included source files in a
-        # single directory.  The directory name is
-        # the key to the following three dictionaries.
-        # the set of all libraries needed to link
-        # is in the single, string variable INPUT_LIBS.
-        # These are initialized in build.py. 
         self.INPUT = {}
-        self.INPUT_INCLUDES = {}
-        self.INPUT_CPPFLAGS = {}
-        self.INPUT_LIBS = ""
-        # We treat sources from third party libraries the same
-        # as VDB sources with respect to folders, includes,
-        # compilation flags and libraries.
+        self.SRC_INCLUDE_DIRS = []
+        self.OBJ_INCLUDE_DIRS = []
         self.THIRD_PARTY_INPUT = {}
-        self.THIRD_PARTY_INCLUDES = {}
-        self.THIRD_PARTY_CPPFLAGS = {}
-        self.THIRD_PARTY_LIBS = ""
-        # We do almost the same with tests as with the ones
-        # above.  But libraries are slightly different.
         self.TESTS = {}
-        self.TESTS_INCLUDES = {}
-        self.TESTS_CPPFLAGS = {}
-        self.TESTS_LIBS = {}
         self.PLATFORM = os.uname()[0]
         self.LEVEL = "DEBUG"
         self.TARGET = "BUILD"
@@ -47,8 +28,14 @@ class BuildContext:
         self.NMFLAGS = "-n"    # specialized by platform in build.py
         self.COVERAGE = False
         self.PROFILE = False
+        # Compiler Configuration
         self.CC = "gcc"
         self.CXX = "g++"
+        self.COMPILER_NAME = "Unknown"
+        self.COMPILER_CONFIGURED = False
+        self.MAJORVERSION = 0
+        self.MINORVERSION = 0
+        self.PATCHLEVEL   = 0
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -66,6 +53,62 @@ class BuildContext:
         buildLocal = os.path.join(os.path.dirname(__file__), "build.local")
         if os.path.exists(buildLocal):
             execfile(buildLocal, dict(BUILD = self))
+        
+    def compilerName(self):
+        self.getCompilerVersion()
+        if self.COMPILER_NAME:
+            return self.COMPILER_NAME
+        else:
+            return "UnknownCompiler"
+    def compilerMajorVersion(self):
+        self.getCompilerVersion()
+        return self.MAJORVERSION
+    def compilerMinorVersion(self):
+        self.getCompilerVersion()
+        return self.MINORVERSION
+    def compilerPatchLevel(self):
+        self.getCompilerVersion()
+        return self.PATCHLEVEL
+    def getCompilerVersion(self):
+        if self.COMPILER_CONFIGURED:
+            return
+        self.COMPILER_CONFIGURED = True
+        vinfo = output = Popen([self.CXX, "-v"], stderr=PIPE).communicate()[1]
+        self.MAJORVERSION = 0
+        self.MINORVERSION = 0
+        self.PATCHLEVEL   = 0
+        vvector = [0, 0, 0]
+        # Apple now uses clang and has its own versioning system.
+        # The version 7 compiler needs special compilation options.
+        # This is pretty dumb code that could be improved as we support more
+        # compilers and versions.
+        #   Xcode versions before 10.10
+        #   Xcode version 10.11
+        #   Clang built not from apple.
+        #   gcc
+        patterns = [
+                    [ r"based on LLVM ([.0-9]*)[^.0-9]",      "clang"],
+                    [ r"Apple LLVM version ([.0-9]*)[^.0-9]", "clang"],
+                    [ r"clang version ([.0-9]*)[^.0-9]",      "clang"],
+                    [ r"gcc version ([.0-9]*)[^.0-9]",        "gcc"  ],
+                   ]
+        for pattern in patterns:
+            m = re.search(pattern[0], vinfo)
+            if m:
+                self.COMPILER_NAME = pattern[1]
+                vinfo = m.group(1)
+                vvector = vinfo.split(".")
+                break
+        if self.COMPILER_NAME == "Unknown":
+            print("Cannot find compiler version by running \"%s\"" % self.CXX)
+        else:
+            vlen = len(vvector)
+            if vlen > 0:
+                self.MAJORVERSION = int(vvector[0])
+                if vlen > 1:
+                    self.MINORVERSION = int(vvector[1])
+                    if vlen > 2:
+                        self.PATCHLEVEL = int(vvector[2])
 
 def readFile(filename):
     "read a file into a string"
@@ -89,23 +132,34 @@ except:
 # appended.
 def replaceExtension(filename, newExtension):
     pos = filename.rfind(".")
-    if pos == -1:
+    if pos < 0:
         return filename + newExtension
     else:
-        return filename[0:pos] + newExtension
+        return filename[:pos] + newExtension
     
 def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
     jni_objname = replaceExtension("objects/" + relativepath, ".o")
     static_objname = replaceExtension("static_objects/" + relativepath, ".o")
-    return jni_objname, static_objname
+    return os.path.normpath(jni_objname), os.path.normpath(static_objname)
 
 def namesForTestCode(filename):
     relativepath = "/".join(filename.split("/")[2:])
     binname = "cpptests/" + relativepath
     sourcename = filename + ".cpp"
-    objectname = replaceExtension("static_objects/" + filename.split("/")[-1], ".o")
-    return binname, objectname, sourcename
+    objectname = replaceExtension("static_objects/" + relativepath, ".o")
+    return os.path.normpath(binname), os.path.normpath(objectname), os.path.normpath(sourcename)
+
+def formatList(list):
+    str = ""
+    indent = 16
+    for name in list:
+        if indent + len(name) + 1 > 120:
+            str += " \\\n\t\t"
+            indent = 16
+        str += (" " + name)
+        indent += len(name) + 1
+    return str
 
 def buildMakefile(CTX):
     global version
@@ -113,14 +167,21 @@ def buildMakefile(CTX):
     CPPFLAGS = " ".join(CTX.CPPFLAGS.split())
     MAKECPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
-        MAKECPPFLAGS += " -isystem ../../%s" % (dir)
-    for dir in CTX.INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I../../%s" % (dir)
+        MAKECPPFLAGS += " -isystem $(ROOTDIR)/%s" % (dir)
+    for dir in CTX.SRC_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I$(ROOTDIR)/%s" % (dir)
+    for dir in CTX.OBJ_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
+    MAKECPPFLAGS += " -I${OBJDIR}"
+    # I don't think these are used anywhere.
     LOCALCPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
         LOCALCPPFLAGS += " -isystem %s" % (dir)
-    for dir in CTX.INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I%s" % (dir)
+    for dir in CTX.SRC_INCLUDE_DIRS:
+        LOCALCPPFLAGS += " -I${ROOTDIR}/%s" % (dir)
+    for dir in CTX.OBJ_INCLUDE_DIRS:
+        LOCALCPPFLAGS += " -I${OBJDIR}/%s" % (dir)
+    LOCALCPPFLAGS += " -I${OBJDIR}"
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -131,7 +192,6 @@ def buildMakefile(CTX):
     JNIEXT = CTX.JNIEXT.strip()
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
-    LIBS = " " + CTX.INPUT_LIBS + " " + CTX.THIRD_PARTY_LIBS
 
     # create directories for output if they don't exist
     os.system("mkdir -p %s" % (OUTPUT_PREFIX))
@@ -141,61 +201,41 @@ def buildMakefile(CTX):
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
 
-    # Calculate the input_paths and third_party_input_paths.
-    # For each source directory, we have a set of file names,
-    # perhaps a set of source directory specific CPPFLAGS and
-    # perhaps a set of source directory specific include
-    # directories.  We calculate the actual file name,
-    # the final CPPFLAGS value and remember the list of
-    # include directories.
     input_paths = []
     for dir in CTX.INPUT.keys():
         input = CTX.INPUT[dir].split()
-        cppflags = ""
-        includes = []
-        if dir in CTX.INPUT_CPPFLAGS:
-            cppflags += (" " + CTX.INPUT_CPPFLAGS[dir])
-        if dir in CTX.INPUT_INCLUDES:
-            includes += CTX.INPUT_INCLUDES
-        input_paths += [{'filename': INPUT_PREFIX + "/" + dir + "/" + x, 'cppflags':cppflags, 'includes': includes} for x in input]
+        input_paths += [INPUT_PREFIX + "/" + dir + "/" + x for x in input]
+
     third_party_input_paths = []
     for dir in CTX.THIRD_PARTY_INPUT.keys():
-        # Calculate the per-third-party cpp flags
-        # and include files.
-        flags = ""
-        includes = []
-        if dir in CTX.THIRD_PARTY_CPPFLAGS:
-            flags += (" " + CTX.THIRD_PARTY_CPPFLAGS[dir])
-        if dir in CTX.THIRD_PARTY_INCLUDES:
-            includes += CTX.THIRD_PARTY_INCLUDES[dir]
         input = CTX.THIRD_PARTY_INPUT[dir].split()
-        third_party_input_paths += [{'filename': THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x, 'cppflags': flags, 'includes': includes} for x in input]
+        third_party_input_paths += [THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x for x in input]
+
     tests = []
     for dir in CTX.TESTS.keys():
-        flags = ""
-        includes = ""
-        libs = ""
-        if dir in CTX.TESTS_CPPFLAGS:
-            flags += (" " + CTX.TESTS_CPPFLAGS[dir])
-        if dir in CTX.TESTS_INCLUDES:
-            includes += " " + CTX.TESTS_INCLUDES[dir]
-        if dir in CTX.TESTS_LIBS:
-            libs = CTX.TESTS_LIBS[dir]
         input = CTX.TESTS[dir].split()
-        tests += [{'filename': TEST_PREFIX + "/" + dir + "/" + x, 'cppflags': flags, 'includes': includes, 'libs': libs} for x in input]
+        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
+
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
+    makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
     makefile.write("CXX = %s\n" % CTX.CXX)
-    makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
+    makefile.write("CPPFLAGS += %s\n" % formatList(MAKECPPFLAGS.split(" ")))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
     makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
-    makefile.write("SRC = ../../%s\n" % (INPUT_PREFIX))
-    makefile.write("THIRD_PARTY_SRC = ../../%s\n" % (THIRD_PARTY_INPUT_PREFIX))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
-    makefile.write("LIBS = %s\n" % (LIBS))
+    makefile.write("#\n# Capture the (relative) name of the root directory.\n")
+    makefile.write("# Also, remember the obj directory,\n")
+    makefile.write("# which should be the directory we are currently in.\n#\n")
+    makefile.write('ROOTDIR=../..\n')
+    makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
+    makefile.write('#\n# This is the root of the cpp sources.\n#\n')
+    makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
+    makefile.write('#\n# This is the root of the third party sources.\n#\n')
+    makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
     makefile.write("\n")
 
     if CTX.TARGET == "CLEAN":
@@ -205,126 +245,163 @@ def buildMakefile(CTX):
         makefile.close()
         return
 
-    makefile.write(".PHONY: main\n")
+    makefile.write(".PHONY: main\n\n")
     if CTX.TARGET == "VOLTRUN":
         makefile.write("main: prod/voltrun\n")
     elif CTX.TARGET == "TEST":
-        makefile.write("main: ")
+        makefile.write("main:\n")
     else:
         makefile.write("main: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % version)
     makefile.write("\n")
 
     jni_objects = []
     static_objects = []
-    for file_descr in input_paths:
-        filename = file_descr['filename']
+    for filename in input_paths:
         jni, static = outputNamesForSource(filename)
         jni_objects.append(jni)
         static_objects.append(static)
-    for file_descr in third_party_input_paths:
-        filename = file_descr['filename']
+    for filename in third_party_input_paths:
         jni, static = outputNamesForSource(filename)
         jni_objects.append(jni)
         static_objects.append(static)
 
+    cleanobjs = []
     makefile.write("# create symbols by running nm against libvoltdb-%s\n" % version)
-    makefile.write("nativelibs/libvoltdb-%s.sym: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % (version, version))
-    makefile.write("\t$(NM) $(NMFLAGS) nativelibs/libvoltdb-%s.$(JNIEXT) > $@\n" % version)
+    nmfilename = ("nativelibs/libvoltdb-%s.sym" % version)
+    jnilibname = ("nativelibs/libvoltdb-%s.$(JNIEXT)" % version)
+    cleanobjs += [nmfilename]
+    makefile.write("%s: %s\n" % (nmfilename, jnilibname))
+    makefile.write("\t$(NM) $(NMFLAGS) %s > $@\n" % jnilibname)
     makefile.write("\n")
 
     makefile.write("# main jnilib target\n")
-    makefile.write("nativelibs/libvoltdb-%s.$(JNIEXT): " % version + " ".join(jni_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ $(LIBS)\n")
+    makefile.write("%s: %s\n" % (jnilibname, formatList(jni_objects)))
+    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ %s \n" % ( CTX.LASTLDFLAGS ) )
     makefile.write("\n")
+    cleanobjs += [ jnilibname ]
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
-    makefile.write("prod/voltrun: $(SRC)/voltrun.cpp " + " ".join(static_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ $(LIBS)\n")
+    makefile.write("prod/voltrun: $(SRCDIR)/voltrun.cpp " + formatList(static_objects) + "\n")
+    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ %s\n" % ( CTX.LASTLDFLAGS ))
     makefile.write("\n")
+    cleanobjs += ["prod/voltrun"]
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
-    makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) -o $@ $^ %s\n" % (CTX.LASTLDFLAGS))
+    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp " + " objects/volt.a\n")
+    makefile.write("\t$(LINK.cpp) -o $@ $^ %s %s\n" % (CTX.LASTLDFLAGS, CTX.LASTIPCLDFLAGS))
     makefile.write("\n")
+    cleanobjs += ["prod/voltdbipc"]
 
-
+    # If this is a memcheck or memcheck_nofreelist build, then
+    # building test requires building the ipc executable as well.
+    IPC_EXENAME = ""
+    if CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST":
+        IPC_EXENAME = "prod/voltdbipc "
     makefile.write(".PHONY: test\n")
-    makefile.write("test: ")
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test['filename'])
-        makefile.write(binname + " ")
-    if CTX.LEVEL == "MEMCHECK":
-        makefile.write("prod/voltdbipc")
-    if CTX.LEVEL == "MEMCHECK_NOFREELIST":
-        makefile.write("prod/voltdbipc")
-    makefile.write("\n\n")
-    makefile.write("objects/volt.a: " + " ".join(jni_objects) + " objects/harness.o\n")
+    makefile.write("test: %s%s\n" % (IPC_EXENAME, formatList((namesForTestCode(test)[0] for test in tests))))
+        
+    makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
-    makefile.write("objects/harness.o: ../../" + TEST_PREFIX + "/harness.cpp\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
+    harness_source = TEST_PREFIX + "/harness.cpp"
+    makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $^\n")
+    makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
-
+    cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
+    
     LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
-    for file_descr in input_paths:
-        filename = file_descr['filename']
-        cppflags = file_descr['cppflags']
-        includes = " ".join([ "-I ../../%s" % include_name for include_name in file_descr['includes']])
+  
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# %s\n#\n" % "Volt Files")
+    makefile.write("########################################################################\n")
+    for filename in input_paths:
         jni_objname, static_objname = outputNamesForSource(filename)
-        filename = filename.replace(INPUT_PREFIX, "$(SRC)")
+        filename = os.path.normpath(filename.replace(INPUT_PREFIX, "$(SRCDIR)"))
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
-        makefile.write(jni_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -MMD -MP -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, jni_objname, filename))
-        makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
-        makefile.write(static_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -MMD -MP -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, static_objname, filename))
+        makefile.write("########################################################################\n")
+        makefile.write("#\n# %s\n#\n" % filename)
+        makefile.write("########################################################################\n")
+        makefile.write("%s: %s \n" % (jni_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("%s: %s \n" % (static_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
+        cleanobjs += [jni_objname,
+                      static_objname,
+                      replaceExtension(jni_objname, ".d"),
+                      replaceExtension(jni_objname, ".d")]
+        makefile.write("\n")
     makefile.write("\n")
 
-    for file_descr in third_party_input_paths:
-        filename = file_descr['filename']
-        cppflags = file_descr['cppflags']
-        includes = " ".join([ "-I ../../%s" % include_name for include_name in file_descr['includes']])
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# %s\n#\n" % "Third Party Files")
+    makefile.write("########################################################################\n")
+    for filename in third_party_input_paths:
         jni_objname, static_objname = outputNamesForSource(filename)
         filename = filename.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)")
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write("\n-include %s\n" % replaceExtension(jni_objname, ".d"))
-        makefile.write(jni_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, jni_objname, filename))
-        makefile.write("\n-include %s\n" % replaceExtension(static_objname, ".d"))
-        makefile.write(static_objname + ":\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s %s %s -o %s %s\n" % (CTX.EXTRAFLAGS, cppflags, includes, static_objname, filename))
+        makefile.write("########################################################################\n")
+        makefile.write("#\n# %s\n#\n" % filename)
+        makefile.write("########################################################################\n")
+        makefile.write("%s: %s \n" % (jni_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("%s: %s \n" % (static_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
+        cleanobjs += [jni_objname,
+                      static_objname,
+                      replaceExtension(jni_objname, ".d"),
+                      replaceExtension(jni_objname, ".d")]
+        makefile.write("\n")
     makefile.write("\n")
+    makefile.write("#\n# This target lets us print makefile variables, for debugging\n")
+    makefile.write("#\n# the makefile.\n#\n")
+    makefile.write("echo_makefile_config:\n")
+    makefile.write('\t@echo "ROOTDIR = $(ROOTDIR)"\n')
+    makefile.write('\t@echo "OBJDIR = $(OBJDIR)"\n')
+    makefile.write('\t@echo "SRCDIR = $(SRCDIR)"\n')
+    makefile.write('\t@echo "THIRD_PARTY_SRC = $(THIRD_PARTY_SRC)"\n\n')
 
-    for test_descr in tests:
-        test = test_descr['filename']
-        cppflags = test_descr['cppflags']
-        includes = test_descr['includes']
-        libs     = test_descr['libs']
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# %s\n#\n" % "Tests")
+    makefile.write("########################################################################\n")
+    for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
-        makefile.write("%s: ../../%s" % (objectname, sourcename))
-        makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -I../../%s %s -o %s ../../%s\n" % (cppflags, TEST_PREFIX, includes, objectname, sourcename))
-
+        makefile.write("########################################################################\n")
+        makefile.write("#\n# %s\n#\n" % sourcename)
+        makefile.write("########################################################################\n")
+        makefile.write("%s: $(ROOTDIR)/%s \n" % (objectname, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("-include %s\n" % replaceExtension(objectname, ".d"))
         # link the test
-        makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, libs))
+        makefile.write("%s: %s objects/volt.a \n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
+        makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
-
         pysourcename = sourcename[:-3] + "py"
+        cleanobjs += [objectname, replaceExtension(objectname, ".d"), binname]
         if os.path.exists(pysourcename):
             shutil.copy(pysourcename, targetpath)
+            cleanobjs += [targetpath]
 
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# %s\n#\n" % "Cleaning")
+    makefile.write("########################################################################\n")
     makefile.write("\n")
+    makefile.write("clean: \n")
+    makefile.write("\t@echo Deleting all derived files.\n")
+    makefile.write("\t@${RM} %s\n" % formatList(cleanobjs))
     makefile.close()
     return True
 
@@ -396,33 +473,4 @@ def runTests(CTX):
     print "==============================================================================="
 
     return failures
-
-def getCompilerVersion():
-    vinfo = output = Popen(["gcc", "-v"], stderr=PIPE).communicate()[1]
-    # Apple now uses clang and has its own versioning system.
-    # Not sure we do anything that cares which version of clang yet.
-    # This is pretty dumb code that could be improved as we support more
-    #  compilers and versions.
-    if output.find('clang') != -1:
-        # this is a hacky way to find the real clang version from the output of
-        # gcc -v on the mac. The version is right after the string "based on LLVM ".
-        token = "based on LLVM "
-        pos = vinfo.find(token)
-        if pos != -1:
-            pos += len(token)
-            vinfo = vinfo[pos:pos+3]
-            vinfo = vinfo.split(".")
-            return "clang", vinfo, vinfo, 0
-        # if not the expected apple clang format
-        # this probably needs to be adjusted for clang on linux or from source
-        return "clang", 0, 0, 0
-    else:
-        vinfo = vinfo.strip().split("\n")
-        vinfo = vinfo[-1]
-        vinfo = vinfo.split()[2]
-        vinfo = vinfo.split(".")
-        return "gcc", int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
-
-# get the version of gcc and make it avaliable
-compiler_name, compiler_major, compiler_minor, compiler_point = getCompilerVersion()
 
