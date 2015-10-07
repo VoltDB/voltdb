@@ -90,6 +90,23 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
+class SetAndRestorePendingDeleteFlag
+{
+public:
+    SetAndRestorePendingDeleteFlag(TableTuple &target) : m_target(target)
+    {
+        assert(!m_target.isPendingDelete());
+        m_target.setPendingDeleteTrue();
+    }
+    ~SetAndRestorePendingDeleteFlag()
+    {
+        m_target.setPendingDeleteFalse();
+    }
+
+private:
+    TableTuple &m_target;
+};
+
 PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
@@ -608,12 +625,13 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    // handle any materialized views, hide the tuple from sequential scan temporarily.
-    targetTupleToUpdate.setPendingDeleteTrue();
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+        }
     }
-    targetTupleToUpdate.setPendingDeleteFalse();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     if (hasDRTimestampColumn()) {
@@ -776,12 +794,13 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    // handle any materialized views, hide the tuple from sequential scan temporarily.
-    target.setPendingDeleteTrue();
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(target, fallible);
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(target);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(target, fallible);
+        }
     }
-    target.setPendingDeleteFalse();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
