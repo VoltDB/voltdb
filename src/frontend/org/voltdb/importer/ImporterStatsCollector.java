@@ -24,15 +24,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltdb.InternalConnectionStatsCollector;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Maintains success, failure, pending and other relevant counts per importer.
  */
 
-public class ImporterStatsCollector extends SiteStatsSource {
+public class ImporterStatsCollector extends SiteStatsSource
+    implements InternalConnectionStatsCollector {
 
     public static final String IMPORTER_NAME_COL = "IMPORTER_NAME";
     public static final String PROC_NAME_COL = "PROCEDURE_NAME";
@@ -50,6 +53,21 @@ public class ImporterStatsCollector extends SiteStatsSource {
         super(siteId, false);
     }
 
+    @Override
+    public void reportCompletion(String importerName, String procName, ClientResponse response) {
+            switch(response.getStatus()) {
+            case ClientResponse.RESPONSE_UNKNOWN :
+                reportRetry(importerName, procName);
+                break;
+            case ClientResponse.SUCCESS:
+                reportSuccess(importerName, procName);
+                break;
+            default:
+                reportFailure(importerName, procName);
+                break;
+            }
+    }
+
     // An insert request was queued
     public void reportQueued(String importerName, String procName) {
         StatsInfo statsInfo = getStatsInfo(importerName, procName);
@@ -57,7 +75,7 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     // One insert failed
-    public void reportFailure(String importerName, String procName) {
+    private void reportFailure(String importerName, String procName) {
         reportFailure(importerName, procName, true);
     }
 
@@ -71,14 +89,14 @@ public class ImporterStatsCollector extends SiteStatsSource {
     }
 
     // One insert succeeded
-    public void reportSuccess(String importerName, String procName) {
+    private void reportSuccess(String importerName, String procName) {
         StatsInfo statsInfo = getStatsInfo(importerName, procName);
         statsInfo.m_pendingCount.decrementAndGet();
         statsInfo.m_successCount.incrementAndGet();
     }
 
     // One insert was retried
-    public void reportRetry(String importerName, String procName) {
+    private void reportRetry(String importerName, String procName) {
         StatsInfo statsInfo = getStatsInfo(importerName, procName);
         statsInfo.m_retryCount.incrementAndGet();
     }
