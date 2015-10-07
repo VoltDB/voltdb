@@ -30,6 +30,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
@@ -64,12 +65,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             String file_nonce,
                                             long txnId,
                                             Map<Integer, Long> partitionTransactionIds,
-                                            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+                                            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                             JSONObject jsData,
                                             SystemProcedureExecutionContext context,
                                             final VoltTable result,
                                             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+                                            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
                                             SiteTracker tracker,
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
@@ -83,12 +84,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     String file_nonce,
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
-                                                    Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+                                                    Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                     JSONObject jsData,
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
                                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                    Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+                                                    Map<Integer, DRLogSegmentId> drTupleStreamInfo,
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
                                                     long timestamp,
@@ -170,10 +171,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final String file_nonce,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
-                                                  final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+                                                  final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                  final Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+                                                  final Map<Integer, DRLogSegmentId> drTupleStreamInfo,
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
@@ -310,10 +311,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     static void createFileBasedCompletionTasks(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
             HashinatorSnapshotData hashinatorData,
             long timestamp, int newPartitionCount,
             Table[] tables) throws IOException

@@ -34,6 +34,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CSVSnapshotFilter;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.SimpleFileSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
@@ -70,11 +71,11 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -171,10 +172,10 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                   final Table[] tables,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
-                                                  final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+                                                  final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                  final Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+                                                  final Map<Integer, DRLogSegmentId> drTupleStreamInfo,
                                                   final long timestamp,
                                                   final AtomicInteger numTables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,

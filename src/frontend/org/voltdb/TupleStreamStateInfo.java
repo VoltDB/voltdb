@@ -18,25 +18,18 @@
 package org.voltdb;
 
 public class TupleStreamStateInfo {
-    public final long partitionSequenceNumber;
-    public final long partitionUniqueId;
+    public final DRLogSegmentId partitionInfo;
     public final boolean containsReplicatedStreamInfo;
-    public final long replicatedSequenceNumber;
-    public final long replicatedUniqueId;
+    public final DRLogSegmentId replicatedInfo;
 
-    public TupleStreamStateInfo(long partitionSequenceNumber,
-                                long partitionUniqueId) {
-        this(partitionSequenceNumber, partitionUniqueId, Long.MIN_VALUE, Long.MIN_VALUE);
+    public TupleStreamStateInfo(DRLogSegmentId partitionInfo) {
+        this(partitionInfo, new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE));
     }
 
-    public TupleStreamStateInfo(long partitionSequenceNumber,
-                                long partitionUniqueId,
-                                long replicatedSequenceNumber,
-                                long replicatedUniqueId) {
-        this.partitionSequenceNumber = partitionSequenceNumber;
-        this.partitionUniqueId = partitionUniqueId;
-        this.replicatedSequenceNumber = replicatedSequenceNumber;
-        this.replicatedUniqueId = replicatedUniqueId;
-        this.containsReplicatedStreamInfo = (this.replicatedSequenceNumber > Long.MIN_VALUE);
+    public TupleStreamStateInfo(DRLogSegmentId partitionInfo,
+            DRLogSegmentId replicatedInfo) {
+        this.partitionInfo = partitionInfo;
+        this.replicatedInfo = replicatedInfo;
+        this.containsReplicatedStreamInfo = (this.replicatedInfo.drId > Long.MIN_VALUE);
     }
 }
