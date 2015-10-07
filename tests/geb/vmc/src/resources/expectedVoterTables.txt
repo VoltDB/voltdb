@@ -1,0 +1,6 @@
+# Expected Tables: (when running the Voter example app)
+AREA_CODE_STATE
+CONTESTANTS
+PARTITIONED_TABLE
+REPLICATED_TABLE
+VOTES

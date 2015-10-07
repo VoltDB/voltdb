@@ -837,8 +837,6 @@ var loadPage = function (serverName, portid) {
                         if (drResult != -2) {
                             VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
                             VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
-                            
-                           
                             //show master/replica table
                             if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
                                 var userPreference = getUserPreferences();
@@ -848,7 +846,6 @@ var loadPage = function (serverName, portid) {
                                 if (userPreference["DRTables"]) {
                                     $("#divDrReplication").show();
                                 }
-                             
 
                                 if (drTablesSpanSelector != undefined) {
                                     drTablesSpanSelector.html('Data Replication Tables');
@@ -859,6 +856,7 @@ var loadPage = function (serverName, portid) {
                                 // showHideLastLineClass(true);
 
                                 $("#divDrWrapperAdmin").show();
+
                                 if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                     
                                     drReplicationSpanSelector.html('Data Replication (DR)');
@@ -883,6 +881,10 @@ var loadPage = function (serverName, portid) {
                                     }
                                     $('#drReplicaSection').css('display', 'block');
                                 } else {
+                                    voltDbRenderer.GetDrInformations(function (clusterInfo) {
+                                        $('#clusterId').show();
+                                        $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
+                                    });
                                     drReplicationSpanSelector.html('Data Replication (DR) (not active)');
                                     drReplicationSpanSelector.addClass("notActive");
                                     drReplicationInputSelector.attr("disabled", true);
@@ -898,6 +900,10 @@ var loadPage = function (serverName, portid) {
                                     $('#drReplicaSection').css('display', 'none');
                                 }
                             } else {
+                                voltDbRenderer.GetDrInformations(function (clusterInfo) {
+                                    $('#clusterId').show();
+                                    $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
+                                });
                                 VoltDbUI.isDRInfoRequired = true;
                                 $("#divDrReplication").hide();
                                 drReplicationSpanSelector.html('Data Replication (DR) (not active)');
@@ -913,6 +919,8 @@ var loadPage = function (serverName, portid) {
                                 $("#divDrWrapperAdmin").show();
                             }
                         } else {
+                            $('#clusterId').hide();
+                            $('#clusterId').html("");
                             VoltDbUI.isDRInfoRequired = false;
                             $("#divDrReplication").hide();
                             drReplicationSpanSelector.html('Data Replication (DR) (not active)');
@@ -1524,6 +1532,8 @@ var loadPage = function (serverName, portid) {
     var replicaTable = '';
     var refreshDrReplicaSection = function (graphView, currentTab) {
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+            $('#clusterId').show();
+            $('#clusterId').html(" (ID: " + replicationData["DR_GRAPH"]["CLUSTER_ID"] + ")");
 
             MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
 
