@@ -97,7 +97,7 @@ public:
     class iterator {
     public:
 
-        iterator(const char* pos, size_t numRemainingLoops)
+        iterator(const char* pos, std::size_t numRemainingLoops)
             : m_pos(pos)
             , m_numRemainingLoops(numRemainingLoops)
         {
@@ -138,7 +138,7 @@ public:
 
     private:
         const char* m_pos;
-        size_t m_numRemainingLoops;
+        std::size_t m_numRemainingLoops;
     };
 
     LoopContainer(const char* data)
@@ -147,9 +147,9 @@ public:
     }
 
     // return the number of loops
-    // (using size_t here to follow convention of std containers)
-    size_t size() const {
-        return static_cast<const size_t>(reinterpret_cast<const int32_t*>(m_data)[0]);
+    // (using std::size_t here to follow convention of std containers)
+    std::size_t size() const {
+        return static_cast<const std::size_t>(reinterpret_cast<const int32_t*>(m_data)[0]);
     }
 
     iterator begin() const {

@@ -213,7 +213,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t as t1, t as t2 "
                 + "where t1.poly = t2.poly "
                 + "order by t1.pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bermuda Triangle", BERMUDA_TRIANGLE_POLY},
                 {1, "Bermuda Triangle with a hole", BERMUDA_TRIANGLE_HOLE_POLY},
                 {2, "Billerica Triangle", BILLERICA_TRIANGLE_POLY},
@@ -226,7 +226,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t as t1, t as t2 "
                 + "where t1.poly != t2.poly "
                 + "order by t1.pk, t2.pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                 {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                 {0, "Bermuda Triangle", 3, "Lowell Square"},
@@ -247,7 +247,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t as t1, t as t2 "
                 + "where t1.poly < t2.poly "
                 + "order by t1.pk, t2.pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
                 {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                 {0, "Bermuda Triangle", 3, "Lowell Square"},
@@ -262,7 +262,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t as t1, t as t2 "
                 + "where t1.poly <= t2.poly "
                 + "order by t1.pk, t2.pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bermuda Triangle" , 0, "Bermuda Triangle"},
                 {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
                 {0, "Bermuda Triangle", 2, "Billerica Triangle"},
@@ -281,7 +281,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t as t1, t as t2 "
                 + "where t1.poly > t2.poly "
                 + "order by t1.pk, t2.pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                 {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                 {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
@@ -296,7 +296,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t as t1, t as t2 "
                 + "where t1.poly >= t2.poly "
                 + "order by t1.pk, t2.pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
                 {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                 {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
@@ -315,7 +315,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t "
                 + "where poly is null "
                 + "order by pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {4, "null poly"}},
                 vt);
 
@@ -325,7 +325,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "from t "
                 + "where poly is not null "
                 + "order by pk").getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bermuda Triangle"},
                 {1, "Bermuda Triangle with a hole"},
                 {2, "Billerica Triangle"},
@@ -359,7 +359,7 @@ public class TestGeographyValue extends RegressionSuite {
                 + "group by poly "
                 + "order by poly asc")
                 .getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {null, 3},
                 {BERMUDA_TRIANGLE_POLY, 3},
                 {BILLERICA_TRIANGLE_POLY, 3},
@@ -400,7 +400,7 @@ public class TestGeographyValue extends RegressionSuite {
         vt = client.callProcedure("@AdHoc",
                 "select * from t order by pk asc")
                 .getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Santa Cruz Triangle", new GeographyValue(santaCruzWkt)},
                 {1, "Bermuda Triangle with a hole", BERMUDA_TRIANGLE_HOLE_POLY},
                 {2, "South Valley Triangle", new GeographyValue(southValleyWkt)},
@@ -441,10 +441,75 @@ public class TestGeographyValue extends RegressionSuite {
         VoltTable vt = client.callProcedure("select_in",
                 (Object)(new GeographyValue[] {BERMUDA_TRIANGLE_POLY, null, LOWELL_SQUARE_POLY}))
                 .getResults()[0];
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0},
                 {3}},
                 vt);
+    }
+
+    private String wktRoundTrip(Client client, String wkt) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc", "select polygonfromtext(?) from t", wkt)
+                .getResults()[0];
+        vt.advanceRow();
+        return vt.getGeographyValue(0).toString();
+    }
+
+    public void testPolygonFromTextPositive() throws Exception {
+        Client client = getClient();
+        validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
+
+        String expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))";
+
+        // Just a simple round trip with reasonable WKT.
+        assertEquals(expected, wktRoundTrip(client, expected));
+
+        // polygonfromtext should be case-insensitve.
+        assertEquals(expected, wktRoundTrip(client,
+                "Polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+        assertEquals(expected, wktRoundTrip(client,
+                "polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+        assertEquals(expected, wktRoundTrip(client,
+                "PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+
+        assertEquals(expected, wktRoundTrip(client,
+                "\n\nPOLYGON\n(\n(\n32.305\n-64.751\n,\n25.244\n-80.437\n,\n18.476\n-66.371\n,\n32.305\n-64.751\n)\n)\n"));
+        assertEquals(expected, wktRoundTrip(client,
+                "\t\tPOLYGON\t(\t(\t32.305\t-64.751\t,\t25.244\t-80.437\t,\t18.476\t-66.371\t,\t32.305\t-64.751\t)\t)\t"));
+        assertEquals(expected, wktRoundTrip(client,
+                "    POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305  -64.751  )  )  "));
+
+        // Parsing with more than one loop should work the same.
+        expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
+                      + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
+        assertEquals(expected, wktRoundTrip(client,
+                "PoLyGoN\t(  (\n32.305\n-64.751   ,    25.244\t-80.437\n,18.476 -66.371,32.305\t\t\t-64.751   ),\t "
+                        + "(\n28.066\t-68.874,\t25.361    -68.855\n,28.376      -73.381,28.066\n\n-68.874\t)\n)\t"));
+    }
+
+    private void assertWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+        String stmt = "select polygonfromtext('" + wkt + "') from t";
+        verifyStmtFails(client, stmt, expectedMsg);
+    }
+
+    public void testPolygonFromTextNegative() throws Exception {
+        Client client = getClient();
+        validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
+
+        assertWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
+        assertWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
+        assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
+        assertWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
+        assertWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
+        assertWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
+        assertWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
+        assertWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
+        assertWktParseError(client, "unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
+
+        // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates
+        // that are separated only by a minus sign indicating that the second coordinate is negative.
+        // But boost's tokenizer (at least its currently configured) will consider "32.305-64.571" as a single
+        // token.  This seems like an acceptable discrepancy?
+        assertWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
     }
 
     static public junit.framework.Test suite() {

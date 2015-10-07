@@ -127,8 +127,16 @@ public class GeographyValue {
 
     /**
      * Serialize this object to a ByteBuffer.
-     * (Assumes that the 4-byte length prefix has already been serialized.)
-     * @param buf
+     * (Assumes that the 4-byte length prefix for variable-length data
+     * has already been serialized.)
+     *
+     * Here's the serialization format for polygons:
+     *   The number of loops in the polygon as a 4-byte int
+     *   For each loop:
+     *     The number of vertices in the polygon as a 4-byte int
+     *     For each vertex in the loop, a serialization of the PointType object
+     *
+     * @param buf  The ByteBuffer into which the serialization will be placed.
      */
     public void flattenToBuffer(ByteBuffer buf) {
         buf.putInt(m_loops.size());
@@ -143,7 +151,7 @@ public class GeographyValue {
     /**
      * Deserialize a GeographyValue from a ByteBuffer.
      * (Assumes that the 4-byte length prefix has already been deserialized, and that
-     * offset points the start of data just after the prefix.)
+     * offset points to the start of data just after the prefix.)
      * @param inBuffer
      * @param offset
      * @return a new GeographyValue

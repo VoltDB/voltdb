@@ -771,8 +771,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 m_buffer.putDouble(VoltType.NULL_FLOAT);
                 break;
             case STRING:
-                m_buffer.putInt(NULL_STRING_INDICATOR);
-                break;
             case GEOGRAPHY:
             case VARBINARY:
                 m_buffer.putInt(NULL_STRING_INDICATOR);

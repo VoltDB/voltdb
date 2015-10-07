@@ -125,7 +125,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt = t2.pt "
                 + "order by t1.pk;").getResults()[0];
 
-        assertTablesAreEqual(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
                 {1, "Santa Clara", SANTA_CLARA_PT}},
                 vt);
@@ -137,7 +137,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt <> t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
                 vt);
@@ -149,7 +149,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt < t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
                 vt);
 
@@ -160,7 +160,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt <= t2.pt "
                 + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, BEDFORD_PT},
                 {1, SANTA_CLARA_PT, SANTA_CLARA_PT},
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
@@ -173,7 +173,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt > t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT}},
                 vt);
 
@@ -184,7 +184,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt >= t2.pt "
                 + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
                 {0, BEDFORD_PT, BEDFORD_PT},
                 {1, SANTA_CLARA_PT, SANTA_CLARA_PT}},
@@ -197,7 +197,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt is null "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {2, "Atlantis", null}},
                 vt);
 
@@ -208,7 +208,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt is not null "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
                 {1, "Santa Clara", SANTA_CLARA_PT}},
                 vt);
@@ -229,7 +229,7 @@ public class TestPointType extends RegressionSuite {
                 + "order by pt asc")
                 .getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {null, 3},
                 {SANTA_CLARA_PT, 3},
                 {BEDFORD_PT, 3}},
@@ -262,7 +262,7 @@ public class TestPointType extends RegressionSuite {
                 "select pk, name, pt from t order by pk")
                 .getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, "Cambridge", CAMBRIDGE_PT},
                 {1, "San Jose", SAN_JOSE_PT},
                 {2, "Atlantis", null}},
@@ -302,7 +302,7 @@ public class TestPointType extends RegressionSuite {
                 "select pk, name, pt from t_not_null order by pk")
                 .getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, "Singapore", new PointType(1.2905f, 103.8521f)}},
                 vt);
     }
@@ -316,7 +316,7 @@ public class TestPointType extends RegressionSuite {
         VoltTable vt = client.callProcedure("sel_in", listParam)
                 .getResults()[0];
 
-        assertTablesAreEqual (new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {1, SANTA_CLARA_PT}},
                 vt);
     }

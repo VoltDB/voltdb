@@ -42,12 +42,11 @@ static void throwInvalidWktPoint(const std::string& input)
                        oss.str().c_str());
 }
 
-static void throwInvalidWktPoly(const std::string& input)
+static void throwInvalidWktPoly(const std::string& reason)
 {
     std::ostringstream oss;
-    oss << "Invalid input to POLYGONFROMTEXT: ";
-    oss << "'" << input << "', ";
-    oss << "expected input of the form 'POLYGON((<lat> <lng>, ...), ...)'";
+    oss << "Invalid input to POLYGONFROMTEXT: " << reason << ".  ";
+    oss << "Expected input of the form 'POLYGON((<lat> <lng>, ...), ...)'";
     throw SQLException(SQLException::data_exception_invalid_parameter,
                        oss.str().c_str());
 }
@@ -62,7 +61,7 @@ static Point::Coord stringToCoord(int pointOrPoly,
     }
     catch (const boost::bad_lexical_cast&) {
         if (pointOrPoly == POLY) {
-            throwInvalidWktPoly(input);
+            throwInvalidWktPoly("expected a number but found '" + val + "'");
         }
         else {
             throwInvalidWktPoint(input);
@@ -124,7 +123,7 @@ static void readLoop(const std::string &wkt,
                      std::vector<Point::Coord> *loop)
 {
     if (! boost::iequals(*it, "(")) {
-        throwInvalidWktPoly(wkt);
+        throwInvalidWktPoly("expected left parenthesis to start a loop");
     }
     ++it;
 
@@ -142,13 +141,13 @@ static void readLoop(const std::string &wkt,
             // continue to next lat long pair
         }
         else if (*it != ")") {
-            throwInvalidWktPoly(wkt);
+            throwInvalidWktPoly("unexpected token: '" + (*it) + "'");
         }
     }
 
     if (it == end) {
         // we hit the end of input before the closing parenthesis
-        throwInvalidWktPoly(wkt);
+        throwInvalidWktPoly("unexpected end of input");
     }
 
     assert (*it == ")");
@@ -172,12 +171,12 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     Tokenizer::iterator end = tokens.end();
 
     if (! boost::iequals(*it, "polygon")) {
-        throwInvalidWktPoly(wkt);
+        throwInvalidWktPoly("does not start with POLYGON keyword");
     }
     ++it;
 
     if (! boost::iequals(*it, "(")) {
-        throwInvalidWktPoly(wkt);
+        throwInvalidWktPoly("missing left parenthesis after POLYGON keyword");
     }
     ++it;
 
@@ -196,13 +195,13 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
             break;
         }
         else {
-            throwInvalidWktPoly(wkt);
+            throwInvalidWktPoly("unexpected token: '" + (*it) + "'");
         }
     }
 
     if (it != end) {
         // extra stuff after input
-        throwInvalidWktPoly(wkt);
+        throwInvalidWktPoly("unrecognized input after WKT");
     }
 
     std::ostringstream oss;

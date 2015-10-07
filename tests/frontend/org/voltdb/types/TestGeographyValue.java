@@ -26,9 +26,6 @@ package org.voltdb.types;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Rule;
-import org.junit.rules.ExpectedException;
-
 import junit.framework.TestCase;
 
 public class TestGeographyValue extends TestCase {
@@ -70,6 +67,30 @@ public class TestGeographyValue extends TestCase {
         assertEquals(76, geog.getLengthInBytes());
     }
 
+    private static String canonicalizeWkt(String wkt) {
+        return (new GeographyValue(wkt)).toString();
+    }
+
+    public void testWktParsingPositive() {
+
+        // Parsing is case-insensitive
+        String expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))";
+        assertEquals(expected, canonicalizeWkt("Polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+        assertEquals(expected, canonicalizeWkt("polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+        assertEquals(expected, canonicalizeWkt("PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+
+        // Parsing is whitespace-insensitive
+        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305   -64.751  )  ) "));
+        assertEquals(expected, canonicalizeWkt("\nPOLYGON\n(\n(\n32.305\n-64.751\n,\n25.244\n-80.437\n,\n18.476\n-66.371\n,32.305\n-64.751\n)\n)\n"));
+        assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t32.305\t-64.751\t,\t25.244\t-80.437\t,\t18.476\t-66.371\t,\t32.305\t-64.751\t)\t)\t"));
+
+        // Parsing with more than one loop should work the same.
+        expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
+                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
+        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n32.305\n-64.751   ,    25.244\t-80.437\n,18.476-66.371,32.305\t\t\t-64.751   ),\t "
+                + "(\n28.066-68.874,\t25.361    -68.855\n,28.376      -73.381,28.066\n\n-68.874\t)\n)\t"));
+    }
+
     private void assertWktParseError(String error, String wkt) {
         try {
             new GeographyValue(wkt);
@@ -84,7 +105,7 @@ public class TestGeographyValue extends TestCase {
         }
     }
 
-    public void testParseNegative() {
+    public void testWktParsingNegative() {
         assertWktParseError("expected WKT to start with POLYGON", "NOT_A_POLYGON(...)");
         assertWktParseError("expected left parenthesis after POLYGON", "POLYGON []");
         assertWktParseError("missing opening parenthesis", "POLYGON(3 3, 4 4, 5 5, 3 3)");
@@ -95,5 +116,4 @@ public class TestGeographyValue extends TestCase {
         assertWktParseError("unrecognized token", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
         assertWktParseError("unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
     }
-
 }

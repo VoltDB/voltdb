@@ -771,7 +771,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    private static void assertRowEquals(int row, Object[] expectedRow, VoltTable actualRow) {
+    private static void assertContentOfRow(int row, Object[] expectedRow, VoltTable actualRow) {
         for (int i = 0; i < expectedRow.length; ++i) {
             String msg = "Row " + row + ", col " + i + ": ";
             Object expectedObj = expectedRow[i];
@@ -805,16 +805,16 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
-     * Accept a "table" as 2-dimensional array of objects, to make it easier to write tests.
+     * Accept expected table contents as 2-dimensional array of objects, to make it easy to write tests.
      * Currently only handles some data types.  Feel free to add more as needed.
      */
-    public static void assertTablesAreEqual(Object[][] expectedTable, VoltTable actualTable) {
+    public static void assertContentOfTable(Object[][] expectedTable, VoltTable actualTable) {
         for (int i = 0; i < expectedTable.length; ++i) {
             assertTrue("Fewer rows than expected: "
                     + "expected: " + expectedTable.length + ", "
                     + "actual: " + i,
                     actualTable.advanceRow());
-            assertRowEquals(i, expectedTable[i], actualTable);
+            assertContentOfRow(i, expectedTable[i], actualTable);
         }
         assertFalse("More rows than expected: "
                 + "expected " + expectedTable.length + ", "

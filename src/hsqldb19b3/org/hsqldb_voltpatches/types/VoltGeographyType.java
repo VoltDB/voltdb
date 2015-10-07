@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2015 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.hsqldb_voltpatches.types;
 
 import org.hsqldb_voltpatches.Error;
@@ -40,7 +57,7 @@ public class VoltGeographyType extends Type {
         // We come here when parsing default values.
         if (type instanceof VoltGeographyType) {
             // This is currently unreachable, since there's no way to
-            // create a POINT object in a DEFAULT clause given allowable syntax.
+            // create a GEOGRAPHY object in a DEFAULT clause given allowable syntax.
             assert(false);
         }
 
@@ -78,12 +95,12 @@ public class VoltGeographyType extends Type {
 
     @Override
     public Type getCombinedType(Type other, int operation) {
-        // The 'combined type' seems to refer combining types with
+        // The 'combined type' seems to refer to combining types with
         // operators other than comparisons.   Comparisons always
-        // return BOOLEAN, and are valid for POINTs.
+        // return BOOLEAN, and are valid for values of type GEOGRAPHY.
         //
-        // We don't allow any non-comparison operators on POINTs, so
-        // just throw here if anyone tries.
+        // We don't allow any non-comparison operators on GEOGRAPHY values,
+        //so just throw here if anyone tries.
         //
         // incompatible types in operation
         throw Error.error(ErrorCode.X_42561);

@@ -243,7 +243,7 @@ public enum VoltType {
             'P'), // 'p' was taken by timestamp
 
     /**
-     * Geography type, for a geographical objects (polygons, etc)
+     * Geography type, for geographical objects (polygons, etc)
      */
     GEOGRAPHY ((byte)27,
             -1, // length in bytes (variable length)
