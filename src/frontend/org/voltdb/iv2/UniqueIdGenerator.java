@@ -336,7 +336,11 @@ public class UniqueIdGenerator {
         sb.append(" Date: ").append(getDateFromUniqueId(uniqueId));
         return sb.toString();
     }
-
+    public static String toShortString(long uniqueId) {
+        return new String(getPartitionIdFromUniqueId(uniqueId) + ":" +
+                getTimestampFromUniqueId(uniqueId) + ":" +
+                getSequenceNumberFromUniqueId(uniqueId));
+    }
     public static String toBitString(long uniqueId) {
         String retval = "";
         long mask = 0x8000000000000000L;

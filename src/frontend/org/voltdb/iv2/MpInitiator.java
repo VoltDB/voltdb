@@ -30,6 +30,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.MemoryStats;
 import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
@@ -120,14 +121,12 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
-                long binaryLogDRId = Long.MIN_VALUE;
-                long binaryLogUniqueId = Long.MIN_VALUE;
+                DRLogSegmentId drLogInfo = null;
                 long localMpUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
-                    binaryLogDRId = res.m_binaryLogDRId;
-                    binaryLogUniqueId = res.m_binaryLogUniqueId;
+                    drLogInfo = res.m_binaryLogInfo;
                     localMpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
@@ -165,8 +164,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
-                    if (m_consumerDRGateway != null && binaryLogDRId >= 0) {
-                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, binaryLogDRId, binaryLogUniqueId, localMpUniqueId);
+                    if (m_consumerDRGateway != null && drLogInfo.drId >= 0) {
+                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localMpUniqueId);
                     }
                 }
                 else {
