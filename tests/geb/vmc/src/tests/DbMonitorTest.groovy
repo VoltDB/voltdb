@@ -70,7 +70,7 @@ class DbMonitorTest extends TestBase {
 
                 then: 'Add all the preferences'
                 page.storedProceduresCheckboxClick()
-                page.dataTablesCheckboxClick()
+                //page.dataTablesCheckboxClick()
                 page.partitionIdleTimeCheckboxClick()
               //  page.clusterTransactionsCheckboxClick()
                // page.clusterLatencyCheckboxClick()
