@@ -871,7 +871,8 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 tooltip = d3.select(body).append("div")
                     .attr("class", "nvtooltip " + (classes ? classes : "xy-tooltip"))
                     .attr("id", id);
-                tooltip.style("top", 0).style("left", 0);
+                
+                //tooltip.style("top", 0).style("left", 0);
                 tooltip.style('opacity', 0);
                 tooltip.selectAll("div, table, td, tr").classed(nvPointerEventsClass, true);
                 tooltip.classed(nvPointerEventsClass, true);
@@ -906,6 +907,14 @@ nv.nearestValueIndex = function (values, searchVal, threshold) {
                 // Bonus - If you override contentGenerator and return falsey you can use something like
                 //         React or Knockout to bind the data for your tooltip
                 var newContent = contentGenerator(data);
+                
+                // code added to remove dot like border in tool tip hover : Sujesh
+                if (data.series[0].value != null) {
+                    tooltip.style("top", 0).style("left", 0);
+                } else {
+                    tooltipElem.style.removeProperty("top");
+                }
+
                 if (newContent) {
                     tooltipElem.innerHTML = newContent;
                 } else {
