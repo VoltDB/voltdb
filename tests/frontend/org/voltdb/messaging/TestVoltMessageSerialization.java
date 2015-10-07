@@ -33,6 +33,7 @@ import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -446,7 +447,7 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(
                 0, 10, Long.MAX_VALUE, Long.MAX_VALUE,
                 Pair.<Long, byte[]>of(2L, new byte[] {(byte)1,(byte)2,(byte)3}),
-                Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE
+                Long.MIN_VALUE, new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE)
                 );
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
@@ -454,7 +455,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
-        assertEquals(r1.getBinaryLogUniqueId(), r2.getBinaryLogUniqueId());
+        assertTrue(r1.getBinaryLogInfo().equals(r2.getBinaryLogInfo()));
         assertTrue(r1.hasHashinatorConfig());
         assertEquals(r1.getHashinatorVersionedConfig().getFirst(),new Long(2));
     }
