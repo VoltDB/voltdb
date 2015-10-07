@@ -742,8 +742,7 @@ class Distributer {
                     !m_ex.isShutdown()) {
                     //Don't subscribe to a new node immediately
                     //to somewhat prevent a thundering herd
-                    try
-                    {
+                    try {
                         m_ex.schedule(new Runnable() {
                             @Override
                             public void run() {
@@ -751,10 +750,8 @@ class Distributer {
                             }
                         }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS),
                                 TimeUnit.MILLISECONDS);
-                    } catch (RejectedExecutionException ree)
-                    {
+                    } catch (RejectedExecutionException ree) {
                         // this is for race if m_ex shuts down in the middle of schedule
-                        ree.printStackTrace(); // for testing
                         return;
                     }
 

@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.regressionsuites;
+package org.voltdb.regressionsuites.statistics;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,6 +41,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {

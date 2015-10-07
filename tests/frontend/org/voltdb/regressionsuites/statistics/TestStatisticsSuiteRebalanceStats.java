@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.regressionsuites;
+package org.voltdb.regressionsuites.statistics;
 
 import java.io.IOException;
 import java.util.Random;
@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import junit.framework.Test;
 
 import org.voltdb.join.BalancePartitionsStatistics;
+import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 
 public class TestStatisticsSuiteRebalanceStats extends StatisticsTestSuiteBase {
 

@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.regressionsuites;
+package org.voltdb.regressionsuites.statistics;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,6 +37,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb.utils.MiscUtils;
 
 public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuiteBase {
