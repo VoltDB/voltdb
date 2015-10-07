@@ -811,9 +811,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
+        if (m_runEveryWhere && m_replicaRunning) {
+           //we dont forward if we are running as replica in replicated export
+           return;
+        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
-        BitSet bs = new BitSet(2);
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
             // signaturesBytes.length + ackUSO:long(8) + 1 byte for runeverywhere+ifmaster
@@ -830,6 +833,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
             for( Long siteId: p.getSecond()) {
+                exportLog.info("Forward Ack to replica: " + uso);
                 mbx.send(siteId, bpm);
             }
         }
@@ -839,7 +843,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // If I am not master and run everywhere connector and I get ack to start replicating....do so and become a exporting replica.
         if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
             //These are single threaded so no need to lock.
-            exportLog.info("Export generation " + getGeneration() + " replica run request for " + getPartitionId());
+            m_lastAckUSO = uso;
             if (!m_replicaRunning) {
                 exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica");
                 m_replicaRunning = true;
@@ -849,16 +853,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
 
+        //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (!m_es.isShutdown()) {
-                        if (!m_replicaRunning) {
-                            ackImpl(uso);
-                        } else {
-                            m_lastAckUSO = uso;
-                        }
+                       ackImpl(uso);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
