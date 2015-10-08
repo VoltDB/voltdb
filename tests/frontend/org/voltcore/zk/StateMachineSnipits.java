@@ -78,7 +78,8 @@ public class StateMachineSnipits extends ZKTestBase {
             assert(siteId < NUM_AGREEMENT_SITES);
             ssm = new SynchronizedStatesManager(m_messengers.get(siteId).getZK(),
                     stateMachineManagerRoot, communityName,
-                    managerId, numberOfStateMachines);
+                    managerId);
+            ssm.initialize(numberOfStateMachines);
         }
         catch (KeeperException | InterruptedException e) {
         }
@@ -87,12 +88,12 @@ public class StateMachineSnipits extends ZKTestBase {
         return ssm;
     }
 
-    class DistributedLock extends SynchronizedStatesManager.StateMachineInstance {
+    class DistributedLock extends StateMachineInstance {
         public boolean m_locked = false;
         private Lock m_mutex;
 
         public DistributedLock(SynchronizedStatesManager ssm, String instanceName) {
-            ssm.super(instanceName, log);
+            super(ssm, instanceName, log);
         }
 
         @Override
@@ -171,11 +172,11 @@ public class StateMachineSnipits extends ZKTestBase {
         void membersAddedAndRemoved(Set<String> addedMembers, Set<String> removedMembers);
     }
 
-    public class MembershipChangeMonitor extends SynchronizedStatesManager.StateMachineInstance {
+    public class MembershipChangeMonitor extends StateMachineInstance {
         protected MemberChangeCallback m_cb = null;
 
         public MembershipChangeMonitor(SynchronizedStatesManager ssm, String instanceName) {
-            ssm.super(instanceName, log);
+            super(ssm, instanceName, log);
         }
 
         @Override
@@ -236,7 +237,7 @@ public class StateMachineSnipits extends ZKTestBase {
         void ourProposalRejected();
     }
 
-    public abstract class StateMachine extends SynchronizedStatesManager.StateMachineInstance {
+    public abstract class StateMachine extends StateMachineInstance {
         private ByteBuffer m_startingState;
         protected volatile ByteBuffer m_currentStateBuffer = null;
         protected StateMachineCallback m_cb;
@@ -244,7 +245,7 @@ public class StateMachineSnipits extends ZKTestBase {
         private boolean m_haveLock = false;
 
         protected StateMachine(SynchronizedStatesManager ssm, String instanceName) {
-            ssm.super(instanceName, log);
+            super(ssm,instanceName, log);
         }
 
         @Override
@@ -338,13 +339,13 @@ public class StateMachineSnipits extends ZKTestBase {
         public void externalUncorrelatedTaskComplete(List<ByteBuffer> results);
     }
 
-    public abstract class Task extends SynchronizedStatesManager.StateMachineInstance {
+    public abstract class Task extends StateMachineInstance {
         protected TaskCallback m_cb;
         private final AtomicBoolean m_taskPending = new AtomicBoolean(false);
         private boolean m_haveLock = false;
 
         public Task(SynchronizedStatesManager ssm, String instanceName) {
-            ssm.super(instanceName, log);
+            super(ssm,instanceName, log);
         }
 
         @Override
