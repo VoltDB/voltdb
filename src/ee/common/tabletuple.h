@@ -73,6 +73,7 @@ class TableColumn;
 class TupleIterator;
 class ElasticScanner;
 class StandAloneTupleStorage;
+class SetAndRestorePendingDeleteFlag;
 
 class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
@@ -85,6 +86,7 @@ class TableTuple {
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
+    friend class SetAndRestorePendingDeleteFlag;
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
