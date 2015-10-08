@@ -1525,6 +1525,23 @@ public class DDLCompiler {
             }
         }
 
+        // Warn user if DR table don't have any unique index.
+        if (db.getIsactiveactivedred() &&
+                node.attributes.get("drTable") != null &&
+                node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
+            boolean hasUniqueIndex = false;
+            for (Index index : table.getIndexes()) {
+                if (index.getUnique()) {
+                    hasUniqueIndex = true;
+                    break;
+                }
+            }
+            if (!hasUniqueIndex) {
+                String info = String.format("Table %s doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow.", table.getTypeName());
+                m_compiler.addWarn(info);
+            }
+        }
+
         table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
