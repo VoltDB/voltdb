@@ -503,11 +503,11 @@ public class TestGeographyValue extends RegressionSuite {
         assertWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
         assertWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
         assertWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertWktParseError(client, "unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
+        assertWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
 
         // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates
         // that are separated only by a minus sign indicating that the second coordinate is negative.
-        // But boost's tokenizer (at least its currently configured) will consider "32.305-64.571" as a single
+        // But boost's tokenizer (at least as its currently configured) will consider "32.305-64.571" as a single
         // token.  This seems like an acceptable discrepancy?
         assertWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
     }

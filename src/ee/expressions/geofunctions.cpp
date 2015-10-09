@@ -201,7 +201,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
 
     if (it != end) {
         // extra stuff after input
-        throwInvalidWktPoly("unrecognized input after WKT");
+        throwInvalidWktPoly("unrecognized input after WKT: '" + (*it) + "'");
     }
 
     std::ostringstream oss;
