@@ -184,7 +184,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
                     // If we are a DR replica, inform that subsystem of any remote data we've seen
-                    if (m_consumerDRGateway != null && drLogInfo.drId >= 0) {
+                    if (m_consumerDRGateway != null) {
                         m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localSpUniqueId);
                     }
                 }
