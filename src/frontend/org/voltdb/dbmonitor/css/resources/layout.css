@@ -516,7 +516,7 @@ ul.topRightList {
 
 .clusterDetailsContLeft {
     float: left;
-    width: 50%;
+    width: 60%;
 }
 
 .clusterDetailsContRight {
@@ -2298,7 +2298,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -358px -56px;
+    background-position: -165px -56px;
     width: 40px;
     height: 36px;
 }
@@ -3628,9 +3628,12 @@ a:hover.changePsd {
 table.diskLimitTbl tr td { border: none;}
 
 /*********overlapping nv.d3.css*********/
-.nvtooltip{ padding: 5px!important;}
+.nvtooltip{border: 1px solid #CCCCCC !important;}
 
-svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
+
+svg.nvd3-svg { width:95% !important; }
+.nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
+.nvtooltip table tr td { border: none !important;}
 
 /*********************************************media Qu********************/
 
@@ -3653,6 +3656,7 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+	.downloadConfig { margin-bottom:5px;}
 
   
 }
@@ -4116,7 +4120,8 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
         width: 100%;
         position: absolute;
         right: -1px;
-        top: 205px;
+       /* top: 205px;*/
+	   top:151px;
     }
 
     .partitionHeight {
@@ -4258,9 +4263,9 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
     /* .configWrapper {
         width: 380px;
     }*/
-    .popup_cont {
+    /*.popup_cont {
         width: 380px;
-    }
+    }*/
 }
 
 @media (width: 768px) {
@@ -4403,6 +4408,7 @@ svg.nvd3-svg { padding: 0 0 0 20px!important; width:95% !important; }
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
+		
     }
 }
 

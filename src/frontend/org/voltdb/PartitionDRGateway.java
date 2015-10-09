@@ -20,16 +20,12 @@ package org.voltdb;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
@@ -38,9 +34,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  *
  */
 public class PartitionDRGateway implements DurableUniqueIdListener {
-    private static final VoltLogger log = new VoltLogger("DR");
-
-    private static boolean ENABLE_DR_BUFFER_TRACE = Boolean.getBoolean("ENABLE_DR_BUFFER_TRACE");
 
     public enum DRRecordType {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
@@ -120,7 +113,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public void onSuccessfulMPCall(long spHandle, long txnId, long uniqueId, int hash,
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
-    public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber, long lastUniqueId, ByteBuffer buf) {
+    public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
+            long lastSpUniqueId, long lastMpUniqueId, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
@@ -129,20 +123,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
-
-    private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
-        @Override
-        protected AtomicLong initialValue() {
-            return new AtomicLong(-1);
-        }
-    };
-
-    private static final ThreadLocal<AtomicLong> lastCommittedSpHandleTL = new ThreadLocal<AtomicLong>() {
-        @Override
-        protected AtomicLong initialValue() {
-            return new AtomicLong(0);
-        }
-    };
 
     public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
                                  String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
@@ -154,121 +134,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             int partitionId,
             long startSequenceNumber,
             long lastSequenceNumber,
-            long lastUniqueId,
+            long lastSpUniqueId,
+            long lastMpUniqueId,
             ByteBuffer buf) {
-        if (ENABLE_DR_BUFFER_TRACE && log.isTraceEnabled()) {
-            synchronized (PartitionDRGateway.class) {
-                log.trace("Received DR buffer size " + buf.remaining());
-                AtomicLong haveOpenTransaction = haveOpenTransactionLocal.get();
-                buf.order(ByteOrder.LITTLE_ENDIAN);
-                //Magic header space for Java for implementing zero copy stuff
-                buf.position(8 /* stream block header */ + 69 /* txn metadata padding */);
-                while (buf.hasRemaining()) {
-                    int startPosition = buf.position();
-                    byte version = buf.get();
-                    int type = buf.get();
-
-                    int checksum = 0;
-                    if (version != 0) log.trace("Remaining is " + buf.remaining());
-
-                    DRRecordType recordType = DRRecordType.values()[type];
-                    switch (recordType) {
-                    case INSERT:
-                    case DELETE:
-                    case DELETE_BY_INDEX: {
-                        //Insert
-                        if (haveOpenTransaction.get() == -1) {
-                            log.error("Have insert/delete but no open transaction");
-                            break;
-                        }
-                        final long tableHandle = buf.getLong();
-                        final int lengthPrefix = buf.getInt();
-                        final int indexCrc;
-                        if (recordType == DRRecordType.DELETE_BY_INDEX) {
-                            indexCrc = buf.getInt();
-                        } else {
-                            indexCrc = 0;
-                        }
-                        buf.position(buf.position() + lengthPrefix);
-                        checksum = buf.getInt();
-                        log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " length " + lengthPrefix + " checksum " + checksum +
-                                  (recordType == DRRecordType.DELETE_BY_INDEX ? (" index checksum " + indexCrc) : ""));
-                        break;
-                    }
-                    case UPDATE:
-                    case UPDATE_BY_INDEX: {
-                        if (haveOpenTransaction.get() == -1) {
-                            log.error("Have update but no open transaction");
-                            break;
-                        }
-                        final long tableHandle = buf.getLong();
-                        final int oldRowLengthPrefix = buf.getInt();
-                        final int oldRowIndexCrc;
-                        if (recordType == DRRecordType.UPDATE_BY_INDEX) {
-                            oldRowIndexCrc = buf.getInt();
-                        } else {
-                            oldRowIndexCrc = 0;
-                        }
-                        buf.position(buf.position() + oldRowLengthPrefix);
-                        final int newRowLengthPrefix = buf.getInt();
-                        buf.position(buf.position() + newRowLengthPrefix);
-                        checksum = buf.getInt();
-                        log.trace("Version " + version + " type " + recordType + " table handle " + tableHandle + " old row length " + oldRowLengthPrefix +
-                                  " new row length " + newRowLengthPrefix + " checksum " + checksum +
-                                  (recordType == DRRecordType.UPDATE_BY_INDEX ? (" index checksum " + oldRowIndexCrc) : ""));
-                        break;
-                    }
-                    case BEGIN_TXN: {
-                        //Begin txn
-                        final long txnId = buf.getLong();
-                        final long spHandle = buf.getLong();
-                        if (haveOpenTransaction.get() != -1) {
-                            log.error("Have open transaction txnid " + txnId + " spHandle " + spHandle + " but already open transaction");
-                            break;
-                        }
-                        haveOpenTransaction.set(spHandle);
-                        checksum = buf.getInt();
-                        log.trace("Version " + version + " type BEGIN_TXN " + " txnid " + txnId + " spHandle " + spHandle + " checksum " + checksum);
-                        break;
-                    }
-                    case END_TXN: {
-                        //End txn
-                        final long spHandle = buf.getLong();
-                        if (haveOpenTransaction.get() == -1 ) {
-                            log.error("Have end transaction spHandle " + spHandle + " but no open transaction and its less then last committed " + lastCommittedSpHandleTL.get().get());
-                            break;
-                        }
-                        haveOpenTransaction.set(-1);
-                        lastCommittedSpHandleTL.get().set(spHandle);
-                        checksum = buf.getInt();
-                        log.trace("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
-                        break;
-                    }
-                    case TRUNCATE_TABLE: {
-                        final long tableHandle = buf.getLong();
-                        final byte tableNameBytes[] = new byte[buf.getInt()];
-                        buf.get(tableNameBytes);
-                        final String tableName = new String(tableNameBytes, Charsets.UTF_8);
-                        checksum = buf.getInt();
-                        log.trace("Version " + version + " type TRUNCATE_TABLE table handle " + tableHandle + " table name " + tableName);
-                        break;
-                    }
-                    }
-                    int calculatedChecksum = DBBPool.getBufferCRC32C(buf, startPosition, buf.position() - startPosition - 4);
-                    if (calculatedChecksum != checksum) {
-                        log.error("Checksum " + calculatedChecksum + " didn't match " + checksum);
-                        break;
-                    }
-                }
-            }
-            buf.order(ByteOrder.BIG_ENDIAN);
-        }
-
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastUniqueId, buf);
+        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastSpUniqueId, lastMpUniqueId, buf);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}

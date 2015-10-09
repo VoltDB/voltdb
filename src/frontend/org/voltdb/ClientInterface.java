@@ -1952,7 +1952,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.",
                                 task.clientHandle);
                     }
-                    log.warn("@SnapshotRestore called on an empty database, attempting to restore catalog from snapshot.");
+                    log.info("No schema found. Restoring schema and procedures from snapshot.");
                     try {
                         JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
                         final String path = jsObj.getString(SnapshotUtil.JSON_PATH);

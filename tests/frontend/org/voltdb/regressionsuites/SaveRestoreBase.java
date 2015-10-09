@@ -27,7 +27,6 @@ import java.io.File;
 import java.io.FilenameFilter;
 
 import org.voltdb.DefaultSnapshotDataTarget;
-import org.voltdb.regressionsuites.RegressionSuite;
 
 
 public class SaveRestoreBase extends RegressionSuite {
