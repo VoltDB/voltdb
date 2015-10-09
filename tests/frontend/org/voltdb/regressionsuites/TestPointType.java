@@ -27,7 +27,6 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -63,55 +62,6 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
         startPk++;
         return startPk;
-    }
-
-    private static void assertEquals(String msg, PointType expected, PointType actual) {
-        assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), 0.001);
-        assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), 0.001);
-    }
-
-    private static void assertRowEquals(int row, Object[] expectedRow, VoltTable actualRow) {
-        for (int i = 0; i < expectedRow.length; ++i) {
-            String msg = "Row " + row + ", col " + i + ": ";
-            Object expectedObj = expectedRow[i];
-            if (expectedObj == null) {
-                VoltType vt = actualRow.getColumnType(i);
-                actualRow.get(i,  vt);
-                assertTrue(msg, actualRow.wasNull());
-            }
-            else if (expectedObj instanceof PointType) {
-                assertEquals(msg, (PointType)expectedObj, actualRow.getPoint(i));
-            }
-            else if (expectedObj instanceof Long) {
-                long val = ((Long)expectedObj).longValue();
-                assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof Integer) {
-                long val = ((Integer)expectedObj).longValue();
-                assertEquals(msg, val, actualRow.getLong(i));
-            }
-            else if (expectedObj instanceof String) {
-                String val = (String)expectedObj;
-                assertEquals(msg, val, actualRow.getString(i));
-            }
-            else {
-                fail("Unexpected type in expected row: " + expectedObj.getClass().getSimpleName());
-            }
-        }
-    }
-
-    private static void assertTableEquals(Object[][] expectedTable, VoltTable actualTable) {
-        for (int i = 0; i < expectedTable.length; ++i) {
-            assertTrue("Fewer rows than expected: "
-                    + "expected: " + expectedTable.length + ", "
-                    + "actual: " + i,
-                    actualTable.advanceRow());
-            assertRowEquals(i, expectedTable[i], actualTable);
-        }
-        assertFalse("More rows than expected: "
-                + "expected " + expectedTable.length + ", "
-                + "actual: " + actualTable.getRowCount(),
-                actualTable.advanceRow());
     }
 
     public void testInsertDefaultNull() throws IOException, ProcCallException {
@@ -175,7 +125,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt = t2.pt "
                 + "order by t1.pk;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable(new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
                 {1, "Santa Clara", SANTA_CLARA_PT}},
                 vt);
@@ -187,7 +137,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt <> t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
                 vt);
@@ -199,7 +149,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt < t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
                 vt);
 
@@ -210,7 +160,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt <= t2.pt "
                 + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, BEDFORD_PT},
                 {1, SANTA_CLARA_PT, SANTA_CLARA_PT},
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
@@ -223,7 +173,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt > t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT}},
                 vt);
 
@@ -234,7 +184,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt >= t2.pt "
                 + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
                 {0, BEDFORD_PT, BEDFORD_PT},
                 {1, SANTA_CLARA_PT, SANTA_CLARA_PT}},
@@ -247,7 +197,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt is null "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {2, "Atlantis", null}},
                 vt);
 
@@ -258,7 +208,7 @@ public class TestPointType extends RegressionSuite {
                 + "where t1.pt is not null "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
                 {1, "Santa Clara", SANTA_CLARA_PT}},
                 vt);
@@ -279,7 +229,7 @@ public class TestPointType extends RegressionSuite {
                 + "order by pt asc")
                 .getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {null, 3},
                 {SANTA_CLARA_PT, 3},
                 {BEDFORD_PT, 3}},
@@ -312,7 +262,7 @@ public class TestPointType extends RegressionSuite {
                 "select pk, name, pt from t order by pk")
                 .getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, "Cambridge", CAMBRIDGE_PT},
                 {1, "San Jose", SAN_JOSE_PT},
                 {2, "Atlantis", null}},
@@ -352,7 +302,7 @@ public class TestPointType extends RegressionSuite {
                 "select pk, name, pt from t_not_null order by pk")
                 .getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {0, "Singapore", new PointType(1.2905f, 103.8521f)}},
                 vt);
     }
@@ -366,7 +316,7 @@ public class TestPointType extends RegressionSuite {
         VoltTable vt = client.callProcedure("sel_in", listParam)
                 .getResults()[0];
 
-        assertTableEquals(new Object[][] {
+        assertContentOfTable (new Object[][] {
                 {1, SANTA_CLARA_PT}},
                 vt);
     }

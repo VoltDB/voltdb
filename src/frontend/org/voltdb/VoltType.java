@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -239,7 +240,17 @@ public enum VoltType {
             "POINT",
             new Class[] {PointType.class},
             PointType[].class,
-            'P'); // 'p' was taken by timestamp
+            'P'), // 'p' was taken by timestamp
+
+    /**
+     * Geography type, for geographical objects (polygons, etc)
+     */
+    GEOGRAPHY ((byte)27,
+            -1, // length in bytes (variable length)
+            "GEOGRAPHY",
+            new Class[] {GeographyValue.class},
+            GeographyValue[].class,
+            'g');
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -371,7 +382,7 @@ public enum VoltType {
 
     private final static ImmutableMap<Class<?>, VoltType> s_classes;
     //Update this if you add a type.
-    private final static VoltType s_types[] = new VoltType[27];
+    private final static VoltType s_types[] = new VoltType[28];
     static {
         ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
         HashMap<Class<?>, VoltType> validation = new HashMap<Class<?>, VoltType>();
@@ -760,12 +771,15 @@ public enum VoltType {
         }
     }
 
-    public static boolean isIndexable(VoltType vt) {
-        if (vt == VARBINARY || vt == POINT) {
+    public boolean isIndexable() {
+        switch(this) {
+        case POINT:
+        case GEOGRAPHY:
+        case VARBINARY:
             return false;
+        default:
+            return true;
         }
-
-        return true;
     }
 
     /**
@@ -798,6 +812,17 @@ public enum VoltType {
         case INTEGER:
         case BIGINT:
         case TIMESTAMP:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    public boolean isVariableLength() {
+        switch (this) {
+        case GEOGRAPHY:
+        case VARBINARY:
+        case STRING:
             return true;
         default:
             return false;
@@ -993,4 +1018,8 @@ public enum VoltType {
     private static final class NullPointSigil{}
     /** Null value for <code>POINT</code>. */
     public static final NullPointSigil NULL_POINT = new NullPointSigil();
+
+    private static final class NullGeographySigil{}
+    /** Null value for <code>POINT</code>. */
+    public static final NullGeographySigil NULL_GEOGRAPHY = new NullGeographySigil();
 }

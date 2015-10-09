@@ -21,28 +21,24 @@ import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.OpTypes;
 
-public class VoltPointType extends Type {
+public class VoltGeographyType extends Type {
 
-    VoltPointType() {
-        super(Types.VOLT_POINT, // comparison group
-                Types.VOLT_POINT,  // type
-                0, // precision
-                0); // scale
+    VoltGeographyType() {
+        super(Types.VOLT_GEOGRAPHY,    // comparison group
+                Types.VOLT_GEOGRAPHY,  // type id
+                0,                     // precision
+                0);                    // scale
     }
-
-    // The length of "point(<float value> <float value>)"
-    private static final int DISPLAY_SIZE = String.valueOf(-Float.MAX_VALUE).length() * 2 + 8;
 
     @Override
     public int displaySize() {
-        return DISPLAY_SIZE;
+        return -1;
     }
 
     @Override
     public String getNameString() {
-        return "POINT";
+        return "GEOGRAPHY";
     }
 
     @Override
@@ -59,9 +55,9 @@ public class VoltPointType extends Type {
     @Override
     public Object convertToType(SessionInterface session, Object a, Type type) {
         // We come here when parsing default values.
-        if (type instanceof VoltPointType) {
+        if (type instanceof VoltGeographyType) {
             // This is currently unreachable, since there's no way to
-            // create a POINT object in a DEFAULT clause given allowable syntax.
+            // create a GEOGRAPHY object in a DEFAULT clause given allowable syntax.
             assert(false);
         }
 
@@ -101,10 +97,10 @@ public class VoltPointType extends Type {
     public Type getCombinedType(Type other, int operation) {
         // The 'combined type' seems to refer to combining types with
         // operators other than comparisons.   Comparisons always
-        // return BOOLEAN, and are valid for POINTs.
+        // return BOOLEAN, and are valid for values of type GEOGRAPHY.
         //
-        // We don't allow any non-comparison operators on POINTs, so
-        // just throw here if anyone tries.
+        // We don't allow any non-comparison operators on GEOGRAPHY values,
+        //so just throw here if anyone tries.
         //
         // incompatible types in operation
         throw Error.error(ErrorCode.X_42561);

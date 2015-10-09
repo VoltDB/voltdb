@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+#include "boost/functional/hash.hpp"
+
 namespace voltdb
 {
 
@@ -41,6 +43,46 @@ class MiscUtil
      * Split string on delimiter into two sub-strings.
      */
     static std::vector<std::string> splitToTwoString(const std::string &str, char delimiter);
+
+    /**
+     * A hashCombine function that can deal with the quirks of floating point math
+     * on the various platforms that we support.
+     */
+    template<typename FloatOrDouble>
+    static void hashCombineFloatingPoint(std::size_t &seed, const FloatOrDouble& floatingPointValue) {
+        // This method was observed to fail on Centos 5 / GCC 4.1.2, returning different hashes
+        // for identical inputs, so the conditional was added,
+        // mutated from the one in boost/type_traits/intrinsics.hpp,
+        // and the broken overload for "double" was by-passed in favor of the more reliable
+        // one for int64 -- even if this may give sub-optimal hashes for typical collections of double.
+        // This conditional can be dropped when Centos 5 support is dropped.
+#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && !defined(__GCCXML__))) && !defined(BOOST_CLANG)
+        boost::hash_combine( seed, floatingPointValue);
+#else
+        {
+            typedef typename FloatToSameSizeInt<FloatOrDouble>::IntType IntType;
+            const IntType proxyForDouble =  *reinterpret_cast<const IntType*>(&floatingPointValue);
+            boost::hash_combine( seed, proxyForDouble);
+        }
+#endif
+    }
+
+  private:
+
+    // A helper class to convert a floating point type to an integral
+    // type of the same size.
+    template<typename FloatOrDouble>
+    struct FloatToSameSizeInt;
+};
+
+template<>
+struct MiscUtil::FloatToSameSizeInt<float> {
+    typedef int32_t IntType;
+};
+
+template<>
+struct MiscUtil::FloatToSameSizeInt<double> {
+    typedef int64_t IntType;
 };
 
 } // namespace voltdb

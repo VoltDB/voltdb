@@ -864,6 +864,8 @@ public class ProcedureRunner {
                 args[ii] = VoltType.NULL_DECIMAL;
             } else if (type == VoltType.POINT) {
                 args[ii] = VoltType.NULL_POINT;
+            } else if (type == VoltType.GEOGRAPHY) {
+                args[ii] = VoltType.NULL_GEOGRAPHY;
             } else {
                 throw new VoltAbortException("Unknown type " + type +
                         " can not be converted to NULL representation for arg " + ii +

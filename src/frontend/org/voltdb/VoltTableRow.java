@@ -23,6 +23,7 @@ import java.nio.charset.Charset;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -143,7 +144,7 @@ public abstract class VoltTableRow {
         for (int i = 1; i < getColumnCount(); i++) {
             final VoltType type = getColumnType(i - 1);
             // handle variable length types specially
-            if ((type == VoltType.STRING) || (type == VoltType.VARBINARY)) {
+            if (type.isVariableLength()) {
                 final int len = m_buffer.getInt(m_offsets[i - 1]);
                 if (len == VoltTable.NULL_STRING_INDICATOR) {
                     m_offsets[i] = m_offsets[i - 1] + STRING_LEN_SIZE;
@@ -298,6 +299,9 @@ public abstract class VoltTableRow {
         case POINT:
             ret = getPoint(columnIndex);
             break;
+        case GEOGRAPHY:
+            ret = getGeographyValue(columnIndex);
+            break;
         default:
             throw new IllegalArgumentException("Invalid type '" + type + "'");
         }
@@ -438,6 +442,7 @@ public abstract class VoltTableRow {
             return retval;
         case STRING:
         case VARBINARY:
+        case GEOGRAPHY:
             // all of these types are variable length with a prefix
             length = m_buffer.getInt(offset);
             if (length == VoltTable.NULL_STRING_INDICATOR) {
@@ -625,6 +630,25 @@ public abstract class VoltTableRow {
         final int colIndex = getColumnIndex(columnName);
         return getPoint(colIndex);
     }
+
+    public final GeographyValue getGeographyValue(int columnIndex) {
+        int offset = getOffset(columnIndex);
+        int len = m_buffer.getInt(offset);
+        if (len == VoltTable.NULL_STRING_INDICATOR) {
+            m_wasNull = true;
+            return null;
+        }
+
+        offset += 4;
+        GeographyValue gv = GeographyValue.unflattenFromBuffer(m_buffer, offset);
+        return gv;
+    }
+
+    public final GeographyValue getGeographyValue(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getGeographyValue(colIndex);
+    }
+
 
     /**
      * Retrieve the <tt>long</tt> timestamp stored in the column specified by index.
@@ -828,6 +852,9 @@ public abstract class VoltTableRow {
             else
                 js.value(dec.toString());
             break;
+        case POINT:
+        case GEOGRAPHY:
+            throw new IllegalArgumentException("Instances of GEOGRAPHY and POINT are not yet serializable to JSON");
         // VoltType includes a few values that aren't valid column value types
         case INVALID:
             break;
