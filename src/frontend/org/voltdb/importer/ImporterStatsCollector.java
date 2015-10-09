@@ -19,16 +19,17 @@ package org.voltdb.importer;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.InternalConnectionStatsCollector;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Maintains success, failure, pending and other relevant counts per importer.
@@ -44,8 +45,9 @@ public class ImporterStatsCollector extends SiteStatsSource
     public static final String PENDING_COUNT_COL = "OUTSTANDING_REQUESTS";
     public static final String RETRY_COUNT_COL = "RETRIES";
 
-    // Holds stats info for each known importer-procname combination
-    private ConcurrentMap<String, ConcurrentMap<String, StatsInfo>> m_importerStats = new ConcurrentHashMap<>();
+    // Holds stats info for each known importer-procname combination.
+    // Using AtomicReferences with ImmutableMap to avoid locking and faster access
+    private AtomicReference<ImmutableMap<String, AtomicReference<ImmutableMap<String, StatsInfo>>>> m_importerStats = new AtomicReference<>();
     private boolean m_isInterval;
 
     public ImporterStatsCollector(long siteId)
@@ -102,26 +104,44 @@ public class ImporterStatsCollector extends SiteStatsSource
     }
 
     private StatsInfo getStatsInfo(String importerName, String procName) {
-        ConcurrentMap<String, StatsInfo> statsByProc = m_importerStats.get(importerName);
-        if (statsByProc==null) {
-            statsByProc = new ConcurrentHashMap<String, StatsInfo>();
-            ConcurrentMap<String, StatsInfo> existing = m_importerStats.putIfAbsent(importerName, statsByProc);
-            if (existing!=null) {
-                statsByProc = existing;
+        ImmutableMap<String, AtomicReference<ImmutableMap<String, StatsInfo>>> existingMap;
+        ImmutableMap<String, AtomicReference<ImmutableMap<String, StatsInfo>>> newMap;
+        do {
+            existingMap = m_importerStats.get();
+            if (existingMap != null && existingMap.containsKey(importerName)) {
+                break;
             }
-        }
-        StatsInfo statsInfo = statsByProc.get(procName);
-        if (statsInfo==null) {
-            StatsInfo newValue = new StatsInfo(importerName, procName);
-            StatsInfo existing = statsByProc.putIfAbsent(procName, newValue);
-            if (existing!=null) {
-                statsInfo = existing;
+            if (existingMap == null) {
+                newMap = ImmutableMap.of(importerName, new AtomicReference<ImmutableMap<String, StatsInfo>>());
             } else {
-                statsInfo = newValue;
+                newMap = ImmutableMap.<String, AtomicReference<ImmutableMap<String, StatsInfo>>> builder()
+                .putAll(existingMap)
+                .put(importerName, new AtomicReference<ImmutableMap<String, StatsInfo>>())
+                .build();
             }
         }
+        while(!m_importerStats.compareAndSet(existingMap, newMap));
 
-        return statsInfo;
+        AtomicReference<ImmutableMap<String, StatsInfo>> existingProcMapRef = m_importerStats.get().get(importerName);
+        ImmutableMap<String, StatsInfo> existingProcMap;
+        ImmutableMap<String, StatsInfo> newProcMap;
+        do {
+            existingProcMap = existingProcMapRef.get();
+            if (existingProcMap != null && existingProcMap.containsKey(procName)) {
+                break;
+            }
+            StatsInfo newStatValue = new StatsInfo(importerName, procName);
+            if (existingProcMap == null) {
+                newProcMap = ImmutableMap.of(procName, newStatValue);
+            } else {
+                newProcMap = ImmutableMap.<String, StatsInfo> builder()
+                .putAll(existingProcMap)
+                .put(procName, newStatValue)
+                .build();
+            }
+        } while(!existingProcMapRef.compareAndSet(existingProcMap, newProcMap));
+
+        return existingProcMapRef.get().get(procName);
     }
 
     @Override
@@ -187,40 +207,7 @@ public class ImporterStatsCollector extends SiteStatsSource
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         m_isInterval = interval;
-        return new Iterator<Object>() {
-            private Iterator<Map.Entry<String, ConcurrentMap<String, StatsInfo>>> m_outerItr = m_importerStats.entrySet().iterator();
-            private Iterator<Map.Entry<String, StatsInfo>> m_innerItr;
-
-            @Override
-            public boolean hasNext() {
-                if (m_innerItr == null || !m_innerItr.hasNext()) {
-                    if (!m_outerItr.hasNext()) {
-                        return false;
-                    } else {
-                        m_innerItr = m_outerItr.next().getValue().entrySet().iterator();
-                    }
-                }
-
-                return m_innerItr.hasNext();
-            }
-
-            @Override
-            public Object next() {
-                // If next is called when there are no more next elements,
-                // this will throw error, which is the expected correct behaviour.
-
-                if (m_innerItr == null || !m_innerItr.hasNext()) {
-                    m_innerItr = m_outerItr.next().getValue().entrySet().iterator();
-                }
-
-                return m_innerItr.next().getValue();
-            }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException("Remove operation is not supported for ImporterStats iterator implementation");
-            }
-        };
+        return new StatsInfoIterator();
     }
 
     @Override
@@ -255,6 +242,58 @@ public class ImporterStatsCollector extends SiteStatsSource
         @Override
         public String toString() {
             return "StatsInfo(" + m_importerName + "." + m_procName + ")";
+        }
+    }
+
+    private class StatsInfoIterator implements Iterator<Object> {
+        private Iterator<AtomicReference<ImmutableMap<String, StatsInfo>>> m_outerItr;
+        private Iterator<StatsInfo> m_innerItr;
+
+        public StatsInfoIterator() {
+            ImmutableMap<String, AtomicReference<ImmutableMap<String, StatsInfo>>> importerMap = m_importerStats.get();
+            m_outerItr = (importerMap == null) ? null : importerMap.values().iterator();
+        }
+
+        @Override
+        public boolean hasNext() {
+            if (m_outerItr == null) { // no stats yet
+                return false;
+            }
+
+            if (m_innerItr == null || !m_innerItr.hasNext()) {
+                if (!m_outerItr.hasNext()) {
+                    return false;
+                } else {
+                    ImmutableMap<String, StatsInfo> innerMap = m_outerItr.next().get();
+                    // Referenced inner map may be null
+                    while (innerMap==null && m_outerItr.hasNext()) {
+                        innerMap = m_outerItr.next().get();
+                    }
+
+                    if (innerMap==null) {
+                        return false;
+                    } else {
+                        m_innerItr = innerMap.values().iterator(); // we never put empty map
+                    }
+                }
+            }
+
+            return m_innerItr.hasNext();
+        }
+
+        @Override
+        public Object next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException("No more importer stats elements");
+            }
+
+            // hasNext call above sets everything up
+            return m_innerItr.next();
+        }
+
+        @Override
+        public void remove() {
+            throw new UnsupportedOperationException("Remove operation is not supported for ImporterStats iterator implementation");
         }
     }
 }

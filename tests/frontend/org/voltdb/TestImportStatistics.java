@@ -63,10 +63,11 @@ public class TestImportStatistics extends RegressionSuite {
         { Level.DEBUG, Level.ERROR, Level.FATAL, Level.INFO, Level.TRACE, Level.WARN };
 
     private Boolean m_socketHandlerInitialized = false;
-    private long m_expectedSocketFailures;
+    // Identify socket data pushers by the procedure they use
+    private Map<String, Long> m_expectedSocketFailures = new HashMap<>();;
 
-    private long m_lastSocketSuccesses = -1;
-    private long m_lastSocketFailures = -1;
+    private Map<String, Long> m_lastSocketSuccesses = new HashMap<>();;
+    private Map<String, Long> m_lastSocketFailures = new HashMap<>();;
     private long m_lastLog4jSuccesses = -1;
 
     @Override
@@ -148,12 +149,18 @@ public class TestImportStatistics extends RegressionSuite {
     class SocketDataPusher extends DataPusher {
         private final String m_server;
         private final int m_port;
+        private final String m_procName;
         private OutputStream m_sout;
 
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, int failureDivisor, boolean goSlow) {
+        public SocketDataPusher(String server, int port, String procName, int count, CountDownLatch latch, int failureDivisor, boolean goSlow) {
             super(count, latch, failureDivisor, goSlow);
             m_server = server;
             m_port = port;
+            m_procName = procName;
+        }
+
+        public String getProcName() {
+            return m_procName;
         }
 
         @Override
@@ -205,21 +212,25 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     private void pushDataToImporters(int count, int loops, boolean goSlow) throws Exception {
-        CountDownLatch latch = new CountDownLatch(2*loops);
-        List<DataPusher> socketDataPushers = new ArrayList<>();
-        List<DataPusher> log4jDataPushers = new ArrayList<>();
+        CountDownLatch latch = new CountDownLatch(3*loops);
+        List<SocketDataPusher> socketDataPushers = new ArrayList<>();
         for (int i=0; i<loops; i++) {
-            SocketDataPusher socketPusher = new SocketDataPusher("localhost", 7001, count, latch, 7, goSlow);
+            SocketDataPusher socketPusher = new SocketDataPusher("localhost", 7001, "TestImportStatistics$TestStatsProcedure7", count, latch, 7, goSlow);
             socketDataPushers.add(socketPusher);
             socketPusher.start();
-            Log4jDataPusher log4jPusher = (new Log4jDataPusher(count, latch, 11));
-            log4jDataPushers.add(log4jPusher);
-            log4jPusher.start();
+            socketPusher = new SocketDataPusher("localhost", 7002, "TestImportStatistics$TestStatsProcedure11", count, latch, 11, goSlow); // second socket importer
+            socketDataPushers.add(socketPusher);
+            socketPusher.start();
+
+            (new Log4jDataPusher(count, latch, 11)).start();;
         }
         latch.await();
 
-        for (DataPusher pusher : socketDataPushers) {
-            m_expectedSocketFailures += pusher.getExpectedFailures();
+        for (SocketDataPusher pusher : socketDataPushers) {
+            String procName = pusher.getProcName();
+            Long currValue = m_expectedSocketFailures.get(procName);
+            long newValue = ((currValue==null) ? 0 : currValue.longValue()) + pusher.getExpectedFailures();
+            m_expectedSocketFailures.put(procName, newValue);
         }
     }
 
@@ -241,17 +252,16 @@ public class TestImportStatistics extends RegressionSuite {
 
         ClientResponse response = client.callProcedure("@Statistics", "Importer", 0);
         VoltTable stats = response.getResults()[0];
-        boolean foundSocket = false;
+        int numSocketsFound = 0;
         boolean foundLog4j = false;
         for (int i=0; i<stats.getRowCount(); i++) {
             VoltTableRow row = stats.fetchRow(i);
             String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
             long expectedFailures = 0;
-            String procName = null;
+            String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
             if (name.equals("SocketImporter")) {
-                expectedFailures = m_expectedSocketFailures;
-                procName = "TestImportStatistics$TestStatsProcedure7";
-                foundSocket = true;
+                expectedFailures = m_expectedSocketFailures.get(procName);
+                numSocketsFound++;
             } else if (name.equals("Log4jSocketHandlerImporter")) {
                 expectedFailures = 0;
                 procName = "log_events.insert";
@@ -270,13 +280,13 @@ public class TestImportStatistics extends RegressionSuite {
             assertNotNull(row.getLong(VoltSystemProcedure.CNAME_SITE_ID));
         }
 
-        assertTrue(foundSocket && foundLog4j);
+        assertTrue(numSocketsFound==2 && foundLog4j);
     }
 
     private void verifyInterval(Client client, int count) throws Exception {
         ClientResponse response = client.callProcedure("@Statistics", "Importer", 1);
         VoltTable stats = response.getResults()[0];
-        boolean foundSocket = false;
+        int numSocketsFound = 0;
         boolean foundLog4j = false;
         for (int i=0; i<stats.getRowCount(); i++) {
             VoltTableRow row = stats.fetchRow(i);
@@ -284,19 +294,17 @@ public class TestImportStatistics extends RegressionSuite {
             long expectedFailures = 0;
             long lastFailures = 0;
             long lastSuccesses = 0;
-            String procName = null;
+            String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
             if (name.equals("SocketImporter")) {
-                expectedFailures = m_expectedSocketFailures;
-                procName = "TestImportStatistics$TestStatsProcedure7";
-                lastFailures = (m_lastSocketFailures < 0) ? 0 : m_lastSocketFailures;
-                lastSuccesses = (m_lastSocketSuccesses < 0) ? 0 : m_lastSocketSuccesses;
-                foundSocket = true;
+                expectedFailures = m_expectedSocketFailures.get(procName);
+                lastFailures = m_lastSocketFailures.containsKey(procName) ? m_lastSocketFailures.get(procName) : 0;
+                lastSuccesses = m_lastSocketSuccesses.containsKey(procName) ? m_lastSocketSuccesses.get(procName) : 0;
+                numSocketsFound++;
             } else if (name.equals("Log4jSocketHandlerImporter")) {
                 expectedFailures = 0;
                 procName = "log_events.insert";
                 lastFailures = 0;
                 lastSuccesses = (m_lastLog4jSuccesses < 0) ? 0 : m_lastLog4jSuccesses;
-                foundSocket = true;
                 foundLog4j = true;
             } else {
                 continue;
@@ -305,8 +313,8 @@ public class TestImportStatistics extends RegressionSuite {
             assertEquals(expectedFailures-lastFailures, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
             assertEquals(count-expectedFailures-lastSuccesses, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
             if (name.equals("SocketImporter")) {
-                m_lastSocketFailures = expectedFailures;
-                m_lastSocketSuccesses = count-expectedFailures;
+                m_lastSocketFailures.put(procName, expectedFailures);
+                m_lastSocketSuccesses.put(procName, count-expectedFailures);
             } else if (name.equals("Log4jSocketHandlerImporter")) {
                 m_lastLog4jSuccesses = count;
             }
@@ -318,11 +326,11 @@ public class TestImportStatistics extends RegressionSuite {
             assertNotNull(row.getLong(VoltSystemProcedure.CNAME_SITE_ID));
         }
 
-        assertTrue(foundSocket && foundLog4j);
+        assertTrue(numSocketsFound==2 && foundLog4j);
     }
 
     public void testImportSingleClient() throws Exception {
-        m_expectedSocketFailures = 0;
+        m_expectedSocketFailures.clear();
 
         Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
@@ -349,7 +357,7 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     public void testImportMultipleClientsInParallel() throws Exception {
-        m_expectedSocketFailures = 0;
+        m_expectedSocketFailures.clear();
 
         Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
@@ -376,7 +384,7 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     // leave this disabled because this is not perfectly reliable and is slow. Enable and run manually as needed.
-    public void donttestPending() throws Exception {
+    public void testPending() throws Exception {
         Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
@@ -419,11 +427,9 @@ public class TestImportStatistics extends RegressionSuite {
             for (int i=0; i<stats.getRowCount(); i++) {
                 VoltTableRow row = stats.fetchRow(i);
                 String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
-                String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
                 if (!name.equals("SocketImporter")) {
                     continue;
                 }
-                assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
                 assertEquals(0, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
                 long pending = row.getLong(ImporterStatsCollector.PENDING_COUNT_COL);
                 if (pending < lastPending) {
@@ -490,6 +496,7 @@ public class TestImportStatistics extends RegressionSuite {
         project.setUseDDLSchema(true);
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-import-ddl.sql"));
         project.addProcedures(TestStatsProcedure7.class);
+        project.addProcedures(TestStatsProcedure11.class);
 
         // configure socket importer
         Properties props = new Properties();
@@ -497,6 +504,15 @@ public class TestImportStatistics extends RegressionSuite {
                 "port", "7001",
                 "decode", "true",
                 "procedure", "TestImportStatistics$TestStatsProcedure7"));
+        project.addImport(true, "custom", "csv", "socketstream.jar", props);
+        project.addPartitionInfo("importTable", "PKEY");
+
+        // another socket importer
+        props = new Properties();
+        props.putAll(ImmutableMap.<String, String>of(
+                "port", "7002",
+                "decode", "true",
+                "procedure", "TestImportStatistics$TestStatsProcedure11"));
         project.addImport(true, "custom", "csv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
@@ -526,6 +542,21 @@ public class TestImportStatistics extends RegressionSuite {
                     Thread.sleep(1000);
                 } catch(InterruptedException e) { }
             } else if (colvalue%7==0) {
+                throw new RuntimeException("Sending back failure from test proc");
+            }
+
+            return 0;
+        }
+    }
+
+    public static class TestStatsProcedure11 extends VoltProcedure {
+        public long run(long pkvalue, long colvalue, int goslow) {
+            if (goslow > 0) {
+                // sleep a bit to slow things down
+                try {
+                    Thread.sleep(1000);
+                } catch(InterruptedException e) { }
+            } else if (colvalue%11==0) {
                 throw new RuntimeException("Sending back failure from test proc");
             }
 
