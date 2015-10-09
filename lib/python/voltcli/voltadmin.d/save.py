@@ -40,10 +40,10 @@ import urllib
                         default = 'native'),
         VOLT.StringListOption(None, '--tables', 'tables',
                               'tables to include in the snapshot',
-                              default = ''),
+                              default = None),
         VOLT.StringListOption(None, '--skiptables', 'skip_tables',
                               'tables to skip in the snapshot',
-                              default = '')
+                              default = None)
     ),
     arguments = (
         VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
@@ -57,9 +57,16 @@ def save(runner):
         blocking = 'true'
     else:
         blocking = 'false'
-    json_opts = ['{uripath:"%s",nonce:"%s",block:%s,format:"%s",tables:%s,skiptables:%s}'
-                    % (uri, nonce, blocking, runner.opts.format, runner.opts.tables, runner.opts.skip_tables)]
-    runner.verbose_info('@SnapshotSave "%s"' % json_opts)
+    raw_json_opts = ['uripath:"%s"' % (uri),
+                     'nonce:"%s"' % (nonce),
+                     'block:%s' % (blocking),
+                     'format:"%s"' % (runner.opts.format)]
+    if runner.opts.tables:
+        raw_json_opts.append('tables:%s' % (runner.opts.tables))
+    if runner.opts.skip_tables:
+        raw_json_opts.append('skiptables:%s' % (runner.opts.skip_tables))
+    runner.verbose_info('@SnapshotSave "%s"' % raw_json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
-    response = runner.call_proc('@SnapshotSave', columns, json_opts)
+    response = runner.call_proc('@SnapshotSave', columns,
+                                ['{%s}' % (','.join(raw_json_opts))])
     print response.table(0).format_table(caption = 'Snapshot Save Results')
