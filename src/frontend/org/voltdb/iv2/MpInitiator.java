@@ -165,7 +165,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
                     if (m_consumerDRGateway != null) {
-                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localMpUniqueId);
+                        m_consumerDRGateway.beginPromotePartition(m_partitionId, drLogInfo, localMpUniqueId);
                     }
                 }
                 else {

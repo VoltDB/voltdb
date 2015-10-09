@@ -185,7 +185,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                     // If we are a DR replica, inform that subsystem of any remote data we've seen
                     if (m_consumerDRGateway != null) {
-                        m_consumerDRGateway.notifyOfLastSeenSegmentId(m_partitionId, drLogInfo, localSpUniqueId);
+                        m_consumerDRGateway.beginPromotePartition(m_partitionId, drLogInfo, localSpUniqueId);
                     }
                 }
                 else {
