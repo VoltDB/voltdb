@@ -39,7 +39,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
-    public abstract void beginPromotePartition(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId);
+    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId);
 
     public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId);
 
@@ -73,7 +73,7 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
-        public void beginPromotePartition(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId) {}
+        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId) {}
 
         @Override
         public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId) {}
