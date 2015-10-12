@@ -20,6 +20,9 @@ class BuildContext:
         self.SRC_INCLUDE_DIRS = []
         self.OBJ_INCLUDE_DIRS = []
         self.THIRD_PARTY_INPUT = {}
+        # Third party libraries that needs to be linked
+        self.ROCKSDB_LIBS = ""
+        # END
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
         self.LEVEL = "DEBUG"
@@ -236,6 +239,9 @@ def buildMakefile(CTX):
     makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
     makefile.write('#\n# This is the root of the third party sources.\n#\n')
     makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
+    makefile.write("#\n# These are RocksDB library's source and object directories.\n#\n")
+    makefile.write('ROCKSDB_SRC=${THIRD_PARTY_SRC}/rocksdb\n')
+    makefile.write('ROCKSDB_OBJ=${OBJDIR}/rocksdb\n')
     makefile.write("\n")
 
     if CTX.TARGET == "CLEAN":
@@ -244,6 +250,23 @@ def buildMakefile(CTX):
         makefile.write("\trm -rf *\n")
         makefile.close()
         return
+
+    # build third party library using their makefile
+    makefile.write(".PHONY: build-rocksdb\n")
+    makefile.write("build-rocksdb:\n")
+    makefile.write("\t@echo Building the rocksdb library\n")
+    makefile.write("\tif [ ! -f ${ROCKSDB_OBJ}/librocksdb.dylib ] ; then \\\n")
+    makefile.write("\t    rm -rf rocksdb; \\\n")
+    makefile.write('\t    mkdir rocksdb; \\\n')
+    makefile.write('\tmake --directory=${ROCKSDB_SRC}/ shared_lib; \\\n')
+    makefile.write('\tmv ${ROCKSDB_SRC}/librocksdb.* ${ROCKSDB_OBJ};\\\n')
+    makefile.write("\tfi\n\n")
+
+    makefile.write(".PHONY: clean-rocksdb\n")
+    makefile.write('clean-rocksdb:\n')
+    makefile.write("\t@echo Deleting the rocksdb library\\\'s object files\n")
+    makefile.write('\trm -rf rocksdb\n')
+    makefile.write('\n')
 
     makefile.write(".PHONY: main\n\n")
     if CTX.TARGET == "VOLTRUN":
@@ -399,7 +422,7 @@ def buildMakefile(CTX):
     makefile.write("#\n# %s\n#\n" % "Cleaning")
     makefile.write("########################################################################\n")
     makefile.write("\n")
-    makefile.write("clean: \n")
+    makefile.write("clean: clean-rocksdb \n")
     makefile.write("\t@echo Deleting all derived files.\n")
     makefile.write("\t@${RM} %s\n" % formatList(cleanobjs))
     makefile.close()

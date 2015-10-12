@@ -366,6 +366,12 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
  sha1.cpp
 """
 
+###############################################################################
+# Some special handling for rocksdb.
+###############################################################################
+CTX.ROCKSDB_LIBS += " -Lrocksdb/ -lrocksdb"
+CTX.OBJ_INCLUDE_DIRS += ['rocksdb/include/rocksdb']
+CTX.LASTLDFLAGS += CTX.ROCKSDB_LIBS
 
 ###############################################################################
 # SPECIFY THE TESTS
