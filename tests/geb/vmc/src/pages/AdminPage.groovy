@@ -152,7 +152,7 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         exportbtn			{ $("#row-4 > td.configLabel > a", text:"Export")}
         noconfigtxt			{ $("#exportConfiguration > tr > td.configLabel")}
-        addconfig			{ $("#addNewConfigLink")}
+        //addconfig			{ $("#addNewConfigLink")}
         addconfigpopup			{ $("#addConfigInnerPopup")}
         addconfigtxt			{ $("#addConfigHeader")}
         inputstream			{ $("#txtStream")}
