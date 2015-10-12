@@ -22,6 +22,7 @@ class BuildContext:
         self.THIRD_PARTY_INPUT = {}
         # Third party libraries that needs to be linked
         self.ROCKSDB_LIBS = ""
+        self.ROCKSDB_LIBS_TYPE = "so"
         # END
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
@@ -255,7 +256,7 @@ def buildMakefile(CTX):
     makefile.write(".PHONY: build-rocksdb\n")
     makefile.write("build-rocksdb:\n")
     makefile.write("\t@echo Building the rocksdb library\n")
-    makefile.write("\tif [ ! -f ${ROCKSDB_OBJ}/librocksdb.dylib ] ; then \\\n")
+    makefile.write("\tif [ ! -f ${ROCKSDB_OBJ}/librocksdb.%s ] ; then \\\n" % (CTX.ROCKSDB_LIBS_TYPE))
     makefile.write("\t    rm -rf rocksdb; \\\n")
     makefile.write('\t    mkdir rocksdb; \\\n')
     makefile.write('\tmake --directory=${ROCKSDB_SRC}/ shared_lib; \\\n')

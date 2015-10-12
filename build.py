@@ -156,6 +156,7 @@ if CTX.PLATFORM == "Darwin":
     CTX.SOFLAGS += "-dynamiclib -undefined dynamic_lookup -single_module"
     CTX.SOEXT = "dylib"
     CTX.JNIFLAGS = "-framework JavaVM,1.7"
+    CTX.ROCKSDB_LIBS_TYPE = "dylib"
 
 if CTX.PLATFORM == "Linux":
     CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
