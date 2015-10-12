@@ -251,7 +251,7 @@ def buildMakefile(CTX):
     makefile.write("\tif [ ! -f ${ROCKSDB_OBJ}/librocksdb.%s ] ; then \\\n" % (CTX.ROCKSDB_LIBS_TYPE))
     makefile.write("\t    rm -rf rocksdb; \\\n")
     makefile.write('\t    mkdir rocksdb; \\\n')
-    makefile.write('\tmake --directory=${ROCKSDB_SRC}/ shared_lib; \\\n')
+    makefile.write('\tmake --directory=${ROCKSDB_SRC}/ static_lib; \\\n')
     makefile.write('\tmv ${ROCKSDB_SRC}/librocksdb.* ${ROCKSDB_OBJ};\\\n')
     makefile.write("\tfi\n\n")
 
@@ -397,11 +397,11 @@ def buildMakefile(CTX):
         makefile.write("#\n# %s\n#\n" % sourcename)
         makefile.write("########################################################################\n")
         makefile.write("%s: $(ROOTDIR)/%s \n" % (objectname, sourcename))
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -O2 -std=c++11 -DROCKSDB_PLATFORM_POSIX  -DOS_MACOSX -DZLIB -DBZIP2 -Wshorten-64-to-32 -march=native -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
         makefile.write("-include %s\n" % replaceExtension(objectname, ".d"))
         # link the test
         makefile.write("%s: %s objects/volt.a \n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
+        makefile.write("\t$(LINK.cpp) -o %s rocksdb/librocksdb.a %s objects/volt.a -lz -lbz2 %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))

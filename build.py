@@ -41,7 +41,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
@@ -156,7 +156,7 @@ if CTX.PLATFORM == "Darwin":
     CTX.SOFLAGS += "-dynamiclib -undefined dynamic_lookup -single_module"
     CTX.SOEXT = "dylib"
     CTX.JNIFLAGS = "-framework JavaVM,1.7"
-    CTX.ROCKSDB_LIBS_TYPE = "dylib"
+    CTX.ROCKSDB_LIBS_TYPE = "a"
 
 if CTX.PLATFORM == "Linux":
     CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
@@ -370,8 +370,8 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
 ###############################################################################
 # Some special handling for rocksdb.
 ###############################################################################
+CTX.SRC_INCLUDE_DIRS += ['third_party/cpp/rocksdb/include']
 CTX.ROCKSDB_LIBS += " -Lrocksdb/ -lrocksdb"
-CTX.OBJ_INCLUDE_DIRS += ['rocksdb/include/rocksdb']
 CTX.LASTLDFLAGS += CTX.ROCKSDB_LIBS
 
 ###############################################################################
@@ -387,6 +387,11 @@ if whichtests ==  "${eetestsuite}":
     CTX.TESTS['.'] = """
      harness_test
     """
+    
+# if whichtests in ("${eetestsuite}", "dbtests"):
+#     CTX.TESTS['dbtests'] = """
+#      simple_example
+#     """
 
 if whichtests in ("${eetestsuite}", "catalog"):
     CTX.TESTS['catalog'] = """
@@ -456,6 +461,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_and_indexes_test
      table_test
      tabletuple_export_test
+     simple_example
     """
 
 if whichtests in ("${eetestsuite}", "structures"):
