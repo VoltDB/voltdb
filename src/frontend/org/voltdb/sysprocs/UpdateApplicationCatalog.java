@@ -17,7 +17,9 @@
 
 package org.voltdb.sysprocs;
 
+import java.lang.Class;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
@@ -49,6 +51,7 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
@@ -57,6 +60,7 @@ import com.google_voltpatches.common.base.Throwables;
 
 @ProcInfo(singlePartition = false)
 public class UpdateApplicationCatalog extends VoltSystemProcedure {
+    static JavaClassForTest m_javaClass = new JavaClassForTest();
 
     VoltLogger log = new VoltLogger("HOST");
 
@@ -155,6 +159,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         }
     }
 
+    public static class JavaClassForTest {
+        public Class forName(String name, boolean initialize, ClassLoader loader) throws ClassNotFoundException {
+            return Class.forName(name, initialize, loader);
+        }
+    }
+
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -180,10 +190,35 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 JarLoader testjarloader = testjar.getLoader();
                 for (String classname : testjarloader.getClassNames()) {
                     try {
-                        Class.forName(classname, true, testjarloader);
+                        m_javaClass.forName(classname, true, testjarloader);
                     }
                     // LinkageError catches most of the various class loading errors we'd
                     // care about here.
+                    catch (UnsupportedClassVersionError e) {
+                        String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                                     " in use.";
+                        Integer major = 0;
+                        try {
+                            major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
+                        } catch (Exception ex) {
+                            // Could not extract major version number from error message.
+                        }
+                        HashMap<Integer, String> versionMap = new HashMap<Integer, String>();
+                        versionMap.put(45, "Java 1.1");
+                        versionMap.put(46, "Java 1.2");
+                        versionMap.put(47, "Java 1.3");
+                        versionMap.put(48, "Java 1.4");
+                        versionMap.put(49, "Java 5");
+                        versionMap.put(50, "Java 6");
+                        versionMap.put(51, "Java 7");
+                        versionMap.put(52, "Java 8");
+                        if (versionMap.containsKey(major)) {
+                            msg = msg.concat(" Class " + classname + " was compiled with " + versionMap.get(major) +
+                                             ", current runtime version is " + System.getProperty("java.version") + ".");
+                        }
+                        log.error(msg);
+                        throw new VoltAbortException(msg);
+                    }
                     catch (LinkageError | ClassNotFoundException e) {
                         String cause = e.getMessage();
                         if (cause == null && e.getCause() != null) {
@@ -451,5 +486,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {result});
+    }
+
+    public static void setJavaClassForTest(JavaClassForTest fakeJavaClass) {
+        m_javaClass = fakeJavaClass;
     }
 }
