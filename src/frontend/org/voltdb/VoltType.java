@@ -742,7 +742,8 @@ public enum VoltType {
         if ((obj == null) ||
             (obj == VoltType.NULL_TIMESTAMP) ||
             (obj == VoltType.NULL_STRING_OR_VARBINARY) ||
-            (obj == VoltType.NULL_DECIMAL))
+            (obj == VoltType.NULL_DECIMAL) ||
+            (obj == VoltType.NULL_POINT))
         {
             return true;
         }
@@ -763,6 +764,8 @@ public enum VoltType {
         case STRING:
         case VARBINARY:
         case DECIMAL:
+        case POINT:
+        case GEOGRAPHY:
             // already checked these above
             return false;
         default:

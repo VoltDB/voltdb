@@ -621,6 +621,7 @@ public abstract class VoltTableRow {
     }
 
     public final PointType getPoint(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.POINT);
         PointType pt = PointType.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
         m_wasNull = (pt == null);
         return pt;
@@ -632,6 +633,7 @@ public abstract class VoltTableRow {
     }
 
     public final GeographyValue getGeographyValue(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.GEOGRAPHY);
         int offset = getOffset(columnIndex);
         int len = m_buffer.getInt(offset);
         if (len == VoltTable.NULL_STRING_INDICATOR) {

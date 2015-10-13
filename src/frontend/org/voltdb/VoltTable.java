@@ -775,6 +775,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             case VARBINARY:
                 m_buffer.putInt(NULL_STRING_INDICATOR);
                 break;
+            case POINT:
+                PointType.serializeNull(m_buffer);
+                break;
             case DECIMAL:
                 VoltDecimalHelper.serializeNull(m_buffer);
                 break;
@@ -914,6 +917,17 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         GeographyValue gv = (GeographyValue)value;
                         m_buffer.putInt(gv.getLengthInBytes());
                         gv.flattenToBuffer(m_buffer);
+                    }
+                    else {
+                        throw new ClassCastException();
+                    }
+                    break;
+                }
+
+                case POINT: {
+                    if (value instanceof PointType) {
+                        PointType pt = (PointType)value;
+                        pt.flattenToBuffer(m_buffer);
                     }
                     else {
                         throw new ClassCastException();

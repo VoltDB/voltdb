@@ -284,13 +284,16 @@ public:
     void serializeTo(Serializer& output) const {
         assert (! isNull());
         int32_t nLoops = numLoops();
+        assert(nLoops > 0);
         output.writeInt(nLoops);
 
         LoopContainer::iterator it = loops().begin();
         LoopContainer::iterator loopsEnd = loops().end();
         for (; it != loopsEnd; ++it) {
             Loop loop = *it;
-            output.writeInt(loop.numVertices());
+            int numVerts = loop.numVertices();
+            assert(numVerts > 0);
+            output.writeInt(numVerts);
             BOOST_FOREACH(const Point& vertex, loop) {
                 vertex.serializeTo(output);
             }
@@ -310,6 +313,7 @@ public:
     {
         char *pos = storage;
         int32_t nLoops = input.readInt();
+        assert(nLoops > 0);
         reinterpret_cast<int32_t*>(pos)[0] = nLoops;
         pos += sizeof(nLoops);
 
