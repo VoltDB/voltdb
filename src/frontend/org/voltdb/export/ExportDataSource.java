@@ -104,7 +104,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_numberOfReplicas;
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
-    private boolean m_closed = false;
+    private volatile boolean m_closed = false;
 
     /**
      * Create a new data source.
@@ -311,7 +311,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_ackMailboxRefs.set( ackMailboxes);
         if (task != null) {
             if (m_ackMailboxRefs.get().getSecond().size() == m_numberOfReplicas) {
-                ImmutableList<Long> p = m_ackMailboxRefs.get().getSecond();
                 task.setCompleted(getPartitionId());
             }
         }
@@ -814,7 +813,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         Mailbox mbx = p.getFirst();
         if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8) + 1 byte for runeverywhere+ifmaster
+            // signaturesBytes.length + ackUSO:long(8) + 2 bytes for runEverywhere or not.
             final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
@@ -843,6 +842,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica");
                 m_replicaRunning = true;
                 m_isMaster = false;
+                //This must be the continueing generation the last generation after draining all on disk generation.
+                //Continueing generation must wait for mailbox setup task to finish. On disk generation destined to drain does not wait for task
+                // as they must drain
                 acceptMastership(true);
             }
             return;
@@ -865,7 +867,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    private void ackImpl(long uso) {
+     private void ackImpl(long uso) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
             m_onDrain.run();
@@ -903,14 +905,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
+     * @param isContinueingGeneration Is this part of continueing generation?
      */
-    public void acceptMastership(final boolean isContinueing) {
+    public void acceptMastership(final boolean isContinueingGeneration) {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    if (isContinueing) {
+                    if (isContinueingGeneration) {
                         m_allowAcceptingMastership.acquire();
                     }
                     if (!m_es.isShutdown() || !m_closed) {
