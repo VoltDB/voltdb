@@ -60,7 +60,6 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import org.voltdb.export.ExportGeneration.EnsureMailboxSetupTask;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -101,7 +100,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private boolean m_runEveryWhere = false;
     private boolean m_isMaster = false;
     private boolean m_replicaRunning = false;
-    private final int m_numberOfReplicas;
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
@@ -122,12 +120,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath,
-            int noOfReplicas
+            String overflowPath
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
-        m_numberOfReplicas = noOfReplicas;
         m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
@@ -237,7 +233,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        m_numberOfReplicas = VoltDB.instance().getCatalogContext().getDeployment().getCluster().getKfactor();
 
         String overflowPath = adFile.getParent();
         byte data[] = Files.toByteArray(adFile);
@@ -302,18 +297,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public void allowMastership() {
-        m_allowAcceptingMastership.release();
-        exportLog.info("All replicas seen for partition " + getPartitionId() + " allow mastership now.");
-    }
-
-    public synchronized void updateAckMailboxes(EnsureMailboxSetupTask task, final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
+    public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
-        if (task != null) {
-            if (m_ackMailboxRefs.get().getSecond().size() == m_numberOfReplicas) {
-                task.setCompleted(getPartitionId());
-            }
-        }
     }
 
     private void releaseExportBytes(long releaseOffset) throws IOException {
@@ -827,7 +812,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
             for( Long siteId: p.getSecond()) {
-                exportLog.info("Forward Ack to replica: " + uso);
                 mbx.send(siteId, bpm);
             }
         }
@@ -842,10 +826,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId() + " as replica");
                 m_replicaRunning = true;
                 m_isMaster = false;
-                //This must be the continueing generation the last generation after draining all on disk generation.
-                //Continueing generation must wait for mailbox setup task to finish. On disk generation destined to drain does not wait for task
-                // as they must drain
-                acceptMastership(true);
+                acceptMastership();
             }
             return;
         }
@@ -905,17 +886,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
-     * @param isContinueingGeneration Is this part of continueing generation?
      */
-    public void acceptMastership(final boolean isContinueingGeneration) {
+    public void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    if (isContinueingGeneration) {
-                        m_allowAcceptingMastership.acquire();
-                    }
                     if (!m_es.isShutdown() || !m_closed) {
                         exportLog.info("Export generation " + getGeneration() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();

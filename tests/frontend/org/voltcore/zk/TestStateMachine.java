@@ -89,17 +89,15 @@ public class TestStateMachine extends ZKTestBase {
             m_stateMachineGroup1[Site] = ssm1;
             BooleanStateMachine bsm1 = new BooleanStateMachine(ssm1, "bool");
             m_booleanStateMachinesForGroup1[Site] = bsm1;
-            ssm1.initialize(1);
 
             // Create a SynchronizedStatesManager to manage both a BooleanStateMachine and ByteStateMachine
             SynchronizedStatesManager ssm2 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
-                    stateMachineManagerRoot, "ssm2", siteString);
+                    stateMachineManagerRoot, "ssm2", siteString, stateMachines.values().length);
             m_stateMachineGroup2[Site] = ssm2;
             BooleanStateMachine bsm2 = new BooleanStateMachine(ssm2, "bool");
             m_booleanStateMachinesForGroup2[Site] = bsm2;
             ByteStateMachine msm2 = new ByteStateMachine(ssm2, "byte");
             m_byteStateMachinesForGroup2[Site] = msm2;
-            ssm2.initialize(2);
         }
         catch (KeeperException | InterruptedException e) {
             //  Auto-generated catch block
@@ -162,7 +160,7 @@ public class TestStateMachine extends ZKTestBase {
     }
 
 
-    class BooleanStateMachine extends StateMachineInstance {
+    class BooleanStateMachine extends SynchronizedStatesManager.StateMachineInstance {
         volatile boolean initialized = false;
         boolean makeProposal = false;
         boolean startTask = false;
@@ -192,7 +190,7 @@ public class TestStateMachine extends ZKTestBase {
         }
 
         public BooleanStateMachine(SynchronizedStatesManager ssm, String instanceName) {
-            super(ssm, instanceName, log);
+            ssm.super(instanceName, log);
             assertFalse("State machine local lock held after bool initialization", debugIsLocalStateLocked());
         }
 
@@ -346,7 +344,7 @@ public class TestStateMachine extends ZKTestBase {
         }
     };
 
-    class ByteStateMachine extends StateMachineInstance {
+    class ByteStateMachine extends SynchronizedStatesManager.StateMachineInstance {
         volatile boolean initialized = false;
         boolean makeProposal = false;
         boolean startTask = false;
@@ -373,7 +371,7 @@ public class TestStateMachine extends ZKTestBase {
         }
 
         public ByteStateMachine(SynchronizedStatesManager ssm, String instanceName) {
-            super(ssm, instanceName, log);
+            ssm.super(instanceName, log);
             assertFalse("State machine local lock held after byte initialization", debugIsLocalStateLocked());
         }
 

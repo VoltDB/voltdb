@@ -60,11 +60,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.utils.DBBPool;
-import org.voltcore.zk.StateMachineInstance;
-import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.catalog.Column;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.VoltFile;
@@ -74,9 +70,6 @@ import org.voltdb.utils.VoltFile;
  *
  */
 public class ExportGeneration {
-
-    // This task ensures that all nodes which has replicas for partition have their mailboxes setup.
-    private EnsureMailboxSetupTask m_task = null;
 
     /**
      * Processors also log using this facility.
@@ -164,17 +157,13 @@ public class ExportGeneration {
 
     //This is maintained to detect if this is a continueing generation or not
     private final boolean m_isContinueingGeneration;
-    private final SynchronizedStatesManager m_ssm;
-    private final int m_numOfReplicas;
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(SynchronizedStatesManager ssm, long txnId, File exportOverflowDirectory, int numOfReplicas, boolean isRejoin) throws IOException {
-        m_ssm = ssm;
+    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
-        m_numOfReplicas = numOfReplicas;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
         if (!m_directory.canWrite()) {
             if (!m_directory.mkdirs()) {
@@ -182,10 +171,6 @@ public class ExportGeneration {
             }
         }
         m_isContinueingGeneration = true;
-        //null check is only for tests.
-        if (!isRejoin && m_ssm != null) {
-            m_task = new EnsureMailboxSetupTask(m_ssm, "ExportGeneration", exportLog);
-        }
 
         exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
@@ -196,9 +181,7 @@ public class ExportGeneration {
      * @param catalogGen Generation from catalog.
      * @throws IOException
      */
-    public ExportGeneration(SynchronizedStatesManager ssm, File generationDirectory, long catalogGen, int numOfReplicas) throws IOException {
-        m_ssm = ssm;
-        m_numOfReplicas = numOfReplicas;
+    public ExportGeneration(File generationDirectory, long catalogGen) throws IOException {
         m_directory = generationDirectory;
         try {
             m_timestamp = Long.parseLong(generationDirectory.getName());
@@ -389,7 +372,7 @@ public class ExportGeneration {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
                         if (!eds.setMaster()) {
-                            eds.acceptMastership(this.m_isContinueingGeneration);
+                            eds.acceptMastership();
                         }
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
@@ -415,7 +398,7 @@ public class ExportGeneration {
             if (conn.getEnabled()) {
                 for (ConnectorTableInfo ti : conn.getTableinfo()) {
                     Table table = ti.getTable();
-                    addDataSources(m_ssm, table, hostId, partitions);
+                    addDataSources(table, hostId, partitions);
 
                     partitionsInUse.addAll(partitions);
                 }
@@ -438,119 +421,9 @@ public class ExportGeneration {
         }
     }
 
-    //The task is done when all partitions are seen.
-    public class EnsureMailboxSetupTask extends StateMachineInstance {
-        private boolean m_done = false;
-        private final AtomicBoolean m_requestPending = new AtomicBoolean(false);
-        private boolean m_taskStarted = false;
-        private final Set<Integer> m_partitions = new HashSet<Integer>();
-        private final Set<Integer> m_done_partitions = new HashSet<Integer>();
-        private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
-        private final ByteBuffer m_dummyBuffer = ByteBuffer.allocate(0);
-
-        public EnsureMailboxSetupTask(SynchronizedStatesManager mgr, String instanceName, VoltLogger logger) {
-            super(mgr, instanceName, logger);
-        }
-
-        @Override
-        protected void setInitialState(ByteBuffer currentAgreedState) {
-            m_allowAcceptingMastership.release();
-        }
-
-        @Override
-        protected void lockRequestCompleted() {
-            if (m_done) {
-                cancelLockRequest();
-                return;
-            }
-            initiateCoordinatedTask(false, m_dummyBuffer);
-        }
-
-        public void setCompleted(int i) {
-            m_partitions.remove(i);
-            m_done_partitions.add(i);
-            if (m_partitions.isEmpty() && m_requestPending.compareAndSet(true, false)) {
-                if (!m_done) {
-                    requestedTaskComplete(m_dummyBuffer);
-                    exportLog.info("EnsureMailboxSetupTask Task complete: " + m_partitions + " Done: " + m_done_partitions);
-                }
-            } else {
-                exportLog.info("EnsureMailboxSetupTask Task not complete: " + m_partitions + " Done: " + m_done_partitions);
-            }
-        }
-
-        public void setPartitions(Set<Integer> localPartitions) {
-            m_partitions.addAll(localPartitions);
-        }
-
-        @Override
-        protected void taskRequested(ByteBuffer proposedTask) {
-            if (m_partitions.isEmpty()) {
-                requestedTaskComplete(m_dummyBuffer);
-                return;
-            }
-            m_requestPending.set(true);
-        }
-
-        @Override
-        protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {
-            m_done = true;
-        }
-
-        @Override
-        protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, List<ByteBuffer> results) {
-            m_done = true;
-            if (m_partitions.isEmpty()) {
-                //Since the task is complete allow data source to take on mastership if its asked for.
-                for (Integer partition : m_done_partitions) {
-                    Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-                    for (ExportDataSource eds : dataSourcesForPartition.values()) {
-                        eds.allowMastership();
-                    }
-                }
-            }
-            m_taskStarted = false;
-        }
-
-        public void attemptTask() {
-            if (!m_allowAcceptingMastership.tryAcquire()) return;
-            if (m_taskStarted) return;
-            m_taskStarted = true;
-            if (requestLock()) {
-                lockRequestCompleted();
-            }
-        }
-
-        public void cancelAttempt() {
-            cancelLockRequest();
-        }
-
-        public void supplyResponse(ByteBuffer taskResponse) {
-            requestedTaskComplete(taskResponse);
-        }
-
-        @Override
-        protected String stateToString(ByteBuffer state) {
-            return "ExportGenerationTask";
-        }
-    }
-
     private void createAndRegisterAckMailboxes(final Set<Integer> localPartitions, HostMessenger messenger) {
         m_zk = messenger.getZK();
         m_mailboxesZKPath = VoltZK.exportGenerations + "/" + m_timestamp + "/" + "mailboxes";
-
-        // for new generations Create a task and wait for all mailboxes setup.
-        try {
-            if (m_task != null) {
-                m_task.setPartitions(localPartitions);
-                if (m_ssm.getStateMachine(0) == null) {
-                    m_ssm.registerStateMachine(m_task);
-                }
-                m_task.attemptTask();
-            }
-        } catch (InterruptedException ex) {
-            exportLog.error("Error setting up state machine for ensure mailbox task.", ex);
-        }
 
         m_mbox = new LocalMailbox(messenger) {
             @Override
@@ -639,7 +512,7 @@ public class ExportGeneration {
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
                     for( ExportDataSource eds:
                         m_dataSourcesByPartition.get( partition).values()) {
-                        eds.updateAckMailboxes(m_task, Pair.of(m_mbox, mailboxHsids));
+                        eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
                     }
                 }
             }
@@ -649,17 +522,6 @@ public class ExportGeneration {
             fut.get();
         } catch (Throwable t) {
             Throwables.propagate(t);
-        }
-
-        //If we are joining we dont depend on task and just allow mastership if its presented.
-        if (m_task != null) {
-            //allow mastership without the task.
-            for (Integer partition : localPartitions) {
-                Map<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partition);
-                for (ExportDataSource eds : dataSourcesForPartition.values()) {
-                    eds.allowMastership();
-                }
-            }
         }
 
     }
@@ -712,7 +574,7 @@ public class ExportGeneration {
                             }
                             ImmutableList<Long> mailboxHsids = mailboxes.build();
                             for( ExportDataSource eds: m_dataSourcesByPartition.get( partition).values()) {
-                                eds.updateAckMailboxes(m_task, Pair.of(m_mbox, mailboxHsids));
+                                eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
                             }
                         } catch (Throwable t) {
                             VoltDB.crashLocalVoltDB("Error in export ack handling", true, t);
@@ -791,8 +653,7 @@ public class ExportGeneration {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(SynchronizedStatesManager ssm,
-            Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
 
@@ -816,7 +677,7 @@ public class ExportGeneration {
                         m_timestamp,
                         table.getColumns(),
                         partColumn,
-                        m_directory.getPath(), m_numOfReplicas);
+                        m_directory.getPath());
                 m_numSources++;
                 exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                         " signature " + table.getSignature() + " partition id " + partition);
@@ -978,7 +839,7 @@ public class ExportGeneration {
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
                 if (!eds.setMaster()) {
-                    eds.acceptMastership(this.m_isContinueingGeneration);
+                    eds.acceptMastership();
                 }
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);

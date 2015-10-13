@@ -51,9 +51,6 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.voltcore.zk.SynchronizedStatesManager;
-import org.voltdb.VoltZK;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -359,7 +356,6 @@ public class ExportManager
         return db.getConnectors();
     }
 
-    SynchronizedStatesManager m_exportStatesManager;
     /**
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
@@ -386,15 +382,6 @@ public class ExportManager
                 return;
             }
         }
-        String hostIdStr = "ExportHost_" + messenger.getHostId();
-        m_exportStatesManager = new SynchronizedStatesManager(messenger.getZK(), VoltZK.syncStateMachine, "PER_HOST_EXPORT_STATES", hostIdStr);
-        try {
-            m_exportStatesManager.initialize(1);
-        } catch (KeeperException ex) {
-            Throwables.propagate(ex);
-        } catch (InterruptedException ex) {
-            Throwables.propagate(ex);
-        }
 
         updateProcessorConfig(connectors);
 
@@ -420,7 +407,6 @@ public class ExportManager
             boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
-            final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
             ExportDataProcessor newProcessor = null;
             final Class<?> loaderClass = Class.forName(m_loaderClass);
             newProcessor = (ExportDataProcessor)loaderClass.newInstance();
@@ -437,7 +423,7 @@ public class ExportManager
             if (startup) {
                 initializePersistedGenerations(
                         exportOverflowDirectory,
-                        catalogContext, connectors, numOfReplicas);
+                        catalogContext, connectors);
             }
 
             /*
@@ -446,9 +432,9 @@ public class ExportManager
              */
             if (startup) {
                 if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
-                    final ExportGeneration currentGeneration = new ExportGeneration(m_exportStatesManager,
+                    final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
-                            exportOverflowDirectory, numOfReplicas, isRejoin);
+                            exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
@@ -513,7 +499,7 @@ public class ExportManager
 
     private void initializePersistedGenerations(
             File exportOverflowDirectory, CatalogContext catalogContext,
-            CatalogMap<Connector> connectors, final int numOfReplicas) throws IOException {
+            CatalogMap<Connector> connectors) throws IOException {
         TreeSet<File> generationDirectories = new TreeSet<File>();
         for (File f : exportOverflowDirectory.listFiles()) {
             if (f.isDirectory()) {
@@ -526,7 +512,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(m_exportStatesManager, generationDirectory, catalogContext.m_uniqueId, numOfReplicas);
+            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
@@ -600,25 +586,12 @@ public class ExportManager
             return;
         }
 
-
-        if (m_exportStatesManager == null) {
-            HostMessenger messenger = VoltDB.instance().getHostMessenger();
-            String hostIdStr = "ExportHost_" + messenger.getHostId();
-            m_exportStatesManager = new SynchronizedStatesManager(messenger.getZK(), VoltZK.syncStateMachine, "PER_HOST_EXPORT_STATES", hostIdStr);
-            try {
-                m_exportStatesManager.initialize(1);
-            } catch (KeeperException ex) {
-            } catch (InterruptedException ex) {
-            }
-        }
-
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
         final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
         ExportGeneration newGeneration = null;
         try {
-            newGeneration = new ExportGeneration(m_exportStatesManager,
-                    catalogContext.m_uniqueId, exportOverflowDirectory, numOfReplicas, false);
+            newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             m_generations.put(catalogContext.m_uniqueId, newGeneration);
