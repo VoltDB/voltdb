@@ -30,6 +30,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -115,6 +117,24 @@ public class VoltTableUtil {
                    } else {
                        fields[ii] = Encoder.hexEncode(bytes);
                    }
+                }
+                else if (type == VoltType.POINT) {
+                    final PointType pt = vt.getPoint(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = Constants.CSV_NULL;
+                    }
+                    else {
+                        fields[ii] = pt.toString();
+                    }
+                }
+                else if (type == VoltType.GEOGRAPHY) {
+                    final GeographyValue gv = vt.getGeographyValue(ii);
+                    if (vt.wasNull()) {
+                        fields[ii] = Constants.CSV_NULL;
+                    }
+                    else {
+                        fields[ii] = gv.toString();
+                    }
                 }
             }
             csv.writeNext(fields);
