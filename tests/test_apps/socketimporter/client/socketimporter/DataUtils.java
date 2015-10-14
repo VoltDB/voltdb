@@ -52,8 +52,10 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltcore.logging.VoltLogger;
 
 public class DataUtils {
+    static VoltLogger log = new VoltLogger("DataUtils");
     static Queue<Pair<String, String>> m_queue;
     static Queue<Pair<String, String>> m_delete_queue;
     Client m_client;
@@ -79,14 +81,14 @@ public class DataUtils {
                     String key = p.getFirst();
                     boolean ret = m_client.callProcedure(new SelectCallback(m_queue, p, key), m_select, key);
                     if (!ret) {
-                        System.out.println("Select call failed!");
+                        log.info("Select call failed!");
                     }
                 }
                 Pair<String, String> p2 = m_delete_queue.poll();
                 if (p2 != null) {
                     boolean ret = m_client.callProcedure(new DeleteCallback(m_delete_queue, p2), m_delete, p2.getFirst());
                     if (!ret) {
-                        System.out.println("Delete call failed!");
+                        log.info("Delete call failed!");
                     }
                 }
                 AsyncBenchmark.rowsChecked.incrementAndGet();
@@ -193,7 +195,7 @@ public class DataUtils {
         public void clientCallback(ClientResponse response)
                 throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                System.out.println(response.getStatusString());
+                log.info(response.getStatusString());
                 return;
             }
 
@@ -210,8 +212,8 @@ public class DataUtils {
             }
 
             if (!value.equals(m_pair.getSecond())) {
-                System.out.println("Pair from DB: " + key + ", " + value);
-                System.out.println("Pair from queue: " + m_pair.getFirst() + ", " + m_pair.getSecond());
+                log.info("Pair from DB: " + key + ", " + value);
+                log.info("Pair from queue: " + m_pair.getFirst() + ", " + m_pair.getSecond());
                 AsyncBenchmark.rowsMismatch.incrementAndGet();
             }
         }
@@ -220,7 +222,7 @@ public class DataUtils {
             List<String> m_pair = new ArrayList<String>();
             VoltTable[] m_results = response.getResults();
             if (m_results.length == 0) {
-                System.out.println("zero length results");
+                log.info("zero length results");
                 return m_pair;
             }
             VoltTable recordset = m_results[0];
@@ -247,7 +249,7 @@ public class DataUtils {
         public void clientCallback(ClientResponse response)
                 throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                System.out.println(response.getStatusString());
+                log.info(response.getStatusString());
                 return;
             }
             m_queue.remove(m_pair);
