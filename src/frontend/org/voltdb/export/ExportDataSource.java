@@ -307,7 +307,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             return;
         }
 
-        long lastUso = getFirstUnpolledUso();
+        long lastUso = m_firstUnpolledUso;
         while (!m_committedBuffers.isEmpty()
                 && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
@@ -325,7 +325,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
         m_lastReleaseOffset = releaseOffset;
-        m_firstUnpolledUso = Math.max(getFirstUnpolledUso(), lastUso);
+        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
     }
 
     public String getDatabase() {
