@@ -25,10 +25,20 @@ public class PointType {
     //
     // It's slightly hard to see this in the actual pattern
     // definition, but the pattern we want to match, ignoring space, is:
-    //    point([1-9]*.[0-9]* , [1-9]*.[0-9]*)
-    // Here the '.' is not 'match anything' but 'match a single dot'.  The
-    // RE below does this right, though the simplified version above
-    // does not.
+    //    1. Some optional space.
+	//    2. The word "point", case insensitive.
+	//    3. Some optional space.
+	//    4. A left parenthesis.
+	//    5. Some optional space.
+	//    6. A coordinate, consisting of
+	//       6.1. An optional sign.
+	//       6.2. A digit string, starting with [1-9].
+	//       6.3. An optional dot followed by a floating point string.
+	//    7. Some required space.
+	//    8. A second coordinate, just like (6) above
+	//    9. A right parenthesis.
+	//   10. Some optional space.
+	//   11. The end of the string.
     //
     private static final Pattern wktPattern
         = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?[1-9]\\d*)(?:[.](\\d*))?\\s+([-]?[1-9]\\d*)(?:[.](\\d*))?\\s*[)]\\s*\\z",
