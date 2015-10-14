@@ -144,7 +144,7 @@ public class KafkaImportBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public KafkaImportBenchmark(Config config) {
-    	this.config = config;
+        this.config = config;
         periodicStatsContext = client.createStatsContext();
 
         log.info(HORIZONTAL_RULE);

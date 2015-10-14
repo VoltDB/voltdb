@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="2" kfactor="1" sitesperhost="1"/>
+    <cluster hostcount="3" kfactor="1" sitesperhost="8"/>
    <httpd enabled="true">
       <jsonapi enabled="true" />
    </httpd>

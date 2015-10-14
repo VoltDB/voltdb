@@ -24,7 +24,7 @@
     </target>
 
     <path id="build-classpath">
-        <fileset dir="/home/pshaw/workspace/pro/obj/pro/voltdb-ent-5.7beta1/voltdb">
+        <fileset dir="/home/pshaw/voltdb/voltdb">
            <!-- <include name="voltdbclient*.jar"/> -->
          <include name="voltdb*.jar"/>
        </fileset>
