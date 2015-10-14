@@ -34,7 +34,7 @@ class AdminExportEditTest extends TestBase {
     /*
      *  This test creates a new configuration, adds a property to it and deletes it
      */
-/*
+
     def "Verify 'Add configuration' in Export and delete it"() {
         println("Test Start: Verify 'Add configuration' in Export and delete it")
         int count = 0
@@ -178,7 +178,10 @@ class AdminExportEditTest extends TestBase {
         
 	    println("Test End: Verify 'Add configuration' in Export and delete it")
     }
-    */
+    
+    /*
+     *  This test creates a new configuration, edits it and deletes it
+     */
     def "Verify edit in Export and delete it"() {
         println("Test Start: Verify edit in Export and delete it")
         int count = 0
