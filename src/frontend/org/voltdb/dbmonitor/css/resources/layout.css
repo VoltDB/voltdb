@@ -1610,6 +1610,12 @@ div.popup {
     overflow: auto;
     line-height: 18px;
 }
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+     ::i-block-chrome,.overlay-content  {
+     width: 450px;
+    }
+   
+}
 
 .graphPop {
     height: 110px;
@@ -4260,9 +4266,9 @@ svg.nvd3-svg { width:95% !important; }
         width: 80%;
     }
 
-    /* .configWrapper {
+     .configWrapper {
         width: 380px;
-    }*/
+    }
     /*.popup_cont {
         width: 380px;
     }*/
