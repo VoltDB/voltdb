@@ -272,15 +272,29 @@ def do_main():
             for inpath in files:
                 if not inpath.endswith(".in"):
                     continue
-                print "Running ", os.path.join(parent, inpath)
                 prefix = inpath[:-3]
+
+                config_params = ""
+                prompt = "Running " + os.path.join(parent, inpath)
+                if os.path.isfile(os.path.join(parent, prefix + '.config')):
+                    with open (os.path.join(parent, prefix + '.config'), "r") as configFile:
+                        config_params=configFile.read().strip()
+                    prompt += " with configuration:" + config_params.replace('\n', ' ')
+                print prompt
+
                 childin = open(os.path.join(parent, inpath))
                 # TODO use temp scratch files instead of local files to avoid polluting the git
                 # workspace. Ideally they would be self-purging except in failure cases or debug
                 # modes when they may contain useful diagnostic detail.
                 childout = open(os.path.join(parent, prefix + '.out'), 'w+')
                 childerr = open(os.path.join(parent, prefix + '.err'), 'w+')
-                subprocess.call(['../../bin/sqlcmd'],
+
+
+                if config_params:
+                    subprocess.call(['../../bin/sqlcmd'] + config_params.split("\n"),
+                        stdin=childin, stdout=childout, stderr=childerr)
+                else:
+                    subprocess.call(['../../bin/sqlcmd'],
                         stdin=childin, stdout=childout, stderr=childerr)
 
                 # TODO launch a hard-coded script that verifies a clean database and healthy server

@@ -1525,7 +1525,7 @@ public class Expression {
         prototypes.put(OpTypes.EXISTS,        (new VoltXMLElement("operation")).withValue("optype", "exists"));
         prototypes.put(OpTypes.OVERLAPS,      null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.UNIQUE,        null); // not yet supported ExpressionLogical
-        prototypes.put(OpTypes.NOT_DISTINCT,  null); // not yet supported ExpressionLogical
+        prototypes.put(OpTypes.NOT_DISTINCT,  (new VoltXMLElement("operation")).withValue("optype", "notdistinct"));
         prototypes.put(OpTypes.MATCH_SIMPLE,  null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_PARTIAL, null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_FULL,    null); // not yet supported ExpressionLogical

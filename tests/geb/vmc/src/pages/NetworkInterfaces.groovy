@@ -19,8 +19,8 @@ class NetworkInterfaces extends Module {
     static content = {
         title			                { $("h1", text:"Network Interfaces") }
 
-        portNameTitle			        { $("th", text:"Port Name") }
-        clusterSettingTitle		        { $("th", text:"Cluster Settings") }
+        portNameTitle			        { $("#hPortName") }
+        clusterSettingTitle		        { $("#hClusterSettings") }
         serverSettingTitle		        { $("#hServerSettings") }
         clientPortTitle			        { $("#clientport").previous() }
         adminPortTitle			        { $("#adminport").previous() }

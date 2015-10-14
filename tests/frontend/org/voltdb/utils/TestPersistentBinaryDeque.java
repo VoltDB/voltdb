@@ -32,7 +32,6 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -877,6 +876,37 @@ public class TestPersistentBinaryDeque {
         assertEquals(3, names.size());
         assertTrue(names.first().equals("pbd_nonce.6.pbd"));
 
+    }
+
+    @Test
+    public void testDeleteOnNonEmptyNextSegment() throws Exception {
+        System.out.println("Running testOfferPollOfferMoreThanPoll");
+        assertNull(m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY));
+
+        final int total = 47;      // Number of buffers it takes to fill a segment
+
+        //Make sure a single file with the appropriate data is created
+        for (int i = 0; i < total; i++) {
+            m_pbd.offer(defaultContainer());
+        }
+        assertEquals(1, TEST_DIR.listFiles().length);
+
+        // Read read all the buffers from the segment (isEmpty() returns true)
+        for (int i = 0; i < total; i++) {
+            m_pbd.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY).discard();
+        }
+
+        assert(m_pbd.isEmpty());
+        File files[] = TEST_DIR.listFiles();
+        assertEquals(1, files.length);
+        assert(files[0].getName().equals("pbd_nonce.0.pbd"));
+
+        m_pbd.offer(defaultContainer());
+
+        files = TEST_DIR.listFiles();
+        // Make sure a new segment was created and the old segment was deleted
+        assertEquals(1, files.length);
+        assert(files[0].getName().equals("pbd_nonce.1.pbd"));
     }
 
     @Before

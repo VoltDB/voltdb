@@ -50,3 +50,9 @@ I  VCC
  3 platypii  
 
 (Returned 2 rows in #.##s)
+
+drop table t;
+Command succeeded.
+
+drop table s;
+Command succeeded.

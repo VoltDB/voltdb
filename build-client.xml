@@ -126,6 +126,7 @@
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java
                   org/voltdb/ClientResponseImpl.java
+                  org/voltdb/InternalConnectionContext.java
                   org/voltdb/common/Constants.java
                   org/voltdb/jdbc/**/*.java
                   org/voltdb/LatencyBucketSet.java

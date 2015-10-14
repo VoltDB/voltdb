@@ -25,17 +25,212 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import glob
+import platform
+import subprocess
+import sys
+import os.path
 
-def check_thp_config():
-    thp_filenames = glob.glob("/sys/kernel/mm/*transparent_hugepage/enabled")
-    thp_filenames += glob.glob("/sys/kernel/mm/*transparent_hugepage/defrag")
-    for filename in thp_filenames:
-        with file(filename) as f:
-            if '[always]' in f.read():
-                return "The kernel is configured to use transparent huge pages (THP). " \
-                    "This is not supported when running VoltDB. See the VoltDB Administrator's " \
-                    "Guide for instructions for disabling THP."
+# Helper functions
 
-def check_config():
-    return check_thp_config()
+def _check_thp_file(file_pattern, file_prefix):
+    filename = file_pattern.format(file_prefix)
+    if not os.path.isfile(filename):
+        return None
+    with file(filename) as f:
+        if '[always]' in f.read():
+            return True
+    return False
+
+def _check_thp_files(file_prefix):
+    res = _check_thp_file("/sys/kernel/mm/{0}transparent_hugepage/enabled", file_prefix)
+    if res is not False:
+        return res
+    return bool(_check_thp_file("/sys/kernel/mm/{0}transparent_hugepage/defrag", file_prefix))
+
+def _check_thp_config():
+    """ Returns None unless THP is configured to [always], in which case it returns an error
+        string describing how to disable this unsupported kernel feature
+    """
+    file_prefix = "redhat_"
+    has_error = _check_thp_files(file_prefix)
+    if has_error is None:
+        file_prefix = ""
+        has_error = bool(_check_thp_files(file_prefix))
+    if has_error:
+        return "The kernel is configured to use transparent huge pages (THP). " \
+            "This is not supported when running VoltDB. Use the following commands " \
+            "to disable this feature for the current session:\n\n" \
+            "sudo bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/enabled\"\n" \
+            "sudo bash -c \"echo never > /sys/kernel/mm/{0}transparent_hugepage/defrag\"\n\n" \
+            "To disable THP on reboot, add the preceding commands to the /etc/rc.local file.".format(file_prefix)
+
+def _check_segmentation_offload():
+    """ Returns a list mapping devices to tcp-segmentation-offload and
+        generic-receive-offload settings
+    """
+    results = []
+    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[:-1][0::2]
+    for d in map(lambda x: x.split(':'), tokenDevs):
+        if len(d) < 2:
+            continue
+        dev = d[1].strip()
+        tcpSeg = False
+        genRec = False
+        features = subprocess.Popen("ethtool --show-offload " + dev, stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')
+        for f in features:
+            if "tcp-segmentation-offload" in f:
+                tcpSeg = f.split()[1] == "off"
+            elif "generic-receive-offload" in f:
+                genRec = f.split()[1] == "off"
+        results.append([dev, tcpSeg, genRec])
+    return results
+
+# Configuration tests
+
+def test_os_release(output):
+    if platform.system() == "Linux":
+        output['OS'] = ["PASS", "Linux"]
+        distInfo = platform.linux_distribution()
+        distName = distInfo[0].replace(' ', '').lower()
+        supported = False
+        if "centos" == distName or "redhat" == distName or "rhel" == distName:
+            if float(distInfo[1]) >= 6.3:
+                supported = True
+        elif "ubuntu" == distName:
+            if '10.04' == distInfo[1] or '12.04' == distInfo[1] or '14.04' == distInfo[1]:
+                supported = True
+        formatString = "{0} release {1} {2}"
+        if not supported:
+            formatString = "Unsupported release: " + formatString
+        output['OS release'] = ["PASS" if supported else "WARN", formatString.format(*distInfo)]
+    else:
+        output['OS'] = ["WARN", "Only supports Linux based platforms"]
+        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 10.04/12.04/14.04 and RedHat/CentOS 6.3 or later"]
+
+def test_64bit_os(output):
+    if platform.machine().endswith('64'):
+        output['64 bit'] = ["PASS", platform.uname()[2]]
+    else:
+        output['64 bit'] = ["FAIL", "64-bit Linux-based operating system is required to run VoltDB"]
+
+def test_host_memory(output):
+    hostMemory = subprocess.Popen("free | grep 'Mem' | tr -s ' ' | cut -d' ' -f2 ", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    if int(hostMemory) >= 4194304:
+        output['Memory'] = ["PASS", hostMemory]
+        if int(hostMemory) >= 67108864:
+            mmapCount = subprocess.Popen("cat /proc/sys/vm/max_map_count", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+            if int(mmapCount) >= 1048576:
+                output['MemoryMapCount'] = ["PASS", "Virtual memory max map count is " + mmapCount]
+            else:
+                output['MemoryMapCount'] = ["WARN", "Virtual memory max map count is " + mmapCount +
+                                                    ", recommended is 1048576 for system with 64 GB or more memory"]
+    else:
+        output['Memory'] = ["WARN", "Recommended memory is at least 4194304 kB but was " + hostMemory + " kB"]
+                                
+def test_ntp(output):
+    numOfRunningNTP = subprocess.Popen("ps -ef | grep 'ntpd ' | grep -cv grep", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    returnCodeForNTPD = os.system("which ntpd >/dev/null 2>&1")
+    if numOfRunningNTP == '1':
+        output['NTP'] = ["PASS", "NTP is installed and running"]
+    elif numOfRunningNTP  == '0':
+        if returnCodeForNTPD == 0:
+            output['NTP'] = ["WARN", "NTP is installed but not running"]
+        else:
+            output['NTP'] = ["WARN", "NTP is not installed or not in PATH enviroment"]
+    else:
+            output['NTP'] = ["WARN", "More then one NTP service is running"]
+
+def test_java_version(output):
+    javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java '", stdout=subprocess.PIPE, shell=True).stdout.read()
+    javacVersion = subprocess.Popen("javac -version 2>&1", stdout=subprocess.PIPE, shell=True).stdout.read()
+    if '1.7.' in javaVersion or '1.8.' in javaVersion:
+        if '1.7.' in javacVersion:
+            output['Java'] = ["PASS", javaVersion.strip() + ' ' + javacVersion.strip()]
+        elif '1.8.' in javacVersion:
+            output['Java'] = ["FAIL", "VoltDB can not be compiled with Java8, " + javacVersion]
+        else:
+            output['Java'] = ["FAIL", "Unsupported Javac version detected, " + javacVersion]
+    else:
+        output['Java'] = ["FAIL", "Please check if Java has been installed properly."]
+
+def test_python_version(output):
+    pythonVersion = "Python " + str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
+    if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+        for dir in os.environ['PATH'].split(':'):
+            for name in ('python2.7', 'python2.6'):
+                path = os.path.join(dir, name)
+                if os.path.exists(path):
+                    pythonVersion = subprocess.Popen(path + " --version", stdout=subprocess.PIPE, shell=True).stdout.read()
+                    break
+            else:
+                output['Python'] = ["FAIL", "VoltDB requires Python 2.6 or newer."]
+                return
+    output['Python'] = ["PASS", pythonVersion]
+
+def test_thp_config(output):
+    thpError = _check_thp_config()
+    if thpError is not None:
+        output['TransparentHugePage'] = ["FAIL", thpError]
+    else:
+        output['TransparentHugePage'] = ["PASS", "Transparent huge pages not set to always"]
+
+def test_swap(output):
+    swaponFiles = subprocess.Popen("cat /proc/swaps", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[1:-1]
+    if len(swaponFiles) > 0:
+        swaponList = []
+        for x in swaponFiles:
+            l = x.split()
+            if len(l) != 0:
+                swaponList.append(l[0])
+        output['Swapoff'] = ["WARN", "Swap is enabled for the filenames: " + ' '.join(swaponList)]
+    else:
+        output['Swapoff'] = ["PASS", "Swap is off"]
+
+def test_swappinness(output):
+    swappiness = subprocess.Popen("cat /proc/sys/vm/swappiness", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    output['Swappiness'] = ["PASS" if int(swappiness) == 0 else "WARN", "Swappiness is set to " + swappiness]
+
+def test_vm_overcommit(output):
+    oc = subprocess.Popen("cat /proc/sys/vm/overcommit_memory", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    if int(oc) == 1:
+        output['MemoryOvercommit'] = ["PASS", "Virtual memory overcommit is enabled"]
+    else:
+        output['MemoryOvercommit'] = ["WARN", "Virtual memory overcommit is disabled"]
+
+def test_segmentation_offload(output):
+    devInfoList = _check_segmentation_offload()
+    if devInfoList is None:
+        return
+    for devInfo in devInfoList:
+        dev = devInfo[0]
+        if devInfo[1]:
+            output['TCPSegOffload_'+dev] = ["PASS", "TCP segmentation offload for " + dev + " is disabled"]
+        else:
+            output['TCPSegOffload_'+dev] = ["WARN", "TCP segmentation offload is recommended to be disabled, but is currently enabled for " + dev]
+        if devInfo[2]:
+            output['GenRecOffload_'+dev] = ["PASS", "Generic receive offload for " + dev + " is disabled"]
+        else:
+            output['GenRecOffload_'+dev] = ["WARN", "Generic receive offload is recommended to be disabled, but is currently enabled for " + dev]
+
+def test_full_config(output):
+    """ Runs a full set of configuration tests and writes the results to output
+    """
+    test_os_release(output)
+    test_64bit_os(output)
+    test_ntp(output)
+    test_java_version(output)
+    test_python_version(output)
+    if platform.system() == "Linux":
+        test_host_memory(output)
+        test_swappinness(output)
+        test_vm_overcommit(output)
+        test_thp_config(output)
+        test_swap(output)
+        test_segmentation_offload(output)
+
+def test_hard_requirements():
+    """ Returns any errors resulting from hard config requirement violations
+    """
+    return _check_thp_config()
+
+

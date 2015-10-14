@@ -46,6 +46,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     private String m_tableName;
     private ServerSocket m_serverSocket;
     private final ArrayList<SocketReader> m_connections = new ArrayList<SocketReader>();
+    private SocketReader m_reader = null;
 
     @Override
     public void start(BundleContext context)
@@ -126,6 +127,13 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     }
 
 
+    @Override
+    public void setBackPressure(boolean flag) {
+        if (m_reader != null) {
+            m_reader.m_hasBackPressure = flag;
+        }
+    }
+
     /**
      * This is called when server is ready to accept any transactions.
      */
@@ -175,6 +183,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     private class SocketReader implements Runnable
     {
         private final Socket m_socket;
+        private volatile boolean m_hasBackPressure = false;
 
         public SocketReader(Socket socket)
         {
@@ -192,6 +201,13 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
                     LoggingEvent event = (LoggingEvent) ois.readObject();
                     if (!Log4jSocketHandlerImporter.this.callProcedure(new SaveLog4jEventInvocation(hostname, event, m_tableName))) {
                         Log4jSocketHandlerImporter.this.error("Failed to insert log4j event");
+                    }
+                    if (m_hasBackPressure) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ioe) {
+                            //
+                        }
                     }
                 }
             } catch(EOFException e) { // normal exit condition

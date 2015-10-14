@@ -39,6 +39,14 @@ def highlight(s, flag):
         s = str(s)
     return flag and "<span style=\"color: red\">%s</span>" % (s) or s
 
+def as_html_unicode_string(s):
+    if isinstance(s, list):
+        return '[' + ", ".join(as_html_unicode_string(x) for x in s) + ']'
+    elif isinstance(s, basestring):
+        return "'" + s.encode('ascii', 'xmlcharrefreplace') + "'"
+    else:
+        return str(s)
+
 def generate_table_str(res, key):
 
     highlights = res.get("highlight")
@@ -53,9 +61,9 @@ def generate_table_str(res, key):
     result.append("rows -")
     if isinstance(highlights, list):
         for j in xrange(len(source.tuples)):
-            result.append(highlight(source.tuples[j], j in highlights))
+            result.append(highlight(as_html_unicode_string(source.tuples[j]), j in highlights))
     else:
-        result.extend(map(lambda x: str(x), source.tuples))
+        result.extend(map(lambda x: as_html_unicode_string(x), source.tuples))
     tablestr = "<br />".join(result)
     return tablestr
 
@@ -95,8 +103,8 @@ td {width: 50%%}
 </body>
 
 </html>
-""" % (cgi.escape(item["SQL"]),
-       cgi.escape(item["SQL"]),
+""" % (cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
+       cgi.escape(item["SQL"]).encode('ascii', 'xmlcharrefreplace'),
        highlight(item["jni"]["Status"], "Status" == item.get("highlight")),
        highlight(item["hsqldb"]["Status"], "Status" == item.get("highlight")),
        item["jni"].get("Info") or "",
@@ -145,7 +153,7 @@ def print_section(name, mismatches, output_dir):
 <td>%s</td>
 </tr>""" % (i["id"],
             detail_page,
-            cgi.escape(i["SQL"]),
+            cgi.escape(i["SQL"]).encode('ascii', 'xmlcharrefreplace'),
             jniStatus,
             hsqldbStatus))
 

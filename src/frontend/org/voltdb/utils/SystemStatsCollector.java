@@ -25,7 +25,6 @@ import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.util.ArrayDeque;
-import java.util.HashMap;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.jni.ExecutionEngine;
@@ -42,6 +41,9 @@ import org.voltdb.processtools.ShellTools;
 public class SystemStatsCollector {
 
     private enum GetRSSMode { MACOSX_NATIVE, PROCFS, PS }
+
+    // Used by tests only to set up fake system statistics numbers
+    private static FakeStatsProducer testStatsProducer;
 
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
@@ -179,7 +181,7 @@ public class SystemStatsCollector {
          *
          * @param rss Resident set size.
          */
-        Datum(long rss) {
+        public Datum(long rss) {
             MemoryMXBean mmxb = ManagementFactory.getMemoryMXBean();
             MemoryUsage muheap = mmxb.getHeapMemoryUsage();
             MemoryUsage musys = mmxb.getNonHeapMemoryUsage();
@@ -364,6 +366,11 @@ public class SystemStatsCollector {
      * @return A newly created Datum instance.
      */
     private static synchronized Datum generateCurrentSample() {
+        // Code used to fake system statistics by tests
+        if (testStatsProducer!=null) {
+            return testStatsProducer.getCurrentStatsData();
+        }
+
         // get this info once
         if (!initialized) initialize();
 
@@ -508,6 +515,10 @@ public class SystemStatsCollector {
         per = duration / (double) repeat;
         System.out.printf("%.2f ms per ee.nativeGetRSS call / %d / %d correct\n",
                 per, correct, repeat);
+    }
+
+    public static void setFakeStatsProducer(FakeStatsProducer fakeStatsProducer) {
+        testStatsProducer = fakeStatsProducer;
     }
 
 }

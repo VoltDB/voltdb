@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -32,6 +33,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -64,6 +66,7 @@ import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+import org.voltdb.ResourceUsageMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -89,6 +92,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
@@ -103,6 +107,8 @@ import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -115,6 +121,7 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -126,14 +133,6 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
-
-import java.net.URISyntaxException;
-import java.util.HashMap;
-
-import org.voltdb.client.ClientAuthHashScheme;
-import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportType;
-import org.voltdb.importer.ImportDataProcessor;
 
 /**
  *
@@ -147,6 +146,18 @@ public abstract class CatalogUtil {
 
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
+
+    // DR conflicts export table name prefix
+    public static final String DR_CONFLICTS_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
+    // DR conflicts export group name
+    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_AUTOGEN_DR_CONFLICTS";
+    public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
+    public static final String DEFAULT_DR_CONFLICTS_NONCE = "MyExport";
+    public static final String DEFAULT_DR_CONFLICTS_DIR = "dr_conflicts";
+    public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+
+    public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
+            new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -280,7 +291,7 @@ public abstract class CatalogUtil {
 
     /**
      *
-     * @param catalogTable
+     * @param catalogTable a catalog table providing the schema
      * @return An empty table with the same schema as a given catalog table.
      */
     public static VoltTable getVoltTable(Table catalogTable) {
@@ -291,6 +302,28 @@ public abstract class CatalogUtil {
         int i = 0;
         for (Column catCol : catalogColumns) {
             columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+        }
+
+        return new VoltTable(columns);
+    }
+
+    /**
+     *
+     * @param catalogTable a catalog table providing the schema
+     * @param hiddenColumnInfos variable-length ColumnInfo objects for hidden columns
+     * @return An empty table with the same schema as a given catalog table.
+     */
+    public static VoltTable getVoltTable(Table catalogTable, VoltTable.ColumnInfo... hiddenColumns) {
+        List<Column> catalogColumns = CatalogUtil.getSortedCatalogItems(catalogTable.getColumns(), "index");
+
+        VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[catalogColumns.size() + hiddenColumns.length];
+
+        int i = 0;
+        for (Column catCol : catalogColumns) {
+            columns[i++] = new VoltTable.ColumnInfo(catCol.getTypeName(), VoltType.get((byte)catCol.getType()));
+        }
+        for (VoltTable.ColumnInfo hiddenColumnInfo : hiddenColumns) {
+            columns[i++] = hiddenColumnInfo;
         }
 
         return new VoltTable(columns);
@@ -544,7 +577,7 @@ public abstract class CatalogUtil {
     }
 
     public static String compileDeploymentString(Catalog catalog, String deploymentString,
-            boolean isPlaceHolderCatalog)
+                     boolean isPlaceHolderCatalog)
     {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
@@ -606,6 +639,8 @@ public abstract class CatalogUtil {
             setCommandLogInfo( catalog, deployment.getCommandlog());
 
             setDrInfo(catalog, deployment.getDr());
+
+            validateResourceMonitorInfo(deployment);
         }
         catch (Exception e) {
             // Anything that goes wrong anywhere in trying to handle the deployment file
@@ -618,6 +653,12 @@ public abstract class CatalogUtil {
 
         return null;
     }
+
+    private static void validateResourceMonitorInfo(DeploymentType deployment) {
+        // call resource monitor ctor so that it does all validations.
+        new ResourceUsageMonitor(deployment.getSystemsettings(), deployment.getPaths());
+    }
+
 
     /*
      * Command log element is created in setPathsInfo
@@ -1136,6 +1177,9 @@ public abstract class CatalogUtil {
         switch(importConfiguration.getType()) {
             case CUSTOM:
                 break;
+            case KAFKA:
+                importBundleUrl = "kafkastream.jar";
+                break;
             default:
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
@@ -1214,11 +1258,19 @@ public abstract class CatalogUtil {
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        if (db.getIsactiveactivedred()) {
+            // add default export configuration to DR conflict table
+            exportType = addExportConfigToDRConflictsTable(catalog, exportType);
+        }
+
         if (exportType == null) {
             return;
         }
         List<String> streamList = new ArrayList<String>();
         boolean noEmptyTarget = (exportType.getConfiguration().size() != 1);
+
+
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
@@ -1240,7 +1292,6 @@ public abstract class CatalogUtil {
             }
             boolean defaultConnector = streamName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
-            Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(streamName);
             if (catconn == null) {
@@ -1320,10 +1371,7 @@ public abstract class CatalogUtil {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getModule())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import module: " +
-                        importConfiguration.getModule()+ ".");
-            } else {
+            if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
@@ -1337,20 +1385,17 @@ public abstract class CatalogUtil {
             return processorConfig;
         }
         List<String> streamList = new ArrayList<String>();
-
+        int i = 0;
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
             if (!connectorEnabled) continue;
-            if (streamList.contains(importConfiguration.getModule())) {
-                throw new RuntimeException("Multiple connectors can not be assigned to single import bundle: " +
-                        importConfiguration.getModule()+ ".");
-            } else {
+            if (!streamList.contains(importConfiguration.getModule())) {
                 streamList.add(importConfiguration.getModule());
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
-            processorConfig.put(importConfiguration.getModule(), processorProperties);
+            processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;
     }
@@ -2176,5 +2221,50 @@ public abstract class CatalogUtil {
             }
         }
         return exprsjson.isEmpty();
+    }
+    /**
+     * Add default configuration to DR conflicts export stream if deployment file doesn't have the configuration
+     *
+     * @param catalog  current catalog
+     * @param export   list of export configuration
+     */
+    public static ExportType addExportConfigToDRConflictsTable(Catalog catalog, ExportType export) {
+        if (export == null) {
+            export = new ExportType();
+        }
+        boolean userDefineStream = false;
+        for (ExportConfigurationType exportConfiguration : export.getConfiguration()) {
+            if (exportConfiguration.getStream().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
+                userDefineStream = true;
+            }
+        }
+
+        if (!userDefineStream) {
+            ExportConfigurationType defaultConfiguration = new ExportConfigurationType();
+            defaultConfiguration.setEnabled(true);
+            defaultConfiguration.setStream(DR_CONFLICTS_TABLE_EXPORT_GROUP);
+            defaultConfiguration.setType(ServerExportEnum.FILE);
+
+            // type
+            PropertyType type = new PropertyType();
+            type.setName("type");
+            type.setValue(DEFAULT_DR_CONFLICTS_EXPORT_TYPE);
+            defaultConfiguration.getProperty().add(type);
+
+            // nonce
+            PropertyType nonce = new PropertyType();
+            nonce.setName("nonce");
+            nonce.setValue(DEFAULT_DR_CONFLICTS_NONCE);
+            defaultConfiguration.getProperty().add(nonce);
+
+            // outdir
+            PropertyType outdir = new PropertyType();
+            outdir.setName("outdir");
+            outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
+            defaultConfiguration.getProperty().add(outdir);
+
+            export.getConfiguration().add(defaultConfiguration);
+        }
+        return export;
     }
 }

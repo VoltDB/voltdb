@@ -203,27 +203,52 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.SECONDS, parameters);
+        return callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
+                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
+    }
+
+    /**
+     * Synchronously invoke a procedure call blocking until a result is available.
+     * @param batchTimeout procedure invocation batch timeout.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return array of VoltTable results.
+     * @throws org.voltdb.client.ProcCallException
+     * @throws NoConnectionsException
+     */
+    @Override
+    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException
+    {
+        if (batchTimeout < 0) {
+            throw new IllegalArgumentException("Timeout value can't be negative." );
+        }
+
+        return callProcedureWithClientTimeout(batchTimeout, procName,
+                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
      * Synchronously invoke a procedure call blocking until a result is available.
      *
+     * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure
+     * @param clientTimeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public ClientResponse callProcedureWithTimeout(String procName, long timeout, TimeUnit unit, Object... parameters)
-            throws IOException, NoConnectionsException, ProcCallException {
+    public ClientResponse callProcedureWithClientTimeout(int batchTimeout, String procName,
+            long clientTimeout, TimeUnit unit, Object... parameters)
+            throws IOException, NoConnectionsException, ProcCallException
+    {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation
-                = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, System.nanoTime(), unit.toNanos(timeout), invocation);
+            = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
+        return callProcedure(cb, System.nanoTime(), unit.toNanos(clientTimeout), invocation);
     }
 
     /**
@@ -243,7 +268,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, System.nanoTime(), Distributer.USE_DEFAULT_TIMEOUT, invocation);
+        return callProcedure(cb, System.nanoTime(), Distributer.USE_DEFAULT_CLIENT_TIMEOUT, invocation);
     }
 
     private final ClientResponse callProcedure(SyncCallback cb, long nowNanos, long timeout, ProcedureInvocation invocation)
@@ -286,20 +311,42 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
         //Time unit doesn't matter in this case since the timeout isn't being specified
-        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
+        return callProcedureWithClientTimeout(callback, BatchTimeoutOverrideType.NO_TIMEOUT, procName,
+                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
+    }
+
+    /**
+     * Asynchronously invoke a procedure call with timeout.
+     * @param callback TransactionCallback that will be invoked with procedure results.
+     * @param batchTimeout procedure invocation batch timeout.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return True if the procedure was queued and false otherwise
+     */
+    @Override
+    public final boolean callProcedureWithTimeout(ProcedureCallback callback, int batchTimeout, String procName, Object... parameters)
+    throws IOException, NoConnectionsException {
+        if (batchTimeout < 0) {
+            throw new IllegalArgumentException("Timeout value can't be negative." );
+        }
+
+        //Time unit doesn't matter in this case since the timeout isn't being specified
+        return callProcedureWithClientTimeout(callback, batchTimeout, procName,
+                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
     }
 
     /**
      * Asynchronously invoke a procedure call.
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
+     * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param timeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
-    public boolean callProcedureWithTimeout(ProcedureCallback callback, String procName,
+    public boolean callProcedureWithClientTimeout(ProcedureCallback callback, int batchTimeout, String procName,
             long timeout, TimeUnit unit, Object... parameters) throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
@@ -308,7 +355,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             ((ProcedureArgumentCacher) callback).setArgs(parameters);
         }
         ProcedureInvocation invocation
-                = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
+                = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, procName, parameters);
         return private_callProcedure(callback, 0, invocation, unit.toNanos(timeout));
     }
 
@@ -341,7 +388,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return private_callProcedure(callback, 0, invocation, Distributer.USE_DEFAULT_TIMEOUT);
+        return private_callProcedure(callback, 0, invocation, Distributer.USE_DEFAULT_CLIENT_TIMEOUT);
     }
 
     @Override
@@ -364,7 +411,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation, Distributer.USE_DEFAULT_TIMEOUT);
+        return private_callProcedure(callback, expectedSerializedSize, invocation, Distributer.USE_DEFAULT_CLIENT_TIMEOUT);
     }
 
     private final boolean private_callProcedure(
@@ -394,7 +441,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                  * Wait on backpressure honoring the timeout settings
                  */
                 final long delta = Math.max(1, System.nanoTime() - nowNanos);
-                final long timeout = timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT ? m_distributer.getProcedureTimeoutNanos() : timeoutNanos;
+                final long timeout = timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ? m_distributer.getProcedureTimeoutNanos() : timeoutNanos;
                 try {
                     if (backpressureBarrier(nowNanos, timeout - delta)) {
                         final ClientResponseImpl r = new ClientResponseImpl(

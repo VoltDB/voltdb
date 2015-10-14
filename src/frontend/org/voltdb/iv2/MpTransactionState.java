@@ -160,7 +160,7 @@ public class MpTransactionState extends TransactionState
                 task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
             }
 
-            if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
+            if (ProcedureInvocationType.isDeprecatedInternalDRType(m_initiationMsg.getStoredProcedureInvocation().getType())) {
                 task.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
             }
 

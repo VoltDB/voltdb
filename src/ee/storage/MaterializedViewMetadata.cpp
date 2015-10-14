@@ -369,7 +369,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
                 }
             }
             // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
+            if (tuple.address() == oldTuple.address() ||
                 (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
                 continue;
             }
@@ -388,7 +388,7 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         TableTuple tuple;
         while (!(tuple = selectedIndex->nextValueAtKey(minMaxCursor)).isNullTuple()) {
             // skip the oldTuple and apply post filter
-            if (tuple.equals(oldTuple) ||
+            if (tuple.address() == oldTuple.address() ||
                 (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
                 continue;
             }

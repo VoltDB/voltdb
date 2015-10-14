@@ -45,6 +45,7 @@ namespace voltdb
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastDRBeginTxnOffset(0),
               m_hasDRBeginTxn(false),
+              m_rowCountForDR(0),
               m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
               m_lastUniqueId(std::numeric_limits<int64_t>::max()),
@@ -61,6 +62,7 @@ namespace voltdb
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
               m_hasDRBeginTxn(other->m_hasDRBeginTxn),
+              m_rowCountForDR(other->m_rowCountForDR),
               m_startDRSequenceNumber(other->m_startDRSequenceNumber),
               m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
               m_lastUniqueId(other->m_lastUniqueId),
@@ -144,6 +146,11 @@ namespace voltdb
             m_lastUniqueId = lastUniqueId;
         }
 
+        size_t updateRowCountForDR(size_t rowsToCommit) {
+            m_rowCountForDR += rowsToCommit;
+            return m_rowCountForDR;
+        }
+
         StreamBlockType type() const {
             return m_type;
         }
@@ -202,6 +209,7 @@ namespace voltdb
         int64_t m_lastCommittedSpHandle;
         size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
         bool m_hasDRBeginTxn;    // only used for DR Buffer
+        size_t m_rowCountForDR;
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
         int64_t m_lastUniqueId;

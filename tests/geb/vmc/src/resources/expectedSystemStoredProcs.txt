@@ -20,5 +20,3 @@
 @Promote
 @ValidatePartitioning
 @GetPartitionKeys
-#This was added (late) to Web Studio, but is currently missing from VMC:
-#@ApplyBinaryLogSP

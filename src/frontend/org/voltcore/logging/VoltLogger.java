@@ -25,6 +25,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
+
 import com.google_voltpatches.common.base.Throwables;
 
 /**
@@ -347,5 +350,14 @@ public class VoltLogger {
         }
         // set the final variable for the core logger
         m_logger = tempLogger;
+    }
+
+    public void rateLimitedLog(long suppressInterval, Level level, Throwable cause, String format, Object...args) {
+        RateLimitedLogger.tryLogForMessage(
+                EstTime.currentTimeMillis(),
+                suppressInterval, TimeUnit.SECONDS,
+                this, level,
+                cause, format, args
+                );
     }
 }

@@ -71,7 +71,7 @@ bool isIntegralType(ValueType type) {
     throw exception();
 }
 
-NValue getRandomValue(ValueType type) {
+NValue getRandomValue(ValueType type, uint32_t maxLength) {
     switch (type) {
         case VALUE_TYPE_TIMESTAMP:
             return ValueFactory::getTimestampValue(static_cast<int64_t>(time(NULL)));
@@ -83,11 +83,24 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getIntegerValue(rand() % (1 << 31));
         case VALUE_TYPE_BIGINT:
             return ValueFactory::getBigIntValue(rand());
+        case VALUE_TYPE_DECIMAL: {
+            char characters[29];
+            int i;
+            for (i = 0; i < 15; ++i) {
+                characters[i] = (char)(48 + (rand() % 10));
+            }
+            characters[i] = '.';
+            for (i = 16; i < 28; ++i) {
+                characters[i] = (char)(48 + (rand() % 10));
+            }
+            characters[i] = '\0';
+            return ValueFactory::getDecimalValueFromString(string(characters));
+        }
         case VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / (double)(rand() % 10000));
         case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % 10);
-            char characters[11];
+            int length = (rand() % maxLength);
+            char characters[maxLength];
             for (int ii = 0; ii < length; ii++) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
@@ -96,8 +109,8 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getStringValue(string(characters));
         }
         case VALUE_TYPE_VARBINARY: {
-            int length = (rand() % 16);
-            unsigned char bytes[17];
+            int length = (rand() % maxLength);
+            unsigned char bytes[maxLength];
             for (int ii = 0; ii < length; ii++) {
                 bytes[ii] = (unsigned char)rand() % 256; //printable characters
             }
@@ -532,6 +545,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_COMPARE_IN: {
         return "COMPARE_IN";
     }
+    case EXPRESSION_TYPE_COMPARE_NOTDISTINCT: {
+        return "COMPARE_NOTDISTINCT";
+    }
     case EXPRESSION_TYPE_CONJUNCTION_AND: {
         return "CONJUNCTION_AND";
     }
@@ -648,6 +664,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_COMPARE_LIKE;
     } else if (str == "COMPARE_IN") {
         return EXPRESSION_TYPE_COMPARE_IN;
+    } else if (str == "COMPARE_NOTDISTINCT") {
+        return EXPRESSION_TYPE_COMPARE_NOTDISTINCT;
     } else if (str == "CONJUNCTION_AND") {
         return EXPRESSION_TYPE_CONJUNCTION_AND;
     } else if (str == "CONJUNCTION_OR") {

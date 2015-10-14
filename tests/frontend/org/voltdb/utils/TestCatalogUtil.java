@@ -40,9 +40,11 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
@@ -935,7 +937,7 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </import>"
                 + "</deployment>";
-        final String withBadImport4 =
+        final String withGoodImport0 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
@@ -1016,8 +1018,8 @@ public class TestCatalogUtil extends TestCase {
         String msg3 = CatalogUtil.compileDeployment(cat3, bad_deployment3, false);
         assertTrue("compilation should have failed", msg3.contains("Error validating deployment configuration: Import failed to configure, failed to load module by URL or classname provided"));
 
-        //import with dup bundlename
-        final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withBadImport4);
+        //import with dup should be ok now
+        final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withGoodImport0);
         DeploymentType bad_deployment4 = CatalogUtil.getDeployment(new FileInputStream(tmpBad4));
 
         VoltCompiler compiler4 = new VoltCompiler();
@@ -1025,7 +1027,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
 
         String msg4 = CatalogUtil.compileDeployment(cat4, bad_deployment4, false);
-        assertTrue("compilation should have failed", msg4.contains("Error validating deployment configuration: Multiple connectors can not be assigned to single import module"));
+        assertNull(msg4);
 
         //import good bundle not necessary loadable by felix.
         final File good1 = VoltProjectBuilder.writeStringToTempFile(goodImport1);
@@ -1761,6 +1763,126 @@ public class TestCatalogUtil extends TestCase {
 
         String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
         assertNull("deployment should compile with missing file export type", msg);
+    }
+
+    public void testDefaultDRConflictTableExportSetting() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "</deployment>";
+        final String ddl =
+                "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                 "DR TABLE T;\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getIsactiveactivedred());
+        assertTrue(db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP) != null);
+    }
+
+    public void testMemoryLimitNegative() throws Exception {
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "  <cluster hostcount=\"1\" kfactor=\"0\" />"
+                + "  <httpd enabled=\"true\">"
+                + "    <jsonapi enabled=\"true\" />"
+                + "  </httpd>"
+                + "  <systemsettings>"
+                + "    <resourcemonitor>"
+                + "      <memorylimit size=\"90.5%\"/>"
+                + "    </resourcemonitor>"
+                + "  </systemsettings>"
+                + "</deployment>";
+        final String ddl =
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        assertTrue(msg.contains("Invalid memory limit"));
+    }
+
+    public void testDiskLimitNegative() throws Exception {
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "  <cluster hostcount=\"1\" kfactor=\"0\" />"
+                + "  <httpd enabled=\"true\">"
+                + "    <jsonapi enabled=\"true\" />"
+                + "  </httpd>"
+                + "  <systemsettings>"
+                + "    <resourcemonitor>"
+                + "      <disklimit>"
+                + "        <feature name=\"commandlog\" size=\"xx\"/>"
+                + "      </disklimit>"
+                + "    </resourcemonitor>"
+                + "  </systemsettings>"
+                + "</deployment>";
+        final String ddl =
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        assertTrue(msg.contains("Invalid value"));
+    }
+
+    public void testOverrideDRConflictTableExportSetting() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String deploymentString =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration stream='" + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + "' enabled='true' type='file'>"
+                + "            <property name=\"type\">csv</property>"
+                + "            <property name=\"nonce\">newNonce</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String ddl =
+                "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
+                 "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER);\n" +
+                 "DR TABLE T;\n";
+        final File tmpWithDefault = VoltProjectBuilder.writeStringToTempFile(deploymentString);
+        DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        assertTrue(db.getIsactiveactivedred());
+        Connector conn = db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP);
+        assertTrue(conn != null);
+        assertTrue(conn.getConfig().get("nonce").getValue().equals("newNonce"));
+
     }
 
     @SafeVarargs

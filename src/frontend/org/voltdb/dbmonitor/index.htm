@@ -148,12 +148,28 @@
                                     <div class="clear"></div>
                                 </div>
                                 <div class="slide-pop-content">
-                                    <div class="server-info-heading">
-                                        <span class="server">Server Name</span> <span class="memory-use">Memory Usage</span>
+                                   <!-- <div class="server-info-heading">
+                                        <span class="server">Server Name</span> <span class="servIp">IP Address</span> <span class="memory-use">Memory Usage</span>
                                         <div class="clear"></div>
-                                    </div>
-                                    <div id="serverListWrapper">
-                                        <ul class="servers-list" id="serversList"></ul>
+                                    </div>-->
+                                    <div class="slimScrollDiv" style="position: relative; overflow: hidden; width: auto; ">
+                                        <div id="serverListWrapper">
+                                            <table  id="tblServerListHeader" class="serversTbl">
+                                                <tr >
+                                                    <th id="thServerName" width="40%">Server Name</th>
+                                                    <th id="thIpAddress" width="30%">IP Address</th>
+                                                    <th id="thMemoryUsage" width="30%">Memory Usage</th>
+
+                                                </tr>
+                                            </table>
+                                            <div style="overflow:auto; width: auto; height: 225px;">
+                                                
+                                            <table class="serversTbl" id="serversList">
+                                               
+                                            </table>
+                                            </div>
+                                            </div>
+                                        <div class="slimScrollBar" style="width: 14px; position: absolute; top: 0px; opacity: 0.8; display: none; border-radius: 0px; z-index: 99; right: 1px; height: 255px; background: rgb(63, 83, 100);"></div><div class="slimScrollRail" style="width: 14px; height: 100%; position: absolute; top: 0px; display: none; border-radius: 0px; opacity: 0.2; z-index: 90; right: 1px; background: rgb(63, 83, 100);"></div>
                                     </div>
                                 </div>
                             </div>
@@ -331,7 +347,7 @@
                                 <ul class="drList">
                                     <!-- <li>State</li>
                                         <li class="drArrow">On</li>-->
-                                    <li class="alertIcon warningDr" style="display: none">
+                                    <li class="alertIcon warningDr" id="drAlertWarning" style="display: none">
                                         <a id="drWarning" href="#drPartitionWarning" class="drWarning">
                                             <span style="margin:0 0 0 24px">Warning</span>
                                         </a>
@@ -345,7 +361,7 @@
                             <div id="drMasterSection" class="masterWrapper" style="display:block;">
                                 <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-master">Master</div>
+                                        <div class="drTitle icon-master" id="drMasterTitle">Master</div>
                                         <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onblur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
@@ -375,7 +391,7 @@
                             <div id="drReplicaSection" class="replicaWrapper" style="display:block">
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-replica">Replica</div>
+                                        <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
                                         <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
@@ -417,7 +433,7 @@
                             <!--<div id="drMasterSection" class="masterWrapper" style="display:block;">-->
                             <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
                                 <div class="tabs-filter-wrapperDR">
-                                    <div class="drTitle icon-command">Command Log</div>
+                                    <div class="drTitle icon-command" id="drCLPTitle">Command Log</div>
                                     <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                     <div class="clear"></div>
                                 </div>
@@ -489,12 +505,22 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="slide-pop-content" style="padding: 0 0 15px 0;">
-                                        <div id="serverListWrapperAdmin">
+                                        <div style="padding: 15px 16px 0 15px;">
                                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
-                                                <tbody></tbody>
-                                            </table>
+                                               <tr class="serverHeader">
+                                                   <th class="configLabel" width="40%"> Server Name </th> 
+                                                   <th align="center">IP Address</th>
+                                                   <th align="right"> State</th>
+                                               </tr>
+                                           </table>
+                                            <div id="serverListWrapperAdmin" style="height:220px; overflow: auto;">
+                                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                                                    <tbody> </tbody>
+                                                </table>
+                                            </div>
+                                            
+                                             </div>
                                         </div>
-                                    </div>
                                 </div>
                             </div>
                             <!-- server list -->
@@ -666,7 +692,6 @@
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
-                                    <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-3 subLabelRow">
                                     <td class="configLabel">Log Frequency Transactions </td>
@@ -712,7 +737,6 @@
                                     <td>
                                         <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
                                         <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
-                                        <!--<a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>-->
                                     </td>
                                 </tr>
                                 <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
@@ -728,7 +752,6 @@
                                         <span id="maxJavaHeap"></span>
                                         <span id="maxJavaHeapUnit"></span>
                                     </td>
-                                    <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
@@ -775,6 +798,34 @@
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
+                                <tr class="child-row-6 subLabelRow" id="memorySizeTimeout">
+                                    <td class="configLabel">Memory Limit</td>
+                                    <td align="right" class="memorySize">
+                                        <form id="formMemoryLimit" method="get" action="">
+                                            <div id="loadingMemoryLimit" class="loading-small" style="display: none;"></div>
+                                            <span id="memoryLimitSize"></span>
+                                            <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <span id="memoryLimitSizeUnit"></span>
+                                            <select id="ddlMemoryLimitUnit" style="display: none;">
+                                                <option>GB</option>
+                                                <option>%</option>
+                                            </select>
+                                            <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>
+                                       
+                                        <a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                        <a href="#addDiskLimitPopup" id="addDiskLimitPopupLink" data-id="-1" title="Add Disk Limit" style="display: none">Add Disk Limit</a>
+                                        <a id="btnDeleteMemory" href="#deleteMemoryLimitPopup" class="deleteSmall" title="Delete" style="display:none;">&nbsp;</a>
+                                    </td>
+
+                                </tr>
+                                <tbody id="diskLimitConfiguration" data-status="value" style="display: none;"></tbody>
+
                             </table>
                         </div>
                         <div class="drWrapperAdmin" id="divDrWrapperAdmin" style="display:none">
@@ -851,9 +902,9 @@
                             <div style="overflow: auto">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
                                     <tr>
-                                        <th width="30%">Port Name</th>
+                                        <th width="30%" id="hPortName">Port Name</th>
                                         <th width="45%" id="hServerSettings">Server Settings</th>
-                                        <th width="25%">Cluster Settings</th>
+                                        <th width="25%" id="hClusterSettings">Cluster Settings</th>
                                     </tr>
                                     <tr>
                                         <td>Client Port</td>
@@ -1069,9 +1120,24 @@
     <div id="memoryAlerts" style="display: none">
         <div class="overlay-title">Memory Usage Alerts</div>
         <div class="clear"></div>
-        <div class="overlay-content">
-            <div class="server-info-heading"><span class="server">Server Name</span><span class="memory-use">Memory Usage</span></div>
-            <ul class="servers-list" id="memoryAlertsList"></ul>
+        <div class="overlay-content overlayAlert"> <!--style="display:block;height: auto !important"-->
+            <div class="mainContentAlert">
+            <table class="serversListTbl">
+                   <tr class="serverHeader">
+                    <th width="40%">Server Name</th>
+                    <th width="30%">IP Address</th>
+                    <th width="30%">Memory Usage</th>
+                </tr>
+            </table>
+                
+            <div class="alertWrap">
+                <table class="serversListTbl" id="memoryAlertsList">
+                   
+                </table>
+            </div>
+
+            </div>
+
         </div>
     </div>
     <!-- POPUP Alerts -->
@@ -1243,7 +1309,7 @@
             </div>
         </div>
     </div>
-    
+
     <!--help popup ends-->
     <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
@@ -1460,6 +1526,36 @@
         <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
     </div>
     <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="MemoryLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+    
+    <div id="deleteMemoryLimitPopup" style="display:none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to delete the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnDelPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnDelPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+
+    <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="diskLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Disk Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupDiskLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupDiskLimitCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP Memory Limit -->
     <!-- POPUP saveConfirmationPopup -->
     <div id="Div2" style="display: none">
         <div class="overlay-title icon-alert">Save Confirmation</div>
@@ -1584,6 +1680,42 @@
         </div>
     </div>
     <!--Update error Popup-->
+    <!--Update Memory Limit error Popup-->
+    <div style="display: none"><a href="#memorySizeUpdateErrorPopup" id="memorySizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="memorySizeUpdateErrorPopup" style="display: none">
+        <div id="memorySizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="memorySizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnMemorySizeUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Disk Limit error Popup-->
+    <div style="display: none"><a href="#diskSizeUpdateErrorPopup" id="diskSizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="diskSizeUpdateErrorPopup" style="display: none">
+        <div id="diskSizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="diskSizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnDiskSizeUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
     <!--Update error Security User-->
     <div style="display: none"><a href="#securityUserErrorPopup" id="sercurityUserPopupLink">Update Error</a></div>
     <div id="securityUserErrorPopup" style="display: none">
@@ -1634,6 +1766,31 @@
                     <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveConfigText">save</span>?</div>
                 </div>
                 <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+
+    <!--Add Disk Limit Popup-->
+    <div id="addDiskLimitPopup" style="display: none">
+        <div id="addDiskLimitInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addDiskLimitHeader" class="addConfigHeader">Add Disk Limit</div>
+                <div class="clear"></div>
+            </div>
+            <div id="addDiskLimitControls">
+                <div class="clear"></div>
+                <form id="formAddDiskLimit" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addDiskLimitWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddDiskLimitSave" class="btn">Save</a> <a id="btnAddDiskLimitCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveDiskLimitConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveDiskLimitText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveDiskLimitOk" class="btn closeBtn">Yes</a> <a id="btnSaveDiskLimitCancel" class="btn btn-gray confirmNoSave">No</a> </div>
             </div>
         </div>
     </div>

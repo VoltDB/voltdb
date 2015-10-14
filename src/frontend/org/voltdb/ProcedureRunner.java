@@ -233,7 +233,7 @@ public class ProcedureRunner {
      */
     long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalTxnId();
         } else {
             return m_txnState.txnId;
@@ -398,7 +398,16 @@ public class ProcedureRunner {
             // don't leave empty handed
             if (results == null) {
                 results = new VoltTable[0];
+            } else if (results.length > Short.MAX_VALUE) {
+                String statusString = "Stored procedure returns too much data. Exceeded  maximum number of VoltTables: " + Short.MAX_VALUE;
+                retval = new ClientResponseImpl(
+                        ClientResponse.GRACEFUL_FAILURE,
+                        ClientResponse.GRACEFUL_FAILURE,
+                        statusString,
+                        new VoltTable[0],
+                        statusString);
             }
+
 
             if (retval == null) {
                 retval = new ClientResponseImpl(
@@ -415,7 +424,7 @@ public class ProcedureRunner {
             }
             if ((m_txnState != null) && // may be null for tests
                 (m_txnState.getInvocation() != null) &&
-                (m_txnState.getInvocation().getType() == ProcedureInvocationType.REPLICATED))
+                (ProcedureInvocationType.isDeprecatedInternalDRType(m_txnState.getInvocation().getType())))
             {
                 retval.convertResultsToHashForDeterminism();
             }
@@ -543,12 +552,7 @@ public class ProcedureRunner {
      * a pre-IV2 transaction id.
      */
     public Date getTransactionTime() {
-        StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
-            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(invocation.getOriginalUniqueId()));
-        } else {
-            return new Date(UniqueIdGenerator.getTimestampFromUniqueId(m_txnState.uniqueId));
-        }
+        return new Date(UniqueIdGenerator.getTimestampFromUniqueId(getUniqueId()));
     }
 
     /*
@@ -559,7 +563,7 @@ public class ProcedureRunner {
      */
     public long getUniqueId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && invocation.getType() == ProcedureInvocationType.REPLICATED) {
+        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalUniqueId();
         } else {
             return m_txnState.uniqueId;
@@ -1294,6 +1298,7 @@ public class ProcedureRunner {
                                                  false,
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
+           m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1306,6 +1311,7 @@ public class ProcedureRunner {
            m_distributedTask.setProcedureName(procedureName);
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
+           m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
        }
 
        /*

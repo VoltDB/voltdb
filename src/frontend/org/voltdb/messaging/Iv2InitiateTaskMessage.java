@@ -91,8 +91,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public boolean isForDR() {
-        return super.isForDR();
+    public boolean isForDRv1() {
+        return super.isForDRv1();
     }
 
     @Override

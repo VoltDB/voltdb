@@ -648,6 +648,41 @@
         //Update admin configuration
         this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
             try {
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.memorylimit != null) {
+                        var memorySize = "";
+                        if (updatedData.systemsettings.resourcemonitor.memorylimit.size.indexOf("%")>-1) {
+                            memorySize = parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size.replace("%", ""));
+                            updatedData.systemsettings.resourcemonitor.memorylimit.size = memorySize + encodeURIComponent("%");
+                        } else {
+                            updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size));
+                        }
+                    }
+                }
+
+                var features = [];
+
+                if (updatedData.systemsettings.resourcemonitor != null) {
+                    if (updatedData.systemsettings.resourcemonitor.disklimit != null) {
+                        for (var i = 0; i < updatedData.systemsettings.resourcemonitor.disklimit.feature.length; i++) {
+                            var diskSize = "";
+                            if (updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size.indexOf("%")>-1) {
+                                diskSize = parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size.replace("%", ""));
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size = diskSize + encodeURIComponent("%");
+                            } else {
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size));
+                            }
+
+                            features.push({
+                                name: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].name,
+                                size: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size
+                            });
+                        }
+                        updatedData.systemsettings.resourcemonitor.disklimit.feature = features;
+                    }
+
+                }
+
                 var processName = "SHORTAPI_UPDATEDEPLOYMENT";
                 var procedureNames = [];
                 var parameters = [];

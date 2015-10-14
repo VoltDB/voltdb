@@ -20,6 +20,8 @@ package org.voltdb.importer;
 import java.net.URI;
 import java.util.Properties;
 import java.util.Set;
+
+import org.voltdb.InternalConnectionContext;
 import org.voltdb.client.ProcedureCallback;
 
 /**
@@ -27,7 +29,7 @@ import org.voltdb.client.ProcedureCallback;
  * @author akhanzode
  */
 
-public interface ImportContext {
+public interface ImportContext extends InternalConnectionContext {
 
     /**
      * This is called to configure properties. Just save or configure anything you want here.
@@ -90,6 +92,7 @@ public interface ImportContext {
      * Give a friendly name for the importer.
      * @return
      */
+    @Override
     public String getName();
 
     /**

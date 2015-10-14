@@ -576,11 +576,6 @@ public class CatalogDiffEngine {
                                             final CatalogType prevType,
                                             final String field)
     {
-        if (suspect instanceof Deployment) {
-            // ignore host count differences as clusters may elastically expand,
-            // and yet require catalog changes
-            return "hostcount".equals(field);
-        }
         return false;
     }
 
@@ -839,7 +834,7 @@ public class CatalogDiffEngine {
         if (prevType instanceof Database) {
             if(field.equalsIgnoreCase("isActiveActiveDRed")) {
                 List<String[]> retval = new ArrayList<>();
-                for (Table t : ((Database) suspect).getTables()) {
+                for (Table t : ((Database) prevType).getTables()) {
                     if (t.getIsdred()) {
                         String[] entry = new String[2];
                         entry[0] = t.getTypeName();

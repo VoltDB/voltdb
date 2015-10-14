@@ -49,6 +49,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
@@ -63,7 +64,6 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltdb.catalog.Column;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -413,7 +413,7 @@ public class ExportGeneration {
         findMissingDataSources(partitions, missingPartitions);
         if (missingPartitions.size() > 0) {
             exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
-            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList(missingPartitions));
+            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList<Integer>(missingPartitions));
         }
     }
 

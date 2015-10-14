@@ -45,10 +45,11 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         viewsNames  { listsArea.find('#accordionViews').find('h3') }
         storedProcs { listsArea.find('#accordionProcedures') }
         systemStoredProcsHeader  { storedProcs.find('.systemHeader').first() }
-        defaultStoredProcsHeader { storedProcs.find('.systemHeader').first().next('h3') }
+        defaultStoredProcsHeader { systemStoredProcsHeader.next('.systemHeader') }
+        userStoredProcsHeader    { storedProcs.find('.systemHeader').last() }
         systemStoredProcs   { storedProcs.find('#systemProcedure').find('h3') }
         defaultStoredProcs  { storedProcs.find('#defaultProcedure').find('h3') }
-        userStoredProcs { defaultStoredProcsHeader.nextAll('h3') }
+        userStoredProcs     { storedProcs.find('#userProcedure').find('h3') }
         allStoredProcs  { storedProcs.find('h3') }
 
         queryStatus			{ $("th", text:"STATUS") }
@@ -161,6 +162,37 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
+     * Given two Navigators, for a specific category of Stored Procedures
+     * (System, Default or User), returns the list of that category of Stored
+     * Procedures (as displayed on the "Stored Procedures" tab, under the
+     * specified heading).<p>
+     * Note: as a side effect, the "Stored Procedures" tab is opened (if
+     * needed), and the specfied list of Stored Procedures  is opened (if
+     * needed), and then closed.
+     * @param storedProcsHeaderNav - a Navigator specifiying the header for
+     * the desired category (System, Default or User) of Stored Procedures.
+     * @param storedProcsNav - a Navigator specifiying each of the Stored
+     * Procedures the desired category (System, Default or User).
+     * @return the list of Default Stored Procedure names.
+     */
+    private List<String> getSpecifiedStoredProcedures(Navigator storedProcsHeaderNav,
+                                                      Navigator storedProcsNav) {
+        def storedProcs = []
+        try {
+            showStoredProcedures()
+            clickToDisplay(storedProcsHeaderNav, storedProcsNav)
+            storedProcsNav.each {
+                scrollIntoView(it)
+                storedProcs.add(it.text())
+            }
+            clickToNotDisplay(storedProcsHeaderNav, storedProcsNav)
+        } catch (RequiredPageContentNotPresent e) {
+            // do nothing: empty list will be returned
+        }
+        return storedProcs
+    }
+
+    /**
      * Returns the list of System Stored Procedures (as displayed on the
      * "Stored Procedures" tab, under the "System Stored Procedures" heading).<p>
      * Note: as a side effect, the "Stored Procedures" tab is opened (if
@@ -169,15 +201,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the list of System Stored Procedure names.
      */
     def List<String> getSystemStoredProcedures() {
-        def storedProcs = []
-        showStoredProcedures()
-        clickToDisplay(systemStoredProcsHeader, systemStoredProcs)
-        systemStoredProcs.each {
-            scrollIntoView(it);
-            storedProcs.add(it.text())
-        }
-        clickToNotDisplay(systemStoredProcsHeader, systemStoredProcs)
-        return storedProcs
+        return getSpecifiedStoredProcedures(systemStoredProcsHeader, systemStoredProcs)
     }
 
     /**
@@ -189,15 +213,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the list of Default Stored Procedure names.
      */
     def List<String> getDefaultStoredProcedures() { // defaultStoredProcsHeader
-        def storedProcs = []
-        showStoredProcedures()
-        clickToDisplay(defaultStoredProcsHeader, defaultStoredProcs)
-        defaultStoredProcs.each {
-            scrollIntoView(it);
-            storedProcs.add(it.text())
-        }
-        clickToNotDisplay(defaultStoredProcsHeader, defaultStoredProcs)
-        return storedProcs
+        return getSpecifiedStoredProcedures(defaultStoredProcsHeader, defaultStoredProcs)
     }
 
     /**
@@ -210,13 +226,14 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      */
     def List<String> getUserStoredProcedures() {
         def storedProcs = []
-        showStoredProcedures()
-        //clickToDisplay(userStoredProcsHeader, userStoredProcs)
         try {
+            showStoredProcedures()
+            clickToDisplay(userStoredProcsHeader, userStoredProcs)
             userStoredProcs.each {
                 scrollIntoView(it)
                 storedProcs.add(it.text())
             }
+            clickToNotDisplay(userStoredProcsHeader, userStoredProcs)
         } catch (RequiredPageContentNotPresent e) {
             // do nothing: empty list will be returned
         }

@@ -99,16 +99,27 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
         }
     }
 
+    @Override
+    public void setBackPressure(boolean flag) {
+        for (ClientConnectionHandler fetcher : m_clients) {
+            fetcher.hasBackPressure(flag);
+        }
+    }
+
+
     //This is ClientConnection handler to read and dispatch data to stored procedure.
     private class ClientConnectionHandler extends Thread {
         private final Socket m_clientSocket;
         private final String m_procedure;
-        private final ImportHandlerProxy m_importHandlerProxy;
+        private volatile boolean m_hasBackPressure = false;
 
-        public ClientConnectionHandler(ImportHandlerProxy ic, Socket clientSocket, String procedure) {
-            m_importHandlerProxy = ic;
+        public ClientConnectionHandler(Socket clientSocket, String procedure) {
             m_clientSocket = clientSocket;
             m_procedure = procedure;
+        }
+
+        public void hasBackPressure(boolean flag) {
+            m_hasBackPressure = flag;
         }
 
         @Override
@@ -124,6 +135,13 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                         CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                         if (!callProcedure(invocation)) {
                             System.out.println("Inserted failed: " + line);
+                        }
+                        if (m_hasBackPressure) {
+                            try {
+                                Thread.sleep(100);
+                            } catch (InterruptedException ioe) {
+                                //
+                            }
                         }
                     }
                     m_clientSocket.close();
@@ -153,7 +171,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
             String procedure = m_properties.getProperty("procedure");
             while (true) {
                 Socket clientSocket = m_serverSocket.accept();
-                ClientConnectionHandler ch = new ClientConnectionHandler(this, clientSocket, procedure);
+                ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket, procedure);
                 m_clients.add(ch);
                 ch.start();
             }

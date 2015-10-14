@@ -37,6 +37,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
@@ -543,7 +544,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             stringBytes.flip();
 
-            final String retval = new String(stringBytes.array());
+            final String retval = new String(stringBytes.array(), Constants.UTF8ENCODING);
             return retval;
         }
 
@@ -1449,7 +1450,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+    public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
                                long undoToken)
     throws EEException
     {
@@ -1465,6 +1466,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         try {
             m_data.flip();
             m_connection.write();
+            ByteBuffer rowCount = ByteBuffer.allocate(8);
+            while (rowCount.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(rowCount);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            rowCount.flip();
+            return rowCount.getLong();
         } catch (final Exception e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);

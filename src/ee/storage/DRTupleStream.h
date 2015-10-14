@@ -29,6 +29,9 @@ namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
+// Use this to indicate uninitialized DR mark
+const size_t INVALID_DR_MARK = SIZE_MAX;
+
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
 const int MAGIC_DR_TRANSACTION_PADDING = 69;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
@@ -41,7 +44,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 1;
+    static const uint8_t DR_VERSION = 2;
 
     DRTupleStream();
 
@@ -67,8 +70,16 @@ public:
                        int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type,
-                       const TableIndex *uniqueIndex = NULL,
-                       uint32_t uniqueIndexCrc = 0);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+
+    virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId,
+                       TableTuple &oldTuple,
+                       TableTuple &newTuple,
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -76,8 +87,6 @@ public:
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId);
-
-    size_t computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns);
 
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
@@ -93,9 +102,27 @@ public:
 
     static int32_t getTestDRBuffer(char *out);
 private:
+    void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
+
+    void writeRowTuple(TableTuple& tuple,
+            size_t rowHeaderSz,
+            size_t rowMetadataSz,
+            const std::vector<int> *interestingColumns,
+            const std::pair<const TableIndex*, uint32_t> &indexPair,
+            ExportSerializeOutput &io);
+
+    size_t computeOffsets(DRRecordType &type,
+            const std::pair<const TableIndex*, uint32_t> &indexPair,
+            TableTuple &tuple,
+            size_t &rowHeaderSz,
+            size_t &rowMetadataSz,
+            const std::vector<int> *&interestingColumns);
+
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
     bool m_opened;
+    int64_t m_rowTarget;
+    size_t m_txnRowCount;
 };
 
 class MockDRTupleStream : public DRTupleStream {
@@ -108,8 +135,7 @@ public:
                            int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type,
-                           const TableIndex *uniqueIndex = NULL,
-                           uint32_t uniqueIndexCrc = 0) {
+                           const std::pair<const TableIndex*, uint32_t>& indexPair) {
         return 0;
     }
 
@@ -129,15 +155,39 @@ public:
 
 class DRTupleStreamDisableGuard {
 public:
-    DRTupleStreamDisableGuard(DRTupleStream *stream) : m_stream(stream), m_oldValue(stream->m_enabled) {
-        stream->m_enabled = false;
+    DRTupleStreamDisableGuard(DRTupleStream *drStream, DRTupleStream *drReplicatedStream, bool ignore) :
+            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_drStreamOldValue(drStream->m_enabled),
+            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
+    {
+        if (!ignore) {
+            setGuard();
+        }
+    }
+    DRTupleStreamDisableGuard(DRTupleStream *drStream, DRTupleStream *drReplicatedStream) :
+            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_drStreamOldValue(drStream->m_enabled),
+            m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
+    {
+        setGuard();
     }
     ~DRTupleStreamDisableGuard() {
-        m_stream->m_enabled = m_oldValue;
+        m_drStream->m_enabled = m_drStreamOldValue;
+        if (m_drReplicatedStream) {
+            m_drReplicatedStream->m_enabled = m_drReplicatedStreamOldValue;
+        }
     }
+
 private:
-    DRTupleStream *m_stream;
-    const bool m_oldValue;
+    inline void setGuard() {
+        m_drStream->m_enabled = false;
+        if (m_drReplicatedStream) {
+            m_drReplicatedStream->m_enabled = false;
+        }
+    }
+
+    DRTupleStream *m_drStream;
+    DRTupleStream *m_drReplicatedStream;
+    const bool m_drStreamOldValue;
+    const bool m_drReplicatedStreamOldValue;
 };
 
 }

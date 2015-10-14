@@ -81,7 +81,7 @@ void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple)
     assert(tuple);
     for (int col_ctr = 0, col_cnt = table->columnCount(); col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = table->schema()->getColumnInfo(col_ctr);
-        NValue value = getRandomValue(columnInfo->getVoltType());
+        NValue value = getRandomValue(columnInfo->getVoltType(), columnInfo->length);
 
         tuple->setNValue(col_ctr, value);
 

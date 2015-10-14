@@ -35,13 +35,21 @@ public enum TxnId2Utils {;
 
     static VoltLogger log = new VoltLogger("TxnId2Utils");
 
-    static ClientResponse doAdHoc(Client client, String query) throws NoConnectionsException, IOException, ProcCallException {
+    static ClientResponse doAdHoc(Client client, String query) throws ProcCallException {
+        return doProcCall(client, "@AdHoc", query);
+    }
+
+    static ClientResponse doProcCall(Client client, String proc, Object... parms) throws ProcCallException {
         Boolean sleep = false;
         Boolean noConnections = false;
         Boolean timedOutOnce = false;
         while (true) {
             try {
-                ClientResponse cr = client.callProcedure("@AdHoc", query);
+                ClientResponse cr = null;
+                if (proc == "@AdHoc")
+                    cr = client.callProcedure("@AdHoc", (String) parms[0]);
+                else
+                    cr = client.callProcedure(proc);
                 if (cr.getStatus() == ClientResponse.SUCCESS) {
                     Benchmark.txnCount.incrementAndGet();
                     return cr;

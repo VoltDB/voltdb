@@ -91,6 +91,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
             Object params[] = invocation.getParams();
             return (Boolean )m_callProcMethod.invoke(m_handler, this, invocation.getProcedure(), params);
         } catch (Exception ex) {
+            ex.printStackTrace();
             return false;
         }
     }
@@ -116,12 +117,12 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         m_warn_log = m_handler.getClass().getMethod("warn", String.class);
         m_debug_log = m_handler.getClass().getMethod("debug", String.class);
         m_trace_log = m_handler.getClass().getMethod("debug", String.class);
-        m_error_log_rateLimited = m_handler.getClass().getMethod("error", Throwable.class, String.class, Object[].class);
+        m_error_log_rateLimited = m_handler.getClass().getMethod("rateLimitedError", Throwable.class, String.class, Object[].class);
         m_error_log_withT = m_handler.getClass().getMethod("error", String.class, Throwable.class);
         m_debug_enabled = m_handler.getClass().getMethod("isDebugEnabled", (Class<?>[] )null);
         m_info_enabled = m_handler.getClass().getMethod("isInfoEnabled", (Class<?>[] )null);
         m_trace_enabled = m_handler.getClass().getMethod("isTraceEnabled", (Class<?>[] )null);
-        m_warn_log_rateLimited = m_handler.getClass().getMethod("warn", Throwable.class, String.class, Object[].class);
+        m_warn_log_rateLimited = m_handler.getClass().getMethod("rateLimitedWarn", Throwable.class, String.class, Object[].class);
     }
 
     @Override

@@ -18,18 +18,11 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -38,7 +31,6 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.iv2.MpTransactionState;
-import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
 import com.google_voltpatches.common.primitives.Longs;
@@ -194,160 +186,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         }
 
         return results.toArray(new VoltTable[0]);
-    }
-
-    /*
-     * When restoring replicated tables I found that a single site can receive multiple fragments instructing it to
-     * distribute a replicated table. It processes each fragment causing it to enter executeSysProcPlanFragments
-     * twice. Each time it enters it has generated a task for some other site, and is waiting on dependencies.
-     *
-     * The problem is that they will come back out of order, the dependency for the first task comes while
-     * the site is waiting for the dependency of the second task. When the second dependency arrives we fail
-     * to drop out because of extra/mismatches dependencies.
-     *
-     * The solution is to recognize unexpected dependencies, stash them away, and then check for them each time
-     * we finish running a plan fragment. This doesn't allow you to process the dependencies immediately
-     * (Continuations anyone?), but it doesn't deadlock and is good enough for restore.
-     */
-    private final Map<Integer, List<VoltTable>> m_unexpectedDependencies =
-            new HashMap<Integer, List<VoltTable>>();
-
-    /*
-     * A helper method for snapshot restore that manages a mailbox run loop and dependency tracking.
-     * The mailbox is a dedicated mailbox for snapshot restore. This assumes a very specific plan fragment
-     * worklow where fragments 0 - (N - 1) all have a single output dependency that is aggregated
-     * by fragment N which uses their output dependencies as it's input dependencies.
-     *
-     * This matches the workflow of snapshot restore
-     *
-     * This is not safe to use after restore because it doesn't do failure handling that would deal with
-     * dropped plan fragments
-     */
-    public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
-        Set<Integer> dependencyIds = new HashSet<Integer>();
-        VoltTable results[] = new VoltTable[1];
-
-        /*
-         * Iterate the plan fragments and distribute them. Each
-         * plan fragment goes to an individual site.
-         * The output dependency of each fragment is added to the
-         * set of expected dependencies
-         */
-        for (int ii = 0; ii < pfs.length - 1; ii++) {
-            SynthesizedPlanFragment pf = pfs[ii];
-            dependencyIds.add(pf.outputDepId);
-
-            log.trace(
-                    "Sending fragment " + pf.fragmentId + " dependency " + pf.outputDepId +
-                    " from " + CoreUtils.hsIdToString(m.getHSId()) + "-" +
-                            CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) + " to " +
-                            CoreUtils.hsIdToString(pf.siteId));
-            /*
-             * The only real data is the fragment id, output dep id,
-             * and parameters. Transactions ids, readonly-ness, and finality-ness
-             * are unused.
-             */
-            FragmentTaskMessage ftm =
-                    FragmentTaskMessage.createWithOneFragment(
-                            0,
-                            m.getHSId(),
-                            0,
-                            0,
-                            false,
-                            fragIdToHash(pf.fragmentId),
-                            pf.outputDepId,
-                            pf.parameters,
-                            false,
-                            m_runner.getTxnState().isForReplay());
-            m.send(pf.siteId, ftm);
-        }
-
-        /*
-         * Track the received dependencies. Stored as a list because executePlanFragment for
-         * the aggregator plan fragment expects the tables as a list in the dependency map,
-         * but sysproc fragments only every have a single output dependency.
-         */
-        Map<Integer, List<VoltTable>> receivedDependencyIds = new HashMap<Integer, List<VoltTable>>();
-
-        /*
-         * This loop will wait for all the responses to the fragment that was sent out,
-         * but will also respond to incoming fragment tasks by executing them.
-         */
-        while (true) {
-            //Lightly spinning makes debugging easier by allowing inspection
-            //of stuff on the stack
-            VoltMessage vm = m.recvBlocking(1000);
-            if (vm == null) continue;
-
-            if (vm instanceof FragmentTaskMessage) {
-                FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
-                DependencyPair dp =
-                        m_runner.executeSysProcPlanFragment(
-                                m_runner.getTxnState(),
-                                null,
-                                hashToFragId(ftm.getPlanHash(0)),
-                                ftm.getParameterSetForFragment(0));
-                FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
-                frm.addDependency(dp.depId, dp.dependency);
-                m.send(ftm.getCoordinatorHSId(), frm);
-
-                if (!m_unexpectedDependencies.isEmpty()) {
-                    for (Integer dependencyId : dependencyIds) {
-                        if (m_unexpectedDependencies.containsKey(dependencyId)) {
-                            receivedDependencyIds.put(dependencyId, m_unexpectedDependencies.remove(dependencyId));
-                        }
-                    }
-
-                    /*
-                     * This predicate exists below in FRM handling, they have to match
-                     */
-                    if (receivedDependencyIds.size() == dependencyIds.size() &&
-                            receivedDependencyIds.keySet().equals(dependencyIds)) {
-                        break;
-                    }
-                }
-            } else if (vm instanceof FragmentResponseMessage) {
-                FragmentResponseMessage frm = (FragmentResponseMessage)vm;
-                final int dependencyId = frm.getTableDependencyIdAtIndex(0);
-                if (dependencyIds.contains(dependencyId)) {
-                    receivedDependencyIds.put(
-                            dependencyId,
-                            Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
-                    log.trace("Received dependency at " + CoreUtils.hsIdToString(m.getHSId()) +
-                            "-" + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
-                            " from " + CoreUtils.hsIdToString(frm.m_sourceHSId) +
-                            " have " + receivedDependencyIds.size() + " " + receivedDependencyIds.keySet() +
-                            " and need " + dependencyIds.size() + " " + dependencyIds);
-                    /*
-                     * This predicate exists above in FTM handling, they have to match
-                     */
-                    if (receivedDependencyIds.size() == dependencyIds.size() &&
-                            receivedDependencyIds.keySet().equals(dependencyIds)) {
-                        break;
-                    }
-                } else {
-                    /*
-                     * Stash the dependency intended for a different fragment
-                     */
-                    if (m_unexpectedDependencies.put(
-                            dependencyId,
-                            Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)})) != null) {
-                        VoltDB.crashGlobalVoltDB("Received a duplicate dependency", true, null);
-                    }
-                }
-            }
-        }
-
-        /*
-         * Executing the last aggregator plan fragment in the list produces the result
-         */
-        results[0] =
-                m_runner.executeSysProcPlanFragment(
-                        m_runner.getTxnState(),
-                        receivedDependencyIds,
-                        pfs[pfs.length - 1].fragmentId,
-                        pfs[pfs.length - 1].parameters).dependency;
-        return results;
     }
 
     /**

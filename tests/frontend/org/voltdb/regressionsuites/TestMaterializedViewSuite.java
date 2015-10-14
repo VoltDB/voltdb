@@ -245,31 +245,33 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     // Test the correctness of min/max when choosing an index on both group-by columns and aggregation column/exprs.
-    private void subtestENG6511SinglePartition() throws IOException, ProcCallException
+    private void subtestENG6511(boolean singlePartition) throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
+        int pid = singlePartition ? 1 : 2;
 
-        insertENG6511(client, 1, 1, 3, 70, -46);
+        insertENG6511(client, 1, 1, 3, 70, 46);
         insertENG6511(client, 1, 1, 3, 70, 46);
         insertENG6511(client, 1, 1, 3, 12, 66);
-        insertENG6511(client, 1, 1, 3, 9, 70);
-        insertENG6511(client, 1, 1, 3, 256, 412);
+        insertENG6511(client, pid, 1, 3, 9, 70);
+        insertENG6511(client, pid, 1, 3, 256, 412);
+        insertENG6511(client, pid, 1, 3, 70, -46);
 
         insertENG6511(client, 1, 1, 4, 17, 218);
         insertENG6511(client, 1, 1, 4, 25, 28);
-        insertENG6511(client, 1, 1, 4, 48, 65);
-        insertENG6511(client, 1, 1, 4, -48, 70);
+        insertENG6511(client, pid, 1, 4, 48, 65);
+        insertENG6511(client, pid, 1, 4, -48, 70);
 
         insertENG6511(client, 1, 2, 5, -71, 75);
         insertENG6511(client, 1, 2, 5, -4, 5);
-        insertENG6511(client, 1, 2, 5, 64, 16);
-        insertENG6511(client, 1, 2, 5, null, 91);
+        insertENG6511(client, pid, 2, 5, 64, 16);
+        insertENG6511(client, pid, 2, 5, null, 91);
 
         insertENG6511(client, 1, 2, 6, -9, 85);
         insertENG6511(client, 1, 2, 6, 38, 43);
-        insertENG6511(client, 1, 2, 6, 21, -51);
-        insertENG6511(client, 1, 2, 6, null, 17);
+        insertENG6511(client, pid, 2, 6, 21, -51);
+        insertENG6511(client, pid, 2, 6, null, 17);
         verifyENG6511(client);
 
         runAndVerifyENG6511(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
@@ -277,6 +279,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=-71;");
         runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=48;");
         runAndVerifyENG6511(client, "UPDATE ENG6511 SET v1=NULL WHERE v1=256;");
+        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE pid=1 AND v1=70 ORDER BY pid, d1, d2, v1, v2 LIMIT 2;");
         runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
     }
 
@@ -292,7 +295,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestIndexMinMaxSinglePartitionWithPredicate();
         subtestNullMinMaxSinglePartition();
         subtestENG7872SinglePartition();
-        subtestENG6511SinglePartition();
+        subtestENG6511(false);
     }
 
 
@@ -960,42 +963,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "4", "0.0", "10");
     }
 
-    // Test the correctness of min/max when choosing an index on both group-by columns and aggregation column/exprs.
-    private void subtestENG6511MP() throws IOException, ProcCallException
-    {
-        Client client = getClient();
-        truncateBeforeTest(client);
-
-        insertENG6511(client, 1, 1, 3, 70, -46);
-        insertENG6511(client, 1, 1, 3, 70, 46);
-        insertENG6511(client, 1, 1, 3, 12, 66);
-        insertENG6511(client, 2, 1, 3, 9, 70);
-        insertENG6511(client, 2, 1, 3, 256, 412);
-
-        insertENG6511(client, 1, 1, 4, 17, 218);
-        insertENG6511(client, 1, 1, 4, 25, 28);
-        insertENG6511(client, 2, 1, 4, 48, 65);
-        insertENG6511(client, 2, 1, 4, -48, 70);
-
-        insertENG6511(client, 1, 2, 5, -71, 75);
-        insertENG6511(client, 1, 2, 5, -4, 5);
-        insertENG6511(client, 2, 2, 5, 64, 16);
-        insertENG6511(client, 2, 2, 5, null, 91);
-
-        insertENG6511(client, 1, 2, 6, -9, 85);
-        insertENG6511(client, 1, 2, 6, 38, 43);
-        insertENG6511(client, 2, 2, 6, 21, -51);
-        insertENG6511(client, 2, 2, 6, null, 17);
-        verifyENG6511(client);
-
-        runAndVerifyENG6511(client, "UPDATE ENG6511 SET v2=120 WHERE v2=17;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v2=-51;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=-71;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE v1=48;");
-        runAndVerifyENG6511(client, "UPDATE ENG6511 SET v1=NULL WHERE v1=256;");
-        runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
-    }
-
     public void testMPAndRegressions() throws IOException, ProcCallException
     {
         subtestMultiPartitionSimple();
@@ -1005,7 +972,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestIndexed();
         subtestMinMaxMultiPartition();
         subtestENG7872MP();
-        subtestENG6511MP();
+        subtestENG6511(true);
     }
 
     private void subtestMultiPartitionSimple() throws IOException, ProcCallException
