@@ -18,9 +18,31 @@
 package org.voltdb.types;
 
 import java.nio.ByteBuffer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PointType {
-
+    //
+    // It's slightly hard to see this in the actual pattern
+    // definition, but the pattern we want to match, ignoring space, is:
+    //    1. Some optional space.
+    //    2. The word "point", case insensitive.
+    //    3. Some optional space.
+    //    4. A left parenthesis.
+    //    5. Some optional space.
+    //    6. A coordinate, consisting of
+    //       6.1. An optional sign.
+    //       6.2. A digit string, starting with [1-9].
+    //       6.3. An optional dot followed by a floating point string.
+    //    7. Some required space.
+    //    8. A second coordinate, just like (6) above
+    //    9. A right parenthesis.
+    //   10. Some optional space.
+    //   11. The end of the string.
+    //
+    private static final Pattern wktPattern
+        = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?[1-9]\\d*)(?:[.](\\d*))?\\s+([-]?[1-9]\\d*)(?:[.](\\d*))?\\s*[)]\\s*\\z",
+                          Pattern.CASE_INSENSITIVE);
     // Internal representation of a geospatial point
     // is subject to change.  For now, just use two floats.
     // This matches the EE representation.
@@ -37,6 +59,33 @@ public class PointType {
     public PointType(float latitude, float longitude) {
         m_latitude = latitude;
         m_longitude = longitude;
+    }
+
+    private static float toFloat(String aInt, String aFrac) {
+        return Float.parseFloat(aInt + "." + (aFrac == null ? "0" : aFrac));
+    }
+    /**
+     * Create a PointType from a WellKnownText string.
+     * @param param
+     */
+    public static PointType pointFromText(String param) {
+        if (param == null) {
+            throw new IllegalArgumentException("Null well known text argument to PointType constructor.");
+        }
+        Matcher m = wktPattern.matcher(param);
+        if (m.find()) {
+            float latitude  = toFloat(m.group(1), m.group(2));
+            float longitude = toFloat(m.group(3), m.group(4));
+            if (Math.abs(latitude) > 90.0) {
+                throw new IllegalArgumentException(String.format("Latitude \"%f\" out of bounds.", latitude));
+            }
+            if (Math.abs(longitude) > 180.0) {
+                throw new IllegalArgumentException(String.format("Longitude \"%f\" out of bounds.", longitude));
+            }
+            return new PointType(latitude, longitude);
+        } else {
+            throw new IllegalArgumentException("Cannot construct PointType value from \"" + param + "\"");
+        }
     }
 
     public boolean isNull() {
