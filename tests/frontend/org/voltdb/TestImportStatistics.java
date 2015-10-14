@@ -384,7 +384,7 @@ public class TestImportStatistics extends RegressionSuite {
     }
 
     // leave this disabled because this is not perfectly reliable and is slow. Enable and run manually as needed.
-    public void testPending() throws Exception {
+    public void donttestPending() throws Exception {
         Client client = getClient();
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);

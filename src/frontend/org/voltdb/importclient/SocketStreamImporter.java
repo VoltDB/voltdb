@@ -66,7 +66,11 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     @Override
     public void stop() {
         for (SocketImporterImpl impl : m_instances) {
+            try {
             impl.stop();
+            } catch(Exception e) {
+                warn(e, "Error trying to stop importer");
+            }
         }
 
         m_instances.clear();
@@ -77,7 +81,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                 m_es.awaitTermination(365, TimeUnit.DAYS);
             } catch (InterruptedException ex) {
                 //Should never come here.
-                ex.printStackTrace();
+                warn(ex, "Exception waiting for SocketImporter executor service to shutdown");
             }
         }
     }
@@ -128,7 +132,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
             String s = (String )m_properties.get("port");
             m_procedure = (String )m_properties.get("procedure");
             if (m_procedure == null || m_procedure.trim().length() == 0) {
-                throw new RuntimeException("Missing procedure.");
+                throw new IllegalArgumentException("Missing procedure.");
             }
             try {
                 if (m_serverSocket != null) {
@@ -136,7 +140,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                 }
                 m_serverSocket = new ServerSocket(Integer.parseInt(s));
             } catch (IOException ex) {
-                ex.printStackTrace();
+                warn(ex, "Exception closing existing server socket and reopening on port %s", s);
                 throw new RuntimeException(ex.getCause());
             }
         }
@@ -160,15 +164,20 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
         }
 
         public void stop() {
-            try {
-                for (ClientConnectionHandler s : m_clients) {
+            for (ClientConnectionHandler s : m_clients) {
+                try {
                     s.stopClient();
+                } catch(Exception e) {
+                    warn(e, "Error closing socket client connection");
                 }
-                m_clients.clear();
+            }
+            m_clients.clear();
+
+            try {
                 m_serverSocket.close();
                 m_serverSocket = null;
             } catch (IOException ex) {
-                ex.printStackTrace();
+                warn(ex, "Error closing socket importer server socket");
             }
         }
 
@@ -206,7 +215,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                             if (line == null) break;
                             CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                             if (!callProcedure(invocation)) {
-                                System.out.println("Inserted failed: " + line);
+                                error(null, "Socket importer insertion failed");
                             }
                             if (m_hasBackPressure) {
                                 try {
@@ -217,10 +226,10 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
                             }
                         }
                         m_clientSocket.close();
-                        System.out.println("Client Closed.");
+                        info("Client Closed.");
                     }
                 } catch (IOException ioe) {
-                    ioe.printStackTrace();
+                    error(ioe, "IO exception reading from client socket connection in socket importer");
                 }
             }
 

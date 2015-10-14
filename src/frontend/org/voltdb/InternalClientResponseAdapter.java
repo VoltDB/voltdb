@@ -81,7 +81,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final ConcurrentMap<String, Long> m_internalConnectionIds = new ConcurrentHashMap<>();
 
     private InternalConnectionContext m_context;
-    private ProcedureCallback m_UacProccb;
+    private ProcedureCallback m_uacProccb;
 
     private class InternalCallback implements Callback {
 
@@ -191,7 +191,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
                     // initiate the transaction. These hard-coded values from catalog
                     // procedure are horrible, horrible, horrible.
-                    createTransaction(m_context, task.procName, catProc, m_UacProccb, null, task, partition, System.nanoTime());
+                    createTransaction(m_context, task.procName, catProc, m_uacProccb, null, task, partition, System.nanoTime());
                 }
             } else {
                 throw new RuntimeException(
@@ -203,7 +203,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public boolean dispatchUpdateApplicationCatalog(StoredProcedureInvocation task, AuthSystem.AuthUser user, InternalConnectionContext context,
             ProcedureCallback proccb) {
         m_context = context;
-        m_UacProccb = proccb;
+        m_uacProccb = proccb;
         Object[] params = task.getParams().toArray();
         // default catalogBytes to null, when passed along, will tell the
         // catalog change planner that we want to use the current catalog.

@@ -78,6 +78,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
             reportStat(result, invocation.getProcedure());
             return result;
         } catch (Exception ex) {
+            error(ex, "%s: Error trying to import", getName());
             reportFailureStat(invocation.getProcedure());
             return false;
         }
@@ -91,6 +92,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
             reportStat(result, invocation.getProcedure());
             return result;
         } catch (Exception ex) {
+            error(ex, "%s: Error trying to import", getName());
             reportFailureStat(invocation.getProcedure());
             return false;
         }
