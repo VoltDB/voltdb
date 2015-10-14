@@ -5,8 +5,8 @@ drop table points if exists;
 Command succeeded.
 
 create table points (
-  id      integer primary key not null,
-  point   point not null
+  id         integer primary key not null,
+  location   point
 );
 Command succeeded.
 
@@ -42,3 +42,18 @@ exec make_point 110 'point( -45.0  -360.0)';
 exec make_point 111 'point( -45.0  -270.0)';
 
 exec make_point 112 'point(0.0, 0.0)';
+
+exec make_point 200 null;
+(Returned 1 rows in #.##s)
+
+select * from points;
+ID   LOCATION                
+---- ------------------------
+ 101 POINT (10.333 20.666)   
+ 102 POINT (10.333 20.666)   
+ 103 POINT (-10.333 -20.666) 
+ 104 POINT (-10.333 -20.666) 
+ 105 POINT (10.0 10.0)       
+ 200 NULL                    
+
+(Returned 6 rows in #.##s)

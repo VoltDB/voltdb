@@ -1,8 +1,8 @@
 drop table points if exists;
 
 create table points (
-  id      integer primary key not null,
-  point   point not null
+  id         integer primary key not null,
+  location   point
 );
 
 create procedure make_point as

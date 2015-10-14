@@ -15,3 +15,8 @@ exec make_point 111 'point( -45.0  -270.0)';
 -- Syntax errors
 -- Comma separating the coordinates.
 exec make_point 112 'point(0.0, 0.0)';
+
+exec make_point 200 null;
+
+select * from points;
+
