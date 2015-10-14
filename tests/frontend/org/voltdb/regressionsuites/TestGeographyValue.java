@@ -77,28 +77,28 @@ public class TestGeographyValue extends RegressionSuite {
     private final GeographyValue BILLERICA_TRIANGLE_POLY = new GeographyValue(BILLERICA_TRIANGLE_WKT);
     private final GeographyValue LOWELL_SQUARE_POLY = new GeographyValue(LOWELL_SQUARE_WKT);
 
-    private int fillTable(Client client, int startPk) throws Exception {
-        VoltTable vt = client.callProcedure("t.Insert", startPk, "Bermuda Triangle",
+    private int fillTable(Client client, String tbl, int startPk) throws Exception {
+        VoltTable vt = client.callProcedure(tbl + ".Insert", startPk, "Bermuda Triangle",
                 BERMUDA_TRIANGLE_POLY).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         ++startPk;
 
-        vt = client.callProcedure("t.Insert", startPk, "Bermuda Triangle with a hole",
+        vt = client.callProcedure(tbl + ".Insert", startPk, "Bermuda Triangle with a hole",
                 BERMUDA_TRIANGLE_HOLE_POLY).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         ++startPk;
 
-        vt = client.callProcedure("t.Insert", startPk, "Billerica Triangle",
+        vt = client.callProcedure(tbl + ".Insert", startPk, "Billerica Triangle",
                 BILLERICA_TRIANGLE_POLY).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         ++startPk;
 
-        vt = client.callProcedure("t.Insert", startPk, "Lowell Square",
+        vt = client.callProcedure(tbl + ".Insert", startPk, "Lowell Square",
                 LOWELL_SQUARE_POLY).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         ++startPk;
 
-        vt = client.callProcedure("t.Insert", startPk, "null poly", null).getResults()[0];
+        vt = client.callProcedure(tbl + ".Insert", startPk, "null poly", null).getResults()[0];
         ++startPk;
 
         return startPk;
@@ -163,26 +163,29 @@ public class TestGeographyValue extends RegressionSuite {
 
     public void testInsertAndSimpleSelect() throws IOException, ProcCallException {
         Client client = getClient();
+        String tables[] = {"pt", "t"};
 
-        // There's no rows in here yet.
-        validateTableOfScalarLongs(client, "select * from t;", new long[] {});
+        for (String tbl : tables) {
+            // There's no rows in here yet.
+            validateTableOfScalarLongs(client, "select * from " + tbl, new long[] {});
 
-        // insert using the polygonfromtext function
-        validateTableOfScalarLongs(client, "insert into t values(0, 'Bermuda Triangle', "
-                + "polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "'));",
-                new long[] {1});
+            // insert using the polygonfromtext function
+            validateTableOfScalarLongs(client, "insert into " + tbl + " values(0, 'Bermuda Triangle', "
+                    + "polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "'));",
+                    new long[] {1});
 
-        VoltTable vt = client.callProcedure("@AdHoc", "select * from t").getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(0, vt.getLong(0));
-        assertEquals("Bermuda Triangle", vt.getString(1));
-        assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(2).toString());
-        assertFalse(vt.advanceRow());
+            VoltTable vt = client.callProcedure("@AdHoc", "select * from " + tbl).getResults()[0];
+            assertTrue(vt.advanceRow());
+            assertEquals(0, vt.getLong(0));
+            assertEquals("Bermuda Triangle", vt.getString(1));
+            assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(2).toString());
+            assertFalse(vt.advanceRow());
 
-        vt = client.callProcedure("@AdHoc", "select polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "') from t").getResults()[0];
-        assertTrue(vt.advanceRow());
-        assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(0).toString());
-        assertFalse(vt.advanceRow());
+            vt = client.callProcedure("@AdHoc", "select polygonfromtext('" + BERMUDA_TRIANGLE_WKT + "') from " + tbl).getResults()[0];
+            assertTrue(vt.advanceRow());
+            assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(0).toString());
+            assertFalse(vt.advanceRow());
+        }
     }
 
     public void testParams() throws IOException, ProcCallException {
@@ -205,7 +208,7 @@ public class TestGeographyValue extends RegressionSuite {
     public void testComparison() throws Exception {
         Client client = getClient();
 
-        fillTable(client, 0);
+        fillTable(client, "t", 0);
 
         // equals
         VoltTable vt = client.callProcedure("@AdHoc",
@@ -336,7 +339,7 @@ public class TestGeographyValue extends RegressionSuite {
     public void testArithmetic() throws Exception {
         Client client = getClient();
 
-        fillTable(client, 0);
+        fillTable(client, "t", 0);
 
         verifyStmtFails(client, "select pk, poly + poly from t order by pk",
                 "incompatible data type in conversion");
@@ -349,9 +352,9 @@ public class TestGeographyValue extends RegressionSuite {
         Client client = getClient();
 
         int pk = 0;
-        pk = fillTable(client, pk);
-        pk = fillTable(client, pk);
-        pk = fillTable(client, pk);
+        pk = fillTable(client, "t", pk);
+        pk = fillTable(client, "t", pk);
+        pk = fillTable(client, "t", pk);
 
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select poly, count(*) "
@@ -371,7 +374,7 @@ public class TestGeographyValue extends RegressionSuite {
     public void testUpdate() throws Exception {
         Client client = getClient();
 
-        fillTable(client, 0);
+        fillTable(client,"t", 0);
 
         String santaCruzWkt = "POLYGON("
                 + "(36.999 -122.061, "
@@ -436,7 +439,7 @@ public class TestGeographyValue extends RegressionSuite {
 
     public void testIn() throws Exception {
         Client client = getClient();
-        fillTable(client, 0);
+        fillTable(client, "t", 0);
 
         VoltTable vt = client.callProcedure("select_in",
                 (Object)(new GeographyValue[] {BERMUDA_TRIANGLE_POLY, null, LOWELL_SQUARE_POLY}))
@@ -527,6 +530,12 @@ public class TestGeographyValue extends RegressionSuite {
                 + "  NAME VARCHAR(32),\n"
                 + "  POLY GEOGRAPHY\n"
                 + ");\n"
+                + "CREATE TABLE PT (\n"
+                + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  NAME VARCHAR(32),\n"
+                + "  POLY GEOGRAPHY\n"
+                + ");\n"
+                + "PARTITION TABLE PT ON COLUMN PK;\n"
                 + "CREATE TABLE T_NOT_NULL (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
