@@ -603,7 +603,10 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check whether 'Not Enforced' and no unit are displayed when blank value is saved"(){
+    def "Verify empty entry is not accepted in Memory Limit"(){
+        int count = 0
+        println("Test Start: Verify empty entry is not accepted in Memory Limit")
+        
         when:
         String memoryLimit = ""
         page.advanced.click()
@@ -628,27 +631,22 @@ class AdminAdvancedTest extends TestBase {
 
         when:
         page.overview.memoryLimitField.value(memoryLimit)
-        waitFor(waitTime) {
-            page.overview.memoryLimitOk.click()
-        }
         then:
-        waitFor(waitTime) {
-            page.overview.memoryLimitPopupOk.isDisplayed()
-            page.overview.memoryLimitPopupCancel.isDisplayed()
-        }
-
-        waitFor(waitTime) {
+        while(count < numberOfTrials) {
+            count++
             try {
-                page.overview.memoryLimitPopupOk.click()
-            } catch (org.openqa.selenium.ElementNotVisibleException e) {
-                println("ElementNotVisibleException, Retrying")
+                waitFor(waitTime) {
+                    page.overview.memoryLimitOk.click()
+                }
+                
+                waitFor(waitTime) {
+                    page.overview.memoryLimitError.isDisplayed()
+                }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
             }
-            page.overview.memoryLimitEdit.isDisplayed()
-            page.overview.memoryLimitValue.text().equals("Not Enforced")
-            page.overview.memoryLimitUnit.text().equals("")
-            !page.overview.memoryLimitPopupOk.isDisplayed()
-            !page.overview.memoryLimitPopupCancel.isDisplayed()
         }
+        println("Test End: Verify empty entry is not accepted in Memory Limit")
     }
 
 //    def "Check the error message for memory Limit when more than 4 digits are placed after decimal"() {
@@ -1264,6 +1262,7 @@ class AdminAdvancedTest extends TestBase {
     }
 
     def cleanupSpec() {
+        int count = 0
         if (!(page instanceof VoltDBManagementCenterPage)) {
             when: 'Open VMC page'
             ensureOnVoltDBManagementCenterPage()
@@ -1389,33 +1388,31 @@ class AdminAdvancedTest extends TestBase {
             }
 
             when:
-            if(initialMemoryLimit == "Not Enforced")
-                initialMemoryLimit = ""
-            page.overview.memoryLimitField.value(initialMemoryLimit)
-            waitFor(waitTime) {
-                page.overview.memoryLimitOk.click()
-            }
-            then:
-            waitFor(waitTime) {
-                page.overview.memoryLimitPopupOk.isDisplayed()
-                page.overview.memoryLimitPopupCancel.isDisplayed()
-            }
-
-            waitFor(waitTime) {
-                try {
-                    page.overview.memoryLimitPopupOk.click()
-                } catch (org.openqa.selenium.ElementNotVisibleException e) {
-                    println("retrying")
+            if(initialMemoryLimit == "Not Enforced") {
+                if(page.overview.memoryLimitDelete.isDisplayed()) {
+                    count = 0
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.overview.memoryLimitDelete.click()
+                            waitFor(waitTime) { page.overview.btnDelPopupMemoryLimitOk.isDisplayed() }
+                            break
+                        } catch(geb.waiting.WaitTimeoutException e) {
+                        }
+                    }
+                    
+                    count = 0
+                    while(count<numberOfTrials) {
+                        count++
+                        try {
+                            page.overview.btnDelPopupMemoryLimitOk.click()
+                            waitFor(waitTime) { page.overview.memoryLimitSizeValue.isDisplayed() }
+                            break
+                        } catch(geb.waiting.WaitTimeoutException e) {
+                        }
+                    }
                 }
-
-                page.overview.memoryLimitEdit.isDisplayed()
-                if(initialMemoryLimit == "")
-                    initialMemoryLimit = "Not Enforced"
-                page.overview.memoryLimitValue.text().equals(initialMemoryLimit)
-                !page.overview.memoryLimitPopupOk.isDisplayed()
-                !page.overview.memoryLimitPopupCancel.isDisplayed()
             }
         }
     }
-
 }

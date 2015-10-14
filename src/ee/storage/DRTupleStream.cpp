@@ -46,7 +46,9 @@ DRTupleStream::DRTupleStream()
       m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
       m_opened(false),
       m_rowTarget(-1),
-      m_txnRowCount(0)
+      m_txnRowCount(0),
+      m_lastCommittedSpUniqueId(0),
+      m_lastCommittedMpUniqueId(0)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -324,11 +326,22 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
-void DRTupleStream::rollbackTo(size_t mark) {
-    if (mark == INVALID_DR_MARK) return;
-    m_opened = false;
-    m_txnRowCount = 0;
-    TupleStreamBase::rollbackTo(mark);
+void DRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
+    if (mark == INVALID_DR_MARK) {
+        return;
+    }
+    if (drRowCost <= m_txnRowCount) {
+        m_txnRowCount -= drRowCost;
+    } else {
+        // convenience to let us just throw away everything at once
+        assert(drRowCost == SIZE_MAX);
+        m_txnRowCount = 0;
+    }
+    if (mark == m_committedUso) {
+        assert(m_txnRowCount == 0);
+        m_opened = false;
+    }
+    TupleStreamBase::rollbackTo(mark, drRowCost);
 }
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
@@ -356,10 +369,10 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
          m_currBlock->lastDRSequenceNumber() != (sequenceNumber - 1)) {
          throwFatalException(
              "Appending begin transaction message to a DR buffer without closing the previous transaction."
-             " Last closed DR sequence number (%jd), last closed unique ID (%jd)."
-             " Current DR sequence number (%jd), current unique ID (%jd)",
-             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastUniqueId(),
-             (intmax_t)sequenceNumber, (intmax_t)uniqueId);
+             " Last closed DR sequence number (%jd), last closed UniqueIds (%jd, %jd)."
+             " Current DR sequence number (%jd), current UniqueId (%jd)",
+             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(),
+             (intmax_t)m_currBlock->lastMpUniqueId(), (intmax_t)sequenceNumber, (intmax_t)uniqueId);
      }
 
      m_currBlock->startDRSequenceNumber(sequenceNumber);
@@ -381,51 +394,66 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_opened = true;
 }
 
-void DRTupleStream::endTransaction() {
+void DRTupleStream::endTransaction(int64_t uniqueId) {
     if (!m_opened) {
         return;
     }
 
     if (!m_currBlock) {
-         extendBufferChain(m_defaultCapacity);
-     }
+        extendBufferChain(m_defaultCapacity);
+    }
 
-     if (m_currBlock->remaining() < END_RECORD_SIZE) {
-         extendBufferChain(END_RECORD_SIZE);
-     }
+    if (m_currBlock->remaining() < END_RECORD_SIZE) {
+        extendBufferChain(END_RECORD_SIZE);
+    }
 
-     if (m_currBlock->startDRSequenceNumber() == std::numeric_limits<int64_t>::max()) {
-         throwFatalException(
-             "Appending end transaction message to a DR buffer with no matching begin transaction message."
-             " DR sequence number (%jd), unique ID (%jd)",
-             (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
-     }
-     if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
-         m_currBlock->lastDRSequenceNumber() > m_openSequenceNumber) {
-         throwFatalException(
-             "Appending end transaction message to a DR buffer with a greater DR sequence number."
-             " Buffer end DR sequence number (%jd), buffer end unique ID (%jd)."
-             " Current DR sequence number (%jd), current unique ID (%jd)",
-             (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastUniqueId(),
-             (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
-     }
+    if (m_currBlock->startDRSequenceNumber() == std::numeric_limits<int64_t>::max()) {
+        throwFatalException(
+            "Appending end transaction message to a DR buffer with no matching begin transaction message."
+            " DR sequence number (%jd), UniqueId (%jd)",
+            (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
+    }
+    if (m_currBlock->lastDRSequenceNumber() != std::numeric_limits<int64_t>::max() &&
+            m_currBlock->lastDRSequenceNumber() > m_openSequenceNumber) {
+        throwFatalException(
+            "Appending end transaction message to a DR buffer with a greater DR sequence number."
+            " Buffer end DR sequence number (%jd), buffer end UniqueIds (%jd, %jd)."
+            " Current DR sequence number (%jd), current UniqueId (%jd)",
+            (intmax_t)m_currBlock->lastDRSequenceNumber(), (intmax_t)m_currBlock->lastSpUniqueId(),
+            (intmax_t)m_currBlock->lastMpUniqueId(), (intmax_t)m_openSequenceNumber, (intmax_t)m_openUniqueId);
+    }
 
-     m_currBlock->recordCompletedTxnForDR(m_openSequenceNumber, m_openUniqueId);
+    if (m_openUniqueId != uniqueId) {
+        throwFatalException(
+            "Stream UniqueId (%jd) does not match the Context's UniqueId (%jd)."
+            " DR sequence number is out of sync with UniqueId",
+            (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
+    }
 
-     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
-                              m_currBlock->remaining());
-     io.writeByte(DR_VERSION);
-     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
-     io.writeLong(m_openSequenceNumber);
-     uint32_t crc = vdbcrc::crc32cInit();
-     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
-     crc = vdbcrc::crc32cFinish(crc);
-     io.writeInt(crc);
-     m_currBlock->consumed(io.position());
+    if (UniqueId::isMpUniqueId(uniqueId)) {
+        m_lastCommittedMpUniqueId = uniqueId;
+        m_currBlock->recordCompletedMpTxnForDR(uniqueId);
+    }
+    else {
+        m_lastCommittedSpUniqueId = uniqueId;
+        m_currBlock->recordCompletedSpTxnForDR(uniqueId);
+    }
+    m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
 
-     m_uso += io.position();
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
+                             m_currBlock->remaining());
+    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
+    io.writeLong(m_openSequenceNumber);
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
+    crc = vdbcrc::crc32cFinish(crc);
+    io.writeInt(crc);
+    m_currBlock->consumed(io.position());
 
-     m_opened = false;
+    m_uso += io.position();
+
+    m_opened = false;
 
     size_t bufferRowCount = m_currBlock->updateRowCountForDR(m_txnRowCount);
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
@@ -465,7 +493,7 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
 }
 
 void DRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
-    assert(m_committedSequenceNumber == 0);
+    assert(m_committedSequenceNumber == -1);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;
 }
@@ -501,7 +529,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT, uniqueIndex);
         }
-        stream.endTransaction();
+        stream.endTransaction(uid);
         ii += 5;
     }
 
@@ -510,7 +538,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
     int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
-    stream.endTransaction();
+    stream.endTransaction(uid);
 
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);

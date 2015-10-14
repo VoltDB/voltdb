@@ -92,15 +92,32 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(databaseId, name, table);
 
-    if(!exportOnly) {
-        // allocate tuple storage block for the persistent table ahead of time
-        // instead of waiting till first tuple insertion. Intend of allocating tuple
-        // block storage ahead is to improve performance on first tuple insertion.
-        PersistentTable *persistentTable = static_cast<PersistentTable*>(table);
-        TBPtr block = persistentTable->allocateNextBlock();
-        assert(block->hasFreeTuples());
-        persistentTable->m_blocksWithSpace.insert(block);
-    }
+    return dynamic_cast<Table*>(table);
+}
+
+// This is a convenient wrapper for test only.
+Table* TableFactory::getStreamedTableForTest(
+            voltdb::CatalogId databaseId,
+            const std::string &name,
+            TupleSchema* schema,
+            const std::vector<std::string> &columnNames,
+            ExportTupleStream* wrapper,
+            bool exportEnabled,
+            int32_t compactionThreshold)
+{
+    Table *table = new StreamedTable(exportEnabled, wrapper);
+
+    initCommon(databaseId,
+               table,
+               name,
+               schema,
+               columnNames,
+               true,  // table will take ownership of TupleSchema object
+               compactionThreshold);
+
+    // initialize stats for the table
+    configureStats(databaseId, name, table);
+
     return table;
 }
 

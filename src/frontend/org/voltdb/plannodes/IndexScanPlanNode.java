@@ -145,16 +145,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void setSkipNullPredicate() {
         // prepare position of non null key
-        int searchKeySize = m_searchkeyExpressions.size();
-        if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
+        if (m_lookupType == IndexLookupType.EQ || isReverseScan()) {
             m_skip_null_predicate = null;
             return;
         }
+        int searchKeySize = m_searchkeyExpressions.size();
 
         int nextKeyIndex;
         if (m_endExpression != null &&
                 searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
             nextKeyIndex = searchKeySize;
+        } else if (searchKeySize == 0) {
+            m_skip_null_predicate = null;
+            return;
         } else {
             nextKeyIndex = searchKeySize - 1;
         }
@@ -163,6 +166,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate(int nextKeyIndex) {
+        assert(nextKeyIndex >= 0);
+
         m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
     }
 

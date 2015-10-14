@@ -349,3 +349,9 @@ AND product_id = ?
 ORDER by location, product_id, start_date;
 PARTITION PROCEDURE voltdbSelectProductChanges ON TABLE product_changes COLUMN location PARAMETER 0;
 -- ********************************** --
+
+-- ENG-9032
+CREATE TABLE t1(
+ a INTEGER,
+ b integer);
+create index t1_idx1 on t1 (a);

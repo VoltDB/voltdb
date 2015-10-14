@@ -603,7 +603,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 String host = hitr.next();
                 ChannelSpec spec = citr.next();
                 byhost.put(host, spec);
-                LOG.info("LEADER (" + m_hostId + ") assingning " + spec + " to host " + host);
+                LOG.info("LEADER (" + m_hostId + ") assigning " + spec + " to host " + host);
             }
 
             try {
@@ -1110,10 +1110,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
                         m_eb.post(cassigns);
                     }
                     if (!assignment.getRemoved().isEmpty()) {
-                        LOG.info("(" + m_hostId + ") removing the following channel assingments: " + assignment.getRemoved());
+                        LOG.info("(" + m_hostId + ") removing the following channel assignments: " + assignment.getRemoved());
                     }
                     if (!assignment.getAdded().isEmpty()) {
-                        LOG.info("(" + m_hostId + ") adding the following channel assingments: " + assignment.getAdded());
+                        LOG.info("(" + m_hostId + ") adding the following channel assignments: " + assignment.getAdded());
                     }
                 }
             } finally {
@@ -1171,7 +1171,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 if (!m_channels.compareAndSet(oldspecs, channels.get(), stamp[0], stat.getVersion())) {
                     return;
                 }
-                LOG.info("(" + m_hostId + ") succesfully received channel assignment master copy");
+                LOG.info("(" + m_hostId + ") successfully received channel assignment master copy");
                 if (m_isLeader && !m_done.get()) {
                     m_es.submit(new AssignChannels());
                 }

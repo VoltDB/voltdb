@@ -95,7 +95,7 @@ function clean-all() {
 function srccompile() {
     populate
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/voter/*.java \
         src/voter/procedures/*.java || exit 1
 }

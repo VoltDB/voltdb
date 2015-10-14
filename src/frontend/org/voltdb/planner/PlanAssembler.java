@@ -38,13 +38,13 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -2114,10 +2114,6 @@ public class PlanAssembler {
 
         Index index = root.getCatalogIndex();
         if ( ! IndexType.isScannable(index.getType())) {
-            return;
-        }
-        if (! index.getPredicatejson().isEmpty()) {
-            // do not try to look at Partial/Sparse index
             return;
         }
 

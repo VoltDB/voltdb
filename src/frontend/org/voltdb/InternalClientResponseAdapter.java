@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static org.voltdb.ClientInterface.getPartitionForProcedure;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -33,8 +35,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
@@ -43,6 +47,12 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.AsyncCompilerResult;
+import org.voltdb.compiler.AsyncCompilerWork;
+import org.voltdb.compiler.CatalogChangeResult;
+import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses.
@@ -64,8 +74,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
-    private final Map<Long, Callback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, Callback>());
+    private final Map<Long, InternalCallback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, InternalCallback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new ConcurrentHashMap<>();
+    // Maintain internal connection ids per caller id. This is useful when collecting statistics
+    // so that information can be grouped per user of this Connection.
+    private final ConcurrentMap<String, Long> m_internalConnectionIds = new ConcurrentHashMap<>();
+
+    private InternalConnectionContext m_context;
+    private ProcedureCallback m_proccb;
 
     private class InternalCallback implements Callback {
 
@@ -123,6 +139,97 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         return VoltDB.instance().getClientInterface();
     }
 
+    private final  AsyncCompilerWork.AsyncCompilerWorkCompletionHandler m_adhocCompletionHandler = new AsyncCompilerWork.AsyncCompilerWorkCompletionHandler() {
+        @Override
+        public void onCompletion(AsyncCompilerResult result) {
+            final Connection c = (Connection)result.clientData;
+            if (result instanceof CatalogChangeResult) {
+                final CatalogChangeResult changeResult = (CatalogChangeResult) result;
+
+                // if the catalog change is a null change
+                if (changeResult.encodedDiffCommands.trim().isEmpty()) {
+                    ClientResponseImpl response =
+                            new ClientResponseImpl(
+                                    ClientResponseImpl.SUCCESS,
+                                    new VoltTable[0], "Catalog update with no changes was skipped.",
+                                    result.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    response.flattenToBuffer(buf);
+                    buf.flip();
+                    c.writeStream().enqueue(buf);
+                }
+                else {
+                    StoredProcedureInvocation task = getClientInterface().getUpdateCatalogExecutionTask(changeResult);
+
+                    /*
+                     * Round trip the invocation to initialize it for command logging
+                     */
+                    try {
+                        task = MiscUtils.roundTripForCL(task);
+                    } catch (IOException e) {
+                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    }
+
+                    Procedure catProc = getClientInterface().getProcedureFromName(task.procName, VoltDB.instance().getCatalogContext());
+                    int partition = -1;
+                    try {
+                        partition = getPartitionForProcedure(catProc, task);
+                    } catch (Exception e) {
+                        String fmt = "Can not invoke procedure %s from streaming interface %s. Partition not found.";
+                        m_logger.rateLimitedLog(InternalConnectionHandler.SUPPRESS_INTERVAL, Level.ERROR, e, fmt, task.procName, m_context);
+                        return;
+                    }
+
+                    // initiate the transaction. These hard-coded values from catalog
+                    // procedure are horrible, horrible, horrible.
+                    createTransaction(m_context, task.procName, catProc, m_proccb, task, partition, System.nanoTime());
+                }
+            } else {
+                throw new RuntimeException(
+                        "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
+            }
+        }
+    };
+
+    public boolean dispatchUpdateApplicationCatalog(StoredProcedureInvocation task, AuthSystem.AuthUser user, InternalConnectionContext context,
+            ProcedureCallback proccb) {
+        m_context = context;
+        m_proccb = proccb;
+        Object[] params = task.getParams().toArray();
+        // default catalogBytes to null, when passed along, will tell the
+        // catalog change planner that we want to use the current catalog.
+        byte[] catalogBytes = null;
+        Object catalogObj = params[0];
+        if (catalogObj != null) {
+            if (catalogObj instanceof String) {
+                // treat an empty string as no catalog provided
+                String catalogString = (String) catalogObj;
+                if (!catalogString.isEmpty()) {
+                    catalogBytes = Encoder.hexDecode(catalogString);
+                }
+            } else if (catalogObj instanceof byte[]) {
+                // treat an empty array as no catalog provided
+                byte[] catalogArr = (byte[]) catalogObj;
+                if (catalogArr.length != 0) {
+                    catalogBytes = catalogArr;
+                }
+            }
+        }
+        String deploymentString = (String) params[1];
+        LocalObjectMessage work = new LocalObjectMessage(
+                new CatalogChangeWork(
+                    getClientInterface().m_siteId,
+                    task.clientHandle, connectionId(), this.getHostnameAndIPAndPort(),
+                    false, this, catalogBytes, deploymentString,
+                    task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    false, m_adhocCompletionHandler, user));
+
+        getClientInterface().m_mailbox.send(getClientInterface().m_plannerSiteId, work);
+        return true;
+    }
+
     public boolean createTransaction(final InternalConnectionContext context,
             final String procName,
             final Procedure catProc,
@@ -133,12 +240,16 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
         }
+
         ExecutorService executor = m_partitionExecutor.get(partition);
         try {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
                     context.setBackPressure(hasBackPressure());
+                    if (!m_internalConnectionIds.containsKey(context.getName())) {
+                        m_internalConnectionIds.putIfAbsent(context.getName(), VoltProtocolHandler.getNextConnectionId());
+                    }
                     submitTransaction();
                 }
                 public boolean submitTransaction() {
@@ -323,6 +434,18 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        InternalCallback callback = m_callbacks.get(clientHandle);
+        if (callback==null) {
+            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+                    "Could not find caller details for client handle %d. Using internal adapter name", clientHandle);
+            return getHostnameOrIP();
+        } else {
+            return callback.getInternalContext().getName();
+        }
+    }
+
+    @Override
     public int getRemotePort() {
         return -1;
     }
@@ -335,6 +458,25 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     @Override
     public long connectionId() {
         return m_connectionId;
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        InternalCallback callback = m_callbacks.get(clientHandle);
+        if (callback==null) {
+            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+                    "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
+            return connectionId();
+        }
+
+        Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
+        if (internalId==null) {
+            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+                "Could not find internal connection id for client handle %d. Using internal adapter level connection id", clientHandle);
+            return connectionId();
+        } else {
+            return internalId;
+        }
     }
 
     @Override

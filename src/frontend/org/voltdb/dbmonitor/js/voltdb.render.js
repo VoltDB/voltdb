@@ -487,8 +487,15 @@ function alertNodeClicked(obj) {
         };
         //
 
-
-
+        //Get Cluster Id 
+        this.GetDrInformations = function (onInformationLoaded) {
+            var replicationData = {};
+            VoltDBService.GetDrReplicationInformation(function (connection) {
+                getDrInformations(connection, replicationData);
+                onInformationLoaded(replicationData);
+            });
+        };
+        //
         //Render Cluster Transaction Graph
         this.GetTransactionInformation = function (onInformationLoaded) {
             var transactionDetails = {};
@@ -610,6 +617,7 @@ function alertNodeClicked(obj) {
                     '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
             var alertHtml = "";
+
             
             jQuery.each(systemOverview, function(id, val) {
                 var hostName;
@@ -623,7 +631,7 @@ function alertNodeClicked(obj) {
                         '<td width="30%"><span class="alert">' + systemMemory[hostName]["MEMORYUSAGE"] + '%</span></td></tr>';
                     alertCount++;
                 }
-                
+
             });
             if (alertCount > 0) {
                 html += '<li class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>(' + alertCount + ')</span></a></li>';
@@ -773,6 +781,9 @@ function alertNodeClicked(obj) {
 
                     if (data.paths.commandlogsnapshot != null)
                         adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
+                    
+                    if (data.paths.droverflow != null)
+                        adminConfigValues['drOverflowPath'] = data.paths.droverflow.path;
                 }
 
                 //dr
@@ -2218,7 +2229,7 @@ function alertNodeClicked(obj) {
             }
 
             connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M" || columnInfo["name"] == "CLUSTER_ID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2241,6 +2252,7 @@ function alertNodeClicked(obj) {
                 var repData = {};
                 repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                replicationDetails["DR_GRAPH"]["CLUSTER_ID"] = info[colIndex["CLUSTER_ID"]];
                 repData["HOST_ID"] = info[colIndex["HOST_ID"]];
                 repData["HOSTNAME"] = info[colIndex["HOSTNAME"]];
                 repData["STATE"] = info[colIndex["STATE"]];
@@ -2252,6 +2264,29 @@ function alertNodeClicked(obj) {
 
             replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
+        };
+
+        var getDrInformations = function (connection, replicationDetails) {
+            var colIndex = {};
+            var counter = 0;
+            if (connection.Metadata['@Statistics_DRCONSUMER'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "CLUSTER_ID")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]].split('/')[0];
+                if (!replicationDetails.hasOwnProperty(hostName)) {
+                    replicationDetails[hostName] = {};
+                }
+                var clusterId = (info[colIndex["CLUSTER_ID"]] == undefined ? "N/A" : info[colIndex["CLUSTER_ID"]]);
+                replicationDetails[hostName]["CLUSTER_ID"] = clusterId;
+            });
         };
 
         var getReplicationNotCovered = function (replicationData, index) {

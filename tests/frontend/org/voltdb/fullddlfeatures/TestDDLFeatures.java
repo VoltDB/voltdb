@@ -80,7 +80,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
     @Test
     public void testCreateUniqueIndex() throws Exception {
-        assertTrue(findTableInSystemCatalogResults("T17"));
+        assertTrue(findTableInSystemCatalogResults("T1"));
         assertTrue(findIndexInSystemCatalogResults("area"));
         assertTrue(verifyIndexUniqueness("area", true));
         assertEquals(indexedColumnCount("T1"), 2);
@@ -275,6 +275,41 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         // Test for T23
         assertTrue(findTableInSystemCatalogResults("T23"));
         assertEquals(indexedColumnCount("T23"), 5);
+    }
+
+    @Test
+    public void testCreateTableConstraintWithoutKeyword() throws Exception {
+        ClientResponse resp;
+        boolean threw;
+
+        // Test for T17
+        assertTrue(findTableInSystemCatalogResults("T17"));
+        resp = m_client.callProcedure("T17.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        // Test for T18
+        assertTrue(findTableInSystemCatalogResults("T18"));
+        resp = m_client.callProcedure("T18.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        // Test for T19
+        assertTrue(findTableInSystemCatalogResults("T19"));
+        resp = m_client.callProcedure("T19.insert", 1, 2);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        // Test for T20
+        assertTrue(findTableInSystemCatalogResults("T20"));
+        resp = m_client.callProcedure("T20.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T20.insert", 2);
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            threw = true;
+        }
+        assertTrue("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
     }
 
     @Test

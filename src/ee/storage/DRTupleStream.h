@@ -33,8 +33,16 @@ class TableIndex;
 const size_t INVALID_DR_MARK = SIZE_MAX;
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
-const int MAGIC_DR_TRANSACTION_PADDING = 69;
+const int MAGIC_DR_TRANSACTION_PADDING = 78;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
+
+struct DRCommittedInfo{
+    int64_t seqNum;
+    int64_t spUniqueId;
+    int64_t mpUniqueId;
+
+    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
+};
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -58,7 +66,7 @@ public:
     // for test purpose
     virtual void setSecondaryCapacity(size_t capacity);
 
-    virtual void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark, size_t drRowCost);
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
@@ -91,11 +99,13 @@ public:
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
-    void endTransaction();
+    void endTransaction(int64_t uniqueId);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
+    DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
+        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
+    }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
     bool m_enabled;
@@ -123,6 +133,8 @@ private:
     bool m_opened;
     int64_t m_rowTarget;
     size_t m_txnRowCount;
+    int64_t m_lastCommittedSpUniqueId;
+    int64_t m_lastCommittedMpUniqueId;
 };
 
 class MockDRTupleStream : public DRTupleStream {
@@ -141,7 +153,7 @@ public:
 
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
 
-    void rollbackTo(size_t mark) {}
+    void rollbackTo(size_t mark, size_t drRowCost) {}
 
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,

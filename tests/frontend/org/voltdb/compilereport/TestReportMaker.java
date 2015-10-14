@@ -129,4 +129,95 @@ public class TestReportMaker extends TestCase {
         assertTrue(report.contains("To eliminate this warning, specify &quot;VARCHAR(262145 BYTES)&quot;"));
         assertFalse(report.contains("To eliminate this warning, specify \"VARCHAR(262145 BYTES)\""));
     }
+
+    // Under active/active DR, create a DRed table without index will trigger warning
+    public void testTableWithoutIndexGetFullTableScanWarning() throws IOException {
+        final String tableName = "TABLE_WITHOUT_INDEX";
+        final String ddl =
+                "CREATE TABLE " + tableName + " ( " +
+                "t1 INTEGER, " +
+                "t2 BIGINT, " +
+                "t3 VARCHAR(32) " +
+                "); " +
+                "DR TABLE " + tableName + "; " +
+                "SET DR=ACTIVE;";
+        String report = compileAndGenerateCatalogReport(ddl);
+
+        assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+    }
+
+    // Under active/active DR, create a DRed table without index will trigger warning
+    public void testTableWithIndexNoWarning() throws IOException {
+        final String tableName = "TABLE_WITH_INDEX";
+
+        final String nonUniqueIndexDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER, " +
+                "p2 TIMESTAMP, " +
+                "p3 VARCHAR(32) " +
+                ");" +
+                "CREATE INDEX tableIndex ON table_with_index ( p1 ); " +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        String report = compileAndGenerateCatalogReport(nonUniqueIndexDDL);
+        assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+
+        final String uniqueIndexDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER, " +
+                "p2 TIMESTAMP, " +
+                "p3 VARCHAR(32) " +
+                ");" +
+                "CREATE UNIQUE INDEX tableIndex ON table_with_index ( p1 ); " +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        report = compileAndGenerateCatalogReport(uniqueIndexDDL);
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+
+        final String primayKeyDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER NOT NULL, " +
+                "p2 TIMESTAMP, " +
+                "p3 VARCHAR(32), " +
+                "PRIMARY KEY ( p1 )" +
+                ");" +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        report = compileAndGenerateCatalogReport(primayKeyDDL);
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+
+        final String constaintDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER NOT NULL, " +
+                "p2 TIMESTAMP, " +
+                "p3 VARCHAR(32), " +
+                "CONSTRAINT pkey PRIMARY KEY (p1) " +
+                ");" +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        report = compileAndGenerateCatalogReport(constaintDDL);
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+
+        final String uniqueDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER UNIQUE NOT NULL, " +
+                "p2 TIMESTAMP UNIQUE, " +
+                "p3 VARCHAR(32) " +
+                ");" +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        report = compileAndGenerateCatalogReport(uniqueDDL);
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+
+        final String assumeUniqueDDL =
+                "CREATE TABLE " + tableName +" ( " +
+                "p1 INTEGER ASSUMEUNIQUE NOT NULL, " +
+                "p2 TIMESTAMP, " +
+                "p3 VARCHAR(32) " +
+                ");" +
+                "DR TABLE " + tableName + ";" +
+                "SET DR=ACTIVE;";
+        report = compileAndGenerateCatalogReport(assumeUniqueDDL);
+        assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
+    }
 }

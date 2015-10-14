@@ -185,20 +185,19 @@ public class TestBlobType extends TestCase {
         }
     }
 
-    public void testIndexRejection() throws Exception {
+    public void testIndexBlobCompile() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
-            "b varbinary(256) default null, " +
-            "PRIMARY KEY(ival));\n" +
-            "create index idx on blah (ival,b);";
+            "b varbinary(256) default null); " +
+            "create index idx on blah (b);";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0);
-        assertFalse(success);
+        assertTrue(success);
     }
 
     public void testTPCCCustomerLookup() throws Exception {

@@ -834,4 +834,12 @@ public class TestPlansOrderBy extends PlannerTestCase {
         }
     }
 
+    public void testOrderbyWithPartialIndex() {
+        // Partial index T3_PARTIAL_IDX on T3 (T_D1) WHERE T_D2 > 3 is not picked up
+        validatePlan("select T3.T_D0 from T3 order by T3.T_D1;", false, true, true);
+        // Partial index T3_PARTIAL_IDX on T3 (T_D1) WHERE T_D2 > 3 is used now
+        validatePlan("select T3.T_D0 from T3 where T_D2 > 3 order by T3.T_D1;", true, false, false);
+        // Partial index T3_PARTIAL_IDX on T3 (T_D1) WHERE T_D2 > 3 is still used but now ORDER BY is required
+        validatePlan("select T3.T_D0 from T3 where T_D2 > 3 order by T3.T_D2;", true, false, true);
+    }
 }

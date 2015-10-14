@@ -498,6 +498,8 @@ enum DRRecordType {
 };
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
+    // Warning: Currently, the PersistentTableUndo*Actions rely on
+    // DR_RECORD_{0}_BY_INDEX costing the same as DR_RECORD_{0}
     switch (type) {
     case DR_RECORD_INSERT:
     case DR_RECORD_DELETE:
@@ -523,6 +525,14 @@ enum TupleSerializationFormat { TUPLE_SERIALIZATION_NATIVE = 0, TUPLE_SERIALIZAT
 // ------------------------------------------------------------------
 enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 
+// ------------------------------------------------------------------
+// Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)
+// ------------------------------------------------------------------
+enum DRConflictType {
+    DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
+    DR_CONFLICT_MISSING_TUPLE,
+    DR_CONFLICT_TIMESTAMP_MISMATCH
+};
 
 // ------------------------------------------------------------------
 // Utility functions.

@@ -22,6 +22,7 @@ import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.DRLogSegmentId;
 
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -86,8 +87,7 @@ public class StartupAlgo implements RepairAlgo
                 new RepairResult(
                     TxnEgo.makeZero(m_partitionId).getTxnId(),
                     Long.MIN_VALUE,
-                    Long.MIN_VALUE,
-                    Long.MIN_VALUE));
+                    new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE)));
     }
 
     /** Process a new repair log response */

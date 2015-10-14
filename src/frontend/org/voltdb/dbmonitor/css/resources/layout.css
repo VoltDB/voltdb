@@ -69,6 +69,7 @@ h1, h2, h3, h4, h5, h6 {
 .errorValue {
     color: #c70000;
 }
+.notActive {-moz-opacity:0.5; -khtml-opacity: 0.5; filter: alpha(opacity=50); opacity: 0.5; }
 
 /*****Global Ends******/
 /******sprite*************/
@@ -515,7 +516,7 @@ ul.topRightList {
 
 .clusterDetailsContLeft {
     float: left;
-    width: 50%;
+    width: 60%;
 }
 
 .clusterDetailsContRight {
@@ -625,13 +626,14 @@ ul.rightShowhideList {
         border: 1px solid #aaaaaa;
         height: 28px;
         line-height: 28px;
-        width: 150px;
+        width: 140px;
     }
 
 
 .graphChart {
     width: 100%;
 }
+
 
 
 .chart {
@@ -1106,7 +1108,6 @@ a.setVal {
     }
 
 
-
 table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
@@ -1128,12 +1129,10 @@ table.serversTbl tr td.pauseActiveMonitoring {
 
 table.serversTbl tr td.active{
     background-position: 5px 17px;
-
 }
 
 table.serversListTbl tr td.active {
     background-position: 5px 20px;
-
 }
 
 table.serversTbl tr td.pauseMonitoring {
@@ -1363,8 +1362,8 @@ ul.catalogNav {
     border-top: none;
 }
 
-tr.trLicenseInfo td {
-    border: none !important;
+td.trLicenseInfo{
+    padding-top: 20px!important;
 }
 
 
@@ -1629,6 +1628,7 @@ div.popup {
     margin-bottom: 5px;
     height: 30px;
     line-height: 35px;
+   
 }
 
     .user-preferences li.last {
@@ -1640,7 +1640,7 @@ div.popup {
     .user-preferences li input[type='checkbox'] {
         float: right;
         position: relative;
-        top: 8px;
+        top: 10px;
     }
 
 .msg-pop-info {
@@ -2095,7 +2095,7 @@ right: -31px!important;
 h2.help {
     font: bold 15px Arial, Helvetica, sans-serif;
     padding-bottom: 10px;
-    border-bottom: 1px dashed #ddd;
+    /*border-bottom: 1px dashed #ddd;*/
 }
 
 .VDBMonitorHelp p {
@@ -2172,8 +2172,8 @@ ul.helpSchemaList {
 .edit,
 .editDisabled,
 .arrow,
-.labelCollapsed,
-.labelExpanded,
+/*.labelCollapsed,*/
+/*.labelExpanded,*/
 a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
     background-image: url(images/admin-icons.png);
 }
@@ -2298,7 +2298,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -358px -56px;
+    background-position: -165px -56px;
     width: 40px;
     height: 36px;
 }
@@ -2592,13 +2592,15 @@ ul.adminClusterList li a.shutdown {
 }
 
 .labelCollapsed {
-    background-position: -468px -11px;
+    /*background-position: -468px -11px;*/
     padding-left: 22px;
+    background: url("images/up.png")0 1px no-repeat; 
 }
 
 .labelExpanded {
-    background-position: -468px -55px;
+    /*background-position: -468px -55px;*/
     padding-left: 22px;
+    background: url("images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
@@ -2914,7 +2916,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
 .overviewTbl {
-    overflow: auto;
+    /*overflow: auto;*/
     width: auto;
 }
 
@@ -3625,7 +3627,13 @@ a:hover.changePsd {
 /*add idsk limit*/
 table.diskLimitTbl tr td { border: none;}
 
+/*********overlapping nv.d3.css*********/
+.nvtooltip{border: 1px solid #CCCCCC !important;}
 
+
+svg.nvd3-svg { width:95% !important; }
+.nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
+.nvtooltip table tr td { border: none !important;}
 
 /*********************************************media Qu********************/
 
@@ -3648,6 +3656,7 @@ table.diskLimitTbl tr td { border: none;}
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+	.downloadConfig { margin-bottom:5px;}
 
   
 }
@@ -4092,7 +4101,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 350px;
+        height: 350px!important;
         margin-top: 30px;
     }
     .logHeight {
@@ -4111,11 +4120,12 @@ table.diskLimitTbl tr td { border: none;}
         width: 100%;
         position: absolute;
         right: -1px;
-        top: 205px;
+       /* top: 205px;*/
+	   top:151px;
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 30px;
     }
     .logHeight {
@@ -4168,8 +4178,8 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .overviewTbl {
-        overflow: auto;
-        width: auto;
+         overflow: auto;
+       width: auto;
     }
 
     .adminLeft {
@@ -4253,9 +4263,9 @@ table.diskLimitTbl tr td { border: none;}
     /* .configWrapper {
         width: 380px;
     }*/
-    .popup_cont {
+    /*.popup_cont {
         width: 380px;
-    }
+    }*/
 }
 
 @media (width: 768px) {
@@ -4285,6 +4295,12 @@ table.diskLimitTbl tr td { border: none;}
 @media (min-width: 768px) and (max-width: 800px) {
      .server-info-heading .servIp{margin-left: 14%;}
     ul.servers-list li span.servIpNum {margin-left: 3%;}
+}
+@media (min-width: 700px) and (max-width: 902px) {
+    .overviewTbl {
+    overflow: auto;
+    width: auto;
+}
 }
 
 @media (max-width: 980px) {
@@ -4339,7 +4355,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 75px;
     }
 }
@@ -4347,7 +4363,7 @@ table.diskLimitTbl tr td { border: none;}
 
 @media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
     }
      .logHeight {
           height: 364px;
@@ -4375,12 +4391,13 @@ table.diskLimitTbl tr td { border: none;}
     .server-info-heading .servIp {
   margin-left: 30%;
 }
+.refreshBtn { margin-bottom:10px;}
 }
 
 
 @media (min-width: 768px) and (max-width:1246px) {
     .partitionHeight {
-        height: 310px;
+        height: 310px!important;
     }
      
 
@@ -4392,6 +4409,7 @@ table.diskLimitTbl tr td { border: none;}
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
+		
     }
 }
 
@@ -4404,7 +4422,7 @@ table.diskLimitTbl tr td { border: none;}
 
     .graphPop {
         height: 110px;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     /*.restoreInfo .overlay-content { height:200px;}
 		.restoreCont {height:200px;}*/
