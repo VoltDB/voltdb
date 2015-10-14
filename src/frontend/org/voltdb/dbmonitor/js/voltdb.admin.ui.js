@@ -1983,7 +1983,9 @@ function loadAdminPage() {
                 '    <td>' +
                 '       <select id="txtType" name="txtType"> ';
 
-            exporttypes.type.splice(3, 1);
+            var customIndex = $.inArray('CUSTOM', exporttypes.type);
+            
+            exporttypes.type.splice(customIndex, 1);
 
             exporttypes.type.push("CUSTOM");
 

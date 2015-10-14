@@ -152,7 +152,7 @@ class Overview extends Module {
 
         elasticSearchName           { $(class:"labelCollapsed", text:elasticSearchTest) }
         
-        confirmyesbtn			    { $("#btnSaveConfigOk", text:"Yes") }
+        confirmyesbtn			    { $("#btnSaveConfigOk") }
         
         deleteConfiguration         { $("#deleteAddConfig > a") }
         
@@ -301,6 +301,8 @@ class Overview extends Module {
 
         errorPropertyName1 {$("#errorName1")}
         errorPropertyValue1 {$("#errorValue1")}
+
+        addconfig			{ $("#addNewConfigLink")}
     }
 
     int numberOfTrials = 10
@@ -650,13 +652,13 @@ class Overview extends Module {
     }
 
     def openAddConfigurationPopup() {
-	    waitFor(waitTime) { page.addconfig.isDisplayed() }
+	    waitFor(waitTime) { addconfig.isDisplayed() }
 	    int count = 0
 	    while(count<numberOfTrials) {
 	        count++
 	        try {
-	            page.addconfig.click()
-	            waitFor(waitTime) { page.overview.exportAddConfigPopupTitle.isDisplayed() }
+	            addconfig.click()
+	            waitFor(waitTime) { exportAddConfigPopupTitle.isDisplayed() }
 	            break
 	        } catch(geb.waiting.WaitTimeoutException e) {
 	        }
@@ -745,28 +747,36 @@ class Overview extends Module {
     
     def void clickSave() {
         int count = 0
-	    while(count<numberOfTrials) {
+	    while(count<30) {
 	        count++
             try {
-                save.click()
-	            !save.isDisplayed()
+                waitFor(waitTime) { save.click() }
+	            waitFor(waitTime) { confirmyesbtn.isDisplayed() }
+	            println("new")
+	            break
             } catch(geb.error.RequiredPageContentNotPresent e) {
-            
+                println("new1")
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+                println("new2")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("old")
             }
 	    }
 	    
 	    count = 0
-	    while(count<numberOfTrials) {
+	    while(count<30) {
 	        count++
             try {
-                confirmyesbtn.click()
-	            !confirmyesbtn.isDisplayed()
+                waitFor(waitTime) { confirmyesbtn.click() }
+	            waitFor(waitTime) { !confirmyesbtn.isDisplayed() }
+	            println("new3")
+	            break
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                
+                println("new4")
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+                println("new5")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("old1")
             }
 	    }
     }
