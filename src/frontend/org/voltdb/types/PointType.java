@@ -18,9 +18,21 @@
 package org.voltdb.types;
 
 import java.nio.ByteBuffer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PointType {
-
+	//
+	// It's slightly hard to see this in the actual pattern
+	// definition, but the pattern we want to match, ignoring space, is:
+	//    point([1-9]*.[0-9]* , [1-9]*.[0-9]*)
+	// Here the '.' is not 'match anything' but 'match a single dot'.  The
+	// RE below does this right, though the simplified version above
+	// does not.
+	//
+	private static final Pattern wktPattern 
+		= Pattern.compile("^\\s*point\\s*[(]\\s*([-]?[1-9]\\d*)(?:[.](\\d*))?\\s+([-]?[1-9]\\d*)(?:[.](\\d*))?\\s*[)]\\s*\\z",
+						  Pattern.CASE_INSENSITIVE);
     // Internal representation of a geospatial point
     // is subject to change.  For now, just use two floats.
     // This matches the EE representation.
@@ -39,7 +51,34 @@ public class PointType {
         m_longitude = longitude;
     }
 
-    public boolean isNull() {
+    private static float toFloat(String aInt, String aFrac) {
+    	return Float.parseFloat(aInt + "." + (aFrac == null ? "0" : aFrac));
+    }
+    /**
+     * Create a PointType from a WellKnownText string.
+     * @param param
+     */
+    public static PointType pointFromText(String param) {
+    	if (param == null) {
+    		throw new IllegalArgumentException("Null well known text argument to PointType constructor.");
+    	}
+    	Matcher m = wktPattern.matcher(param);
+    	if (m.find()) {
+    		float latitude  = toFloat(m.group(1), m.group(2));
+    		float longitude = toFloat(m.group(3), m.group(4));
+    		if (Math.abs(latitude) > 90.0) {
+    			throw new IllegalArgumentException(String.format("Latitude \"%f\" out of bounds.", latitude));
+    		}
+    		if (Math.abs(longitude) > 180.0) {
+    			throw new IllegalArgumentException(String.format("Longitude \"%f\" out of bounds.", longitude));
+    		}
+    		return new PointType(latitude, longitude);
+    	} else {
+    		throw new IllegalArgumentException("Cannot construct PointType value from \"" + param + "\"");
+    	}
+	}
+
+	public boolean isNull() {
         return Float.isNaN(m_latitude) || Float.isNaN(m_longitude);
     }
 
