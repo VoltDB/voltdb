@@ -42,3 +42,14 @@ exec make_point 110 'point( -45.0  -360.0)';
 exec make_point 111 'point( -45.0  -270.0)';
 
 exec make_point 112 'point(0.0, 0.0)';
+
+select * from points;
+ID   POINT                   
+---- ------------------------
+ 101 POINT (10.333 20.666)   
+ 102 POINT (10.333 20.666)   
+ 103 POINT (-10.333 -20.666) 
+ 104 POINT (-10.333 -20.666) 
+ 105 POINT (10.0 10.0)       
+
+(Returned 5 rows in #.##s)

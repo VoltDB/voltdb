@@ -1389,8 +1389,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             padding[i] += 1;
             fmt[i] = "%1$"
                     + ((this.getColumnType(i) == VoltType.STRING
-                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
-                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                            || this.getColumnType(i) == VoltType.TIMESTAMP 
+                            || this.getColumnType(i) == VoltType.VARBINARY
+                            || this.getColumnType(i) == VoltType.POINT) ? "-" : "")
                     + padding[i] + "s";
         }
 
