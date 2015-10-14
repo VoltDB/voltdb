@@ -49,40 +49,40 @@ public class TestPointType extends TestCase {
 
         assertEquals("POINT (10.333 20.666)", point.toString());
     }
-    
+
     private void testOnePointFromFactory(String aWKT, float aLatitude, float aLongitude, float aEpsilon, String aErrMsg) {
-    	try {
-    		PointType point = PointType.pointFromText(aWKT);
-    		assertEquals(aLatitude, point.getLatitude(), aEpsilon);
-    		if (aErrMsg != null) {
-    			assertTrue(String.format("Expected error message matching \"%s\", but got no error.", aErrMsg), aErrMsg == null);
-    		}
-    	} catch (Exception ex) {
-    		if (aErrMsg != null) {
-	    		assertTrue(String.format("Expected error message matching \"%s\", but got \"%s\"",
-	    								 aErrMsg, ex.getMessage()),
-	    				   Pattern.matches(aErrMsg, ex.getMessage()));
-    		} else {
-    			assertTrue(String.format("Unexpected error message: \"%s\"", ex.getMessage()), false);
-    		}
-    	}
+        try {
+            PointType point = PointType.pointFromText(aWKT);
+            assertEquals(aLatitude, point.getLatitude(), aEpsilon);
+            if (aErrMsg != null) {
+                assertTrue(String.format("Expected error message matching \"%s\", but got no error.", aErrMsg), aErrMsg == null);
+            }
+        } catch (Exception ex) {
+            if (aErrMsg != null) {
+                assertTrue(String.format("Expected error message matching \"%s\", but got \"%s\"",
+                                         aErrMsg, ex.getMessage()),
+                           Pattern.matches(aErrMsg, ex.getMessage()));
+            } else {
+                assertTrue(String.format("Unexpected error message: \"%s\"", ex.getMessage()), false);
+            }
+        }
     }
-    
+
     public void testPointFactory() {
-    	testOnePointFromFactory("point(10.333 20.666)",               10.333f,  20.666f, 0.001f, null);
-    	testOnePointFromFactory("  point  (10.333   20.666)    ",     10.333f,  20.666f, 0.001f, null);
-    	testOnePointFromFactory("point(-10.333 -20.666)",            -10.333f, -20.666f, 0.001f, null);
-    	testOnePointFromFactory("  point  (-10.333   -20.666)    ",  -10.333f, -20.666f, 0.001f, null);
-    	testOnePointFromFactory("point(10 10)",                       10.0f,    10.0f,   0.001f, null);
-    	// Test latitude/longitude ranges.
-    	testOnePointFromFactory("point( 100.0   100.0)",             100.0f,   100.0f,   0.001f, "Latitude \"100.0+\" out of bounds.");
-    	testOnePointFromFactory("point(  45.0   360.0)",              45.0f,   360.0f,   0.001f, "Longitude \"360.0+\" out of bounds.");
-    	testOnePointFromFactory("point(  45.0   270.0)",              45.0f,   360.0f,   0.001f, "Longitude \"270.0+\" out of bounds.");
-    	testOnePointFromFactory("point(-100.0  -100.0)",            -100.0f,  -100.0f,   0.001f, "Latitude \"-100.0+\" out of bounds.");
-    	testOnePointFromFactory("point( -45.0  -360.0)",             -45.0f,  -360.0f,   0.001f, "Longitude \"-360.0+\" out of bounds.");
-    	testOnePointFromFactory("point( -45.0  -270.0)",             -45.0f,  -360.0f,   0.001f, "Longitude \"-270.0+\" out of bounds.");
-    	// Syntax errors
-    	//   Comma separating the coordinates.
-    	testOnePointFromFactory("point(0.0, 0.0)",                     0.0f,     0.0f,   0.001f, "Cannot construct PointType value from \"point\\(0[.]0, 0[.]0\\)\"");
+        testOnePointFromFactory("point(10.333 20.666)",               10.333f,  20.666f, 0.001f, null);
+        testOnePointFromFactory("  point  (10.333   20.666)    ",     10.333f,  20.666f, 0.001f, null);
+        testOnePointFromFactory("point(-10.333 -20.666)",            -10.333f, -20.666f, 0.001f, null);
+        testOnePointFromFactory("  point  (-10.333   -20.666)    ",  -10.333f, -20.666f, 0.001f, null);
+        testOnePointFromFactory("point(10 10)",                       10.0f,    10.0f,   0.001f, null);
+        // Test latitude/longitude ranges.
+        testOnePointFromFactory("point( 100.0   100.0)",             100.0f,   100.0f,   0.001f, "Latitude \"100.0+\" out of bounds.");
+        testOnePointFromFactory("point(  45.0   360.0)",              45.0f,   360.0f,   0.001f, "Longitude \"360.0+\" out of bounds.");
+        testOnePointFromFactory("point(  45.0   270.0)",              45.0f,   360.0f,   0.001f, "Longitude \"270.0+\" out of bounds.");
+        testOnePointFromFactory("point(-100.0  -100.0)",            -100.0f,  -100.0f,   0.001f, "Latitude \"-100.0+\" out of bounds.");
+        testOnePointFromFactory("point( -45.0  -360.0)",             -45.0f,  -360.0f,   0.001f, "Longitude \"-360.0+\" out of bounds.");
+        testOnePointFromFactory("point( -45.0  -270.0)",             -45.0f,  -360.0f,   0.001f, "Longitude \"-270.0+\" out of bounds.");
+        // Syntax errors
+        //   Comma separating the coordinates.
+        testOnePointFromFactory("point(0.0, 0.0)",                     0.0f,     0.0f,   0.001f, "Cannot construct PointType value from \"point\\(0[.]0, 0[.]0\\)\"");
     }
 }
