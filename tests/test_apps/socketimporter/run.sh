@@ -38,7 +38,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=socketstream-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-lang3-3.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
