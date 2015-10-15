@@ -34,7 +34,6 @@ class BinaryLogSink {
 public:
     BinaryLogSink();
     int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled = false);
-    void exportDRConflict(PersistentTable* srcTable, Table* dstTable, const DRRecordType &type, TableTuple &tuple);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
 
@@ -66,6 +65,11 @@ private:
      * Divide update related conflict types into fine singularity
      */
     DRConflictType optimizeUpdateConflictType(PersistentTable* drTable, TableTuple* expectedTuple, TableTuple* newTuple, std::vector<TableTuple*> &existingRows, DRConflictType conflictType);
+
+    /**
+     * Export the conflict log to downstream
+     */
+    void exportDRConflict(Table *exportTable, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
 };
 
 

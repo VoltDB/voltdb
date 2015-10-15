@@ -119,9 +119,9 @@ public:
     int64_t pushDRBufferRetval;
     DRConflictType conflictType;
     DRRecordType actionType;
-    int existingRowCount;
-    int expectedRowCount;
-    int newRowCount;
+    boost::shared_ptr<Table> existingTable;
+    boost::shared_ptr<Table> expectedTable;
+    boost::shared_ptr<Table> newTable;
 };
 
 }

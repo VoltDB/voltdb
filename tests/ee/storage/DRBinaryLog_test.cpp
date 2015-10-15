@@ -683,30 +683,30 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
 }
 
 // TODO: when we implement conflict detection, the testcase should rewrite to manually create a conflict
-TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
-    ASSERT_FALSE(flush(98));
-
-    // single row write transaction
-    beginTxn(99, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
-    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
-    endTxn(true);
-
-    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
-    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
-    ASSERT_FALSE(received_tuple.isNullTuple());
-    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
-    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
-    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
-    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
-    // Now compare the rest of columns
-    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
-}
+//TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
+//    ASSERT_FALSE(flush(98));
+//
+//    // single row write transaction
+//    beginTxn(99, 99, 98, 70);
+//    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+//    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
+//    endTxn(true);
+//
+//    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
+//    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
+//    ASSERT_FALSE(received_tuple.isNullTuple());
+//    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
+//    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
+//    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
+//    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
+//    // Now compare the rest of columns
+//    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
+//    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
+//    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
+//    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
+//    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
+//    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
+//}
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
@@ -1057,43 +1057,53 @@ TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
     updateWithNullsTest();
 }
 
+/**
+ * optimizeUpdateConflictType() needs the relative order
+ */
+TEST_F(DRBinaryLogTest, EnumOrderTest) {
+    EXPECT_EQ(CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_ON_PK_UPDATE, CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION + 1);
+    EXPECT_EQ(CONFLICT_EXPECTED_ROW_MISSING_ON_PK_UPDATE, CONFLICT_EXPECTED_ROW_MISSING + 1);
+    EXPECT_EQ(CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT_ON_PK, CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT + 1);
+}
+
 /*
  * Conflict detection test case - Insert Unique Constraint Violation
  * Operations like insert/insert, insert/update.
  */
 TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
     m_engine->setIsActiveActiveDREnabled(true);
-    createUniqueIndex(m_table, 0);
-    createUniqueIndex(m_tableReplica, 0);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
     createUniqueIndex(m_table, 1);
     createUniqueIndex(m_tableReplica, 1);
-    ASSERT_FALSE(flush(98));
+    ASSERT_FALSE(flush(99));
 
     // write transactions on replica
-    beginTxn(99, 99, 98, 70);
-    /*TableTuple new_tuple = */insertTuple(m_tableReplica, prepareTempTuple(m_table, 99, 55555,
+    beginTxn(100, 100, 99, 71);
+    /*TableTuple existingTuple1 = */insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 99, 55555,
             "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
-    insertTuple(m_tableReplica, prepareTempTuple(m_table, 42, 34523,
+    /*TableTuple existingTuple2 = */insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 34523,
                 "7565464.2342", "yes", "no no no, writing more words to make it outline?", 1234));
     endTxn(true);
-    flushButDontApply(99);
+    flushButDontApply(100);
 
-    // insert the row contains the same key on master side
-    beginTxn(100, 100, 99, 71);
-    /*TableTuple existing_tuple = */insertTuple(m_table, prepareTempTuple(m_tableReplica, 42, 55555,
-            "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // write transactions on master
+    beginTxn(101, 101, 100, 72);
+    /*TableTuple new_tuple = */insertTuple(m_table, prepareTempTuple(m_table, 99, 34523,
+            "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
     endTxn(true);
-
     // trigger a insert unique constraint violation conflict
-    flushAndApply(100, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
 
     EXPECT_EQ(m_topend.conflictType, CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION);
     EXPECT_EQ(m_topend.actionType, DR_RECORD_INSERT);
 
-//    TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTable)->lookupTupleByValues(existing_tuple);
+//    TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTable.get())->lookupTupleByValues(existingTuple1);
+//    ASSERT_FALSE(tuple.isNullTuple());
+//    tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTable.get())->lookupTupleByValues(existingTuple2);
 //    ASSERT_FALSE(tuple.isNullTuple());
 //    EXPECT_EQ(0, m_topend.expectedTable->activeTupleCount());
-//    tuple = reinterpret_cast<PersistentTable*>(m_topend.newTable)->lookupTupleByValues(new_tuple);
+//    tuple = reinterpret_cast<PersistentTable*>(m_topend.newTable.get())->lookupTupleByValues(new_tuple);
 //    ASSERT_FALSE(tuple.isNullTuple());
 }
 
