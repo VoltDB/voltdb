@@ -161,8 +161,6 @@ if CTX.PLATFORM == "Darwin":
 if CTX.PLATFORM == "Linux":
     CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
-    CTX.ROCKSDB_CXXFLAGS += " -DOS_LINUX"
-
 
 ###############################################################################
 # Some special handling for rocksdb.
