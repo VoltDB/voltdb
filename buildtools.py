@@ -21,7 +21,6 @@ class BuildContext:
         self.OBJ_INCLUDE_DIRS = []
         self.THIRD_PARTY_INPUT = {}
         # Third party libraries that needs to be linked
-        self.ROCKSDB_LIBS = ""
         self.ROCKSDB_LIBS_TYPE = "so"
         # END
         self.TESTS = {}
@@ -165,6 +164,47 @@ def formatList(list):
         indent += len(name) + 1
     return str
 
+def runRocksdbPlatformScriptUpdatesMakefile(CTX):
+    ###############################################################################
+    # RUN ROCKSDB PLATFORM DETECTING SCRIPT
+    ###############################################################################
+    rocksdb_src = CTX.THIRD_PARTY_INPUT_PREFIX + "rocksdb"
+    obj_dir = CTX.OUTPUT_PREFIX.rstrip("/") + "/rocksdb"
+    rocksdb_config = "rocksdb_config"
+    os.system("mkdir -p %s" % (obj_dir))
+    curdir = os.getcwd()
+    os.chdir(rocksdb_src)
+    
+    config_file_path = obj_dir + "/" + rocksdb_config
+    
+    bashCommand = "build_tools/build_detect_platform %s/%s" % (curdir, config_file_path)
+    rocksdb_error = Popen(bashCommand.split(), stderr=PIPE).communicate()[1]
+    os.chdir(curdir)
+    
+    if os.path.isfile(config_file_path) == False:
+        print "RocksDB platform detecting script failed!"
+        sys.exit(-1)
+    
+    if len(rocksdb_error) != 0:
+        print rocksdb_error
+        sys.exit(-1)
+    
+    for line in open(config_file_path).readlines():
+        idx = line.find("=")
+        assert(idx >= 0)
+        if len(line) == idx + 1:
+            continue
+        key = line[:idx]
+        value = line[idx + 1:]
+        
+        if key == "PLATFORM_CXXFLAGS":
+            CTX.CPPFLAGS += " " + value
+        elif key == "PLATFORM_LDFLAGS":
+            CTX.LDFLAGS += " " + value
+        # END IF
+    # END FOR
+    return None
+
 def buildMakefile(CTX):
     global version
 
@@ -236,19 +276,19 @@ def buildMakefile(CTX):
     makefile.write('ROCKSDB_SRC=${THIRD_PARTY_SRC}/rocksdb\n')
     makefile.write('ROCKSDB_OBJ=${OBJDIR}/rocksdb\n')
     makefile.write("\n")
-
-    if CTX.TARGET == "CLEAN":
-        makefile.write(".PHONY: clean\n")
-        makefile.write("clean: \n")
-        makefile.write("\trm -rf *\n")
-        makefile.close()
-        return
-
-    # build third party library using their makefile
+    
+    ###############################################################################
+    # Third party  makefile
+    ###############################################################################
+    makefile.write('.PHONY: build-third-party-tools\n')
+    makefile.write('build-third-party-tools: build-rocksdb\n\n')
+    
+    # build ROCKSDB using its makefile
     makefile.write(".PHONY: build-rocksdb\n")
     makefile.write("build-rocksdb:\n")
-    makefile.write("\t@echo Building the rocksdb library\n")
-    makefile.write("\tif [ ! -f ${ROCKSDB_OBJ}/librocksdb.%s ] ; then \\\n" % (CTX.ROCKSDB_LIBS_TYPE))
+    if CTX.TARGET != "CLEAN":
+        makefile.write("\t@echo Building the rocksdb library\n")
+    makefile.write("\t@if [ ! -f ${ROCKSDB_OBJ}/librocksdb.%s ] ; then \\\n" % (CTX.ROCKSDB_LIBS_TYPE))
     makefile.write("\t    rm -rf rocksdb; \\\n")
     makefile.write('\t    mkdir rocksdb; \\\n')
     makefile.write('\tmake --directory=${ROCKSDB_SRC}/ static_lib; \\\n')
@@ -260,6 +300,17 @@ def buildMakefile(CTX):
     makefile.write("\t@echo Deleting the rocksdb library\\\'s object files\n")
     makefile.write('\trm -rf rocksdb\n')
     makefile.write('\n')
+    
+    
+    ###############################################################################
+    # VoltDB specific makefile
+    ###############################################################################
+    if CTX.TARGET == "CLEAN":
+        makefile.write(".PHONY: clean\n")
+        makefile.write("clean: \n")
+        makefile.write("\trm -rf *\n")
+        makefile.close()
+        return
 
     makefile.write(".PHONY: main\n\n")
     if CTX.TARGET == "VOLTRUN":
@@ -338,9 +389,9 @@ def buildMakefile(CTX):
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % filename)
         makefile.write("########################################################################\n")
-        makefile.write("%s: %s \n" % (jni_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (jni_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write("%s: %s \n" % (static_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (static_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
         makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
         makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
@@ -364,9 +415,9 @@ def buildMakefile(CTX):
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % filename)
         makefile.write("########################################################################\n")
-        makefile.write("%s: %s \n" % (jni_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (jni_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write("%s: %s \n" % (static_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (static_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
         makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
         makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
@@ -396,15 +447,17 @@ def buildMakefile(CTX):
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % sourcename)
         makefile.write("########################################################################\n")
-        makefile.write("%s: $(ROOTDIR)/%s \n" % (objectname, sourcename))
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -O2 -std=c++11 -DROCKSDB_PLATFORM_POSIX  -DOS_MACOSX -DZLIB -DBZIP2 -Wshorten-64-to-32 -march=native -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
         makefile.write("-include %s\n" % replaceExtension(objectname, ".d"))
         # link the test
-        makefile.write("%s: %s objects/volt.a \n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s rocksdb/librocksdb.a %s objects/volt.a -lz -lbz2 %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
+        makefile.write("%s: %s objects/volt.a | build-third-party-tools \n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
+        static_targetpath = OUTPUT_PREFIX + "/" + "/".join(objectname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
+        os.system("mkdir -p %s" % (static_targetpath))
         pysourcename = sourcename[:-3] + "py"
         cleanobjs += [objectname, replaceExtension(objectname, ".d"), binname]
         if os.path.exists(pysourcename):

@@ -41,7 +41,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS += """-Wall -Wextra -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
@@ -161,6 +161,17 @@ if CTX.PLATFORM == "Darwin":
 if CTX.PLATFORM == "Linux":
     CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
+    CTX.ROCKSDB_CXXFLAGS += " -DOS_LINUX"
+
+
+###############################################################################
+# Some special handling for rocksdb.
+###############################################################################
+CTX.SRC_INCLUDE_DIRS += ['third_party/cpp/rocksdb/include']
+CTX.LASTLDFLAGS += " -Lrocksdb/ -lrocksdb"   # ROCKSDB library
+
+if CTX.TARGET != "CLEAN":
+    runRocksdbPlatformScriptUpdatesMakefile(CTX)
 
 ###############################################################################
 # SPECIFY SOURCE FILE INPUT
@@ -367,12 +378,6 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
  sha1.cpp
 """
 
-###############################################################################
-# Some special handling for rocksdb.
-###############################################################################
-CTX.SRC_INCLUDE_DIRS += ['third_party/cpp/rocksdb/include']
-CTX.ROCKSDB_LIBS += " -Lrocksdb/ -lrocksdb"
-CTX.LASTLDFLAGS += CTX.ROCKSDB_LIBS
 
 ###############################################################################
 # SPECIFY THE TESTS
@@ -388,10 +393,10 @@ if whichtests ==  "${eetestsuite}":
      harness_test
     """
     
-# if whichtests in ("${eetestsuite}", "dbtests"):
-#     CTX.TESTS['dbtests'] = """
-#      simple_example
-#     """
+if whichtests in ("${eetestsuite}", "dbtests"):
+    CTX.TESTS['dbtests'] = """
+     simple_example
+    """
 
 if whichtests in ("${eetestsuite}", "catalog"):
     CTX.TESTS['catalog'] = """
@@ -461,7 +466,6 @@ if whichtests in ("${eetestsuite}", "storage"):
      table_and_indexes_test
      table_test
      tabletuple_export_test
-     simple_example
     """
 
 if whichtests in ("${eetestsuite}", "structures"):
