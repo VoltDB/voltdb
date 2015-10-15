@@ -557,6 +557,16 @@ public class ChannelDistributer implements ChannelChangeCallback {
         /** mesh nodes */
         final NavigableMap<String,AtomicInteger> hosts = m_hosts.getReference();
 
+        final int seed;
+
+        AssignChannels(final int seed) {
+            this.seed = seed;
+        }
+
+        AssignChannels() {
+            seed = System.identityHashCode(this);
+        }
+
         @Override
         public void susceptibleRun() throws Exception {
             if (m_mode.getReference() == OperationMode.INITIALIZING) {
@@ -595,7 +605,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     hostassoc.add(host);
                 }
             }
-            Collections.shuffle(hostassoc, new Random(System.identityHashCode(this)));
+            Collections.shuffle(hostassoc, new Random(seed));
 
             Iterator<String> hitr = hostassoc.iterator();
             Iterator<ChannelSpec> citr = added.iterator();
@@ -610,7 +620,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 // write to each node their assigned channel list
                 NavigableSet<ChannelSpec> previous = null;
                 NavigableSet<ChannelSpec> needed = null;
-                SetNodeChannels setter = null;
+                List<SetNodeChannels> setters = new ArrayList<>();
 
                 for (String host: hosts.navigableKeySet()) {
                     previous = Maps.filterValues(specs,equalTo(host)).navigableKeySet();
@@ -618,12 +628,20 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     if (!needed.equals(previous)) {
                         int version = hosts.get(host).get();
                         byte [] nodedata = asHostData(needed);
-                        setter = new SetNodeChannels(joinZKPath(HOST_DN, host), version, nodedata);
+                        setters.add(new SetNodeChannels(joinZKPath(HOST_DN, host), version, nodedata));
                     }
                 }
                 // wait for the last write to complete
-                if (setter != null) {
-                    setter.getCallbackCode();
+                for (SetNodeChannels setter: setters) {
+                    if (setter.getCallbackCode() != Code.OK && !m_done.get()) {
+                        LOG.warn(
+                                "LEADER (" + m_hostId
+                                + ") Retrying channel assignment because write attempt to "
+                                + setter.path + " failed with " + setter.getCallbackCode()
+                               );
+                        m_es.submit(new AssignChannels(seed));
+                        return;
+                    }
                 }
             } catch (JSONException|IllegalArgumentException e) {
                 LOG.fatal("unable to create json document to assign imported channels to nodes", e);
@@ -701,12 +719,6 @@ public class ChannelDistributer implements ChannelChangeCallback {
         public void processResult(int rc, String path, Object ctx, Stat stat) {
             try {
                 internalProcessResult(rc, path, ctx, stat);
-                Code code = Code.get(rc);
-                // no node, or bad version means that we need to work on the assignments
-                // again.
-                if ((code == Code.NONODE || code == Code.BADVERSION) && !m_done.get()) {
-                    m_es.submit(new AssignChannels());
-                }
             } finally {
                 lock.release();
             }
