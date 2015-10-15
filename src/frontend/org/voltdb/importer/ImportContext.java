@@ -54,14 +54,6 @@ public interface ImportContext extends InternalConnectionContext {
 
     /**
      * Call this to get the ingested data passed to procedure.
-     * @param procName procedure to invoke.
-     * @param fieldList parameters to the procedure.
-     * @return true if successfully accepted the work.
-     */
-    public boolean callProcedure(String procName, Object... fieldList);
-
-    /**
-     * Call this to get the ingested data passed to procedure.
      * @param invocation indicating what kind of data is passed in for this.
      * @return true if successfully accepted the work.
      */

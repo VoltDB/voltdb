@@ -17,12 +17,20 @@
 
 package org.voltdb;
 
+import org.voltdb.client.ClientResponse;
+
 
 /**
- * This should give information about the caller of InternalConnectionHandler.
+ * Methods to report success, failure, retries etc. of internal connection transactions.
  */
-public interface InternalConnectionContext
+public interface InternalConnectionStatsCollector
 {
-    public String getName();
-    public void setBackPressure(boolean hasBackPressure);
+    /**
+     * Used to report that a request completion details.
+     *
+     * @param callerName a name identifying the request invoker
+     * @param procName name of the procedure that is used in the transaction request.
+     * @param response ClientResponse with response details
+     */
+    public void reportCompletion(String callerName, String procName, ClientResponse response);
 }
