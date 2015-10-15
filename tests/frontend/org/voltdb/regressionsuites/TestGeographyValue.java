@@ -77,6 +77,8 @@ public class TestGeographyValue extends RegressionSuite {
     private final GeographyValue BILLERICA_TRIANGLE_POLY = new GeographyValue(BILLERICA_TRIANGLE_WKT);
     private final GeographyValue LOWELL_SQUARE_POLY = new GeographyValue(LOWELL_SQUARE_WKT);
 
+    private final String[] TABLES = {"t", "pt"};
+
     private int fillTable(Client client, String tbl, int startPk) throws Exception {
         VoltTable vt = client.callProcedure(tbl + ".Insert", startPk, "Bermuda Triangle",
                 BERMUDA_TRIANGLE_POLY).getResults()[0];
@@ -161,11 +163,11 @@ public class TestGeographyValue extends RegressionSuite {
         assertFalse(vt.advanceRow());
     }
 
+
     public void testInsertAndSimpleSelect() throws IOException, ProcCallException {
         Client client = getClient();
-        String tables[] = {"pt", "t"};
 
-        for (String tbl : tables) {
+        for (String tbl : TABLES) {
             // There's no rows in here yet.
             validateTableOfScalarLongs(client, "select * from " + tbl, new long[] {});
 
@@ -208,12 +210,13 @@ public class TestGeographyValue extends RegressionSuite {
     public void testComparison() throws Exception {
         Client client = getClient();
 
+        for (String tbl : TABLES) {
         fillTable(client, "t", 0);
 
         // equals
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select pk, name, poly "
-                + "from t as t1, t as t2 "
+                + "from " + tbl + " as t1, t as t2 "
                 + "where t1.poly = t2.poly "
                 + "order by t1.pk").getResults()[0];
         assertContentOfTable(new Object[][] {
@@ -334,6 +337,7 @@ public class TestGeographyValue extends RegressionSuite {
                 {2, "Billerica Triangle"},
                 {3, "Lowell Square"}},
                 vt);
+        }
     }
 
     public void testArithmetic() throws Exception {
