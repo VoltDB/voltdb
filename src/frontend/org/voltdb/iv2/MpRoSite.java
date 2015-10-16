@@ -32,6 +32,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -74,8 +75,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
-    // Still need m_hsql here.
+    // Still need m_hsql (& m_postgresql) here.
     HsqlBackend m_hsql;
+    PostgreSQLBackend m_postgresql;
 
     // Current catalog
     volatile CatalogContext m_context;
@@ -267,9 +269,15 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         if (m_backend == BackendTarget.HSQLDB_BACKEND) {
             m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
+            m_postgresql = null;
+        }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_postgresql = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+            m_hsql = null;
         }
         else {
             m_hsql = null;
+            m_postgresql = null;
         }
     }
 
@@ -318,6 +326,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     {
         if (m_hsql != null) {
             HsqlBackend.shutdownInstance();
+        }
+        if (m_postgresql != null) {
+            PostgreSQLBackend.shutdownInstance();
         }
     }
 
@@ -403,6 +414,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public HsqlBackend getHsqlBackendIfExists()
     {
         return m_hsql;
+    }
+
+    @Override
+    public PostgreSQLBackend getPostgreSQLBackendIfExists()
+    {
+        return m_postgresql;
     }
 
     @Override

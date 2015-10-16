@@ -46,6 +46,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -137,9 +138,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     final InitiatorMailbox m_initiatorMailbox;
 
-    // Almighty execution engine and its HSQL sidekick
+    // Almighty execution engine and its HSQL or PostgreSQL sidekick
     ExecutionEngine m_ee;
     HsqlBackend m_hsql;
+    PostgreSQLBackend m_postgresql;
 
     // Stats
     final TableStats m_tableStats;
@@ -458,15 +460,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         if (m_backend == BackendTarget.NONE) {
             m_hsql = null;
+            m_postgresql = null;
             m_ee = new MockExecutionEngine();
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
-                                                       m_context);
+            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
+            m_postgresql = null;
+            m_ee = new MockExecutionEngine();
+        }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_postgresql = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+            m_hsql = null;
             m_ee = new MockExecutionEngine();
         }
         else {
             m_hsql = null;
+            m_postgresql = null;
             m_ee = initializeEE();
         }
 
@@ -720,6 +729,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (m_hsql != null) {
                 HsqlBackend.shutdownInstance();
             }
+            if (m_postgresql != null) {
+                PostgreSQLBackend.shutdownInstance();
+            }
             if (m_ee != null) {
                 m_ee.release();
             }
@@ -921,6 +933,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public HsqlBackend getHsqlBackendIfExists()
     {
         return m_hsql;
+    }
+
+    @Override
+    public PostgreSQLBackend getPostgreSQLBackendIfExists()
+    {
+        return m_postgresql;
     }
 
     @Override

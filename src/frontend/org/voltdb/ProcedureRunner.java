@@ -380,6 +380,15 @@ public class ProcedureRunner {
                                 m_cachedSingleStmt.stmt.statementParamJavaTypes);
                         results = new VoltTable[] { table };
                     }
+                    else if (getPostgreSQLBackendIfExists() != null) {
+                        // PostgreSQL handling
+                        VoltTable table =
+                            getPostgreSQLBackendIfExists().runSQLWithSubstitutions(
+                                m_cachedSingleStmt.stmt,
+                                m_cachedSingleStmt.params,
+                                m_cachedSingleStmt.stmt.statementParamJavaTypes);
+                        results = new VoltTable[] { table };
+                    }
                     else {
                         m_batch.add(m_cachedSingleStmt);
                         results = voltExecuteSQL(true);
@@ -527,6 +536,13 @@ public class ProcedureRunner {
      */
     public HsqlBackend getHsqlBackendIfExists() {
         return m_site.getHsqlBackendIfExists();
+    }
+
+    /**
+     * If returns non-null, then using PostgreSQL backend
+     */
+    public PostgreSQLBackend getPostgreSQLBackendIfExists() {
+        return m_site.getPostgreSQLBackendIfExists();
     }
 
     public void setAppStatusCode(byte statusCode) {
@@ -771,12 +787,21 @@ public class ProcedureRunner {
             return new VoltTable[] {};
         }
 
-        // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
+        // If this is HSQLDB, run the queries directly in HSQLDB
         if (getHsqlBackendIfExists() != null) {
             results = new VoltTable[batchSize];
             int i = 0;
             for (QueuedSQL qs : batch) {
                 results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
+                        qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
+            }
+        }
+        // If this is PostgreSQL, run the queries directly in PostgreSQL
+        else if (getPostgreSQLBackendIfExists() != null) {
+            results = new VoltTable[batchSize];
+            int i = 0;
+            for (QueuedSQL qs : batch) {
+                results[i++] = getPostgreSQLBackendIfExists().runSQLWithSubstitutions(
                         qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
             }
         }
@@ -1096,7 +1121,7 @@ public class ProcedureRunner {
            msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
-           msg.append("HSQL-BACKEND ERROR\n");
+           msg.append("HSQL-OR-POSTGRESQL-BACKEND ERROR\n");
            if (e.getCause() != null) {
                e = e.getCause();
            }
