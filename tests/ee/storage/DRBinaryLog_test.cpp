@@ -793,6 +793,38 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndex) {
     simpleDeleteTest();
 }
 
+TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_TRUE(indexPair.first == NULL);
+    ASSERT_TRUE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, 0);
+    EXPECT_EQ(indexPairReplica.second, 0);
+
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    TableTuple third_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+
+    flushAndApply(99);
+
+    EXPECT_EQ(3, m_tableReplica->activeTupleCount());
+
+    beginTxn(100, 100, 99, 71);
+    deleteTuple(m_table, first_tuple);
+    deleteTuple(m_table, second_tuple);
+    endTxn(true);
+
+    flushAndApply(100);
+
+    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+}
+
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
 
@@ -870,6 +902,18 @@ TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     ASSERT_FALSE(indexPair.first == NULL);
     ASSERT_FALSE(indexPairReplica.first == NULL);
     EXPECT_EQ(indexPair.second, indexPairReplica.second);
+    simpleUpdateTest();
+}
+
+TEST_F(DRBinaryLogTest, UpdateWithUniqueIndexWhenAAEnabled) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_TRUE(indexPair.first == NULL);
+    ASSERT_TRUE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, 0);
+    EXPECT_EQ(indexPairReplica.second, 0);
     simpleUpdateTest();
 }
 
