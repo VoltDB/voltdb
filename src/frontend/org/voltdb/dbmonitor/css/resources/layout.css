@@ -4248,6 +4248,8 @@ svg.nvd3-svg { width:95% !important; }
     .refreshBtn {
         margin-bottom: 10px;
     }
+	.menuHome ul li:hover ul{ position:absolute;}
+	.menuHome ul li a{padding: 3px 2px 5px 15px;}
 }
 
 @media (min-width: 480px) and (max-width: 700px) {
@@ -4273,6 +4275,7 @@ svg.nvd3-svg { width:95% !important; }
     /*.popup_cont {
         width: 380px;
     }*/
+	
 }
 
 @media (width: 768px) {
