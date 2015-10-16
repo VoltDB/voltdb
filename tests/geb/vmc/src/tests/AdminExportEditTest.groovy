@@ -84,8 +84,18 @@ class AdminExportEditTest extends TestBase {
         
         // Add property in the existing Configuration
         when: 'Expand export'
-        page.overview.export.isDisplayed()
-        page.overview.expandExport()
+        count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                export.click()
+		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+		     	break
+         	} catch(geb.error.RequiredPageContentNotPresent e) {
+         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     	    } catch(geb.waiting.WaitTimeoutException e) {
+     	    }
+     	}
         then: 'Display the created KAFKA'
         waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
         println("Configuration created")
@@ -283,8 +293,18 @@ class AdminExportEditTest extends TestBase {
 	    
 	    // Delete the configuration
 	    when: 'Expand export'
-        page.overview.export.isDisplayed()
-        page.overview.expandExport()
+	    count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                export.click()
+		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+		     	break
+         	} catch(geb.error.RequiredPageContentNotPresent e) {
+         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     	    } catch(geb.waiting.WaitTimeoutException e) {
+     	    }
+     	}
         then: 'Display the KAFKA'
         waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
 	    
