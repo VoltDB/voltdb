@@ -219,8 +219,8 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
-    writeRowTuple(oldTuple, oldRowHeaderSz, oldRowHeaderSz, oldRowInterestingColumns, indexPair, io);
-    writeRowTuple(newTuple, newRowHeaderSz, newRowHeaderSz, NULL, indexPair, io);
+    writeRowTuple(oldTuple, oldRowHeaderSz, oldRowMetadataSz, oldRowInterestingColumns, indexPair, io);
+    writeRowTuple(newTuple, newRowHeaderSz, newRowMetadataSz, NULL, indexPair, io);
 
     uint32_t crc = vdbcrc::crc32cInit();
     crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
