@@ -173,15 +173,7 @@ def buildMakefile(CTX):
     for dir in CTX.OBJ_INCLUDE_DIRS:
         MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
     MAKECPPFLAGS += " -I${OBJDIR}"
-    # I don't think these are used anywhere.
-    LOCALCPPFLAGS = CPPFLAGS
-    for dir in CTX.SYSTEM_DIRS:
-        LOCALCPPFLAGS += " -isystem %s" % (dir)
-    for dir in CTX.SRC_INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I${ROOTDIR}/%s" % (dir)
-    for dir in CTX.OBJ_INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I${OBJDIR}/%s" % (dir)
-    LOCALCPPFLAGS += " -I${OBJDIR}"
+
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -309,8 +301,6 @@ def buildMakefile(CTX):
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
     
-    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
-  
     makefile.write("########################################################################\n")
     makefile.write("#\n# %s\n#\n" % "Volt Files")
     makefile.write("########################################################################\n")
@@ -362,8 +352,10 @@ def buildMakefile(CTX):
                       replaceExtension(jni_objname, ".d")]
         makefile.write("\n")
     makefile.write("\n")
+
+    makefile.write("########################################################################\n")
     makefile.write("#\n# This target lets us print makefile variables, for debugging\n")
-    makefile.write("#\n# the makefile.\n#\n")
+    makefile.write("########################################################################\n")
     makefile.write("echo_makefile_config:\n")
     makefile.write('\t@echo "ROOTDIR = $(ROOTDIR)"\n')
     makefile.write('\t@echo "OBJDIR = $(OBJDIR)"\n')

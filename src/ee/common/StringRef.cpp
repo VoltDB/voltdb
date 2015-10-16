@@ -45,71 +45,49 @@ StringRef::computeStringMemoryUsed(size_t length)
 }
 
 StringRef*
-StringRef::create(size_t size, Pool* dataPool)
+StringRef::create(size_t size, Pool* tempPool)
 {
-    StringRef* retval;
-    if (dataPool != NULL)
-    {
-        retval =
-            new(dataPool->allocate(sizeof(StringRef))) StringRef(size, dataPool);
+    if (tempPool != NULL) {
+        return new (tempPool->allocate(sizeof(StringRef))) StringRef(size, tempPool);
     }
-    else
-    {
 #ifdef MEMCHECK
-        retval = new StringRef(size);
+    return new StringRef(size);
 #else
-        retval = new(ThreadLocalPool::get(sizeof(StringRef))->malloc()) StringRef(size);
+    return new (ThreadLocalPool::allocateExactSizedObject(sizeof(StringRef))) StringRef(size);
 #endif
-    }
-    return retval;
 }
+
+void StringRef::operator delete(void* sref)
+{ return ThreadLocalPool::freeExactSizedObject(sizeof(StringRef), sref); }
 
 void
 StringRef::destroy(StringRef* sref)
 {
-#ifdef MEMCHECK
-    delete sref;
-#else
-    bool temp_pool = sref->m_tempPool;
-    sref->~StringRef();
-    if (!temp_pool)
-    {
-        ThreadLocalPool::get(sizeof(StringRef))->free(sref);
+    if (sref->m_tempPool) {
+        return;
     }
-#endif
+    delete sref;
 }
 
 StringRef::StringRef(size_t size)
 {
     m_size = size + sizeof(StringRef*);
     m_tempPool = false;
-#ifdef MEMCHECK
-    m_stringPtr = new char[m_size];
-#else
-    m_stringPtr =
-        reinterpret_cast<char*>(ThreadLocalPool::getStringPool()->get(m_size)->malloc());
-#endif
+    m_stringPtr = ThreadLocalPool::allocateRelocatable(m_size);
     setBackPtr();
 }
 
-StringRef::StringRef(std::size_t size, Pool* dataPool)
+StringRef::StringRef(std::size_t size, Pool* tempPool)
 {
     m_tempPool = true;
     m_stringPtr =
-        reinterpret_cast<char*>(dataPool->allocate(size + sizeof(StringRef*)));
+        reinterpret_cast<char*>(tempPool->allocate(size + sizeof(StringRef*)));
     setBackPtr();
 }
 
 StringRef::~StringRef()
 {
-    if (!m_tempPool)
-    {
-#ifdef MEMCHECK
-        delete[] m_stringPtr;
-#else
-        ThreadLocalPool::getStringPool()->get(m_size)->free(m_stringPtr);
-#endif
-    }
+    ThreadLocalPool::freeRelocatable(m_size, m_stringPtr);
 }
 
 char*

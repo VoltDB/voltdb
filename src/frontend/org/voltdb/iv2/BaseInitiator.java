@@ -29,6 +29,7 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.ClientInterfaceRepairCallback;
 import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
@@ -241,6 +242,7 @@ public abstract class BaseInitiator implements Initiator
         m_consumerDRGateway = gateway;
         if (m_term != null && m_consumerDRGateway instanceof ClientInterfaceRepairCallback) {
             // We're the leader, and this consumer gateway is late to the party
+            m_consumerDRGateway.beginPromotePartition(m_partitionId, new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE), Long.MIN_VALUE);
             ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback)gateway;
             callback.repairCompleted(m_partitionId, m_initiatorMailbox.getHSId());
         }

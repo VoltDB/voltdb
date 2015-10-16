@@ -1962,7 +1962,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         SyncCallback cb = new SyncCallback();
                         getInternalConnectionHandler().callProcedure(
-                                new ClientInterfaceConnectionContext(), 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                                new ClientInterfaceConnectionContext(), null, 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
                         cb.waitForResponse();
 
                         m_catalogContext.set(VoltDB.instance().getCatalogContext());
