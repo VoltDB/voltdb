@@ -411,7 +411,8 @@ ul.topRightList {
             display: block;
             text-decoration: none;
             color: #000000;
-            padding: 3px 2px 5px 15px;
+		  /*padding: 3px 2px 5px 15px;*/
+            padding: 3px 2px 5px 70px;
             white-space: nowrap;
         }
 
@@ -420,7 +421,7 @@ ul.topRightList {
 
         .menuHome ul li:hover ul {
             display: block;
-            position: absolute;
+            /*position: absolute;*/
         }
 
         .menuHome ul li:hover li {
@@ -433,7 +434,7 @@ ul.topRightList {
             border-left: 1px solid #CCCCCC;
             border-right: 1px solid #CCCCCC;
             position: relative;
-            right: 50px;
+            right:0 /*50px*/;
             z-index: 1;
             width: 115px;
         }
