@@ -61,6 +61,10 @@ public class PointType {
         if (m_latitude < -90.0 || m_latitude > 90.0) {
             throw new IllegalArgumentException("Latitude out of range in PointType constructor");
         }
+
+        if (m_longitude < -180.0 || m_longitude > 180.0) {
+            throw new IllegalArgumentException("Longitude out of range in PointType constructor");
+        }
     }
 
     private static float toFloat(String aInt, String aFrac) {
