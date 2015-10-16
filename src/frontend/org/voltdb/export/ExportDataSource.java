@@ -26,6 +26,7 @@ import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
@@ -112,7 +113,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             int partitionId, String signature, long generation,
             CatalogMap<Column> catalogMap,
             Column partitionColumn,
-            String overflowPath
+            String overflowPath,
+            List<ListeningExecutorService> excutors, int numExecutor
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
@@ -132,11 +134,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         };
         m_database = db;
         m_tableName = tableName;
-        m_es =
-                CoreUtils.getListeningExecutorService(
-                        "ExportDataSource gen " + m_generation
-                        + " table " + m_tableName + " partition " + partitionId, 1);
-
         String nonce = signature + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
@@ -209,9 +206,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
+
+        m_es = excutors.get(getExecutorKey(m_database, m_tableName, m_partitionId, numExecutor));
     }
 
-    public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
+    public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration,
+            List<ListeningExecutorService> excutors, int numExecutor) throws IOException {
 
         /*
          * Certainly no more data coming if this is coming off of disk
@@ -288,8 +288,16 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
-        m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
+
+        m_es = excutors.get(getExecutorKey(m_database, m_tableName, m_partitionId, numExecutor));
     }
+
+    // return a hash key
+    // for selecting a executeService from the shared executroService pool
+    private int getExecutorKey(String m_database, String m_tableName, int m_partitionId, int numExecutor) {
+        return Math.abs((m_database.hashCode() + m_tableName.hashCode() + m_partitionId) % numExecutor);
+    }
+
 
     public void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
@@ -555,12 +563,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
-                try {
                     m_committedBuffers.closeAndDelete();
                     return null;
-                } finally {
-                    m_es.shutdown();
-                }
             }
         });
     }
@@ -627,8 +631,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.close();
                 } catch (IOException e) {
                     exportLog.error(e);
-                } finally {
-                    m_es.shutdown();
                 }
             }
         }));

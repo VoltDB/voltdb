@@ -108,6 +108,7 @@ function server() {
     VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
     VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
     VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
+    VOLTDB_OPTS="${VOLTDB_OPTS} -DDATASOURCE_CONCURRENT_THREADS=4"
     # truncate the voltdb log
     [[ -d log && -w log ]] && > log/volt.log
     # run the server

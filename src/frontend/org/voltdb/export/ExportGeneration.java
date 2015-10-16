@@ -94,6 +94,28 @@ public class ExportGeneration {
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
 
     private Runnable m_onAllSourcesDrained = null;
+    // create a shared pool for executing datasource pool and acks
+    public final static int DATASOURCE_CONCURRENT_THREADS = Integer.getInteger("DATASOURCE_CONCURRENT_THREADS", 6);
+    private List<ListeningExecutorService> m_executors = null;
+
+    private void initDatasourceExectors() {
+        if (m_executors == null) {
+            ImmutableList.Builder<ListeningExecutorService> lbldr = ImmutableList.builder();
+            for (int i = 0; i < DATASOURCE_CONCURRENT_THREADS; ++i) {
+                String threadName = "ExportDataSource gen " + m_timestamp + " worker " + i;
+                lbldr.add(CoreUtils.getListeningSingleThreadExecutor(threadName, CoreUtils.MEDIUM_STACK_SIZE));
+            }
+            m_executors = lbldr.build();
+        }
+    }
+
+    private void shutdownDatasourceExectors() {
+        for (int i = 0; i < DATASOURCE_CONCURRENT_THREADS; ++i) {
+            m_executors.get(i).shutdown();
+        }
+        m_executors = null;
+    }
+
 
     private final Runnable m_onSourceDrained = new Runnable() {
         @Override
@@ -171,6 +193,7 @@ public class ExportGeneration {
             }
         }
         m_isContinueingGeneration = true;
+        initDatasourceExectors();
         exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
 
@@ -188,6 +211,7 @@ public class ExportGeneration {
             throw new IOException("Invalid Generation directory, directory name must be a number.");
         }
         m_isContinueingGeneration = (catalogGen == m_timestamp);
+        initDatasourceExectors();
     }
 
     //This checks if the on disk generation is a catalog generation.
@@ -613,7 +637,8 @@ public class ExportGeneration {
      * Create a datasource based on an ad file
      */
     private void addDataSource(File adFile, Set<Integer> partitions) throws IOException {
-        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration());
+        ExportDataSource source = new ExportDataSource(m_onSourceDrained, adFile, isContinueingGeneration(),
+                m_executors, DATASOURCE_CONCURRENT_THREADS);
         partitions.add(source.getPartitionId());
         if (source.getGeneration() != this.m_timestamp) {
             throw new IOException("Failed to load generation from disk invalid data source generation found.");
@@ -673,7 +698,9 @@ public class ExportGeneration {
                         m_timestamp,
                         table.getColumns(),
                         partColumn,
-                        m_directory.getPath());
+                        m_directory.getPath(),
+                        m_executors,
+                        DATASOURCE_CONCURRENT_THREADS);
                 m_numSources++;
                 exportLog.info("Creating ExportDataSource for table " + table.getTypeName() +
                         " signature " + table.getSignature() + " partition id " + partition);
@@ -739,6 +766,8 @@ public class ExportGeneration {
             Futures.allAsList(tasks).get();
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
+        } finally {
+            // shutdownDatasourceExectors();
         }
         shutdown = true;
         VoltFile.recursivelyDelete(m_directory);
@@ -815,6 +844,8 @@ public class ExportGeneration {
             //Logging of errors  is done inside the tasks so nothing to do here
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
+        } finally {
+            // shutdownDatasourceExectors();
         }
         shutdown = true;
     }
