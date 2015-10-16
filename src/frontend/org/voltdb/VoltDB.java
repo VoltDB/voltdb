@@ -212,6 +212,7 @@ public class VoltDB {
          */
         public String m_versionStringOverrideForTest = null;
         public String m_versionCompatibilityRegexOverrideForTest = null;
+        public String m_buildStringOverrideForTest = null;
 
         public Configuration() {
             // Set start action create.  The cmd line validates that an action is specified, however,
@@ -463,6 +464,8 @@ public class VoltDB {
                     m_versionStringOverrideForTest = args[++i].trim();
                     m_versionCompatibilityRegexOverrideForTest = args[++i].trim();
                 }
+                else if (arg.equalsIgnoreCase("buildstringoverride"))
+                    m_buildStringOverrideForTest = args[++i].trim();
                 else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
