@@ -903,21 +903,27 @@ public class ChannelDistributer implements ChannelChangeCallback {
 
         @Override
         public void processResult(int rc, String path, Object ctx,
-                List<String> children, Stat stat) {
+                final List<String> children, Stat stat) {
             try {
                 internalProcessResults(rc, path, ctx, children, stat);
                 if (Code.get(rc) != Code.OK || m_done.get()) {
                     return;
                 }
                 m_es.submit(new DistributerRunnable() {
+                    final int participants = children.size();
                     @Override
                     public void susceptibleRun() throws Exception {
                         String candidate = basename.apply(leaderCandidate.getNode());
                         if (!m_isLeader && candidate.equals(ElectLeader.this.children.get().first())) {
                             m_isLeader = true;
                             LOG.info("LEADER (" + m_hostId + ") is now the importer channel leader");
-                            // determine node importer channel assignments
-                            new AssignChannels().run();
+                            if (m_hosts.getReference().size() == participants) {
+                                LOG.info(
+                                        "(" + m_hostId
+                                        + ") LEADER assign channels task triggered on on elector node change"
+                                        );
+                                new AssignChannels().run();
+                            }
                         }
                     }
                 });
@@ -1185,6 +1191,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
                 }
                 LOG.info("(" + m_hostId + ") successfully received channel assignment master copy");
                 if (m_isLeader && !m_done.get()) {
+                    LOG.info(
+                            "(" + m_hostId
+                            + ") LEADER assign channels task triggered on changed master copy receipt"
+                            );
                     m_es.submit(new AssignChannels());
                 }
             } finally {
@@ -1251,6 +1261,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     return;
                 }
                 if (m_isLeader && !m_done.get() && next == OperationMode.RUNNING) {
+                    LOG.info(
+                            "(" + m_hostId
+                            + ") LEADER assign channels task triggered on cluster state change"
+                            );
                     m_es.submit(new AssignChannels());
                 }
                 m_eb.post(opmode.get());
@@ -1333,6 +1347,10 @@ public class ChannelDistributer implements ChannelChangeCallback {
                     LOG.info("(" + m_hostId + ") host(s) " + removed + " no longer servicing importer channels");
 
                     if (m_isLeader && !m_done.get()) {
+                        LOG.info(
+                                "(" + m_hostId
+                                + ") LEADER assign channels task triggered on node removal"
+                                );
                         m_es.submit(new AssignChannels());
                     }
                 }
