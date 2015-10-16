@@ -2970,7 +2970,18 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 *reinterpret_cast<void**>(storage) = NULL;
                 return;
             }
-            const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
+
+            const char* data;
+            if (type != VALUE_TYPE_GEOGRAPHY) {
+                // This advances input past the end of the string
+                data = reinterpret_cast<const char*>(input.getRawPointer(length));
+            }
+            else {
+                // This gets a pointer to the start of data without advancing
+                // input stream, so we can read loops and vertices.
+                data = reinterpret_cast<const char*>(input.getRawPointer());
+            }
+
             checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
 
             const int32_t minlength = lengthLength + length;
