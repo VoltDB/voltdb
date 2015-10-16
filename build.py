@@ -393,9 +393,9 @@ if whichtests ==  "${eetestsuite}":
     
 if whichtests in ("${eetestsuite}", "dbtests"):
     CTX.TESTS['dbtests'] = """
+     simple_example
      compact_files_example
     """
-#    simple_example
 
 if whichtests in ("${eetestsuite}", "catalog"):
     CTX.TESTS['catalog'] = """
