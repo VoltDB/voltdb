@@ -38,9 +38,9 @@ public class TestPointType extends RegressionSuite {
         super(name);
     }
 
-    private static final PointType BEDFORD_PT = new PointType(42.4906f, -71.2767f);
-    private static final PointType SANTA_CLARA_PT = new PointType(37.3544f, -121.9692f);
-    private static final PointType LOWELL_PT = new PointType(42.6200f, -71.3273f);
+    private static final PointType BEDFORD_PT = new PointType(42.4906, -71.2767);
+    private static final PointType SANTA_CLARA_PT = new PointType(37.3544, -121.9692);
+    private static final PointType LOWELL_PT = new PointType(42.6200, -71.3273);
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
@@ -82,11 +82,11 @@ public class TestPointType extends RegressionSuite {
         assertEquals(1, id);
         PointType ptByIndex = vt.getPoint(1);
         assertTrue(vt.wasNull());
-        assertTrue(ptByIndex.isNull());
+        assertNull(ptByIndex);
 
         PointType ptByColumnName = vt.getPoint("pt");
         assertTrue(vt.wasNull());
-        assertTrue(ptByColumnName.isNull());
+        assertNull(ptByColumnName);
 
         assertFalse(vt.advanceRow());
 
@@ -241,8 +241,8 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        final PointType CAMBRIDGE_PT = new PointType(42.3736f, -71.1106f);
-        final PointType SAN_JOSE_PT = new PointType(37.3362f, -121.8906f);
+        final PointType CAMBRIDGE_PT = new PointType(42.3736, -71.1106);
+        final PointType SAN_JOSE_PT = new PointType(37.3362, -121.8906);
 
         validateTableOfScalarLongs(client,
                 "update t set "
@@ -303,7 +303,7 @@ public class TestPointType extends RegressionSuite {
                 .getResults()[0];
 
         assertContentOfTable (new Object[][] {
-                {0, "Singapore", new PointType(1.2905f, 103.8521f)}},
+                {0, "Singapore", new PointType(1.2905, 103.8521)}},
                 vt);
     }
 
@@ -312,7 +312,7 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        Object listParam = new PointType[] {SANTA_CLARA_PT, LOWELL_PT};
+        Object listParam = new PointType[] {SANTA_CLARA_PT, null, LOWELL_PT};
         VoltTable vt = client.callProcedure("sel_in", listParam)
                 .getResults()[0];
 

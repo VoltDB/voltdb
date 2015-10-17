@@ -622,7 +622,7 @@ public abstract class VoltTableRow {
 
     public final PointType getPoint(int columnIndex) {
         PointType pt = PointType.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
-        m_wasNull = pt.isNull();
+        m_wasNull = (pt == null);
         return pt;
     }
 

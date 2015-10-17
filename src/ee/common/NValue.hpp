@@ -2586,7 +2586,7 @@ inline int NValue::compare(const NValue rhs) const {
  * Set this NValue to null.
  */
 inline void NValue::setNull() {
-    tagAsNull(); // This gets overwritten for DECIMAL -- but that's OK.
+    tagAsNull(); // This gets overwritten for DECIMAL and POINT -- but that's OK.
     switch (getValueType())
     {
     case VALUE_TYPE_BOOLEAN:
@@ -2752,9 +2752,6 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     case VALUE_TYPE_POINT:
     {
         retval.getPoint() = *reinterpret_cast<const Point*>(storage);
-        if (retval.getPoint().isNull()) {
-            retval.tagAsNull();
-        }
         break;
     }
     default:
@@ -3338,11 +3335,19 @@ inline void NValue::allocateObjectFromOutlinedValue()
 }
 
 inline bool NValue::isNull() const {
+    // DECIMAL and POINT don't use the
+    // OBJECT_NULL_BIT, because they have a 16-byte
+    // representation in m_data, and the object null bit
+    // (if set) lives in m_data[13].
     if (getValueType() == VALUE_TYPE_DECIMAL) {
         TTInt min;
         min.SetMin();
         return getDecimal() == min;
     }
+    else if (getValueType() == VALUE_TYPE_POINT) {
+        return getPoint().isNull();
+    }
+
     return m_data[13] == OBJECT_NULL_BIT;
 }
 
