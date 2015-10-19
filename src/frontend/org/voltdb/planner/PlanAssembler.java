@@ -377,14 +377,20 @@ public class PlanAssembler {
             return;
         }
 
-        if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
+        boolean contentDeterministic = plan.isContentDeterministic();
+        if (parsedStmt instanceof ParsedInsertStmt && !(plan.isOrderDeterministic() && contentDeterministic)) {
             ParsedInsertStmt parsedInsert = (ParsedInsertStmt)parsedStmt;
             boolean targetHasLimitRowsTrigger = parsedInsert.targetTableHasLimitRowsTrigger();
+            String contentDeterministicMsg = "";
+            if (!contentDeterministic) {
+                contentDeterministicMsg = "  " + plan.nondeterminismDetail();
+            }
 
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(
                         "UPSERT statement manipulates data in a non-deterministic way.  "
-                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue."
+                        + contentDeterministicMsg);
             }
             else if (targetHasLimitRowsTrigger) {
                 throw new PlanningErrorException(
@@ -392,12 +398,18 @@ public class PlanAssembler {
                         + "non-deterministic.  Since the table being inserted into has a row limit "
                         + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
                         + "to address this issue."
+                        + contentDeterministicMsg
                         );
             }
             else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(
                         "INSERT statement manipulates data in a content non-deterministic way.  "
-                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue.");
+                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue."
+                        + contentDeterministicMsg);
+            }
+            else if (!contentDeterministic) {
+                throw new PlanningErrorException("INSERT statement manipulates data in a non-deterministic way."
+                                                 + contentDeterministicMsg);
             }
         }
 
@@ -516,8 +528,16 @@ public class PlanAssembler {
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
+        /*
+         * Find out if the query is inherently content deterministic and
+         * remember it.
+         */
+        String contentDeterminismMessage = parsedStmt.isContentDeterministic();
+        retval.setIsContentDeterministic(contentDeterminismMessage == null);
+        if (contentDeterminismMessage != null) {
+            retval.setNondeterminismDetail(contentDeterminismMessage);
+        }
         failIfNonDeterministicDml(parsedStmt, retval);
-
         if (m_partitioning != null) {
             retval.setStatementPartitioning(m_partitioning);
         }

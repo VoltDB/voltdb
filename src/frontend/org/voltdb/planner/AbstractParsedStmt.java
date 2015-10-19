@@ -67,7 +67,6 @@ public abstract class AbstractParsedStmt {
     public static int NEXT_STMT_ID = 0;
     // Internal parameter counter
     public static int NEXT_PARAMETER_ID = 0;
-
     // The unique id to identify the statement
     public int m_stmtId;
 
@@ -1664,6 +1663,20 @@ public abstract class AbstractParsedStmt {
         Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
                 SelectSubqueryExpression.class);
         return !subqueryExprs.isEmpty();
+    }
+
+    /**
+     * Return an error message iff this statement is inherently content
+     * deterministic. Some operations can cause non-determinism. Notably,
+     * aggregate functions of floating point type can cause non-deterministic
+     * round-off error. The default is to return null, which means the query is
+     * inherently deterministic.
+     *
+     * @return An error message if this statement is *not* content
+     *         deterministic. Otherwise we return null.
+     */
+    public String isContentDeterministic() {
+        return null;
     }
 
 }

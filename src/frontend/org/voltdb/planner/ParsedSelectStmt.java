@@ -1968,4 +1968,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         return exprs;
     }
+
+    @Override
+
+    public String isContentDeterministic() {
+        String ans = null;
+        for (ParsedColInfo displayCol : m_displayColumns) {
+            AbstractExpression displayExpr = displayCol.expression;
+            for (AbstractExpression absExpr : displayExpr.findAllSubexpressionsOfClass(AggregateExpression.class)) {
+                AggregateExpression aggExpr = (AggregateExpression) absExpr;
+                if (aggExpr.getValueType() == VoltType.FLOAT) {
+                    return "Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.";
+                }
+            }
+        }
+        return null;
+    }
+
 }
