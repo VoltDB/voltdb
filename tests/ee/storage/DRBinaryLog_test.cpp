@@ -71,13 +71,26 @@ public:
     std::vector<TableTuple> receivedTuples;
 };
 
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+    void setIsActiveActiveDREnabled(bool enabled) { m_isActiveActiveEnabled = enabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
       : m_undoToken(0)
-      , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
-            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0))
     {
+        m_engine = new MockVoltDBEngine(false);
+        m_context.reset(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
+                                    NULL, m_engine, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0));
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
@@ -213,6 +226,7 @@ public:
         for (vector<NValue>::const_iterator cit = m_cachedStringValues.begin(); cit != m_cachedStringValues.end(); ++cit) {
             (*cit).free();
         }
+        delete m_engine;
         delete m_table;
         delete m_replicatedTable;
         delete m_tableReplica;
@@ -380,8 +394,8 @@ public:
     }
 
     void simpleDeleteTest() {
-        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
         ASSERT_FALSE(indexPair.first == NULL);
         ASSERT_FALSE(indexPairReplica.first == NULL);
         EXPECT_EQ(indexPair.second, indexPairReplica.second);
@@ -510,6 +524,7 @@ protected:
     Pool m_pool;
     BinaryLogSink m_sink;
     boost::scoped_ptr<ExecutorContext> m_context;
+    MockVoltDBEngine* m_engine;
     char tableHandle[20];
     char replicatedTableHandle[20];
     char otherTableHandleWithIndex[20];
@@ -804,11 +819,43 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndex) {
     simpleDeleteTest();
 }
 
+TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_TRUE(indexPair.first == NULL);
+    ASSERT_TRUE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, 0);
+    EXPECT_EQ(indexPairReplica.second, 0);
+
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    TableTuple third_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+
+    flushAndApply(99);
+
+    EXPECT_EQ(3, m_tableReplica->activeTupleCount());
+
+    beginTxn(100, 100, 99, 71);
+    deleteTuple(m_table, first_tuple);
+    deleteTuple(m_table, second_tuple);
+    endTxn(true);
+
+    flushAndApply(100);
+
+    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+}
+
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
 
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getUniqueIndexForDR();
     ASSERT_FALSE(indexPair1.first == NULL);
     ASSERT_TRUE(indexPair2.first == NULL);
 
@@ -876,11 +923,23 @@ TEST_F(DRBinaryLogTest, BasicUpdate) {
 
 TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
     ASSERT_FALSE(indexPair.first == NULL);
     ASSERT_FALSE(indexPairReplica.first == NULL);
     EXPECT_EQ(indexPair.second, indexPairReplica.second);
+    simpleUpdateTest();
+}
+
+TEST_F(DRBinaryLogTest, UpdateWithUniqueIndexWhenAAEnabled) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_TRUE(indexPair.first == NULL);
+    ASSERT_TRUE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, 0);
+    EXPECT_EQ(indexPairReplica.second, 0);
     simpleUpdateTest();
 }
 
