@@ -316,6 +316,7 @@ html, body {
         float: left;
         width: 140px;
         padding: 8px 0 0 0;
+		margin-right:90px;
     }
 
     .headLeft .menu {
@@ -1736,7 +1737,7 @@ div.popup {
 /*navigation responsive*/
 
 #nav {
-    position: absolute;
+    /*position: absolute;*/
     left: 250px;
     z-index: 999;
     display: block;
@@ -3692,6 +3693,7 @@ svg.nvd3-svg { width:95% !important; }
   margin-top: 5px;}
     ul.servers-list li span.servIpNum {margin-left: 10%;}
     /*.serverNameAlign { width: 22%;}*/
+	.headLeft .logo{ margin-right:0;}
 
 }
 @media (max-width: 360px) {
@@ -3825,6 +3827,7 @@ svg.nvd3-svg { width:95% !important; }
     }
 
     #nav {
+		position:absolute;
         width: 100%;
         top: 65px;
         left: 0;
@@ -4281,6 +4284,7 @@ svg.nvd3-svg { width:95% !important; }
 @media (width: 768px) {
     #nav {
         left: 180px;
+		position:absolute;
     }
 
     .userN {
