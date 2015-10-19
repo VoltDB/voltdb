@@ -40,7 +40,7 @@ public:
         if (m_storageSize > 0 && indexCrc == m_cachedIndexCrc) {
             return m_tuple;
         }
-        std::pair<const TableIndex*, uint32_t> index = table->getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> index = table->getUniqueIndexForDR();
         if (!index.first || indexCrc != index.second) {
             throwSerializableEEException("Unable to find unique index %u while applying a binary log record",
                                          indexCrc);
@@ -186,7 +186,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
             tempTuple.deserializeFromDR(rowInput, pool);
 
-            const TableIndex* index = table->getSmallestUniqueIndex().first;
+            const TableIndex* index = table->getUniqueIndexForDR().first;
             IndexCursor indexCursor(index->getTupleSchema());
             index->moveToKey(&tempTuple, indexCursor);
             TableTuple deleteTuple = index->nextValueAtKey(indexCursor);
@@ -219,7 +219,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
             tempTuple.deserializeFromDR(oldRowInput, pool);
 
-            const TableIndex* index = table->getSmallestUniqueIndex().first;
+            const TableIndex* index = table->getUniqueIndexForDR().first;
             IndexCursor indexCursor(index->getTupleSchema());
             index->moveToKey(&tempTuple, indexCursor);
             TableTuple oldTuple = index->nextValueAtKey(indexCursor);
