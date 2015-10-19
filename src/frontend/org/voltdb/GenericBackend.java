@@ -121,7 +121,8 @@ public abstract class GenericBackend {
         else if (typeName.equalsIgnoreCase("CHARACTER"))
             return new VoltTable.ColumnInfo(colName, VoltType.STRING);
         else
-            throw new ExpectedProcedureException("Trying to create a column in Backend with a (currently) unsupported type: " + typeName);
+            throw new ExpectedProcedureException("Trying to create a column in " + m_database_type
+                    + " Backend with a (currently) unsupported type: " + typeName);
     }
 
     public VoltTable runDML(String dml) {
