@@ -1121,7 +1121,7 @@ public class ProcedureRunner {
            msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
-           msg.append("HSQL-OR-POSTGRESQL-BACKEND ERROR\n");
+           msg.append("HSQL-BACKEND ERROR\n");
            if (e.getCause() != null) {
                e = e.getCause();
            }
