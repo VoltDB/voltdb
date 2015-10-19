@@ -81,21 +81,24 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final ConcurrentMap<String, Long> m_internalConnectionIds = new ConcurrentHashMap<>();
 
     private InternalConnectionContext m_context;
-    private ProcedureCallback m_proccb;
+    private ProcedureCallback m_uacProccb;
 
     private class InternalCallback implements Callback {
 
         private final ProcedureCallback m_cb;
+        private final InternalConnectionStatsCollector m_statsCollector;
         private final int m_partition;
         private final InternalConnectionContext m_context;
         private final StoredProcedureInvocation m_task;
         private final Procedure m_proc;
 
-        public InternalCallback(final InternalConnectionContext context, Procedure proc, StoredProcedureInvocation task, String procName, int partition, ProcedureCallback cb, long id) {
+        public InternalCallback(final InternalConnectionContext context, Procedure proc, StoredProcedureInvocation task,
+                String procName, int partition, ProcedureCallback cb, InternalConnectionStatsCollector statsCollector, long id) {
             m_context = context;
             m_task = task;
             m_proc = proc;
             m_cb = cb;
+            m_statsCollector = statsCollector;
             m_partition = partition;
         }
 
@@ -104,9 +107,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             if (m_cb != null) {
                 m_cb.clientCallback(response);
             }
+
+            if (m_statsCollector != null) {
+                m_statsCollector.reportCompletion(m_context.getName(), m_task.getProcName(), response);
+            }
+
             if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
                 //Handle failure of transaction due to node kill
-                createTransaction(m_context, m_task.getProcName(), m_proc, m_cb, m_task, m_partition, System.nanoTime());
+                createTransaction(m_context, m_task.getProcName(), m_proc, m_cb, m_statsCollector, m_task, m_partition, System.nanoTime());
             }
         }
 
@@ -183,7 +191,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
                     // initiate the transaction. These hard-coded values from catalog
                     // procedure are horrible, horrible, horrible.
-                    createTransaction(m_context, task.procName, catProc, m_proccb, task, partition, System.nanoTime());
+                    createTransaction(m_context, task.procName, catProc, m_uacProccb, null, task, partition, System.nanoTime());
                 }
             } else {
                 throw new RuntimeException(
@@ -195,7 +203,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public boolean dispatchUpdateApplicationCatalog(StoredProcedureInvocation task, AuthSystem.AuthUser user, InternalConnectionContext context,
             ProcedureCallback proccb) {
         m_context = context;
-        m_proccb = proccb;
+        m_uacProccb = proccb;
         Object[] params = task.getParams().toArray();
         // default catalogBytes to null, when passed along, will tell the
         // catalog change planner that we want to use the current catalog.
@@ -234,6 +242,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final String procName,
             final Procedure catProc,
             final ProcedureCallback proccb,
+            final InternalConnectionStatsCollector statsCollector,
             final StoredProcedureInvocation task,
             final int partition, final long nowNanos) {
 
@@ -255,7 +264,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                 public boolean submitTransaction() {
                     final long handle = nextHandle();
                     task.setClientHandle(handle);
-                    final InternalCallback cb = new InternalCallback(context, catProc, task, procName, partition, proccb, handle);
+                    final InternalCallback cb = new InternalCallback(context, catProc, task, procName, partition, proccb, statsCollector, handle);
                     m_callbacks.put(handle, cb);
 
                     //Submit the transaction.
@@ -263,6 +272,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             catProc.getReadonly(), catProc.getSinglepartition(), catProc.getEverysite(), partition,
                             task.getSerializedSize(), nowNanos);
                     if (!bval) {
+                        // Supposedly this will never happen and is OK to ignore from stats collection perspective.
+                        // Hence it is OK that this is not getting reported to callbacks.
                         m_logger.error("Failed to submit transaction.");
                         m_callbacks.remove(handle);
                     }
