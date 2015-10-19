@@ -1753,7 +1753,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             InputStream buildstringStream =
                 ClassLoader.getSystemResourceAsStream("buildstring.txt");
             if (buildstringStream != null) {
-                byte b;
+                //byte b;
                 while ((b = (byte) buildstringStream.read()) != -1) {
                     sb.append((char)b);
                 }
