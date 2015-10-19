@@ -988,13 +988,13 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
 }
 
 void PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple, TableTuple *conflict) {
-    for (int i = static_cast<int>(m_indexes.size()) - 1; i >= 0; --i) {
+    for (int i = 0; i < static_cast<int>(m_indexes.size()); ++i) {
         m_indexes[i]->addEntry(tuple, conflict);
         FAIL_IF(!conflict->isNullTuple()) {
             VOLT_DEBUG("Failed to insert into index %s,%s",
                        m_indexes[i]->getTypeName().c_str(),
                        m_indexes[i]->getName().c_str());
-            for (int j = i + 1; j < m_indexes.size(); ++j) {
+            for (int j = 0; j < i; ++j) {
                 m_indexes[j]->deleteEntry(tuple);
             }
             return;
