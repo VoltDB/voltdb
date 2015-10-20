@@ -215,7 +215,7 @@ public abstract class GenericBackend {
                     b.put(e.getSQLState().getBytes());
                     b.putInt(0); // ConstraintFailure.type
                     try {
-                        FastSerializer.writeString(m_database_type, b);
+                        FastSerializer.writeString(m_database_type.substring(0, 4), b);
                     }
                     catch (IOException e1) {
                         e1.printStackTrace();
