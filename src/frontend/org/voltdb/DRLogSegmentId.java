@@ -17,11 +17,15 @@
 
 package org.voltdb;
 
+import java.io.Serializable;
+
 import org.voltdb.iv2.UniqueIdGenerator;
 
 import com.google_voltpatches.common.base.Preconditions;
 
-public class DRLogSegmentId {
+public class DRLogSegmentId implements Serializable {
+    private static final long serialVersionUID = 2540289527683570995L;
+
     public static final short MAX_CLUSTER_ID = (1 << 8) - 1;
     public static final long MAX_SEQUENCE_NUMBER = (1L << 55) - 1L;
 

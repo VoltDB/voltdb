@@ -34,7 +34,7 @@ class AdminExportEditTest extends TestBase {
     /*
      *  This test creates a new configuration, adds a property to it and deletes it
      */
-/*
+
     def "Verify 'Add configuration' in Export and delete it"() {
         println("Test Start: Verify 'Add configuration' in Export and delete it")
         int count = 0
@@ -84,8 +84,18 @@ class AdminExportEditTest extends TestBase {
         
         // Add property in the existing Configuration
         when: 'Expand export'
-        page.overview.export.isDisplayed()
-        page.overview.expandExport()
+        count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                export.click()
+		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+		     	break
+         	} catch(geb.error.RequiredPageContentNotPresent e) {
+         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     	    } catch(geb.waiting.WaitTimeoutException e) {
+     	    }
+     	}
         then: 'Display the created KAFKA'
         waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
         println("Configuration created")
@@ -178,7 +188,10 @@ class AdminExportEditTest extends TestBase {
         
 	    println("Test End: Verify 'Add configuration' in Export and delete it")
     }
-    */
+    
+    /*
+     *  This test creates a new configuration, edits it and deletes it
+     */
     def "Verify edit in Export and delete it"() {
         println("Test Start: Verify edit in Export and delete it")
         int count = 0
@@ -280,8 +293,18 @@ class AdminExportEditTest extends TestBase {
 	    
 	    // Delete the configuration
 	    when: 'Expand export'
-        page.overview.export.isDisplayed()
-        page.overview.expandExport()
+	    count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                export.click()
+		     	waitFor(waitTime) { page.overview.exportExpanded.isDisplayed() }
+		     	break
+         	} catch(geb.error.RequiredPageContentNotPresent e) {
+         	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     	    } catch(geb.waiting.WaitTimeoutException e) {
+     	    }
+     	}
         then: 'Display the KAFKA'
         waitFor(waitTime) { page.overview.kafkaName.isDisplayed() }
 	    

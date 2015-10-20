@@ -86,7 +86,7 @@
                             <div class="menuHome">
                                 <ul class="menuHomeList">
                                     <li>
-                                        <a href="#" style="float:left">Help</a>
+                                        <a href="javascript:void(0);" style="float:left">Help</a>
                                         <div class="helpDrop"></div>
                                         <div class="clear"></div>
                                         <ul>
@@ -94,7 +94,7 @@
                                             <li><a href="#About" id="ShowAbout">About</a></li>
                                         </ul>
                                     </li>
-                                </ul>
+                                </ul>	
                             </div>
                         </li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
@@ -136,7 +136,7 @@
                                     <div class="icon-server searchLeft">Servers</div>
                                     <div class="searchRight">
                                         <div class="search">
-                                            <input type="text" id="popServerSearch" class="icon-search" onclick="this.value = '';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
+                                            <input type="text" id="popServerSearch" class="icon-search" onClick="this.value = '';" onBlur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
                                         </div>
                                         <div class="thresholdVal">
                                             Alert Threshold
@@ -263,7 +263,7 @@
                                     <div class="tabs-filter-wrapper">
                                         <div class="tableTitle icon-procedures">Stored Procedures (Cluster)</div>
                                         <div class="filter">
-                                            <input name="filter" id="filterStoredProc" type="text" class="search-box" onblur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" />
+                                            <input name="filter" id="filterStoredProc" type="text" class="search-box" onBlur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" />
                                             <a id="searchStoredProc" href="javascript:void(0)" class="icon-search" title="Search">search</a>
                                         </div>
                                         <div class="pagination">
@@ -295,7 +295,7 @@
                                     <div class="tabs-filter-wrapper">
                                         <div class="tableTitle icon-tables">Database Tables</div>
                                         <div class="filter">
-                                            <input name="filter" id="filterDatabaseTable" type="text" class="search-box" onblur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" />
+                                            <input name="filter" id="filterDatabaseTable" type="text" class="search-box" onBlur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" />
                                             <a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a>
                                         </div>
                                         <div class="pagination">
@@ -358,7 +358,7 @@
                                 <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
                                         <div class="drTitle icon-master" id="drMasterTitle">Master</div>
-                                        <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onblur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                        <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
@@ -388,7 +388,7 @@
                                 <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
                                     <div class="tabs-filter-wrapperDR">
                                         <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
-                                        <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                        <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                         <div class="clear"></div>
                                     </div>
                                     <div class="clear"></div>
@@ -430,7 +430,7 @@
                             <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
                                 <div class="tabs-filter-wrapperDR">
                                     <div class="drTitle icon-command" id="drCLPTitle">Command Log Data</div>
-                                    <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onblur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                    <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
                                     <div class="clear"></div>
                                 </div>
                                 <div class="clear"></div>
@@ -588,7 +588,7 @@
                                         </div>
                                         <div class="securWrapper" id="UsersListEditable" style="display: none;">
                                             <div class="userName">Users</div>
-                                            <div class="editBtn"><a href="javascript:void(0)" class="btnEd" id="addmorePOIbutton" onclick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
+                                            <div class="editBtn"><a href="javascript:void(0)" class="btnEd" id="addmorePOIbutton" onClick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
                                             <div class="clear secLine"></div>
                                             <form id="frmUserList" method="get" action="">
                                                 <div id="editUserList">
@@ -715,8 +715,8 @@
                                 </tr>
                                 <tr class="child-row-4 subLabelRow">
                                     <td class="configLabel">Export Tables</td>
-                                    <td align="right">
-                                        &nbsp;
+                                    <td align="right">&nbsp;
+                                        
                                     </td>
                                     <td></td>
                                     <td>
@@ -1156,7 +1156,7 @@
             <br />
             <ul class="btnList" id="Ul1">
                 <li>
-                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="A1" onclick="logout();">Ok</a></div>
+                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="A1" onClick="logout();">Ok</a></div>
                 </li>
                 <li>
                     <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnCancel">Cancel</a></div>

@@ -58,7 +58,13 @@ StringRef::create(size_t size, Pool* tempPool)
 }
 
 void StringRef::operator delete(void* sref)
-{ return ThreadLocalPool::freeExactSizedObject(sizeof(StringRef), sref); }
+{
+#ifdef MEMCHECK
+    ::operator delete(sref);
+#else
+    ThreadLocalPool::freeExactSizedObject(sizeof(StringRef), sref);
+#endif
+}
 
 void
 StringRef::destroy(StringRef* sref)
