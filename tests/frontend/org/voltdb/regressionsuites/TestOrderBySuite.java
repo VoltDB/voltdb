@@ -830,7 +830,7 @@ public class TestOrderBySuite extends RegressionSuite {
         expected = new long[][] {{1}, {0}, {2}, {3}};
         validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertTrue(vt.toString().contains("MERGE RECEIVE"));
+        assertFalse(vt.toString().contains("MERGE RECEIVE"));
         assertTrue(vt.toString().contains("P_D32_10_IDX"));
 
         // P_D0 is a partition column for P. All rows are from a single partition.
@@ -846,25 +846,6 @@ public class TestOrderBySuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
 
-        // A_INLINE_STR is not covered by indexes. Partition results are unordered
-        // ORDER BY node is pushed down. Merge Receive
-        sql = "select PKEY, A_INT from O1 order by A_INT, A_INLINE_STR";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        expected = new long[][] {{3, 1}, {4, 2}, {5, 5}, {1, 5}, {2, 7}, {6, 7}, {7, 8}};
-        validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertTrue(vt.toString().contains("MERGE RECEIVE"));
-        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"O1\""));
-
-        // NLIJ with sequential outer table scan. ORDER BY column  O3.PK2 is not the first index column
-        // ORDER BY node is pushed down. Merge Receive
-        sql = "select O1.PKEY, O3.PK1, O3.PK2 from O1, O3 where O1.A_INT = O3.PK2 order by O3.PK2;";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        expected = new long[][] {{3, 1, 1}, {4, 2, 2}};
-        validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertTrue(vt.toString().contains("MERGE RECEIVE"));
-        assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
     }
 
     private void subtestOrderByMP_Agg() throws Exception
@@ -970,20 +951,6 @@ public class TestOrderBySuite extends RegressionSuite {
         sql = "SELECT V_P_D1, V_P_D2 FROM V_P order by V_P_D1 DESC , V_P_D2 DESC";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{11, 2}, {11, 1}, {6, 2}, {6, 1}, {1, 4}, {1, 2}};
-        validateTableOfLongs(vt, expected);
-        vt = client.callProcedure("@Explain", sql).getResults()[0];
-        assertTrue(vt.toString().contains("MERGE RECEIVE"));
-
-        // ORDER BY column P_D1 is not covered by the P_D32_IDX index
-        // and its sort direction is invalid. Partition outputs are unordered.
-        // The ORDER BY node is pushed down to the partition fragment
-        //            select indexed_non_partition_key1, non_indexed_non_partition_col2, max(col)
-        //            from partitioned
-        //            group by indexed_non_partition_key1, non_indexed_non_partition_col2
-        //            order by indexed_non_partition_key1, non_indexed_non_partition_col2;"
-        sql = "select P_D3, P_D1, max (P_D0) from p where P_D3 > 0 group by P_D3, P_D1 order by P_D1, P_D3";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        expected = new long[][] {{1, 1, 7}, {1, 6, 7}, {1, 11, 5}};
         validateTableOfLongs(vt, expected);
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("MERGE RECEIVE"));
