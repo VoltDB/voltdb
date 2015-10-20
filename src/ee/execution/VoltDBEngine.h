@@ -134,6 +134,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         TableCatalogDelegate* getTableDelegate(std::string name) const;
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(std::string name) const;
+        virtual bool getIsActiveActiveDREnabled() const;
 
         // -------------------------------------------------
         // Execution Functions
