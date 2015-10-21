@@ -631,6 +631,7 @@ class Schema:
         "float":     ("float",        "numeric", ""),
         "decimal":   ("decimal",      "numeric", ""),
         "string":    ("string",    "nonnumeric", ""),
+        "varbinary": ("varbinary", "nonnumeric", ""),
         "timestamp": ("timestamp", "nonnumeric", ""),
     }
 
@@ -641,6 +642,7 @@ class Schema:
         FastSerializer.VOLTTYPE_BIGINT:    "int64",
         FastSerializer.VOLTTYPE_FLOAT:     "float",
         FastSerializer.VOLTTYPE_STRING:    "string",
+        FastSerializer.VOLTTYPE_VARBINARY: "varbinary",
         FastSerializer.VOLTTYPE_DECIMAL:   "decimal",
         FastSerializer.VOLTTYPE_TIMESTAMP: "timestamp",
     }

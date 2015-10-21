@@ -26,6 +26,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "harness.h"
+#include "execution/VoltDBEngine.h"
 #include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/debuglog.h"
@@ -35,6 +36,7 @@
 #include "common/tabletuple.h"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
+#include "storage/streamedtable.h"
 #include "storage/tableiterator.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -53,19 +55,49 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
 }
 
+class MockExportTupleStream : public ExportTupleStream {
+public:
+    MockExportTupleStream(CatalogId partitionId, int64_t siteId) : ExportTupleStream(partitionId, siteId) {}
+    virtual size_t appendTuple(int64_t lastCommittedSpHandle,
+                                           int64_t spHandle,
+                                           int64_t seqNo,
+                                           int64_t uniqueId,
+                                           int64_t timestamp,
+                                           TableTuple &tuple,
+                                           ExportTupleStream::Type type) {
+        receivedTuples.push_back(tuple);
+        return 0;
+    }
+    std::vector<TableTuple> receivedTuples;
+};
+
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+    void setIsActiveActiveDREnabled(bool enabled) { m_isActiveActiveEnabled = enabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
       : m_undoToken(0)
-      , m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
-            NULL, NULL, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0))
     {
+        m_engine = new MockVoltDBEngine(false);
+        m_context.reset(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
+                                    NULL, m_engine, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0));
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
         *reinterpret_cast<int64_t*>(replicatedTableHandle) = 24;
         *reinterpret_cast<int64_t*>(otherTableHandleWithIndex) = 43;
         *reinterpret_cast<int64_t*>(otherTableHandleWithoutIndex) = 44;
+        *reinterpret_cast<int64_t*>(exportTableHandle) = 55;
 
         std::vector<ValueType> columnTypes;
         std::vector<int32_t> columnLengths;
@@ -162,12 +194,39 @@ public:
                                                                                                           singleColumnName,
                                                                                                           tableHandle + 1, false, 0));
         m_singleColumnTable->setDR(true);
+
+        // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
+        std::vector<ValueType> exportColumnType;
+        std::vector<int32_t> exportColumnLength;
+        std::vector<bool> exportColumnAllowNull(10, false);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(7); /* length of 'P_TABLE' */
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_DECIMAL);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(15);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(300);
+        exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
+
+        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
+        string exportColumnNamesArray[10] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
+                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT", "C_DECIMAL",
+                                            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
+
+        m_exportStream = new MockExportTupleStream(1, 1);
+        m_exportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
+                                                                m_exportSchema, exportColumnName,
+                                                                m_exportStream, true);
     }
 
     virtual ~DRBinaryLogTest() {
         for (vector<NValue>::const_iterator cit = m_cachedStringValues.begin(); cit != m_cachedStringValues.end(); ++cit) {
             (*cit).free();
         }
+        delete m_engine;
         delete m_table;
         delete m_replicatedTable;
         delete m_tableReplica;
@@ -177,9 +236,12 @@ public:
         delete m_otherTableWithoutIndex;
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
+        delete m_exportTable;
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
+        m_currTxnUniqueId = addPartitionId(uniqueId);
+
         UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken);
         m_context->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                 addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
@@ -190,8 +252,8 @@ public:
             m_undoLog.undo(m_undoToken);
         } else {
             m_undoLog.release(m_undoToken++);
-            m_drStream.endTransaction();
-            m_drReplicatedStream.endTransaction();
+            m_drStream.endTransaction(m_currTxnUniqueId);
+            m_drReplicatedStream.endTransaction(m_currTxnUniqueId);
         }
     }
 
@@ -307,9 +369,33 @@ public:
         m_table->addIndex(thirdIndex);
     }
 
+    TableTuple firstTupleWithNulls(PersistentTable* table, bool indexFriendly = false) {
+        TableTuple temp_tuple = table->tempTuple();
+        temp_tuple.setNValue(0, (indexFriendly ? ValueFactory::getTinyIntValue(99) : NValue::getNullValue(VALUE_TYPE_TINYINT)));
+        temp_tuple.setNValue(1, ValueFactory::getBigIntValue(489735));
+        temp_tuple.setNValue(2, NValue::getNullValue(VALUE_TYPE_DECIMAL));
+        m_cachedStringValues.push_back(ValueFactory::getStringValue("whatever"));
+        temp_tuple.setNValue(3, m_cachedStringValues.back());
+        temp_tuple.setNValue(4, ValueFactory::getNullStringValue());
+        temp_tuple.setNValue(5, ValueFactory::getTimestampValue(3495));
+        return temp_tuple;
+    }
+
+    TableTuple secondTupleWithNulls(PersistentTable* table, bool indexFriendly = false) {
+        TableTuple temp_tuple = table->tempTuple();
+        temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(42));
+        temp_tuple.setNValue(1, (indexFriendly ? ValueFactory::getBigIntValue(31241) : NValue::getNullValue(VALUE_TYPE_BIGINT)));
+        temp_tuple.setNValue(2, ValueFactory::getDecimalValueFromString("234234.243"));
+        temp_tuple.setNValue(3, ValueFactory::getNullStringValue());
+        m_cachedStringValues.push_back(ValueFactory::getStringValue("whatever and ever and ever and ever"));
+        temp_tuple.setNValue(4, m_cachedStringValues.back());
+        temp_tuple.setNValue(5, NValue::getNullValue(VALUE_TYPE_TIMESTAMP));
+        return temp_tuple;
+    }
+
     void simpleDeleteTest() {
-        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+        std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
         ASSERT_FALSE(indexPair.first == NULL);
         ASSERT_FALSE(indexPairReplica.first == NULL);
         EXPECT_EQ(indexPair.second, indexPairReplica.second);
@@ -375,9 +461,37 @@ public:
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
+    void updateWithNullsTest() {
+        beginTxn(99, 99, 98, 70);
+        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 31241, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+        TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+        endTxn(true);
+
+        flushAndApply(99);
+
+        EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+
+        beginTxn(100, 100, 99, 71);
+        TableTuple tuple_to_update = m_table->lookupTupleByValues(first_tuple);
+        ASSERT_FALSE(tuple_to_update.isNullTuple());
+        TableTuple updated_tuple = secondTupleWithNulls(m_table);
+        m_table->updateTuple(tuple_to_update, updated_tuple);
+        endTxn(true);
+
+        flushAndApply(100);
+
+        EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+        TableTuple expected_tuple = secondTupleWithNulls(m_table);
+        TableTuple tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+        tuple = m_table->lookupTupleByValues(second_tuple);
+        ASSERT_FALSE(tuple.isNullTuple());
+    }
+
 protected:
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
+    ExportTupleStream* m_exportStream;
 
     TupleSchema* m_schema;
     TupleSchema* m_replicatedSchema;
@@ -388,6 +502,7 @@ protected:
     TupleSchema* m_otherSchemaWithIndexReplica;
     TupleSchema* m_otherSchemaWithoutIndexReplica;
     TupleSchema* m_singleColumnSchema;
+    TupleSchema* m_exportSchema;
 
     PersistentTable* m_table;
     PersistentTable* m_replicatedTable;
@@ -399,18 +514,22 @@ protected:
     PersistentTable* m_otherTableWithoutIndexReplica;
     // This table does not exist on the replica
     PersistentTable* m_singleColumnTable;
+    Table* m_exportTable;
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
+    int64_t m_currTxnUniqueId;
 
     DummyTopend m_topend;
     Pool m_pool;
     BinaryLogSink m_sink;
     boost::scoped_ptr<ExecutorContext> m_context;
+    MockVoltDBEngine* m_engine;
     char tableHandle[20];
     char replicatedTableHandle[20];
     char otherTableHandleWithIndex[20];
     char otherTableHandleWithoutIndex[20];
+    char exportTableHandle[20];
 
     vector<NValue> m_cachedStringValues;//To free at the end of the test
 };
@@ -485,10 +604,38 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     ASSERT_FALSE(tuple.isNullTuple());
     tuple = m_tableReplica->lookupTupleByValues(second_tuple);
     ASSERT_TRUE(tuple.isNullTuple());
-
-    EXPECT_EQ(3, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
-    EXPECT_EQ(-1, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(3, committed.seqNum);
+    committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(-1, committed.seqNum);
 }
+
+// TODO: when we implement conflict detection, the testcase should rewrite to manually create a conflict
+TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
+    ASSERT_FALSE(flush(98));
+
+    // single row write transaction
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
+    endTxn(true);
+
+    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
+    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
+    ASSERT_FALSE(received_tuple.isNullTuple());
+    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
+    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
+    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
+    // Now compare the rest of columns
+    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
+    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
+}
+
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
@@ -502,7 +649,8 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     // it would flush itself out now
     ASSERT_FALSE(flush(99));
 
-    EXPECT_EQ(-1, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(-1, committed.seqNum);
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 
     beginTxn(100, 100, 99, 71);
@@ -522,7 +670,8 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
-    EXPECT_EQ(0, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(0, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
@@ -572,31 +721,16 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
-    EXPECT_EQ(0, m_drStream.getLastCommittedSequenceNumberAndUniqueId().first);
-    EXPECT_EQ(2, m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueId().first);
+    DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(0, committed.seqNum);
+    committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
+    EXPECT_EQ(2, committed.seqNum);
 }
 
 TEST_F(DRBinaryLogTest, SerializeNulls) {
     beginTxn(109, 99, 98, 70);
-    TableTuple temp_tuple = m_replicatedTable->tempTuple();
-    temp_tuple.setNValue(0, NValue::getNullValue(VALUE_TYPE_TINYINT));
-    temp_tuple.setNValue(1, ValueFactory::getBigIntValue(489735));
-    temp_tuple.setNValue(2, NValue::getNullValue(VALUE_TYPE_DECIMAL));
-    m_cachedStringValues.push_back(ValueFactory::getStringValue("whatever"));
-    temp_tuple.setNValue(3, m_cachedStringValues.back());
-    temp_tuple.setNValue(4, ValueFactory::getNullStringValue());
-    temp_tuple.setNValue(5, ValueFactory::getTimestampValue(3495));
-    TableTuple first_tuple = insertTuple(m_replicatedTable, temp_tuple);
-
-    temp_tuple = m_replicatedTable->tempTuple();
-    temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(42));
-    temp_tuple.setNValue(1, NValue::getNullValue(VALUE_TYPE_BIGINT));
-    temp_tuple.setNValue(2, ValueFactory::getDecimalValueFromString("234234.243"));
-    temp_tuple.setNValue(3, ValueFactory::getNullStringValue());
-    m_cachedStringValues.push_back(ValueFactory::getStringValue("whatever and ever and ever and ever"));
-    temp_tuple.setNValue(4, m_cachedStringValues.back());
-    temp_tuple.setNValue(5, NValue::getNullValue(VALUE_TYPE_TIMESTAMP));
-    TableTuple second_tuple = insertTuple(m_replicatedTable, temp_tuple);
+    TableTuple first_tuple = insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable));
+    TableTuple second_tuple = insertTuple(m_replicatedTable, secondTupleWithNulls(m_replicatedTable));
     endTxn(true);
 
     flushAndApply(99);
@@ -610,15 +744,7 @@ TEST_F(DRBinaryLogTest, SerializeNulls) {
 
 TEST_F(DRBinaryLogTest, RollbackNulls) {
     beginTxn(109, 99, 98, 70);
-    TableTuple temp_tuple = m_replicatedTable->tempTuple();
-    temp_tuple.setNValue(0, NValue::getNullValue(VALUE_TYPE_TINYINT));
-    temp_tuple.setNValue(1, ValueFactory::getBigIntValue(489735));
-    temp_tuple.setNValue(2, NValue::getNullValue(VALUE_TYPE_DECIMAL));
-    m_cachedStringValues.push_back(ValueFactory::getStringValue("whatever"));
-    temp_tuple.setNValue(3, m_cachedStringValues.back());
-    temp_tuple.setNValue(4, ValueFactory::getNullStringValue());
-    temp_tuple.setNValue(5, ValueFactory::getTimestampValue(3495));
-    insertTuple(m_replicatedTable, temp_tuple);
+    insertTuple(m_replicatedTable, firstTupleWithNulls(m_replicatedTable));
     endTxn(false);
 
     beginTxn(110, 100, 99, 71);
@@ -693,11 +819,43 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndex) {
     simpleDeleteTest();
 }
 
+TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_TRUE(indexPair.first == NULL);
+    ASSERT_TRUE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, 0);
+    EXPECT_EQ(indexPairReplica.second, 0);
+
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    TableTuple third_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+
+    flushAndApply(99);
+
+    EXPECT_EQ(3, m_tableReplica->activeTupleCount());
+
+    beginTxn(100, 100, 99, 71);
+    deleteTuple(m_table, first_tuple);
+    deleteTuple(m_table, second_tuple);
+    endTxn(true);
+
+    flushAndApply(100);
+
+    EXPECT_EQ(1, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+}
+
 TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     createIndexes();
 
-    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPair1 = m_otherTableWithIndex->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPair2 = m_otherTableWithoutIndex->getUniqueIndexForDR();
     ASSERT_FALSE(indexPair1.first == NULL);
     ASSERT_TRUE(indexPair2.first == NULL);
 
@@ -765,12 +923,67 @@ TEST_F(DRBinaryLogTest, BasicUpdate) {
 
 TEST_F(DRBinaryLogTest, UpdateWithUniqueIndex) {
     createIndexes();
-    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getSmallestUniqueIndex();
-    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getSmallestUniqueIndex();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
     ASSERT_FALSE(indexPair.first == NULL);
     ASSERT_FALSE(indexPairReplica.first == NULL);
     EXPECT_EQ(indexPair.second, indexPairReplica.second);
     simpleUpdateTest();
+}
+
+TEST_F(DRBinaryLogTest, UpdateWithUniqueIndexWhenAAEnabled) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_TRUE(indexPair.first == NULL);
+    ASSERT_TRUE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, 0);
+    EXPECT_EQ(indexPairReplica.second, 0);
+    simpleUpdateTest();
+}
+
+TEST_F(DRBinaryLogTest, PartialTxnRollback) {
+    beginTxn(98, 98, 97, 69);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 99, 29058, "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(true);
+
+    beginTxn(99, 99, 98, 70);
+
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+
+    // Simulate a second batch within the same txn
+    UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
+    m_context->setupForPlanFragments(uq, addPartitionId(99), addPartitionId(99),
+                                     addPartitionId(98), addPartitionId(70));
+
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+
+    m_undoLog.undo(m_undoToken + 1);
+
+    endTxn(true);
+
+    flushAndApply(100);
+
+    EXPECT_EQ(2, m_tableReplica->activeTupleCount());
+    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+}
+
+TEST_F(DRBinaryLogTest, UpdateWithNulls) {
+    updateWithNullsTest();
+}
+
+TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
+    createIndexes();
+    std::pair<const TableIndex*, uint32_t> indexPair = m_table->getUniqueIndexForDR();
+    std::pair<const TableIndex*, uint32_t> indexPairReplica = m_tableReplica->getUniqueIndexForDR();
+    ASSERT_FALSE(indexPair.first == NULL);
+    ASSERT_FALSE(indexPairReplica.first == NULL);
+    EXPECT_EQ(indexPair.second, indexPairReplica.second);
+    updateWithNullsTest();
 }
 
 int main() {

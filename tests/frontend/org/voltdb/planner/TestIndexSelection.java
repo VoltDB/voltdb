@@ -459,6 +459,29 @@ public class TestIndexSelection extends PlannerTestCase {
         }
     }
 
+    public void testPartialIndexPredicateOnly()
+    {
+        // Partial index can be used solely to eliminate a post-filter
+        // even when the indexed columns are irrelevant
+        {
+            // CREATE INDEX partial_idx_3 ON c (b)  where d > 0;
+            AbstractPlanNode pn = compile("select * from c where d > 0");
+            checkIndexName(pn, PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\"");
+        }
+        {
+            // CREATE UNIQUE INDEX z_full_idx_a ON c (a); takes precedence over the partial_idx_3
+            // because indexed column (A) is part of the WHERE expressions
+            AbstractPlanNode pn = compile("select * from c where d > 0 and a < 0");
+            checkIndexName(pn, PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"Z_FULL_IDX_A\"");
+        }
+        {
+            // CREATE INDEX partial_idx_3 ON c (b)  where d > 0;
+            AbstractPlanNode pn = compile("select c.d from a join c on a.id = c.e and d > 0");
+            assertEquals(PlanNodeType.NESTLOOPINDEX, pn.getChild(0).getChild(0).getPlanNodeType());
+            checkIndexName(pn.getChild(0).getChild(0), PlanNodeType.INDEXSCAN, "\"TARGET_INDEX_NAME\":\"PARTIAL_IDX_3\"");
+        }
+    }
+
     public void testParameterizedQueryPartialIndex()
     {
         {

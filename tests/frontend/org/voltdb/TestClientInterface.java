@@ -371,7 +371,7 @@ public class TestClientInterface {
         Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
         assertTrue(partitionParam instanceof byte[]);
         VoltType type = VoltType.get((Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1));
-        assertTrue(type.isInteger());
+        assertTrue(type.isBackendIntegerType());
         byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
         ByteBuffer buf = ByteBuffer.wrap(serializedData);
         Object[] parameters = AdHocPlannedStmtBatch.userParamsFromBuffer(buf);

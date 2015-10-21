@@ -447,7 +447,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    static protected void validateTableOfLongs(VoltTable vt, long[][] expected) {
+    public static void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",
                         expected.length, vt.getRowCount());
@@ -933,7 +933,8 @@ public class RegressionSuite extends TestCase {
         assertTrue(found);
     }
 
-    static protected void checkQueryPlan(Client client, String query, String...patterns) throws Exception {
+    static protected void checkQueryPlan(Client client, String query, String...patterns)
+            throws NoConnectionsException, IOException, ProcCallException {
         VoltTable vt;
         assert(patterns.length >= 1);
 
@@ -941,7 +942,9 @@ public class RegressionSuite extends TestCase {
         String vtStr = vt.toString();
 
         for (String pattern : patterns) {
-            assertTrue(vtStr.contains(pattern));
+            if (! vtStr.contains(pattern)) {
+                fail("The explain plan \n" + vtStr + "\n is expected to contain pattern: " + pattern);
+            }
         }
     }
 
@@ -979,6 +982,17 @@ public class RegressionSuite extends TestCase {
             System.out.println("DEBUG: plan for " + queries[ii] + "\n" + vtn + "\n");
             ++ii;
         }
+    }
+
+    protected static void truncateTables(Client client, String[] tables) throws IOException, ProcCallException {
+        for (String tb : tables) {
+            truncateTables(client, tb);
+        }
+    }
+
+    protected static void truncateTables(Client client, String tb) throws IOException, ProcCallException {
+        client.callProcedure("@AdHoc", "Truncate table " + tb);
+        validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
     }
 
 }

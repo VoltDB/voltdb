@@ -73,6 +73,7 @@ class TableColumn;
 class TupleIterator;
 class ElasticScanner;
 class StandAloneTupleStorage;
+class SetAndRestorePendingDeleteFlag;
 
 class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
@@ -85,6 +86,7 @@ class TableTuple {
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
+    friend class SetAndRestorePendingDeleteFlag;
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
@@ -153,14 +155,22 @@ public:
     }
 
     size_t maxDRSerializationSize(const std::vector<int>* interestingColumns) const {
-        if (!interestingColumns) {
-            return maxExportSerializationSize();
-        }
         size_t bytes = 0;
+
+        if (!interestingColumns) {
+            bytes = maxExportSerializationSize();
+        } else {
         std::vector<int> cols = *interestingColumns;
         for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
             bytes += maxExportSerializedColumnSize(*cit);
         }
+        }
+
+        int hiddenCols = m_schema->hiddenColumnCount();
+        for (int i = 0; i < hiddenCols; ++i) {
+            bytes += maxExportSerializedHiddenColumnSize(i);
+        }
+
         return bytes;
     }
 
@@ -423,7 +433,20 @@ private:
     }
 
     inline size_t maxExportSerializedColumnSize(int colIndex) const {
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+        return maxExportSerializedColumnSizeCommon(colIndex, false);
+    }
+
+    inline size_t maxExportSerializedHiddenColumnSize(int colIndex) const {
+        return maxExportSerializedColumnSizeCommon(colIndex, true);
+    }
+
+    inline size_t maxExportSerializedColumnSizeCommon(int colIndex, bool isHidden) const {
+        const TupleSchema::ColumnInfo *columnInfo;
+        if (isHidden) {
+            columnInfo = m_schema->getHiddenColumnInfo(colIndex);
+        } else {
+            columnInfo = m_schema->getColumnInfo(colIndex);
+        }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
           case VALUE_TYPE_TINYINT:
@@ -442,11 +465,19 @@ private:
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
           case VALUE_TYPE_GEOGRAPHY:
+              bool isNullCol;
+              if (isHidden) {
+                  isNullCol = isHiddenNull(colIndex);
+              } else {
+                  isNullCol = isNull(colIndex);
+              }
+
               // 32 bit length preceding value and
               // actual character data without null string terminator.
-              if (!isNull(colIndex))
+              if (!isNullCol)
               {
-                  return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
+                  const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+                  return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(value));
               }
               return (size_t)0;
           case VALUE_TYPE_POINT:

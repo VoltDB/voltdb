@@ -1,3 +1,4 @@
-# Views: (for the genqa test app)
+# Expected Views: (when running the default GEB VMC
+# test server; see ../../server/run_voltdb_server.sh)
 PARTITIONED_TABLE_GROUP
 REPLICATED_TABLE_GROUP

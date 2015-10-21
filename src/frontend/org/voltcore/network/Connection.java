@@ -17,8 +17,8 @@
 
 package org.voltcore.network;
 
-import java.util.concurrent.Future;
 import java.net.InetSocketAddress;
+import java.util.concurrent.Future;
 
 public interface Connection {
     /**
@@ -51,10 +51,26 @@ public interface Connection {
      * Returns the hostname if it was resolved, otherwise it returns the IP. Doesn't do a reverse DNS lookup
      */
     String getHostnameOrIP();
+    /**
+     * Returns a value identifying the caller of this connection. This is useful with connections like
+     * InternalClientResponseAdapter, which is used by multiple internal callers.
+     *
+     * @param clientHandle clientHandle identifying the caller
+     * @return value identifying the caller of this connection
+     */
+    String getHostnameOrIP(long clientHandle);
+
     int getRemotePort();
     InetSocketAddress getRemoteSocketAddress();
 
     long connectionId();
+    /**
+     * Returns an internal connection id for the caller of this Connection identified by input parameter.
+     * This is useful with connections like InternalClientResponseAdatper, which is used by multiple internal callers.
+     * @param clientHandle clientHandle identifying the caller
+     * @return an internal connection id for the caller of this Connection identified by input parameter
+     */
+    long connectionId(long clientHandle);
 
     void queueTask(Runnable r);
 

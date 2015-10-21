@@ -38,6 +38,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
@@ -88,9 +89,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 import vanilla.java.affinity.impl.PosixJNAAffinity;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -534,7 +535,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void run()
     {
-        Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
+        if (m_partitionId == MpInitiator.MP_INIT_PID) {
+            Thread.currentThread().setName("MP Site - " + CoreUtils.hsIdToString(m_siteId));
+        }
+        else {
+            Thread.currentThread().setName("SP " + m_partitionId + " Site - " + CoreUtils.hsIdToString(m_siteId));
+        }
         if (m_coreBindIds != null) {
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
@@ -745,8 +751,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
-            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
+            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
                                         exportSequenceNumbers, drTupleStreamInfo,
                                         remoteDCLastIds);
@@ -928,16 +934,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, ByteBuffer.allocate(0)));
         long partitionSequenceNumber = resultBuffer.getLong();
-        long partitionUniqueId = resultBuffer.getLong();
+        long partitionSpUniqueId = resultBuffer.getLong();
+        long partitionMpUniqueId = resultBuffer.getLong();
+        DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
         TupleStreamStateInfo info = null;
         if (hasReplicatedStateInfo != 0) {
             long replicatedSequenceNumber = resultBuffer.getLong();
-            long replicatedUniqueId = resultBuffer.getLong();
-            info = new TupleStreamStateInfo(partitionSequenceNumber, partitionUniqueId,
-                    replicatedSequenceNumber, replicatedUniqueId);
+            long replicatedSpUniqueId = resultBuffer.getLong();
+            long replicatedMpUniqueId = resultBuffer.getLong();
+            DRLogSegmentId replicatedInfo = new DRLogSegmentId(replicatedSequenceNumber, replicatedSpUniqueId, replicatedMpUniqueId);
+
+            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo);
         } else {
-            info = new TupleStreamStateInfo(partitionSequenceNumber, partitionUniqueId);
+            info = new TupleStreamStateInfo(partitionInfo);
         }
         return info;
     }

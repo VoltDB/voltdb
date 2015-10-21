@@ -90,6 +90,23 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
+class SetAndRestorePendingDeleteFlag
+{
+public:
+    SetAndRestorePendingDeleteFlag(TableTuple &target) : m_target(target)
+    {
+        assert(!m_target.isPendingDelete());
+        m_target.setPendingDeleteTrue();
+    }
+    ~SetAndRestorePendingDeleteFlag()
+    {
+        m_target.setPendingDeleteFalse();
+    }
+
+private:
+    TableTuple &m_target;
+};
+
 PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
@@ -479,7 +496,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
         drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
@@ -608,9 +625,12 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+        }
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -626,7 +646,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
         drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
     }
 
@@ -774,9 +794,12 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(target, fallible);
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(target);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(target, fallible);
+        }
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -787,7 +810,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
         drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
     }
 
@@ -965,13 +988,13 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
 }
 
 void PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple, TableTuple *conflict) {
-    for (int i = static_cast<int>(m_indexes.size()) - 1; i >= 0; --i) {
+    for (int i = 0; i < static_cast<int>(m_indexes.size()); ++i) {
         m_indexes[i]->addEntry(tuple, conflict);
         FAIL_IF(!conflict->isNullTuple()) {
             VOLT_DEBUG("Failed to insert into index %s,%s",
                        m_indexes[i]->getTypeName().c_str(),
                        m_indexes[i]->getName().c_str());
-            for (int j = i + 1; j < m_indexes.size(); ++j) {
+            for (int j = 0; j < i; ++j) {
                 m_indexes[j]->deleteEntry(tuple);
             }
             return;
@@ -1088,6 +1111,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // The view is already up to date.
             // but still need to update the index used for min/max
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            // Fallback executor vectors must be set after indexForMinMax
+            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
 
@@ -1098,6 +1123,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // the view was initialized, so re-initialize the view.
             currView->setTargetTable(target);
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            // Fallback executor vectors must be set after indexForMinMax
+            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
     }
@@ -1613,6 +1640,20 @@ void PersistentTableSurgeon::activateSnapshot() {
     for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
         assert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
     }
+}
+
+std::pair<const TableIndex*, uint32_t> PersistentTable::getUniqueIndexForDR() {
+    // In active-active we always send full tuple instead of just index tuple.
+    bool isActiveActive = ExecutorContext::getExecutorContext()->getEngine()->getIsActiveActiveDREnabled();
+    if (isActiveActive) {
+        TableIndex* nullIndex = NULL;
+        return std::make_pair(nullIndex, 0);
+    }
+
+    if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
+        computeSmallestUniqueIndex();
+    }
+    return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
 }
 
 void PersistentTable::computeSmallestUniqueIndex() {

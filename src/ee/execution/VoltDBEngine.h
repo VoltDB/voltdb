@@ -88,7 +88,7 @@ class AbstractPlanNode;
 class CatalogDelegate;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
-class ExecutorVector; // Locally defined in VoltDBEngine.cpp
+class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
 class Table;
@@ -127,12 +127,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Table* getTable(int32_t tableId) const;
         Table* getTable(std::string name) const;
+        Table* getDRConflictTable(PersistentTable* drTable);
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
 
         TableCatalogDelegate* getTableDelegate(std::string name) const;
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(std::string name) const;
+        virtual bool getIsActiveActiveDREnabled() const;
 
         // -------------------------------------------------
         // Execution Functions
@@ -295,10 +297,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_undoLog.release(undoToken);
 
             if (m_drStream) {
-                m_drStream->endTransaction();
+                m_drStream->endTransaction(m_executorContext->currentUniqueId());
             }
             if (m_drReplicatedStream) {
-                m_drReplicatedStream->endTransaction();
+                m_drReplicatedStream->endTransaction(m_executorContext->currentUniqueId());
             }
         }
 
@@ -498,6 +500,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Only includes non-materialized tables
          */
         boost::unordered_map<int64_t, PersistentTable*> m_tablesBySignatureHash;
+
+        /*
+         * Map of DR tables to DR conflict tables
+         */
+        boost::unordered_map<PersistentTable*, Table*> m_cachedDRConflictLookupTable;
 
         /**
          * System Catalog.

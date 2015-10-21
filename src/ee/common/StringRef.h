@@ -49,11 +49,12 @@ namespace voltdb
         /// allocated out of the ThreadLocalPool.
         static StringRef* create(std::size_t size, Pool* dataPool);
 
-        /// Destroy the given StringRef object and free any memory, if
-        /// any, allocated from pools to store the object.
+        /// Destroy the given StringRef object and free any memory
+        /// allocated from persistet pools to store the object.
         /// sref must have been allocated and returned by a call to
-        /// StringRef::create() and must not have been created in a
-        /// temporary Pool
+        /// StringRef::create() and is a no-op for strings created in
+        /// a temporary Pool -- they simply leak their allocations
+        /// until the Pool is purged or destroyed.
         static void destroy(StringRef* sref);
 
         char* get();
@@ -62,7 +63,11 @@ namespace voltdb
     private:
         StringRef(std::size_t size);
         StringRef(std::size_t size, Pool* dataPool);
+        // Only called from destroy and only for persistent strings.
         ~StringRef();
+
+        // Only called from destroy and only for persistent strings.
+        void operator delete(void* object);
 
         /// Callback used via the back-pointer in order to update the
         /// pointer to the memory backing this string reference

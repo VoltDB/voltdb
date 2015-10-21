@@ -22,6 +22,7 @@
 #include "common/serializeio.h"
 #include "common/tabletuple.h"
 #include "common/types.h"
+#include "common/ValueFactory.hpp"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
 #include "indexes/tableindex.h"
@@ -39,7 +40,7 @@ public:
         if (m_storageSize > 0 && indexCrc == m_cachedIndexCrc) {
             return m_tuple;
         }
-        std::pair<const TableIndex*, uint32_t> index = table->getSmallestUniqueIndex();
+        std::pair<const TableIndex*, uint32_t> index = table->getUniqueIndexForDR();
         if (!index.first || indexCrc != index.second) {
             throwSerializableEEException("Unable to find unique index %u while applying a binary log record",
                                          indexCrc);
@@ -63,6 +64,7 @@ private:
 };
 
 BinaryLogSink::BinaryLogSink() {}
+
 
 int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
@@ -184,7 +186,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
             tempTuple.deserializeFromDR(rowInput, pool);
 
-            const TableIndex* index = table->getSmallestUniqueIndex().first;
+            const TableIndex* index = table->getUniqueIndexForDR().first;
             IndexCursor indexCursor(index->getTupleSchema());
             index->moveToKey(&tempTuple, indexCursor);
             TableTuple deleteTuple = index->nextValueAtKey(indexCursor);
@@ -217,7 +219,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
             tempTuple.deserializeFromDR(oldRowInput, pool);
 
-            const TableIndex* index = table->getSmallestUniqueIndex().first;
+            const TableIndex* index = table->getUniqueIndexForDR().first;
             IndexCursor indexCursor(index->getTupleSchema());
             index->moveToKey(&tempTuple, indexCursor);
             TableTuple oldTuple = index->nextValueAtKey(indexCursor);
@@ -288,6 +290,24 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
         }
     }
     return static_cast<int64_t>(rowCount);
+}
+
+void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTable, const DRRecordType &type, TableTuple &exportTuple) {
+    assert(exportTable != NULL);
+    assert(exportTable->isExport());
+
+    TableTuple tempTuple = exportTable->tempTuple();
+    NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
+
+    NValue tableName = ValueFactory::getStringValue(drTable->name());
+    tempTuple.setNValue(0, tableName);  // Table Name
+    tempTuple.setNValue(1, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenColumn))));       // Cluster Id
+    tempTuple.setNValue(2, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenColumn)));   // Timestamp
+    tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
+    tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
+
+    exportTable->insertTuple(tempTuple);
+    tableName.free();
 }
 
 void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const char *end) {
