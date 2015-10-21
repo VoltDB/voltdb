@@ -39,7 +39,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     private byte status = 0;
     private String statusString = null;
     private byte encodedStatusString[];
-    private byte appStatus = Byte.MIN_VALUE;
+    private byte appStatus = UNINITIALIZED_APP_STATUS_CODE;
     private String appStatusString = null;
     private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];

@@ -45,10 +45,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.console.CursorBuffer;
-import jline.console.KeyMap;
-import jline.console.history.FileHistory;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -64,6 +60,10 @@ import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import jline.console.CursorBuffer;
+import jline.console.KeyMap;
+import jline.console.history.FileHistory;
 
 public class SQLCommand
 {
@@ -134,7 +134,14 @@ public class SQLCommand
             }
             // Assert the current DDL AdHoc batch call behavior
             assert(response.getResults().length == 1);
-            System.out.println("Batch command succeeded.");
+            if (response.getAppStatus() == ClientResponse.UNINITIALIZED_APP_STATUS_CODE) {
+                System.out.println("Batch command succeeded.");
+            }
+            else {
+                System.out.println("Batch command succeeded with warnings:\n" +
+                        response.getAppStatusString());
+            }
+
             loadStoredProcedures(Procedures, Classlist);
         }
         catch (ProcCallException ex) {
@@ -891,7 +898,13 @@ public class SQLCommand
         }
         //TODO: In the future, if/when we change the prompt when waiting for the remainder of an unfinished command,
         // successful DDL commands may just silently return to a normal prompt without this verbose feedback.
-        System.out.println("Command succeeded.");
+        if (response.getAppStatus() == ClientResponse.UNINITIALIZED_APP_STATUS_CODE) {
+            System.out.println("Command succeeded.");
+        }
+        else {
+            System.out.println("Command succeeded with warnings:\n" +
+                    response.getAppStatusString());
+        }
     }
 
     // VoltDB connection support
