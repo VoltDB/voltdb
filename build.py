@@ -166,7 +166,6 @@ if CTX.PLATFORM == "Linux":
 # Some special handling for rocksdb.
 ###############################################################################
 CTX.SRC_INCLUDE_DIRS += ['third_party/cpp/rocksdb/include']
-CTX.LASTLDFLAGS += " -Lrocksdb/ -lrocksdb"   # ROCKSDB library
 
 if CTX.TARGET != "CLEAN":
     runRocksdbPlatformScriptUpdatesMakefile(CTX)

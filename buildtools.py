@@ -188,7 +188,8 @@ def runRocksdbPlatformScriptUpdatesMakefile(CTX):
     if len(rocksdb_error) != 0:
         print rocksdb_error
         sys.exit(-1)
-    
+
+    CTX.LDFLAGS += " -Lrocksdb/ -lrocksdb "    
     for line in open(config_file_path).readlines():
         idx = line.find("=")
         assert(idx >= 0)
@@ -275,20 +276,21 @@ def buildMakefile(CTX):
     makefile.write("#\n# These are RocksDB library's source and object directories.\n#\n")
     makefile.write('ROCKSDB_SRC=${THIRD_PARTY_SRC}/rocksdb\n')
     makefile.write('ROCKSDB_OBJ=${OBJDIR}/rocksdb\n')
+    makefile.write('ROCKSDB_LIB=${ROCKSDB_OBJ}/librocksdb.%s\n' % (CTX.ROCKSDB_LIBS_TYPE))
     makefile.write("\n")
     
     ###############################################################################
     # Third party  makefile
     ###############################################################################
     makefile.write('.PHONY: build-third-party-tools\n')
-    makefile.write('build-third-party-tools: build-rocksdb\n\n')
+    makefile.write('build-third-party-tools: build-rocksdb \n\n')
     
     # build ROCKSDB using its makefile
     makefile.write(".PHONY: build-rocksdb\n")
     makefile.write("build-rocksdb:\n")
     if CTX.TARGET != "CLEAN":
         makefile.write("\t@echo Building the rocksdb library\n")
-    makefile.write("\t@if [ ! -f ${ROCKSDB_OBJ}/librocksdb.%s ] ; then \\\n" % (CTX.ROCKSDB_LIBS_TYPE))
+    makefile.write("\t@if [ ! -f ${ROCKSDB_LIB} ] ; then \\\n")
     makefile.write("\t    rm -rf rocksdb; \\\n")
     makefile.write('\t    mkdir rocksdb; \\\n')
     makefile.write('\tmake --directory=${ROCKSDB_SRC}/ static_lib; \\\n')
@@ -494,7 +496,7 @@ def runTests(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
     successes = 0
     failures = 0
-    noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
+    noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test", "simple_example" ]
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
