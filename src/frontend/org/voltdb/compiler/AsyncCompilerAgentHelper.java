@@ -18,6 +18,9 @@
 package org.voltdb.compiler;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
@@ -28,6 +31,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
+import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
@@ -38,6 +42,7 @@ public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     private final LicenseApi m_licenseApi;
+    private String m_ddlWarnings;
 
     public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
         m_licenseApi = licenseApi;
@@ -212,6 +217,16 @@ public class AsyncCompilerAgentHelper
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
             retval.tablesThatMustBeEmpty = diff.tablesThatMustBeEmpty();
             retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
+            // Short-term, until we do a formal protocol version upgrade that
+            // will allow ddl warnings to be forwarded as a separate parameter,
+            // cram any ddl warning string onto the end of the reason strings.
+            if (m_ddlWarnings != null) {
+                List<String> hackedResult =
+                        new ArrayList<String>(Arrays.asList(retval.reasonsForEmptyTables));
+                hackedResult.add(m_ddlWarnings);
+                retval.reasonsForEmptyTables = hackedResult.toArray(new String[0]);
+            }
+
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
         }
@@ -250,6 +265,7 @@ public class AsyncCompilerAgentHelper
 
             VoltCompiler compiler = new VoltCompiler();
             compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
+            setDdlWarnings(compiler.m_warnings);
             return jarfile.getFullJarBytes();
         }
         finally {
@@ -260,6 +276,19 @@ public class AsyncCompilerAgentHelper
                 catch (IOException ioe) {}
             }
         }
+    }
+
+    private void setDdlWarnings(ArrayList<Feedback> warnings)
+    {
+        if (warnings.size() == 0) {
+            m_ddlWarnings = null;
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Feedback warning : warnings) {
+            sb.append(warning.getMessage()).append("\n");
+        }
+        m_ddlWarnings = sb.toString();
     }
 
     private byte[] modifyCatalogClasses(byte[] oldCatalogBytes, String deletePatterns,

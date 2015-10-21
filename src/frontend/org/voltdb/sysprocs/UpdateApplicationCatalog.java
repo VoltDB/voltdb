@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -413,6 +414,25 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 catalogBytes,
                 deploymentBytes);
 
+        String warnings = null;
+
+        // This is a short-term hack that allows optional warning text
+        // to piggy-back onto the reasonsForEmptyTables parameter.
+        // This is a little ugly but it will work until we can
+        // support the warning text as its own optional parameter.
+        // That requires a protocol version change and work to support
+        // the old protocol. In theory, we would not need to continue
+        // supporting this hack technique after a protocol upgrade because
+        // separate client processes do not use it -- only
+        // "server internal clients".
+        if (reasonsForEmptyTables.length == tablesThatMustBeEmpty.length+1) {
+            warnings = reasonsForEmptyTables[reasonsForEmptyTables.length-1];
+            List<String> unhackedResult =
+                    new ArrayList<String>(Arrays.asList(reasonsForEmptyTables));
+            unhackedResult.remove(reasonsForEmptyTables.length-1);
+            reasonsForEmptyTables = unhackedResult.toArray(new String[0]);
+        }
+
         try {
             performCatalogVerifyWork(
                     catalogDiffCommands,
@@ -447,6 +467,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 catalogDiffCommands,
                 expectedCatalogVersion,
                 requiresSnapshotIsolation);
+
+        if (warnings != null) {
+            m_runner.setAppStatusCode((byte)'!');
+            m_runner.setAppStatusString(warnings);
+        }
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
