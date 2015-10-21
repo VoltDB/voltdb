@@ -476,8 +476,8 @@ public class Cartographer extends StatsSource
                 @Override
                 public Boolean call() throws Exception {
                     if (m_configuredReplicationFactor == 0
-                            || (m_configuredReplicationFactor == 1 && liveHids.size() == 2)) {
-                        //Dont die in k=0 cluster or 2node k1
+                            || (m_configuredReplicationFactor == 1 && liveHids.size() == 2 && m_partitionDetectionEnabled)) {
+                        //Dont die in k=0 cluster or 2node k1 (with partition detection on)
                         return false;
                     }
                     //Otherwise we do check replicas for host
