@@ -488,12 +488,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_purgeExecutorVector;
     }
 
-    inline std::pair<const TableIndex*, uint32_t> getSmallestUniqueIndex() {
-        if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
-            computeSmallestUniqueIndex();
-        }
-        return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
-    }
+    std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
   private:
 

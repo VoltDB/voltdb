@@ -108,6 +108,10 @@ public class PlannerTool {
         return planSql(sqlIn, infer, false, null);
     }
 
+    private void logException(Exception e, String fmtLabel) {
+        hostLog.error(fmtLabel + ": ", e);
+    }
+
     /**
      * Stripped down compile that is ONLY used to plan default procedures.
      */
@@ -127,7 +131,8 @@ public class PlannerTool {
             assert(plan != null);
         }
         catch (Exception e) {
-            throw new RuntimeException("Error compiling query: " + e.toString(), e);
+            logException(e, "Error compiling query");
+            throw new RuntimeException("Error compiling query: " + e.toString() + " (Stack trace has been logged).", e);
         }
 
         if (plan == null) {
@@ -255,7 +260,9 @@ public class PlannerTool {
                     partitioning = plan.getStatementPartitioning();
                 }
             } catch (Exception e) {
-                throw new RuntimeException("Error compiling query: " + e.toString(), e);
+                logException(e, "Error compiling query");
+                throw new RuntimeException("Error compiling query: " + e.toString() + " (Stack trace has been logged.)",
+                                           e);
             }
 
             if (plan == null) {

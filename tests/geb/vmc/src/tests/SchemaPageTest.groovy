@@ -115,8 +115,7 @@ class SchemaPageTest extends TestBase {
         return runningGenqa
     }
 
-
-      // HEADER TESTS
+    // HEADER TESTS
 
     def "header banner exists" () {
         when:
@@ -227,7 +226,6 @@ class SchemaPageTest extends TestBase {
         }
     }
 
-
     def "header username check" () {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
@@ -252,7 +250,6 @@ class SchemaPageTest extends TestBase {
                 header.usernameInHeader.text().equals(username) }
         }
     }
-
 
     def "header username click and close" () {
         when:
@@ -455,7 +452,7 @@ class SchemaPageTest extends TestBase {
     /**
      * Check that the DDL Source displayed on the DDL Source tab matches the
      * expected list (for the 'genqa' test app).
-     */
+     */ 
     def checkSchemaTab() {
         when: 'click the Schema tab link'
         page.openSchemaPageSchemaTab()
@@ -474,7 +471,7 @@ class SchemaPageTest extends TestBase {
     /**
      * Check that the DDL Source displayed on the DDL Source tab matches the
      * expected list (for the 'genqa' test app).
-     */
+     */ 
     def checkDdlSourceTab() {
         when: 'click the DDL Source tab link'
         page.openSchemaPageDdlSourceTab()
@@ -503,8 +500,6 @@ class SchemaPageTest extends TestBase {
         and: 'DDL Source should match expected text'
         printAndCompare('DDL Source', fileName, true, ddlExpectedSourceLines, ddlActualSourceLines)
     }
-
-
 
     // Overview Tab
 
