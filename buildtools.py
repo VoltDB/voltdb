@@ -189,19 +189,21 @@ def runRocksdbPlatformScriptUpdatesMakefile(CTX):
         print rocksdb_error
         sys.exit(-1)
 
-    CTX.LDFLAGS += " -Lrocksdb/ -lrocksdb "    
+    CTX.LASTLDFLAGS += " -Lrocksdb/ -lrocksdb"
     for line in open(config_file_path).readlines():
+        line = line.rstrip()
         idx = line.find("=")
         assert(idx >= 0)
         if len(line) == idx + 1:
             continue
+
         key = line[:idx]
         value = line[idx + 1:]
         
         if key == "PLATFORM_CXXFLAGS":
             CTX.CPPFLAGS += " " + value
         elif key == "PLATFORM_LDFLAGS":
-            CTX.LDFLAGS += " " + value
+            CTX.LASTLDFLAGS += " " + value
         # END IF
     # END FOR
     return None
