@@ -65,10 +65,9 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
-    virtual int reportDRConflict(int64_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
-            std::string tableName, Table* existingTable, Table* expectedTable,
-            Table* newTable, Table* output) = 0;
+    virtual bool reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
+            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
 
@@ -101,10 +100,9 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
-    int reportDRConflict(int64_t partitionId,
-                int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
-                std::string tableName, Table* existingTable, Table* expectedTable,
-                Table* newTable, Table* output);
+    bool reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
+            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
@@ -117,11 +115,13 @@ public:
     bool receivedDRBuffer;
     bool receivedExportBuffer;
     int64_t pushDRBufferRetval;
-    DRConflictType conflictType;
     DRRecordType actionType;
-    boost::shared_ptr<Table> existingTable;
-    boost::shared_ptr<Table> expectedTable;
-    boost::shared_ptr<Table> newTable;
+    DRConflictType deleteConflictType;
+    DRConflictType insertConflictType;
+    boost::shared_ptr<Table> existingRowsForDelete;
+    boost::shared_ptr<Table> expectedRowsForDelete;
+    boost::shared_ptr<Table> existingRowsForInsert;
+    boost::shared_ptr<Table> newRowsForInsert;
 };
 
 }

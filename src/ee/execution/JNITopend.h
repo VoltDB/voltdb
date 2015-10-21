@@ -48,10 +48,9 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
-    int reportDRConflict(int64_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
-            std::string tableName, Table* exisitingTable, Table* expectedTable, Table* newTable,
-            Table* output);
+    bool reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
+            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 

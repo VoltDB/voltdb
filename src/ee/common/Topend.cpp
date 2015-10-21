@@ -71,34 +71,44 @@ namespace voltdb {
     }
 
 
-    int DummyTopend::reportDRConflict(int64_t partitionId,
-            int64_t remoteSequenceNumber, DRConflictType conflict_type, DRRecordType action_type,
-            std::string tableName, Table* existingTable, Table* expectedTable,
-            Table* newTable, Table* output) {
-        this->conflictType = conflict_type;
-        this->actionType = action_type;
+    bool DummyTopend::reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
+            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
+        this->actionType = action;
+        this->deleteConflictType = deleteConflict;
+        this->insertConflictType = insertConflict;
         char signature[20];
-        this->existingTable = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTable->schema()), existingTable->getColumnNames(), signature));
-        this->expectedTable = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "expected", TupleSchema::createTupleSchema(expectedTable->schema()), expectedTable->getColumnNames(), signature));
-        this->newTable = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "new", TupleSchema::createTupleSchema(newTable->schema()), newTable->getColumnNames(), signature));
-        TableTuple tempTuple(existingTable->schema());
-        TableIterator iterator = existingTable->iterator();
-        while (iterator.next(tempTuple)) {
-            this->existingTable->insertTuple(tempTuple);
-        }
+        if (deleteConflict != NO_CONFLICT) {
+            this->existingRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForDelete->schema()), existingTableForDelete->getColumnNames(), signature));
+            TableTuple tempTuple(existingTableForDelete->schema());
+            TableIterator iterator = existingTableForDelete->iterator();
+            while (iterator.next(tempTuple)) {
+                this->existingRowsForDelete->insertTuple(tempTuple);
+            }
 
-        iterator = expectedTable->iterator();
-        while (iterator.next(tempTuple)) {
-            this->expectedTable->insertTuple(tempTuple);
+            this->expectedRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "expected", TupleSchema::createTupleSchema(expectedTableForDelete->schema()), expectedTableForDelete->getColumnNames(), signature));
+            iterator = expectedTableForDelete->iterator();
+            while (iterator.next(tempTuple)) {
+                this->expectedRowsForDelete->insertTuple(tempTuple);
+            }
         }
+        if (insertConflict != NO_CONFLICT) {
+            this->existingRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForInsert->schema()), existingTableForInsert->getColumnNames(), signature));
+            TableTuple tempTuple(existingTableForInsert->schema());
+            TableIterator iterator = existingTableForInsert->iterator();
+            while (iterator.next(tempTuple)) {
+                this->existingRowsForInsert->insertTuple(tempTuple);
+            }
 
-        iterator = newTable->iterator();
-        while (iterator.next(tempTuple)) {
-            this->newTable->insertTuple(tempTuple);
+            this->newRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "new", TupleSchema::createTupleSchema(newTableForInsert->schema()), newTableForInsert->getColumnNames(), signature));
+            iterator = newTableForInsert->iterator();
+            while (iterator.next(tempTuple)) {
+                this->newRowsForInsert->insertTuple(tempTuple);
+            }
         }
 
         // TODO: implement a mock conflict resolver so we can test the resolution part of code in EE.
-        return 0;
+        return false;
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}

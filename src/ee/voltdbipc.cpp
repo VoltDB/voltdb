@@ -131,10 +131,9 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
-    int reportDRConflict(int64_t partitionId,
-                int64_t remoteSequenceNumber, voltdb::DRConflictType conflict_type, voltdb::DRRecordType action_type,
-                std::string tableName, voltdb::Table* existingTable, voltdb::Table* expectedTable,
-                voltdb::Table* newTable, voltdb::Table* output);
+    bool reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, voltdb::DRRecordType action,
+                        voltdb::DRConflictType deleteConflict, voltdb::Table *existingTableForDelete, voltdb::Table *expectedTableForDelete,
+                        voltdb::DRConflictType insertConflict, voltdb::Table *existingTableForInsert, voltdb::Table *newTableForInsert);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;
@@ -1561,11 +1560,11 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
     return -1;
 }
 
-int VoltDBIPC::reportDRConflict(int64_t partitionId,
-        int64_t remoteSequenceNumber, voltdb::DRConflictType conflict_type,
-        voltdb::DRRecordType action_type, std::string tableName,
-        voltdb::Table* exisitingTable, voltdb::Table* expectedTable,
-        voltdb::Table* newTable, voltdb::Table* output) {
+bool VoltDBIPC::reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber,
+                        std::string tableName, voltdb::DRRecordType action,
+                        voltdb::DRConflictType deleteConflict, voltdb::Table *existingTableForDelete,
+                        voltdb::Table *expectedTableForDelete, voltdb::DRConflictType insertConflict,
+                        voltdb::Table *existingTableForInsert, voltdb::Table *newTableForInsert) {
     return 0;
 }
 
