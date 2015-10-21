@@ -26,7 +26,9 @@ package vmcTest.pages
 import geb.error.RequiredPageContentNotPresent
 import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
+
 import org.openqa.selenium.support.ui.Select
+import org.openqa.selenium.WebElement
 
 /**
  * This class represents the 'SQL Query' tab of the VoltDB Management Center
@@ -52,8 +54,6 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         userStoredProcs     { storedProcs.find('#userProcedure').find('h3') }
         allStoredProcs  { storedProcs.find('h3') }
 
-        queryStatus			{ $("th", text:"STATUS") }
-
         // Query elements
         queryInput  { $('#theQueryText') }
         runButton   { $('#runBTn') }
@@ -61,10 +61,11 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         qrFormatDropDown    { $('#exportType') }
         qrfddOptions    { qrFormatDropDown.find('option') }
         qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
-        queryResHtml    { $('#resultHtml') }
+        queryRes        { $('.queryResult') }
+        queryResHtml    { queryRes.find('#resultHtml') }
         queryTables     (required: false) { queryResHtml.find('table') }
-        queryErrHtml    (required: false) { queryResHtml.find('span') }
-        queryDurHtml    { $('#queryResults') }
+        queryErrHtml    (required: false) { queryResHtml.find('.errorValue') }
+        queryDur        { $('#queryResults') }
 
 
         //popup query ok and cancel
@@ -93,7 +94,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         resultHtml		{ $("#resultHtml") }
         resultCsv		{ $("#resultCsv") }
         resultMonospace	{ $("#resultMonospace") }
-        
+
         errorObjectNameAlreadyExist     { $("span", class:"errorValue") }
     }
     static at = {
@@ -104,8 +105,10 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         storedProcsTab.displayed
         listsArea.displayed
         queryInput.displayed
-        queryResHtml.displayed
+        queryRes.displayed
+        queryDur.displayed
     }
+    boolean textHasChanged = false
 
     /**
      * Displays the list of Tables (by clicking the "Tables" tab).
@@ -404,28 +407,51 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /**
+     * Returns true if the text of the query duration element has changed to a
+     * different value - even if it subsequently changed back to the same value.
+     * @param navDurElem - a Navigator specifying the query duration element
+     * to be checked for having changed.
+     * @param initDurText - the original text of the query duration element,
+     * before running a new query.
+     * @return true if the query duration text has changed.
+     */
+    private boolean hasChanged(Navigator navDurElem, String initDurText) {
+        if (textHasChanged) {
+            return true
+        }
+        if (navDurElem.text() != initDurText ) {
+            textHasChanged = true
+         }
+        return textHasChanged
+    }
+
+    /**
      * Runs whatever query is currently listed in the Query text
      * (by clicking the "Run" button).
      */
     def runQuery() {
-        String initQueryResultText = queryResHtml.text()
-        String initQueryDurationText = queryDurHtml.text()
+        String initQueryDurationText = queryDur.text()
         runButton.click()
-        // TODO: improve this wait, so that it waits for the old element(s) to
-        // become "stale", rather than relying on the text to change (which it
-        // sometimes does not, which is why we have to catch a WaitTimeoutException
+
+        // Wait for both the query result and duration to be displayed, with
+        // (non-null) non-empty text; and for the latter to have changed
         try {
+            textHasChanged = false
             waitFor() {
-                queryResHtml.text() != null && !queryResHtml.text().isEmpty() &&
-                        queryDurHtml.text() != null && !queryDurHtml.text().isEmpty() &&
-                        (queryResHtml.text() != initQueryResultText || queryDurHtml.text() != initQueryDurationText)
+                hasChanged(queryDur, initQueryDurationText) &&
+                isDisplayed(queryRes) && queryRes.text() != null && !queryRes.text().isEmpty() &&
+                isDisplayed(queryDur) && queryDur.text() != null && !queryDur.text().isEmpty()
             }
         } catch (WaitTimeoutException e) {
             String message = '\nIn SqlQueryPage.runQuery(), caught WaitTimeoutException; this is probably nothing to worry about'
             println message + '.'
+            println 'See Standard error for stack trace.'
+            println 'Previous Duration text: ' + initQueryDurationText
+            println 'Current  Duration text: ' + queryDur.text()
+            println 'Duration text changed : ' + hasChanged(queryDur, initQueryDurationText)
+            println 'Current  Result   text:\n' + queryRes.text()
             System.err.println message + ':'
             e.printStackTrace()
-            println 'See Standard error for stack trace.\n'
         }
         return this
     }
@@ -534,7 +560,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the text of whatever is shown in the "Query Result" area.
      */
     def String getQueryResultText() {
-        return queryResHtml.text()
+        return queryRes.text()
     }
 
     /**
@@ -552,7 +578,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the text of any "Query Duration" message; or null.
      */
     def String getQueryDuration() {
-        return queryDurHtml.text()
+        return queryDur.text()
     }
 
     /*

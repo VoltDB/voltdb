@@ -52,5 +52,6 @@ public enum StatsSelector {
     KSAFETY,        // return ksafety coverage information
     CPU,            // Return CPU Stats
 
-    COMMANDLOG      // return number of outstanding bytes and txns on this node
+    COMMANDLOG,     // return number of outstanding bytes and txns on this node
+    IMPORTER
 }

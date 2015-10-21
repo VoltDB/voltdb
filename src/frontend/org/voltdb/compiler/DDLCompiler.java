@@ -1525,6 +1525,23 @@ public class DDLCompiler {
             }
         }
 
+        // Warn user if DR table don't have any unique index.
+        if (db.getIsactiveactivedred() &&
+                node.attributes.get("drTable") != null &&
+                node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
+            boolean hasUniqueIndex = false;
+            for (Index index : table.getIndexes()) {
+                if (index.getUnique()) {
+                    hasUniqueIndex = true;
+                    break;
+                }
+            }
+            if (!hasUniqueIndex) {
+                String info = String.format("Table %s doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow.", table.getTypeName());
+                m_compiler.addWarn(info);
+            }
+        }
+
         table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
@@ -1835,7 +1852,7 @@ public class DDLCompiler {
                     throw this.m_compiler.new VoltCompilerException(emsg);
                 }
 
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
                 }
@@ -1849,7 +1866,7 @@ public class DDLCompiler {
                     throw this.m_compiler.new VoltCompilerException(emsg);
                 }
 
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
+                if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
                 }
@@ -2109,6 +2126,36 @@ public class DDLCompiler {
         catalog_const.setType(type.getValue());
     }
 
+    // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
+    void compileFallbackQueriesAndUpdateCatalog(Database db,
+                                                List<VoltXMLElement> fallbackQueryXMLs,
+                                                MaterializedViewInfo matviewinfo) throws VoltCompilerException {
+        org.voltdb.compiler.DatabaseEstimates estimates = new org.voltdb.compiler.DatabaseEstimates();
+        for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
+            String key = String.valueOf(i);
+            Statement fallbackQueryStmt = matviewinfo.getFallbackquerystmts().add(key);
+            VoltXMLElement fallbackQueryXML = fallbackQueryXMLs.get(i);
+            // Use the uniqueName as the sqlText. This is easier for differentiating the queries?
+            // Normally for select statements, the unique names will start with "Eselect".
+            // Remove the first "E" to let QueryType.getFromSQL(stmt) generate correct query type value.
+            // (StatementCompiler.java, line 159)
+            fallbackQueryStmt.setSqltext( fallbackQueryXML.getUniqueName().substring(2) );
+            // For debug:
+            // System.out.println(fallbackQueryXML.toString());
+            StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
+                              m_hsql,
+                              db.getCatalog(),
+                              db,
+                              estimates,
+                              fallbackQueryStmt,
+                              fallbackQueryXML,
+                              fallbackQueryStmt.getSqltext(),
+                              null, // no user-supplied join order
+                              DeterminismMode.FASTER,
+                              org.voltdb.planner.StatementPartitioning.forceSP());
+        }
+    }
+
     /**
      * Add materialized view info to the catalog for the tables that are
      * materialized views.
@@ -2265,6 +2312,11 @@ public class DDLCompiler {
                     minMaxAggs.add(aggExpr);
                 }
             }
+
+            // Generate query XMLs for min/max recalculation (ENG-8641)
+            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
+            List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
+            compileFallbackQueriesAndUpdateCatalog(db, fallbackQueryXMLs, matviewinfo);
 
             // set Aggregation Expressions.
             if (hasAggregationExprs) {

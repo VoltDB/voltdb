@@ -66,11 +66,11 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
 //ext { phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1") }
 
 dependencies {
-    def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.10.0")
+    def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.12.2")
     def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
-    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.45.0")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.47.1")
     def phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1")
-    
+
     // GEB & Spock
     testCompile "org.gebish:geb-spock:$gebVersion"
     testCompile "org.spockframework:spock-core:$spockVersion"
@@ -85,7 +85,7 @@ dependencies {
     // Apache commons (needed by HtmlUnitDriver?)
     //classpath "commons-lang3:commons-lang3:3.3.2"
     //classpath 'org.apache.commons:commons-lang3:3.0'
-    
+
     // Selenium Drivers
     println "Allowed browser-drivers (some work better than others):\n" + drivers
     drivers.each { driver ->
@@ -141,7 +141,10 @@ drivers.each { driver ->
         systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
         systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
         systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
+        // System properties specific to SqlQueriesTest or FullDdlSqlTest
+        systemProperty "sqlTests", getProjectPropertyOrDefaultValue("sqlTests", null)
         systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
+        // System properties specific to SqlQueriesTest
         systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
         systemProperty "testTables", getProjectPropertyOrDefaultValue("testTables", "PARTITIONED_TABLE,REPLICATED_TABLE")
         systemProperty "testViews", getProjectPropertyOrDefaultValue("testViews", null)

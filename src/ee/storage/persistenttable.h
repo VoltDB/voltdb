@@ -134,7 +134,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark);
+    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -488,12 +488,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_purgeExecutorVector;
     }
 
-    inline std::pair<const TableIndex*, uint32_t> getSmallestUniqueIndex() {
-        if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
-            computeSmallestUniqueIndex();
-        }
-        return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
-    }
+    std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
   private:
 
@@ -836,14 +831,14 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 }
 
 inline void
-PersistentTableSurgeon::DRRollback(size_t drMark) {
+PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
     if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
         if (m_table.m_partitionColumn == -1) {
             if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark);
+                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
             }
         } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
         }
     }
 }
@@ -936,9 +931,10 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
     return TBPtr(NULL);
 }
 
-inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
-    m_data.insert( block->address(), block);
+inline TBPtr PersistentTable::allocateNextBlock()
+{
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;
 }

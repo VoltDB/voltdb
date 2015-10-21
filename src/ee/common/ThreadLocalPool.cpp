@@ -15,17 +15,31 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/ThreadLocalPool.h"
-#include <pthread.h>
-#include <boost/unordered_map.hpp>
+
+#include "common/CompactingStringStorage.h"
 #include "common/FatalException.hpp"
-#include <iostream>
 #include "common/SQLException.h"
 
+#include <boost/unordered_map.hpp>
+
+#include <iostream>
+#include <pthread.h>
+
 namespace voltdb {
+
+struct voltdb_pool_allocator_new_delete
+{
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
+
+    static char * malloc(const size_type bytes);
+    static void free(char * const block);
+};
+
 // This needs to be >= the VoltType.MAX_VALUE_LENGTH defined in java, currently 1048576.
-// The rationale for making it any larger would be to allow calculating wider "temp" values
-// for use in situations where they are not being stored as column values.
-const int ThreadLocalPool::POOLED_MAX_VALUE_LENGTH = 1048576;
+// The rationale for making it any larger would be to allow calculating wider "temp"
+// values for use in situations where they are not being stored as column values.
+const int ThreadLocalPool::POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
 
 /**
  * Thread local key for storing thread specific memory pools
@@ -38,9 +52,11 @@ static pthread_key_t m_stringKey;
 static pthread_key_t m_keyAllocated;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
-typedef boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > > MapType;
-typedef MapType* MapTypePtr;
-typedef std::pair<int, MapTypePtr > PairType;
+typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
+typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
+typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
+
+typedef std::pair<int, PoolsByObjectSize* > PairType;
 typedef PairType* PairTypePtr;
 
 static void createThreadLocalKey() {
@@ -55,7 +71,7 @@ ThreadLocalPool::ThreadLocalPool() {
         pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
         pthread_setspecific( m_key, static_cast<const void *>(
                 new PairType(
-                        1, new MapType())));
+                        1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
     } else {
         PairTypePtr p =
@@ -171,47 +187,79 @@ ThreadLocalPool::getAllocationSizeForObject(std::size_t length) {
     }
 }
 
-CompactingStringStorage*
-ThreadLocalPool::getStringPool()
+#ifdef MEMCHECK
+/// Persistent string pools with their compaction are completely bypassed for
+/// the memcheck build. It just does standard C++ heap allocations and
+/// deallocations.
+char* ThreadLocalPool::allocateRelocatable(std::size_t sz)
+{ return new char[sz]; }
+
+void ThreadLocalPool::freeRelocatable(std::size_t sz, char* string)
+{ delete [] string; }
+
+#else // not MEMCHECK
+// TODO: CompactingStringStorage is an odd packaging of functionality:
+// - pool management which is similar to code below that handles exact
+//   size allocations and could be similarly inlined below
+// - critical aspects of a compacting pool that are better bundled into
+//   the CompactingPool class.
+// - interfacing with the StringRef class to implement other critical
+//   aspects of a compacting pool that should ALSO be abstracted into
+//   CompactingPool, greatly simplifying StringRef.
+// CompactingStringStorage is just getting in the way and needs to be dropped.
+static CompactingStringStorage& getStringPoolMap()
 {
-    return static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
 }
 
-boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::get(std::size_t size) {
-    size_t alloc_size = getAllocationSizeForObject(size);
-    if (alloc_size == 0)
-    {
-        throwDynamicSQLException("Attempted to allocate an object > than the 1 meg limit. Requested size was %du",
-            static_cast<int32_t>(size));
-    }
-    return getExact(alloc_size);
+char* ThreadLocalPool::allocateRelocatable(std::size_t sz)
+{
+    return reinterpret_cast<char*>(getStringPoolMap().get(sz)->malloc());
 }
 
-boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPool::getExact(std::size_t size) {
-    MapTypePtr pools =
-            static_cast< PairTypePtr >(pthread_getspecific(m_key))->second;
-    boost::unordered_map< std::size_t, boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > >::iterator
-        iter = pools->find(size);
-    if (iter == pools->end()) {
-        boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > pool =
-                boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> >(
-                        new boost::pool<voltdb_pool_allocator_new_delete>(size));
-        pools->insert( std::pair<std::size_t, boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > >(size, pool));
-        return pool;
-    }
-    boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > pool = iter->second;
+void ThreadLocalPool::freeRelocatable(std::size_t sz, char* string)
+{
+    getStringPoolMap().get(sz)->free(string);
+}
 
+#endif
+
+void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
+{
+    PoolsByObjectSize& pools =
+            *(static_cast< PairTypePtr >(pthread_getspecific(m_key))->second);
+    PoolsByObjectSize::iterator iter = pools.find(sz);
+    PoolForObjectSize* pool;
+    if (iter == pools.end()) {
+        pool = new PoolForObjectSize(sz);
+        PoolForObjectSizePtr poolPtr(pool);
+        pools.insert(std::pair<std::size_t, PoolForObjectSizePtr>(sz, poolPtr));
+    }
+    else {
+        pool = iter->second.get();
+    }
     /**
-     * The goal of this code is to bypass the pool sizing algorithm used by boost
-     * and replace it with something that bounds allocations to a series of 2 meg blocks
-     * for small allocations. For large allocations fall back to a strategy of allocating two of
-     * these huge things at a time. The goal of this bounding is make the amount of untouched but allocated
-     * memory relatively small so that the counting done by the volt allocator accurately represents the effect
-     * on RSS.
+     * The goal of this code is to bypass the pool sizing algorithm used by
+     * boost and replace it with something that bounds allocations to a series
+     * of 2MB blocks for small allocation sizes. For larger allocations
+     * (not a typical case, possibly not a useful case), fall back to
+     * allocating two of these huge things at a time.
+     * The goal of this bounding is make the amount of unused but allocated
+     * memory relatively small so that the counting done by the volt allocator
+     * accurately represents the effect on RSS. Left to its own algorithms,
+     * boost will purposely allocate pages that increase in size until they
+     * are too large to ever overflow, regardless of absolute scale -- so
+     * likely containing lots of unused space (for safety). VoltDB prefers
+     * to risk lots of separate smaller allocations (~2MB each) at larger
+     * scale rather than risk fewer, larger, but mostly unused buffers.
+     * Also, for larger allocation requests (not typical -- not used? -- in
+     * VoltDB, boost will _start_ with very large blocks, while VoltDB would
+     * prefer to start smaller with just 2 allocations per block.
      */
     if (pool->get_next_size() * pool->get_requested_size() > (1024 * 1024 * 2)) {
         //If the size of objects served by this pool is less than 256 kilobytes
-        //go ahead an allocated a 2 meg block of them
+        // plan to allocate a 2MB block, but no larger, even if it eventually
+        // requires more blocks than boost would normally allocate.
         if (pool->get_requested_size() < (1024 * 256)) {
             pool->set_next_size((1024 * 1024 * 2) /  pool->get_requested_size());
         } else {
@@ -219,7 +267,21 @@ boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPoo
             pool->set_next_size(2);
         }
     }
-    return iter->second;
+    return pool->malloc();
+}
+
+void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
+{
+    PoolsByObjectSize& pools =
+            *(static_cast< PairTypePtr >(pthread_getspecific(m_key))->second);
+    PoolsByObjectSize::iterator iter = pools.find(sz);
+    if (iter == pools.end()) {
+        throwFatalException(
+                "Failed to locate an allocated object of size %ld to free it.",
+                static_cast<long>(sz));
+    }
+    PoolForObjectSize* pool = iter->second.get();
+    pool->free(object);
 }
 
 std::size_t ThreadLocalPool::getPoolAllocationSize() {

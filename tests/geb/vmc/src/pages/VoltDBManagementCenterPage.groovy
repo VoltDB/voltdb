@@ -31,6 +31,8 @@ import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
 
 import org.openqa.selenium.JavascriptExecutor
+import org.openqa.selenium.StaleElementReferenceException
+import org.openqa.selenium.WebElement
 
 /**
  * This class represents a generic VoltDB Management Center page (without
@@ -74,11 +76,26 @@ class VoltDBManagementCenterPage extends Page {
      * for visibility.
      * @return true if at least one of the specified elements is displayed.
      */
-    protected boolean atLeastOneIsDisplayed(Navigator navElements) {
+    protected boolean isDisplayed(Navigator navElements) {
         for (navElem in navElements.findAll()) {
             if (navElem.displayed) {
                 return true
             }
+        }
+        return false
+    }
+
+    /**
+     * Returns true if the specified element is stale, i.e., no longer present
+     * in the DOM.
+     * @param webElement - a WebElement whose staleness is to be checked.
+     * @return true if the specified WebElement is stale.
+     */
+    protected boolean isStale(WebElement webElement) {
+        try {
+            webElement.isDisplayed()
+        } catch (StaleElementReferenceException e) {
+            return true
         }
         return false
     }
@@ -106,11 +123,11 @@ class VoltDBManagementCenterPage extends Page {
      * should become visible.
      */
     protected void clickToDisplay(Navigator clickElement, Navigator displayElements) {
-        if (!atLeastOneIsDisplayed(displayElements)) {
+        if (!isDisplayed(displayElements)) {
             scrollIntoView(clickElement)
             clickElement.click()
             scrollIntoView(displayElements.first())
-            waitFor { atLeastOneIsDisplayed(displayElements) }
+            waitFor { isDisplayed(displayElements) }
         }
     }
 
@@ -123,10 +140,10 @@ class VoltDBManagementCenterPage extends Page {
      * should become invisible.
      */
     protected void clickToNotDisplay(Navigator clickElement, Navigator displayElements) {
-        if (atLeastOneIsDisplayed(displayElements)) {
+        if (isDisplayed(displayElements)) {
             scrollIntoView(clickElement)
             clickElement.click()
-            waitFor { !atLeastOneIsDisplayed(displayElements) }
+            waitFor { !isDisplayed(displayElements) }
         }
     }
 
@@ -237,7 +254,7 @@ class VoltDBManagementCenterPage extends Page {
         }
     }
 
-/**
+    /**
      * Returns true if the current page is a AdminPage (i.e., the "Admin"
      * tab of the VoltDB Management Center page is currently open).
      * @return true if a AdminPage is currently open.
