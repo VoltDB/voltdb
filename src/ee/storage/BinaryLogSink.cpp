@@ -36,6 +36,7 @@
 #include "catalog/database.h"
 
 #include<boost/unordered_map.hpp>
+#include<boost/unordered_set.hpp>
 #include<crc/crc32c.h>
 
 namespace voltdb {
@@ -43,7 +44,16 @@ namespace voltdb {
 const static std::string EXISTING_TABLE = "existing_table";
 const static std::string EXPECTED_TABLE = "expected_table";
 const static std::string NEW_TABLE = "new_table";
-const static std::string OUTPUT_TABLE = "output_table";
+
+// column indices of DR conflict export table
+const static int DR_ROW_TYPE_COLUMN_INDEX = 0;
+const static int DR_LOG_ACTION_COLUMN_INDEX = 1;
+const static int DR_CONFLICT_COLUMN_INDEX = 2;
+const static int DR_CONFLICTS_ON_PK_COLUMN_INDEX = 3;
+const static int DR_ROW_DECISION_COLUMN_INDEX = 4;
+const static int DR_CLUSTER_ID_COLUMN_INDEX = 5;
+const static int DR_TIMESTAMP_COLUMN_INDEX = 6;
+const static int DR_DIVERGENCE_COLUMN_INDEX = 7;
 
 class CachedIndexKeyTuple {
 public:
@@ -75,21 +85,6 @@ private:
     size_t m_storageSize;
     boost::scoped_array<char> m_tupleStorage;
 };
-
-//class DRConflict {
-//public:
-//    DRConflict();
-//    ~DRConflict();
-//private:
-//    Table* m_existingTable;
-//    Table* m_expectedTable;
-//    Table* m_newTable;
-//    Table* m_outputTable;
-//    DRConflictType m_conflictType;
-//    DRRecordType m_actionType;
-//    int64_t m_uniqueId;
-//    int64_t m_sequenceId;
-//};
 
 BinaryLogSink::BinaryLogSink() {}
 
@@ -133,8 +128,8 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             try {
                 table->insertPersistentTuple(tempTuple, true);
             } catch (ConstraintFailureException &e) {
-                if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    if (handleConflict(engine, table, pool, NULL, NULL, e.getConflictTuple(), uniqueId, sequenceNumber, DR_RECORD_INSERT, CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION)) {
+                if (isActiveActiveDREnabled) {
+                    if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()), uniqueId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                         continue;
                     }
                 }
@@ -163,8 +158,8 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
             if (deleteTuple.isNullTuple()) {
-                if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, sequenceNumber, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING)) {
+                if (isActiveActiveDREnabled) {
+                    if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                         continue;
                     }
                 }
@@ -173,14 +168,14 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             }
 
             // we still run in risk of having timestamp mismatch, need to check.
-            if (isActiveActiveDREnabled && table->isDREnabled()) {
+            if (isActiveActiveDREnabled) {
                 NValue localHiddenColumn = deleteTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
                 int64_t localTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(localHiddenColumn);
                 NValue remoteHiddenColumn = tempTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
                 int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
                 if (localTimestamp != remoteTimestamp) {
                     // timestamp mismatch conflict
-                    if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, sequenceNumber, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH)) {
+                    if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
                         continue;
                     }
                 }
@@ -210,55 +205,44 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE oldRowInput(oldRowData, oldRowLength);
             tempTuple.deserializeFromDR(oldRowInput, pool);
 
-            TableTuple oldTuple = table->lookupTupleByValues(tempTuple);
+            // create the expected tuple
+            TableTuple expectedTuple(table->schema());
+            boost::shared_array<char> expectedData = boost::shared_array<char>(new char[tempTuple.tupleLength()]);
+            expectedTuple.move(expectedData.get());
+            expectedTuple.copyForPersistentInsert(tempTuple, pool);
+
+            ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
+            tempTuple.deserializeFromDR(newRowInput, pool);
+
+            TableTuple oldTuple = table->lookupTupleByValues(expectedTuple);
             if (oldTuple.isNullTuple()) {
-                if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    // create tuple to accommodate new row
-                    TableTuple oldTuple(table->schema());
-                    char * data = new char[tempTuple.tupleLength()];
-                    oldTuple.move(data);
-                    oldTuple.copy(tempTuple);
-                    ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-                    tempTuple.deserializeFromDR(newRowInput, pool);
-                    if (handleConflict(engine, table, pool, NULL, &oldTuple, &tempTuple, uniqueId, sequenceNumber, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING)) {
-                        delete [] data;
+                if (isActiveActiveDREnabled) {
+                    if (handleConflict(engine, table, pool, NULL, &expectedTuple, &tempTuple, uniqueId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                         continue;
                     }
-                    delete [] data;
                 }
                 throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
                                          type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
             }
 
             // Timestamp mismatch conflict
-            if (isActiveActiveDREnabled && table->isDREnabled()) {
+            if (isActiveActiveDREnabled) {
                 NValue localHiddenColumn = oldTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
                 int64_t localTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(localHiddenColumn);
-                NValue remoteHiddenColumn = tempTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
+                NValue remoteHiddenColumn = expectedTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
                 int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
                 if (localTimestamp != remoteTimestamp) {
-                    // create tuple to accommodate new row
-                    TableTuple expectedTuple(table->schema());
-                    char * data = new char[tempTuple.tupleLength()];
-                    expectedTuple.move(data);
-                    expectedTuple.copy(tempTuple);
-                    ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-                    tempTuple.deserializeFromDR(newRowInput, pool);
-                    if (handleConflict(engine, table, pool, &oldTuple, &expectedTuple, &tempTuple, uniqueId, sequenceNumber, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH)) {
-                        delete [] data;
+                    if (handleConflict(engine, table, pool, &oldTuple, &expectedTuple, &tempTuple, uniqueId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
                         continue;
                     }
                 }
             }
 
-            ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
-            tempTuple.deserializeFromDR(newRowInput, pool);
-
             try {
                 table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
             } catch (ConstraintFailureException &e) {
-                if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    if (handleConflict(engine, table, pool, e.getOriginalTuple(), e.getOriginalTuple(), e.getConflictTuple(), uniqueId, sequenceNumber, DR_RECORD_UPDATE, CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION)) {
+                if (isActiveActiveDREnabled) {
+                    if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(), const_cast<TableTuple *>(e.getConflictTuple()), uniqueId, DR_RECORD_UPDATE, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                         continue;
                     }
                 }
@@ -393,30 +377,113 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
     return static_cast<int64_t>(rowCount);
 }
 
-void BinaryLogSink::exportDRConflict(Table *exportTable, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable) {
+typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
+
+/**
+   * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
+   * All conflicting rows are put into @conflictRows.
+   */
+static void findConflictTuple(Table *table, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+    boost::unordered_set<char*> redundancyFilter;
+    BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
+        if (index->isUniqueIndex()) {
+            IndexCursor cursor(index->getTupleSchema());
+            if (index->moveToKeyByTuple(searchTuple, cursor)) {
+                TableTuple conflictTuple = index->nextValueAtKey(cursor);
+                if (expectedTuple && expectedTuple->equals(conflictTuple)) {
+                    // exclude the expected tuple
+                    continue;
+                } else if (expectedTuple && searchTuple->equals(conflictTuple)) {
+                    // skip the search tuple if this is an update, in update we report this row
+                    // as a timestamp mismatch not an unique constraint violation
+                    continue;
+                } else if (redundancyFilter.find(conflictTuple.address()) != redundancyFilter.end()) {
+                    // skip the conflict tuples that are already found
+                    continue;
+                } else {
+                    conflictRows.push_back(std::make_pair(boost::shared_ptr<TableTuple>(new TableTuple(conflictTuple)), table->primaryKeyIndex() == index ? true : false));
+                    redundancyFilter.insert(conflictTuple.address());
+                }
+            }
+        }
+    }
+}
+
+/**
+ * create conflict export tuple from the conflict tuple
+ */
+static void createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
+        DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
+    TableTuple tempTuple = outputTable->tempTuple();
+    NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
+    tempTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTinyIntValue(rowType));
+    tempTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTinyIntValue(actionType));
+    tempTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictType));
+    tempTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
+    switch (rowType) {
+    case EXISTING_ROW:
+    case EXPECTED_ROW:
+        tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
+        break;
+    case NEW_ROW:
+        tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
+        break;
+    default:
+        break;
+    }
+    tempTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
+    tempTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
+    tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+    tempTuple.setNValues(DR_DIVERGENCE_COLUMN_INDEX + 1, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
+
+    // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
+    outputTable->insertTupleNonVirtualWithDeepCopy(tempTuple, pool);
+}
+
+// iterate all four tables and push them into export table
+void BinaryLogSink::exportDRConflict(Table *exportTable, bool resolved, TempTable *existingTableForDelete, TempTable *expectedTableForDelete, TempTable *existingTableForInsert, TempTable *newTableInsert) {
     assert(exportTable != NULL);
     assert(exportTable->isExport());
 
-    // iterate all four tables and push them into export table
     TableTuple tempTuple(exportTable->schema());
-    TableIterator iterator = existingTable->iterator();
-    while (iterator.next(tempTuple)) {
-        exportTable->insertTuple(tempTuple);
+    if (existingTableForDelete) {
+        TableIterator iterator = existingTableForDelete->iterator();
+        while (iterator.next(tempTuple)) {
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
+            }
+            exportTable->insertTuple(tempTuple);
+        }
     }
 
-    iterator = expectedTable->iterator();
-    while (iterator.next(tempTuple)) {
-        exportTable->insertTuple(tempTuple);
+    if (expectedTableForDelete) {
+        TableIterator iterator = expectedTableForDelete->iterator();
+        while (iterator.next(tempTuple)) {
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
+            }
+            exportTable->insertTuple(tempTuple);
+        }
     }
 
-    iterator = newTable->iterator();
-    while (iterator.next(tempTuple)) {
-        exportTable->insertTuple(tempTuple);
+    if (existingTableForInsert) {
+        TableIterator iterator = existingTableForInsert->iterator();
+        while (iterator.next(tempTuple)) {
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
+            }
+            exportTable->insertTuple(tempTuple);
+        }
     }
 
-    iterator = outputTable->iterator();
-    while (iterator.next(tempTuple)) {
-        exportTable->insertTuple(tempTuple);
+    if (newTableInsert) {
+        TableIterator iterator = newTableInsert->iterator();
+        while (iterator.next(tempTuple)) {
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
+            }
+            exportTable->insertTuple(tempTuple);
+        }
     }
 }
 
@@ -430,206 +497,116 @@ void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const
     }
 }
 
-// iterate all unique indices to find any conflicting tuples (under assumption that primary key is the first index in the index vector)
-// TODO: conflict rows may contains duplicated rows, reduce the redundancy
-void BinaryLogSink::findConflictTuple(Table *table, TableTuple *searchTuple, TableTuple *expectedTuple, std::vector<TableTuple *> &conflictRows) {
-    BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
-        if (index->isUniqueIndex()) {
-            TableTuple* conflictTuple = new TableTuple();
-            if (index->exists(searchTuple, conflictTuple)) {
-                if (expectedTuple && expectedTuple->equals(*conflictTuple)) {
-                    continue; // skip the expected tuple
-                } else if (searchTuple->equals(*conflictTuple)) {
-                    continue; // skip the search tuple
-                } else {
-                    conflictRows.push_back(conflictTuple);
-                }
-            }
+bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, const TableTuple *expectedTuple, TableTuple *newTuple,
+        int64_t uniqueId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
+    if (!engine) {
+        return false;
+    }
+    Table* conflictExportTable = engine->getDRConflictTable(drTable);
+    if (!conflictExportTable) {
+        return false;
+    }
+
+
+    // construct delete conflict
+    boost::shared_ptr<TempTable> existingTableForDelete;
+    boost::shared_ptr<TempTable> expectedTableForDelete;
+    if (deleteConflict != NO_CONFLICT) {
+        existingTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
+        if (existingTuple) {
+            createConflictExportTuple(existingTableForDelete.get(), drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXISTING_ROW);
+        }
+
+        expectedTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));
+        if (expectedTuple) {
+            createConflictExportTuple(expectedTableForDelete.get(), drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
         }
     }
-}
 
-void BinaryLogSink::createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool, TableTuple *tupleToBeWrote, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
-    TableTuple tempTuple = outputTable->tempTuple();
-    NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
-    tempTuple.setNValue(0, ValueFactory::getTinyIntValue(rowType));
-    tempTuple.setNValue(1, ValueFactory::getTinyIntValue(actionType));
-    tempTuple.setNValue(2, ValueFactory::getTinyIntValue(conflictType));
-    switch (rowType) {
-    case CONFLICT_EXISTING_ROW:
-    case CONFLICT_EXPECTED_ROW:
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(CONFLICT_KEEP_ROW));   // decision
-        break;
-    case CONFLICT_NEW_ROW:
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(CONFLICT_DELETE_ROW));     // decision
-        break;
-    case CONFLICT_CUSTOM_ROW:
-    default:
-        break;
-    }
-    tempTuple.setNValue(4, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
-    tempTuple.setNValue(5, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
-    tempTuple.setNValues(6, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
-
-    outputTable->insertTupleNonVirtualWithDeepCopy(tempTuple, pool);
-}
-
-DRConflictType BinaryLogSink::optimizeUpdateConflictType(PersistentTable* drTable, TableTuple* expectedTuple, TableTuple* newTuple, std::vector<TableTuple*> &existingRows, DRConflictType conflictType) {
-    if (conflictType == CONFLICT_EXPECTED_ROW_MISSING || conflictType == CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH) {
-        // add any rows conflict with the new row
-        findConflictTuple(drTable, newTuple, expectedTuple, existingRows);
-        if (existingRows.size() > 0) {
-            if (conflictType == CONFLICT_EXPECTED_ROW_MISSING) {
-                conflictType = CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT;
-            }
-            if (conflictType == CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH) {
-                conflictType = CONFLICT_EXPECTED_ROW_TIMESTAMP_AND_NEW_ROW_CONSTRAINT;
-            }
-        }
-    }
-    if (conflictType == CONFLICT_EXPECTED_ROW_MISSING ||
-            conflictType == CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION ||
-        conflictType == CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT) {
-        // check if change happens on primary key
-        TableIndex * primaryKey = drTable->primaryKeyIndex();
-        if (primaryKey && primaryKey->checkForIndexChange(expectedTuple, newTuple) == true) {
-            conflictType = static_cast<DRConflictType>(conflictType + 1);
-        }
-    }
-    return conflictType;
-}
-
-bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, TableTuple *expectedTuple, TableTuple *newTuple,
-        int64_t uniqueId, int64_t sequenceNumber, DRRecordType actionType, DRConflictType conflictType) {
-    if (engine) {
-        Table* conflictExportTable = engine->getDRConflictTable(drTable);
-        if (conflictExportTable) {
-            // add new row
-            std::vector<TableTuple *> existingRows;
-            TempTable* newTable = TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL);
-            if (newTuple) {
-                if (actionType == DR_RECORD_UPDATE) {
-                    conflictType = optimizeUpdateConflictType(drTable, expectedTuple, newTuple, existingRows, conflictType);
-                }
-                if (actionType == DR_RECORD_INSERT) {
-                    // add any rows conflict with the new row
-                    findConflictTuple(drTable, newTuple, NULL, existingRows);
-                }
-                createConflictExportTuple(newTable, drTable, pool, newTuple, actionType, conflictType, CONFLICT_NEW_ROW);
-            }
-
-            // add expected row
-            TempTable* expectedTable = TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL);
-            if (expectedTuple) {
-                createConflictExportTuple(expectedTable, drTable, pool, expectedTuple, actionType, conflictType, CONFLICT_EXPECTED_ROW);
-            }
-
-            // add existing row
-            TempTable* existingTable = TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL);
-            if (existingTuple) {
-                createConflictExportTuple(existingTable, drTable, pool, existingTuple, actionType, conflictType, CONFLICT_EXISTING_ROW);
-            }
+    // find any rows conflict with the new row
+    std::vector< LabeledTableTuple > existingRows;
+    if (newTuple) {
+        findConflictTuple(drTable, newTuple, actionType == DR_RECORD_UPDATE ? expectedTuple : NULL, existingRows);
+        if (actionType == DR_RECORD_UPDATE) {
             if (existingRows.size() > 0) {
-                BOOST_FOREACH(TableTuple* tuple, existingRows) {
-                    createConflictExportTuple(existingTable, drTable, pool, tuple, actionType, conflictType, CONFLICT_EXISTING_ROW);
-                }
+                insertConflict = CONFLICT_CONSTRAINT_VIOLATION; // update timestamp mismatch may trigger constraint violation conflict
             }
-
-            // TODO: the size of output table should be same as existingTable
-            TempTable* outputTable = TableFactory::getCopiedTempTable(0, OUTPUT_TABLE, conflictExportTable, NULL);
-
-            //======================== test output ===========================
-            TableTuple tempTuple(conflictExportTable->schema());
-            TableIterator iterator = existingTable->iterator();
-            bool first = true;
-            while (iterator.next(tempTuple)) {
-                if (first) {
-                    std::cout << "\n========existingTable=========" << std::endl;
-                    first = false;
-                }
-                std::cout << tempTuple.debugNoHeader() << std::endl;
-            }
-
-            iterator = expectedTable->iterator();
-            first = true;
-            while (iterator.next(tempTuple)) {
-                if (first) {
-                    std::cout << "\n========expectedTable=========" << std::endl;
-                    first = false;
-                }
-                std::cout << tempTuple.debugNoHeader() << std::endl;
-            }
-
-            iterator = newTable->iterator();
-            first = true;
-            while (iterator.next(tempTuple)) {
-                if (first) {
-                    std::cout << "\n========newTable=========" << std::endl;
-                }
-                std::cout << tempTuple.debugNoHeader() << std::endl;
-            }
-            //=================================================================
-
-            DRResolutionType retval =static_cast<DRResolutionType>(ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(UniqueId::pid(uniqueId),
-                                                                                                                                      sequenceNumber,
-                                                                                                                                      conflictType,
-                                                                                                                                      actionType,
-                                                                                                                                      drTable->name(),
-                                                                                                                                      existingTable,
-                                                                                                                                      expectedTable,
-                                                                                                                                      newTable,
-                                                                                                                                      outputTable));
-            switch (retval) {
-            case CONFLICT_DO_NOTHING: {
-                // Literally meaning don't do anything except logging the conflict
-                exportDRConflict(conflictExportTable, existingTable, expectedTable, newTable, outputTable);
-                break;
-            }
-            case CONFLICT_APPLY_NEW: {
-                // Delete rows in existing table that conflict with other rows and apply the new row
-                BOOST_FOREACH(TableTuple* tuple, existingRows) {
-                    drTable->deleteTuple(*tuple, true);
-                    delete tuple;
-                }
-                if (actionType == DR_RECORD_INSERT) {
-                    drTable->insertPersistentTuple(*newTuple, true);
-                } else if (actionType == DR_RECORD_UPDATE) {
-                    // TODO: should we set expectedTuple as the old value here?
-                    drTable->updateTupleWithSpecificIndexes(*expectedTuple, *newTuple, drTable->allIndexes());
-                }
-                break;
-            }
-            case CONFLICT_DELETE_EXISTING: {
-                // Delete all rows in existing table that be marked with "DELETE", ignore the new row
-                TableTuple tempTuple(conflictExportTable->schema());
-                TableIterator iterator = existingTable->iterator();
-                while (iterator.next(tempTuple)) {
-                    DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
-                    if (decision == CONFLICT_DELETE_ROW) {
-                        drTable->deleteTuple(tempTuple, true);
-                    }
-                }
-                break;
-            }
-            case CONFLICT_APPLY_GENERATED: {
-                //TODO: implement custom conflict resolver
-                break;
-            }
-            case BREAK_REPLICATION: {
-                // Ignore current record, commit the transaction then throw a break replication exception.
-                throwSerializableEEException("Because of a unresolvable conflict in table %s actionType %d conflictType %d sequenceNumber %jd uniqueId %jd, DR replication is broken",
-                                                             drTable->name().c_str(), (int8_t)actionType, (int8_t)conflictType, (intmax_t)sequenceNumber, (intmax_t)uniqueId);
-                break;
-            }
-            default:
-                return false;
-            }
-
-            delete existingTable;
-            delete expectedTable;
-            delete newTable;
-            delete outputTable;
         }
+    }
+    // construct insert conflict
+    boost::shared_ptr<TempTable> existingTableForInsert;
+    boost::shared_ptr<TempTable> newTableForInsert;
+    if (insertConflict != NO_CONFLICT) {
+        existingTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
+        if (existingRows.size() > 0) {
+            BOOST_FOREACH(LabeledTableTuple labeledTuple, existingRows) {
+                createConflictExportTuple(existingTableForInsert.get(), drTable, pool, labeledTuple.first.get(),
+                        labeledTuple.second ? CONFLICT_ON_PK : NOT_CONFLICT_ON_PK, actionType, insertConflict, EXISTING_ROW);
+            }
+        }
+
+        newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
+        if (newTuple) {
+           createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
+        }
+    }
+
+    bool resolved = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
+                                                                                      UniqueId::timestamp(uniqueId),
+                                                                                      drTable->name(),
+                                                                                      actionType,
+                                                                                      deleteConflict,
+                                                                                      existingTableForDelete.get(),
+                                                                                      expectedTableForDelete.get(),
+                                                                                      insertConflict,
+                                                                                      existingTableForInsert.get(),
+                                                                                      newTableForInsert.get());
+
+    TableTuple tempTuple(conflictExportTable->schema());
+    if (deleteConflict != NO_CONFLICT) {
+        if (existingTuple) {
+            TableIterator iterator = existingTableForDelete->iterator();
+            iterator.next(tempTuple);
+            DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(DR_ROW_DECISION_COLUMN_INDEX)));
+            assert(resolved || decision != DELETE_ROW);  // It should never delete any existing rows if conflict is not resolved.
+            if (decision == DELETE_ROW) {
+                drTable->deleteTuple(*existingTuple, true);
+            }
+        }
+    }
+    if (insertConflict != NO_CONFLICT) {
+        TableIterator iterator = newTableForInsert->iterator();
+        iterator.next(tempTuple);
+        DRRowDecision newRowDecision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(DR_ROW_DECISION_COLUMN_INDEX)));
+
+        iterator = existingTableForInsert->iterator();
+        for (int i = 0; iterator.next(tempTuple); i++) {
+            DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(DR_ROW_DECISION_COLUMN_INDEX)));
+            assert(resolved || decision != DELETE_ROW); // It should never delete any existing rows if conflict is not resolved.
+            assert(decision != KEEP_ROW || newRowDecision != KEEP_ROW); // If existing rows are kept, new row should NOT be KEEP_ROW.
+            if (decision == DELETE_ROW) {
+                drTable->deleteTuple(*existingRows[i].first.get(), true);
+            }
+
+        }
+        if (newRowDecision == KEEP_ROW) {
+            drTable->insertPersistentTuple(*newTuple, true);
+        }
+
+    }
+    exportDRConflict(conflictExportTable, resolved, existingTableForDelete.get(), expectedTableForDelete.get(), existingTableForInsert.get(), newTableForInsert.get());
+
+    if (existingTableForDelete.get()) {
+        existingTableForDelete.get()->deleteAllTuples(true);
+    }
+    if (expectedTableForDelete.get()) {
+        expectedTableForDelete.get()->deleteAllTuples(true);
+    }
+    if (existingTableForInsert.get()) {
+        existingTableForInsert.get()->deleteAllTuples(true);
+    }
+    if (newTableForInsert.get()) {
+        newTableForInsert.get()->deleteAllTuples(true);
     }
 
     return true;

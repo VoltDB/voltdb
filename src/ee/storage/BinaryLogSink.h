@@ -17,6 +17,7 @@
 #ifndef BINARYLOGSINK_H
 #define BINARYLOGSINK_H
 #include <boost/unordered_map.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace voltdb {
 
@@ -38,38 +39,15 @@ private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
 
     /**
-     * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
-     * All conflicting rows are put into @conflictRows.
-     */
-    void findConflictTuple(Table* table, TableTuple* searchTuple, TableTuple* expectedTuple, std::vector<TableTuple *>& conflictRows);
-
-    /**
-     * Report the DR conflict to frontend through conflict resolution API
-     */
-    DRResolutionType reportDRConflict(PersistentTable* table, int64_t partitionId, int64_t sequenceNumber, DRConflictType conflictType,
-            DRRecordType recordType, Table* existingRow, Table* expectedRow, Table* newRow, Table* outputRow);
-
-    /**
      * Handle insert constraint violation
      */
-    bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* conflictTuple, TableTuple* missingTuple, TableTuple* newTuple, int64_t uniqueId,
-            int64_t sequenceNumber, DRRecordType actionType, DRConflictType conflictType);
-
-    /**
-     * create conflict export tuple from the conflict tuple
-     */
-    void createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool,
-            TableTuple *tupleToBeWrote, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType reportType);
-
-    /**
-     * Divide update related conflict types into fine singularity
-     */
-    DRConflictType optimizeUpdateConflictType(PersistentTable* drTable, TableTuple* expectedTuple, TableTuple* newTuple, std::vector<TableTuple*> &existingRows, DRConflictType conflictType);
+    bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* existingTuple, const TableTuple* expectedTuple, TableTuple* newTuple, int64_t uniqueId,
+            DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
 
     /**
      * Export the conflict log to downstream
      */
-    void exportDRConflict(Table *exportTable, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
+    void exportDRConflict(Table *exportTable, bool diverge, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
 };
 
 

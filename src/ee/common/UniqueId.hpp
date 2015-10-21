@@ -61,6 +61,10 @@ public:
         return pid(uid) == MP_INIT_PID;
     }
 
+    static int64_t timestamp(UniqueId uid) {
+        return (uid & TIMESTAMP_MAX_VALUE) >> (COUNTER_BITS + PARTITIONID_BITS);
+    }
+
     const int64_t uid;
 
     UniqueId(int64_t uid) : uid(uid) {}

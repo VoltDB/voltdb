@@ -220,14 +220,6 @@ bool TableIndex::exists(const TableTuple *persistentTuple) const
     return existsDo(persistentTuple);
 }
 
-bool TableIndex::exists(const TableTuple* persistentTuple, TableTuple *conflictTuple) const
-{
-    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue()) {
-        return false;
-    }
-    return existsDo(persistentTuple, conflictTuple);
-}
-
 bool TableIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const {
     if (isPartialIndex()) {
         const AbstractExpression* predicate = getPredicate();
