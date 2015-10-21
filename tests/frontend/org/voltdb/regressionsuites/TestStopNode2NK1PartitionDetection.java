@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -40,6 +39,8 @@ public class TestStopNode2NK1PartitionDetection extends RegressionSuite
 {
 
     static LocalCluster m_config;
+    private static final String TMPDIR = "/tmp";
+    private static final String TESTNONCE = "ppd_nonce";
 
     public TestStopNode2NK1PartitionDetection(String name) {
         super(name);
@@ -48,6 +49,7 @@ public class TestStopNode2NK1PartitionDetection extends RegressionSuite
     static VoltProjectBuilder getBuilderForTest() throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("");
+        builder.setPartitionDetectionSettings(TMPDIR, TESTNONCE);
         return builder;
     }
 
