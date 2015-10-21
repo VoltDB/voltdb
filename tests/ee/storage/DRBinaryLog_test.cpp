@@ -354,14 +354,13 @@ public:
         outputTable->setNValue(1, ValueFactory::getTinyIntValue(actionType));
         outputTable->setNValue(2, ValueFactory::getTinyIntValue(conflictType));
         switch (rowType) {
-        case CONFLICT_EXISTING_ROW:
-        case CONFLICT_EXPECTED_ROW:
+        case EXISTING_ROW:
+        case EXPECTED_ROW:
             outputTable->setNValue(3, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
             break;
-        case CONFLICT_NEW_ROW:
+        case NEW_ROW:
             outputTable->setNValue(3, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
             break;
-        case CONFLICT_CUSTOM_ROW:
         default:
             break;
         }
@@ -500,7 +499,7 @@ public:
     void verifyExistingTableForDelete(TableTuple &existingTuple, DRRecordType action, DRConflictType deleteConflict, int64_t timestamp) {
         PersistentTable* existingTable = reinterpret_cast<PersistentTable*>(m_topend.existingRowsForDelete.get());
         TableTuple tempTuple = existingTable->tempTuple();
-        createConflictExportTuple(&tempTuple, &existingTuple, CONFLICT_EXISTING_ROW, action, deleteConflict, 0, timestamp);
+        createConflictExportTuple(&tempTuple, &existingTuple, EXISTING_ROW, action, deleteConflict, 0, timestamp);
         TableTuple tuple = existingTable->lookupTupleByValues(tempTuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
@@ -508,7 +507,7 @@ public:
     void verifyExpectedTableForDelete(TableTuple &expectedTuple, DRRecordType action, DRConflictType deleteConflict, int64_t timestamp) {
         PersistentTable* expectedTable = reinterpret_cast<PersistentTable*>(m_topend.expectedRowsForDelete.get());
         TableTuple tempTuple = expectedTable->tempTuple();
-        createConflictExportTuple(&tempTuple, &expectedTuple, CONFLICT_EXPECTED_ROW, action, deleteConflict, 0, timestamp);
+        createConflictExportTuple(&tempTuple, &expectedTuple, EXPECTED_ROW, action, deleteConflict, 0, timestamp);
         TableTuple tuple = expectedTable->lookupTupleByValues(tempTuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
@@ -516,7 +515,7 @@ public:
     void verifyExistingTableForInsert(TableTuple &existingTuple, DRRecordType action, DRConflictType insertConflict, int64_t timestamp) {
         PersistentTable* existingTable = reinterpret_cast<PersistentTable*>(m_topend.existingRowsForInsert.get());
         TableTuple tempTuple = existingTable->tempTuple();
-        createConflictExportTuple(&tempTuple, &existingTuple, CONFLICT_EXISTING_ROW, action, insertConflict, 0, timestamp);
+        createConflictExportTuple(&tempTuple, &existingTuple, EXISTING_ROW, action, insertConflict, 0, timestamp);
         TableTuple tuple = existingTable->lookupTupleByValues(tempTuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
@@ -524,7 +523,7 @@ public:
     void verifyNewTableForInsert(TableTuple &newTuple, DRRecordType action, DRConflictType insertConflict, int64_t timestamp) {
         PersistentTable* newTable = reinterpret_cast<PersistentTable*>(m_topend.newRowsForInsert.get());
         TableTuple tempTuple = newTable->tempTuple();
-        createConflictExportTuple(&tempTuple, &newTuple, CONFLICT_NEW_ROW, action, insertConflict, 0, timestamp);
+        createConflictExportTuple(&tempTuple, &newTuple, NEW_ROW, action, insertConflict, 0, timestamp);
         TableTuple tuple = newTable->lookupTupleByValues(tempTuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
@@ -1127,15 +1126,6 @@ TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
     ASSERT_FALSE(indexPairReplica.first == NULL);
     EXPECT_EQ(indexPair.second, indexPairReplica.second);
     updateWithNullsTest();
-}
-
-/**
- * optimizeUpdateConflictType() needs the relative order
- */
-TEST_F(DRBinaryLogTest, EnumOrderTest) {
-    EXPECT_EQ(CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_ON_PK_UPDATE, CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_VIOLATION + 1);
-    EXPECT_EQ(CONFLICT_EXPECTED_ROW_MISSING_ON_PK_UPDATE, CONFLICT_EXPECTED_ROW_MISSING + 1);
-    EXPECT_EQ(CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT_ON_PK, CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT + 1);
 }
 
 /*
