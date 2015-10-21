@@ -732,6 +732,10 @@ public enum VoltType {
             return NULL_DECIMAL;
         case VARBINARY:
             return NULL_STRING_OR_VARBINARY;
+        case POINT:
+            return NULL_POINT;
+        case GEOGRAPHY:
+            return NULL_GEOGRAPHY;
         default:
             throw new VoltTypeException("No NULL value for " + toString());
         }
@@ -743,7 +747,8 @@ public enum VoltType {
             (obj == VoltType.NULL_TIMESTAMP) ||
             (obj == VoltType.NULL_STRING_OR_VARBINARY) ||
             (obj == VoltType.NULL_DECIMAL) ||
-            (obj == VoltType.NULL_POINT))
+            (obj == VoltType.NULL_POINT) ||
+            (obj == VoltType.NULL_GEOGRAPHY))
         {
             return true;
         }
