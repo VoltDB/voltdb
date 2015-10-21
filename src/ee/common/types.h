@@ -535,23 +535,14 @@ enum DRConflictType {
 };
 
 enum DRConflictRowType {
-    CONFLICT_EXISTING_ROW,
-    CONFLICT_EXPECTED_ROW,
-    CONFLICT_NEW_ROW,
-    CONFLICT_CUSTOM_ROW,
+    EXISTING_ROW,
+    EXPECTED_ROW,
+    NEW_ROW,
 };
 
 enum DRRowDecision {
-   CONFLICT_KEEP_ROW,
-   CONFLICT_DELETE_ROW
-};
-
-enum DRResolutionType {
-    CONFLICT_DO_NOTHING,         // Use existing rows for Constraint or TimeStamp; Ignore New if Missing Row
-    CONFLICT_APPLY_NEW,          // Delete all existing and apply the new row
-    CONFLICT_DELETE_EXISTING,    // Delete some existing rows and do not apply the new row
-    CONFLICT_APPLY_GENERATED,    // Ignore the new row and use the generated instead (possibly delete existing rows)
-    BREAK_REPLICATION,
+   KEEP_ROW,
+   DELETE_ROW
 };
 
 // ------------------------------------------------------------------

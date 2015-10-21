@@ -356,10 +356,10 @@ public:
         switch (rowType) {
         case CONFLICT_EXISTING_ROW:
         case CONFLICT_EXPECTED_ROW:
-            outputTable->setNValue(3, ValueFactory::getTinyIntValue(CONFLICT_KEEP_ROW));   // decision
+            outputTable->setNValue(3, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
             break;
         case CONFLICT_NEW_ROW:
-            outputTable->setNValue(3, ValueFactory::getTinyIntValue(CONFLICT_DELETE_ROW));     // decision
+            outputTable->setNValue(3, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
             break;
         case CONFLICT_CUSTOM_ROW:
         default:

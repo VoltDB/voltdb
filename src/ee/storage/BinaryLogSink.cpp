@@ -413,10 +413,10 @@ static void createConflictExportTuple(TempTable *outputTable, PersistentTable *d
     switch (rowType) {
     case CONFLICT_EXISTING_ROW:
     case CONFLICT_EXPECTED_ROW:
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(CONFLICT_KEEP_ROW));   // decision
+        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
         break;
     case CONFLICT_NEW_ROW:
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(CONFLICT_DELETE_ROW));     // decision
+        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
         break;
     case CONFLICT_CUSTOM_ROW:
     default:
@@ -603,7 +603,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         TableIterator iterator = existingTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
             DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
-            if (decision == CONFLICT_DELETE_ROW) {
+            if (decision == DELETE_ROW) {
                 drTable->deleteTuple(tempTuple, true);
             }
         }
@@ -612,14 +612,14 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         TableIterator iterator = existingTableForInsert->iterator();
         while (iterator.next(tempTuple)) {
             DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
-            if (decision == CONFLICT_DELETE_ROW) {
+            if (decision == DELETE_ROW) {
                 drTable->deleteTuple(tempTuple, true);
             }
         }
         iterator = newTableForInsert->iterator();
         while (iterator.next(tempTuple)) {
             DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
-            if (decision == CONFLICT_DELETE_ROW) {
+            if (decision == DELETE_ROW) {
                 drTable->deleteTuple(tempTuple, true);
             }
         }
