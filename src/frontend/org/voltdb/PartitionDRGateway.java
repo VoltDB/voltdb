@@ -46,29 +46,16 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     public static enum DRRowDecision {
-        CONFLICT_KEEP_ROW,
-        CONFLICT_DELETE_ROW;
+        KEEP_ROW,
+        DELETE_ROW;
     }
 
     // Keep sync with EE DRConflictType at types.h
     public static enum DRConflictType {
-        CONFLICT_NEW_ROW_UNIQUE_CONSTRIANT_VIOLATION,
-        CONFLICT_NEW_ROW_UNIQUE_CONSTRAINT_ON_PK_UPDATE,
-        CONFLICT_EXPECTED_ROW_MISSING,
-        CONFLICT_EXPECTED_ROW_MISSING_ON_PK_UPDATE,
-        CONFLICT_EXPECTED_ROW_TIMESTAMP_MISMATCH,
-        CONFLICT_EXPECTED_ROW_TIMESTAMP_AND_NEW_ROW_CONSTRAINT,
-        CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT,
-        CONFLICT_EXPECTED_ROW_MISSING_AND_NEW_ROW_CONSTRAINT_ON_PK,
-    }
-
-    // Keep sync with EE DRConflictType at types.h
-    public static enum DRResolutionType {
-        CONFLICT_DO_NOTHING,         // Use existing rows for Constraint or TimeStamp; Ignore New if Missing Row
-        CONFLICT_APPLY_NEW,          // Delete all existing and apply the new row
-        CONFLICT_DELETE_EXISTING,    // Delete some existing rows and do not apply the new row
-        CONFLICT_APPLY_GENERATED,    // Ignore the new row and use the generated instead (possibly delete existing rows)
-        BREAK_REPLICATION;
+        NO_CONFLICT,
+        CONSTRIANT_VIOLATION,
+        EXPECTED_ROW_MISSING,
+        EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
     public static String DR_ROW_TYPE_COLUMN_NAME = "@DR_ROW_TYPE";
@@ -157,10 +144,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
-    public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
-                                 DRRecordType action, String tableName, ByteBuffer existingTable,
-                                 ByteBuffer expectedTable, ByteBuffer newTable, ByteBuffer output) {
-        return 0;
+    public boolean processDRConflict(int partitionId, long remoteSequenceNumber, String tableName, DRRecordType action,
+                                 DRConflictType deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
+                                 DRConflictType insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
+        return false;
     }
 
     public static long pushDRBuffer(
@@ -179,14 +166,16 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
-    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType, int action,
-                                       String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
-                                       ByteBuffer newTable, ByteBuffer output) {
+    public static boolean reportDRConflict(int partitionId, long remoteSequenceNumber, String tableName, int action,
+                                       int deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
+                                       int insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, DRConflictType.values()[drConflictType],
-                DRRecordType.values()[action], tableName, existingTable, expectedTable, newTable, output);
+
+        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, tableName, DRRecordType.values()[action],
+                DRConflictType.values()[deleteConflict], existingTableForDelete, expectedTableForDelete,
+                DRConflictType.values()[insertConflict], existingTableForInsert, newTableForInsert);
     }
 }
