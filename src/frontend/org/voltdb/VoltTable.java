@@ -913,25 +913,15 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 }
 
                 case GEOGRAPHY: {
-                    if (value instanceof GeographyValue) {
-                        GeographyValue gv = (GeographyValue)value;
-                        m_buffer.putInt(gv.getLengthInBytes());
-                        gv.flattenToBuffer(m_buffer);
-                    }
-                    else {
-                        throw new ClassCastException();
-                    }
+                    GeographyValue gv = (GeographyValue)value;
+                    m_buffer.putInt(gv.getLengthInBytes());
+                    gv.flattenToBuffer(m_buffer);
                     break;
                 }
 
                 case POINT: {
-                    if (value instanceof PointType) {
-                        PointType pt = (PointType)value;
-                        pt.flattenToBuffer(m_buffer);
-                    }
-                    else {
-                        throw new ClassCastException();
-                    }
+                    PointType pt = (PointType)value;
+                    pt.flattenToBuffer(m_buffer);
                     break;
                 }
 
