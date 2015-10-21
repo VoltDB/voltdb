@@ -392,14 +392,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         private final long m_offset;
         private final AtomicLong m_cbcnt;
-        private final Gap m_tracker;
+        private final TopicPartitionFetcher.Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
         private final Invocation m_invocation;
 
         public TopicPartitionInvocationCallback(
                 final long offset,
                 final AtomicLong cbcnt,
-                final Gap tracker,
+                final TopicPartitionFetcher.Gap tracker,
                 final AtomicBoolean dontCommit,
                 final Invocation invocation) {
             m_offset = offset;
@@ -419,6 +419,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             }
         }
 
+        @SuppressWarnings("unused")
         public Invocation getInvocation() {
             return m_invocation;
         }
@@ -461,6 +462,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_topicAndPartition = new TopicAndPartition(topic, partition);
         }
 
+        @SuppressWarnings("unused")
         public final URI getUrl() {
             return m_url;
         }
@@ -889,6 +891,57 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             return true;
         }
 
+        final class Gap {
+            long c = 0;
+            long s = -1L;
+            final long [] lag;
+
+            Gap(int leeway) {
+                if (leeway <= 0) {
+                    throw new IllegalArgumentException("leeways is zero or negative");
+                }
+                lag = new long[leeway];
+            }
+
+            synchronized void submit(long offset) {
+                if (s == -1L && offset >= 0) {
+                    lag[idx(offset)] = c = s = offset;
+                }
+                if (offset > s) {
+                    s = offset;
+                }
+            }
+
+            private final int idx(long offset) {
+                return (int)offset % lag.length;
+            }
+
+            synchronized void resetTo(long offset) {
+                if (offset < 0) {
+                    throw new IllegalArgumentException("offset is negative");
+                }
+                lag[idx(offset)] = s = c = offset;
+            }
+
+            synchronized long commit(long offset) {
+                if (offset <= s && offset > c) {
+                    int ggap = (int)Math.min(lag.length, offset-c);
+                    if (ggap == lag.length) {
+                        warn(
+                              null, "Gap tracker moving topic commit point from %d to %d for "
+                              + m_topicAndPartition, c, (offset - lag.length + 1)
+                            );
+                        c = offset - lag.length + 1;
+                        lag[idx(c)] = c;
+                    }
+                    lag[idx(offset)] = offset;
+                    while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
+                        ++c;
+                    }
+                }
+                return c;
+            }
+        }
     }
 
     public void closeConsumer(SimpleConsumer consumer) {
@@ -1004,8 +1057,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
     }
 
-    public class KafkaStreamImporterException extends ImportBaseException
-    {
+    public class KafkaStreamImporterException extends ImportBaseException {
         private static final long serialVersionUID = 7668280657393399984L;
 
         public KafkaStreamImporterException() {
@@ -1023,7 +1075,5 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 Object... args) {
             super(format, cause, args);
         }
-
     }
-
 }
