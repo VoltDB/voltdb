@@ -20,7 +20,8 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.http.HttpServletResponse;
@@ -47,8 +48,8 @@ public class HTTPClientInterface {
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
     AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference<AuthenticatedConnectionCache>();
+    private AuthenticatedConnectionCache m_oldCache;
     static final int CACHE_TARGET_SIZE = 10;
-    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
 
     public static final String PARAM_USERNAME = "User";
     public static final String PARAM_PASSWORD = "Password";
@@ -56,6 +57,7 @@ public class HTTPClientInterface {
     public static final String PARAM_ADMIN = "admin";
     int m_timeout = 0;
     final String m_timeoutResponse;
+    private ExecutorService m_closeAllExecutor;
 
     public final static int MAX_QUERY_PARAM_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -104,6 +106,8 @@ public class HTTPClientInterface {
         final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
                 new VoltTable[0], "Request Timeout");
         m_timeoutResponse = r.toJSONString();
+        // TODO: how many threads should this require? Only the first closeAll will take time, so 1 or 2 should be good enough.
+        m_closeAllExecutor = Executors.newFixedThreadPool(2);
     }
 
     public void process(Request request, HttpServletResponse response) {
@@ -272,18 +276,10 @@ public class HTTPClientInterface {
         String admin = request.getParameter(PARAM_ADMIN);
 
         AuthenticatedConnectionCache connection_cache = m_connections.get();
-
-        // first check for a catalog update and purge the cached connections
-        // if one has happened since we were here last
-        if (m_shouldUpdateCatalog.compareAndSet(true, false))
-        {
-            if (connection_cache != null) {
-                connection_cache.closeAll();
-                connection_cache = null;
+        while (connection_cache == null) {
+            if (m_oldCache!=null) {
+                closeAllAsync(m_oldCache);
             }
-        }
-
-        if (connection_cache == null) {
             Configuration config = VoltDB.instance().getConfig();
             int port = config.m_port;
             int adminPort = config.m_adminPort;
@@ -301,7 +297,13 @@ public class HTTPClientInterface {
             if (config.m_adminInterface.length() > 0) {
                 adminInterface = config.m_adminInterface;
             }
-            m_connections.set(new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort));
+            AuthenticatedConnectionCache newCache = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
+            boolean setNewValue = m_connections.compareAndSet(null, newCache);
+            if (setNewValue) {
+                connection_cache = newCache;
+            } else {
+                connection_cache = m_connections.get();
+            }
         }
 
         // check for admin mode
@@ -320,7 +322,7 @@ public class HTTPClientInterface {
                 MessageDigest md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(ClientAuthHashScheme.HASH_SHA256));
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
-                return new AuthenticationResult(null, null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
+                return new AuthenticationResult(null, null, null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
@@ -329,14 +331,14 @@ public class HTTPClientInterface {
         // Hashedassword must be a 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)
         if (hashedPassword != null) {
             if (hashedPassword.length() != 40 && hashedPassword.length() != 64) {
-                return new AuthenticationResult(null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(null, null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
             try {
                 hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
             }
             catch (Exception e) {
-                return new AuthenticationResult(null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
+                return new AuthenticationResult(null, null, null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded). "
                         + "or 64-byte hex-encoded SHA-256 hash (32 bytes unencoded)");
             }
         }
@@ -346,15 +348,24 @@ public class HTTPClientInterface {
         try {
             // get a connection to localhost from the pool
             AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme =
-                    m_connections.get().getClient(username, password, hashedPasswordBytes, adminMode);
+                    connection_cache.getClient(username, password, hashedPasswordBytes, adminMode);
             if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
-                return new AuthenticationResult(clientWithScheme.m_client, clientWithScheme.m_scheme,
+                return new AuthenticationResult(clientWithScheme.m_client, connection_cache, clientWithScheme.m_scheme,
                         adminMode, username, "");
             }
-            return new AuthenticationResult(null, null, adminMode, username, "Failed to get client.");
+            return new AuthenticationResult(null, null, null, adminMode, username, "Failed to get client.");
         } catch (IOException ex) {
-            return new AuthenticationResult(null, null, adminMode, username, ex.getMessage());
+            return new AuthenticationResult(null, null, null, adminMode, username, ex.getMessage());
         }
+    }
+
+    private void closeAllAsync(final AuthenticatedConnectionCache cache) {
+        m_closeAllExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                cache.closeAll();
+            }
+        });
     }
 
     //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
@@ -369,13 +380,17 @@ public class HTTPClientInterface {
     //Must be called by all who call authenticate.
     public void releaseClient(AuthenticationResult authResult, boolean force) {
         if (authResult != null && authResult.m_client != null) {
-            assert(m_connections != null);
-            m_connections.get().releaseClient(authResult.m_client, authResult.m_scheme, force);
+            assert(authResult.m_connectionCache != null);
+            authResult.m_connectionCache.releaseClient(authResult.m_client, authResult.m_scheme, force || (authResult.m_connectionCache != m_connections.get()));
         }
     }
 
     public void notifyOfCatalogUpdate()
     {
-        m_shouldUpdateCatalog.set(true);
+        AuthenticatedConnectionCache cache = m_connections.get();
+        if (cache!=null) {
+            m_oldCache = cache;
+        }
+        m_connections.set(null);
     }
 }
