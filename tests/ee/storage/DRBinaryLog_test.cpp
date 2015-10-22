@@ -115,6 +115,7 @@ public:
     bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
     void setIsActiveActiveDREnabled(bool enabled) { m_isActiveActiveEnabled = enabled; }
     Table* getDRConflictTable(PersistentTable* drTable) { return m_conflictExportTable; }
+    ExportTupleStream* getExportTupleStream() { return m_exportStream; }
     ExecutorContext* getExecutorContext() { return m_context.get(); }
 
 private:
@@ -234,32 +235,6 @@ public:
                                                                                                           singleColumnName,
                                                                                                           tableHandle + 1, false, 0));
         m_singleColumnTable->setDR(true);
-
-        // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
-        std::vector<ValueType> exportColumnType;
-        std::vector<int32_t> exportColumnLength;
-        std::vector<bool> exportColumnAllowNull(10, false);
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(7); /* length of 'P_TABLE' */
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        exportColumnType.push_back(VALUE_TYPE_DECIMAL);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(15);
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(300);
-        exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
-
-        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
-        string exportColumnNamesArray[10] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
-                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT", "C_DECIMAL",
-                                            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
-        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
-
-        m_exportStream = new MockExportTupleStream(1, 1);
-        m_exportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
-                                                                m_exportSchema, exportColumnName,
-                                                                m_exportStream, true);
     }
 
     virtual ~DRBinaryLogTest() {
@@ -276,7 +251,6 @@ public:
         delete m_otherTableWithoutIndex;
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
-        delete m_exportTable;
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
@@ -498,36 +472,40 @@ public:
         }
     }
 
-    void verifyExistingTableForDelete(TableTuple &existingTuple, DRRecordType action, DRConflictType deleteConflict, int64_t timestamp) {
+    TableTuple verifyExistingTableForDelete(TableTuple &existingTuple, DRRecordType action, DRConflictType deleteConflict, int64_t timestamp) {
         PersistentTable* existingTable = reinterpret_cast<PersistentTable*>(m_topend.existingRowsForDelete.get());
         TableTuple tempTuple = existingTable->tempTuple();
         createConflictExportTuple(&tempTuple, &existingTuple, EXISTING_ROW, action, deleteConflict, 0, timestamp);
         TableTuple tuple = existingTable->lookupTupleByValues(tempTuple);
-        ASSERT_FALSE(tuple.isNullTuple());
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
     }
 
-    void verifyExpectedTableForDelete(TableTuple &expectedTuple, DRRecordType action, DRConflictType deleteConflict, int64_t timestamp) {
+    TableTuple verifyExpectedTableForDelete(TableTuple &expectedTuple, DRRecordType action, DRConflictType deleteConflict, int64_t timestamp) {
         PersistentTable* expectedTable = reinterpret_cast<PersistentTable*>(m_topend.expectedRowsForDelete.get());
         TableTuple tempTuple = expectedTable->tempTuple();
         createConflictExportTuple(&tempTuple, &expectedTuple, EXPECTED_ROW, action, deleteConflict, 0, timestamp);
         TableTuple tuple = expectedTable->lookupTupleByValues(tempTuple);
-        ASSERT_FALSE(tuple.isNullTuple());
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
     }
 
-    void verifyExistingTableForInsert(TableTuple &existingTuple, DRRecordType action, DRConflictType insertConflict, int64_t timestamp) {
+    TableTuple verifyExistingTableForInsert(TableTuple &existingTuple, DRRecordType action, DRConflictType insertConflict, int64_t timestamp) {
         PersistentTable* existingTable = reinterpret_cast<PersistentTable*>(m_topend.existingRowsForInsert.get());
         TableTuple tempTuple = existingTable->tempTuple();
         createConflictExportTuple(&tempTuple, &existingTuple, EXISTING_ROW, action, insertConflict, 0, timestamp);
         TableTuple tuple = existingTable->lookupTupleByValues(tempTuple);
-        ASSERT_FALSE(tuple.isNullTuple());
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
     }
 
-    void verifyNewTableForInsert(TableTuple &newTuple, DRRecordType action, DRConflictType insertConflict, int64_t timestamp) {
+    TableTuple verifyNewTableForInsert(TableTuple &newTuple, DRRecordType action, DRConflictType insertConflict, int64_t timestamp) {
         PersistentTable* newTable = reinterpret_cast<PersistentTable*>(m_topend.newRowsForInsert.get());
         TableTuple tempTuple = newTable->tempTuple();
         createConflictExportTuple(&tempTuple, &newTuple, NEW_ROW, action, insertConflict, 0, timestamp);
         TableTuple tuple = newTable->lookupTupleByValues(tempTuple);
-        ASSERT_FALSE(tuple.isNullTuple());
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
     }
 
     void simpleDeleteTest() {
@@ -628,7 +606,6 @@ public:
 protected:
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
-    ExportTupleStream* m_exportStream;
 
     TupleSchema* m_schema;
     TupleSchema* m_replicatedSchema;
@@ -651,7 +628,6 @@ protected:
     PersistentTable* m_otherTableWithoutIndexReplica;
     // This table does not exist on the replica
     PersistentTable* m_singleColumnTable;
-    Table* m_exportTable;
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
@@ -755,31 +731,6 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(-1, committed.seqNum);
 }
-
-//TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
-//    ASSERT_FALSE(flush(98));
-//
-//    // single row write transaction
-//    beginTxn(99, 99, 98, 70);
-//    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
-//    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
-//    endTxn(true);
-//
-//    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
-//    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
-//    ASSERT_FALSE(received_tuple.isNullTuple());
-//    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
-//    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
-//    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
-//    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
-//    // Now compare the rest of columns
-//    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
-//    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
-//    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
-//    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
-//    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
-//    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
-//}
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
@@ -1179,11 +1130,19 @@ TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
-    verifyExistingTableForInsert(existingTuple, DR_RECORD_INSERT, CONFLICT_CONSTRAINT_VIOLATION, 71);
+    TableTuple exportTuple1 = verifyExistingTableForInsert(existingTuple, DR_RECORD_INSERT, CONFLICT_CONSTRAINT_VIOLATION, 71);
 
     // verify new table
     EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
-    verifyNewTableForInsert(newTuple, DR_RECORD_INSERT, CONFLICT_CONSTRAINT_VIOLATION, 72);
+    TableTuple exportTuple2 = verifyNewTableForInsert(newTuple, DR_RECORD_INSERT, CONFLICT_CONSTRAINT_VIOLATION, 72);
+
+    // check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
 }
 
 /*
@@ -1235,16 +1194,24 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_DELETE);
 
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISSING);
     // verify existing table
     EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
     // verfiy expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    verifyExpectedTableForDelete(expectedTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, 70);
+    TableTuple exportTuple = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, 70);
 
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
     ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(1, exportStream->receivedTuples.size());
+    TableTuple receivedTuple = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple.equals(exportTuple));
 }
 
 /*
@@ -1301,20 +1268,27 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_DELETE);
 
-    // check delete conflict part
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingRowsForDelete->activeTupleCount());
-    verifyExistingTableForDelete(existingTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, 71);
-
+    TableTuple exportTuple1 = verifyExistingTableForDelete(existingTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, 71);
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    verifyExpectedTableForDelete(expectedTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, 70);
+    TableTuple exportTuple2 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, 70);
 
-    // check insert conflict part
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
     ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
 }
 
 /*
@@ -1379,20 +1353,27 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
-    // check delete conflict part
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForDelete.get() == NULL);
     ASSERT_TRUE(m_topend.expectedRowsForDelete.get() == NULL);
 
-    // check insert conflict part
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
-    verifyExistingTableForInsert(existingTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
-
+    TableTuple exportTuple1 = verifyExistingTableForInsert(existingTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
     // verify new table
     EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
-    verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 72);
+    TableTuple exportTuple2 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 72);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
 }
 
 /*
@@ -1444,18 +1425,24 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
-    // check delete conflict part
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISSING);
     // verify existing table
     EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, 70);
+    TableTuple exportTuple = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, 70);
 
-    // check insert conflict part
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
     ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(1, exportStream->receivedTuples.size());
+    TableTuple receivedTuple = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple.equals(exportTuple));
 }
 
 
@@ -1519,22 +1506,32 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
-    // check delete conflict part
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISSING);
     // verify existing table
     EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, 70);
+    TableTuple exportTuple1 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, 70);
 
-    // check insert conflict part
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
-    verifyExistingTableForInsert(existingTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
+    TableTuple exportTuple2 = verifyExistingTableForInsert(existingTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
     // verify new table
     EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
-    verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 72);
+    TableTuple exportTuple3 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 72);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+    TableTuple receivedTuple3 = exportStream->receivedTuples[2];
+    ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
 }
 
 /*
@@ -1595,18 +1592,27 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
-    // check delete conflict part
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingRowsForDelete->activeTupleCount());
-    verifyExistingTableForDelete(existingTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 71);
+    TableTuple exportTuple1 = verifyExistingTableForDelete(existingTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 71);
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 70);
+    TableTuple exportTuple2 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 70);
 
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
     ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
 }
 
 /**
@@ -1675,23 +1681,37 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     EXPECT_EQ(2, m_table->activeTupleCount());
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
-    // check delete conflict part
+    // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
     // verify existing table
     EXPECT_EQ(1, m_topend.existingRowsForDelete->activeTupleCount());
-    verifyExistingTableForDelete(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 71);
+    TableTuple exportTuple1 = verifyExistingTableForDelete(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 71);
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 70);
+    TableTuple exportTuple2 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, 70);
 
-    // check insert conflict part
+    // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
     EXPECT_EQ(2, m_topend.existingRowsForInsert->activeTupleCount());
-    verifyExistingTableForInsert(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
-    verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
+    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
+    TableTuple exportTuple4 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 71);
     // verify new table
-    verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 72);
+    TableTuple exportTuple5 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, 72);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(5, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+    TableTuple receivedTuple3 = exportStream->receivedTuples[2];
+    ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
+    TableTuple receivedTuple4 = exportStream->receivedTuples[3];
+    ASSERT_TRUE(receivedTuple4.equals(exportTuple4));
+    TableTuple receivedTuple5 = exportStream->receivedTuples[4];
+    ASSERT_TRUE(receivedTuple5.equals(exportTuple5));
 }
 
 int main() {
