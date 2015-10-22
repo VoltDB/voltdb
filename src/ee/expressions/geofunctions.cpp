@@ -237,4 +237,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
                                                static_cast<int32_t>(oss.str().length()));
 }
 
+template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
+    std::unique_ptr<S2Polygon> s2Poly = arguments[0].getGeography().toS2Polygon();
+    S2Point s2Point = arguments[1].getPoint().toS2Point();
+    return ValueFactory::getBooleanValue(s2Poly->Contains(s2Point));
+}
+
 } // end namespace voltdb

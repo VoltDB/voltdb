@@ -431,6 +431,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
             break;
+        case FUNC_VOLT_CONTAINS:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_CONTAINS>(*arguments);
+            break;
         default:
             return NULL;
         }

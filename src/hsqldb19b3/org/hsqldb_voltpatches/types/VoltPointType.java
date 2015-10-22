@@ -88,7 +88,7 @@ public class VoltPointType extends Type {
 
     @Override
     public boolean canConvertFrom(Type otherType) {
-        return false;
+        return otherType instanceof VoltPointType;
     }
 
     @Override
