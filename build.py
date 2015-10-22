@@ -83,18 +83,18 @@ if CTX.compilerName() == 'gcc':
 	print("GCC Version %d.%d.%d is too old\n" 
 	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel())); 
 	sys.exit(-1);
-    if CTX.compilerMinorVersion() == 4:
-	CTX.CXX_VERSION_FLAG = "--std=c++0x"
-	print("Building with C++ 0x\n")
+    if 4 <= CTX.compilerMinorVersion() <= 6:
+	   CTX.CXX_VERSION_FLAG = "--std=c++0x"
+	   print("Building with C++ 0x\n")
     else:
-	CTX.CXX_VERSION_FLAG ="--std=c++11"
+	   CTX.CXX_VERSION_FLAG ="--std=c++11"
 	print("Building with C++11")
 elif CTX.compilerName() == 'clang':
     CTX.CXX_VERSION_FLAG="--std=c++11"
 CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
 
 # linker flags
-CTX.LDFLAGS += """ -g3"""
+CTX.LDFLAGS += """ -g3 """
 CTX.LASTLDFLAGS = """ -ldl """
 CTX.LASTIPCLDFLAGS = """ """
 
