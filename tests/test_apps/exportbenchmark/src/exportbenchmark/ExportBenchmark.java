@@ -243,7 +243,7 @@ public class ExportBenchmark {
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
-                //Get highest timestamp and watch is change
+                //Get highest timestamp and watch it change
                 if (tts > ts) {
                     ts = tts;
                 }

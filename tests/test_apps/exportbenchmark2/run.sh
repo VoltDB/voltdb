@@ -21,7 +21,7 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
     VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
     VOLTDB_VOLTDB="$VOLTDB_LIB"
-# distribution layout has libraries in separate lib and voltdb directories
+    # distribution layout has libraries in separate lib and voltdb directories
 else
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
     VOLTDB_LIB="$VOLTDB_BASE/lib"
@@ -29,10 +29,11 @@ else
 fi
 
 APPCLASSPATH=$CLASSPATH:$({ \
-    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/*.jar; \
-    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+\echo ${APPNAME}2-client.jar; \
+\ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+\ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
+echo "APPCLASSPATH: " $APPCLASSPATH
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -40,52 +41,52 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
+rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
 }
 
 # Grab the necessary command line arguments
 function parse_command_line() {
-    OPTIND=1
-    
-    while getopts ":h?e:n:" opt; do
-	case "$opt" in
-	e)
-	    ARG=$( echo $OPTARG | tr "," "\n" )
-	    for e in $ARG; do
-		EXPORTS+=("$e")
-	    done
-	    ;;
-	n)
-	    COUNT=$OPTARG
-	    ;;
-	esac
-    done
+OPTIND=1
 
-    # Return the function to run
-    shift $(($OPTIND - 1))
-    RUN=$@
+while getopts ":h?e:n:" opt; do
+    case "$opt" in
+        e)
+        ARG=$( echo $OPTARG | tr "," "\n" )
+        for e in $ARG; do
+            EXPORTS+=("$e")
+        done
+        ;;
+        n)
+        COUNT=$OPTARG
+        ;;
+    esac
+done
+
+# Return the function to run
+shift $(($OPTIND - 1))
+RUN=$@
 }
 
 function build_deployment_file() {
-    exit
+exit
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
-    mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/exportbenchmark/*.java \
-        src/exportbenchmark/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-    (cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
+mkdir -p obj
+javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+src/exportbenchmark/*.java \
+src/exportbenchmark/procedures/*.java
+# stop if compilation fails
+if [ $? != 0 ]; then exit; fi
+(cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
 
-    cp ./obj/*.jar "$VOLTDB_LIB/"
+cp ./obj/*.jar "$VOLTDB_LIB/"
 }
 
 # build an application catalog
 function catalog() {
-    srccompile
+srccompile
     echo "Compiling the export-benchmark application catalog."
     echo "To perform this action manually, use the command line: "
     echo
@@ -130,9 +131,9 @@ function run_benchmark_help() {
 }
 
 function run_benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        exportbenchmark.ExportBenchmark \
+    # srccompile
+    java -classpath :$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        exportbenchmark2.client.exportbenchmark.ExportBenchmark \
         --duration=30 \
         --servers=localhost \
 	--statsfile=exportbench.csv
