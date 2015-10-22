@@ -48,7 +48,7 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
-    bool reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, DRRecordType action,
+    bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
             DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert);
 

@@ -120,7 +120,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                 table->insertPersistentTuple(tempTuple, true);
             } catch (ConstraintFailureException &e) {
                 if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    if (handleConflict(engine, table, pool, NULL, NULL, e.getConflictTuple(), uniqueId, sequenceNumber, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
+                    if (handleConflict(engine, table, pool, NULL, NULL, e.getConflictTuple(), uniqueId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                         continue;
                     }
                 }
@@ -150,7 +150,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
             if (deleteTuple.isNullTuple()) {
                 if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, sequenceNumber, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
+                    if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                         continue;
                     }
                 }
@@ -166,7 +166,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                 int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
                 if (localTimestamp != remoteTimestamp) {
                     // timestamp mismatch conflict
-                    if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, sequenceNumber, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
+                    if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
                         continue;
                     }
                 }
@@ -206,7 +206,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                     oldTuple.copyForPersistentInsert(tempTuple, pool);
                     ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
                     tempTuple.deserializeFromDR(newRowInput, pool);
-                    if (handleConflict(engine, table, pool, NULL, &oldTuple, &tempTuple, uniqueId, sequenceNumber, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
+                    if (handleConflict(engine, table, pool, NULL, &oldTuple, &tempTuple, uniqueId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                         continue;
                     }
                 }
@@ -228,7 +228,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                     expectedTuple.copyForPersistentInsert(tempTuple, pool);
                     ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
                     tempTuple.deserializeFromDR(newRowInput, pool);
-                    if (handleConflict(engine, table, pool, &oldTuple, &expectedTuple, &tempTuple, uniqueId, sequenceNumber, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
+                    if (handleConflict(engine, table, pool, &oldTuple, &expectedTuple, &tempTuple, uniqueId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
                         continue;
                     }
                 }
@@ -241,7 +241,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                 table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
             } catch (ConstraintFailureException &e) {
                 if (isActiveActiveDREnabled && table->isDREnabled()) {
-                    if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(), e.getConflictTuple(), uniqueId, sequenceNumber, DR_RECORD_UPDATE, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
+                    if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(), e.getConflictTuple(), uniqueId, DR_RECORD_UPDATE, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                         continue;
                     }
                 }
@@ -487,7 +487,7 @@ void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const
 }
 
 bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, TableTuple *expectedTuple, TableTuple *newTuple,
-        int64_t uniqueId, int64_t sequenceNumber, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
+        int64_t uniqueId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
     if (!engine) {
         return false;
     }
@@ -597,7 +597,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
 //    //=================================================================
 
     bool diverge = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
-                                                                                      sequenceNumber,
+                                                                                      UniqueId::timestamp(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,

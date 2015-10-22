@@ -71,7 +71,7 @@ namespace voltdb {
     }
 
 
-    bool DummyTopend::reportDRConflict(int32_t partitionId, int64_t remoteSequenceNumber, std::string tableName, DRRecordType action,
+    bool DummyTopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
             DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
         this->actionType = action;

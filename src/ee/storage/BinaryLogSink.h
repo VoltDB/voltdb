@@ -42,7 +42,7 @@ private:
      * Handle insert constraint violation
      */
     bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* conflictTuple, TableTuple* missingTuple, TableTuple* newTuple, int64_t uniqueId,
-            int64_t sequenceNumber, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
+            DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
 
     /**
      * Export the conflict log to downstream
