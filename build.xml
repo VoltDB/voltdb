@@ -938,7 +938,7 @@ DISTRIBUTION
 </target>
 
 <target name="prep_libvoltdb">
-    <copy todir='voltdb'>
+    <copy todir='voltdb' overwrite="true">
         <fileset dir="${build.dir}/nativelibs">
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
