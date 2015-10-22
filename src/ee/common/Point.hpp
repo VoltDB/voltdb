@@ -24,6 +24,9 @@
 #include "common/MiscUtil.h"
 #include "common/value_defs.h"
 
+#include "s2geo/s2.h"
+#include "s2geo/s2latlng.h"
+
 namespace voltdb {
 /**
  * A class for representing instances of geo-spatial points.
@@ -71,6 +74,10 @@ public:
 
     Coord getLongitude() const {
         return m_longitude;
+    }
+
+    S2Point toS2Point() const {
+        return S2LatLng::FromDegrees(getLatitude(), getLongitude()).ToPoint();
     }
 
     int compareWith(const Point& rhs) const {

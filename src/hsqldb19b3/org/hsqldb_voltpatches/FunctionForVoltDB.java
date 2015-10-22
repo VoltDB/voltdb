@@ -131,6 +131,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_POINTFROMTEXT        = 20031;
         static final int FUNC_VOLT_POLYGONFROMTEXT      = 20032;
+        static final int FUNC_VOLT_CONTAINS             = 20033;
 
         private static final FunctionId[] instances = {
 
@@ -232,7 +233,12 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
             new FunctionId("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET })
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+                    new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_POINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET })
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();

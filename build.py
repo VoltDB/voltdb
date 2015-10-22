@@ -82,8 +82,8 @@ if CTX.PROFILE:
 # This should match the calculation in CMakeLists.txt
 if CTX.compilerName() == 'gcc':
     if (CTX.compilerMajorVersion() < 4) or (CTX.compilerMajorVersion() == 4) and (CTX.compilerMinorVersion() < 4):
-	print("GCC Version %d.%d.%d is too old\n" 
-	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel())); 
+	print("GCC Version %d.%d.%d is too old\n"
+	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()));
 	sys.exit(-1);
     if 4 <= CTX.compilerMinorVersion() <= 6:
 	CTX.CXX_VERSION_FLAG = "--std=c++0x"
@@ -395,7 +395,7 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
 ###############################################################################
 # Some special handling for S2.
 ###############################################################################
-CTX.S2GEO_LIBS += " -Lgoogle-s2-geometry/lib -ls2geo"
+CTX.S2GEO_LIBS += " -Lgoogle-s2-geometry/lib -ls2geo -lcrypto "
 CTX.OBJ_INCLUDE_DIRS += ['google-s2-geometry/include']
 CTX.LASTLDFLAGS += CTX.S2GEO_LIBS
 
