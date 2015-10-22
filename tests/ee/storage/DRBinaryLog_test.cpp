@@ -350,7 +350,7 @@ public:
         return temp_tuple;
     }
 
-    void createConflictExportTuple(TableTuple *outputTuple, TableTuple *tupleToBeWrote, DRConflictRowType rowType, DRRecordType actionType, DRConflictType conflictType, int64_t clusterId, int64_t timestamp) {
+    void createConflictExportTuple(TableTuple *outputTuple, TableTuple *tupleToBeWrote, DRConflictRowType rowType, DRRecordType actionType, DRConflictType conflictType, int8_t clusterId, int64_t timestamp) {
         outputTuple->setNValue(0, ValueFactory::getTinyIntValue(rowType));
         outputTuple->setNValue(1, ValueFactory::getTinyIntValue(actionType));
         outputTuple->setNValue(2, ValueFactory::getTinyIntValue(conflictType));
