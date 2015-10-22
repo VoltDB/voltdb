@@ -144,7 +144,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
-    public boolean processDRConflict(int partitionId, long remoteSequenceNumber, String tableName, DRRecordType action,
+    public boolean processDRConflict(int partitionId, long remoteTimestamp, String tableName, DRRecordType action,
                                  DRConflictType deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
                                  DRConflictType insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
         return false;
@@ -166,7 +166,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
-    public static boolean reportDRConflict(int partitionId, long remoteSequenceNumber, String tableName, int action,
+    public static boolean reportDRConflict(int partitionId, long remoteTimestamp, String tableName, int action,
                                        int deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
                                        int insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
@@ -174,7 +174,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
 
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber, tableName, DRRecordType.values()[action],
+        return pdrg.processDRConflict(partitionId, remoteTimestamp, tableName, DRRecordType.values()[action],
                 DRConflictType.values()[deleteConflict], existingTableForDelete, expectedTableForDelete,
                 DRConflictType.values()[insertConflict], existingTableForInsert, newTableForInsert);
     }
