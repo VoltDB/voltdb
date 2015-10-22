@@ -545,6 +545,11 @@ enum DRRowDecision {
    DELETE_ROW
 };
 
+enum DRDivergence {
+    NOT_DIVERGE,
+    DIVERGE,
+};
+
 // ------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------

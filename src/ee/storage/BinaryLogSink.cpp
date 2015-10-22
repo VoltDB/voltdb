@@ -421,9 +421,10 @@ static void createConflictExportTuple(TempTable *outputTable, PersistentTable *d
     default:
         break;
     }
-    tempTuple.setNValue(4, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
-    tempTuple.setNValue(5, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
-    tempTuple.setNValues(6, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
+    tempTuple.setNValue(4, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+    tempTuple.setNValue(5, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
+    tempTuple.setNValue(6, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
+    tempTuple.setNValues(7, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
 
     outputTable->insertTupleNonVirtualWithDeepCopy(tempTuple, pool);
 }
@@ -437,6 +438,9 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (existingTableForDelete) {
         TableIterator iterator = existingTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
+            if (diverge) {
+                tempTuple.setNValue(4, ValueFactory::getTinyIntValue(DIVERGE));
+            }
             exportTable->insertTuple(tempTuple);
         }
     }
@@ -444,6 +448,9 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (expectedTableForDelete) {
         TableIterator iterator = expectedTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
+            if (diverge) {
+                tempTuple.setNValue(4, ValueFactory::getTinyIntValue(DIVERGE));
+            }
             exportTable->insertTuple(tempTuple);
         }
     }
@@ -451,6 +458,9 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (existingTableForInsert) {
         TableIterator iterator = existingTableForInsert->iterator();
         while (iterator.next(tempTuple)) {
+            if (diverge) {
+                tempTuple.setNValue(4, ValueFactory::getTinyIntValue(DIVERGE));
+            }
             exportTable->insertTuple(tempTuple);
         }
     }
@@ -458,11 +468,11 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (newTableInsert) {
         TableIterator iterator = newTableInsert->iterator();
         while (iterator.next(tempTuple)) {
+            if (diverge) {
+                tempTuple.setNValue(4, ValueFactory::getTinyIntValue(DIVERGE));
+            }
             exportTable->insertTuple(tempTuple);
         }
-    }
-    if (diverge) {
-        // TODO: write a special row to indicate divergence
     }
 }
 

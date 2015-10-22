@@ -81,7 +81,8 @@ public:
 
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
-        std::vector<bool> exportColumnAllowNull(12, false);
+        std::vector<bool> exportColumnAllowNull(13, false);
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
         exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
@@ -97,10 +98,10 @@ public:
         exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
 
         m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
-        string exportColumnNamesArray[12] = { "VOLTDB_AUTOGEN_ROW_TYPE", "VOLTDB_AUTOGEN_ACTION_TYPE", "VOLTDB_AUTOGEN_CONFLICT_TYPE",
-                                           "VOLTDB_AUTOGEN_ROW_DECISION", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
+        string exportColumnNamesArray[13] = { "VOLTDB_AUTOGEN_ROW_TYPE", "VOLTDB_AUTOGEN_ACTION_TYPE", "VOLTDB_AUTOGEN_CONFLICT_TYPE",
+                                           "VOLTDB_AUTOGEN_ROW_DECISION", "VOLTDB_AUTOGEN_DIVERGENCE", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
                                            "C_TINYINT", "C_BIGINT", "C_DECIMAL", "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
-        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 12);
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 13);
 
         m_exportStream = new MockExportTupleStream(1, 1);
         m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
@@ -349,24 +350,25 @@ public:
         return temp_tuple;
     }
 
-    void createConflictExportTuple(TableTuple *outputTable, TableTuple *tupleToBeWrote, DRConflictRowType rowType, DRRecordType actionType, DRConflictType conflictType, int64_t clusterId, int64_t timestamp) {
-        outputTable->setNValue(0, ValueFactory::getTinyIntValue(rowType));
-        outputTable->setNValue(1, ValueFactory::getTinyIntValue(actionType));
-        outputTable->setNValue(2, ValueFactory::getTinyIntValue(conflictType));
+    void createConflictExportTuple(TableTuple *outputTuple, TableTuple *tupleToBeWrote, DRConflictRowType rowType, DRRecordType actionType, DRConflictType conflictType, int64_t clusterId, int64_t timestamp) {
+        outputTuple->setNValue(0, ValueFactory::getTinyIntValue(rowType));
+        outputTuple->setNValue(1, ValueFactory::getTinyIntValue(actionType));
+        outputTuple->setNValue(2, ValueFactory::getTinyIntValue(conflictType));
         switch (rowType) {
         case EXISTING_ROW:
         case EXPECTED_ROW:
-            outputTable->setNValue(3, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
+            outputTuple->setNValue(3, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
             break;
         case NEW_ROW:
-            outputTable->setNValue(3, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
+            outputTuple->setNValue(3, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
             break;
         default:
             break;
         }
-        outputTable->setNValue(4, ValueFactory::getTinyIntValue(clusterId));    // clusterId
-        outputTable->setNValue(5, ValueFactory::getBigIntValue(timestamp));     // timestamp
-        outputTable->setNValues(6, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
+        outputTuple->setNValue(4, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+        outputTuple->setNValue(5, ValueFactory::getTinyIntValue(clusterId));    // clusterId
+        outputTuple->setNValue(6, ValueFactory::getBigIntValue(timestamp));     // timestamp
+        outputTuple->setNValues(7, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
     }
 
     void deepCopy(TableTuple &target, TableTuple &copy, boost::shared_array<char> &data) {
