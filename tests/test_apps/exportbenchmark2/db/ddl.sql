@@ -1,4 +1,4 @@
-LOAD CLASSES exportbenchmark2.jar;
+LOAD CLASSES sp.jar;
 
 CREATE TABLE ALL_VALUES_EXPORT1 (
   txnid                     BIGINT        NOT NULL

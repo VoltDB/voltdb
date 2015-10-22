@@ -1,57 +1,36 @@
-<!-- Simple build file to build  export benchmark -->
+<!-- Simple build file to build ... whatever -->
 <project name="exportbenchmark2" basedir="." default="all">
 
-    <property name="voltlibext.dir"     value="../../../lib/extension"/>
-
-    <property name="src.dir"     value="${basedir}/db/exportbenchmark"/>
+    <property name="procedures.dir"     value="${basedir}/db/exportbenchmark/procedures"/>
     <property name="clientsrc.dir"     value="${basedir}/client/exportbenchmark"/>
-    <property name="exportsrc.dir"     value="${basedir}/exporter/exportbenchmark"/>
+    <property name="exportersrc.dir"     value="${basedir}/exporter/exportbenchmark"/>
 
     <property name="build.dir"   value="build"/>
     <property name="classes.dir" value="${build.dir}/classes"/>
-    <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
-    <property name="procedureclasses.dir" value="${build.dir}/pclasses"/>
-    <property name="exportclasses.dir" value="${build.dir}/eclasses"/>
+    <property name="clientclasses.dir" value="${build.dir}/cclasses/exportbenchmark2/client"/>
+    <property name="proceduresclasses.dir" value="${build.dir}/cclasses/exportbenchmark2/db"/>
+    <property name="exporterclasses.dir" value="${build.dir}/cclasses/exportbenchmark2/exporter"/>
     <property name="jar.dir"     value="${basedir}"/>
     <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
     <property name="log.dir"     value="${basedir}/log"/>
+
+    <target name="all" depends="client, procedures, exporter"/>
 
     <target name="clean">
         <delete dir="${build.dir}"/>
         <delete dir="${log.dir}"/>
         <delete dir="${voltdbroot.dir}"/>
         <delete dir="${basedir}/felix-cache"/>
-        <delete file="${jar.dir}/${ant.project.name}-client.jar"/>
-        <delete file="${jar.dir}/${ant.project.name}.jar"/>
+        <delete file="${jar.dir}/client.jar"/>
         <delete file="${basedir}/catalog-report.html"/>
     </target>
 
     <path id="build-classpath">
        <fileset dir="${basedir}/../../../voltdb">
+           <!-- <include name="voltdbclient*.jar"/> -->
          <include name="voltdb*.jar"/>
        </fileset>
-       <fileset dir="${basedir}/../../../lib">
-         <include name="*.jar"/>
-       </fileset>
-       <fileset dir="${basedir}/../../../lib/extension">
-         <include name="*.jar"/>
-       </fileset>
     </path>
-
-    <target name="all" depends="client, procedures, exporter"/>
-
-    <target name="exporter-compile">
-        <mkdir dir="${exportclasses.dir}"/>
-        <javac target="1.7" source="1.7" debug="on" srcdir="${exportsrc.dir}" destdir="${exportclasses.dir}" >
-            <classpath refid="build-classpath"/>
-        </javac>
-    </target>
-
-    <target name="exporter" depends="exporter-compile">
-        <mkdir dir="${jar.dir}"/>
-        <jar destfile="${voltlibext.dir}/${ant.project.name}-export.jar" basedir="${exportclasses.dir}">
-        </jar>
-    </target>
 
     <target name="client-compile">
         <mkdir dir="${clientclasses.dir}"/>
@@ -62,21 +41,34 @@
 
     <target name="client" depends="client-compile">
         <mkdir dir="${jar.dir}"/>
-        <jar destfile="${jar.dir}/${ant.project.name}-client.jar" basedir="${clientclasses.dir}">
+        <jar destfile="${jar.dir}/client.jar" basedir="${clientclasses.dir}">
         </jar>
     </target>
 
-    <target name="procedures" depends="procedure-compile">
-        <mkdir dir="${jar.dir}"/>
-        <jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${procedureclasses.dir}">
-        </jar>
-    </target>
-
-    <target name="procedure-compile">
-        <mkdir dir="${procedureclasses.dir}"/>
-        <javac target="1.7" source="1.7" debug="on" srcdir="${src.dir}" destdir="${procedureclasses.dir}" >
+    <target name="procedures-compile">
+        <mkdir dir="${proceduresclasses.dir}"/>
+        <javac target="1.7" source="1.7" debug="on" srcdir="${procedures.dir}" destdir="${proceduresclasses.dir}" >
             <classpath refid="build-classpath"/>
         </javac>
     </target>
-    
+
+    <target name="procedures" depends="procedures-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/sp.jar" basedir="${proceduresclasses.dir}">
+        </jar>
+    </target>
+
+    <target name="exporter-compile">
+        <mkdir dir="${exporterclasses.dir}"/>
+        <javac target="1.7" source="1.7" debug="on" srcdir="${exportersrc.dir}" destdir="${exporterclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="exporter" depends="exporter-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/exporter.jar" basedir="${exporterclasses.dir}">
+        </jar>
+    </target>
+
 </project>

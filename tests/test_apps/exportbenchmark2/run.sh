@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="exportbenchmark"
+APPNAME="exportbenchmark2"
 COUNT=10000
 
 # find voltdb binaries in either installation or distribution directory.
@@ -29,7 +29,7 @@ else
 fi
 
 APPCLASSPATH=$CLASSPATH:$({ \
-\echo ${APPNAME}2-client.jar; \
+\echo client.jar; \
 \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
 \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
@@ -41,7 +41,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
+rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark2.jar"
 }
 
 # Grab the necessary command line arguments
@@ -75,11 +75,11 @@ exit
 function srccompile() {
 mkdir -p obj
 javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-src/exportbenchmark/*.java \
-src/exportbenchmark/procedures/*.java
+src/exportbenchmark2/*.java \
+src/exportbenchmark2/procedures/*.java
 # stop if compilation fails
 if [ $? != 0 ]; then exit; fi
-(cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
+(cd obj && jar cvf ExportBenchmark2.jar exportbenchmark2/*)
 
 cp ./obj/*.jar "$VOLTDB_LIB/"
 }
@@ -127,7 +127,7 @@ function client() {
 
 function run_benchmark_help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj exportbenchmark.ExportBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj exportbenchmark2.ExportBenchmark --help
 }
 
 function run_benchmark() {
