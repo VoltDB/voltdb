@@ -20,6 +20,8 @@ package org.voltdb;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -29,20 +31,32 @@ import org.voltdb.utils.LogKeys;
 /**
  * A wrapper around a PostgreSQL database server, and JDBC connection. This
  * class can be used to execute SQL statements instead of the C++ ExecutionEngine.
- * It is currently used only by the SQL Coverage tests.
+ * It is currently used only by the SQL Coverage tests (and perhaps, someday,
+ * the JUnit regressionsuite tests).
  */
-public class PostgreSQLBackend extends GenericBackend {
+public class PostgreSQLBackend extends NonVoltDBBackend {
     /** java.util.logging logger. */
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(PostgreSQLBackend.class.getName());
 
-    private static final Object backendLock = new Object();
     private static final String m_default_username = "postgres";
     private static final String m_default_password = "voltdb";
     private static final String m_permanent_database_name = "postgres";
     private static final String m_database_name = "sqlcoveragetest";
     private static PostgreSQLBackend m_permanent_db_backend = null;
-    private static PostgreSQLBackend m_backend = null;
+    // PostgreSQL column type names that are not found in VoltDB or HSqlDB
+    private static final Map<String,String> m_PostgreSQLTypeNames;
+    static {
+        m_PostgreSQLTypeNames = new HashMap<String,String>();
+        m_PostgreSQLTypeNames.put("int2", "SMALLINT");
+        m_PostgreSQLTypeNames.put("int4", "INTEGER");
+        m_PostgreSQLTypeNames.put("int8", "BIGINT");
+        m_PostgreSQLTypeNames.put("float8", "FLOAT");
+        m_PostgreSQLTypeNames.put("numeric", "DECIMAL");
+        m_PostgreSQLTypeNames.put("bytea", "VARBINARY");
+        m_PostgreSQLTypeNames.put("char", "CHARACTER");
+        m_PostgreSQLTypeNames.put("text", "VARCHAR");
+    }
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -73,17 +87,7 @@ public class PostgreSQLBackend extends GenericBackend {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
             }
-            return m_backend;
-        }
-    }
-
-    static public void shutdownInstance()
-    {
-        synchronized(backendLock) {
-            if (m_backend != null) {
-                m_backend.shutdown();
-                m_backend = null;
-            }
+            return (PostgreSQLBackend) m_backend;
         }
     }
 
@@ -126,36 +130,24 @@ public class PostgreSQLBackend extends GenericBackend {
     /**
      * Returns a VoltTable.ColumnInfo of appropriate type, based on a
      * <i>typeName</i> and <i>colName</i> (both Strings).
-     * This version checks for special column types used by PostgreSQL,
+     * This version checks for column types used only by PostgreSQL,
      * and then passes the remaining work to the base class version.
      */
     @Override
     protected VoltTable.ColumnInfo getColumnInfo(String typeName, String colName) {
-        if (typeName.equalsIgnoreCase("TINYINT"))
-            return new VoltTable.ColumnInfo(colName, VoltType.SMALLINT);
-        else if (typeName.equals("int2"))
-            return new VoltTable.ColumnInfo(colName, VoltType.SMALLINT);
-        else if (typeName.equals("int4"))
-            return new VoltTable.ColumnInfo(colName, VoltType.INTEGER);
-        else if (typeName.equals("int8"))
-            return new VoltTable.ColumnInfo(colName, VoltType.BIGINT);
-        else if (typeName.equalsIgnoreCase("NUMERIC"))
-            return new VoltTable.ColumnInfo(colName, VoltType.DECIMAL);
-        else if (typeName.equals("float8"))
-            return new VoltTable.ColumnInfo(colName, VoltType.FLOAT);
-        else if (typeName.equals("bytea"))
-            return new VoltTable.ColumnInfo(colName, VoltType.VARBINARY);
-        else if (typeName.equals("char") || typeName.equals("text"))
-            return new VoltTable.ColumnInfo(colName, VoltType.STRING);
-        else
-            return super.getColumnInfo(typeName, colName);
+        String postrgresqlType = m_PostgreSQLTypeNames.get(typeName);
+        if (postrgresqlType != null) {
+            typeName = postrgresqlType;
+        }
+        return super.getColumnInfo(typeName, colName);
     }
 
     private Connection getConnection() {
         return dbconn;
     }
 
-    private void shutdown() {
+    @Override
+    protected void shutdown() {
         try {
             dbconn.close();
             dbconn = null;

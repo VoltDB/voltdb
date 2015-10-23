@@ -28,15 +28,12 @@ import org.voltdb.utils.LogKeys;
 /**
  * A wrapper around the HSQLDB engine. This class can be used to execute SQL
  * statements instead of the C++ ExecutionEngine. It is currently used only
- * by the SQL Coverage tests.
+ * by the SQL Coverage and JUnit regressionsuite tests.
  */
-public class HsqlBackend extends GenericBackend {
+public class HsqlBackend extends NonVoltDBBackend {
     /** java.util.logging logger. */
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(HsqlBackend.class.getName());
-
-    private static final Object backendLock = new Object();
-    protected static HsqlBackend m_backend = null;
 
     static public HsqlBackend initializeHSQLBackend(long siteId, CatalogContext context)
     {
@@ -61,23 +58,13 @@ public class HsqlBackend extends GenericBackend {
                     VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
                 }
             }
-            return m_backend;
-        }
-    }
-
-    static public void shutdownInstance()
-    {
-        synchronized(backendLock) {
-            if (m_backend != null) {
-                m_backend.shutdown();
-                m_backend = null;
-            }
+            return (HsqlBackend) m_backend;
         }
     }
 
     /** Constructor specifying a siteId, which is used in the connectionURL. */
     public HsqlBackend(long siteId) {
-        super("HSQLDB", "org.hsqldb_voltpatches.jdbcDriver",
+        super("HSQL", "org.hsqldb_voltpatches.jdbcDriver",
               "jdbc:hsqldb:mem:x" + String.valueOf(siteId), "sa", "");
     }
 
@@ -86,7 +73,8 @@ public class HsqlBackend extends GenericBackend {
         super(dbconn);
     }
 
-    private void shutdown() {
+    @Override
+    protected void shutdown() {
         try {
             try {
                 Statement stmt = dbconn.createStatement();
