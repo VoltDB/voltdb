@@ -1396,9 +1396,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             + "local supplied path: " + m_config.m_pathToDeployment);
                     deploymentBytes = null;
                 }
+            } catch(KeeperException.NoNodeException e) {
+                // no deploymentBytes case is handled below. So just log this error.
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("Error trying to get deployment bytes from cluster", e);
+                }
             }
             if (deploymentBytes == null) {
-                hostLog.error("Deployment could not be obtained from cluster node or locally");
+                hostLog.error("Deployment information could not be obtained from cluster node or locally");
                 VoltDB.crashLocalVoltDB("No such deployment file: "
                         + m_config.m_pathToDeployment, false, null);
             }
