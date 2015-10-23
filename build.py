@@ -54,6 +54,8 @@ if CTX.compilerName() == 'gcc':
     CTX.LDFLAGS += " -rdynamic"
     if (CTX.compilerMajorVersion() >= 4):
         CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas"
+	if (CTX.compilerMinorVersion() == 6):
+	    CTX.CPPFLAGS += " -Wno-unused-but-set-variable"
 	if (CTX.compilerMinorVersion() == 9):
             CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
         elif (CTX.compilerMinorVersion() == 8):
@@ -83,7 +85,7 @@ if CTX.compilerName() == 'gcc':
 	print("GCC Version %d.%d.%d is too old\n" 
 	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel())); 
 	sys.exit(-1);
-    if CTX.compilerMinorVersion() == 4:
+    if 4 <= CTX.compilerMinorVersion() <= 6:
 	CTX.CXX_VERSION_FLAG = "--std=c++0x"
 	print("Building with C++ 0x\n")
     else:
@@ -94,7 +96,7 @@ elif CTX.compilerName() == 'clang':
 CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
 
 # linker flags
-CTX.LDFLAGS += """ -g3"""
+CTX.LDFLAGS += """ -g3 """
 CTX.LASTLDFLAGS = """ -ldl """
 CTX.LASTIPCLDFLAGS = """ """
 
