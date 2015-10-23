@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -354,9 +355,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     public long fragmentProgressUpdate(int indexFromFragmentTask,
-            String planNodeName,
-            String lastAccessedTable,
-            long lastAccessedTableSize,
+            int planNodeTypeAsInt,
             long tuplesProcessed,
             long currMemoryInBytes,
             long peakMemoryInBytes)
@@ -374,7 +373,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long latency = currentTime - m_startTime;
 
         if (shouldTimedOut(latency)) {
-            String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, true);
+
+            String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, true);
             log.info(msg);
 
             // timing out the long running queries
@@ -399,7 +399,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
-        String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, false);
+        String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, false);
         log.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
@@ -411,7 +411,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     private String getLongRunningQueriesMessage(int indexFromFragmentTask,
-            long latency, String planNodeName, boolean timeout) {
+            long latency, int planNodeTypeAsInt, boolean timeout) {
         String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
         String msg = String.format(
                 "Procedure %s is %s " +
@@ -426,7 +426,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         status,
                         latency / 1000.0,
                         m_lastTuplesAccessed,
-                        planNodeName,
+                        PlanNodeType.get(planNodeTypeAsInt).name(),
                         m_currentBatchIndex,
                         CoreUtils.hsIdToString(m_siteId),
                         m_currMemoryInBytes,
