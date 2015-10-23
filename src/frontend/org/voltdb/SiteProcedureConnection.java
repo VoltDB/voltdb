@@ -37,16 +37,11 @@ public interface SiteProcedureConnection {
     public long getLatestUndoToken();
 
     /**
-     * Get the HSQL backend, if any.  Returns null if we're not configured
-     * to use it
+     * Get the non-VoltDB backend, if any, such as an HSQL or PostgreSQL
+     * backend used for comparison testing. Returns null if we're not
+     * configured to use it.
      */
-    public HsqlBackend getHsqlBackendIfExists();
-
-    /**
-     * Get the PostgreSQL backend, if any.  Returns null if we're not configured
-     * to use it.
-     */
-    public PostgreSQLBackend getPostgreSQLBackendIfExists();
+    public NonVoltDBBackend getNonVoltDBBackendIfExists();
 
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection

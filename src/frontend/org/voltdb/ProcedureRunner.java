@@ -371,19 +371,10 @@ public class ProcedureRunner {
                 assert(m_catProc.getStatements().size() == 1);
                 try {
                     m_cachedSingleStmt.params = getCleanParams(m_cachedSingleStmt.stmt, paramList);
-                    if (getHsqlBackendIfExists() != null) {
-                        // HSQL handling
+                    if (getNonVoltDBBackendIfExists() != null) {
+                        // Backend handling, such as HSQL or PostgreSQL
                         VoltTable table =
-                            getHsqlBackendIfExists().runSQLWithSubstitutions(
-                                m_cachedSingleStmt.stmt,
-                                m_cachedSingleStmt.params,
-                                m_cachedSingleStmt.stmt.statementParamJavaTypes);
-                        results = new VoltTable[] { table };
-                    }
-                    else if (getPostgreSQLBackendIfExists() != null) {
-                        // PostgreSQL handling
-                        VoltTable table =
-                            getPostgreSQLBackendIfExists().runSQLWithSubstitutions(
+                            getNonVoltDBBackendIfExists().runSQLWithSubstitutions(
                                 m_cachedSingleStmt.stmt,
                                 m_cachedSingleStmt.params,
                                 m_cachedSingleStmt.stmt.statementParamJavaTypes);
@@ -532,17 +523,11 @@ public class ProcedureRunner {
     }
 
     /**
-     * If returns non-null, then using hsql backend
+     * If this returns non-null, then we're using a non-VoltDB backend, such
+     * as HSQL or PostgreSQL.
      */
-    public HsqlBackend getHsqlBackendIfExists() {
-        return m_site.getHsqlBackendIfExists();
-    }
-
-    /**
-     * If returns non-null, then using PostgreSQL backend
-     */
-    public PostgreSQLBackend getPostgreSQLBackendIfExists() {
-        return m_site.getPostgreSQLBackendIfExists();
+    public NonVoltDBBackend getNonVoltDBBackendIfExists() {
+        return m_site.getNonVoltDBBackendIfExists();
     }
 
     public void setAppStatusCode(byte statusCode) {
@@ -787,21 +772,13 @@ public class ProcedureRunner {
             return new VoltTable[] {};
         }
 
-        // If this is HSQLDB, run the queries directly in HSQLDB
-        if (getHsqlBackendIfExists() != null) {
+        // If this is a non-VoltDB backend, run the queries directly in that
+        // database (e.g. HSQL or PostgreSQL)
+        if (getNonVoltDBBackendIfExists() != null) {
             results = new VoltTable[batchSize];
             int i = 0;
             for (QueuedSQL qs : batch) {
-                results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
-                        qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
-            }
-        }
-        // If this is PostgreSQL, run the queries directly in PostgreSQL
-        else if (getPostgreSQLBackendIfExists() != null) {
-            results = new VoltTable[batchSize];
-            int i = 0;
-            for (QueuedSQL qs : batch) {
-                results[i++] = getPostgreSQLBackendIfExists().runSQLWithSubstitutions(
+                results[i++] = getNonVoltDBBackendIfExists().runSQLWithSubstitutions(
                         qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
             }
         }
