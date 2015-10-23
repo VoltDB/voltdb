@@ -38,6 +38,9 @@ import org.voltdb.types.PlanNodeType;
 public class InlineOrderByIntoMergeReceive extends MicroOptimization {
 
     @Override
+    boolean appliesToSubqueryOfDML() { return false; }
+
+    @Override
     protected AbstractPlanNode recursivelyApply(AbstractPlanNode planNode)
     {
         assert(planNode != null);

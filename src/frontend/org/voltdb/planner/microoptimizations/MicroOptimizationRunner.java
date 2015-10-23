@@ -39,10 +39,13 @@ public class MicroOptimizationRunner {
         optimizations.add(new InlineOrderByIntoMergeReceive());
     }
 
-    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan, boolean hasParentDML, AbstractParsedStmt parsedStmt)
     {
         for (int i = 0; i < optimizations.size(); i++) {
             MicroOptimization opt = optimizations.get(i);
+            if (hasParentDML && ! opt.appliesToSubqueryOfDML()) {
+                continue;
+            }
             opt.apply(plan, parsedStmt);
         }
     }
