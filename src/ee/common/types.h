@@ -550,6 +550,11 @@ enum DRDivergence {
     DIVERGE,
 };
 
+enum DRChangeOnPK {
+    NOT_UPDATE_ON_PK,
+    UPDATE_ON_PK,
+};
+
 // ------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------

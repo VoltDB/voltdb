@@ -750,7 +750,7 @@ public class TestDDLCompiler extends TestCase {
             Table t = compiler.getCatalogDatabase().getTables().get(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + "T");
             assertNotNull(t);
             // verify table schema
-            assertTrue(t.getColumns().size() == 13);
+            assertTrue(t.getColumns().size() == 14);
             Column c1 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[0][0]);
             assertNotNull(c1);
             assertTrue(c1.getType() == VoltType.TINYINT.getValue());
@@ -760,18 +760,21 @@ public class TestDDLCompiler extends TestCase {
             Column c3 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[2][0]);
             assertNotNull(c3);
             assertTrue(c3.getType() == VoltType.TINYINT.getValue());
-            Column c4 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[3][0]);
+            Column c4 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[2][0]);
             assertNotNull(c4);
             assertTrue(c4.getType() == VoltType.TINYINT.getValue());
-            Column c5 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[4][0]);
+            Column c5 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[3][0]);
             assertNotNull(c5);
             assertTrue(c5.getType() == VoltType.TINYINT.getValue());
-            Column c6 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[5][0]);
+            Column c6 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[4][0]);
             assertNotNull(c6);
             assertTrue(c6.getType() == VoltType.TINYINT.getValue());
             Column c7 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[6][0]);
             assertNotNull(c7);
             assertTrue(c7.getType() == VoltType.BIGINT.getValue());
+            Column c8 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS[5][0]);
+            assertNotNull(8);
+            assertTrue(c8.getType() == VoltType.TINYINT.getValue());
             assertNotNull(t.getColumns().get("D1"));
             assertNotNull(t.getColumns().get("D2"));
             assertNotNull(t.getColumns().get("D3"));

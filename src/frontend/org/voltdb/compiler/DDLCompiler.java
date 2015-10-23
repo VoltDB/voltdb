@@ -143,10 +143,11 @@ public class DDLCompiler {
         {"VOLTDB_AUTOGEN_DR_ROW_TYPE", "TINYINT"},
         {"VOLTDB_AUTOGEN_DR_ACTION_TYPE", "TINYINT"},
         {"VOLTDB_AUTOGEN_DR_CONFLICT_TYPE", "TINYINT"},
+        {"VOLTDB_AUTOGEN_DR_UPDATE_ON_PRIMARY_KEY", "TINYNIT"},
         {"VOLTDB_AUTOGEN_DR_ROW_DECISION", "TINYINT"},
-        {"VOLTDB_AUTOGEN_DR_DIVERGENCE", "TINYINT"},
         {"VOLTDB_AUTOGEN_DR_CLUSTER_ID", "TINYINT"},
         {"VOLTDB_AUTOGEN_DR_TIMESTAMP", "BIGINT"},
+        {"VOLTDB_AUTOGEN_DR_DIVERGENCE", "TINYINT"},
     };
 
     private static final Pattern drConflictsTablePattern = Pattern.compile(

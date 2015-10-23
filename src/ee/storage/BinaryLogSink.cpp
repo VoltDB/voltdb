@@ -44,7 +44,6 @@ namespace voltdb {
 const static std::string EXISTING_TABLE = "existing_table";
 const static std::string EXPECTED_TABLE = "expected_table";
 const static std::string NEW_TABLE = "new_table";
-const static std::string OUTPUT_TABLE = "output_table";
 
 class CachedIndexKeyTuple {
 public:
@@ -404,27 +403,29 @@ static void findConflictTuple(Table *table, TableTuple *searchTuple, TableTuple 
 /**
  * create conflict export tuple from the conflict tuple
  */
-static void createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool, TableTuple *tupleToBeWrote, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
+static void createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool, TableTuple *tupleToBeWrote,
+        DRChangeOnPK changeOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
     TableTuple tempTuple = outputTable->tempTuple();
     NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
     tempTuple.setNValue(0, ValueFactory::getTinyIntValue(rowType));
     tempTuple.setNValue(1, ValueFactory::getTinyIntValue(actionType));
     tempTuple.setNValue(2, ValueFactory::getTinyIntValue(conflictType));
+    tempTuple.setNValue(3, ValueFactory::getTinyIntValue(changeOnPKType));
     switch (rowType) {
     case EXISTING_ROW:
     case EXPECTED_ROW:
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
+        tempTuple.setNValue(4, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
         break;
     case NEW_ROW:
-        tempTuple.setNValue(3, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
+        tempTuple.setNValue(4, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
         break;
     default:
         break;
     }
-    tempTuple.setNValue(4, ValueFactory::getTinyIntValue(NOT_DIVERGE));
     tempTuple.setNValue(5, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
     tempTuple.setNValue(6, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
-    tempTuple.setNValues(7, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
+    tempTuple.setNValue(7, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+    tempTuple.setNValues(8, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
 
     outputTable->insertTupleNonVirtualWithDeepCopy(tempTuple, pool);
 }
@@ -496,10 +497,9 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         return false;
     }
 
-    // add new row
+    // find any rows conflict with the new row
     std::vector<boost::shared_ptr<TableTuple> > existingRows;
     if (newTuple) {
-        // add any rows conflict with the new row
         findConflictTuple(drTable, newTuple, actionType == DR_RECORD_UPDATE ? expectedTuple : NULL, existingRows);
         if (actionType == DR_RECORD_UPDATE) {
             if (existingRows.size() > 0) {
@@ -514,12 +514,12 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
     if (deleteConflict != NO_CONFLICT) {
         existingTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
         if (existingTuple) {
-            createConflictExportTuple(existingTableForDelete.get(), drTable, pool, existingTuple, actionType, deleteConflict, EXISTING_ROW);
+            createConflictExportTuple(existingTableForDelete.get(), drTable, pool, existingTuple, NOT_UPDATE_ON_PK, actionType, deleteConflict, EXISTING_ROW);
         }
 
         expectedTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));
         if (expectedTuple) {
-            createConflictExportTuple(expectedTableForDelete.get(), drTable, pool, expectedTuple, actionType, deleteConflict, EXPECTED_ROW);
+            createConflictExportTuple(expectedTableForDelete.get(), drTable, pool, expectedTuple, NOT_UPDATE_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
         }
     }
 
@@ -530,71 +530,22 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         existingTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
         if (existingRows.size() > 0) {
             BOOST_FOREACH(boost::shared_ptr<TableTuple> tuple, existingRows) {
-                createConflictExportTuple(existingTableForInsert.get(), drTable, pool, tuple.get(), actionType, insertConflict, EXISTING_ROW);
+                createConflictExportTuple(existingTableForInsert.get(), drTable, pool, tuple.get(), NOT_UPDATE_ON_PK, actionType, insertConflict, EXISTING_ROW);
             }
         }
 
         newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
         if (newTuple) {
-            createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, actionType, insertConflict, NEW_ROW);
+            DRChangeOnPK changeOnPKType = NOT_UPDATE_ON_PK;
+            if (actionType == DR_RECORD_UPDATE) {
+                TableIndex * primaryKey = drTable->primaryKeyIndex();
+                if (primaryKey && primaryKey->checkForIndexChange(expectedTuple, newTuple) == true) {
+                    changeOnPKType = UPDATE_ON_PK;
+                }
+            }
+            createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, changeOnPKType, actionType, insertConflict, NEW_ROW);
         }
     }
-
-//    //======================== test output ===========================
-//    TableTuple tempTuple(conflictExportTable->schema());
-//    if (deleteConflict != NO_CONFLICT) {
-//        TableIterator iterator = existingTableForDelete->iterator();
-//        bool once = true;
-//        while (iterator.next(tempTuple)) {
-//            if (once) {
-//                std::cout << "\n========existingTableForDelete=========" << std::endl;
-//                once = false;
-//            }
-//            std::cout << tempTuple.debugNoHeader() << std::endl;
-//        }
-//
-//        iterator = expectedTableForDelete->iterator();
-//        once = true;
-//        while (iterator.next(tempTuple)) {
-//            if (once) {
-//                std::cout << "\n========expectedTableForDelete=========" << std::endl;
-//                once = false;
-//            }
-//            std::cout << tempTuple.debugNoHeader() << std::endl;
-//        }
-//    } else {
-//        std::cout << "\n========existingTableForDelete=========" << std::endl;
-//        std::cout << "<null>" << std::endl;
-//        std::cout << "\n========expectedTableForDelete=========" << std::endl;
-//        std::cout << "<null>" << std::endl;
-//    }
-//
-//    if (insertConflict != NO_CONFLICT) {
-//        TableIterator iterator = existingTableForInsert->iterator();
-//        bool once = true;
-//        while (iterator.next(tempTuple)) {
-//            if (once) {
-//                std::cout << "\n========existingTableForInsert=========" << std::endl;
-//                once = false;
-//            }
-//            std::cout << tempTuple.debugNoHeader() << std::endl;
-//        }
-//
-//        iterator = newTableForInsert->iterator();
-//        once = true;
-//        while (iterator.next(tempTuple)) {
-//            if (once) {
-//                std::cout << "\n========newTableForInsert=========" << std::endl;
-//            }
-//            std::cout << tempTuple.debugNoHeader() << std::endl;
-//        }
-//    } else {
-//        std::cout << "\n========existingTableForInsert=========" << std::endl;
-//        std::cout << "<null>" << std::endl;
-//        std::cout << "\n========newTableForInsert=========" << std::endl;
-//        std::cout << "<null>" << std::endl;
-//    }
-//    //=================================================================
 
     bool diverge = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
                                                                                       UniqueId::timestamp(uniqueId),
@@ -612,7 +563,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         if (existingTuple) {
             TableIterator iterator = existingTableForDelete->iterator();
             iterator.next(tempTuple);
-            DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
+            DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(4)));
             if (decision == DELETE_ROW) {
                 drTable->deleteTuple(*existingTuple, true);
             }
@@ -621,14 +572,14 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
     if (insertConflict != NO_CONFLICT) {
         TableIterator iterator = existingTableForInsert->iterator();
         for (int i = 0; iterator.next(tempTuple); i++) {
-            DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
+            DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(4)));
             if (decision == DELETE_ROW) {
                 drTable->deleteTuple(*existingRows[i].get(), true);
             }
         }
         iterator = newTableForInsert->iterator();
         iterator.next(tempTuple);
-        DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(3)));
+        DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(4)));
         if (decision == KEEP_ROW) {
             drTable->insertPersistentTuple(*newTuple, true);
         }
