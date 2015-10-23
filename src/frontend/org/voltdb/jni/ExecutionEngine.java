@@ -355,8 +355,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     public long fragmentProgressUpdate(int indexFromFragmentTask,
             String planNodeName,
-            String lastAccessedTable,
-            long lastAccessedTableSize,
             long tuplesProcessed,
             long currMemoryInBytes,
             long peakMemoryInBytes)
