@@ -48,7 +48,7 @@ public class Connect2Server {
             }
             catch (IOException e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (InterruptedException interruted) {}
+                try { Thread.sleep(sleep); } catch (InterruptedException interrupted) {}
                 if (sleep < 8000) sleep += sleep;
             }
         }
