@@ -359,7 +359,7 @@ public class QueryPlanner {
         // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning,
-                (PlanSelector) m_planSelector.clone());
+                (PlanSelector) m_planSelector.clone(), false);
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 

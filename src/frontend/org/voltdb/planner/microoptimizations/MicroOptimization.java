@@ -17,7 +17,6 @@
 
 package org.voltdb.planner.microoptimizations;
 
-import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -31,13 +30,8 @@ public abstract class MicroOptimization {
     /// Derived classes must implement recursiveApply, but that implementation could,
     /// theoretically, just "assert(false)" IF the class also completely re-implements "apply".
     /// Implementing recursivelyApply to do real work on the plan graph is the more common paradigm.
-    void apply(CompiledPlan plan, DeterminismMode detMode, AbstractParsedStmt parsedStmt)
-    {
-        // seq scan to index scan overrides this function
-        apply(plan, parsedStmt);
-    }
-
-    void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt)
+    /// InlineOrderByIntoMergeReceive overrides this function
+    protected void apply(CompiledPlan plan, AbstractParsedStmt parsedStmt)
     {
         try {
             m_parsedStmt = parsedStmt;
@@ -53,4 +47,6 @@ public abstract class MicroOptimization {
     }
 
     protected abstract AbstractPlanNode recursivelyApply(AbstractPlanNode plan);
+
+    boolean appliesToSubqueryOfDML() { return true; }
 }

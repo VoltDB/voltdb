@@ -1666,4 +1666,6 @@ public abstract class AbstractParsedStmt {
         return !subqueryExprs.isEmpty();
     }
 
+    public abstract boolean isDML();
+
 }
