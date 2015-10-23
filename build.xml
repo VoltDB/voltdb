@@ -1,7 +1,6 @@
 <?xml version="1.0" ?>
 <project default="default" name="VoltDB">
 
-
 <!-- GENERAL HELPER MACROS -->
 <macrodef name="envdefault">
     <attribute name="prop" />
