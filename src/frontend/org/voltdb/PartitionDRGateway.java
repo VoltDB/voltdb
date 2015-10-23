@@ -58,13 +58,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
-    public static String DR_ROW_TYPE_COLUMN_NAME = "@DR_ROW_TYPE";
-    public static String DR_LOG_ACTION_COLUMN_NAME = "@DR_ACTION_TYPE";
-    public static String DR_CONFLICT_COLUMN_NAME = "@DR_CONFLICT_TYPE";
-    public static String DR_ROW_DECISION_COLUMN_NAME = "@DR_ROW_DECISION";
-    public static String DR_CLUSTER_ID_COLUMN_NAME = "@DR_CLUSTER_ID";
-    public static String DR_TIMESTAMP_COLUMN_NAME = "@DR_TIMESTAMP";
-
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
 
     /**
