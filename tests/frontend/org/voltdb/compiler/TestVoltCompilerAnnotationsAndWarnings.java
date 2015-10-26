@@ -26,14 +26,14 @@ package org.voltdb.compiler;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.procedures.FloatParamToGetNiceComplaint;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc1;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc2;
+import org.voltdb_testprocs.regressionsuites.failureprocs.FloatingInsertAggregates;
+import org.voltdb_testprocs.regressionsuites.failureprocs.FloatingUpdateAggregates;
 import org.voltdb_testprocs.regressionsuites.failureprocs.NondeterministicROProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.NondeterministicRWProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate1;
@@ -50,8 +50,60 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate5;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate6;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate7;
 
+import junit.framework.TestCase;
+
 public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
 
+    /**
+     * Test that a DDL stored procedure does not compile properly. The test
+     * testSimple is not very useful for this.
+     *
+     * @param simpleSchema
+     *            A string containing the test schema.
+     * @param partitionInfo
+     *            Partitioning information. This can be null if none is wanted.
+     * @param procKlazz
+     *            The class to test.
+     * @param errorMessages
+     *            The error messages we expect to see.
+     * @throws Exception
+     */
+    public void testCompilationFailure(String simpleSchema,
+                                       String[][] partitionInfo,
+                                       Object     procObject,
+                                       String[]   errorMessages) throws Exception {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
+        PrintStream capturing = new PrintStream(capturer);
+        builder.setCompilerDebugPrintStream(capturing);
+        builder.addLiteralSchema(simpleSchema);
+        if (partitionInfo != null) {
+            for (String[] pair : partitionInfo) {
+                assertTrue(pair.length == 2);
+                builder.addPartitionInfo(pair[0], pair[1]);
+            }
+        }
+        if (procObject instanceof String[]) {
+            String[] stmtProcDescrip = (String[]) procObject;
+            assertTrue(stmtProcDescrip.length == 2);
+            builder.addStmtProcedure(stmtProcDescrip[0], stmtProcDescrip[1]);
+        } else if (procObject instanceof Class<?>) {
+            Class<?> procKlazz = (Class<?>) procObject;
+            builder.addProcedures(procKlazz);
+        } else {
+            assertTrue("Bad type of object for parameter \"procObject\"", false);
+        }
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
+        assertFalse(success);
+        String captured = capturer.toString("UTF-8");
+        String[] lines = captured.split("\n");
+        // Output should include a line suggesting replacement of float with
+        // double.
+        for (String oneMessagePattern : errorMessages) {
+            assertTrue(foundLineMatching(lines, oneMessagePattern));
+        }
+    }
     public void testFloatParamComplaint() throws Exception {
         String simpleSchema =
             "create table floatie (" +
@@ -59,21 +111,39 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             "fval float not null," +
             "PRIMARY KEY(ival)" +
             ");";
+        String[][] partitionInfo = new String[][] { { "floatie", "ival" } };
+        testCompilationFailure(simpleSchema,
+                               partitionInfo,
+                               FloatParamToGetNiceComplaint.class,
+                               new String[] { ".*FloatParamToGetNiceComplaint.* float.* double.*" });
+    }
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
-        PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("floatie", "ival");
-        builder.addProcedures(FloatParamToGetNiceComplaint.class);
+    public void testFloatingInsertAggregates() throws Exception {
+        String simpleSchema =
+                "create table floatingaggs_input ( alpha float );" +
+                "create table floatingaggs_output ( beta float );" +
+                "";
+        testCompilationFailure(simpleSchema,
+                               null,
+                               FloatingInsertAggregates.class,
+                               new String[] { ".*FloatingInsertAggregates.*" });
+    }
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
-        assertFalse(success);
-        String captured = capturer.toString("UTF-8");
-        String[] lines = captured.split("\n");
-        // Output should include a line suggesting replacement of float with double.
-        assertTrue(foundLineMatching(lines, ".*FloatParamToGetNiceComplaint.* float.* double.*"));
+    public void testFloatingAggregatesDDL() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure(simpleSchema,
+                               null,
+                               new String[] { "FLoatingDDLInsertAggregates", "create procedure FloatingDDLInsertAggregates as insert into floatingaggs_output select sum(alpha) from floatingaggs_input;",
+                               },
+                               new String[] { ".*FloatingDDLInsertAggregates.*" });
+    }
+
+    public void testFloatingUpdateAggregates() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure(simpleSchema,
+                               null,
+                               FloatingUpdateAggregates.class,
+                               new String[] { ".*FloatingUpdateAggregates.*" });
     }
 
     public void testSimple() throws Exception {
@@ -91,6 +161,12 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             "ival bigint default 0 not null, " +
             "sval varchar(255) not null, " +
             "PRIMARY KEY(ival)" +
+            ");" +
+            "create table floatingaggs_input (" +
+            "alpha float" +
+            ");" +
+            "create table floatingaggs_output (" +
+            "beta float" +
             ");" +
             "";
 
@@ -111,6 +187,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addProcedures(DeterministicROSeqProc.class);
         builder.addProcedures(DeterministicRWProc1.class);
         builder.addProcedures(DeterministicRWProc2.class);
+        builder.addProcedures(FloatingUpdateAggregates.class);
 
         builder.addProcedures(ProcSPcandidate1.class);
         builder.addProcedures(ProcSPcandidate2.class);
@@ -141,8 +218,6 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
         builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?", null);
         builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah", null);
-
-
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
         assert(success);
         String captured = capturer.toString("UTF-8");
@@ -157,6 +232,12 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[TABLE SCAN].*select ival, sval from indexed_replicated_blah.*"));
+        // Find FloatingUpdate error lines.
+        assertTrue(foundLineMatching(lines, ".*\\[MP]\\[WRITE].*FloatingUpdateAggregates"));
+        assertTrue(foundLineMatching(lines,
+                                     ".*\\[TABLE SCAN].*\\[NDC] select sum[(]alpha[)] from floatingaggs_input;.*"));
+        assertTrue(foundLineMatching(lines,
+                                     ".*Procedure FloatingUpdateAggregates.*Aggregate functions of floating point columns may not be deterministic[.]  We suggest converting to DECIMAL[.]"));
 
         assertEquals(1, countLinesMatching(lines, ".*\\[NDC].*NDC=true.*"));
 
@@ -212,7 +293,6 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertFalse(foundLineMatching(lines, "^ .*values.*\\s\\s.*")); // includes 2 successive embedded or trailing whitespace of any kind
         assertTrue(foundLineMatching(lines, "^[^ ].*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
         assertFalse(foundLineMatching(lines, "^ .*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
-
     }
 
     private boolean foundLineMatching(String[] lines, String pattern) {

@@ -449,4 +449,8 @@ public class StmtSubqueryScan extends StmtTableScan {
     public List<SchemaColumn> getOutputSchema() {
         return m_outputColumnList;
     }
+
+    public String isContentDeterministic() {
+        return m_subqueryStmt.isContentDeterministic();
+    }
 }

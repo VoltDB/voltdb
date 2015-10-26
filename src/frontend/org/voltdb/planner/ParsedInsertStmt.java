@@ -239,4 +239,15 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         return exprs;
     }
+
+    /**
+     * Return the content determinism string of the subquery if there is one.
+     */
+    @Override
+    public String isContentDeterministic() {
+        if (m_subquery != null) {
+            return m_subquery.isContentDeterministic();
+        }
+        return null;
+    }
 }
