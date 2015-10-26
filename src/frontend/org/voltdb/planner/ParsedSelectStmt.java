@@ -1968,4 +1968,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         return exprs;
     }
+
+    @Override
+    public boolean isDML() { return false; }
+
 }
