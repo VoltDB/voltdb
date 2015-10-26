@@ -576,11 +576,6 @@ public class CatalogDiffEngine {
                                             final CatalogType prevType,
                                             final String field)
     {
-        if (suspect instanceof Deployment) {
-            // ignore host count differences as clusters may elastically expand,
-            // and yet require catalog changes
-            return "hostcount".equals(field);
-        }
         return false;
     }
 
@@ -624,13 +619,17 @@ public class CatalogDiffEngine {
         }
 
         // Support any modification of these
+        // I added Statement and PlanFragment for the need of materialized view recalculation plan updates.
+        // ENG-8641, yzhang.
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
             suspect instanceof SnapshotSchedule ||
             suspect instanceof UserRef ||
             suspect instanceof GroupRef ||
-            suspect instanceof ColumnRef) {
+            suspect instanceof ColumnRef ||
+            suspect instanceof Statement ||
+            suspect instanceof PlanFragment) {
             return null;
         }
 

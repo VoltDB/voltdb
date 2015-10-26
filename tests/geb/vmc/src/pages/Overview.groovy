@@ -152,7 +152,7 @@ class Overview extends Module {
 
         elasticSearchName           { $(class:"labelCollapsed", text:elasticSearchTest) }
         
-        confirmyesbtn			    { $("#btnSaveConfigOk", text:"Yes") }
+        confirmyesbtn			    { $("#btnSaveConfigOk") }
         
         deleteConfiguration         { $("#deleteAddConfig > a") }
         
@@ -223,6 +223,8 @@ class Overview extends Module {
 		maxTempTableMemory		{ $(class:"configLabel", text:"Max Temp Table Memory") }
 		snapshotPriority		{ $(class:"configLabel", text:"Snapshot Priority") }
         memoryLimitSize         { $(class:"configLabel", text:"Memory Limit") }
+        diskLimit               {$("#diskLimit")}
+
 
 		maxJavaHeapValue		{ $("#maxJavaHeap") }
 		heartbeatTimeoutValue	{ $("#formHeartbeatTimeout") }
@@ -260,6 +262,36 @@ class Overview extends Module {
         memoryLimitCancel       { $("#btnEditMemorySizeCancel") }
         memoryLimitPopupOk      { $("#btnPopupMemoryLimitOk") }
         memoryLimitPopupCancel  { $("#btnPopupMemoryLimitCancel") }
+        memoryLimitDdlUnit      { $("#ddlMemoryLimitUnit") }
+        memoryLimitDelete       (required:false) { $("#btnDeleteMemory") } 
+        memoryLimitDeleteOk     { $("#btnDelPopupMemoryLimitOk") }
+        
+        //Disk Limit
+
+
+        lnkAddNewFeature {$("#lnkAddNewFeature")}
+        btnAddDiskLimitSave {$("#btnAddDiskLimitSave")}
+        btnAddDiskLimitCancel {$("#btnAddDiskLimitCancel")}
+        btnSaveDiskLimitOk {$("#btnSaveDiskLimitOk")}
+        btnSaveDiskLimitCancel {$("#btnSaveDiskLimitCancel")}
+        addDiskLimitHeader {$("#addDiskLimitHeader")}
+        featureName1 {$("#txtNameDL1")}
+        featureValue1 {$("#txtValueDL1")}
+        featureUnit1 {$("#txtUnitDL1")}
+        featureName2 {$("#txtNameDL2")}
+        featureValue2 {$("#txtValueDL2")}
+        featureUnit2 {$("#txtUnitDL2")}
+        deleteFirstFeature {$("#deleteFirstFeature")}
+        errorValue1 {$("#errorValueDL1")}
+        errortxtName2 {$("#error_txtNameDL2")}
+        errortxtName1 {$("#error_txtNameDL1")}
+
+
+            //$(class:"labelCollapsed labelExpanded", text:"Disk Limit") }
+
+
+
+
 
         // error message
         errorMsgHeartbeat		{ $("#errorHeartbeatTimeout") }
@@ -269,15 +301,17 @@ class Overview extends Module {
 
         errorPropertyName1 {$("#errorName1")}
         errorPropertyValue1 {$("#errorValue1")}
+
+        addconfig			{ $("#addNewConfigLink")}
     }
-    
+
     int numberOfTrials = 10
     int waitTime = 30
     int five = 5
     int count = 0
     String onClickValue     = getName()
     String onClickValueNext = getNameNext()
-    
+
     String fileTest             = getFileTest()
     String jdbcTest             = getJdbcTest()
     String kafkaTest            = getKafkaTest()
@@ -294,7 +328,7 @@ class Overview extends Module {
 	def String getNameNext() {
     	return "addUser(1,'" + getUsernameTwoForSecurity() + "','" + getRoleTwoForSecurity() + "');"
     }
-    
+
     def String getFileTest() {
         return getFileTestName() + " (FILE)"
     }
@@ -306,27 +340,27 @@ class Overview extends Module {
     def String getJdbcTest() {
         return getJdbcTestName() + " (JDBC)"
     }
-    
+
     def String getKafkaTest() {
         return getKafkaTestName() + " (KAFKA)"
     }
-    
+
     def String getHttpTest() {
         return getHttpTestName() + " (HTTP)"
     }
-    
+
     def String getRabbitmqBrokerTest() {
         return getRabbitmqBrokerTestName() + " (RABBITMQ)"
     }
-    
+
     def String getRabbitmqAmqpTest() {
         return getRabbitmqAmqpTestName() + " (RABBITMQ)"
     }
-    
+
     def String getCustomTest() {
         return getCustomTestName() + " (CUSTOM)"
     }
-    
+
     // Get usernameone for security
     def String getUsernameOneForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
@@ -344,7 +378,7 @@ class Overview extends Module {
         username = br.readLine()
         return username
     }
-    
+
     // Get passwordone for security
     def String getPasswordOneForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
@@ -362,7 +396,7 @@ class Overview extends Module {
         password = br.readLine()
         return password
     }
-    
+
     // Get roleone for security
     def String getRoleOneForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
@@ -371,7 +405,7 @@ class Overview extends Module {
         role = br.readLine()
         return role
     }
-    
+
     // Get roletwo for security
     def String getRoleTwoForSecurity() {
     	BufferedReader br = new BufferedReader(new FileReader("src/resources/securityUsers.txt"))
@@ -380,24 +414,24 @@ class Overview extends Module {
         role = br.readLine()
         return role
     }
-    
+
     /**
      * Click security to expand, if already it is not expanded
      */
-     def boolean expandSecurity() {	
+     def boolean expandSecurity() {
      	if (checkIfSecurityIsExpanded() == false)
      		security.click()
      }
-     
-     
+
+
      /**
      * Click security to collapse, if already it is expanded
      */
-     def boolean collapseSecurity() {	
+     def boolean collapseSecurity() {
      	if (checkIfSecurityIsExpanded() == true)
      		security.click()
      }
-     
+
      /**
      * Check if security is expanded or not
      */
@@ -411,7 +445,7 @@ class Overview extends Module {
      		return true
      	}
      }
-     
+
      /**
      * Click and open security Add popup
      */
@@ -427,7 +461,7 @@ class Overview extends Module {
      		return false
      	}
      }
-     
+
      /**
      * Check if Security Add is open or not
      */
@@ -445,7 +479,7 @@ class Overview extends Module {
      		return false
      	}
      }
-     
+
      /**
      * Enter the username, password, and role save it
      */
@@ -458,17 +492,17 @@ class Overview extends Module {
 				userPopupSelectRole.value(role)
 		 	}
 		 	userPopupSave.click()
-		 	
+
 		 	waitFor(waitTime) {
 				saveDelete.text().equals("save")
 				userPopupConfirmYes.isDisplayed()
 			}
-			
+
 			count = 0
 			while(count < five) {
 				count++
 				try {
-					waitFor(waitTime) { 
+					waitFor(waitTime) {
 						userPopupConfirmYes.click()
 					}
 				} catch(geb.error.RequiredPageContentNotPresent e) {
@@ -479,7 +513,7 @@ class Overview extends Module {
 					break
 				}
 			}
-			
+
      		return true
      	} catch(geb.error.RequiredPageContentNotPresent e) {
      		return false
@@ -487,8 +521,8 @@ class Overview extends Module {
      		return false
      	}
     }
-     
-     
+
+
     /**
     * Returns the list of all the users in Security
     */
@@ -496,9 +530,9 @@ class Overview extends Module {
     	String list = ""
     	try {
     		//expandSecurity()
-     		
+
      		waitFor(waitTime) { securityUserList.isDisplayed() }
-     		
+
      		list = securityUserList.text()
      		return list
      	} catch(geb.error.RequiredPageContentNotPresent e) {
@@ -509,8 +543,8 @@ class Overview extends Module {
      		return ""
      	}
     }
-     
-     
+
+
     def boolean checkListForUsers(String username) {
     	try {
     		String list = getListOfUsers()
@@ -529,8 +563,8 @@ class Overview extends Module {
      		return false
      	}
     }
-     
-     
+
+
     /**
     * Check if Security Edit is open or not
     */
@@ -548,8 +582,8 @@ class Overview extends Module {
      		return false
      	}
     }
-     
-     
+
+
     def boolean openEditUser() {
     	try {
 		 	waitFor(waitTime) { editUser.isDisplayed() }
@@ -562,7 +596,7 @@ class Overview extends Module {
      		return false
     	}
     }
-     
+
     def boolean openEditUserNext() {
 		try {
 		 	waitFor(waitTime) { editUserNext.isDisplayed() }
@@ -575,7 +609,7 @@ class Overview extends Module {
      		return false
     	}
     }
-     
+
     def boolean cancelPopup() {
     	try {
 	     	waitFor(waitTime) { userPopupCancel.click() }
@@ -584,21 +618,21 @@ class Overview extends Module {
      		return true
      	}
     }
-    
+
     def boolean deleteUserSecurityPopup() {
     	try {
 	     	waitFor(waitTime) { userPopupDelete.click() }
-	     	
+
 	     	waitFor(waitTime) {
 				saveDelete.text().equals("delete")
 				userPopupConfirmYes.isDisplayed()
 			}
-			
+
 			count = 0
 			while(count < five) {
 				count++
 				try {
-					waitFor(waitTime) { 
+					waitFor(waitTime) {
 						page.overview.userPopupConfirmYes.click()
 					}
 				} catch(geb.error.RequiredPageContentNotPresent e) {
@@ -608,7 +642,7 @@ class Overview extends Module {
 				} catch(geb.waiting.WaitTimeoutException e) {
 					break
 				}
-			}	
+			}
     	} catch(geb.error.RequiredPageContentNotPresent e) {
      		println("Delete button isn't present")
      		return true
@@ -616,19 +650,33 @@ class Overview extends Module {
      		return false
     	}
     }
-    
+
     def openAddConfigurationPopup() {
-	    waitFor(waitTime) { page.addconfig.isDisplayed() }
+	    waitFor(waitTime) { addconfig.isDisplayed() }
 	    int count = 0
 	    while(count<numberOfTrials) {
 	        count++
 	        try {
-	            page.addconfig.click()
-	            waitFor(waitTime) { page.overview.exportAddConfigPopupTitle.isDisplayed() }
+	            addconfig.click()
+	            waitFor(waitTime) { exportAddConfigPopupTitle.isDisplayed() }
 	            break
 	        } catch(geb.waiting.WaitTimeoutException e) {
 	        }
 	    }
+    }
+
+    def openEditDiskLimitPopup() {
+        waitFor(waitTime) { page.diskLimitEdit.isDisplayed() }
+        int count = 0
+        while(count<numberOfTrials) {
+            count++
+            try {
+                page.diskLimitEdit.click()
+                waitFor(waitTime) { page.overview.addDiskLimitHeader.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+            }
+        }
     }
     
     // For Export
@@ -699,28 +747,36 @@ class Overview extends Module {
     
     def void clickSave() {
         int count = 0
-	    while(count<numberOfTrials) {
+	    while(count<30) {
 	        count++
             try {
-                save.click()
-	            !save.isDisplayed()
+                waitFor(waitTime) { save.click() }
+	            waitFor(waitTime) { confirmyesbtn.isDisplayed() }
+	            println("new")
+	            break
             } catch(geb.error.RequiredPageContentNotPresent e) {
-            
+                println("new1")
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+                println("new2")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("old")
             }
 	    }
 	    
 	    count = 0
-	    while(count<numberOfTrials) {
+	    while(count<30) {
 	        count++
             try {
-                confirmyesbtn.click()
-	            !confirmyesbtn.isDisplayed()
+                waitFor(waitTime) { confirmyesbtn.click() }
+	            waitFor(waitTime) { !confirmyesbtn.isDisplayed() }
+	            println("new3")
+	            break
             } catch(geb.error.RequiredPageContentNotPresent e) {
-                
+                println("new4")
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+                println("new5")
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("old1")
             }
 	    }
     }
@@ -786,6 +842,26 @@ class Overview extends Module {
      		return true
      	}
      }
+
+
+     def boolean checkIfDiskLimitIsExpanded() {
+     	try {
+		 	diskLimitExpanded.isDisplayed()
+     		return true
+     	} catch(geb.error.RequiredPageContentNotPresent e) {
+     		return false
+     	} catch(org.openqa.selenium.StaleElementReferenceException e) {
+     		return true
+     	}
+     }
+
+    /**
+     * Click export to expand, if already it is not expanded
+     */
+    def boolean expandDiskLimit() {
+        if (checkIfDiskLimitIsExpanded() == false)
+            diskLimitExpanded.click()
+    }
      
      def String getFileValueOne() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/exportDetails.txt"))

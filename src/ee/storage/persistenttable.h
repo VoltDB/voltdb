@@ -134,7 +134,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark);
+    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -488,12 +488,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_purgeExecutorVector;
     }
 
-    inline std::pair<const TableIndex*, uint32_t> getSmallestUniqueIndex() {
-        if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
-            computeSmallestUniqueIndex();
-        }
-        return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
-    }
+    std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
   private:
 
@@ -533,7 +528,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
-    bool tryInsertOnAllIndexes(TableTuple *tuple);
+    void tryInsertOnAllIndexes(TableTuple *tuple, TableTuple *conflict);
     bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                     const TableTuple &sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const &indexesToUpdate);
@@ -566,7 +561,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock=false);
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -836,14 +831,14 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 }
 
 inline void
-PersistentTableSurgeon::DRRollback(size_t drMark) {
-    if (drMark < SIZE_MAX && !m_table.m_isMaterialized && m_table.m_drEnabled) {
+PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
+    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
         if (m_table.m_partitionColumn == -1) {
             if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark);
+                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
             }
         } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
         }
     }
 }
@@ -855,7 +850,7 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
 }
 
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
@@ -902,13 +897,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, 
         }
     }
 
-    // If the current block is empty and there are more than one storage blocks, release the
-    // existing empty block. If there is only 1 tuple block storage block remaining, which is empty,
-    // and if caller has not requested to release the last remaining storage block, don't release
-    // the last empty tuple storage block. Intend of not releasing the last remaining empty block
-    // is to improve first tuple insertion performance in the table next time by avoiding to fetch
-    // new storage tuple block for storing tuples from pool at time of first tuple insertion
-    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
+    if (block->isEmpty()) {
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
         m_blocksNotPendingSnapshot.erase(block);
@@ -942,9 +931,10 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
     return TBPtr(NULL);
 }
 
-inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
-    m_data.insert( block->address(), block);
+inline TBPtr PersistentTable::allocateNextBlock()
+{
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;
 }

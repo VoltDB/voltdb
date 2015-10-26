@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -50,6 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -86,10 +88,13 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -101,6 +106,7 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -945,8 +951,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Log initiator stats
              */
             cihm.m_acg.logTransactionCompleted(
-                    cihm.connection.connectionId(),
-                    cihm.connection.getHostnameOrIP(),
+                    cihm.connection.connectionId(clientData.m_clientHandle),
+                    cihm.connection.getHostnameOrIP(clientData.m_clientHandle),
                     clientData.m_procName,
                     delta,
                     clientResponse.getStatus());
@@ -1210,7 +1216,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
-        bindAdapter(internalAdapter, null);
+        bindAdapter(internalAdapter, null, true);
         m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
     }
 
@@ -1302,9 +1308,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Tell the clientInterface about a connection adapter.
      */
     public ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
+        return bindAdapter(adapter, repairCallback, false);
+    }
+
+    private ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback, boolean addAcg) {
         if (m_cihm.get(adapter.connectionId()) == null) {
-            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
-                        AdmissionControlGroup.getDummy());
+            AdmissionControlGroup acg = AdmissionControlGroup.getDummy();
+            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback, acg);
+            if (addAcg) {
+                m_allACGs.add(acg);
+            }
             m_cihm.put(adapter.connectionId(), cihm);
         }
         return m_cihm.get(adapter.connectionId());
@@ -1729,6 +1742,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    private class ClientInterfaceConnectionContext implements InternalConnectionContext{
+
+        @Override
+        public String getName() {
+            return getClass().getSimpleName();
+        }
+
+        @Override
+        public void setBackPressure(boolean hasBackPressure) {
+            // nothing to do here.
+        }}
+
     /**
      *
      * @param port
@@ -1787,6 +1812,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Check param deserialization policy for sysprocs
         if ((error = m_invocationValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
             return error;
+        }
+
+        //Check individual query timeout value settings with privilege
+        int batchTimeout = task.getBatchTimeout();
+        if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
+            if (! user.hasPermission(Permission.ADMIN)) {
+                int systemTimeout = catalogContext.cluster.getDeployment().
+                        get("deployment").getSystemsettings().get("systemsettings").getQuerytimeout();
+                if (systemTimeout != ExecutionEngine.NO_BATCH_TIMEOUT_VALUE &&
+                        (batchTimeout > systemTimeout || batchTimeout == ExecutionEngine.NO_BATCH_TIMEOUT_VALUE)) {
+                    String errorMessage = "The attempted individual query timeout value " + batchTimeout +
+                            " milliseconds override was ignored because the connection lacks ADMIN privileges.";
+                    RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                            60, TimeUnit.SECONDS,
+                            log,
+                            Level.INFO, errorMessage + " This message is rate limited to once every 60 seconds.");
+
+                    task.setBatchTimeout(systemTimeout);
+                }
+            }
         }
 
         if (catProc.getSystemproc()) {
@@ -1899,6 +1944,40 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 ClientResponseImpl retval = SnapshotUtil.transformRestoreParamsToJSON(task);
                 if (retval != null) {
                     return retval;
+                }
+                if (catalogContext.database.getTables().size() == 0) {
+                    if (!VoltDB.instance().getCatalogContext().cluster.getUseddlschema()) {
+                        return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                new VoltTable[0],
+                                "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.",
+                                task.clientHandle);
+                    }
+                    log.info("No schema found. Restoring schema and procedures from snapshot.");
+                    try {
+                        JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
+                        final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
+                        final String nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+                        final byte[] catalog = MiscUtils.fileToBytes(new File(path, nonce + ".jar"));
+                        final String dep = new String(catalogContext.getDeploymentBytes(), java.nio.charset.StandardCharsets.UTF_8);
+
+                        SyncCallback cb = new SyncCallback();
+                        getInternalConnectionHandler().callProcedure(
+                                new ClientInterfaceConnectionContext(), null, 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                        cb.waitForResponse();
+
+                        m_catalogContext.set(VoltDB.instance().getCatalogContext());
+                        catProc = getProcedureFromName(task.procName, m_catalogContext.get());
+                    } catch (JSONException e) {
+                        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0],
+                                "Unable to parse parameters.",
+                                task.clientHandle);
+                    } catch (InterruptedException e) {
+                        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0],
+                                "Unexpected failure while restoring catalog from snapshot.",
+                                task.clientHandle);
+                    }
                 }
             }
 
@@ -2269,6 +2348,28 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    public StoredProcedureInvocation getUpdateCatalogExecutionTask(CatalogChangeResult changeResult) {
+     // create the execution site task
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        task.procName = "@UpdateApplicationCatalog";
+        task.setParams(changeResult.encodedDiffCommands,
+                       changeResult.catalogHash,
+                       changeResult.catalogBytes,
+                       changeResult.expectedCatalogVersion,
+                       changeResult.deploymentString,
+                       changeResult.tablesThatMustBeEmpty,
+                       changeResult.reasonsForEmptyTables,
+                       changeResult.requiresSnapshotIsolation ? 1 : 0,
+                       changeResult.worksWithElastic ? 1 : 0,
+                       changeResult.deploymentHash);
+        task.clientHandle = changeResult.clientHandle;
+        // DR stuff
+        task.type = changeResult.invocationType;
+        task.originalTxnId = changeResult.originalTxnId;
+        task.originalUniqueId = changeResult.originalUniqueId;
+        return task;
+    }
+
     /*
      * Invoked from the AsyncCompilerWorkCompletionHandler from the AsyncCompilerAgent thread.
      * Has the effect of immediately handing the completed work to the network thread of the
@@ -2338,23 +2439,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         else {
                             // create the execution site task
-                            StoredProcedureInvocation task = new StoredProcedureInvocation();
-                            task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands,
-                                           changeResult.catalogHash,
-                                           changeResult.catalogBytes,
-                                           changeResult.expectedCatalogVersion,
-                                           changeResult.deploymentString,
-                                           changeResult.tablesThatMustBeEmpty,
-                                           changeResult.reasonsForEmptyTables,
-                                           changeResult.requiresSnapshotIsolation ? 1 : 0,
-                                           changeResult.worksWithElastic ? 1 : 0,
-                                           changeResult.deploymentHash);
-                            task.clientHandle = changeResult.clientHandle;
-                            // DR stuff
-                            task.type = changeResult.invocationType;
-                            task.originalTxnId = changeResult.originalTxnId;
-                            task.originalUniqueId = changeResult.originalUniqueId;
+                            StoredProcedureInvocation task = getUpdateCatalogExecutionTask(changeResult);
 
                             ClientResponseImpl error = null;
                             if ((error = m_permissionValidator.shouldAccept(task.procName, result.user, task,
@@ -2804,6 +2889,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public String getHostnameOrIP(long clientHandle) {
+            return getHostnameOrIP();
+        }
+
+        @Override
         public int getRemotePort() {
             return -1;
         }
@@ -2822,6 +2912,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public long connectionId()
         {
             return Long.MIN_VALUE;
+        }
+
+        @Override
+        public long connectionId(long clientHandle) {
+            return connectionId();
         }
 
         @Override

@@ -174,7 +174,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJLjava/nio/ByteBuffer;)J");
+            "(IJJJJLjava/nio/ByteBuffer;)J");
     if (m_pushDRBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushDRBufferMID != NULL);
@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "reportDRConflict",
-            "(IJJLjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+            "(IJILjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_reportDRConflictMID != NULL);
@@ -482,71 +482,91 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 partitionId,
                 block->startDRSequenceNumber(),
                 block->lastDRSequenceNumber(),
-                block->lastUniqueId(),
+                block->lastSpUniqueId(),
+                block->lastMpUniqueId(),
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }
     return retval;
 }
 
+static char* serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer) {
+   size_t serializeSize = table->getAccurateSizeToSerialize(false);
+   char* backingCharArray = new char[serializeSize];
+   ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
+   table->serializeToWithoutTotalSize(conflictSerializeOutput);
+
+   *buffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingCharArray),
+                                                static_cast<int32_t>(serializeSize));
+   if (*buffer == NULL) {
+       jniEngine->ExceptionDescribe();
+       throw std::exception();
+   }
+   return backingCharArray;
+}
+
 int JNITopend::reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
-            string tableName, Table* input, Table* output) {
-    if (input != NULL && output != NULL) {
-        // prepare tablename
-        jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
+            int64_t remoteSequenceNumber, DRConflictType conflict_type,
+            string tableName, Table* existingRows, Table* expectedRows,
+            Table* newRows, Table* output) {
+    assert(existingRows != NULL);
+    assert(expectedRows != NULL);
+    assert(newRows != NULL);
 
-        // prepare input buffer
-        size_t serializeSize = input->getAccurateSizeToSerialize(false);
-        char* backingCharArray = new char[serializeSize];
-        ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
-        input->serializeToWithoutTotalSize(conflictSerializeOutput);
+    // prepare tablename
+    jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
-        jobject inputBuffer = m_jniEnv->NewDirectByteBuffer(
-            static_cast<void*>(backingCharArray),
-            static_cast<int32_t>(serializeSize));
-        if (inputBuffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
+    // prepare input buffer
+    jobject existingRowsBuffer;
+    jobject expectedRowsBuffer;
+    jobject newRowsBuffer;
+    char* existingCharArray = serializeTable(m_jniEnv, existingRows, &existingRowsBuffer);
+    char* expectedCharArray = serializeTable(m_jniEnv, expectedRows, &expectedRowsBuffer);
+    char* newCharArray = serializeTable(m_jniEnv, newRows, &newRowsBuffer);
 
-        // prepare output buffer
-        size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
-                                     sizeof(int32_t) + // tuple count placeholder
-                                     output->schema()->getMaxSerializedTupleSize();
-        char* outputBackingCharArray = new char[outputSerializeSize];
-        ReferenceSerializeOutput outputSerializeOutput(outputBackingCharArray, outputSerializeSize);
-        // NOTE passed-in output table should have only schema and no tuples
-        output->serializeToWithoutTotalSize(outputSerializeOutput);
+    // prepare output buffer
+    size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
+                                 sizeof(int32_t) + // tuple count placeholder
+                                 output->schema()->getMaxSerializedTupleSize();
+    char* outputBackingCharArray = new char[outputSerializeSize];
+    ReferenceSerializeOutput outputSerializeOutput(outputBackingCharArray, outputSerializeSize);
+    // NOTE passed-in output table should have only schema and no tuples
+    output->serializeToWithoutTotalSize(outputSerializeOutput);
 
-        jobject outputBuffer = m_jniEnv->NewDirectByteBuffer(
-            static_cast<void*>(outputBackingCharArray),
-            static_cast<int32_t>(outputSerializeSize));
-        if (outputBuffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
-
-        int32_t retval = m_jniEnv->CallStaticIntMethod(
-            m_partitionDRGatewayClass,
-            m_reportDRConflictMID,
-            partitionId,
-            remoteSequenceNumber,
-            remoteUniqueId,
-            tableNameString,
-            inputBuffer,
-            outputBuffer);
-
-        ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
-        output->loadTuplesFrom(filledOutputSerializeInput);
-
-        m_jniEnv->DeleteLocalRef(tableNameString);
-        m_jniEnv->DeleteLocalRef(inputBuffer);
-        m_jniEnv->DeleteLocalRef(outputBuffer);
-
-        return retval;
+    jobject outputBuffer = m_jniEnv->NewDirectByteBuffer(
+        static_cast<void*>(outputBackingCharArray),
+        static_cast<int32_t>(outputSerializeSize));
+    if (outputBuffer == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
     }
-    // -1 indicates error in parameters provided, for now
-    return -1;
+
+    int32_t retval = -1;
+    retval = m_jniEnv->CallStaticIntMethod(
+        m_partitionDRGatewayClass,
+        m_reportDRConflictMID,
+        partitionId,
+        remoteSequenceNumber,
+        conflict_type,
+        tableNameString,
+        existingRowsBuffer,
+        expectedRowsBuffer,
+        newRowsBuffer,
+        outputBuffer);
+
+    ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
+    output->loadTuplesFrom(filledOutputSerializeInput);
+
+    delete [] existingCharArray;
+    delete [] expectedCharArray;
+    delete [] newCharArray;
+    delete [] outputBackingCharArray;
+    m_jniEnv->DeleteLocalRef(tableNameString);
+    m_jniEnv->DeleteLocalRef(existingRowsBuffer);
+    m_jniEnv->DeleteLocalRef(expectedRowsBuffer);
+    m_jniEnv->DeleteLocalRef(newRowsBuffer);
+    m_jniEnv->DeleteLocalRef(outputBuffer);
+
+    return retval;
 }
 }

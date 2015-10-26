@@ -42,6 +42,7 @@
 #include "storage/tableiterator.h"
 #include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
+#include "catalog/database.h"
 
 using namespace voltdb;
 using namespace std;
@@ -50,12 +51,23 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 44;
 }
 
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
             NValueArray* noParams = NULL;
-            VoltDBEngine* noEngine = NULL;
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            mockEngine = new MockVoltDBEngine(false);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -88,6 +100,10 @@ class TableAndIndexTest : public Test {
             districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
                                                     districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
                                                     true, false, districtTupleSchema);
+            districtReplicaIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
+                                                           districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                                                           true, false, districtReplicaTupleSchema);
+
 
             vector<voltdb::ValueType> warehouseColumnTypes;
             vector<int32_t> warehouseColumnLengths;
@@ -151,6 +167,9 @@ class TableAndIndexTest : public Test {
             customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
                                                     customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
                                                     true, true, customerTupleSchema);
+            customerReplicaIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
+                                                           customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
+                                                           true, true, customerReplicaTupleSchema);
 
             customerIndex2ColumnIndices.push_back(2);
             customerIndex2ColumnIndices.push_back(1);
@@ -160,7 +179,11 @@ class TableAndIndexTest : public Test {
             customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
                                                     customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
                                                     true, true, customerTupleSchema);
+            customerReplicaIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
+                                                           customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
+                                                           true, true, customerReplicaTupleSchema);
             customerIndexes.push_back(customerIndex2Scheme);
+            customerReplicaIndexes.push_back(customerReplicaIndex2Scheme);
 
             customerIndex3ColumnIndices.push_back(2);
             customerIndex3ColumnIndices.push_back(1);
@@ -169,7 +192,11 @@ class TableAndIndexTest : public Test {
             customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
                                                     customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
                                                     false, false, customerTupleSchema);
+            customerReplicaIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
+                                                           customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
+                                                           false, false, customerReplicaTupleSchema);
             customerIndexes.push_back(customerIndex3Scheme);
+            customerReplicaIndexes.push_back(customerReplicaIndex3Scheme);
 
             string districtColumnNamesArray[11] = {
                 "D_ID", "D_W_ID", "D_NAME", "D_STREET_1", "D_STREET_2", "D_CITY",
@@ -194,9 +221,12 @@ class TableAndIndexTest : public Test {
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
-                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 districtTable->addIndex(index);
+            }
+            BOOST_FOREACH(TableIndexScheme &scheme, districtReplicaIndexes) {
+                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
+                assert(replicaIndex);
                 districtTableReplica->addIndex(replicaIndex);
             }
 
@@ -232,9 +262,12 @@ class TableAndIndexTest : public Test {
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, customerIndexes) {
                 TableIndex *index = TableIndexFactory::getInstance(scheme);
-                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
                 assert(index);
                 customerTable->addIndex(index);
+            }
+            BOOST_FOREACH(TableIndexScheme &scheme, customerReplicaIndexes) {
+                TableIndex *replicaIndex = TableIndexFactory::getInstance(scheme);
+                assert(replicaIndex);
                 customerTableReplica->addIndex(replicaIndex);
             }
 
@@ -245,6 +278,7 @@ class TableAndIndexTest : public Test {
 
         ~TableAndIndexTest() {
             delete engine;
+            delete mockEngine;
             delete districtTable;
             delete districtTableReplica;
             delete districtTempTable;
@@ -257,7 +291,7 @@ class TableAndIndexTest : public Test {
 
         void addPrimaryKeys() {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
-            TableIndex *pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
+            TableIndex *pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(districtReplicaIndex1Scheme);
             assert(pkeyIndex);
             districtTable->addIndex(pkeyIndex);
             districtTable->setPrimaryKeyIndex(pkeyIndex);
@@ -270,7 +304,7 @@ class TableAndIndexTest : public Test {
             warehouseTable->setPrimaryKeyIndex(pkeyIndex);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
-            pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
+            pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(customerReplicaIndex1Scheme);
             assert(pkeyIndex);
             customerTable->addIndex(pkeyIndex);
             customerTable->setPrimaryKeyIndex(pkeyIndex);
@@ -281,6 +315,7 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         ExecutorContext *engine;
+        MockVoltDBEngine *mockEngine;
         DRTupleStream drStream;
         DRTupleStream drReplicatedStream;
         DummyTopend topend;
@@ -290,11 +325,13 @@ class TableAndIndexTest : public Test {
         TupleSchema      *districtTupleSchema;
         TupleSchema      *districtReplicaTupleSchema;
         vector<TableIndexScheme> districtIndexes;
+        vector<TableIndexScheme> districtReplicaIndexes;
         PersistentTable  *districtTable;
         PersistentTable  *districtTableReplica;
         TempTable        *districtTempTable;
         vector<int>       districtIndex1ColumnIndices;
         TableIndexScheme  districtIndex1Scheme;
+        TableIndexScheme  districtReplicaIndex1Scheme;
 
         TupleSchema      *warehouseTupleSchema;
         vector<TableIndexScheme> warehouseIndexes;
@@ -306,16 +343,20 @@ class TableAndIndexTest : public Test {
         TupleSchema      *customerTupleSchema;
         TupleSchema      *customerReplicaTupleSchema;
         vector<TableIndexScheme> customerIndexes;
+        vector<TableIndexScheme> customerReplicaIndexes;
         PersistentTable  *customerTable;
         PersistentTable  *customerTableReplica;
         TempTable        *customerTempTable;
         vector<int>       customerIndex1ColumnIndices;
         TableIndexScheme  customerIndex1Scheme;
+        TableIndexScheme  customerReplicaIndex1Scheme;
         vector<int>       customerIndex2ColumnIndices;
         vector<ValueType> customerIndex2ColumnTypes;
         TableIndexScheme  customerIndex2Scheme;
+        TableIndexScheme  customerReplicaIndex2Scheme;
         vector<int>       customerIndex3ColumnIndices;
         TableIndexScheme  customerIndex3Scheme;
+        TableIndexScheme  customerReplicaIndex3Scheme;
         char signature[20];
 };
 
@@ -356,7 +397,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(70));
     drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -404,7 +445,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->updateTuple( toUpdate, temp_tuple);
 
     //Flush to generate the log buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(72));
     drStream.periodicFlush(-1, addPartitionId(101));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -440,7 +481,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->deleteTuple( toDelete, true);
 
     //Flush to generate the buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(89));
     drStream.periodicFlush(-1, addPartitionId(102));
     EXPECT_TRUE( topend.receivedDRBuffer );
 
@@ -499,7 +540,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     districtTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(70));
     drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -543,7 +584,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     districtTable->deleteTuple(toDelete, true);
 
     //Flush to generate the buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(72));
     drStream.periodicFlush(-1, addPartitionId(101));
     EXPECT_TRUE( topend.receivedDRBuffer );
 
@@ -617,7 +658,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     customerTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(70));
     drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -661,7 +702,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     customerTable->deleteTuple(toDelete, true);
 
     //Flush to generate the buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(72));
     drStream.periodicFlush(-1, addPartitionId(101));
     EXPECT_TRUE( topend.receivedDRBuffer );
 

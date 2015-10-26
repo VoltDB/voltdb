@@ -107,9 +107,9 @@ class TestBase extends GebReportingSpec {
             // to the VoltDBManagementCenterPage not being shown, or a hang
             // (waiting for the browser/VMC to come up, I suspect)
             try {
-                debugPrint 'Attempting to reach VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
+                //debugPrint 'Attempting to reach VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
                 waitForVoltDBManagementCenterPage()
-                debugPrint 'Succeeded:  reached VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
+                //debugPrint 'Succeeded:  reached VoltDBManagementCenterPage, at: ' + sdf.format(new Date())
             } catch (Throwable e) {
                 // If an exception is encountered, make a second attempt
                 String message = '\nCaught an exception attempting to reach VoltDBManagementCenterPage ' +

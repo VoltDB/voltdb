@@ -29,9 +29,20 @@ namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
+// Use this to indicate uninitialized DR mark
+const size_t INVALID_DR_MARK = SIZE_MAX;
+
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
-const int MAGIC_DR_TRANSACTION_PADDING = 69;
+const int MAGIC_DR_TRANSACTION_PADDING = 78;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
+
+struct DRCommittedInfo{
+    int64_t seqNum;
+    int64_t spUniqueId;
+    int64_t mpUniqueId;
+
+    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
+};
 
 class DRTupleStream : public voltdb::TupleStreamBase {
 public:
@@ -41,7 +52,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 1;
+    static const uint8_t DR_VERSION = 2;
 
     DRTupleStream();
 
@@ -55,11 +66,14 @@ public:
     // for test purpose
     virtual void setSecondaryCapacity(size_t capacity);
 
-    virtual void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark, size_t drRowCost);
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
-    /** write a tuple to the stream */
+    /**
+     * write an insert or delete record to the stream
+     * for active-active conflict detection purpose, write full row image for delete records.
+     * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int64_t txnId,
@@ -67,8 +81,20 @@ public:
                        int64_t uniqueId,
                        TableTuple &tuple,
                        DRRecordType type,
-                       const TableIndex *uniqueIndex = NULL,
-                       uint32_t uniqueIndexCrc = 0);
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
+
+    /**
+     * write an update record to the stream
+     * for active-active conflict detection purpose, write full before image for update records.
+     * */
+    virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId,
+                       TableTuple &oldTuple,
+                       TableTuple &newTuple,
+                       const std::pair<const TableIndex*, uint32_t>& indexPair);
 
     virtual size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,
@@ -77,27 +103,45 @@ public:
                        int64_t spHandle,
                        int64_t uniqueId);
 
-    size_t computeOffsets(TableTuple &tuple, size_t &rowHeaderSz, size_t &rowMetadataSz, const std::vector<int>* interestingColumns);
-
     void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
     // If a transaction didn't generate any binary log data, calling this
     // would be a no-op because it was never begun.
-    void endTransaction();
+    void endTransaction(int64_t uniqueId);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
-    std::pair<int64_t, int64_t> getLastCommittedSequenceNumberAndUniqueId() { return std::pair<int64_t, int64_t>(m_committedSequenceNumber, m_committedUniqueId); }
+    DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
+        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
+    }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
     bool m_enabled;
 
     static int32_t getTestDRBuffer(char *out);
 private:
+    void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
+
+    void writeRowTuple(TableTuple& tuple,
+            size_t rowHeaderSz,
+            size_t rowMetadataSz,
+            const std::vector<int> *interestingColumns,
+            const std::pair<const TableIndex*, uint32_t> &indexPair,
+            ExportSerializeOutput &io);
+
+    size_t computeOffsets(DRRecordType &type,
+            const std::pair<const TableIndex*, uint32_t> &indexPair,
+            TableTuple &tuple,
+            size_t &rowHeaderSz,
+            size_t &rowMetadataSz,
+            const std::vector<int> *&interestingColumns);
+
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;
     bool m_opened;
     int64_t m_rowTarget;
     size_t m_txnRowCount;
+    int64_t m_lastCommittedSpUniqueId;
+    int64_t m_lastCommittedMpUniqueId;
 };
 
 class MockDRTupleStream : public DRTupleStream {
@@ -110,14 +154,13 @@ public:
                            int64_t uniqueId,
                            TableTuple &tuple,
                            DRRecordType type,
-                           const TableIndex *uniqueIndex = NULL,
-                           uint32_t uniqueIndexCrc = 0) {
+                           const std::pair<const TableIndex*, uint32_t>& indexPair) {
         return 0;
     }
 
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
 
-    void rollbackTo(size_t mark) {}
+    void rollbackTo(size_t mark, size_t drRowCost) {}
 
     size_t truncateTable(int64_t lastCommittedSpHandle,
                        char *tableHandle,

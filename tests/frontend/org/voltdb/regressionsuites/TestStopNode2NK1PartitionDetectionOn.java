@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -36,12 +35,14 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestStopNode2NK1PartitionDetection extends RegressionSuite
+public class TestStopNode2NK1PartitionDetectionOn extends RegressionSuite
 {
 
     static LocalCluster m_config;
+    private static final String TMPDIR = "/tmp";
+    private static final String TESTNONCE = "ppd_nonce";
 
-    public TestStopNode2NK1PartitionDetection(String name) {
+    public TestStopNode2NK1PartitionDetectionOn(String name) {
         super(name);
     }
 
@@ -99,7 +100,7 @@ public class TestStopNode2NK1PartitionDetection extends RegressionSuite
 
     static public Test suite() throws IOException {
         // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestStopNode2NK1PartitionDetection.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestStopNode2NK1PartitionDetectionOn.class);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
@@ -107,6 +108,7 @@ public class TestStopNode2NK1PartitionDetection extends RegressionSuite
         //Lets tolerate 3 node failures.
         m_config = new LocalCluster("decimal-default.jar", 4, 2, 1, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(true);
+        project.setPartitionDetectionSettings(TMPDIR, TESTNONCE);
         success = m_config.compile(project);
         assertTrue(success);
 
@@ -115,4 +117,3 @@ public class TestStopNode2NK1PartitionDetection extends RegressionSuite
         return builder;
     }
 }
-

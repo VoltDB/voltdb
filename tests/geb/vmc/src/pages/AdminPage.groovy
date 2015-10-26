@@ -152,7 +152,7 @@ class AdminPage extends VoltDBManagementCenterPage {
 
         exportbtn			{ $("#row-4 > td.configLabel > a", text:"Export")}
         noconfigtxt			{ $("#exportConfiguration > tr > td.configLabel")}
-        addconfig			{ $("#addNewConfigLink")}
+        //addconfig			{ $("#addNewConfigLink")}
         addconfigpopup			{ $("#addConfigInnerPopup")}
         addconfigtxt			{ $("#addConfigHeader")}
         inputstream			{ $("#txtStream")}
@@ -176,7 +176,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         deletetxt			{ $("#tblAddNewProperty > tbody > tr:nth-child(1) > th:nth-child(3)", text:"Delete")}
         confirmpopupask			{ $("#saveConfigConfirmation > div.overlay-content > div")}
         confirmnobtn			{ $("#btnSaveConfigCancel", text:"No")}
-        confirmyesbtn			{ $("#btnSaveConfigOk", text:"Yes")}
+        confirmyesbtn			{ $("#btnSaveConfigOk")}
         belowexportbtn			{ $("#row-40 > td.configLabel.expoStream > a")}
         belowexportnametxt		{ $("#exportConfiguration > tr:nth-child(2) > td.configLabe2")}
         belowexportvaluetxt		{ $("#exportConfiguration > tr:nth-child(2) > td:nth-child(2)")}
@@ -196,7 +196,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         checkboxontxt			{ $("#chkStreamValue", text:"On")}
         deleteconfigurations		{ $("#deleteAddConfig > a", text:"Delete this Configuration")}
         deleteconfirmation		{ $("#saveConfigConfirmation > div.overlay-content > div")}
-        deleteYes			{ $("#btnSaveConfigOk", text:"Yes")}
+        deleteYes			{ $("#btnSaveConfigOk")}
         deleteNo			{ $("#btnSaveConfigCancel", text:"No")}
         samestreamnameerrorpopup	{ $("#updateInnerErrorPopup")}
         samestreamnameerrorOk		{ $("#btnUpdateErrorOk", text:"Ok")}
@@ -242,6 +242,12 @@ class AdminPage extends VoltDBManagementCenterPage {
         btnPopupDrMasterCancel      { $("#btnPopupDrMasterCancel") }
         drTablePopup                { $(class:"overlay-title icon-alert", text:"DR Tables") }
         chkDrMaster                 { $("#row-DrConfig > td.tdDrConfig > div.icheckbox_square-aero.checked.customCheckbox > ins") }
+
+        diskLimitEdit { $("#btnEditDiskLimit") }
+        diskLimitExpanded              {$("#diskLimitConfiguration").find(".configLabel").first()}
+        snapShotName {$("#diskLimitConfiguration").find(".configLabe2").first()}
+        noFeaturestxt			{ $("#diskLimitConfiguration > tr.childprop-row-60 > td.configLabel")}
+
     }
     static at = {
         adminTab.displayed

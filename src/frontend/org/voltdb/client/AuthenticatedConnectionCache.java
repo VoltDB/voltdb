@@ -272,7 +272,9 @@ public class AuthenticatedConnectionCache {
             throw new RuntimeException("Released client not in pool.");
         }
         if (force) {
-            conn.refCount = 0;
+            //Dont bother with target size of pool and remove dead connection.
+            m_connections.remove(ckey);
+            closeClient(conn.client);
         } else {
             conn.refCount--;
         }

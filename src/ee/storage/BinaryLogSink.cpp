@@ -22,6 +22,7 @@
 #include "common/serializeio.h"
 #include "common/tabletuple.h"
 #include "common/types.h"
+#include "common/ValueFactory.hpp"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
 #include "indexes/tableindex.h"
@@ -35,16 +36,16 @@ class CachedIndexKeyTuple {
 public:
     CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
 
-    operator TableTuple& () {
-        return m_tuple;
-    }
-
-    inline bool hasCachedTuple(uint32_t indexCrc) {
-        return m_storageSize > 0 && indexCrc == m_cachedIndexCrc;
-    }
-
-    void allocateTuple(std::pair<const TableIndex*, uint32_t> indexPair) {
-        const TupleSchema* schema = indexPair.first->getKeySchema();
+    TableTuple &tuple(PersistentTable *table, uint32_t indexCrc) {
+        if (m_storageSize > 0 && indexCrc == m_cachedIndexCrc) {
+            return m_tuple;
+        }
+        std::pair<const TableIndex*, uint32_t> index = table->getUniqueIndexForDR();
+        if (!index.first || indexCrc != index.second) {
+            throwSerializableEEException("Unable to find unique index %u while applying a binary log record",
+                                         indexCrc);
+        }
+        const TupleSchema* schema = index.first->getKeySchema();
         size_t tupleLength = schema->tupleLength() + TUPLE_HEADER_SIZE;
         if (tupleLength > m_storageSize) {
             m_tupleStorage.reset(new char[tupleLength]);
@@ -52,7 +53,8 @@ public:
         }
         m_tuple.setSchema(schema);
         m_tuple.move(m_tupleStorage.get());
-        m_cachedIndexCrc = indexPair.second;
+        m_cachedIndexCrc = index.second;
+        return m_tuple;
     }
 private:
     TableTuple m_tuple;
@@ -62,6 +64,7 @@ private:
 };
 
 BinaryLogSink::BinaryLogSink() {}
+
 
 int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
@@ -75,74 +78,161 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
         const uint8_t drVersion = taskInfo.readByte();
-        if (drVersion > 1) {
+        if (drVersion > 2) {
             throwFatalException("Unsupported DR version %d", drVersion);
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
         rowCount += rowCostForDRRecord(type);
 
-        int64_t tableHandle = 0;
-
-        uint32_t checksum = 0;
-        const char * rowData = NULL;
         switch (type) {
-        case DR_RECORD_DELETE_BY_INDEX:
-        case DR_RECORD_DELETE:
         case DR_RECORD_INSERT: {
-            tableHandle = taskInfo.readLong();
+            int64_t tableHandle = taskInfo.readLong();
             int32_t rowLength = taskInfo.readInt();
-            uint32_t indexCrc = 0;
-            if (DR_RECORD_DELETE_BY_INDEX == type) {
-                indexCrc = taskInfo.readInt();
-            }
-            rowData = reinterpret_cast<const char *>(taskInfo.getRawPointer(rowLength));
-            checksum = taskInfo.readInt();
+            const char *rowData = reinterpret_cast<const char *>(taskInfo.getRawPointer(rowLength));
+            uint32_t checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwSerializableEEException("Unable to find table hash %jd while applying a binary log insert/delete record",
+                throwSerializableEEException("Unable to find table hash %jd while applying a binary log insert record",
                                              (intmax_t)tableHandle);
             }
-
             PersistentTable *table = tableIter->second;
 
-            TableTuple tempTuple;
-            if (DR_RECORD_DELETE_BY_INDEX == type) {
-                if (!indexKeyTuple.hasCachedTuple(indexCrc)) {
-                    std::pair<const TableIndex*, uint32_t> index = table->getSmallestUniqueIndex();
-                    if (!index.first || indexCrc != index.second) {
-                        throwSerializableEEException("Unable to find unique index %u while applying a binary log delete record",
-                                                     indexCrc);
-                    }
-                    indexKeyTuple.allocateTuple(index);
-                }
-                tempTuple = indexKeyTuple;
-            } else {
-                tempTuple = table->tempTuple();
-            }
+            TableTuple tempTuple = table->tempTuple();
 
-            ReferenceSerializeInputLE rowInput(rowData,  rowLength);
+            ReferenceSerializeInputLE rowInput(rowData, rowLength);
+            tempTuple.deserializeFromDR(rowInput, pool);
+            table->insertPersistentTuple(tempTuple, true);
+            break;
+        }
+        case DR_RECORD_DELETE: {
+            int64_t tableHandle = taskInfo.readLong();
+            int32_t rowLength = taskInfo.readInt();
+            const char *rowData = reinterpret_cast<const char *>(taskInfo.getRawPointer(rowLength));
+            uint32_t checksum = taskInfo.readInt();
+            validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+
+            boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+            if (tableIter == tables.end()) {
+                throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
+                                             (intmax_t)tableHandle);
+            }
+            PersistentTable *table = tableIter->second;
+
+            TableTuple tempTuple = table->tempTuple();
+
+            ReferenceSerializeInputLE rowInput(rowData, rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
 
-            if (type == DR_RECORD_DELETE || type == DR_RECORD_DELETE_BY_INDEX) {
-                TableTuple deleteTuple;
-                if (type == DR_RECORD_DELETE_BY_INDEX) {
-                    const TableIndex* index = table->getSmallestUniqueIndex().first;
-                    IndexCursor indexCursor(index->getTupleSchema());
-                    index->moveToKey(&tempTuple, indexCursor);
-                    deleteTuple = index->nextValueAtKey(indexCursor);
-                } else {
-                    deleteTuple = table->lookupTupleByValues(tempTuple);
-                }
-                if (deleteTuple.isNullTuple()) {
-                    throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                                 type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
-                }
-                table->deleteTuple(deleteTuple, true);
-            } else {
-                table->insertPersistentTuple(tempTuple, true);
+            TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
+            if (deleteTuple.isNullTuple()) {
+                throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
             }
+            table->deleteTuple(deleteTuple, true);
+            break;
+        }
+        case DR_RECORD_UPDATE: {
+            int64_t tableHandle = taskInfo.readLong();
+            int32_t oldRowLength = taskInfo.readInt();
+            const char *oldRowData = reinterpret_cast<const char*>(taskInfo.getRawPointer(oldRowLength));
+            int32_t newRowLength = taskInfo.readInt();
+            const char *newRowData = reinterpret_cast<const char*>(taskInfo.getRawPointer(newRowLength));
+            uint32_t checksum = taskInfo.readInt();
+            validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+
+            boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+            if (tableIter == tables.end()) {
+                throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
+                                             (intmax_t)tableHandle);
+            }
+            PersistentTable *table = tableIter->second;
+
+            TableTuple tempTuple = table->tempTuple();
+
+            ReferenceSerializeInputLE oldRowInput(oldRowData, oldRowLength);
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+
+            TableTuple oldTuple = table->lookupTupleByValues(tempTuple);
+            if (oldTuple.isNullTuple()) {
+                throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+            }
+
+            ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
+            tempTuple.deserializeFromDR(newRowInput, pool);
+
+            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+            break;
+        }
+        case DR_RECORD_DELETE_BY_INDEX: {
+            int64_t tableHandle = taskInfo.readLong();
+            int32_t rowKeyLength = taskInfo.readInt();
+            uint32_t indexCrc = taskInfo.readInt();
+            const char *rowKeyData = reinterpret_cast<const char *>(taskInfo.getRawPointer(rowKeyLength));
+            uint32_t checksum = taskInfo.readInt();
+            validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+
+            boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+            if (tableIter == tables.end()) {
+                throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
+                                             (intmax_t)tableHandle);
+            }
+            PersistentTable *table = tableIter->second;
+
+            TableTuple tempTuple = indexKeyTuple.tuple(table, indexCrc);
+
+            ReferenceSerializeInputLE rowInput(rowKeyData, rowKeyLength);
+            tempTuple.deserializeFromDR(rowInput, pool);
+
+            const TableIndex* index = table->getUniqueIndexForDR().first;
+            IndexCursor indexCursor(index->getTupleSchema());
+            index->moveToKey(&tempTuple, indexCursor);
+            TableTuple deleteTuple = index->nextValueAtKey(indexCursor);
+            if (deleteTuple.isNullTuple()) {
+                throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+            }
+            table->deleteTuple(deleteTuple, true);
+            break;
+        }
+        case DR_RECORD_UPDATE_BY_INDEX: {
+            int64_t tableHandle = taskInfo.readLong();
+            int32_t oldRowKeyLength = taskInfo.readInt();
+            uint32_t oldKeyIndexCrc = taskInfo.readInt();
+            const char *oldRowKeyData = reinterpret_cast<const char*>(taskInfo.getRawPointer(oldRowKeyLength));
+            int32_t newRowLength = taskInfo.readInt();
+            const char *newRowData = reinterpret_cast<const char*>(taskInfo.getRawPointer(newRowLength));
+            uint32_t checksum = taskInfo.readInt();
+            validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+
+            boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+            if (tableIter == tables.end()) {
+                throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
+                                             (intmax_t)tableHandle);
+            }
+            PersistentTable *table = tableIter->second;
+
+            TableTuple tempTuple = indexKeyTuple.tuple(table, oldKeyIndexCrc);
+
+            ReferenceSerializeInputLE oldRowInput(oldRowKeyData, oldRowKeyLength);
+            tempTuple.deserializeFromDR(oldRowInput, pool);
+
+            const TableIndex* index = table->getUniqueIndexForDR().first;
+            IndexCursor indexCursor(index->getTupleSchema());
+            index->moveToKey(&tempTuple, indexCursor);
+            TableTuple oldTuple = index->nextValueAtKey(indexCursor);
+            if (oldTuple.isNullTuple()) {
+                throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
+                                             type, (intmax_t)sequenceNumber, (intmax_t)uniqueId, tempTuple.debug(table->name()).c_str());
+            }
+
+            tempTuple = table->tempTuple();
+            ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
+            tempTuple.deserializeFromDR(newRowInput, pool);
+
+            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
@@ -161,7 +251,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                 }
             }
             sequenceNumber = tempSequenceNumber;
-            checksum = taskInfo.readInt();
+            uint32_t checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
@@ -171,16 +261,15 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
                 throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
                                     (intmax_t)sequenceNumber, (intmax_t)tempSequenceNumber);
             }
-
-            checksum = taskInfo.readInt();
+            uint32_t checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
         case DR_RECORD_TRUNCATE_TABLE: {
-            tableHandle = taskInfo.readLong();
+            int64_t tableHandle = taskInfo.readLong();
             std::string tableName = taskInfo.readTextString();
 
-            checksum = taskInfo.readInt();
+            uint32_t checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
@@ -195,13 +284,30 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             break;
         }
-        case DR_RECORD_UPDATE:
         default:
             throwFatalException("Unrecognized DR record type %d", type);
             break;
         }
     }
     return static_cast<int64_t>(rowCount);
+}
+
+void BinaryLogSink::exportDRConflict(PersistentTable *drTable, Table *exportTable, const DRRecordType &type, TableTuple &exportTuple) {
+    assert(exportTable != NULL);
+    assert(exportTable->isExport());
+
+    TableTuple tempTuple = exportTable->tempTuple();
+    NValue hiddenColumn = exportTuple.getHiddenNValue(drTable->getDRTimestampColumnIndex());
+
+    NValue tableName = ValueFactory::getStringValue(drTable->name());
+    tempTuple.setNValue(0, tableName);  // Table Name
+    tempTuple.setNValue(1, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenColumn))));       // Cluster Id
+    tempTuple.setNValue(2, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenColumn)));   // Timestamp
+    tempTuple.setNValue(3, ValueFactory::getTinyIntValue(type));            // Type of Operation
+    tempTuple.setNValues(4, exportTuple, 0, exportTuple.sizeInValues());    // rest of columns
+
+    exportTable->insertTuple(tempTuple);
+    tableName.free();
 }
 
 void BinaryLogSink::validateChecksum(uint32_t checksum, const char *start, const char *end) {

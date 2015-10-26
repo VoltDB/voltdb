@@ -97,11 +97,11 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     index = TableIndexFactory::getInstance(scheme);
 
     TableTuple *tuple1 = newTuple(schema, 0, 10);
-    index->addEntry(tuple1);
+    index->addEntry(tuple1, NULL);
     TableTuple *tuple2 = newTuple(schema, 0, 11);
-    index->addEntry(tuple2);
+    index->addEntry(tuple2, NULL);
     TableTuple *tuple3 = newTuple(schema, 0, 12);
-    index->addEntry(tuple3);
+    index->addEntry(tuple3, NULL);
 
     TableTuple *tuple4 = newTuple(schema, 0, 10);
     EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));

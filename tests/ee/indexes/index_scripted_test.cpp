@@ -99,7 +99,9 @@ bool commandIS(voltdb::TableTuple &key)
 {
     //cout << "running is" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
-    return currentIndex->addEntry(&key);
+    TableTuple conflict(key.getSchema());
+    currentIndex->addEntry(&key, &conflict);
+    return conflict.isNullTuple();
 }
 
 bool commandIF(voltdb::TableTuple &key)

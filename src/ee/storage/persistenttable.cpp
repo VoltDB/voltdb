@@ -90,6 +90,23 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
+class SetAndRestorePendingDeleteFlag
+{
+public:
+    SetAndRestorePendingDeleteFlag(TableTuple &target) : m_target(target)
+    {
+        assert(!m_target.isPendingDelete());
+        m_target.setPendingDeleteTrue();
+    }
+    ~SetAndRestorePendingDeleteFlag()
+    {
+        m_target.setPendingDeleteFalse();
+    }
+
+private:
+    TableTuple &m_target;
+};
+
 PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),
@@ -344,7 +361,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = SIZE_MAX;
+    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
@@ -460,9 +477,10 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         target.setDirtyFalse();
     }
 
-    if (!tryInsertOnAllIndexes(&target)) {
-        throw ConstraintFailureException(this, source, TableTuple(),
-                CONSTRAINT_TYPE_UNIQUE);
+    TableTuple conflict(m_schema);
+    tryInsertOnAllIndexes(&target, &conflict);
+    if (!conflict.isNullTuple()) {
+        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -471,14 +489,15 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = SIZE_MAX;
+    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -519,7 +538,9 @@ void PersistentTable::insertTupleForUndo(char *tuple)
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
      * just marked as deleted.
      */
-    if (!tryInsertOnAllIndexes(&target)) {
+    TableTuple conflict(m_schema);
+    tryInsertOnAllIndexes(&target, &conflict);
+    if (!conflict.isNullTuple()) {
         // First off, it should be impossible to violate a constraint when RESTORING an index to a
         // known good state via an UNDO of a delete.  So, assume that something is badly broken, here.
         // It's probably safer NOT to do too much cleanup -- such as trying to call deleteTupleStorage --
@@ -604,9 +625,12 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(targetTupleToUpdate);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
+        }
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -615,16 +639,15 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = SIZE_MAX;
+    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -678,12 +701,14 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     /**
      * Insert the updated tuple back into the indexes.
      */
+    TableTuple conflict(m_schema);
     for (int i = 0; i < indexesToUpdate.size(); i++) {
         TableIndex *index = indexesToUpdate[i];
         if (!indexRequiresUpdate[i]) {
             continue;
         }
-        if (!index->addEntry(&targetTupleToUpdate)) {
+        index->addEntry(&targetTupleToUpdate, &conflict);
+        if (!conflict.isNullTuple()) {
             throwFatalException("Failed to insert updated tuple into index in Table: %s Index %s",
                                 m_name.c_str(), index->getName().c_str());
         }
@@ -748,8 +773,10 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
+        TableTuple conflict(m_schema);
         BOOST_FOREACH(TableIndex *index, m_indexes) {
-            if (!index->addEntry(&targetTupleToUpdate)) {
+            index->addEntry(&targetTupleToUpdate, &conflict);
+            if (!conflict.isNullTuple()) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
                                     m_name.c_str(), index->getName().c_str());
             }
@@ -767,21 +794,24 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    // handle any materialized views
-    for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(target, fallible);
+    {
+        // handle any materialized views, hide the tuple from the scan temporarily.
+        SetAndRestorePendingDeleteFlag setPending(target);
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleDelete(target, fallible);
+        }
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = SIZE_MAX;
+    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getSmallestUniqueIndex();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex.first, uniqueIndex.second);
+        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
     }
 
     if (fallible) {
@@ -857,8 +887,7 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
  *  Indexes and views have been destroyed first.
  */
 void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
-    TBPtr block = findBlock(target.address(), m_data, m_tableAllocationSize);
-    deleteTupleStorage(target, block, true); // also frees object columns along with empty tuple block storage
+    deleteTupleStorage(target); // also frees object columns
 }
 
 /*
@@ -939,8 +968,10 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
 }
 
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
+    TableTuple conflict(m_schema);
     BOOST_FOREACH(TableIndex *index, m_indexes) {
-        if (!index->addEntry(tuple)) {
+        index->addEntry(tuple, &conflict);
+        if (!conflict.isNullTuple()) {
             throwFatalException(
                     "Failed to insert tuple in Table: %s Index %s", m_name.c_str(), index->getName().c_str());
         }
@@ -956,19 +987,19 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
     }
 }
 
-bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
-    for (int i = static_cast<int>(m_indexes.size()) - 1; i >= 0; --i) {
-        FAIL_IF(!m_indexes[i]->addEntry(tuple)) {
+void PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple, TableTuple *conflict) {
+    for (int i = 0; i < static_cast<int>(m_indexes.size()); ++i) {
+        m_indexes[i]->addEntry(tuple, conflict);
+        FAIL_IF(!conflict->isNullTuple()) {
             VOLT_DEBUG("Failed to insert into index %s,%s",
                        m_indexes[i]->getTypeName().c_str(),
                        m_indexes[i]->getName().c_str());
-            for (int j = i + 1; j < m_indexes.size(); ++j) {
+            for (int j = 0; j < i; ++j) {
                 m_indexes[j]->deleteEntry(tuple);
             }
-            return false;
+            return;
         }
     }
-    return true;
 }
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
@@ -1080,6 +1111,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // The view is already up to date.
             // but still need to update the index used for min/max
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            // Fallback executor vectors must be set after indexForMinMax
+            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
 
@@ -1090,6 +1123,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             // the view was initialized, so re-initialize the view.
             currView->setTargetTable(target);
             currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
+            // Fallback executor vectors must be set after indexForMinMax
+            currView->setFallbackExecutorVectors(targetMvInfo->fallbackQueryStmts());
             return;
         }
     }
@@ -1283,7 +1318,7 @@ size_t PersistentTable::hashCode() {
     TableIterator iter(this, m_data.begin());
     TableTuple tuple(schema());
     while (iter.next(tuple)) {
-        pkeyIndex->addEntry(&tuple);
+        pkeyIndex->addEntry(&tuple, NULL);
     }
 
     IndexCursor indexCursor(pkeyIndex->getTupleSchema());
@@ -1605,6 +1640,20 @@ void PersistentTableSurgeon::activateSnapshot() {
     for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
         assert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
     }
+}
+
+std::pair<const TableIndex*, uint32_t> PersistentTable::getUniqueIndexForDR() {
+    // In active-active we always send full tuple instead of just index tuple.
+    bool isActiveActive = ExecutorContext::getExecutorContext()->getEngine()->getIsActiveActiveDREnabled();
+    if (isActiveActive) {
+        TableIndex* nullIndex = NULL;
+        return std::make_pair(nullIndex, 0);
+    }
+
+    if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
+        computeSmallestUniqueIndex();
+    }
+    return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
 }
 
 void PersistentTable::computeSmallestUniqueIndex() {
