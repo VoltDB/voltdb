@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.http.HttpServletResponse;
@@ -31,6 +31,7 @@ import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.server.Request;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
@@ -106,8 +107,13 @@ public class HTTPClientInterface {
         final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
                 new VoltTable[0], "Request Timeout");
         m_timeoutResponse = r.toJSONString();
-        // TODO: how many threads should this require? Only the first closeAll will take time, so 1 or 2 should be good enough.
-        m_closeAllExecutor = Executors.newFixedThreadPool(2);
+        m_closeAllExecutor = CoreUtils.getSingleThreadExecutor("HttpClientInterface-closeAll");
+    }
+
+    public void stop() {
+        // This is called on server shutdown.
+        // So, it is OK if we interrupt threads trying to close client connections.
+        m_closeAllExecutor.shutdownNow();
     }
 
     public void process(Request request, HttpServletResponse response) {
@@ -360,12 +366,21 @@ public class HTTPClientInterface {
     }
 
     private void closeAllAsync(final AuthenticatedConnectionCache cache) {
-        m_closeAllExecutor.submit(new Runnable() {
-            @Override
-            public void run() {
-                cache.closeAll();
-            }
-        });
+        if (cache.isClosing()) {
+            return;
+        }
+
+        try {
+            m_closeAllExecutor.submit(new Runnable() {
+                @Override
+                public void run() {
+                    cache.closeAll();
+                }
+            });
+        } catch(RejectedExecutionException e) {
+            m_rate_limited_log.log(System.currentTimeMillis(), Level.WARN, e,
+                    "Task to close connections in old connection cache was rejected. Old connections will not be closed");
+        }
     }
 
     //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
@@ -379,8 +394,7 @@ public class HTTPClientInterface {
 
     //Must be called by all who call authenticate.
     public void releaseClient(AuthenticationResult authResult, boolean force) {
-        if (authResult != null && authResult.m_client != null) {
-            assert(authResult.m_connectionCache != null);
+        if (authResult != null && authResult.m_client != null && authResult.m_connectionCache != null) {
             authResult.m_connectionCache.releaseClient(authResult.m_client, authResult.m_scheme, force || (authResult.m_connectionCache != m_connections.get()));
         }
     }
