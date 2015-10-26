@@ -469,7 +469,7 @@ public abstract class AbstractParsedStmt {
             return expr;
         }
 
-        // This a TVE from the correlated expression
+        // This is a TVE from the correlated expression
         int paramIdx = NEXT_PARAMETER_ID++;
         ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
         m_parameterTveMap.put(paramIdx, expr);
@@ -1211,7 +1211,7 @@ public abstract class AbstractParsedStmt {
     }
 
     public ParameterValueExpression[] getParameters() {
-        // Is a statement contains subqueries the parameters will be associated with
+        // If a statement contains subqueries the parameters will be associated with
         // the parent statement
         if (m_parentStmt != null) {
             return m_parentStmt.getParameters();
@@ -1664,6 +1664,34 @@ public abstract class AbstractParsedStmt {
         Set<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
                 SelectSubqueryExpression.class);
         return !subqueryExprs.isEmpty();
+    }
+
+    public abstract boolean isDML();
+
+    /**
+     * Is the statement a subquery of a DML statement.
+     * Currently, subquery statements initialized through parseFromSubQuery
+     * (as opposed to parseSubquery) do NOT initialize m_parentStmt so they
+     * are indistinguishable from top-level statements. There is a plan to
+     * "fix" that for greater simplicity/consistency.
+     * https://issues.voltdb.com/browse/ENG-9313
+     * This code SHOULD work acceptably with or without that fix,
+     * because we do not allow FROM clause subqueries in DML statements.
+     * Regardless, the current caller has no requirement to return true
+     * if THIS statement is DML.
+     * @return
+     */
+    public boolean topmostParentStatementIsDML() {
+        if (m_parentStmt == null) {
+            return false; // Do not need to check if THIS statement is DML.
+        }
+        // A parent DML statement is always the root parent because DML is not
+        // allowed in subqueries.
+        if (m_parentStmt.isDML()) {
+            return true;
+        }
+        // For queries (potentially subqueries), keep searching upward.
+        return m_parentStmt.topmostParentStatementIsDML();
     }
 
 }
