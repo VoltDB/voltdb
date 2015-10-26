@@ -273,7 +273,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
     private ScheduledFuture<?> m_maxConnectionUpdater;
 
-    private final boolean m_isConfiguredForAlternativeDB;
+    private final boolean m_isConfiguredForNonVoltDBBackend;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -1214,8 +1214,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
         BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
-        m_isConfiguredForAlternativeDB = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
-                                          backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
+        m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
         bindAdapter(internalAdapter, null, true);
@@ -2266,7 +2266,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // pick the sysproc based on the presence of partition info
         // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
         // -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForAlternativeDB;
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
         int partition = -1;
 
         if (isSinglePartition) {

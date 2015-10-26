@@ -39,12 +39,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(PostgreSQLBackend.class.getName());
 
+    // TODO: these will need to match the values used on our Jenkins machines,
+    // once a PostgreSQL server is set up.
     private static final String m_default_username = "postgres";
     private static final String m_default_password = "voltdb";
     private static final String m_permanent_database_name = "postgres";
     private static final String m_database_name = "sqlcoveragetest";
     private static PostgreSQLBackend m_permanent_db_backend = null;
-    // PostgreSQL column type names that are not found in VoltDB or HSqlDB
+    // PostgreSQL column type names that are not found in VoltDB or HSQL,
+    // mapped to their VoltDB/HSQL equivalents
     private static final Map<String,String> m_PostgreSQLTypeNames;
     static {
         m_PostgreSQLTypeNames = new HashMap<String,String>();
@@ -135,9 +138,9 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      */
     @Override
     protected VoltTable.ColumnInfo getColumnInfo(String typeName, String colName) {
-        String postrgresqlType = m_PostgreSQLTypeNames.get(typeName);
-        if (postrgresqlType != null) {
-            typeName = postrgresqlType;
+        String equivalentTypeName = m_PostgreSQLTypeNames.get(typeName);
+        if (equivalentTypeName != null) {
+            typeName = equivalentTypeName;
         }
         return super.getColumnInfo(typeName, colName);
     }
@@ -156,7 +159,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 Statement stmt = m_permanent_db_backend.getConnection().createStatement();
                 stmt.execute("drop database if exists " + m_database_name + ";");
             } catch (SQLException ex) {
-                System.out.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
+                System.err.println("In PostgreSQLBackend.shutdown(), caught exception: " + ex);
                 ex.printStackTrace();
             }
         } catch (Exception e) {

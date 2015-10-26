@@ -54,7 +54,7 @@ public abstract class NonVoltDBBackend {
     private String m_database_type = null;
     protected Connection dbconn;
 
-    /** Constructor specifying the databaseType (e.g. HSqlDB or PostgreSQL),
+    /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
     public NonVoltDBBackend(String databaseType, String driverClassName,
                           String connectionURL, String username, String password) {
@@ -74,7 +74,7 @@ public abstract class NonVoltDBBackend {
         }
     }
 
-    /** Creates a new GenericBackend wrapping dbconn. This is (was?) used for testing only. */
+    /** Creates a new NonVoltDBBackend wrapping dbconn. This is (was?) used for testing only. */
     protected NonVoltDBBackend(Connection dbconn) {
         this.dbconn = dbconn;
     }
@@ -109,9 +109,9 @@ public abstract class NonVoltDBBackend {
     /**
      * Returns a VoltTable.ColumnInfo of appropriate type, based on a
      * <i>typeName</i> and <i>colName</i> (both Strings).
-     * This version checks for standard column types used by most databases;
-     * sub-classes can override it, to handle column types particular to that
-     * database.
+     * This version checks for standard column types used by most databases
+     * (and by VoltDB and HSQL, in particular); sub-classes can override it,
+     * to handle column types particular to that database.
      */
     protected VoltTable.ColumnInfo getColumnInfo(String typeName, String colName) {
         if (typeName.equalsIgnoreCase("VARCHAR"))

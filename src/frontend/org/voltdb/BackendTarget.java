@@ -27,7 +27,7 @@ package org.voltdb;
  * fast and only supports a single partition. It's best used
  * for testing.
  *
- * The PostreSQL option simply calls a PostgreSQL database via JDBC.
+ * The PostgreSQL option simply calls a PostgreSQL database via JDBC.
  * Again, this is used only for testing, specifically, in the SQLCoverage
  * tests, where VoltDB results are compared with PostgreSQL results.
  */
