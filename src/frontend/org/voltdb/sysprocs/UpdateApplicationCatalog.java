@@ -214,7 +214,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         try {
                             major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
                         } catch (Exception ex) {
-                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.");
+                            if (log.isDebugEnabled())
+                                log.debug("Unable to parse compile version number from UnsupportedClassVersionError. " +
+                                          ex.getMessage());
                         }
 
                         if (m_versionMap.containsKey(major)) {
