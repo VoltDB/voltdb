@@ -42,6 +42,16 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
     {
         assert(planNode != null);
 
+        // This optimization was interfering with some UPSERT ... FROM
+        // queries because once the optimization is applied to a subquery,
+        // it becomes difficult to correct the subquery to work in a
+        // multi-partition DML statement context. That's no longer
+        // simply a matter of removing the Send/Receive pair without
+        // side effects.
+        if (m_parsedStmt.topmostParentStatementIsDML()) {
+            return planNode; // Do not apply the optimization.
+        }
+
         Queue<AbstractPlanNode> children = new LinkedList<AbstractPlanNode>();
         children.add(planNode);
 
@@ -60,7 +70,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                     if (plan == planNode) {
                         return newPlan;
                     } else {
-                        return planNode;
+                        return planNode; // Do not apply the optimization.
                     }
                 }
             }
@@ -69,10 +79,11 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                 children.add(plan.getChild(i));
             }
         }
-        return planNode;
+        return planNode; // Do not apply the optimization.
     }
 
-    /** For MP queries, the coordinator's OrderBy node can be replaced with
+    /**
+     * For MP queries, the coordinator's OrderBy node can be replaced with
      * a specialized Receive node that merges individual partitions results
      * into a final result set if the partitions result set is sorted
      * in the order matching the ORDER BY order
