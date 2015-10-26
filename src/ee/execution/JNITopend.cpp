@@ -511,16 +511,6 @@ static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer, boo
 bool JNITopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
         DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
         DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
-
-    if (action == DR_RECORD_DELETE || action == DR_RECORD_UPDATE) {
-        assert(existingTableForDelete);
-        assert(expectedTableForDelete);
-    }
-    if (action == DR_RECORD_INSERT || action == DR_RECORD_UPDATE) {
-        assert(existingTableForInsert);
-        assert(newTableForInsert);
-    }
-
     // prepare tablename
     jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 

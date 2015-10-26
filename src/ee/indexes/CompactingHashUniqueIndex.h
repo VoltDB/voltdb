@@ -122,20 +122,23 @@ class CompactingHashUniqueIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool existsDo(const TableTuple *persistentTuple, TableTuple *conflictTuple) const
-    {
-        MapIterator mapiter = findTuple(*persistentTuple);
-        if (mapiter.isEnd()) {
-            return false;
-        }
-        conflictTuple->setSchema(getTupleSchema());
-        conflictTuple->move(const_cast<void *>(mapiter.value()));
-        return true;
-    }
-
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
+
+        if (mapIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
+
+        return true;
+    }
+
+    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
+    {
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = findTuple(*persistentTuple);
 
         if (mapIter.isEnd()) {
             cursor.m_match.move(NULL);
