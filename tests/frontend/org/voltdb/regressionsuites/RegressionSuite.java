@@ -726,12 +726,16 @@ public class RegressionSuite extends TestCase {
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
     }
 
-    private static void assertEquals(String msg, PointType expected, PointType actual) {
+    public static void assertEquals(String msg, PointType expected, PointType actual) {
         assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), 0.001);
         assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), 0.001);
     }
 
-    private static void assertEquals(String msg, GeographyValue expected, GeographyValue actual) {
+    public static void assertEquals(PointType expected, PointType actual) {
+        assertEquals("Points not equal: ", expected, actual);
+    }
+
+    public static void assertEquals(String msg, GeographyValue expected, GeographyValue actual) {
         if (expected == actual) {
             return;
         }
@@ -769,6 +773,10 @@ public class RegressionSuite extends TestCase {
 
             ++loopCtr;
         }
+    }
+
+    public static void assertEquals(GeographyValue expected, GeographyValue actual) {
+        assertEquals("Geographies not equal: ", expected, actual);
     }
 
     private static void assertContentOfRow(int row, Object[] expectedRow, VoltTable actualRow) {

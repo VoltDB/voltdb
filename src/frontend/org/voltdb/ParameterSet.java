@@ -368,8 +368,16 @@ public class ParameterSet implements JSONString {
             else if (array[i] instanceof Long) integers++;
             else if (array[i] instanceof String) strings++;
             else if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) nulls++;
-            else if (array[i] == VoltType.NULL_GEOGRAPHY) nulls++;
             else if (null == array[i]) nulls++;  // Handle nulls in an Object array.  Note only support nulls in STRING type, later we'll reject all other null usage.
+            else if (array[i] instanceof PointType
+                    || array[i] instanceof GeographyValue
+                    || array[i] == VoltType.NULL_POINT
+                    || array[i] == VoltType.NULL_GEOGRAPHY) {
+                // Ticket ENG-9311 exists to make geo types work with Object[] arrays passed as parameters.
+                // Fixing that ticket will require updating the logic below.
+                throw new RuntimeException("PointType or GeographyValue instances are not yet supported in "
+                        + "Object arrays passed as parameters.  Try passing PointType[] or GeographyValue[] instead.");
+            }
             else {
                 String msg = String.format("Type %s not supported in parameter set arrays.",
                                         array[i].getClass().toString());
@@ -594,6 +602,9 @@ public class ParameterSet implements JSONString {
                 }
                 case POINT :
                     value = PointType.unflattenFromBuffer(in);
+                    if (value == null) {
+                        value = VoltType.NULL_POINT;
+                    }
                     break;
                 case GEOGRAPHY :
                     len = in.getInt();
