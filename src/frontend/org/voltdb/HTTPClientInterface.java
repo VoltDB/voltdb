@@ -58,7 +58,7 @@ public class HTTPClientInterface {
     public static final String PARAM_ADMIN = "admin";
     int m_timeout = 0;
     final String m_timeoutResponse;
-    private ExecutorService m_closeAllExecutor;
+    private final ExecutorService m_closeAllExecutor;
 
     public final static int MAX_QUERY_PARAM_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -282,7 +282,8 @@ public class HTTPClientInterface {
         String admin = request.getParameter(PARAM_ADMIN);
 
         AuthenticatedConnectionCache connection_cache = m_connections.get();
-        while (connection_cache == null) {
+        while (connection_cache == null) { // Need a while loop here because there is a small chance that
+            // catalog update could null out the cache immediately after another request thread sets it.
             if (m_oldCache!=null) {
                 closeAllAsync(m_oldCache);
             }
@@ -402,7 +403,8 @@ public class HTTPClientInterface {
     public void notifyOfCatalogUpdate()
     {
         AuthenticatedConnectionCache cache = m_connections.get();
-        if (cache!=null) {
+        if (cache!=null) { // save the old cache so that it will be closed before we create cache again.
+            // Check for null to make sure that two consecutive catalog updates won't null out old cache erroneously.
             m_oldCache = cache;
         }
         m_connections.set(null);
