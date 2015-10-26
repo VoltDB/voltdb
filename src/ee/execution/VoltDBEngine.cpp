@@ -1774,11 +1774,6 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
 void VoltDBEngine::reportProgressToTopend() {
-    // TableName and tableSize are not really used in the JNI call
-    // Very low risk fix is make them constants
-    // TODO: refer ENG-8903 to deal with them
-    std::string tableName = "None";
-    int64_t tableSize = 0;
     assert(m_currExecutorVec);
 
     //Update stats in java and let java determine if we should cancel this query.
@@ -1786,9 +1781,7 @@ void VoltDBEngine::reportProgressToTopend() {
     int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
                                         (m_lastAccessedExec == NULL) ?
                                         dummy_last_accessed_plan_node_name :
-                                        planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
-                                        tableName,
-                                        tableSize,
+                                          planNodeToString(m_lastAccessedExec->getPlanNode()->getPlanNodeType()),
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
                                         m_currExecutorVec->limits().getAllocated(),
                                         m_currExecutorVec->limits().getPeakMemoryInBytes());
