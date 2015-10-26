@@ -32,10 +32,12 @@ import org.voltdb.OperationMode;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.TestCatalogUpdateSuite;
 import org.voltdb.sysprocs.UpdateApplicationCatalog.JavaClassForTest;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
@@ -47,10 +49,16 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
     private VoltDB.Configuration m_config;
     private Client m_client;
 
+    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
     @Override
     public void setUp() throws Exception
     {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
+        TPCCProjectBuilder builder = new TPCCProjectBuilder();
+        builder.addDefaultSchema();
+        builder.addDefaultPartitioning();
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar"), 1, 1, 0);
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
@@ -61,6 +69,13 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
         m_localServer = new ServerThread(m_config);
         m_localServer.start();
         m_localServer.waitForInitialization();
+
+        builder = new TPCCProjectBuilder();
+        builder.addDefaultSchema();
+        builder.addDefaultPartitioning();
+        builder.addProcedures(BASEPROCS);
+        success = builder.compile(Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar"), 1, 1, 0);
+        assert(success);
 
         JavaClassForTest testClass = Mockito.mock(JavaClassForTest.class);
         Mockito.when(testClass.forName(Matchers.anyString(), Matchers.anyBoolean(), Mockito.any(JarLoader.class))).
@@ -90,6 +105,7 @@ public class TestMockUpdateApplicationCatalog extends TestCase {
             fail("Update catalog should fail with version error.");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("Cannot load classes compiled with a higher version"));
+            assertTrue(e.getMessage().contains("Java 8"));
         }
     }
 }

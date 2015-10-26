@@ -165,6 +165,18 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         }
     }
 
+    public final static HashMap<Integer, String> m_versionMap = new HashMap<Integer, String>();
+    static {
+        m_versionMap.put(45, "Java 1.1");
+        m_versionMap.put(46, "Java 1.2");
+        m_versionMap.put(47, "Java 1.3");
+        m_versionMap.put(48, "Java 1.4");
+        m_versionMap.put(49, "Java 5");
+        m_versionMap.put(50, "Java 6");
+        m_versionMap.put(51, "Java 7");
+        m_versionMap.put(52, "Java 8");
+    }
+
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -196,25 +208,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     // care about here.
                     catch (UnsupportedClassVersionError e) {
                         String msg = "Cannot load classes compiled with a higher version of Java than currently" +
-                                     " in use.";
+                                     " in use. Class " + classname + " was compiled with ";
+
                         Integer major = 0;
                         try {
                             major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
                         } catch (Exception ex) {
-                            // Could not extract major version number from error message.
+                            log.debug("Unable to parse compile version number from UnsupportedClassVersionError.");
                         }
-                        HashMap<Integer, String> versionMap = new HashMap<Integer, String>();
-                        versionMap.put(45, "Java 1.1");
-                        versionMap.put(46, "Java 1.2");
-                        versionMap.put(47, "Java 1.3");
-                        versionMap.put(48, "Java 1.4");
-                        versionMap.put(49, "Java 5");
-                        versionMap.put(50, "Java 6");
-                        versionMap.put(51, "Java 7");
-                        versionMap.put(52, "Java 8");
-                        if (versionMap.containsKey(major)) {
-                            msg = msg.concat(" Class " + classname + " was compiled with " + versionMap.get(major) +
-                                             ", current runtime version is " + System.getProperty("java.version") + ".");
+
+                        if (m_versionMap.containsKey(major)) {
+                            msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
+                                             System.getProperty("java.version") + ".");
+                        } else {
+                            msg = msg.concat("an incompatable Java version.");
                         }
                         log.error(msg);
                         throw new VoltAbortException(msg);
