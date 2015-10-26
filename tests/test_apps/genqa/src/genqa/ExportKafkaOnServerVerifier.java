@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.VoltDB;
+import org.apache.zookeeper_voltpatches.Watcher;
 
 import java.util.Properties;
 import java.util.concurrent.CompletionService;

@@ -71,36 +71,29 @@ function build_deployment_file() {
 exit
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-mkdir -p obj
-javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-src/exportbenchmark2/*.java \
-src/exportbenchmark2/procedures/*.java
-# stop if compilation fails
-if [ $? != 0 ]; then exit; fi
-(cd obj && jar cvf ExportBenchmark2.jar exportbenchmark2/*)
-
-cp ./obj/*.jar "$VOLTDB_LIB/"
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    ant clean
 }
 
-# build an application catalog
-function catalog() {
-srccompile
-    echo "Compiling the export-benchmark application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar exportTable.sql"
-    echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar exportTable.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    ant all
+}
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    rm -rf felix-cache
+    if [ ! -e sp.jar ] || [ ! -e client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
+    jars-ifneeded
     # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # if [ ! -f $APPNAME.jar ]; then catalog; fi
     FR_TEMP=/tmp/${USER}/fr
     mkdir -p ${FR_TEMP}
     # Set up flight recorder options
@@ -115,9 +108,9 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo 
-    echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
+    echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST}"
     echo
-    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar
+    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST}
 }
 
 # run the client that drives the example
@@ -126,17 +119,19 @@ function client() {
 }
 
 function run_benchmark_help() {
-    srccompile
     java -classpath obj:$APPCLASSPATH:obj exportbenchmark2.ExportBenchmark --help
 }
 
 function run_benchmark() {
-    # srccompile
     java -classpath :$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark2.client.exportbenchmark.ExportBenchmark \
         --duration=30 \
         --servers=localhost \
 	--statsfile=exportbench.csv
+}
+
+function init() {
+    sqlcmd < ddl.sql
 }
 
 function help() {
