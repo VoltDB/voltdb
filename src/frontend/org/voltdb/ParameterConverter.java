@@ -494,10 +494,36 @@ public class ParameterConverter {
                 throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
                         inputClz.getName(), expectedClz.getName()));
             }
-        } else if (expectedClz == PointType.class && inputClz == PointType.class) {
-            return param;
-        } else if (expectedClz == GeographyValue.class && inputClz == GeographyValue.class) {
-            return param;
+        } else if (expectedClz == PointType.class) {
+            // Is it a point already?  If so, just return it.
+            if (inputClz == PointType.class) {
+                return param;
+            }
+            // Is it a string from which we can construct a point?
+            // If so, return the newly constructed point.
+            if (inputClz == String.class) {
+                try {
+                    PointType pt = PointType.pointFromText((String)param);
+                    return pt;
+                } catch (IllegalArgumentException e) {
+                    throw new VoltTypeException(String.format("deserialize PointType from string failed (string %s)",
+                                                              (String)param));
+                }
+            }
+        } else if (expectedClz == GeographyValue.class) {
+            if (inputClz == GeographyValue.class) {
+                return param;
+            }
+            if (inputClz == String.class) {
+                String paramStr = (String)param;
+                try {
+                    GeographyValue gv = GeographyValue.geographyValueFromText(paramStr);
+                    return gv;
+                } catch (IllegalArgumentException e) {
+                    throw new VoltTypeException(String.format("deserialize GeographyValue from string failed (string %s)",
+                                                              paramStr));
+                }
+            }
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
         } else if (expectedClz == String.class) {
