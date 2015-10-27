@@ -125,13 +125,32 @@ public class LatencyLogger {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length == 0) {
+        if (args.length != 3) {
             System.out.println("Usage server port reportIntervalSeconds");
             return;
         }
 
+        int duration = 0;
+        try {
+            duration = Integer.valueOf(args[2]);
+            if (duration < 5)
+                throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            System.out.println("reportIntervalSeconds should be greater than or equal to 5");
+            System.out.println("Usage server port reportIntervalSeconds");
+            System.exit(0);
+        }
+
         final Client c = ClientFactory.createClient();
-        System.out.println("Connecting to " + args[0] + " port " + Integer.valueOf(args[1]));
+        int port = 0;
+        try {
+            port = Integer.valueOf(args[1]);
+        } catch (NumberFormatException e) {
+            System.out.println("Failed to parse port number.");
+            System.out.println("Usage server port reportIntervalSeconds");
+            System.exit(0);
+        }
+        System.out.println("Connecting to " + args[0] + " port " + port);
         c.createConnection( args[0], Integer.valueOf(args[1]));
 
         System.out.printf("%12s, %10s, %10s, %10s, %10s, %10s, %10s\n", "TIMESTAMP", "COUNT", "95", "99", "99.9", "99.99", "99.999");
@@ -169,7 +188,7 @@ public class LatencyLogger {
                                       diffHistogram.getValueAtPercentile(99.999));
                     m_histogramData = newHistogram;
                 }
-            }, 0, Integer.valueOf(args[2]), TimeUnit.SECONDS);
+            }, 0, duration, TimeUnit.SECONDS);
     }
 
     static Histogram getHistogram(ByteBuffer histBuf) {
