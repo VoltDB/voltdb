@@ -133,10 +133,10 @@ public class LatencyLogger {
         int duration = 0;
         try {
             duration = Integer.valueOf(args[2]);
-            if (duration < 5)
+            if (duration < 1)
                 throw new NumberFormatException();
         } catch (NumberFormatException e) {
-            System.out.println("reportIntervalSeconds should be greater than or equal to 5");
+            System.out.println("reportIntervalSeconds should be greater than or equal to 1");
             System.out.println("Usage server port reportIntervalSeconds");
             System.exit(0);
         }
@@ -151,7 +151,7 @@ public class LatencyLogger {
             System.exit(0);
         }
         System.out.println("Connecting to " + args[0] + " port " + port);
-        c.createConnection( args[0], Integer.valueOf(args[1]));
+        c.createConnection( args[0], port);
 
         System.out.printf("%12s, %10s, %10s, %10s, %10s, %10s, %10s\n", "TIMESTAMP", "COUNT", "95", "99", "99.9", "99.99", "99.999");
 
