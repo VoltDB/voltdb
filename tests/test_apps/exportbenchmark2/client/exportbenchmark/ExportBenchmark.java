@@ -48,13 +48,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -390,6 +389,7 @@ public class ExportBenchmark {
         benchmarkEndTS = benchmarkWarmupEndTS + (config.duration * 1000);
 
         // Do the inserts in a separate thread
+        ratio = 1;
         Thread writes = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -434,78 +434,78 @@ public class ExportBenchmark {
         }
     }
 
-    void finalStats() {
-        // Write stats to file if requested
-        try {
-            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
-                FileWriter fw = new FileWriter(config.statsfile);
-                fw.append(String.format("%d,%f,%f,%f,%f\n",    benchmarkStartTS, min, max, (end-start)/start*100.0, (max-min)/min*100.0));
-                fw.close();
+	void finalStats() {
+		// Write stats to file if requested
+		try {
+			if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+				FileWriter fw = new FileWriter(config.statsfile);
+				fw.append(String.format("%d,%f,%f,%f,%f\n",	benchmarkStartTS, min, max, (end-start)/start*100.0, (max-min)/min*100.0));
+				fw.close();
+			}
+		} catch (IOException e) {
+			System.err.println("Error writing stats file");
+			e.printStackTrace();
+		}
+	}
+
+    static void connectToOneServerWithRetry(String server) {
+        int sleep = 1000;
+        while (true) {
+            try {
+                client.createConnection(server);
+                break;
             }
-        } catch (IOException e) {
-            System.err.println("Error writing stats file");
-            e.printStackTrace();
+            catch (IOException e) {
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (InterruptedException interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
         }
+        System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
 
-//    static void connectToOneServerWithRetry(String server) {
-//        int sleep = 1000;
-//        while (true) {
-//            try {
-//                client.createConnection(server);
-//                break;
-//            }
-//            catch (IOException e) {
-//                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-//                try { Thread.sleep(sleep); } catch (InterruptedException interruted) {}
-//                if (sleep < 8000) sleep += sleep;
-//            }
-//        }
-//        System.out.printf("Connected to VoltDB node at: %s.\n", server);
-//    }
-//
-//    /**
-//     * Connect to a set of servers in parallel. Each will retry until
-//     * connection. This call will block until all have connected.
-//     *
-//     * @param servers A comma separated list of servers using the hostname:port
-//     * syntax (where :port is optional).
-//     * @throws InterruptedException if anything bad happens with the threads.
-//     */
-//    static void connect(String servers) throws InterruptedException {
-//        ClientConfig clientConfig = new ClientConfig();
-//        clientConfig.setReconnectOnConnectionLoss(true);
-//        clientConfig.setClientAffinity(true);
-//        client = ClientFactory.createClient(clientConfig);
-//        fullStatsContext = client.createStatsContext();
-//        periodicStatsContext = client.createStatsContext();
-//
-//        System.out.println("Connecting to VoltDB...");
-//
-//        String[] serverArray = servers.split(",");
-//        final CountDownLatch connections = new CountDownLatch(serverArray.length);
-//
-//        // use a new thread to connect to each server
-//        for (final String server : serverArray) {
-//            new Thread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    try {
-//                        connectToOneServerWithRetry(server);
-//                        connections.countDown();
-//                    } catch (Throwable ex) {
-//                        ex.printStackTrace();
-//                        Thread.dumpStack();
-//                        System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
-//                        printJStack();
-//                        System.exit(-1);
-//                    }
-//                }
-//            }).start();
-//        }
-//        // block until all have connected
-//        connections.await();
-//    }
+    /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    static void connect(String servers) throws InterruptedException {
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setReconnectOnConnectionLoss(true);
+        clientConfig.setClientAffinity(true);
+        client = ClientFactory.createClient(clientConfig);
+        fullStatsContext = client.createStatsContext();
+        periodicStatsContext = client.createStatsContext();
+
+        System.out.println("Connecting to VoltDB...");
+
+        String[] serverArray = servers.split(",");
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                    	connectToOneServerWithRetry(server);
+                    	connections.countDown();
+                    } catch (Throwable ex) {
+                    	ex.printStackTrace();
+                    	Thread.dumpStack();
+                        System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
+                        printJStack();
+                        System.exit(-1);
+                    }
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+    }
 
     static public void printJStack() {
         Map<String, List<String>> deduped = new HashMap<String, List<String>>();
@@ -545,34 +545,34 @@ public class ExportBenchmark {
         System.out.println("Full thread dump:\n" + logline);
     }
 
-    static void connect(String servers) throws InterruptedException, Exception {
-        //final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
-        try {
-            System.out.println("Connecting to VoltDB Interface...");
-            ClientConfig clientConfig = new ClientConfig();
-            clientConfig.setReconnectOnConnectionLoss(true);
-            client = ClientFactory.createClient(clientConfig);
-
-            for (String server: servers.split(",")) {
-                System.out.println("..." + server);
-                try {
-                    client.createConnection(server);
-                } catch (Throwable ex) {
-                    ex.printStackTrace();
-                    Thread.dumpStack();
-                    System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
-                    printJStack();
-                    System.exit(-1);
-                }
-            }
-        } catch  (Throwable ex) {
-            ex.printStackTrace();
-            Thread.dumpStack();
-            System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
-            printJStack();
-            System.exit(-1);
-        }
-    }
+//    static void connect(String servers) throws InterruptedException, Exception {
+//    	//final Splitter COMMA_SPLITTER = Splitter.on(",").omitEmptyStrings().trimResults();
+//    	try {
+//    		System.out.println("Connecting to VoltDB Interface...");
+//    		ClientConfig clientConfig = new ClientConfig();
+//    		clientConfig.setReconnectOnConnectionLoss(true);
+//    		client = ClientFactory.createClient(clientConfig);
+//
+//    		for (String server: servers.split(",")) {
+//    			System.out.println("..." + server);
+//    			try {
+//    				client.createConnection(server);
+//    			} catch (Throwable ex) {
+//    				ex.printStackTrace();
+//    				Thread.dumpStack();
+//    				System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
+//    				printJStack();
+//    				System.exit(-1);
+//    			}
+//    		}
+//    	} catch  (Throwable ex) {
+//    		ex.printStackTrace();
+//    		Thread.dumpStack();
+//    		System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
+//    		printJStack();
+//    		System.exit(-1);
+//    	}
+//    }
 
     /* Main routine creates a benchmark instance and kicks off the
      * run method for each configuration variant.
