@@ -96,7 +96,7 @@ public:
 
     int64_t fragmentProgressUpdate(
             int32_t batchIndex,
-            PlanNodeType planNodeType,
+            voltdb::PlanNodeType planNodeType,
             int64_t tuplesProcessed,
             int64_t currMemoryInBytes,
             int64_t peakMemoryInBytes);
@@ -944,13 +944,14 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
 
 int64_t VoltDBIPC::fragmentProgressUpdate(
         int32_t batchIndex,
-        PlanNodeType planNodeType,
+        voltdb::PlanNodeType planNodeType,
         int64_t tuplesProcessed,
         int64_t currMemoryInBytes,
         int64_t peakMemoryInBytes) {
+    int32_t nodeTypeAsInt32 = static_cast<int32_t>(planNodeType);
     char message[sizeof(int8_t) +
-                 sizeof(int16_t) +
-                 planNodeName.size() +
+                 sizeof(batchIndex) +
+                 sizeof(nodeTypeAsInt32) +
                  sizeof(tuplesProcessed) +
                  sizeof(currMemoryInBytes) +
                  sizeof(peakMemoryInBytes)];
@@ -960,7 +961,6 @@ int64_t VoltDBIPC::fragmentProgressUpdate(
     *reinterpret_cast<int32_t*>(&message[offset]) = htonl(batchIndex);
     offset += sizeof(batchIndex);
 
-    int32_t nodeTypeAsInt32 = static_cast<int32_t>(planNodeType);
     *reinterpret_cast<int32_t*>(&message[offset]) = htonl(nodeTypeAsInt32);
     offset += sizeof(nodeTypeAsInt32);
 
