@@ -68,7 +68,7 @@ static TempTable* createTempTable() {
     TupleSchema*  schema = createTupleScmema();
 
     std::vector<std::string> names(1);
-    return voltdb::TableFactory::getTempTable(DATABASE_ID,
+    return TableFactory::getTempTable(DATABASE_ID,
                                                  tableName,
                                                  schema,
                                                  names,
@@ -78,23 +78,17 @@ static TempTable* createTempTable() {
 class MergeReceiveExecutorTest : public Test
 {
 public:
-    MergeReceiveExecutorTest() :
-        Test(), m_tempDstTable() ,m_keys()
+    MergeReceiveExecutorTest()
+        : m_tempDstTable(createTempTable())
+        , m_key(0, 0)
     {
-        m_tempDstTable.reset(createTempTable());
-
-        AbstractExpression* key = new TupleValueExpression(0, 0);
-        m_keys.push_back(key);
+        m_keys.push_back(&m_key);
     }
 
     ~MergeReceiveExecutorTest()
-    {
-        BOOST_FOREACH(AbstractExpression* key, m_keys) {
-            delete key;
-        }
-    }
+    { }
 
-    voltdb::TempTable* getDstTempTable() {
+    TempTable* getDstTempTable() {
         return m_tempDstTable.get();
     }
 
@@ -105,7 +99,7 @@ public:
     void validateResults(AbstractExecutor::TupleComparer comp,
         std::vector<TableTuple>& srcTuples, int limit = -1, int offset = 0) {
 
-        int size = (limit == -1) ? srcTuples.size() : limit;
+        std::size_t size = (limit == -1) ? srcTuples.size() : limit;
         ASSERT_EQ(size, m_tempDstTable->activeTupleCount());
 
         // Sort the source
@@ -120,24 +114,28 @@ public:
         m_tempDstTable->deleteAllTuplesNonVirtual(true);
     }
 
-    void addPartitionData(std::vector<int>& partitionValues,
+    char* addPartitionData(std::vector<int>& partitionValues,
         std::vector<TableTuple>& tuples,
-        std::vector<int64_t>& partitionTupleCounts) {
-
-        for (size_t i = 0; i < partitionValues.size(); ++i) {
+        std::vector<int64_t>& partitionTupleCounts)
+    {
+        TableTuple tuple(m_tempDstTable->schema());
+        size_t nValues = partitionValues.size();
+        char* block = new char[nValues*tuple.tupleLength()];
+        for (size_t i = 0; i < nValues; ++i) {
             NValue value = ValueFactory::getIntegerValue(partitionValues[i]);
-            TableTuple tuple(m_tempDstTable->schema());
-            tuple.move(new char[tuple.tupleLength()]);
+            tuple.move(block+i*tuple.tupleLength());
             tuple.setNValue(0, value);
             tuples.push_back(tuple);
         }
         if (!partitionValues.empty()) {
             partitionTupleCounts.push_back(partitionValues.size());
         }
+        return block;
     }
 
 private:
-    boost::scoped_ptr<voltdb::TempTable> m_tempDstTable;
+    boost::scoped_ptr<TempTable> m_tempDstTable;
+    TupleValueExpression m_key;
     std::vector<AbstractExpression*> m_keys;
 };
 
@@ -175,7 +173,8 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    addPartitionData(values, tuples, partitionTupleCounts);
+    boost::scoped_ptr<char> cleaner(
+        addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
@@ -206,7 +205,8 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionLimitOffsetTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    addPartitionData(values, tuples, partitionTupleCounts);
+    boost::scoped_ptr<char> cleaner(
+        addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
@@ -237,7 +237,8 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionBigOffsetTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    addPartitionData(values, tuples, partitionTupleCounts);
+    boost::scoped_ptr<char> cleaner(
+        addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
@@ -273,8 +274,10 @@ TEST_F(MergeReceiveExecutorTest, twoNonOverlapPartitionsTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    addPartitionData(values1, tuples, partitionTupleCounts);
-    addPartitionData(values2, tuples, partitionTupleCounts);
+    boost::scoped_ptr<char> cleaner1(
+        addPartitionData(values1, tuples, partitionTupleCounts));
+    boost::scoped_ptr<char> cleaner2(
+        addPartitionData(values2, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
@@ -324,9 +327,12 @@ TEST_F(MergeReceiveExecutorTest, multipleOverlapPartitionsTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    addPartitionData(values1, tuples, partitionTupleCounts);
-    addPartitionData(values2, tuples, partitionTupleCounts);
-    addPartitionData(values3, tuples, partitionTupleCounts);
+    boost::scoped_ptr<char> cleaner1(
+        addPartitionData(values1, tuples, partitionTupleCounts));
+    boost::scoped_ptr<char> cleaner2(
+        addPartitionData(values2, tuples, partitionTupleCounts));
+    boost::scoped_ptr<char> cleaner3(
+        addPartitionData(values3, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
     AbstractExecutor::TupleComparer comp(getSortKeys(), dirs);
