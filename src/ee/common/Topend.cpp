@@ -108,7 +108,7 @@ namespace voltdb {
         }
 
         // TODO: implement a mock conflict resolver so we can test the resolution part of code in EE.
-        return false;
+        return true;
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}

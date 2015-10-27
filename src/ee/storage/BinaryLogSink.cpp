@@ -441,7 +441,7 @@ static void createConflictExportTuple(TempTable *outputTable, PersistentTable *d
 }
 
 // iterate all four tables and push them into export table
-void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable *existingTableForDelete, TempTable *expectedTableForDelete, TempTable *existingTableForInsert, TempTable *newTableInsert) {
+void BinaryLogSink::exportDRConflict(Table *exportTable, bool resolved, TempTable *existingTableForDelete, TempTable *expectedTableForDelete, TempTable *existingTableForInsert, TempTable *newTableInsert) {
     assert(exportTable != NULL);
     assert(exportTable->isExport());
 
@@ -449,7 +449,7 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (existingTableForDelete) {
         TableIterator iterator = existingTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
-            if (diverge) {
+            if (!resolved) {
                 tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
@@ -459,7 +459,7 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (expectedTableForDelete) {
         TableIterator iterator = expectedTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
-            if (diverge) {
+            if (!resolved) {
                 tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
@@ -469,7 +469,7 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (existingTableForInsert) {
         TableIterator iterator = existingTableForInsert->iterator();
         while (iterator.next(tempTuple)) {
-            if (diverge) {
+            if (!resolved) {
                 tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
@@ -479,7 +479,7 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool diverge, TempTable
     if (newTableInsert) {
         TableIterator iterator = newTableInsert->iterator();
         while (iterator.next(tempTuple)) {
-            if (diverge) {
+            if (!resolved) {
                 tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
@@ -551,7 +551,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         }
     }
 
-    bool diverge = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
+    bool resolved = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
                                                                                       UniqueId::timestamp(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
@@ -568,10 +568,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
             TableIterator iterator = existingTableForDelete->iterator();
             iterator.next(tempTuple);
             DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(DR_ROW_DECISION_COLUMN_INDEX)));
-            // It should never delete any existing rows if conflict is not resolved.
-            if (diverge) {
-                assert(decision != DELETE_ROW);
-            }
+            assert(resolved || decision != DELETE_ROW);  // It should never delete any existing rows if conflict is not resolved.
             if (decision == DELETE_ROW) {
                 drTable->deleteTuple(*existingTuple, true);
             }
@@ -585,23 +582,19 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         iterator = existingTableForInsert->iterator();
         for (int i = 0; iterator.next(tempTuple); i++) {
             DRRowDecision decision = static_cast<DRRowDecision>(ValuePeeker::peekTinyInt(tempTuple.getNValue(DR_ROW_DECISION_COLUMN_INDEX)));
-            // It should never delete any existing rows if conflict is not resolved.
-            if (diverge) {
-                assert(decision != DELETE_ROW);
-            }
+            assert(resolved || decision != DELETE_ROW); // It should never delete any existing rows if conflict is not resolved.
+            assert(decision != KEEP_ROW || newRowDecision != KEEP_ROW); // If existing rows are kept, new row should NOT be KEEP_ROW.
             if (decision == DELETE_ROW) {
                 drTable->deleteTuple(*existingRows[i].first.get(), true);
-            } else {
-                // If existing rows are kept, new row should NOT be KEEP_ROW.
-                assert(newRowDecision != KEEP_ROW);
             }
+
         }
         if (newRowDecision == KEEP_ROW) {
             drTable->insertPersistentTuple(*newTuple, true);
         }
 
     }
-    exportDRConflict(conflictExportTable, diverge, existingTableForDelete.get(), expectedTableForDelete.get(), existingTableForInsert.get(), newTableForInsert.get());
+    exportDRConflict(conflictExportTable, resolved, existingTableForDelete.get(), expectedTableForDelete.get(), existingTableForInsert.get(), newTableForInsert.get());
 
     if (existingTableForDelete.get()) {
         existingTableForDelete.get()->deleteAllTuples(true);
