@@ -87,4 +87,8 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
         return exprs;
     }
+
+    @Override
+    public boolean isDML() { return true; }
+
 }
