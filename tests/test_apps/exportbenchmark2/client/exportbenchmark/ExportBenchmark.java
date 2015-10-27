@@ -49,6 +49,7 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -502,10 +503,11 @@ public class ExportBenchmark {
      * @param args Command line arguments.
      * @throws Exception if anything goes wrong.
      */
-
     public static void main(String[] args) {
         ExportBenchConfig config = new ExportBenchConfig();
         config.parse(ExportBenchmark.class.getName(), args);
+        System.out.println(config.getConfigDumpString());
+
         // set up the distinct tests -- (dbInserts, exportInserts) pairs
         final int DBINSERTS = 0;
         final int EXPORTINSERTS = 1;

@@ -23,8 +23,27 @@
 
 package exportbenchmark2.client.exportbenchmark;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.voltdb.client.Client;
 
@@ -64,7 +83,7 @@ public class Connect2Server {
      * @throws InterruptedException if anything bad happens with the threads.
      */
     static Client connect(String servers) throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        System.out.println("Connecting to VoltDB.... Servers: " + servers);
 
         String[] serverArray = servers.split(",");
         final CountDownLatch connections = new CountDownLatch(serverArray.length);
@@ -74,8 +93,14 @@ public class Connect2Server {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
+                    try {
                     connectToOneServerWithRetry(server);
                     connections.countDown();
+                    } catch (Throwable ex) {
+                        System.out.println("Uncaught exception: " + ex.getMessage() + ex);
+                        printJStack();
+                        System.exit(-1);
+                    }
                 }
             }).start();
         }
@@ -83,5 +108,44 @@ public class Connect2Server {
         connections.await();
         return client;
     }
-}
 
+    static public void printJStack() {
+
+        Map<String, List<String>> deduped = new HashMap<String, List<String>>();
+
+        // collect all the output, but dedup the identical stack traces
+        for (Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+            Thread t = e.getKey();
+            String header = String.format("\"%s\" %sprio=%d tid=%d %s",
+                    t.getName(),
+                    t.isDaemon() ? "daemon " : "",
+                    t.getPriority(),
+                    t.getId(),
+                    t.getState().toString());
+
+            String stack = "";
+            for (StackTraceElement ste : e.getValue()) {
+                stack += "    at " + ste.toString() + "\n";
+            }
+
+            if (deduped.containsKey(stack)) {
+                deduped.get(stack).add(header);
+            }
+            else {
+                ArrayList<String> headers = new ArrayList<String>();
+                headers.add(header);
+                deduped.put(stack, headers);
+            }
+        }
+
+        String logline = "";
+        for (Entry<String, List<String>> e : deduped.entrySet()) {
+            for (String header : e.getValue()) {
+                logline += "\n" + header + "\n";
+            }
+            logline += e.getKey();
+        }
+        System.out.println("Full thread dump:\n" + logline);
+    }
+
+}
