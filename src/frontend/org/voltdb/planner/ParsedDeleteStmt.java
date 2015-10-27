@@ -29,7 +29,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 
 /**
@@ -165,4 +164,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
         return false;
     }
+
+    @Override
+    public boolean isDML() { return true; }
 }

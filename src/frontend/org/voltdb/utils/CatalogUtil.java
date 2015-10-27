@@ -123,6 +123,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -363,6 +364,17 @@ public abstract class CatalogUtil {
         }
 
         return retval;
+    }
+
+    /**
+     * A getSortedCatalogItems variant with the result list filled in-place
+     * @param <T> The type of item to sort.
+     * @param items The set of catalog items.
+     * @param sortFieldName The name of the field to sort on.
+     * @param An output list of catalog items, sorted on the specified field.
+     */
+    public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
+        result.addAll(getSortedCatalogItems(items, sortFieldName    ));
     }
 
     /**
@@ -2230,5 +2242,30 @@ public abstract class CatalogUtil {
             export.getConfiguration().add(defaultConfiguration);
         }
         return export;
+    }
+
+    /*
+     * Given an index return its expressions or list of indexed columns
+     *
+     * @param index  Catalog Index
+     * @param tableScan table
+     * @param indexedExprs   index expressions. This list remains empty if the index is just on simple columns.
+     * @param indexedColRefs indexed columns. This list remains empty if indexedExprs is in use.
+     * @return true if this is a column based index
+     */
+    public static boolean getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs) {
+        String exprsjson = index.getExpressionsjson();
+        if (exprsjson.isEmpty()) {
+            CatalogUtil.getSortedCatalogItems(index.getColumns(), "index", indexedColRefs);
+        } else {
+            try {
+                AbstractExpression.fromJSONArrayString(exprsjson, tableScan, indexedExprs);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+        }
+        return exprsjson.isEmpty();
     }
 }

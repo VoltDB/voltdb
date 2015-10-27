@@ -643,6 +643,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return result;
     }
 
+    public static void fromJSONArrayString(String jsontext, StmtTableScan tableScan, List<AbstractExpression> result) throws JSONException
+    {
+        result.addAll(fromJSONArrayString(jsontext, tableScan));
+    }
+
     public static AbstractExpression fromJSONString(String jsontext, StmtTableScan tableScan) throws JSONException
     {
         JSONObject jobject = new JSONObject(jsontext);

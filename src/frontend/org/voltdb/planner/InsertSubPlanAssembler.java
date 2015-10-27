@@ -61,7 +61,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
         targetTable.getTypeName();
-        StmtSubqueryScan subquery = insertStmt.getSubqueryScans().get(0);
+        StmtSubqueryScan subquery = insertStmt.getSubqueryScan();
         boolean subqueryIsMultiFragment = subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND);
 
         if (targetTable.getIsreplicated()) {

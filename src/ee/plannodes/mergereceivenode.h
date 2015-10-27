@@ -43,21 +43,34 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORERECEIVENODE_H
-#define HSTORERECEIVENODE_H
+#ifndef HSTOREMERGERECEIVENODE_H
+#define HSTOREMERGERECEIVENODE_H
 
 #include "abstractreceivenode.h"
+#include "SchemaColumn.h"
+#include "common/TupleSchema.h"
+
+#include <vector>
 
 namespace voltdb {
 
-class ReceivePlanNode : public AbstractReceivePlanNode
+class MergeReceivePlanNode : public AbstractReceivePlanNode
 {
 public:
+    MergeReceivePlanNode();
+    ~MergeReceivePlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
+    TupleSchema* allocateTupleSchemaPreAgg() const;
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
+
+private:
+    // The schema is used to create a temp table to accumulate partitions results to be merged
+    // prior to an aggregation if the plan node has an inline aggregation.
+    // If there is no aggregation, the receive node output schema is used instead
+    std::vector<SchemaColumn*> m_outputSchemaPreAgg;
 };
 
 } // namespace voltdb

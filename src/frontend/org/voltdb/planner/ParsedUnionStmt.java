@@ -411,4 +411,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             orderCol.expression = expr;
         }
     }
+
+    @Override
+    public boolean isDML() { return false; }
+
 }

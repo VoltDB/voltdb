@@ -43,23 +43,56 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORERECEIVENODE_H
-#define HSTORERECEIVENODE_H
+#include "mergereceivenode.h"
 
-#include "abstractreceivenode.h"
+#include "boost/foreach.hpp"
+
+#include <sstream>
 
 namespace voltdb {
 
-class ReceivePlanNode : public AbstractReceivePlanNode
-{
-public:
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string& spacer) const;
+MergeReceivePlanNode::MergeReceivePlanNode() :
+    AbstractReceivePlanNode(), m_outputSchemaPreAgg()
+{ }
 
-protected:
-    void loadFromJSONObject(PlannerDomValue obj);
-};
+MergeReceivePlanNode::~MergeReceivePlanNode()
+{
+    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+        delete scol;
+    }
+}
+
+PlanNodeType MergeReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MERGERECEIVE; }
+
+std::string MergeReceivePlanNode::debugInfo(const std::string& spacer) const
+{
+    std::ostringstream buffer;
+    if (m_outputSchemaPreAgg.empty()) {
+        buffer << spacer << "Incoming Table effectively the same as Outgoing\n";
+    } else {
+        schemaDebugInfo(buffer, m_outputSchemaPreAgg, "Incoming", spacer);
+    }
+    schemaDebugInfo(buffer, getOutputSchema(), "Outgoing", spacer);
+    return buffer.str();
+}
+
+void MergeReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    if (obj.hasNonNullKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        m_outputSchemaPreAgg.reserve(outputSchemaArray.arrayLen());
+
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
+        }
+    }
+}
+
+TupleSchema* MergeReceivePlanNode::allocateTupleSchemaPreAgg() const
+{
+    return AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
+}
 
 } // namespace voltdb
-
-#endif

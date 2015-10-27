@@ -43,23 +43,59 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORERECEIVENODE_H
-#define HSTORERECEIVENODE_H
+#ifndef HSTOREORDERBYMERGEEXECUTOR_H
+#define HSTOREORDERBYMERGEEXECUTOR_H
 
-#include "abstractreceivenode.h"
+#include "common/common.h"
+#include "common/tabletuple.h"
+#include "common/valuevector.h"
+#include "executors/abstractexecutor.h"
+
+#include <boost/scoped_ptr.hpp>
+
+#include <vector>
 
 namespace voltdb {
 
-class ReceivePlanNode : public AbstractReceivePlanNode
-{
-public:
-    PlanNodeType getPlanNodeType() const;
-    std::string debugInfo(const std::string& spacer) const;
+    class TempTable;
+    class OrderByPlanNode;
+    class LimitPlanNode;
+    class AggregateExecutorBase;
+    class ProgressMonitorProxy;
 
-protected:
-    void loadFromJSONObject(PlannerDomValue obj);
-};
+    /**
+     * The optimized replacement for an ORDER BY executor to be used at the coordinator node
+     * to merge-sort results from multiple partitions. The assumption is
+     * that the individual partitions results are already sorted in the order
+     * specified by the inlined OrderByPlanNode
+     */
+    class MergeReceiveExecutor : public AbstractExecutor {
+    public:
+        MergeReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
-} // namespace voltdb
+        // Public for testing purpose only
+        static void merge_sort(const std::vector<TableTuple>& tuples,
+                               std::vector<int64_t>& partitionTupleCounts,
+                               AbstractExecutor::TupleComparer comp,
+                               int limit,
+                               int offset,
+                               AggregateExecutorBase* agg_exec,
+                               TempTable* output_table,
+                               ProgressMonitorProxy* pmp);
+    protected:
+        bool p_init(AbstractPlanNode* abstract_node,
+                    TempTableLimits* limits);
+        bool p_execute(const NValueArray &params);
+
+    private:
+        OrderByPlanNode* m_orderby_node;
+        LimitPlanNode* m_limit_node;
+
+        AggregateExecutorBase* m_agg_exec;
+
+        boost::scoped_ptr<TempTable> m_tmpInputTable;
+    };
+
+}
 
 #endif
