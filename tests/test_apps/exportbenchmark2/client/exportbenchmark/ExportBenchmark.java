@@ -44,8 +44,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Selector;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -485,14 +490,61 @@ public class ExportBenchmark {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    connectToOneServerWithRetry(server);
-                    connections.countDown();
+                    try {
+                    	connectToOneServerWithRetry(server);
+                    	connections.countDown();
+                    } catch (Throwable ex) {
+                    	ex.printStackTrace();
+                    	Thread.dumpStack();
+                        System.out.println("Uncaught exception: " + ex.getMessage() + ", " + ex.toString());
+                        printJStack();
+                        System.exit(-1);
+                    }
                 }
             }).start();
         }
         // block until all have connected
         connections.await();
     }
+    
+    static public void printJStack() {
+        Map<String, List<String>> deduped = new HashMap<String, List<String>>();
+
+        // collect all the output, but dedup the identical stack traces
+        for (Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+            Thread t = e.getKey();
+            String header = String.format("\"%s\" %sprio=%d tid=%d %s",
+                    t.getName(),
+                    t.isDaemon() ? "daemon " : "",
+                    t.getPriority(),
+                    t.getId(),
+                    t.getState().toString());
+
+            String stack = "";
+            for (StackTraceElement ste : e.getValue()) {
+                stack += "    at " + ste.toString() + "\n";
+            }
+
+            if (deduped.containsKey(stack)) {
+                deduped.get(stack).add(header);
+            }
+            else {
+                ArrayList<String> headers = new ArrayList<String>();
+                headers.add(header);
+                deduped.put(stack, headers);
+            }
+        }
+
+        String logline = "";
+        for (Entry<String, List<String>> e : deduped.entrySet()) {
+            for (String header : e.getValue()) {
+                logline += "\n" + header + "\n";
+            }
+            logline += e.getKey();
+        }
+        System.out.println("Full thread dump:\n" + logline);
+    }
+    
     /* Main routine creates a benchmark instance and kicks off the
      * run method for each configuration variant.
      *
