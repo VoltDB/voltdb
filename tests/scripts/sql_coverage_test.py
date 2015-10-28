@@ -223,8 +223,10 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    global comparison_database
+    comparison_database_lower = comparison_database.lower()
     statements_path = os.path.abspath(os.path.join(output_dir, "statements.data"))
-    hsql_path = os.path.abspath(os.path.join(output_dir, "hsql.data"))
+    cmpdb_path = os.path.abspath(os.path.join(output_dir, comparison_database_lower + ".data"))
     jni_path = os.path.abspath(os.path.join(output_dir, "jni.data"))
     template = config["template"]
 
@@ -287,7 +289,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     failed = False
     try:
         if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
-            print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors."
+            print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors (crash?)."
             failed = True
     except:
         print >> sys.stderr, "JNI (VoltDB) backend crashed!!!"
@@ -309,23 +311,23 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
 
     failed = False
     try:
-        if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
-            print >> sys.stderr, "Test with the HSqlDB backend had errors."
+        if run_once(comparison_database_lower, command, statements_path, cmpdb_path, submit_verbosely, testConfigKit) != 0:
+            print >> sys.stderr, "Test with the " + comparison_database + " backend had errors (crash?)."
             failed = True
     except:
-        print >> sys.stderr, "HSqlDB backend crashed!!"
+        print >> sys.stderr, comparison_database + " backend crashed!!"
         traceback.print_exc()
         failed = True
     if (failed):
-        print >> sys.stderr, "  hsql_path: %s" % (hsql_path)
+        print >> sys.stderr, "  cmpdb_path: %s" % (cmpdb_path)
         sys.stderr.flush()
         num_crashes += 1
         #exit(1)
 
     # Print the elapsed time, with a message
-    global total_hsqldb_time
-    hsqldb_time = print_elapsed_seconds("for running HSqlDB statements (" + suite_name + ")")
-    total_hsqldb_time += hsqldb_time
+    global total_cmpdb_time
+    cmpdb_time = print_elapsed_seconds("for running " + comparison_database + " statements (" + suite_name + ")")
+    total_cmpdb_time += cmpdb_time
 
     someStats = (get_numerical_html_table_element(min_statements_per_pattern, strong_warn_below=1) +
                  get_numerical_html_table_element(max_statements_per_pattern, strong_warn_below=1, warn_above=100000) +
@@ -333,19 +335,19 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
                  get_numerical_html_table_element(num_patterns, warn_below=4, strong_warn_below=1, warn_above=10000) +
                  get_time_html_table_element(gensql_time) +
                  get_time_html_table_element(voltdb_time) +
-                 get_time_html_table_element(hsqldb_time) )
+                 get_time_html_table_element(cmpdb_time) )
     extraStats = get_numerical_html_table_element(num_crashes, error_above=0) + someStats
 
     global compare_results
     try:
         compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
-        success = compare_results(suite_name, random_seed, statements_path, hsql_path,
-                                  jni_path, output_dir, report_all, extraStats)
+        success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
+                                  jni_path, output_dir, report_all, extraStats, comparison_database)
     except:
-        print >> sys.stderr, "Compare (VoltDB & HSqlDB) results crashed!"
+        print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
         traceback.print_exc()
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
-        print >> sys.stderr, "  hsql_path: %s" % (hsql_path)
+        print >> sys.stderr, "  cmpdb_path: %s" % (cmpdb_path)
         sys.stderr.flush()
         num_crashes += 1
         gray_zero_html_table_element = get_numerical_html_table_element(0, use_gray=True)
@@ -605,7 +607,7 @@ if __name__ == "__main__":
     save_prev_time = time0
     total_gensql_time = 0.0
     total_voltdb_time = 0.0
-    total_hsqldb_time = 0.0
+    total_cmpdb_time = 0.0
     total_compar_time = 0.0
     keyStats_start_index = 0
     valid_statements = 0
@@ -646,6 +648,9 @@ if __name__ == "__main__":
     parser.add_option("-g", "--generate-only", action="store_true",
                       dest="generate_only", default=False,
                       help="only generate and report SQL statements, do not start any database servers")
+    parser.add_option("-P", "--postgresql", action="store_true",
+                      dest="postgresql", default=False,
+                      help="compare VoltDB results to PostgreSQL, rather than HSqlDB")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -677,6 +682,10 @@ if __name__ == "__main__":
             configs_to_run.append(options.config)
     else:
         configs_to_run = config_list.get_configs()
+
+    comparison_database = "HSqlDB"  # default value
+    if options.postgresql:
+        comparison_database = 'PostgreSQL'
 
     testConfigKits = {}
     defaultHost = "localhost"
@@ -734,22 +743,22 @@ if __name__ == "__main__":
                            "\n<td align=right>" + str(total_num_patterns) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_gensql_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_voltdb_time) + "</td>" + \
-                           "\n<td align=right>" + minutes_colon_seconds(total_hsqldb_time) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(total_cmpdb_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_compar_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(time1-time0) + "</td></tr>\n"
-    generate_summary(output_dir, statistics)
+    generate_summary(output_dir, statistics, comparison_database)
 
     # Print the total time, for each type of activity
     print_seconds(total_gensql_time, "for generating ALL SQL statements")
     print_seconds(total_voltdb_time, "for running ALL VoltDB (JNI) statements")
-    print_seconds(total_hsqldb_time, "for running ALL HSqlDB statements")
+    print_seconds(total_cmpdb_time,  "for running ALL " + comparison_database + " statements")
     print_seconds(total_compar_time, "for comparing ALL DB results")
     print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
     print_elapsed_seconds("for the entire run", time0, "Total   time: ")
     if total_num_npes > 0:
-        print "Total number of (VoltDB or HSqlDB) NullPointerExceptions (NPEs): %d" % total_num_npes
+        print "Total number of (VoltDB or " + comparison_database + ") NullPointerExceptions (NPEs): %d" % total_num_npes
     if total_num_crashes > 0:
-        print "Total number of (VoltDB, HSqlDB, or compare results) crashes: %d" % total_num_crashes
+        print "Total number of (VoltDB, " + comparison_database + ", or compare results) crashes: %d" % total_num_crashes
 
     if not success:
         print >> sys.stderr, "SQL coverage has errors."
