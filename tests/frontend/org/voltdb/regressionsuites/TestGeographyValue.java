@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -155,6 +156,18 @@ public class TestGeographyValue extends RegressionSuite {
             // Insert a null by passing a null reference.
             validateTableOfScalarLongs(client, "delete from " + tbl, new long[] {1});
             vt = client.callProcedure(tbl + ".Insert", 0, "null geog", null).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            vt = client.callProcedure("@AdHoc", "select poly from " + tbl).getResults()[0];
+            assertTrue(vt.advanceRow());
+            gv = vt.getGeographyValue(0);
+            assertTrue(vt.wasNull());
+            assertEquals(null, gv);
+            assertFalse(vt.advanceRow());
+
+            // Insert a null by passing an instance of the null sigil
+            validateTableOfScalarLongs(client, "delete from " + tbl, new long[] {1});
+            vt = client.callProcedure(tbl + ".Insert", 0, "null geog", VoltType.GEOGRAPHY.getNullValue()).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {1});
 
             vt = client.callProcedure("@AdHoc", "select poly from " + tbl).getResults()[0];
@@ -468,6 +481,21 @@ public class TestGeographyValue extends RegressionSuite {
                     {0},
                     {3}},
                     vt);
+
+            try {
+                client.callProcedure("select_in_" + tbl,
+                    (Object)(new Object[] {
+                            BERMUDA_TRIANGLE_POLY,
+                            VoltType.GEOGRAPHY.getNullValue(),
+                            LOWELL_SQUARE_POLY}));
+                fail("Expected an exception to be thrown");
+            }
+            catch (RuntimeException rte) {
+                // When ENG-9311 is fixed, then we shouldn't get this error and
+                // the procedure call should succeed.
+                assertTrue(rte.getMessage().contains("PointType or GeographyValue instances "
+                        + "are not yet supported in Object arrays passed as parameters"));
+            }
         }
     }
 
