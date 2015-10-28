@@ -210,9 +210,11 @@ void TupleStreamBase::pushPendingBlocks() {
 void TupleStreamBase::rollbackTo(size_t mark, size_t)
 {
     if (mark > m_uso) {
-        throwFatalException("Truncating the future.");
+        throwFatalException("Truncating the future: mark %jd, current USO %jd.",
+                            (intmax_t)mark, (intmax_t)m_uso);
     } else if (mark < m_committedUso) {
-        throwFatalException("Truncating committed tuple data");
+        throwFatalException("Truncating committed tuple data: mark %jd, committed USO %jd, current USO %jd.",
+                            (intmax_t)mark, (intmax_t)m_committedUso, (intmax_t)m_uso);
     }
 
     // back up the universal stream counter
