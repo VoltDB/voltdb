@@ -238,6 +238,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
+    if (arguments[0].isNull() || arguments[1].isNull())
+        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+
     std::unique_ptr<S2Polygon> s2Poly = arguments[0].getGeography().toS2Polygon();
     S2Point s2Point = arguments[1].getPoint().toS2Point();
     return ValueFactory::getBooleanValue(s2Poly->Contains(s2Point));

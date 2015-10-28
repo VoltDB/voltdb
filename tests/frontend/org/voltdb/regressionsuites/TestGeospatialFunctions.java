@@ -23,6 +23,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
         client.callProcedure("places.Insert", 3, "Fort Collins",
                 PointType.pointFromText("POINT(40.585 -105.077)"));
 
+        // A null-valued point
+        client.callProcedure("places.Insert", 4, "Neverwhere", null);
+
         client.callProcedure("borders.Insert", 0, "Colorado",
                 new GeographyValue("POLYGON(("
                         + "41.002 -102.052, "
@@ -51,6 +54,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
                         + "39.188 -105.714, "
                         + "39.188 -104.035,"
                         + "40.240 -104.035))"));
+
+        // a null-valued-polygon
+        client.callProcedure("borders.Insert", 3, "Wonderland", null);
     }
 
     public void testContains() throws Exception {
