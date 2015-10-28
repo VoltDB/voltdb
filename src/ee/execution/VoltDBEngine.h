@@ -161,7 +161,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // Executors can call this to note a certain number of tuples have been
         // scanned or processed.index
-        inline int64_t pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec, Table* target_table);
+        inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType);
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
@@ -453,8 +453,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t m_tuplesProcessedInFragment;
         int64_t m_tuplesProcessedSinceReport;
         int64_t m_tupleReportThreshold;
-        Table *m_lastAccessedTable;
-        AbstractExecutor* m_lastAccessedExec;
+        PlanNodeType m_lastAccessedPlanNodeType;
 
         boost::scoped_ptr<EnginePlanSet> m_plans;
         voltdb::UndoLog m_undoLog;
@@ -620,13 +619,9 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
  * Track total tuples accessed for this query.
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
-inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec,
-                                                                    Table* target_table)
+inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType)
 {
-    if (target_table) {
-        m_lastAccessedTable = target_table;
-    }
-    m_lastAccessedExec = exec;
+    m_lastAccessedPlanNodeType = planNodeType;
     return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
 }
 
@@ -647,7 +642,7 @@ inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t 
         e.serialize(getExceptionOutputSerializer());
     }
 
-    m_lastAccessedExec = NULL;
+    m_lastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
 }
 
 } // namespace voltdb

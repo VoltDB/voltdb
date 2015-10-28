@@ -161,7 +161,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
-    ProgressMonitorProxy pmp(m_engine, this, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this);
 
     TableTuple join_tuple;
     if (m_aggExec != NULL) {
