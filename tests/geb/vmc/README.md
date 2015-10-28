@@ -1,6 +1,10 @@
 Automated Tests of the VMC (VoltDB Management Center), Using GEB
 ================================================================
 
+Another fake change, that will never be merged to master. I just want
+to do something to trigger Jenkins to build, so I can test if the new "debug"
+build works (ENG-9219).
+
 This file describes the GEB automated tests of the VMC (VoltDB Management
 Center), which is the new web UI, replacing the old Web Studio. These automated
 tests are believed to provide more than the level of coverage of the old
