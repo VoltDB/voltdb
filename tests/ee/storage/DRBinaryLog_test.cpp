@@ -1634,8 +1634,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
  * existingRow: <42, 12345, X>
  * expectedRow: <42, 55555, X>
  *               <INSERT constraint violation>
- * existingRow: <42, 12345, X>
- *              <72, 345, Z>
+ * existingRow: <72, 345, Z>
  * newRow:      <42, 345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
@@ -1696,16 +1695,15 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
-    EXPECT_EQ(2, m_topend.existingRowsForInsert->activeTupleCount());
-    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, CONFLICT_ON_PK, 71);
-    TableTuple exportTuple4 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
+    EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
     // verify new table
     EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
-    TableTuple exportTuple5 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+    TableTuple exportTuple4 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(5, exportStream->receivedTuples.size());
+    EXPECT_EQ(4, exportStream->receivedTuples.size());
     TableTuple receivedTuple1 = exportStream->receivedTuples[0];
     ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
     TableTuple receivedTuple2 = exportStream->receivedTuples[1];
@@ -1714,8 +1712,6 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
     TableTuple receivedTuple4 = exportStream->receivedTuples[3];
     ASSERT_TRUE(receivedTuple4.equals(exportTuple4));
-    TableTuple receivedTuple5 = exportStream->receivedTuples[4];
-    ASSERT_TRUE(receivedTuple5.equals(exportTuple5));
 }
 
 int main() {
