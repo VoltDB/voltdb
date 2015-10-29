@@ -368,7 +368,7 @@ public:
         }
     }
 
-    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true, bool isActiveActiveDREnabled = false) {
+    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
         m_engine->getExecutorContext()->setupForPlanFragments(m_undoLog.generateUndoQuantum(m_undoToken));
@@ -388,7 +388,7 @@ public:
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[startPos], tables, &m_pool, m_engine, isActiveActiveDREnabled);
+            m_sink.apply(&data[startPos], tables, &m_pool, m_engine);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -1123,7 +1123,7 @@ TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
             "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
     endTxn(true);
     // trigger a insert unique constraint violation conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_INSERT);
     EXPECT_EQ(m_topend.deleteConflictType, NO_CONFLICT);
@@ -1193,7 +1193,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
     deleteTuple(m_table, tempExpectedTuple);
     endTxn(true);
     // trigger a delete missing tuple conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_DELETE);
 
@@ -1267,7 +1267,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
     deleteTuple(m_table, tempExpectedTuple);
     endTxn(true);
     // trigger a delete timestamp mismatch conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_DELETE);
 
@@ -1352,7 +1352,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
     endTxn(true);
 
     // trigger a update unique constraint violation conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
@@ -1424,7 +1424,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
     /*TableTuple new_tuple = */updateTupleFirstAndSecondColumn(m_table, expectedTuple, 42, 54321);
     endTxn(true);
     // trigger a update missing tuple conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
@@ -1505,7 +1505,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
     TableTuple newTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345/*causes a constraint violation*/);
     endTxn(true);
     // trigger a update missing tuple conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
@@ -1591,7 +1591,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345);
     endTxn(true);
     // trigger a update timestamp mismatch conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
 
@@ -1634,8 +1634,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
  * existingRow: <42, 12345, X>
  * expectedRow: <42, 55555, X>
  *               <INSERT constraint violation>
- * existingRow: <42, 12345, X>
- *              <72, 345, Z>
+ * existingRow: <72, 345, Z>
  * newRow:      <42, 345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
@@ -1679,7 +1678,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     TableTuple newTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 345/*cause a constraint violation*/);
     endTxn(true);
     // trigger a update timestamp mismatch conflict
-    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+    flushAndApply(101);
 
     EXPECT_EQ(2, m_table->activeTupleCount());
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
@@ -1696,16 +1695,15 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
-    EXPECT_EQ(2, m_topend.existingRowsForInsert->activeTupleCount());
-    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, CONFLICT_ON_PK, 71);
-    TableTuple exportTuple4 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
+    EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
     // verify new table
     EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
-    TableTuple exportTuple5 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+    TableTuple exportTuple4 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(5, exportStream->receivedTuples.size());
+    EXPECT_EQ(4, exportStream->receivedTuples.size());
     TableTuple receivedTuple1 = exportStream->receivedTuples[0];
     ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
     TableTuple receivedTuple2 = exportStream->receivedTuples[1];
@@ -1714,8 +1712,6 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
     TableTuple receivedTuple4 = exportStream->receivedTuples[3];
     ASSERT_TRUE(receivedTuple4.equals(exportTuple4));
-    TableTuple receivedTuple5 = exportStream->receivedTuples[4];
-    ASSERT_TRUE(receivedTuple5.equals(exportTuple5));
 }
 
 int main() {
