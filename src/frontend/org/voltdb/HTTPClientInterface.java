@@ -164,6 +164,27 @@ public class HTTPClientInterface {
 
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
+            String timeoutStr = request.getParameter("ProcTimeout");
+            int procCallTimeout = -1;
+            if (timeoutStr != null) {
+                try {
+                    procCallTimeout = Integer.parseInt(timeoutStr);
+                    if (procCallTimeout <= 0) {
+                        throw new NumberFormatException();
+                    }
+                } catch(NumberFormatException e) {
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0],
+                            "Invalid procedure call timeout: " + timeoutStr);
+                    String msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    try {
+                        response.getWriter().print(msg);
+                    } catch (IOException e1) {} // Ignore this as browser must have closed.
+                }
+            }
 
             // null procs are bad news
             if (procName == null) {
@@ -180,10 +201,10 @@ public class HTTPClientInterface {
                     msg = String.format("%s( %s )", jsonp, msg);
                 }
                 response.setStatus(HttpServletResponse.SC_OK);
-                request.setHandled(true);
                 try {
                     response.getWriter().print(msg);
                 } catch (IOException e1) {} // Ignore this as browser must have closed.
+                request.setHandled(true);
                 return;
             }
 
@@ -208,10 +229,18 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                success = authResult.m_client.callProcedure(cb, procName, paramSet.toArray());
+                if (procCallTimeout==-1) {
+                    success = authResult.m_client.callProcedure(cb, procName, paramSet.toArray());
+                } else {
+                    success = authResult.m_client.callProcedureWithTimeout(cb, procCallTimeout, procName, paramSet.toArray());
+                }
             }
             else {
-                success = authResult.m_client.callProcedure(cb, procName);
+                if (procCallTimeout==-1) {
+                    success = authResult.m_client.callProcedure(cb, procName);
+                } else {
+                    success = authResult.m_client.callProcedureWithTimeout(cb, procCallTimeout, procName);
+                }
             }
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
