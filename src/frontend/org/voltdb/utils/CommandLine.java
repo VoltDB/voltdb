@@ -324,7 +324,8 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine target(BackendTarget target) {
         m_backend = target;
-        m_noLoadLibVOLTDB = (target == BackendTarget.HSQLDB_BACKEND);
+        m_noLoadLibVOLTDB = (target == BackendTarget.HSQLDB_BACKEND ||
+                             target == BackendTarget.POSTGRESQL_BACKEND);
         return this;
     }
     public BackendTarget target() {

@@ -42,6 +42,7 @@
 #include "storage/tableiterator.h"
 #include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
+#include "catalog/database.h"
 
 using namespace voltdb;
 using namespace std;
@@ -50,12 +51,23 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 44;
 }
 
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
             NValueArray* noParams = NULL;
-            VoltDBEngine* noEngine = NULL;
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            mockEngine = new MockVoltDBEngine(false);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -266,6 +278,7 @@ class TableAndIndexTest : public Test {
 
         ~TableAndIndexTest() {
             delete engine;
+            delete mockEngine;
             delete districtTable;
             delete districtTableReplica;
             delete districtTempTable;
@@ -302,6 +315,7 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         ExecutorContext *engine;
+        MockVoltDBEngine *mockEngine;
         DRTupleStream drStream;
         DRTupleStream drReplicatedStream;
         DummyTopend topend;
@@ -383,7 +397,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(70));
     drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -431,7 +445,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->updateTuple( toUpdate, temp_tuple);
 
     //Flush to generate the log buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(72));
     drStream.periodicFlush(-1, addPartitionId(101));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -467,7 +481,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     districtTable->deleteTuple( toDelete, true);
 
     //Flush to generate the buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(89));
     drStream.periodicFlush(-1, addPartitionId(102));
     EXPECT_TRUE( topend.receivedDRBuffer );
 
@@ -526,7 +540,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     districtTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(70));
     drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -570,7 +584,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     districtTable->deleteTuple(toDelete, true);
 
     //Flush to generate the buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(72));
     drStream.periodicFlush(-1, addPartitionId(101));
     EXPECT_TRUE( topend.receivedDRBuffer );
 
@@ -644,7 +658,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     customerTable->insertTuple(temp_tuple);
 
     //Flush to generate a buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(70));
     drStream.periodicFlush(-1, addPartitionId(99));
     ASSERT_TRUE( topend.receivedDRBuffer );
 
@@ -688,7 +702,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     customerTable->deleteTuple(toDelete, true);
 
     //Flush to generate the buffer
-    drStream.endTransaction();
+    drStream.endTransaction(addPartitionId(72));
     drStream.periodicFlush(-1, addPartitionId(101));
     EXPECT_TRUE( topend.receivedDRBuffer );
 

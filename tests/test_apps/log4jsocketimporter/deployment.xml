@@ -8,6 +8,7 @@
         <configuration module="log4jsocketimporter.jar" type="custom" enabled="true">
             <property name="port">6060</property>
             <property name="log-event-table">log_events</property>
+            <property name="procedure">log_events.insert</property>
         </configuration>
     </import>
 </deployment>

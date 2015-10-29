@@ -104,6 +104,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
         return m_sortExpressions;
     }
 
+    public List<SortDirectionType> getSortDirections() {
+        return m_sortDirections;
+    }
+
     @Override
     public void resolveColumnIndexes()
     {
@@ -121,6 +125,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
+
+        resolveSortIndexesUsingSchema(input_schema);
+    }
+
+    public void resolveSortIndexesUsingSchema(NodeSchema input_schema) {
 
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
@@ -203,5 +212,12 @@ public class OrderByPlanNode extends AbstractPlanNode {
             collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
         }
         return collected;
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.equals(m_sortExpressions));
+        assert(sortDirections.equals(m_sortDirections));
+        return true;
     }
 }

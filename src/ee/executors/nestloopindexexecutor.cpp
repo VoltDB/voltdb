@@ -245,7 +245,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     const TableTuple &null_tuple = m_null_tuple.tuple();
     int num_of_inner_cols = (m_joinType == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
-    ProgressMonitorProxy pmp(m_engine, this, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this);
 
     TableTuple join_tuple;
     if (m_aggExec != NULL) {

@@ -38,8 +38,9 @@ def normalize(table, sql):
     """
     return NotANormalizer.normalize(table, sql)
 
-def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all, extra_stats):
+def compare_results(suite, seed, statements_path, hsql_path, jni_path,
+                    output_dir, report_all, extra_stats, comparison_database):
     """Just calls SQLCoverageReport.generate_html_reports(...).
     """
-    return generate_html_reports(suite, seed, statements_path, hsql_path,
-                                 jni_path, output_dir, report_all, extra_stats, True)
+    return generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
+                                 output_dir, report_all, extra_stats, comparison_database, True)

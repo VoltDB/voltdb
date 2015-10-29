@@ -64,7 +64,7 @@ public:
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark, size_t drRowCost);
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,

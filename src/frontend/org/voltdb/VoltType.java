@@ -783,7 +783,6 @@ public enum VoltType {
         switch(this) {
         case POINT:
         case GEOGRAPHY:
-        case VARBINARY:
             return false;
         default:
             return true;
@@ -813,7 +812,7 @@ public enum VoltType {
      * <code>INTEGER</code>, <code>BIGINT</code> and <code>TIMESTAMP</code>.
      * @return True if integer type. False if not.
      */
-    public boolean isInteger() {
+    public boolean isBackendIntegerType() {
         switch(this)  {
         case TINYINT:
         case SMALLINT:
@@ -836,6 +835,24 @@ public enum VoltType {
             return false;
         }
     }
+
+    /**
+     * Is this type an integer type? True for <code>TINYINT</code>, <code>SMALLINT</code>,
+     * <code>INTEGER</code>, <code>BIGINT</code>.
+     * @return True if integer type. False if not.
+     */
+    public boolean isAnyIntegerType() {
+        switch(this)  {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
 
     public boolean isMaxValuePaddable() {
         switch (this) {
@@ -903,8 +920,8 @@ public enum VoltType {
         if (this == otherType)
             return true;
 
-        if (otherType.isInteger()) {
-            if (this.isInteger()) {
+        if (otherType.isBackendIntegerType()) {
+            if (this.isBackendIntegerType()) {
                 // Don't allow integers getting smaller.
                 return this.getMaxLengthInBytes() >= otherType.getMaxLengthInBytes();
             }

@@ -95,6 +95,32 @@ Table* TableFactory::getPersistentTable(
     return dynamic_cast<Table*>(table);
 }
 
+// This is a convenient wrapper for test only.
+Table* TableFactory::getStreamedTableForTest(
+            voltdb::CatalogId databaseId,
+            const std::string &name,
+            TupleSchema* schema,
+            const std::vector<std::string> &columnNames,
+            ExportTupleStream* wrapper,
+            bool exportEnabled,
+            int32_t compactionThreshold)
+{
+    Table *table = new StreamedTable(exportEnabled, wrapper);
+
+    initCommon(databaseId,
+               table,
+               name,
+               schema,
+               columnNames,
+               true,  // table will take ownership of TupleSchema object
+               compactionThreshold);
+
+    // initialize stats for the table
+    configureStats(databaseId, name, table);
+
+    return table;
+}
+
 TempTable* TableFactory::getTempTable(
             const voltdb::CatalogId databaseId,
             const std::string &name,

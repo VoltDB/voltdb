@@ -137,7 +137,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (columnType == null) {
             return;
         }
-        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
+        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isBackendIntegerType()) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
         } else if (m_valueType == null) {

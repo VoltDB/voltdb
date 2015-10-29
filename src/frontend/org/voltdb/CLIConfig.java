@@ -26,11 +26,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
+import org.apache.commons_voltpatches.cli.CommandLine;
+import org.apache.commons_voltpatches.cli.CommandLineParser;
+import org.apache.commons_voltpatches.cli.HelpFormatter;
+import org.apache.commons_voltpatches.cli.Options;
+import org.apache.commons_voltpatches.cli.PosixParser;
 
 public abstract class CLIConfig {
 

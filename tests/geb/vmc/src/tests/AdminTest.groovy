@@ -256,6 +256,39 @@ class AdminTest extends TestBase {
         println()
     }
 
+    def "check DR Overflow title"() {
+        int count = 0
+        testStatus = false
+
+        expect: 'at Admin Page'
+
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    directories.drOverflowTitle.isDisplayed()
+                    directories.drOverflowTitle.text().toLowerCase().equals("DR Overflow".toLowerCase())
+                }
+                then:
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
+        }
+        if(testStatus == true) {
+            println("PASS")
+        }
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+            assert false
+        }
+        println()
+    }
+
     def "check Root Value not empty"() {
         int count = 0
         testStatus = false
@@ -417,6 +450,39 @@ class AdminTest extends TestBase {
         else {
         	println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
         	assert false
+        }
+        println()
+    }
+
+    def "check DR Overflow Value not empty"() {
+        int count = 0
+        testStatus = false
+
+        expect: 'at Admin Page'
+
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    directories.drOverflowValue.isDisplayed()
+                    !directories.drOverflowValue.text().equals("")
+                }
+                then:
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
+        }
+        if(testStatus == true) {
+            println("PASS")
+        }
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
+            assert false
         }
         println()
     }

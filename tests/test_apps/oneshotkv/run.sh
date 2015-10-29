@@ -37,7 +37,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/oneshotkv/*.java \
         src/oneshotkv/procedures/*.java
     # stop if compilation fails

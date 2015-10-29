@@ -45,7 +45,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/kvbench/*.java \
         src/kvbench/procedures/*.java
     # stop if compilation fails

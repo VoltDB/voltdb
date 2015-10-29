@@ -46,6 +46,10 @@ public abstract class VoltProtocolHandler implements InputHandler {
         m_connectionId = m_globalConnectionCounter.incrementAndGet();
     }
 
+    public static long getNextConnectionId() {
+        return m_globalConnectionCounter.incrementAndGet();
+    }
+
     @Override
     public ByteBuffer retrieveNextMessage(final NIOReadStream inputStream) throws BadMessageLength {
 

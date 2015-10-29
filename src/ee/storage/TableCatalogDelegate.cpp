@@ -365,7 +365,9 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     }
 
     // Build the index array
-    vector<TableIndexScheme> indexes;
+    // Please note the index array should follow the order of primary key first,
+    // all unique indices afterwards, and all the non-unique indices at the end.
+    deque<TableIndexScheme> indexes;
     TableIndexScheme pkey_index_scheme;
     map<string, TableIndexScheme>::const_iterator index_iterator;
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
@@ -375,7 +377,11 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
             pkey_index_scheme = index_iterator->second;
         // Just add it to the list
         } else {
-            indexes.push_back(index_iterator->second);
+            if (index_iterator->second.unique) {
+                indexes.push_front(index_iterator->second);
+            } else {
+                indexes.push_back(index_iterator->second);
+            }
         }
     }
 

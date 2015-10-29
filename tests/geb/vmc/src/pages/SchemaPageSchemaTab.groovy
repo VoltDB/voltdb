@@ -37,8 +37,8 @@ class SchemaPageSchemaTab extends SchemaPage {
 		requiredId		{ $(checkId) }
         schemaTable { $('#schematable') }
 
-        ascending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerAsc") }
-        descending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerDesc") }
+        ascending		{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-headerRow th.tablesorter-header.bootstrap-header.tablesorter-headerAsc") }
+        descending		{ $("html body div.page-wrap div#wrapper div#schema.contents div#catalogContainer.catalogContainer div#containerCatalog.container div#s.reportpage div.dataBlock div.dataBlockContent div.tblScroll table#schematable.table.tableL1.tablesorter.table-bordered.hasFilters.hasStickyHeaders.tablesorter-bootstrap thead tr.tablesorter-headerRow th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
 
         row					{ $(class:"primaryrow") }
 

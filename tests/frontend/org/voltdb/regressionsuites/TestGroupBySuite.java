@@ -743,6 +743,36 @@ public class TestGroupBySuite extends RegressionSuite {
         // Joined with aggregation is tested in SQL Coverage tests.
     }
 
+    public void testPartialIndexAggregate() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("STARTING partial index aggregate test.....");
+
+        String sql;
+        VoltTable vt;
+
+        Client client = this.getClient();
+
+        String[] tbNames = {"R2", "T5"};
+
+        for (String tbName : tbNames) {
+            String insert = "insert into " + tbName + " values (?,?,?,?)";
+            client.callProcedure("@AdHoc", insert, 1, 3, 1, 2);
+            client.callProcedure("@AdHoc", insert, 2, 3, 4, 2);
+            client.callProcedure("@AdHoc", insert, 3, 2, 4, 1);
+            client.callProcedure("@AdHoc", insert, 4, 2, 5, 1);
+            client.callProcedure("@AdHoc", insert, 5, 5, 1, 3);
+            client.callProcedure("@AdHoc", insert, 6, 5, 2, 3);
+
+            // Partial index PARTIAL_IDX_R2/T5 is selected because its WHERE clause is matched
+            // even though the index column (A) is irrelevant
+            sql = "SELECT C, A, count(B) from " + tbName + "  where B > 3 group by A, C order by C;";
+            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            System.err.println(vt.toString());
+            assertTrue(vt.toString().contains("PARTIAL_IDX_" + tbName));
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.err.println(vt);
+            validateTableOfLongs(vt, new long[][] {{1,2,2}, {2,3,1}});
+        }
+    }
 
     //
     // Suite builder boilerplate

@@ -465,6 +465,11 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        return getHostnameOrIP();
+    }
+
+    @Override
     public int getRemotePort() {
         return m_remoteSocketAddress.getPort();
     }
@@ -477,6 +482,11 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     @Override
     public long connectionId() {
         return m_ih.connectionId();
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        return connectionId();
     }
 
     @Override

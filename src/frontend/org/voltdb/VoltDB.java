@@ -108,7 +108,7 @@ public class VoltDB {
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
         /** select normal JNI backend.
-         *  IPC, Valgrind, and HSQLDB are the other options.
+         *  IPC, Valgrind, HSQLDB, and PostgreSQL are the other options.
          */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
@@ -279,6 +279,9 @@ public class VoltDB {
                 }
                 else if (arg.equals("hsqldb")) {
                     m_backend = BackendTarget.HSQLDB_BACKEND;
+                }
+                else if (arg.equals("postgresql")) {
+                    m_backend = BackendTarget.POSTGRESQL_BACKEND;
                 }
                 else if (arg.equals("valgrind")) {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
