@@ -20,6 +20,7 @@ package org.voltdb;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
@@ -787,6 +788,10 @@ public abstract class VoltTableRow {
         return getDecimalAsBigDecimal(colIndex);
     }
 
+    static final String GEOJSON_TYPE_KEY           = "type";
+    static final String GEOJSON_COORDS_KEY         = "coordinates";
+    static final String GEOJSON_POINT_TYPE_SIGIL   = "Point";
+    static final String GEOJSON_POLYGON_TYPE_SIGIL = "Polygon";
     /**
      *
      * @param columnIndex
@@ -855,8 +860,13 @@ public abstract class VoltTableRow {
                 js.value(dec.toString());
             break;
         case POINT:
+            PointType pt = getPoint(columnIndex);
+            js.value(pt.toString());
+            break;
         case GEOGRAPHY:
-            throw new IllegalArgumentException("Instances of GEOGRAPHY and POINT are not yet serializable to JSON");
+            GeographyValue gv = getGeographyValue(columnIndex);
+            js.value(gv.toString());
+            break;
         // VoltType includes a few values that aren't valid column value types
         case INVALID:
             break;
@@ -870,6 +880,57 @@ public abstract class VoltTableRow {
             break;
         }
     }
+
+    /**
+     * This converts a GeographyValue to GEOJSON. We currently don't use it
+     * because the VMC does not know what to do with GEOJSON. But it's left here
+     * in the hope that it will be useful in the future.
+     *
+     * @param gv
+     * @param js
+     * @throws JSONException
+    @SuppressWarnings("unused")
+    static private void geographyValueToJSON(GeographyValue gv, JSONStringer js) throws JSONException {
+        js.object()
+          .key(GEOJSON_TYPE_KEY)
+          .value(GEOJSON_POLYGON_TYPE_SIGIL)
+          .key(GEOJSON_COORDS_KEY)
+          .array();
+        for (List<PointType> loops : gv.getLoops()) {
+            js.array();
+            for (PointType pt : loops) {
+                js.array();
+                js.value(pt.getLatitude())
+                  .value(pt.getLongitude());
+                js.endArray();
+            }
+            js.endArray();
+        }
+        js.endArray();
+    }
+     */
+
+    /**
+     * This converts a GeographyValue to GEOJSON. We currently don't use it
+     * because the VMC does not know what to do with GEOJSON. But it's left here
+     * in the hope that it will be useful in the future.
+     *
+     * @param gv
+     * @param js
+     * @throws JSONException
+    @SuppressWarnings("unused")
+    static private void pointToJSON(PointType pt, JSONStringer js) throws JSONException {
+        js.object()
+          .key(GEOJSON_TYPE_KEY)
+          .value(GEOJSON_POINT_TYPE_SIGIL)
+          .key(GEOJSON_COORDS_KEY)
+          .array()
+          .value(pt.getLatitude())
+          .value(pt.getLongitude())
+          .endArray()
+          .endObject();
+    }
+     */
 
     /** Validates that type and columnIndex match and are valid. */
     final void validateColumnType(int columnIndex, VoltType... types) {
