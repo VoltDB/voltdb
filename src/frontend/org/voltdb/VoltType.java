@@ -783,7 +783,6 @@ public enum VoltType {
         switch(this) {
         case POINT:
         case GEOGRAPHY:
-        case VARBINARY:
             return false;
         default:
             return true;
