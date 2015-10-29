@@ -88,7 +88,7 @@ private:
 
 BinaryLogSink::BinaryLogSink() {}
 
-int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled) {
+int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
@@ -128,7 +128,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             try {
                 table->insertPersistentTuple(tempTuple, true);
             } catch (ConstraintFailureException &e) {
-                if (isActiveActiveDREnabled) {
+                if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()), uniqueId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                         continue;
                     }
@@ -158,7 +158,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
             if (deleteTuple.isNullTuple()) {
-                if (isActiveActiveDREnabled) {
+                if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                         continue;
                     }
@@ -168,7 +168,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             }
 
             // we still run in risk of having timestamp mismatch, need to check.
-            if (isActiveActiveDREnabled) {
+            if (engine->getIsActiveActiveDREnabled()) {
                 NValue localHiddenColumn = deleteTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
                 int64_t localTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(localHiddenColumn);
                 NValue remoteHiddenColumn = tempTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
@@ -216,7 +216,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
 
             TableTuple oldTuple = table->lookupTupleByValues(expectedTuple);
             if (oldTuple.isNullTuple()) {
-                if (isActiveActiveDREnabled) {
+                if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, &expectedTuple, &tempTuple, uniqueId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                         continue;
                     }
@@ -226,7 +226,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             }
 
             // Timestamp mismatch conflict
-            if (isActiveActiveDREnabled) {
+            if (engine->getIsActiveActiveDREnabled()) {
                 NValue localHiddenColumn = oldTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
                 int64_t localTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(localHiddenColumn);
                 NValue remoteHiddenColumn = expectedTuple.getHiddenNValue(table->getDRTimestampColumnIndex());
@@ -241,7 +241,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             try {
                 table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
             } catch (ConstraintFailureException &e) {
-                if (isActiveActiveDREnabled) {
+                if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(), const_cast<TableTuple *>(e.getConflictTuple()), uniqueId, DR_RECORD_UPDATE, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                         continue;
                     }
