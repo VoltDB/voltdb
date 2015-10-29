@@ -25,9 +25,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
 
@@ -64,6 +66,11 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     @Override
     public boolean isOrderDeterministic() {
         return false; // TODO: enhance to return true for any supportable cases of in-order storage
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        return false;
     }
 
     private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();

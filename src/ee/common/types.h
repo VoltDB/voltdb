@@ -205,6 +205,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_SEND             = 40,
     PLAN_NODE_TYPE_RECEIVE          = 41,
+    PLAN_NODE_TYPE_MERGERECEIVE     = 42,
 
     //
     // Misc Nodes
@@ -499,6 +500,8 @@ enum DRRecordType {
 };
 
 inline size_t rowCostForDRRecord(DRRecordType type) {
+    // Warning: Currently, the PersistentTableUndo*Actions rely on
+    // DR_RECORD_{0}_BY_INDEX costing the same as DR_RECORD_{0}
     switch (type) {
     case DR_RECORD_INSERT:
     case DR_RECORD_DELETE:
@@ -524,6 +527,36 @@ enum TupleSerializationFormat { TUPLE_SERIALIZATION_NATIVE = 0, TUPLE_SERIALIZAT
 // ------------------------------------------------------------------
 enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 
+// ------------------------------------------------------------------
+// Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)
+// ------------------------------------------------------------------
+enum DRConflictType {
+    NO_CONFLICT,
+    CONFLICT_CONSTRAINT_VIOLATION,
+    CONFLICT_EXPECTED_ROW_MISSING,
+    CONFLICT_EXPECTED_ROW_MISMATCH,
+};
+
+enum DRConflictRowType {
+    EXISTING_ROW,
+    EXPECTED_ROW,
+    NEW_ROW,
+};
+
+enum DRRowDecision {
+   KEEP_ROW,
+   DELETE_ROW
+};
+
+enum DRDivergence {
+    NOT_DIVERGE,
+    DIVERGE,
+};
+
+enum DRConflictOnPK {
+    NOT_CONFLICT_ON_PK,
+    CONFLICT_ON_PK,
+};
 
 // ------------------------------------------------------------------
 // Utility functions.

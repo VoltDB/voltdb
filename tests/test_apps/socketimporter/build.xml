@@ -24,6 +24,9 @@
        <fileset dir="${basedir}/../../../voltdb">
          <include name="voltdbclient*.jar"/>
        </fileset>
+       <fileset dir="${basedir}/../../../lib">
+         <include name="commons-lang3*.jar"/>
+       </fileset>
     </path>
 
     <target name="client-compile">

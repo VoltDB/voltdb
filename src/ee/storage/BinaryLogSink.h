@@ -17,21 +17,37 @@
 #ifndef BINARYLOGSINK_H
 #define BINARYLOGSINK_H
 #include <boost/unordered_map.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace voltdb {
 
 class PersistentTable;
 class Pool;
 class VoltDBEngine;
+class Table;
+class TempTable;
+class TableTuple;
+
 /*
  * Responsible for applying binary logs to table data
  */
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
+    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled = false);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
+
+    /**
+     * Handle insert constraint violation
+     */
+    bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* existingTuple, const TableTuple* expectedTuple, TableTuple* newTuple, int64_t uniqueId,
+            DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
+
+    /**
+     * Export the conflict log to downstream
+     */
+    void exportDRConflict(Table *exportTable, bool diverge, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
 };
 
 

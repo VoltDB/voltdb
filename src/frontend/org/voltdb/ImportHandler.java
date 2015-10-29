@@ -25,6 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importer.ImportContext;
+import org.voltdb.importer.ImporterStatsCollector;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -40,14 +41,16 @@ public class ImportHandler {
 
     private final ListeningExecutorService m_es;
     private final ImportContext m_importContext;
+    private final ImporterStatsCollector m_statsCollector;
 
     public final static long SUPPRESS_INTERVAL = 120;
 
     // The real handler gets created for each importer.
-    public ImportHandler(ImportContext importContext) {
+    public ImportHandler(ImportContext importContext, ImporterStatsCollector statsCollector) {
         //Need 2 threads one for data processing and one for stop.
         m_es = CoreUtils.getListeningExecutorService("ImportHandler - " + importContext.getName(), 2);
         m_importContext = importContext;
+        m_statsCollector = statsCollector;
     }
 
     /**
@@ -109,11 +112,19 @@ public class ImportHandler {
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
         return getInternalConnectionHandler()
-                .callProcedure(ic, ic.getBackpressureTimeout(), procCallback, proc, fieldList);
+                .callProcedure(ic, m_statsCollector, ic.getBackpressureTimeout(), procCallback, proc, fieldList);
     }
 
     private InternalConnectionHandler getInternalConnectionHandler() {
         return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
+    }
+
+    public void reportFailure(String importerName, String procName, boolean decrementPending) {
+        m_statsCollector.reportFailure(importerName, procName, decrementPending);
+    }
+
+    public void reportQueued(String importerName, String procName) {
+        m_statsCollector.reportQueued(importerName, procName);
     }
 
 
@@ -176,5 +187,4 @@ public class ImportHandler {
     public void rateLimitedWarn(Throwable t, String format, Object...args) {
         m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
     }
-
 }

@@ -34,7 +34,16 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltdb.*;
+import org.voltdb.DRLogSegmentId;
+import org.voltdb.PostSnapshotTask;
+import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotDataFilter;
+import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableTask;
+import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
@@ -61,11 +70,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
-            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -231,11 +240,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     // NativeSnapshotWritePlan to include all tables.
     private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
-                                                             Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
+                                                             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
                                                              Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                             Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
+                                                             Map<Integer, DRLogSegmentId> drTupleStreamInfo,
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,

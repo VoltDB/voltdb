@@ -101,7 +101,7 @@ public class OperatorExpression extends AbstractExpression {
         // the broadest integer type is preferable, even if the target is of a more limited
         // integer type -- math has a way of scaling values up AND down.
         VoltType operandType = neededType;
-        if (operandType.isInteger()) {
+        if (operandType.isBackendIntegerType()) {
             operandType = VoltType.BIGINT;
         }
         VoltType leftType = m_left.getValueType();

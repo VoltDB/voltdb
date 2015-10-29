@@ -38,7 +38,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=socketstream-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
+    \ls -1 "$VOLTDB_LIB"/commons-lang3-3.0.jar; \
 } 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -63,7 +63,7 @@ function jars() {
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
     rm -rf felix-cache
-    if [ ! -e socketstream.jar ] || [ ! -e socketstream-client.jar ]; then
+    if [ ! -e socketstream-client.jar ]; then
         jars;
     fi
 }
@@ -145,6 +145,11 @@ function client() {
     async-benchmark
 }
 
+# run the client that drives the example
+function sclient() {
+    simple-benchmark
+}
+
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
@@ -158,13 +163,28 @@ function async-benchmark-help() {
 function async-benchmark() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        socketimporter.AsyncBenchmark \
+        socketimporter.client.socketimporter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=2 \
-        --duration=190 \
+        --duration=30 \
+        --perftest=true \
+        --partitioned=true \
         --servers=localhost \
         --sockservers=localhost:7001
 }
+
+function simple-benchmark() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        socketimporter.client.socketimporter.SimpleAsyncBenchmark \
+        --displayinterval=5 \
+        --warmup=2 \
+        --duration=90 \
+        --servers=localhost \
+        --sockservers=localhost:7001 \
+        --statsfile=abc.csv
+}
+
 
 # The following two demo functions are used by the Docker package. Don't remove.
 # compile the jars for procs and client code

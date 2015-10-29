@@ -98,7 +98,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(ILjava/lang/String;Ljava/lang/String;JJJJ)J");
+    m_fragmentProgressUpdateMID = m_jniEnv->GetMethodID(jniClass, "fragmentProgressUpdate", "(IIJJJ)J");
     if (m_fragmentProgressUpdateMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_fragmentProgressUpdateMID != 0);
@@ -174,7 +174,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushDRBufferMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "pushDRBuffer",
-            "(IJJJLjava/nio/ByteBuffer;)J");
+            "(IJJJJLjava/nio/ByteBuffer;)J");
     if (m_pushDRBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushDRBufferMID != NULL);
@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "reportDRConflict",
-            "(IJJLjava/lang/String;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+            "(IJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)Z");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_reportDRConflictMID != NULL);
@@ -270,33 +270,19 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
-int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
-                std::string planNodeName,
-                std::string targetTableName,
-                int64_t targetTableSize,
+int64_t JNITopend::fragmentProgressUpdate(
+                int32_t batchIndex,
+                PlanNodeType planNodeType,
                 int64_t tuplesProcessed,
                 int64_t currMemoryInBytes,
                 int64_t peakMemoryInBytes) {
-        JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
-        if (jni_frame.checkResult() < 0) {
-                VOLT_ERROR("Unable to load dependency: jni frame error.");
-                throw std::exception();
-        }
-
-        jstring jPlanNodeName = m_jniEnv->NewStringUTF(planNodeName.c_str());
-        if (m_jniEnv->ExceptionCheck()) {
-                m_jniEnv->ExceptionDescribe();
-                throw std::exception();
-        }
-        jstring jTargetTableName = m_jniEnv->NewStringUTF(targetTableName.c_str());
-        if (m_jniEnv->ExceptionCheck()) {
-                m_jniEnv->ExceptionDescribe();
-                throw std::exception();
-        }
-
-    jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,m_fragmentProgressUpdateMID,
-                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesProcessed,
-                currMemoryInBytes, peakMemoryInBytes);
+    jlong nextStep = m_jniEnv->CallLongMethod(m_javaExecutionEngine,
+                                              m_fragmentProgressUpdateMID,
+                                              batchIndex,
+                                              static_cast<int32_t>(planNodeType),
+                                              tuplesProcessed,
+                                              currMemoryInBytes,
+                                              peakMemoryInBytes);
     return (int64_t)nextStep;
 }
 
@@ -482,71 +468,75 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 partitionId,
                 block->startDRSequenceNumber(),
                 block->lastDRSequenceNumber(),
-                block->lastUniqueId(),
+                block->lastSpUniqueId(),
+                block->lastMpUniqueId(),
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }
     return retval;
 }
 
-int JNITopend::reportDRConflict(int32_t partitionId,
-            int64_t remoteSequenceNumber, int64_t remoteUniqueId,
-            string tableName, Table* input, Table* output) {
-    if (input != NULL && output != NULL) {
-        // prepare tablename
-        jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
+static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer, boost::shared_array<char>& backingCharArray) {
+   if (!table) {
+       return;
+   }
 
-        // prepare input buffer
-        size_t serializeSize = input->getAccurateSizeToSerialize(false);
-        char* backingCharArray = new char[serializeSize];
-        ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
-        input->serializeToWithoutTotalSize(conflictSerializeOutput);
+   size_t serializeSize = table->getAccurateSizeToSerialize(false);
+   backingCharArray.reset(new char[serializeSize]);
+   ReferenceSerializeOutput conflictSerializeOutput(backingCharArray.get(), serializeSize);
+   table->serializeToWithoutTotalSize(conflictSerializeOutput);
 
-        jobject inputBuffer = m_jniEnv->NewDirectByteBuffer(
-            static_cast<void*>(backingCharArray),
-            static_cast<int32_t>(serializeSize));
-        if (inputBuffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
+   *buffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingCharArray.get()),
+                                                static_cast<int32_t>(serializeSize));
+   if (*buffer == NULL) {
+       jniEngine->ExceptionDescribe();
+       throw std::exception();
+   }
+}
 
-        // prepare output buffer
-        size_t outputSerializeSize = output->getColumnHeaderSizeToSerialize(false) +
-                                     sizeof(int32_t) + // tuple count placeholder
-                                     output->schema()->getMaxSerializedTupleSize();
-        char* outputBackingCharArray = new char[outputSerializeSize];
-        ReferenceSerializeOutput outputSerializeOutput(outputBackingCharArray, outputSerializeSize);
-        // NOTE passed-in output table should have only schema and no tuples
-        output->serializeToWithoutTotalSize(outputSerializeOutput);
+bool JNITopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
+        DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
+        DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
+    // prepare tablename
+    jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
-        jobject outputBuffer = m_jniEnv->NewDirectByteBuffer(
-            static_cast<void*>(outputBackingCharArray),
-            static_cast<int32_t>(outputSerializeSize));
-        if (outputBuffer == NULL) {
-            m_jniEnv->ExceptionDescribe();
-            throw std::exception();
-        }
+    // prepare input buffer for delete conflict
+    jobject existingRowsBufferForDelete;
+    boost::shared_array<char> existingArrayForDelete;
+    serializeTable(m_jniEnv, existingTableForDelete, &existingRowsBufferForDelete, existingArrayForDelete);
 
-        int32_t retval = m_jniEnv->CallStaticIntMethod(
-            m_partitionDRGatewayClass,
-            m_reportDRConflictMID,
-            partitionId,
-            remoteSequenceNumber,
-            remoteUniqueId,
-            tableNameString,
-            inputBuffer,
-            outputBuffer);
+    jobject expectedRowsBufferForDelete;
+    boost::shared_array<char> expectedArrayForDelete;
+    serializeTable(m_jniEnv, expectedTableForDelete, &expectedRowsBufferForDelete, expectedArrayForDelete);
 
-        ReferenceSerializeInputBE filledOutputSerializeInput(outputBackingCharArray, outputSerializeSize);
-        output->loadTuplesFrom(filledOutputSerializeInput);
+    // prepare input buffer for insert conflict
+    jobject existingRowsBufferForInsert;
+    boost::shared_array<char> existingArrayForInsert;
+    serializeTable(m_jniEnv, existingTableForInsert, &existingRowsBufferForInsert, existingArrayForInsert);
 
-        m_jniEnv->DeleteLocalRef(tableNameString);
-        m_jniEnv->DeleteLocalRef(inputBuffer);
-        m_jniEnv->DeleteLocalRef(outputBuffer);
+    jobject newRowsBufferForInsert;
+    boost::shared_array<char> newArrayInsert;
+    serializeTable(m_jniEnv, newTableForInsert, &newRowsBufferForInsert, newArrayInsert);
 
-        return retval;
-    }
-    // -1 indicates error in parameters provided, for now
-    return -1;
+    int32_t retval = m_jniEnv->CallStaticIntMethod(m_partitionDRGatewayClass,
+                                            m_reportDRConflictMID,
+                                            partitionId,
+                                            timestamp,
+                                            tableNameString,
+                                            action,
+                                            deleteConflict,
+                                            existingRowsBufferForDelete,
+                                            expectedRowsBufferForDelete,
+                                            insertConflict,
+                                            existingRowsBufferForInsert,
+                                            newRowsBufferForInsert);
+
+    m_jniEnv->DeleteLocalRef(tableNameString);
+    m_jniEnv->DeleteLocalRef(existingRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(expectedRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(existingRowsBufferForInsert);
+    m_jniEnv->DeleteLocalRef(newRowsBufferForInsert);
+
+    return retval;
 }
 }

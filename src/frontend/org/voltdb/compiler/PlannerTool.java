@@ -47,6 +47,7 @@ import org.voltdb.utils.Encoder;
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger compileLog = new VoltLogger("COMPILE");
 
     private final Database m_database;
     private final Cluster m_cluster;
@@ -108,6 +109,10 @@ public class PlannerTool {
         return planSql(sqlIn, infer, false, null);
     }
 
+    private void logException(Exception e, String fmtLabel) {
+        compileLog.error(fmtLabel + ": ", e);
+    }
+
     /**
      * Stripped down compile that is ONLY used to plan default procedures.
      */
@@ -127,7 +132,16 @@ public class PlannerTool {
             assert(plan != null);
         }
         catch (Exception e) {
-            throw new RuntimeException("Error compiling query: " + e.toString(), e);
+            /*
+             * Don't log PlanningErrorExceptions or HSQLParseExceptions, as they
+             * are at least somewhat expected.
+             */
+            String loggedMsg = "";
+            if (!(e instanceof PlanningErrorException || e instanceof HSQLParseException)) {
+                logException(e, "Error compiling query");
+                loggedMsg = " (Stack trace has been written to the log.)";
+            }
+            throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg, e);
         }
 
         if (plan == null) {
@@ -255,7 +269,17 @@ public class PlannerTool {
                     partitioning = plan.getStatementPartitioning();
                 }
             } catch (Exception e) {
-                throw new RuntimeException("Error compiling query: " + e.toString(), e);
+                /*
+                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
+                 * they are at least somewhat expected.
+                 */
+                String loggedMsg = "";
+                if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
+                    logException(e, "Error compiling query");
+                    loggedMsg = " (Stack trace has been written to the log.)";
+                }
+                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
+                                           e);
             }
 
             if (plan == null) {

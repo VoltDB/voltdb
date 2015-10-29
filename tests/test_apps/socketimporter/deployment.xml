@@ -8,7 +8,7 @@
     <import>
         <configuration module="socketstream.jar" type="custom" enabled="true">
             <property name="port">7001</property>
-            <property name="procedure">importTable.insert</property>
+            <property name="procedure">InsertOnly</property>
         </configuration>
     </import>
 </deployment>

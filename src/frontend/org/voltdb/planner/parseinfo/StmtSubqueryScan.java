@@ -35,10 +35,10 @@ import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.types.PlanNodeType;
 
 /**
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
@@ -304,7 +304,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (! m_subqueriesPartitioning.requiresTwoFragments()) {
             return root;
         }
-        assert(root.findAllNodesOfType(PlanNodeType.RECEIVE).size() == 1);
+        assert(root.findAllNodesOfClass(AbstractReceivePlanNode.class).size() == 1);
         assert(m_subqueryStmt != null);
 
         // recursive check for its nested subqueries for should have receive node.
@@ -314,6 +314,21 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         m_hasReceiveNode = true;
+
+        if (root.hasAnyNodeOfClass(MergeReceivePlanNode.class)) {
+            // The MergeReceivePlanNode always has an inline ORDER BY node and may have
+            // LIMIT/OFFSET and aggregation node(s). Removing the MergeReceivePlanNode will
+            // also remove its inline node(s) which may produce an invalid access plan. For example
+            // SELECT TC1 FROM (SELECT C1 AS TC1 FROM P ORDER BY C1) PT LIMIT 4;
+            // where P is partitioned and C1 is a non-partitioned index column.
+            // Removing the subquery MergeReceivePlnaNode and its ORDER BY node results
+            // in the invalid access plan - the subquery result order is significant in this case
+            // The concern with generally keeping the (Merge)Receive node in the subquery is
+            // that it would needlessly generate more-than-2-fragment plans in cases
+            // where 2 fragments could have done the job.
+            return root;
+        }
+
         if (m_subqueryStmt instanceof ParsedUnionStmt) {
             // Union are just returned
             assert(m_subqueryStmt instanceof ParsedUnionStmt);
@@ -419,7 +434,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     static public AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
             AbstractPlanNode current) {
-        if (current instanceof ReceivePlanNode) {
+        if (current instanceof AbstractReceivePlanNode) {
             assert(current.getChildCount() == 1);
 
             AbstractPlanNode child = current.getChild(0);

@@ -267,6 +267,12 @@ public:
     virtual bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const = 0;
 
     /**
+      * A slightly different to the previous function, this function requires
+      * full tuple instead of just key as the search parameter.
+      */
+     virtual bool moveToKeyByTuple(const TableTuple* searchTuple, IndexCursor &cursor) const = 0;
+
+    /**
      * This method moves to the first tuple equal or greater than
      * given key.  Use this with nextValue(). This method works for
      * partial index search where following value might not match with

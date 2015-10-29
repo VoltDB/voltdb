@@ -88,11 +88,13 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Constants;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -104,6 +106,7 @@ import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -270,7 +273,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
     private ScheduledFuture<?> m_maxConnectionUpdater;
 
-    private final boolean m_isConfiguredForHSQL;
+    private final boolean m_isConfiguredForNonVoltDBBackend;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -948,8 +951,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Log initiator stats
              */
             cihm.m_acg.logTransactionCompleted(
-                    cihm.connection.connectionId(),
-                    cihm.connection.getHostnameOrIP(),
+                    cihm.connection.connectionId(clientData.m_clientHandle),
+                    cihm.connection.getHostnameOrIP(clientData.m_clientHandle),
                     clientData.m_procName,
                     delta,
                     clientResponse.getStatus());
@@ -1210,10 +1213,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
-        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+        BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
+        m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
-        bindAdapter(internalAdapter, null);
+        bindAdapter(internalAdapter, null, true);
         m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter);
     }
 
@@ -1305,9 +1310,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Tell the clientInterface about a connection adapter.
      */
     public ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback) {
+        return bindAdapter(adapter, repairCallback, false);
+    }
+
+    private ClientInterfaceHandleManager bindAdapter(final Connection adapter, final ClientInterfaceRepairCallback repairCallback, boolean addAcg) {
         if (m_cihm.get(adapter.connectionId()) == null) {
-            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback,
-                        AdmissionControlGroup.getDummy());
+            AdmissionControlGroup acg = AdmissionControlGroup.getDummy();
+            ClientInterfaceHandleManager cihm = ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter, repairCallback, acg);
+            if (addAcg) {
+                m_allACGs.add(acg);
+            }
             m_cihm.put(adapter.connectionId(), cihm);
         }
         return m_cihm.get(adapter.connectionId());
@@ -1804,6 +1816,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return error;
         }
 
+        //Check individual query timeout value settings with privilege
+        int batchTimeout = task.getBatchTimeout();
+        if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
+            if (! user.hasPermission(Permission.ADMIN)) {
+                int systemTimeout = catalogContext.cluster.getDeployment().
+                        get("deployment").getSystemsettings().get("systemsettings").getQuerytimeout();
+                if (systemTimeout != ExecutionEngine.NO_BATCH_TIMEOUT_VALUE &&
+                        (batchTimeout > systemTimeout || batchTimeout == ExecutionEngine.NO_BATCH_TIMEOUT_VALUE)) {
+                    String errorMessage = "The attempted individual query timeout value " + batchTimeout +
+                            " milliseconds override was ignored because the connection lacks ADMIN privileges.";
+                    RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                            60, TimeUnit.SECONDS,
+                            log,
+                            Level.INFO, errorMessage + " This message is rate limited to once every 60 seconds.");
+
+                    task.setBatchTimeout(systemTimeout);
+                }
+            }
+        }
+
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
 
@@ -1922,7 +1954,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 "Cannot restore catalog from snapshot when schema is set to catalog in the deployment.",
                                 task.clientHandle);
                     }
-                    log.warn("@SnapshotRestore called on an empty database, attempting to restore catalog from snapshot.");
+                    log.info("No schema found. Restoring schema and procedures from snapshot.");
                     try {
                         JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
                         final String path = jsObj.getString(SnapshotUtil.JSON_PATH);
@@ -1932,7 +1964,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         SyncCallback cb = new SyncCallback();
                         getInternalConnectionHandler().callProcedure(
-                                new ClientInterfaceConnectionContext(), 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                                new ClientInterfaceConnectionContext(), null, 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
                         cb.waitForResponse();
 
                         m_catalogContext.set(VoltDB.instance().getCatalogContext());
@@ -2232,8 +2264,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
-        // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
+        // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
+        // -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
         int partition = -1;
 
         if (isSinglePartition) {
@@ -2859,6 +2892,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public String getHostnameOrIP(long clientHandle) {
+            return getHostnameOrIP();
+        }
+
+        @Override
         public int getRemotePort() {
             return -1;
         }
@@ -2877,6 +2915,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public long connectionId()
         {
             return Long.MIN_VALUE;
+        }
+
+        @Override
+        public long connectionId(long clientHandle) {
+            return connectionId();
         }
 
         @Override
