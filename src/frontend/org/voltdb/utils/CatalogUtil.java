@@ -1773,6 +1773,7 @@ public abstract class CatalogUtil {
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrclusterid(dr.getId());
             cluster.setDrproducerport(dr.getPort());
+            cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);

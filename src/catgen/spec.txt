@@ -20,6 +20,7 @@ begin Cluster                      "A set of connected hosts running one or more
   int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
   int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
   string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
+  int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"
