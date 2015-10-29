@@ -188,4 +188,8 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
             m_subqueryNode.generateOutputSchema(db);
         }
     }
+
+    public String getContentDeterminismMessage() {
+        return null;
+    }
 }

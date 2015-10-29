@@ -270,4 +270,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         subqueryStmt.m_parameterTveMap.clear();
     }
 
+    public String calculateContentDeterminismMessage() {
+        return m_subquery.calculateContentDeterminismMessage();
+    }
 }

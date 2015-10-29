@@ -166,5 +166,10 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     }
 
     @Override
+    public String calculateContentDeterminismMessage() {
+        return null;
+    }
+
+    @Override
     public boolean isDML() { return true; }
 }

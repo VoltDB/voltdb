@@ -54,6 +54,8 @@ public class BranchNode extends JoinNode {
         m_joinType = joinType;
         m_leftNode = leftNode;
         m_rightNode = rightNode;
+        updateContentDeterminismMessage(leftNode.getContentDeterminismMessage());
+        updateContentDeterminismMessage(rightNode.getContentDeterminismMessage());
     }
 
     /**
