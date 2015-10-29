@@ -21,6 +21,21 @@
 #include "storage/tablefactory.h"
 
 namespace voltdb {
+    static Table* copyTable(const std::string &name, Table* template_table, char *signature)
+    {
+        Table* t = TableFactory::getPersistentTable(0,
+                                                    name,
+                                                    TupleSchema::createTupleSchema(template_table->schema()),
+                                                    template_table->getColumnNames(),
+                                                    signature);
+        TableTuple tuple(template_table->schema());
+        TableIterator iterator = template_table->iterator();
+        while (iterator.next(tuple)) {
+            t->insertTuple(tuple);
+        }
+        return t;
+    }
+
     DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1) {
 
     }
@@ -75,47 +90,49 @@ namespace voltdb {
 
 
     int DummyTopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
-            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert) {
         this->actionType = action;
         this->deleteConflictType = deleteConflict;
         this->insertConflictType = insertConflict;
         char signature[20];
 
-        if (existingTableForDelete) {
-            TableTuple tempTuple(existingTableForDelete->schema());
-            this->existingRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForDelete->schema()), existingTableForDelete->getColumnNames(), signature));
-            TableIterator iterator = existingTableForDelete->iterator();
-            while (iterator.next(tempTuple)) {
-                this->existingRowsForDelete->insertTuple(tempTuple);
-            }
+        if (existingMetaTableForDelete) {
+            this->existingMetaRowsForDelete = boost::shared_ptr<Table>(copyTable("existingMeta",
+                                                                                 existingMetaTableForDelete,
+                                                                                 signature));
+            this->existingTupleRowsForDelete = boost::shared_ptr<Table>(copyTable("existing",
+                                                                                  existingTupleTableForDelete,
+                                                                                  signature));
         }
 
-        if (expectedTableForDelete) {
-            TableTuple tempTuple(expectedTableForDelete->schema());
-            this->expectedRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "expected", TupleSchema::createTupleSchema(expectedTableForDelete->schema()), expectedTableForDelete->getColumnNames(), signature));
-            TableIterator iterator = expectedTableForDelete->iterator();
-            while (iterator.next(tempTuple)) {
-                this->expectedRowsForDelete->insertTuple(tempTuple);
-            }
+        if (expectedMetaTableForDelete) {
+            this->expectedMetaRowsForDelete = boost::shared_ptr<Table>(copyTable("expectedMeta",
+                                                                                 expectedMetaTableForDelete,
+                                                                                 signature));
+            this->expectedTupleRowsForDelete = boost::shared_ptr<Table>(copyTable("expected",
+                                                                                  expectedTupleTableForDelete,
+                                                                                  signature));
         }
 
-        if (existingTableForInsert) {
-            TableTuple tempTuple(existingTableForInsert->schema());
-            this->existingRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForInsert->schema()), existingTableForInsert->getColumnNames(), signature));
-            TableIterator iterator = existingTableForInsert->iterator();
-            while (iterator.next(tempTuple)) {
-                this->existingRowsForInsert->insertTuple(tempTuple);
-            }
+        if (existingMetaTableForInsert) {
+            this->existingMetaRowsForInsert = boost::shared_ptr<Table>(copyTable("existingMeta",
+                                                                                 existingMetaTableForInsert,
+                                                                                 signature));
+            this->existingTupleRowsForInsert = boost::shared_ptr<Table>(copyTable("existing",
+                                                                                  existingTupleTableForInsert,
+                                                                                  signature));
         }
 
-        if (newTableForInsert) {
-            TableTuple tempTuple(newTableForInsert->schema());
-            this->newRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "new", TupleSchema::createTupleSchema(newTableForInsert->schema()), newTableForInsert->getColumnNames(), signature));
-            TableIterator iterator = newTableForInsert->iterator();
-            while (iterator.next(tempTuple)) {
-                this->newRowsForInsert->insertTuple(tempTuple);
-            }
+        if (newMetaTableForInsert) {
+            this->newMetaRowsForInsert = boost::shared_ptr<Table>(copyTable("newMeta",
+                                                                            newMetaTableForInsert,
+                                                                            signature));
+            this->newTupleRowsForInsert = boost::shared_ptr<Table>(copyTable("new",
+                                                                             newTupleTableForInsert,
+                                                                             signature));
         }
 
         return 2; /*resolved but not apply remote change*/
