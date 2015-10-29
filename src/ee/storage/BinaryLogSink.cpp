@@ -427,32 +427,33 @@ static void findConflictTuple(Table *table, const TableTuple *existingTuple, con
 /**
  * create conflict export tuple from the conflict tuple
  */
-static void createConflictExportTuple(TempTable *outputTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
+static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
         DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
-    TableTuple tempTuple = outputTable->tempTuple();
+    TableTuple tempMetaTuple = outputMetaTable->tempTuple();
     NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
-    tempTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTinyIntValue(rowType));
-    tempTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTinyIntValue(actionType));
-    tempTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictType));
-    tempTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
+    tempMetaTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTinyIntValue(rowType));
+    tempMetaTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTinyIntValue(actionType));
+    tempMetaTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictType));
+    tempMetaTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
     switch (rowType) {
     case EXISTING_ROW:
     case EXPECTED_ROW:
-        tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
+        tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
         break;
     case NEW_ROW:
-        tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
+        tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
         break;
     default:
         break;
     }
-    tempTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
-    tempTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
-    tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
-    tempTuple.setNValues(DR_DIVERGENCE_COLUMN_INDEX + 1, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
+    tempMetaTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
+    tempMetaTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
+    tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+    tempMetaTuple.setNValues(DR_DIVERGENCE_COLUMN_INDEX + 1, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
 
     // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
-    outputTable->insertTupleNonVirtualWithDeepCopy(tempTuple, pool);
+    TableTuple tempTuple = outputTupleTable->tempTuple();
+    outputTupleTable->insertTupleNonVirtualWithDeepCopy(tempTuple, pool);
 }
 
 // iterate all four tables and push them into export table
@@ -527,24 +528,30 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
     if (!engine) {
         return false;
     }
-    Table* conflictExportTable = engine->getDRConflictTable(drTable);
+    Table* conflictExportTable = engine->getDRConflictTable();
     if (!conflictExportTable) {
         return false;
     }
 
 
     // construct delete conflict
-    boost::shared_ptr<TempTable> existingTableForDelete;
-    boost::shared_ptr<TempTable> expectedTableForDelete;
+    boost::shared_ptr<TempTable> existingMetaTableForDelete;
+    boost::shared_ptr<TempTable> existingTupleTableForDelete;
+    boost::shared_ptr<TempTable> expectedMetaTableForDelete;
+    boost::shared_ptr<TempTable> expectedTupleTableForDelete;
     if (deleteConflict != NO_CONFLICT) {
-        existingTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
+        existingMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
+        existingTupleTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
         if (existingTuple) {
-            createConflictExportTuple(existingTableForDelete.get(), drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXISTING_ROW);
+            createConflictExportTuple(existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
+                    drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXISTING_ROW);
         }
 
-        expectedTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));
+        expectedMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));
+        expectedTupleTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
         if (expectedTuple) {
-            createConflictExportTuple(expectedTableForDelete.get(), drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
+            createConflictExportTuple(expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
+                    drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
         }
     }
 
@@ -559,21 +566,26 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         }
     }
     // construct insert conflict
-    boost::shared_ptr<TempTable> existingTableForInsert;
-    boost::shared_ptr<TempTable> newTableForInsert;
+    boost::shared_ptr<TempTable> existingMetaTableForInsert;
+    boost::shared_ptr<TempTable> existingTupleTableForInsert;
+    boost::shared_ptr<TempTable> newMetaTableForInsert;
+    boost::shared_ptr<TempTable> newTupleTableForInsert;
     if (insertConflict != NO_CONFLICT) {
-        existingTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
+        existingMetaTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, conflictExportTable, NULL));
+        existingTupleTableForInsert.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
         if (existingRows.size() > 0) {
             BOOST_FOREACH(LabeledTableTuple labeledTuple, existingRows) {
-                createConflictExportTuple(existingTableForInsert.get(), drTable, pool, labeledTuple.first.get(),
-                        labeledTuple.second ? CONFLICT_ON_PK : NOT_CONFLICT_ON_PK, actionType, insertConflict, EXISTING_ROW);
+                createConflictExportTuple(existingMetaTableForInsert.get(), existingTupleTableForInsert.get(), drTable,
+                        pool, labeledTuple.first.get(), labeledTuple.second ? CONFLICT_ON_PK : NOT_CONFLICT_ON_PK,
+                        actionType, insertConflict, EXISTING_ROW);
             }
         }
-
     }
     if (newTuple) {
-        newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
-        createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
+        newMetaTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
+        newTupleTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, drTable, NULL));
+        createConflictExportTuple(newMetaTableForInsert.get(), newTupleTableForInsert.get(),
+                                  drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
@@ -582,11 +594,15 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,
-                                                                                      existingTableForDelete.get(),
-                                                                                      expectedTableForDelete.get(),
+                                                                                      existingMetaTableForDelete.get(),
+                                                                                      existingTupleTableForDelete.get(),
+                                                                                      expectedMetaTableForDelete.get(),
+                                                                                      expectedTupleTableForDelete.get(),
                                                                                       insertConflict,
-                                                                                      existingTableForInsert.get(),
-                                                                                      newTableForInsert.get());
+                                                                                      existingMetaTableForInsert.get(),
+                                                                                      existingTupleTableForInsert.get(),
+                                                                                      newMetaTableForInsert.get(),
+                                                                                      newTupleTableForInsert.get());
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
@@ -599,29 +615,39 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
             }
         }
         if (insertConflict != NO_CONFLICT) {
-            TableTuple tempTuple(conflictExportTable->schema());
-            TableIterator iterator = existingTableForInsert->iterator();
-            for (int i = 0; iterator.next(tempTuple); i++) {
-                drTable->deleteTuple(*existingRows[i].first.get(), true);
+            BOOST_FOREACH(LabeledTableTuple tupleToDelete, existingRows) {
+                drTable->deleteTuple(tupleToDelete.first.get(), true);
             }
         }
         if (newTuple) {
             drTable->insertPersistentTuple(*newTuple, true);
         }
     }
-    exportDRConflict(conflictExportTable, applyRemoteChange, resolved, existingTableForDelete.get(), expectedTableForDelete.get(), existingTableForInsert.get(), newTableForInsert.get());
+    exportDRConflict(conflictExportTable, applyRemoteChange, resolved, existingMetaTableForDelete.get(), expectedMetaTableForDelete.get(), existingMetaTableForInsert.get(), newMetaTableForInsert.get());
 
-    if (existingTableForDelete.get()) {
-        existingTableForDelete.get()->deleteAllTuples(true);
+    if (existingMetaTableForDelete.get()) {
+        existingMetaTableForDelete.get()->deleteAllTuples(true);
     }
-    if (expectedTableForDelete.get()) {
-        expectedTableForDelete.get()->deleteAllTuples(true);
+    if (existingTupleTableForDelete.get()) {
+        existingTupleTableForDelete.get()->deleteAllTuples(true);
     }
-    if (existingTableForInsert.get()) {
-        existingTableForInsert.get()->deleteAllTuples(true);
+    if (expectedMetaTableForDelete.get()) {
+        expectedMetaTableForDelete.get()->deleteAllTuples(true);
     }
-    if (newTableForInsert.get()) {
-        newTableForInsert.get()->deleteAllTuples(true);
+    if (expectedTupleTableForDelete.get()) {
+        expectedTupleTableForDelete.get()->deleteAllTuples(true);
+    }
+    if (existingMetaTableForInsert.get()) {
+        existingMetaTableForInsert.get()->deleteAllTuples(true);
+    }
+    if (existingTupleTableForInsert.get()) {
+        existingTupleTableForInsert.get()->deleteAllTuples(true);
+    }
+    if (newMetaTableForInsert.get()) {
+        newMetaTableForInsert.get()->deleteAllTuples(true);
+    }
+    if (newTupleTableForInsert.get()) {
+        newTupleTableForInsert.get()->deleteAllTuples(true);
     }
 
     return true;

@@ -138,8 +138,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
     public int processDRConflict(int partitionId, int remoteClusterId, long remoteTimestamp, String tableName, DRRecordType action,
-                                 DRConflictType deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
-                                 DRConflictType insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
+                                 DRConflictType deleteConflict, ByteBuffer existingMetaTableForDelete, ByteBuffer existingTupleTableForDelete,
+                                 ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
+                                 DRConflictType insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
+                                 ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert) {
         return 0;
     }
 
@@ -160,15 +162,19 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
     public static int reportDRConflict(int partitionId, int remoteClusterId, long remoteTimestamp, String tableName, int action,
-                                       int deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
-                                       int insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
+                                       int deleteConflict, ByteBuffer existingMetaTableForDelete, ByteBuffer existingTupleTableForDelete,
+                                       ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
+                                       int insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
+                                       ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
 
         return pdrg.processDRConflict(partitionId, remoteClusterId, remoteTimestamp, tableName, DRRecordType.values()[action],
-                DRConflictType.values()[deleteConflict], existingTableForDelete, expectedTableForDelete,
-                DRConflictType.values()[insertConflict], existingTableForInsert, newTableForInsert);
+                DRConflictType.values()[deleteConflict], existingMetaTableForDelete, existingTupleTableForDelete,
+                expectedMetaTableForDelete, expectedTupleTableForDelete,
+                DRConflictType.values()[insertConflict], existingMetaTableForInsert, existingTupleTableForInsert,
+                newMetaTableForInsert, newTupleTableForInsert);
     }
 }

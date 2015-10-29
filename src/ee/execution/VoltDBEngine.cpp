@@ -105,7 +105,7 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 // table name prefix of DR conflict table
-const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
+const std::string DR_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_DR_CONFLICT_EXPORTS";
 
 namespace voltdb {
 
@@ -152,6 +152,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_templateSingleLongTable(NULL),
       m_topend(topend),
       m_executorContext(NULL),
+      m_drConflictExportTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
       m_tuplesModifiedStack()
@@ -285,21 +286,6 @@ Table* VoltDBEngine::getTable(std::string name) const
 {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_tablesByName);
-}
-
-Table* VoltDBEngine::getDRConflictTable(PersistentTable* drTable)
-{
-    Table* exportTable;
-    boost::unordered_map<PersistentTable*, Table*>::iterator it = m_cachedDRConflictLookupTable.find(drTable);
-    if (it == m_cachedDRConflictLookupTable.end()) {
-        exportTable = getTable(DR_CONFLICT_TABLE_PREFIX + drTable->name());  // cache table miss, back to full search
-        if (exportTable) {
-            m_cachedDRConflictLookupTable[drTable] = exportTable;
-        }
-    } else {
-        exportTable = it->second;
-    }
-    return exportTable;
 }
 
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
@@ -547,6 +533,13 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     if (!m_database) {
         VOLT_ERROR("Unable to find database catalog information");
         return false;
+    }
+
+    if (getIsActiveActiveDREnabled()) {
+        m_drConflictExportTable = getTable(DR_CONFLICT_TABLE_NAME);
+    }
+    else {
+        m_drConflictExportTable = NULL;
     }
 
     return true;
@@ -1071,7 +1064,6 @@ void VoltDBEngine::rebuildTableCollections()
     m_tables.clear();
     m_tablesByName.clear();
     m_tablesBySignatureHash.clear();
-    m_cachedDRConflictLookupTable.clear();
 
     // need to re-map all the table ids / indexes
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
