@@ -564,6 +564,44 @@ class NValue {
 
     /* Return a string full of arcana and wonder. */
     std::string debug() const;
+    std::string toString() const {
+        if (isNull()) {
+            return "null";
+        }
+
+        std::stringstream value;
+        const ValueType type = getValueType();
+        switch (type) {
+        case VALUE_TYPE_TINYINT:
+            // This cast keeps the tiny int from being confused for a char.
+            value << static_cast<int>(getTinyInt()); break;
+        case VALUE_TYPE_SMALLINT:
+            value << getSmallInt(); break;
+        case VALUE_TYPE_INTEGER:
+            value << getInteger(); break;
+        case VALUE_TYPE_BIGINT:
+            value << getBigInt(); break;
+        case VALUE_TYPE_DOUBLE:
+            // Use the specific standard SQL formatting for float values,
+            // which the C/C++ format options don't quite support.
+            streamSQLFloatFormat(value, getDouble());
+            break;
+        case VALUE_TYPE_DECIMAL:
+            value << createStringFromDecimal(); break;
+        case VALUE_TYPE_VARCHAR:
+        case VALUE_TYPE_VARBINARY: {
+            return std::string(reinterpret_cast<char*>(getObjectValue_withoutNull()),
+                               getObjectLength_withoutNull());
+        }
+        case VALUE_TYPE_TIMESTAMP: {
+            streamTimestamp(value);
+            break;
+        }
+        default:
+            throwCastSQLException(type, VALUE_TYPE_VARCHAR);
+        }
+        return value.str();
+    }
 
     // Constants for Decimal type
     // Precision and scale (inherent in the schema)
