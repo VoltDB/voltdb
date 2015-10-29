@@ -44,8 +44,10 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -137,9 +139,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     final InitiatorMailbox m_initiatorMailbox;
 
-    // Almighty execution engine and its HSQL sidekick
+    // Almighty execution engine and its (HSQL or PostgreSQL) backend sidekick
     ExecutionEngine m_ee;
-    HsqlBackend m_hsql;
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Stats
     final TableStats m_tableStats;
@@ -457,16 +459,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void initialize()
     {
         if (m_backend == BackendTarget.NONE) {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
             m_ee = new MockExecutionEngine();
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
-                                                       m_context);
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
+            m_ee = new MockExecutionEngine();
+        }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
             m_ee = new MockExecutionEngine();
         }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
             m_ee = initializeEE();
         }
 
@@ -717,8 +722,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void shutdown()
     {
         try {
-            if (m_hsql != null) {
-                HsqlBackend.shutdownInstance();
+            if (m_non_voltdb_backend != null) {
+                m_non_voltdb_backend.shutdownInstance();
             }
             if (m_ee != null) {
                 m_ee.release();
@@ -918,9 +923,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override

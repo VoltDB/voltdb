@@ -2239,6 +2239,12 @@ public abstract class CatalogUtil {
             outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
+            // k-safe file export
+            PropertyType ksafe = new PropertyType();
+            ksafe.setName("replicated");
+            ksafe.setValue("true");
+            defaultConfiguration.getProperty().add(ksafe);
+
             export.getConfiguration().add(defaultConfiguration);
         }
         return export;

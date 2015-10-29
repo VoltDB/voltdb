@@ -94,9 +94,12 @@ public:
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
 
-    int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
-            int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
+    int64_t fragmentProgressUpdate(
+            int32_t batchIndex,
+            voltdb::PlanNodeType planNodeType,
+            int64_t tuplesProcessed,
+            int64_t currMemoryInBytes,
+            int64_t peakMemoryInBytes);
 
     std::string decodeBase64AndDecompress(const std::string& base64Data);
 
@@ -938,19 +941,16 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     return dependencyData;
 }
 
-int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
-        std::string planNodeName,
-        std::string targetTableName,
-        int64_t targetTableSize,
+int64_t VoltDBIPC::fragmentProgressUpdate(
+        int32_t batchIndex,
+        voltdb::PlanNodeType planNodeType,
         int64_t tuplesProcessed,
         int64_t currMemoryInBytes,
         int64_t peakMemoryInBytes) {
+    int32_t nodeTypeAsInt32 = static_cast<int32_t>(planNodeType);
     char message[sizeof(int8_t) +
-                 sizeof(int16_t) +
-                 planNodeName.size() +
-                 sizeof(int16_t) +
-                 targetTableName.size() +
-                 sizeof(targetTableSize) +
+                 sizeof(batchIndex) +
+                 sizeof(nodeTypeAsInt32) +
                  sizeof(tuplesProcessed) +
                  sizeof(currMemoryInBytes) +
                  sizeof(peakMemoryInBytes)];
@@ -960,20 +960,8 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
     *reinterpret_cast<int32_t*>(&message[offset]) = htonl(batchIndex);
     offset += sizeof(batchIndex);
 
-    int16_t strSize = static_cast<int16_t>(planNodeName.size());
-    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
-    offset += sizeof(strSize);
-    ::memcpy( &message[offset], planNodeName.c_str(), strSize);
-    offset += strSize;
-
-    strSize = static_cast<int16_t>(targetTableName.size());
-    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
-    offset += sizeof(strSize);
-    ::memcpy( &message[offset], targetTableName.c_str(), strSize);
-    offset += strSize;
-
-    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
-    offset += sizeof(targetTableSize);
+    *reinterpret_cast<int32_t*>(&message[offset]) = htonl(nodeTypeAsInt32);
+    offset += sizeof(nodeTypeAsInt32);
 
     *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesProcessed);
     offset += sizeof(tuplesProcessed);
