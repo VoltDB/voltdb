@@ -996,6 +996,7 @@ TEST_F(NValueTest, TestToString) {
     NValue bigInt = ValueFactory::getBigIntValue(-64);
     NValue doubleValue = ValueFactory::getDoubleValue(-32);
     NValue stringValue = ValueFactory::getStringValue("dude");
+    NValue binaryValue = ValueFactory::getBinaryValue("aa");
     NValue decimalValue = ValueFactory::getDecimalValueFromString("10.22");
     NValue timestamp = ValueFactory::getTimestampValue(99999999);
     NValue nullValue = ValueFactory::getNullValue();
@@ -1007,11 +1008,13 @@ TEST_F(NValueTest, TestToString) {
     EXPECT_EQ(strcmp(doubleValue.toString().c_str(), "-3.2E1"), 0);
     EXPECT_EQ(strcmp(decimalValue.toString().c_str(), "10.220000000000"), 0);
     EXPECT_EQ(strcmp(stringValue.toString().c_str(), "dude"), 0);
+    EXPECT_EQ(strcmp(binaryValue.toString().c_str(), "aa"), 0);
     EXPECT_EQ(strcmp(timestamp.toString().c_str(), "1970-01-01 00:01:39.999999"), 0);
     EXPECT_EQ(strcmp(nullValue.toString().c_str(), "null"), 0);
 
     // Make valgrind happy
     stringValue.free();
+    binaryValue.free();
 }
 
 //

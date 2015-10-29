@@ -34,6 +34,7 @@
 #include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
 
+#include "catalog/catalog.h"
 #include "common/ExportSerializeIo.h"
 #include "common/FatalException.hpp"
 #include "common/Pool.hpp"
@@ -589,9 +590,12 @@ class NValue {
         case VALUE_TYPE_DECIMAL:
             value << createStringFromDecimal(); break;
         case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY: {
             return std::string(reinterpret_cast<char*>(getObjectValue_withoutNull()),
                                getObjectLength_withoutNull());
+        case VALUE_TYPE_VARBINARY: {
+            char buf[getObjectLength_withoutNull() * 2];
+            catalog::Catalog::hexEncodeString(reinterpret_cast<char*>(getObjectValue_withoutNull()), buf);
+            return std::string(buf, getObjectLength_withoutNull() * 2);
         }
         case VALUE_TYPE_TIMESTAMP: {
             streamTimestamp(value);
