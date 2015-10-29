@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -28,6 +29,7 @@ import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.ParsedUnionStmt.UnionType;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class UnionPlanNode extends AbstractPlanNode {
 
@@ -131,4 +133,10 @@ public class UnionPlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(jobj, db);
         m_unionType = UnionType.valueOf(jobj.getString(Members.UNION_TYPE.name()));
     }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        return false;
+    }
+
 }

@@ -134,6 +134,17 @@ class CompactingHashMultiMapIndex : public TableIndex
         return true;
     }
 
+    bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const {
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = findTuple(*persistentTuple);
+        if (mapIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
+        return true;
+   }
+
     TableTuple nextValueAtKey(IndexCursor& cursor) const {
         if (cursor.m_match.isNullTuple()) {
             return cursor.m_match;

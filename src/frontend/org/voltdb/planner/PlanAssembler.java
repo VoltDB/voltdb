@@ -38,13 +38,13 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -52,6 +52,7 @@ import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
@@ -101,44 +102,40 @@ public class PlanAssembler {
     }
 
     /** convenience pointer to the cluster object in the catalog */
-    final Cluster m_catalogCluster;
+    private final Cluster m_catalogCluster;
     /** convenience pointer to the database object in the catalog */
-    final Database m_catalogDb;
+    private final Database m_catalogDb;
 
     /** parsed statement for an insert */
-    ParsedInsertStmt m_parsedInsert = null;
+    private ParsedInsertStmt m_parsedInsert = null;
     /** parsed statement for an update */
-    ParsedUpdateStmt m_parsedUpdate = null;
+    private ParsedUpdateStmt m_parsedUpdate = null;
     /** parsed statement for an delete */
-    ParsedDeleteStmt m_parsedDelete = null;
+    private ParsedDeleteStmt m_parsedDelete = null;
     /** parsed statement for an select */
-    ParsedSelectStmt m_parsedSelect = null;
+    private ParsedSelectStmt m_parsedSelect = null;
     /** parsed statement for an union */
-    ParsedUnionStmt m_parsedUnion = null;
+    private ParsedUnionStmt m_parsedUnion = null;
 
     /** plan selector */
-    PlanSelector m_planSelector;
+    private PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
 
-    public StatementPartitioning getPartition() {
-        return m_partitioning;
-    }
-
     /** Error message */
-    String m_recentErrorMsg;
+    private String m_recentErrorMsg;
 
     /**
      * Used to generate the table-touching parts of a plan. All join-order and
      * access path selection stuff is done by the SelectSubPlanAssember.
      */
-    SubPlanAssembler subAssembler = null;
+    private SubPlanAssembler m_subAssembler = null;
 
     /**
      * Flag when the only expected plan for a statement has already been generated.
      */
-    boolean m_bestAndOnlyPlanWasGenerated = false;
+    private boolean m_bestAndOnlyPlanWasGenerated = false;
 
     /**
      *
@@ -263,7 +260,7 @@ public class PlanAssembler {
      * getNextPlan() will return the first candidate plan for these parameters.
      *
      */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt) {
+    private void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
         m_partitioning.analyzeTablePartitioning(parsedStmt.m_tableAliasMap.values());
 
@@ -287,7 +284,7 @@ public class PlanAssembler {
                     simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
                 }
             }
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
+            m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
@@ -358,7 +355,7 @@ public class PlanAssembler {
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
             m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.m_tableAliasMap.values(), valueEquivalence);
         }
-        subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
 
     private static void failIfNonDeterministicDml(AbstractParsedStmt parsedStmt, CompiledPlan plan) {
@@ -416,10 +413,10 @@ public class PlanAssembler {
      * @param parsedStmt Current SQL statement to generate plan for
      * @return The best cost plan or null.
      */
-    public static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
+    static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
             + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
+    CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
         List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueryScans();
         ParsedResultAccumulator fromSubqueryResult = null;
@@ -529,7 +526,7 @@ public class PlanAssembler {
      * Output the best cost plan.
      *
      */
-    public void finalizeBestCostPlan() {
+    void finalizeBestCostPlan() {
         m_planSelector.finalizeOutput();
     }
 
@@ -671,7 +668,7 @@ public class PlanAssembler {
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
-            partitioning = assembler.getPartition();
+            partitioning = assembler.m_partitioning;
 
             // make sure we got a winner
             if (bestChildPlan == null) {
@@ -824,12 +821,12 @@ public class PlanAssembler {
     }
 
     private CompiledPlan getNextSelectPlan() {
-        assert (subAssembler != null);
+        assert (m_subAssembler != null);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
 
         if (subSelectRoot == null) {
-            m_recentErrorMsg = subAssembler.m_recentErrorMsg;
+            m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
             return null;
         }
         AbstractPlanNode root = subSelectRoot;
@@ -848,7 +845,7 @@ public class PlanAssembler {
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
-            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
@@ -997,7 +994,7 @@ public class PlanAssembler {
             return false;
         }
 
-        if (root.getPlanNodeType() == PlanNodeType.RECEIVE &&
+        if (root instanceof AbstractReceivePlanNode &&
                 m_parsedSelect.hasPartitionColumnInGroupby()) {
             // Top aggregate has been removed, its schema is exactly the same to
             // its local aggregate node.
@@ -1036,13 +1033,13 @@ public class PlanAssembler {
     }
 
     private CompiledPlan getNextDeletePlan() {
-        assert (subAssembler != null);
+        assert (m_subAssembler != null);
 
         // figure out which table we're deleting from
         assert (m_parsedDelete.m_tableList.size() == 1);
         Table targetTable = m_parsedDelete.m_tableList.get(0);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
         if (subSelectRoot == null) {
             return null;
         }
@@ -1141,9 +1138,9 @@ public class PlanAssembler {
     }
 
     private CompiledPlan getNextUpdatePlan() {
-        assert (subAssembler != null);
+        assert (m_subAssembler != null);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
         if (subSelectRoot == null) {
             return null;
         }
@@ -1699,8 +1696,7 @@ public class PlanAssembler {
      */
     static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
         if (pn instanceof OrderByPlanNode ||
-            pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
-        {
+            pn.getPlanNodeType() == PlanNodeType.AGGREGATE) {
             return true;
         }
         return false;
@@ -1717,10 +1713,10 @@ public class PlanAssembler {
         AbstractPlanNode receiveNode = root;
         AbstractPlanNode reAggParent = null;
         // Find receive plan node and insert the constructed re-aggregation plan node.
-        if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+        if (root instanceof AbstractReceivePlanNode) {
             root = reAggNode;
         } else {
-            List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            List<AbstractPlanNode> recList = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
@@ -1729,6 +1725,7 @@ public class PlanAssembler {
             assert(result);
         }
         reAggNode.addAndLinkChild(receiveNode);
+        reAggNode.m_isCoordinatingAggregator = true;
 
         assert(receiveNode instanceof ReceivePlanNode);
         AbstractPlanNode sendNode = receiveNode.getChild(0);
@@ -1771,7 +1768,7 @@ public class PlanAssembler {
         return root;
     }
 
-    class IndexGroupByInfo {
+    private static class IndexGroupByInfo {
         boolean m_multiPartition = false;
 
         List<Integer> m_coveredGroupByColumns;
@@ -1779,22 +1776,22 @@ public class PlanAssembler {
 
         AbstractPlanNode m_indexAccess = null;
 
-        public boolean isChangedToSerialAggregate() {
+        boolean isChangedToSerialAggregate() {
             return m_canBeFullySerialized && m_indexAccess != null;
         }
 
-        public boolean isChangedToPartialAggregate() {
+        boolean isChangedToPartialAggregate() {
             return !m_canBeFullySerialized && m_indexAccess != null;
         }
 
-        public boolean needHashAggregator(AbstractPlanNode root) {
+        boolean needHashAggregator(AbstractPlanNode root, ParsedSelectStmt parsedSelect) {
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
             // of an index scan.
             // Currently, an index scan only claims to have a sort direction when its output
             // matches the order demanded by the ORDER BY clause.
-            if (! m_parsedSelect.isGrouped()) {
+            if (! parsedSelect.isGrouped()) {
                 return false;
             }
 
@@ -1818,7 +1815,7 @@ public class PlanAssembler {
                 // ORDER BY columns.
                 // Yet, any additional non-ORDER-BY columns in the GROUP BY clause will need
                 // partial aggregate.
-                if (m_parsedSelect.groupByIsAnOrderByPermutation()) {
+                if (parsedSelect.groupByIsAnOrderByPermutation()) {
                     return false;
                 }
             }
@@ -1853,13 +1850,27 @@ public class PlanAssembler {
      * For a seqscan feeding a GROUP BY, consider substituting an IndexScan that pre-sorts
      * by the GROUP BY keys. This is a much bigger win if the aggregation can get pushed
      * down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node.
+     * If a candidate is already an indexscan simply calculate GROUP BY column coverage
+     *
      * @param candidate
      * @param gbInfo
      * @return true when planner can switch to index scan from a sequential scan,
-     * and when the index scan has no parent plan node.
+     * and when the index scan has no parent plan node or candidate is already an indexscan and
+     * covers all or some GROUP BY columns
      */
     private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
         if (! m_parsedSelect.isGrouped()) {
+            return false;
+        }
+
+        if (candidate instanceof IndexScanPlanNode) {
+            calculateIndexGroupByInfo((IndexScanPlanNode) candidate, gbInfo);
+            if (gbInfo.m_coveredGroupByColumns != null && !gbInfo.m_coveredGroupByColumns.isEmpty()) {
+                // The candidate index does cover all or some of the GROUP BY columns
+                // and can be serialized
+                gbInfo.m_indexAccess = candidate;
+                return true;
+            }
             return false;
         }
 
@@ -1907,7 +1918,7 @@ public class PlanAssembler {
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
-            if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+            if (root instanceof AbstractReceivePlanNode) {
                 // do not apply index scan for serial/partial aggregation
                 // for distinct that does not group by partition column
                 if (!m_parsedSelect.hasAggregateDistinct() || m_parsedSelect.hasPartitionColumnInGroupby()) {
@@ -1918,7 +1929,7 @@ public class PlanAssembler {
             } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
-            boolean needHashAgg = gbInfo.needHashAggregator(root);
+            boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
             // Construct the aggregate nodes
             if (needHashAgg) {
@@ -2089,6 +2100,24 @@ public class PlanAssembler {
         }
 
         return handleDistinctWithGroupby(root);
+    }
+
+    // Sets IndexGroupByInfo for an IndexScan
+    private void calculateIndexGroupByInfo(IndexScanPlanNode root,
+            IndexGroupByInfo gbInfo) {
+        String fromTableAlias = root.getTargetTableAlias();
+        assert(fromTableAlias != null);
+
+        Index index = root.getCatalogIndex();
+        if ( ! IndexType.isScannable(index.getType())) {
+            return;
+        }
+
+        ArrayList<AbstractExpression> bindings = new ArrayList<>();
+        gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
+                index, fromTableAlias, bindings);
+        gbInfo.m_canBeFullySerialized =
+                gbInfo.m_coveredGroupByColumns.size() == m_parsedSelect.m_groupByColumns.size();
     }
 
     // Turn sequential scan to index scan for group by if possible
@@ -2566,7 +2595,7 @@ public class PlanAssembler {
      * @return The set of column names affected by indexes with duplicates
      *         removed.
      */
-    public static Set<String> getIndexedColumnSetForTable(Table table) {
+    private static Set<String> getIndexedColumnSetForTable(Table table) {
         HashSet<String> columns = new HashSet<String>();
 
         for (Index index : table.getIndexes()) {
@@ -2578,7 +2607,7 @@ public class PlanAssembler {
         return columns;
     }
 
-    public String getErrorMessage() {
+    String getErrorMessage() {
         return m_recentErrorMsg;
     }
 

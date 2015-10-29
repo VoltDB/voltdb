@@ -38,7 +38,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -76,7 +75,7 @@ rm -f *.jar
 rm -f procedures/approxcountdistinct/*.class
 rm -f client/approxcountdistinct/*.class
 
-javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/approxcountdistinct/*.java
+javac -classpath $APPCLASSPATH procedures/approxcountdistinct/*.java
 if (($? != 0)); then
     echo "Error compiling procedures"
     exit 1
@@ -89,7 +88,7 @@ if (($? != 0)); then
 fi
 
 
-javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/approxcountdistinct/*.java
+javac -classpath $CLIENTCLASSPATH client/approxcountdistinct/*.java
 if (($? != 0)); then
     echo "Error compiling client"
     exit 1

@@ -26,6 +26,7 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+    \ls -1 /home/opt/kafka/libs/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.

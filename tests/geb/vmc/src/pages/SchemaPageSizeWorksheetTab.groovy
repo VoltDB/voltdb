@@ -42,9 +42,9 @@ class SchemaPageSizeWorksheetTab extends SchemaPage {
         tableMax	{ $(class:"tablesorter-header-inner", text:"Table Max") }
 
         //ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
-        ascending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerAsc") }
+        ascending		{ $("#sizetable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerAsc") }
         //descending		{ $(class:"tablesorter-icon icon-chevron-down") }
-        descending		{ $(class:"tablesorter-header bootstrap-header tablesorter-headerDesc") }
+        descending		{ $("#sizetable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
 
         sizeAnalysisSummary	{ $("h3", text:"Size Analysis Summary") }
 

@@ -24,14 +24,19 @@
 
 package org.voltdb;
 
-import junit.framework.TestCase;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.util.Date;
+import junit.framework.TestCase;
 
 
 public class TestParameterConverter extends TestCase
@@ -128,6 +133,60 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(byte[].class, t);
         assertTrue("expect varbinary", r.getClass() == byte[].class);
         assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testOneStringToPoint(String rep, PointType pt, double epsilon) throws Exception {
+        Object r = ParameterConverter.tryToMakeCompatible(PointType.class, rep);
+        assertTrue("expected PointType", r.getClass() == PointType.class);
+        PointType rpt = (PointType)r;
+        assertEquals("Cannot convert string to point.", pt.getLatitude(),  rpt.getLatitude(),  epsilon);
+        assertEquals("Cannot convert string to point.", pt.getLongitude(), rpt.getLongitude(), epsilon);
+    }
+
+    public void testOneStringToPolygon(String rep, GeographyValue gv) throws Exception {
+        Object r = ParameterConverter.tryToMakeCompatible(GeographyValue.class, rep);
+        assertTrue("expected GeographyValue", r.getClass() == GeographyValue.class);
+        assertEquals("Cannot convert string to polygon.", gv.toString(), r.toString());
+    }
+
+    public void testStringToPointType() throws Exception {
+        double epsilon = 1.0e-3;
+        testOneStringToPoint("point(10.333 20.666)",               new PointType( 10.333,  20.666), epsilon);
+        testOneStringToPoint("  point  (10.333   20.666)    ",     new PointType( 10.333,  20.666), epsilon);
+        testOneStringToPoint("point(-10.333 -20.666)",             new PointType(-10.333, -20.666), epsilon);
+        testOneStringToPoint("  point  (-10.333   -20.666)    ",   new PointType(-10.333, -20.666), epsilon);
+        testOneStringToPoint("point(10 10)",                       new PointType(10.0,    10.0),    epsilon);
+        testOneStringToPoint("point(10.0 10.0)",                   new PointType(10.0, 10.0),       epsilon);
+        testOneStringToPoint("point(10 10)",                       new PointType(10.0, 10.0),       epsilon);
+        // testOneStringToPoint(null, "null");
+    }
+
+    public void testStringToPolygonType() throws Exception {
+        testOneStringToPolygon("polygon((0 0, 0 1, 1 1, 1 0, 0 0))",
+                               new GeographyValue(Collections.singletonList(Arrays.asList(new PointType[]{ new PointType(0,0),
+                                                                                                           new PointType(0, 1),
+                                                                                                           new PointType(1, 1),
+                                                                                                           new PointType(1, 0),
+                                                                                                           new PointType(0, 0) }))));
+        GeographyValue geog;
+        // The Bermuda Triangle
+        List<PointType> outerLoop = Arrays.asList(new PointType(32.305, -64.751),
+                                                  new PointType(25.244, -80.437),
+                                                  new PointType(18.476, -66.371),
+                                                  new PointType(32.305, -64.751));
+
+        // A triangular hole
+        List<PointType> innerLoop = Arrays.asList(new PointType(28.066, -68.874),
+                                                  new PointType(25.361, -68.855),
+                                                  new PointType(28.376, -73.381),
+                                                  new PointType(28.066, -68.874));
+
+        geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
+        String geogRep = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), " + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
+        testOneStringToPolygon(geogRep, geog);
+        // round trip
+        geog = new GeographyValue(geogRep);
+        testOneStringToPolygon(geogRep, geog);
     }
 
     public void testNulls()

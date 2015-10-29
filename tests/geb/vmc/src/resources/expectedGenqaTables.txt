@@ -1,0 +1,4 @@
+# Expected Tables: (when running the Genqa test app)
+EXPORT_MIRROR_PARTITIONED_TABLE
+PARTITIONED_TABLE
+REPLICATED_TABLE

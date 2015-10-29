@@ -66,6 +66,10 @@ public class GeographyValue {
         }
     }
 
+    public static GeographyValue geographyValueFromText(String text) {
+        return new GeographyValue(text);
+    }
+
     /**
      * Gets the loops that make up the polygon, with the outer loop first.
      * @return  The loops in the polygon as a list of a list of points

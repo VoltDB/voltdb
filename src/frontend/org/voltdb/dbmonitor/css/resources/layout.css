@@ -69,6 +69,7 @@ h1, h2, h3, h4, h5, h6 {
 .errorValue {
     color: #c70000;
 }
+.notActive {-moz-opacity:0.5; -khtml-opacity: 0.5; filter: alpha(opacity=50); opacity: 0.5; }
 
 /*****Global Ends******/
 /******sprite*************/
@@ -410,7 +411,8 @@ ul.topRightList {
             display: block;
             text-decoration: none;
             color: #000000;
-            padding: 3px 2px 5px 15px;
+		  /*padding: 3px 2px 5px 15px;*/
+            padding: 3px 2px 5px 72px;
             white-space: nowrap;
         }
 
@@ -419,7 +421,7 @@ ul.topRightList {
 
         .menuHome ul li:hover ul {
             display: block;
-            position: absolute;
+            /*position: absolute;*/
         }
 
         .menuHome ul li:hover li {
@@ -432,7 +434,7 @@ ul.topRightList {
             border-left: 1px solid #CCCCCC;
             border-right: 1px solid #CCCCCC;
             position: relative;
-            right: 50px;
+            right:0 /*50px*/;
             z-index: 1;
             width: 115px;
         }
@@ -515,7 +517,7 @@ ul.topRightList {
 
 .clusterDetailsContLeft {
     float: left;
-    width: 50%;
+    width: 60%;
 }
 
 .clusterDetailsContRight {
@@ -625,7 +627,7 @@ ul.rightShowhideList {
         border: 1px solid #aaaaaa;
         height: 28px;
         line-height: 28px;
-        width: 150px;
+        width: 140px;
     }
 
 
@@ -1361,8 +1363,8 @@ ul.catalogNav {
     border-top: none;
 }
 
-tr.trLicenseInfo td {
-    border: none !important;
+td.trLicenseInfo{
+    padding-top: 20px!important;
 }
 
 
@@ -1609,6 +1611,12 @@ div.popup {
     overflow: auto;
     line-height: 18px;
 }
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+     ::i-block-chrome,.overlay-content  {
+     width: 450px;
+    }
+   
+}
 
 .graphPop {
     height: 110px;
@@ -1627,6 +1635,7 @@ div.popup {
     margin-bottom: 5px;
     height: 30px;
     line-height: 35px;
+   
 }
 
     .user-preferences li.last {
@@ -1638,7 +1647,7 @@ div.popup {
     .user-preferences li input[type='checkbox'] {
         float: right;
         position: relative;
-        top: 8px;
+        top: 10px;
     }
 
 .msg-pop-info {
@@ -2093,7 +2102,7 @@ right: -31px!important;
 h2.help {
     font: bold 15px Arial, Helvetica, sans-serif;
     padding-bottom: 10px;
-    border-bottom: 1px dashed #ddd;
+    /*border-bottom: 1px dashed #ddd;*/
 }
 
 .VDBMonitorHelp p {
@@ -2170,8 +2179,8 @@ ul.helpSchemaList {
 .edit,
 .editDisabled,
 .arrow,
-.labelCollapsed,
-.labelExpanded,
+/*.labelCollapsed,*/
+/*.labelExpanded,*/
 a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
     background-image: url(images/admin-icons.png);
 }
@@ -2296,7 +2305,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -358px -56px;
+    background-position: -165px -56px;
     width: 40px;
     height: 36px;
 }
@@ -2590,13 +2599,15 @@ ul.adminClusterList li a.shutdown {
 }
 
 .labelCollapsed {
-    background-position: -468px -11px;
+    /*background-position: -468px -11px;*/
     padding-left: 22px;
+    background: url("images/up.png")0 1px no-repeat; 
 }
 
 .labelExpanded {
-    background-position: -468px -55px;
+    /*background-position: -468px -55px;*/
     padding-left: 22px;
+    background: url("images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
@@ -2912,7 +2923,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
 .overviewTbl {
-    overflow: auto;
+    /*overflow: auto;*/
     width: auto;
 }
 
@@ -3624,8 +3635,13 @@ a:hover.changePsd {
 table.diskLimitTbl tr td { border: none;}
 
 /*********overlapping nv.d3.css*********/
-.nvtooltip{ padding: 5px!important;}
-svg.nvd3-svg { padding: 0 0 0 10px!important; }
+.nvtooltip{border: 1px solid #CCCCCC !important;}
+
+
+svg.nvd3-svg { width:95% !important; }
+.nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
+.nvtooltip table tr td { border: none !important;}
+
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
@@ -3647,6 +3663,7 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+	.downloadConfig { margin-bottom:5px;}
 
   
 }
@@ -4110,7 +4127,8 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
         width: 100%;
         position: absolute;
         right: -1px;
-        top: 205px;
+       /* top: 205px;*/
+	   top:151px;
     }
 
     .partitionHeight {
@@ -4167,8 +4185,8 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
     }
 
     .overviewTbl {
-        overflow: auto;
-        width: auto;
+         overflow: auto;
+       width: auto;
     }
 
     .adminLeft {
@@ -4230,6 +4248,8 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
     .refreshBtn {
         margin-bottom: 10px;
     }
+	.menuHome ul li:hover ul{ position:absolute;}
+	.menuHome ul li a{padding: 3px 2px 5px 15px;}
 }
 
 @media (min-width: 480px) and (max-width: 700px) {
@@ -4249,12 +4269,13 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
         width: 80%;
     }
 
-    /* .configWrapper {
-        width: 380px;
-    }*/
-    .popup_cont {
+     .configWrapper {
         width: 380px;
     }
+    /*.popup_cont {
+        width: 380px;
+    }*/
+	
 }
 
 @media (width: 768px) {
@@ -4284,6 +4305,12 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
 @media (min-width: 768px) and (max-width: 800px) {
      .server-info-heading .servIp{margin-left: 14%;}
     ul.servers-list li span.servIpNum {margin-left: 3%;}
+}
+@media (min-width: 700px) and (max-width: 902px) {
+    .overviewTbl {
+    overflow: auto;
+    width: auto;
+}
 }
 
 @media (max-width: 980px) {
@@ -4374,6 +4401,7 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
     .server-info-heading .servIp {
   margin-left: 30%;
 }
+.refreshBtn { margin-bottom:10px;}
 }
 
 
@@ -4391,6 +4419,7 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
+		
     }
 }
 
@@ -4403,7 +4432,7 @@ svg.nvd3-svg { padding: 0 0 0 10px!important; }
 
     .graphPop {
         height: 110px;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     /*.restoreInfo .overlay-content { height:200px;}
 		.restoreCont {height:200px;}*/

@@ -38,6 +38,7 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
@@ -1019,7 +1020,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
 
         // (3) Sub-query with replicated table group by
@@ -1166,7 +1167,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
-        assertNotNull(pn.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
         // single partition filter outside subquery
         planNodes = compileToFragments(
@@ -1387,10 +1388,9 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         // inline limit with order by
-        assertTrue(pn instanceof OrderByPlanNode);
+        assertTrue(pn instanceof MergeReceivePlanNode);
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof ReceivePlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 
         pn = planNodes.get(1).getChild(0);
         // inline limit with order by

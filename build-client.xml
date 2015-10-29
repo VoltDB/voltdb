@@ -69,9 +69,6 @@
 
 <path id='project.classpath'>
     <pathelement location='${build.client.dir}' />
-    <fileset dir='${lib.dir}'>
-        <include name='commons-cli-1.2.jar' />
-    </fileset>
     <fileset dir='${vendor.lib.dir}'>
         <include name='javaee-api-6.0.jar' />
     </fileset>
@@ -82,7 +79,7 @@
         includes="com/google_voltpatches/**/*.java
                   javax/annotation_voltpatches/**/*.java
                   org/apache/cassandra_voltpatches/MurmurHash3.java
-                  org/apache/commons/cli_voltpatches/**/*.java
+                  org/apache/commons_voltpatches/cli/**/*.java
                   org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
                   org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
                   org/apache/jute_voltpatches/**/*.java

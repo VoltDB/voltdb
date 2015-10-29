@@ -168,7 +168,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     TableTuple temp_tuple;
-    ProgressMonitorProxy pmp(m_engine, this, targetTable);
+    ProgressMonitorProxy pmp(m_engine, this);
     if (m_aggExec != NULL) {
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {
@@ -386,6 +386,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     !(tuple = tableIndex->nextValueAtKey(indexCursor)).isNullTuple()) ||
                     ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
                             !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()))) {
+        if (tuple.isPendingDelete()) {
+            continue;
+        }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
         pmp.countdownProgress();
         //

@@ -26,6 +26,8 @@
 #include "catalog/columnref.h"
 #include "catalog/column.h"
 #include "catalog/table.h"
+#include "catalog/planfragment.h"
+#include "catalog/statement.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "expressions/constantvalueexpression.h"
@@ -33,9 +35,17 @@
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
+#include "execution/VoltDBEngine.h"
+#include "execution/ExecutorVector.h"
+#include "plannodes/indexscannode.h"
+#include "executors/abstractexecutor.h"
 #include "boost/foreach.hpp"
 #include "boost/shared_array.hpp"
 
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(Statement);
+typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
+
+using namespace std;
 namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
@@ -72,6 +82,9 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
 
     // handle index for min / max support
     setIndexForMinMax(mvInfo->indexForMinMax());
+    // set up fallback query executors for min/max recalculation
+    // must be set after indexForMinMax
+    setFallbackExecutorVectors(mvInfo->fallbackQueryStmts());
 
     allocateBackedTuples();
 
@@ -121,6 +134,67 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
     allocateBackedTuples();
 
     oldTarget->decrementRefcount();
+}
+
+void MaterializedViewMetadata::setFallbackExecutorVectors(const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts) {
+    m_fallbackExecutorVectors.clear();
+    m_usePlanForAgg.clear();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    int idx = 0;
+    BOOST_FOREACH (LabeledStatement labeledStatement, fallbackQueryStmts) {
+        catalog::Statement *stmt = labeledStatement.second;
+        const string& b64plan = stmt->fragments().begin()->second->plannodetree();
+        const string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(b64plan);
+
+        boost::shared_ptr<ExecutorVector> execVec = ExecutorVector::fromJsonPlan(engine, jsonPlan, -1);
+        // We don't need the send executor.
+        execVec->getRidOfSendExecutor();
+        m_fallbackExecutorVectors.push_back(execVec);
+
+        /* Decide if we should use the plan or still stick to the hard coded function. -- yzhang
+         * For now, we only use the plan to refresh the materialzied view when:
+         *     - the generated plan is an index scan plan
+         *     AND
+         *     - the index that the plan chose is different from the index our hard-coded function chose.
+         *       (If the plan uses index scan but our hard-coded function uses sequential scan,
+         *        we should also go with the plan.)
+         * Things will get different when we add join table materialzied view or CUBE view.
+         */
+        vector<AbstractExecutor*> executorList = execVec->getExecutorList();
+        AbstractPlanNode* apn = executorList[0]->getPlanNode();
+        bool usePlanForAgg = false;
+        if (apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
+            TableIndex* hardCodedIndex = m_indexForMinMax[idx];
+            if (hardCodedIndex) {
+#ifdef VOLT_TRACE_ENABLED
+                if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+                    cout << "hard-coded function uses: " << hardCodedIndex->getName() << "\n"
+                            << "plan uses: " << ((IndexScanPlanNode *)apn)->getTargetIndexName() << endl;
+                }
+#endif
+                usePlanForAgg = hardCodedIndex->getName().compare( ((IndexScanPlanNode *)apn)->getTargetIndexName() ) != 0;
+            }
+            else {
+                usePlanForAgg = true;
+            }
+        }
+        m_usePlanForAgg.push_back(usePlanForAgg);
+
+#ifdef VOLT_TRACE_ENABLED
+        if (ExecutorContext::getExecutorContext()->m_siteId == 0) {
+            const string& hexString = stmt->explainplan();
+            assert(hexString.length() % 2 == 0);
+            int bufferLength = (int)hexString.size() / 2 + 1;
+            char* explanation = new char[bufferLength];
+            boost::shared_array<char> memoryGuard(explanation);
+            catalog::Catalog::hexDecodeString(hexString, explanation);
+            cout << "Aggregation " << idx << "\n"
+                    << explanation << "\n"
+                    << "Uses " << (usePlanForAgg ? "plan.\n" : "hard-coded function.\n") << endl;
+        }
+#endif
+        ++ idx;
+    }
 }
 
 void MaterializedViewMetadata::setIndexForMinMax(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax)
@@ -209,7 +283,7 @@ void MaterializedViewMetadata::allocateBackedTuples()
 
 AbstractExpression* MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvInfo)
 {
-    std::string hexString = mvInfo->predicate();
+    const string& hexString = mvInfo->predicate();
     if (hexString.size() == 0) {
         return NULL;
     }
@@ -228,7 +302,7 @@ AbstractExpression* MaterializedViewMetadata::parsePredicate(catalog::Materializ
 
 std::size_t MaterializedViewMetadata::parseGroupBy(catalog::MaterializedViewInfo *mvInfo)
 {
-    const std::string expressionsAsText = mvInfo->groupbyExpressionsJson();
+    const string& expressionsAsText = mvInfo->groupbyExpressionsJson();
     if (expressionsAsText.length() == 0) {
         // set up the group by columns from the catalog info
         const catalog::CatalogMap<catalog::ColumnRef>& columns = mvInfo->groupbycols();
@@ -247,7 +321,7 @@ std::size_t MaterializedViewMetadata::parseGroupBy(catalog::MaterializedViewInfo
 
 std::size_t MaterializedViewMetadata::parseAggregation(catalog::MaterializedViewInfo *mvInfo)
 {
-    const std::string expressionsAsText = mvInfo->aggregationExpressionsJson();
+    const string& expressionsAsText = mvInfo->aggregationExpressionsJson();
     bool usesComplexAgg = expressionsAsText.length() > 0;
     // set up the mapping from input col to output col
     const catalog::CatalogMap<catalog::Column>& columns = mvInfo->dest()->columns();
@@ -427,7 +501,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
     }
     NValue newVal = initialNull;
     // loop through tuples to find the MIN / MAX
-    bool skippedOne = false;
     TableTuple tuple(m_srcTable->schema());
     TableIterator &iterator = m_srcTable->iterator();
     VOLT_TRACE("Starting iteration on: %s\n", m_srcTable->debug().c_str());
@@ -455,11 +528,6 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
             continue;
         }
         if (current.compare(existingValue) == 0) {
-            if (!skippedOne) {
-                VOLT_TRACE("Skip tuple: %s\n", tuple.debugNoHeader().c_str());
-                skippedOne = true;
-                continue;
-            }
             VOLT_TRACE("Found another tuple with same min / max value, breaking the loop.\n");
             newVal = current;
             break;
@@ -471,6 +539,48 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueSequential(const TableTu
         }
     }
     VOLT_TRACE("\tFinal: new best %s\n", newVal.debug().c_str());
+    return newVal;
+}
+
+NValue MaterializedViewMetadata::findFallbackValueUsingPlan(const TableTuple& oldTuple,
+                                                            const NValue &initialNull,
+                                                            int aggIndex,
+                                                            int minMaxAggIdx) {
+    // build parameters.
+    // the parameters are the groupby columns and the aggregation column.
+    ExecutorContext* context = ExecutorContext::getExecutorContext();
+    NValueArray &params = *context->getParameterContainer();
+    vector<NValue> backups(m_groupByColumnCount+1);
+    NValue newVal = initialNull;
+    NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
+    int colindex = 0;
+    for (; colindex < m_groupByColumnCount; colindex++) {
+        backups[colindex] = params[colindex];
+        params[colindex] = getGroupByValueFromSrcTuple(colindex, oldTuple);
+    }
+    backups[colindex] = params[colindex];
+    params[colindex] = oldValue;
+    // executing the stored plan.
+    vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
+    Table *tbl = context->executeExecutors(executorList, 0);
+    assert(tbl);
+    // get the fallback value from the returned table.
+    TableIterator iterator = tbl->iterator();
+    TableTuple tuple(tbl->schema());
+    if (iterator.next(tuple)) {
+        newVal = tuple.getNValue(0);
+    }
+    // For debug:
+    // if (context->m_siteId == 0) {
+    //     cout << "oldTuple: " << oldTuple.debugNoHeader() << "\n"
+    //             << "Return table: " << endl << tbl->debug() << "\n"
+    //             << "newValue: " << newValue.debug() << endl;
+    // }
+    // restore
+    for (colindex = 0; colindex <= m_groupByColumnCount; colindex++) {
+        params[colindex] = backups[colindex];
+    }
+    context->cleanupExecutorsForSubquery(executorList);
     return newVal;
 }
 
@@ -655,12 +765,15 @@ void MaterializedViewMetadata::processTupleDelete(const TableTuple &oldTuple, bo
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
                     newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
-
+                    if (m_usePlanForAgg[minMaxAggIdx]) {
+                        newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx);
+                    }
                     // indexscan if an index is available, otherwise tablescan
-                    if (m_indexForMinMax[minMaxAggIdx]) {
+                    else if (m_indexForMinMax[minMaxAggIdx]) {
                         newValue = findMinMaxFallbackValueIndexed(oldTuple, existingValue, newValue,
                                                                   reversedForMin, aggIndex, minMaxAggIdx);
-                    } else {
+                    }
+                    else {
                         VOLT_TRACE("before findMinMaxFallbackValueSequential\n");
                         newValue = findMinMaxFallbackValueSequential(oldTuple, existingValue, newValue,
                                                                      reversedForMin, aggIndex);

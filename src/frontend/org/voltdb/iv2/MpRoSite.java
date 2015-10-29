@@ -31,7 +31,9 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -74,8 +76,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
-    // Still need m_hsql here.
-    HsqlBackend m_hsql;
+    // Still need m_non_voltdb_backend (formerly m_hsql) here
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Current catalog
     volatile CatalogContext m_context;
@@ -265,11 +267,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     void initialize()
     {
         if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
         }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+        }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
         }
     }
 
@@ -316,8 +321,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     void shutdown()
     {
-        if (m_hsql != null) {
-            HsqlBackend.shutdownInstance();
+        if (m_non_voltdb_backend != null) {
+            m_non_voltdb_backend.shutdownInstance();
         }
     }
 
@@ -400,9 +405,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override

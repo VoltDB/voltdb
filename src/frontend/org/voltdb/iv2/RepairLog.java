@@ -28,6 +28,7 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -59,8 +60,9 @@ public class RepairLog
      *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
      *  ReplicaDRGateway on repair
      */
-    private long m_maxSeenSpBinaryLogUniqueId = Long.MIN_VALUE;
-    private long m_maxSeenMpBinaryLogUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenSpBinaryLogSpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenSpBinaryLogMpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenMpBinaryLogMpUniqueId = Long.MIN_VALUE;
     private long m_maxSeenSpBinaryLogDRId = Long.MIN_VALUE;
     private long m_maxSeenMpBinaryLogDRId = Long.MIN_VALUE;
     private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
@@ -169,7 +171,8 @@ public class RepairLog
                     // params[2] is the end sequence number from the original cluster
                     Object[] params = spi.getParams().toArray();
                     m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
-                    m_maxSeenSpBinaryLogUniqueId = Math.max(m_maxSeenSpBinaryLogUniqueId, ((Number)params[3]).longValue());
+                    m_maxSeenSpBinaryLogSpUniqueId = Math.max(m_maxSeenSpBinaryLogSpUniqueId, ((Number)params[3]).longValue());
+                    m_maxSeenSpBinaryLogMpUniqueId = Math.max(m_maxSeenSpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
                     m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, m.getUniqueId());
                 }
             }
@@ -190,7 +193,7 @@ public class RepairLog
                     // params[3] is the end sequence number id from the original cluster
                     Object[] params = spi.getParams().toArray();
                     m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
-                    m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)params[3]).longValue());
+                    m_maxSeenMpBinaryLogMpUniqueId = Math.max(m_maxSeenMpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
                     m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, m.getUniqueId());
                 }
             }
@@ -272,15 +275,17 @@ public class RepairLog
         List<Item> items = new LinkedList<Item>();
         // All cases include the log of MP transactions
         items.addAll(m_logMP);
-        long maxSeenBinaryLogUniqueId = m_maxSeenMpBinaryLogUniqueId;
-        long maxSeenBinaryLogDRId = m_maxSeenMpBinaryLogDRId;
-        long maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
+        DRLogSegmentId logInfo;
+        long maxSeenLocalDrUniqueId;
         // SP repair requests also want the SP transactions
-        if (!forMPI) {
-            maxSeenBinaryLogUniqueId = m_maxSeenSpBinaryLogUniqueId;
-            maxSeenBinaryLogDRId = m_maxSeenSpBinaryLogDRId;
-            items.addAll(m_logSP);
+        if (forMPI) {
+            logInfo = new DRLogSegmentId(m_maxSeenMpBinaryLogDRId, Long.MIN_VALUE, m_maxSeenMpBinaryLogMpUniqueId);
+            maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
+        }
+        else {
+            logInfo = new DRLogSegmentId(m_maxSeenSpBinaryLogDRId, m_maxSeenSpBinaryLogSpUniqueId, m_maxSeenSpBinaryLogMpUniqueId);
             maxSeenLocalDrUniqueId = m_maxSeenLocalSpUniqueId;
+            items.addAll(m_logSP);
         }
 
         // Contents need to be sorted in increasing spHandle order
@@ -301,8 +306,7 @@ public class RepairLog
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
                         maxSeenLocalDrUniqueId,
-                        maxSeenBinaryLogDRId,
-                        maxSeenBinaryLogUniqueId);
+                        logInfo);
         responses.add(hheader);
 
         int seq = responses.size();

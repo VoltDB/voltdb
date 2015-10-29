@@ -52,6 +52,13 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * The SELECT statement for INSERT INTO ... SELECT.
      */
     private StmtSubqueryScan m_subquery = null;
+    /**
+     * An empty list for INSERT ... VALUES statements
+     * until they support subquery-based expressions,
+     * OR a list with one entry for an INSERT ... SELECT statement,
+     * to represent the top-level SELECT.
+     */
+    private final List<StmtSubqueryScan> m_scans = new ArrayList<>();
 
 
 
@@ -84,6 +91,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
             }
             else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
                 m_subquery = new StmtSubqueryScan (parseSubquery(node), "__VOLT_INSERT_SUBQUERY__");
+                // Until scalar subqueries are allowed in INSERT ... VALUES statements,
+                // The top-level SELECT subquery in an INSERT ... SELECT statement
+                // is the only possible subselect in an INSERT statement.
+                m_scans.add(m_subquery);
             }
             else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 throw new PlanningErrorException(
@@ -188,15 +199,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * there can be only one.
      */
     @Override
-    public List<StmtSubqueryScan> getSubqueryScans() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<>();
-
-        if (m_subquery != null) {
-            subqueries.add(m_subquery);
-        }
-
-        return subqueries;
-    }
+    public List<StmtSubqueryScan> getSubqueryScans() { return m_scans; }
 
     /**
      * @return the subquery for the insert stmt if there is one, null otherwise
@@ -239,4 +242,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
         return exprs;
     }
+
+    @Override
+    public boolean isDML() { return true; }
 }

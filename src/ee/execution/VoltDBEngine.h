@@ -88,7 +88,7 @@ class AbstractPlanNode;
 class CatalogDelegate;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
-class ExecutorVector; // Locally defined in VoltDBEngine.cpp
+class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
 class Table;
@@ -127,12 +127,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Table* getTable(int32_t tableId) const;
         Table* getTable(std::string name) const;
+        virtual Table* getDRConflictTable(PersistentTable* drTable);
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
 
         TableCatalogDelegate* getTableDelegate(std::string name) const;
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(std::string name) const;
+        virtual bool getIsActiveActiveDREnabled() const;
 
         // -------------------------------------------------
         // Execution Functions
@@ -159,7 +161,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         // Executors can call this to note a certain number of tuples have been
         // scanned or processed.index
-        inline int64_t pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec, Table* target_table);
+        inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType);
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
@@ -295,10 +297,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_undoLog.release(undoToken);
 
             if (m_drStream) {
-                m_drStream->endTransaction();
+                m_drStream->endTransaction(m_executorContext->currentUniqueId());
             }
             if (m_drReplicatedStream) {
-                m_drReplicatedStream->endTransaction();
+                m_drReplicatedStream->endTransaction(m_executorContext->currentUniqueId());
             }
         }
 
@@ -451,8 +453,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t m_tuplesProcessedInFragment;
         int64_t m_tuplesProcessedSinceReport;
         int64_t m_tupleReportThreshold;
-        Table *m_lastAccessedTable;
-        AbstractExecutor* m_lastAccessedExec;
+        PlanNodeType m_lastAccessedPlanNodeType;
 
         boost::scoped_ptr<EnginePlanSet> m_plans;
         voltdb::UndoLog m_undoLog;
@@ -498,6 +499,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Only includes non-materialized tables
          */
         boost::unordered_map<int64_t, PersistentTable*> m_tablesBySignatureHash;
+
+        /*
+         * Map of DR tables to DR conflict tables
+         */
+        boost::unordered_map<PersistentTable*, Table*> m_cachedDRConflictLookupTable;
 
         /**
          * System Catalog.
@@ -613,13 +619,9 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
  * Track total tuples accessed for this query.
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
-inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec,
-                                                                    Table* target_table)
+inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType)
 {
-    if (target_table) {
-        m_lastAccessedTable = target_table;
-    }
-    m_lastAccessedExec = exec;
+    m_lastAccessedPlanNodeType = planNodeType;
     return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
 }
 
@@ -640,7 +642,7 @@ inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t 
         e.serialize(getExceptionOutputSerializer());
     }
 
-    m_lastAccessedExec = NULL;
+    m_lastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
 }
 
 } // namespace voltdb

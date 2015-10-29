@@ -43,8 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <algorithm>
-#include <vector>
 #include "orderbyexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -58,6 +56,9 @@
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
+#include <algorithm>
+#include <vector>
+
 using namespace voltdb;
 using namespace std;
 
@@ -69,24 +70,29 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
     assert(node);
-    assert(node->getInputTableCount() == 1);
 
-    assert(node->getChildren()[0] != NULL);
+    if (!node->isInline()) {
+        assert(node->getInputTableCount() == 1);
 
-    //
-    // Our output table should look exactly like out input table
-    //
-    node->
-        setOutputTable(TableFactory::
+        assert(node->getChildren()[0] != NULL);
+
+        //
+        // Our output table should look exactly like our input table
+        //
+        node->
+            setOutputTable(TableFactory::
                        getCopiedTempTable(node->databaseId(),
                                           node->getInputTable()->name(),
                                           node->getInputTable(),
                                           limits));
-
-    // pickup an inlined limit, if one exists
-    limit_node =
-        dynamic_cast<LimitPlanNode*>(node->
+        // pickup an inlined limit, if one exists
+        limit_node =
+            dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    } else {
+        assert(node->getChildren().empty());
+        assert(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) == NULL);
+    }
 
 #if defined(VOLT_LOG_LEVEL)
 #if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
@@ -99,49 +105,6 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     return true;
 }
-
-class TupleComparer
-{
-public:
-    TupleComparer(const vector<AbstractExpression*>& keys,
-                  const vector<SortDirectionType>& dirs)
-        : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
-    {
-        assert(keys.size() == dirs.size());
-    }
-
-    bool operator()(TableTuple ta, TableTuple tb)
-    {
-        for (size_t i = 0; i < m_keyCount; ++i)
-        {
-            AbstractExpression* k = m_keys[i];
-            SortDirectionType dir = m_dirs[i];
-            int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
-            if (dir == SORT_DIRECTION_TYPE_ASC)
-            {
-                if (cmp < 0) return true;
-                if (cmp > 0) return false;
-            }
-            else if (dir == SORT_DIRECTION_TYPE_DESC)
-            {
-                if (cmp < 0) return false;
-                if (cmp > 0) return true;
-            }
-            else
-            {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "Attempted to sort using"
-                                              " SORT_DIRECTION_TYPE_INVALID");
-            }
-        }
-        return false; // ta == tb on these keys
-    }
-
-private:
-    const vector<AbstractExpression*>& m_keys;
-    const vector<SortDirectionType>& m_dirs;
-    size_t m_keyCount;
-};
 
 bool
 OrderByExecutor::p_execute(const NValueArray &params)
@@ -183,11 +146,11 @@ OrderByExecutor::p_execute(const NValueArray &params)
     if (limit >= 0 && xs.begin() + limit + offset < xs.end()) {
         // partial sort
         partial_sort(xs.begin(), xs.begin() + limit + offset, xs.end(),
-                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+                AbstractExecutor::TupleComparer(node->getSortExpressions(), node->getSortDirections()));
     } else {
         // full sort
         sort(xs.begin(), xs.end(),
-                TupleComparer(node->getSortExpressions(), node->getSortDirections()));
+                AbstractExecutor::TupleComparer(node->getSortExpressions(), node->getSortDirections()));
     }
 
     int tuple_ctr = 0;

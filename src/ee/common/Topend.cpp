@@ -16,6 +16,9 @@
  */
 #include "common/Topend.h"
 #include "common/StreamBlock.h"
+#include "storage/table.h"
+#include "storage/persistenttable.h"
+#include "storage/tablefactory.h"
 
 namespace voltdb {
     DummyTopend::DummyTopend() : receivedDRBuffer(false), receivedExportBuffer(false), pushDRBufferRetval(-1) {
@@ -27,9 +30,12 @@ namespace voltdb {
         return 0;
     }
 
-    int64_t DummyTopend::fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
-            int64_t currMemoryInBytes, int64_t peakMemoryInBytes) {
+    int64_t DummyTopend::fragmentProgressUpdate(
+            int32_t batchIndex,
+            PlanNodeType planNodeType,
+            int64_t tuplesFound,
+            int64_t currMemoryInBytes,
+            int64_t peakMemoryInBytes) {
         return 1000000000; // larger means less likely/frequent callbacks to ignore
     }
 
@@ -67,11 +73,45 @@ namespace voltdb {
         return pushDRBufferRetval;
     }
 
-    int DummyTopend::reportDRConflict(int32_t partitionId,
-                int64_t remoteSequenceNumber, int64_t remoteUniqueId,
-                std::string tableName, Table* input, Table* output) {
-        // TODO conform to return value contract of reportDRConflict()
-        return 0;
+
+    bool DummyTopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
+            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
+        this->actionType = action;
+        this->deleteConflictType = deleteConflict;
+        this->insertConflictType = insertConflict;
+        char signature[20];
+        if (deleteConflict != NO_CONFLICT) {
+            this->existingRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForDelete->schema()), existingTableForDelete->getColumnNames(), signature));
+            TableTuple tempTuple(existingTableForDelete->schema());
+            TableIterator iterator = existingTableForDelete->iterator();
+            while (iterator.next(tempTuple)) {
+                this->existingRowsForDelete->insertTuple(tempTuple);
+            }
+
+            this->expectedRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "expected", TupleSchema::createTupleSchema(expectedTableForDelete->schema()), expectedTableForDelete->getColumnNames(), signature));
+            iterator = expectedTableForDelete->iterator();
+            while (iterator.next(tempTuple)) {
+                this->expectedRowsForDelete->insertTuple(tempTuple);
+            }
+        }
+        if (insertConflict != NO_CONFLICT) {
+            this->existingRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForInsert->schema()), existingTableForInsert->getColumnNames(), signature));
+            TableTuple tempTuple(existingTableForInsert->schema());
+            TableIterator iterator = existingTableForInsert->iterator();
+            while (iterator.next(tempTuple)) {
+                this->existingRowsForInsert->insertTuple(tempTuple);
+            }
+
+            this->newRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "new", TupleSchema::createTupleSchema(newTableForInsert->schema()), newTableForInsert->getColumnNames(), signature));
+            iterator = newTableForInsert->iterator();
+            while (iterator.next(tempTuple)) {
+                this->newRowsForInsert->insertTuple(tempTuple);
+            }
+        }
+
+        // TODO: implement a mock conflict resolver so we can test the resolution part of code in EE.
+        return true;
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
