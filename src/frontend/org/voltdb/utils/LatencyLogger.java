@@ -18,15 +18,16 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
@@ -130,6 +131,7 @@ public class LatencyLogger {
             return;
         }
 
+        final String server = args[0];
         int duration = 0;
         try {
             duration = Integer.valueOf(args[2]);
@@ -150,7 +152,7 @@ public class LatencyLogger {
             System.out.println("Usage server port reportIntervalSeconds");
             System.exit(0);
         }
-        System.out.println("Connecting to " + args[0] + " port " + port);
+        System.out.println("Connecting to " + server + " port " + port);
         c.createConnection( args[0], port);
 
         System.out.printf("%12s, %10s, %10s, %10s, %10s, %10s, %10s\n", "TIMESTAMP", "COUNT", "95", "99", "99.9", "99.99", "99.999");
@@ -169,7 +171,16 @@ public class LatencyLogger {
                         e.printStackTrace();
                         System.exit(0);
                     }
-                    table.advanceRow();
+                    ArrayList<String> hostnames = new ArrayList<String>();
+                    String hostname = "";
+                    while (!server.equalsIgnoreCase(hostname)) {
+                        if (!table.advanceRow()) {
+                            System.out.println("Server host name " + server + " not found. Valid host names are " + hostnames.toString());
+                            System.exit(0);
+                        }
+                        hostname = table.getString(2);
+                        hostnames.add(hostname);
+                    }
                     Date now = new Date(table.getLong(0));
                     Histogram newHistogram = getHistogram(ByteBuffer.wrap(table.getVarbinary(5)));
                     Histogram diffHistogram;

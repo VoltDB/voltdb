@@ -47,25 +47,26 @@ public class LatencyStats extends SiteStatsSource {
      *
      */
     private static class DummyIterator implements Iterator<Object> {
-        boolean oneRow = false;
+        boolean returnRow = true;
 
         @Override
         public boolean hasNext() {
-            if (!oneRow) {
-                oneRow = true;
-                return true;
-            }
-            return false;
+            return returnRow;
         }
 
         @Override
         public Object next() {
-            return null;
+            if (returnRow) {
+                returnRow = false;
+                return new Object();
+            } else {
+                return null;
+            }
         }
 
         @Override
         public void remove() {
-
+            throw new UnsupportedOperationException();
         }
     }
 
