@@ -138,17 +138,17 @@ public class DDLCompiler {
     private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     // Meta columns for DR conflicts table
-    public static String DR_ROW_TYPE_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ROW_TYPE";
-    public static String DR_LOG_ACTION_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ACTION_TYPE";
-    public static String DR_CONFLICT_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_CONFLICT_TYPE";
-    public static String DR_CONFLICTS_ON_PK_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_CONFLICTS_ON_PRIMARY_KEY";
-    public static String DR_ROW_DECISION_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ROW_DECISION";
-    public static String DR_CLUSTER_ID_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_CLUSTER_ID";
-    public static String DR_TIMESTAMP_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_TIMESTAMP";
-    public static String DR_DIVERGENCE_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_DIVERGENCE";
-    public static String DR_TABLE_NAME_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_TABLE_NAME";
+    public static String DR_ROW_TYPE_COLUMN_NAME = "ROW_TYPE";
+    public static String DR_LOG_ACTION_COLUMN_NAME = "ACTION_TYPE";
+    public static String DR_CONFLICT_COLUMN_NAME = "CONFLICT_TYPE";
+    public static String DR_CONFLICTS_ON_PK_COLUMN_NAME = "CONFLICTS_ON_PRIMARY_KEY";
+    public static String DR_ROW_DECISION_COLUMN_NAME = "ROW_DECISION";
+    public static String DR_CLUSTER_ID_COLUMN_NAME = "CLUSTER_ID";
+    public static String DR_TIMESTAMP_COLUMN_NAME = "TIMESTAMP";
+    public static String DR_DIVERGENCE_COLUMN_NAME = "DIVERGENCE";
+    public static String DR_TABLE_NAME_COLUMN_NAME = "TABLE_NAME";
     // The varchar column contains JSON representation of original data
-    public static String DR_ORIGINAL_DATA_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ORIGINAL_DATA";
+    public static String DR_TUPLE_COLUMN_NAME = "TUPLE";
 
     static final String [][] DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS = {
         {DR_ROW_TYPE_COLUMN_NAME, "TINYINT"},
@@ -156,11 +156,11 @@ public class DDLCompiler {
         {DR_CONFLICT_COLUMN_NAME, "TINYINT"},
         {DR_CONFLICTS_ON_PK_COLUMN_NAME, "TINYINT"},
         {DR_ROW_DECISION_COLUMN_NAME, "TINYINT"},
-        {DR_CLUSTER_ID_COLUMN_NAME, "TINYINT"},
-        {DR_TIMESTAMP_COLUMN_NAME, "BIGINT"},
+        {DR_CLUSTER_ID_COLUMN_NAME, "TINYINT NOT NULL"},
+        {DR_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_DIVERGENCE_COLUMN_NAME, "TINYINT"},
-        {DR_TABLE_NAME_COLUMN_NAME, "VARCHAR(1024)"},
-        {DR_ORIGINAL_DATA_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
+        {DR_TABLE_NAME_COLUMN_NAME, "VARCHAR(1024 BYTES)"},
+        {DR_TUPLE_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
     };
 
     static final int DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS_SIZE = 1 + 1 + 1 + 1 + 1 + 1 + 8 + 1;
@@ -246,48 +246,66 @@ public class DDLCompiler {
     }
 
     private void createDRConflictTables(StringBuilder sb, Database previousDBIfAny) {
-        boolean tableAlreadyExist = false;
-        // Has DR conflicts export table already existed?
+        boolean hasPartitionedConflictTable;
+        boolean hasReplicatedConflictTable;
+
+        // Do DR conflicts export table exist already?
         if (previousDBIfAny != null) {
-            tableAlreadyExist = previousDBIfAny.getTables().get(CatalogUtil.DR_CONFLICTS_EXPORT_TABLE) != null;
+            hasPartitionedConflictTable = previousDBIfAny.getTables().get(CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE) != null;
+            hasReplicatedConflictTable = previousDBIfAny.getTables().get(CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE) != null;
         } else {
-            for (VoltXMLElement element : m_schema.children) {
-                if (element.name.equals("table")
-                        && element.attributes.containsKey("export")
-                        && element.attributes.get("name").equals(CatalogUtil.DR_CONFLICTS_EXPORT_TABLE)) {
-                    tableAlreadyExist = true;
-                    break;
-                }
+            hasPartitionedConflictTable = hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE);
+            hasReplicatedConflictTable = hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE);
+        }
+
+        if (!hasPartitionedConflictTable) {
+            createOneDRConflictTable(sb, CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE, true);
+        }
+        if (!hasReplicatedConflictTable) {
+            createOneDRConflictTable(sb, CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE, false);
+        }
+    }
+
+    private static void createOneDRConflictTable(StringBuilder sb, String name, boolean partitioned) {
+        // If the conflict export table doesn't exist yet, create a new one.
+        sb.append("CREATE TABLE ").append(name).append(" (");
+        for (String[] column : DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS) {
+            sb.append(column[0]).append(" ").append(column[1]);
+            if (!column[0].equals(DR_TUPLE_COLUMN_NAME)) {
+                sb.append(", ");
             }
         }
-        if (!tableAlreadyExist) {
-            // If the conflict export table hasn't existed yet, create a new one.
-            sb.append("CREATE TABLE " + CatalogUtil.DR_CONFLICTS_EXPORT_TABLE + " (");
-            for (String[] column : DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS) {
-                sb.append(column[0]).append(" ").append(column[1]);
-                if (!column[0].equals(DR_ORIGINAL_DATA_COLUMN_NAME)) {
-                    sb.append(", ");
-                }
-            }
-            sb.append(");\n");
-            sb.append("EXPORT TABLE " + CatalogUtil.DR_CONFLICTS_EXPORT_TABLE + " TO STREAM " + CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP + ";\n");
+        sb.append(");\n");
+        sb.append("EXPORT TABLE ").append(name).append(" TO STREAM ").append(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).append(";\n");
+
+        // The partitioning here doesn't matter, it's only to trick the export system, not related to data placement.
+        if (partitioned) {
+            sb.append("PARTITION TABLE ").append(name).append(" ON COLUMN ").append(DR_TIMESTAMP_COLUMN_NAME).append(";\n");
         }
+    }
+
+    private static boolean hasConflictTableInSchema(VoltXMLElement m_schema, String name) {
+        for (VoltXMLElement element : m_schema.children) {
+            if (element.name.equals("table")
+                    && element.attributes.containsKey("export")
+                    && element.attributes.get("name").equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Drop the dr conflicts table if A/A is disabled
     private void dropDRConflictTablesIfNeeded(StringBuilder sb) {
-        for (VoltXMLElement node : m_schema.children) {
-            if (node.name.equals("table")
-                    && node.attributes.containsKey("export")
-                    && node.attributes.get("name").equals(CatalogUtil.DR_CONFLICTS_EXPORT_TABLE)) {
-                sb.append("DROP TABLE " + node.attributes.get("name") + ";\n");
-            }
+        if (hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE)) {
+            sb.append("DROP TABLE " + CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE + ";\n");
+        }
+        if (hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE)) {
+            sb.append("DROP TABLE " + CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE + ";\n");
         }
     }
 
     // Generate DDL to create or drop the DR conflict table
-    // TODO:When DR table supports dynamic schema change, we need also change the schema of conflict table,
-    //       maybe dropping the old one and recreating a new one is the easiest way.
     private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
         StringBuilder sb = new StringBuilder();
         if (currentDB.getIsactiveactivedred()) {

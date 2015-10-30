@@ -148,7 +148,8 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_DELIMITER = ",";
 
     // DR conflicts export table name prefix
-    public static final String DR_CONFLICTS_EXPORT_TABLE = "VOLTDB_AUTOGEN_DR_CONFLICTS_EXPORT";
+    public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
+    public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_DR_CONFLICTS_REPLICATED";
     // DR conflicts export group name
     public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_AUTOGEN_DR_CONFLICTS";
     public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
