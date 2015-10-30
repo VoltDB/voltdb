@@ -140,7 +140,7 @@ TEST_F(TableTupleTest, ToJsonArray)
     const TableTuple& tuple = autoStorage.tuple();
 
     NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
-    NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
+    NValue nvalVisibleString = ValueFactory::getStringValue("数据库");
     NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
     NValue nvalHiddenString = ValueFactory::getStringValue("platypus");
 
@@ -150,7 +150,7 @@ TEST_F(TableTupleTest, ToJsonArray)
     tuple.setHiddenNValue(0, nvalHiddenBigint);
     tuple.setHiddenNValue(1, nvalHiddenString);
 
-    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"catdog\",\"null\"]\n"));
+    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]\n"));
 
     nvalHiddenString.free();
     nvalVisibleString.free();
