@@ -84,7 +84,7 @@ public class VoltGeographyType extends Type {
 
     @Override
     public boolean canConvertFrom(Type otherType) {
-        return false;
+        return otherType instanceof VoltGeographyType;
     }
 
     @Override

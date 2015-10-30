@@ -24,6 +24,7 @@
 namespace voltdb {
 template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_CONTAINS>() const;
 }
 
 #endif

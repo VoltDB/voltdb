@@ -27,6 +27,9 @@
 #include "common/value_defs.h"
 #include "common/Point.hpp"
 
+#include "s2geo/s2loop.h"
+#include "s2geo/s2polygon.h"
+
 namespace voltdb {
 
 /**
@@ -213,6 +216,34 @@ public:
     LoopContainer loops() const {
         assert(! isNull());
         return LoopContainer(m_data);
+    }
+
+    std::unique_ptr<S2Polygon> toS2Polygon() const {
+        std::vector<S2Loop*> loops;
+        auto loopIt = this->loops().begin();
+        auto loopEnd = this->loops().end();
+        for (; loopIt != loopEnd; ++loopIt) {
+            std::vector<S2Point> verts;
+            auto vertIt = (*loopIt).begin();
+            // S2 considers the final closing vertex
+            // (which should be identical to the first vertex)
+            // to be implicit.
+            auto vertEnd = (*loopIt).end() - 1;
+            for (; vertIt != vertEnd; ++vertIt) {
+                verts.push_back(vertIt->toS2Point());
+            }
+            S2Loop* loop = new S2Loop();
+            loop->Init(verts);
+            loops.push_back(loop);
+        }
+
+        std::unique_ptr<S2Polygon> s2Poly(new S2Polygon());
+
+        // The polygon will take ownership of the loops here.
+        s2Poly->Init(&loops);
+        assert(loops.empty());
+
+        return s2Poly;
     }
 
     /**
