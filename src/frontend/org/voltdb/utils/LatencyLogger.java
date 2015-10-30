@@ -126,10 +126,16 @@ public class LatencyLogger {
     }
 
     public static void main(String[] args) throws Exception {
+        final String hostname;
         if (args.length != 3) {
-            System.out.println("Usage server port reportIntervalSeconds");
-            return;
-        }
+            if (args.length == 4)
+                hostname = args[3];
+            else {
+                System.out.println("Usage server port reportIntervalSeconds [hostname]");
+                return;
+            }
+        } else
+            hostname = args[0];
 
         final String server = args[0];
         int duration = 0;
@@ -139,7 +145,7 @@ public class LatencyLogger {
                 throw new NumberFormatException();
         } catch (NumberFormatException e) {
             System.out.println("reportIntervalSeconds should be greater than or equal to 1");
-            System.out.println("Usage server port reportIntervalSeconds");
+            System.out.println("Usage server port reportIntervalSeconds [hostname]");
             System.exit(0);
         }
 
@@ -172,14 +178,14 @@ public class LatencyLogger {
                         System.exit(0);
                     }
                     ArrayList<String> hostnames = new ArrayList<String>();
-                    String hostname = "";
-                    while (!server.equalsIgnoreCase(hostname)) {
+                    String tableHostname = "";
+                    while (!hostname.equalsIgnoreCase(tableHostname)) {
                         if (!table.advanceRow()) {
                             System.out.println("Server host name " + server + " not found. Valid host names are " + hostnames.toString());
                             System.exit(0);
                         }
-                        hostname = table.getString(2);
-                        hostnames.add(hostname);
+                        tableHostname = table.getString(2);
+                        hostnames.add(tableHostname);
                     }
                     Date now = new Date(table.getLong(0));
                     Histogram newHistogram = getHistogram(ByteBuffer.wrap(table.getVarbinary(5)));
