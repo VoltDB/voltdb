@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "reportDRConflict",
-            "(IJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)Z");
+            "(IIJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_reportDRConflictMID != NULL);
@@ -494,7 +494,7 @@ static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer, boo
    }
 }
 
-bool JNITopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
+int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
         DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
         DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
     // prepare tablename
@@ -521,7 +521,8 @@ bool JNITopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::st
     int32_t retval = m_jniEnv->CallStaticIntMethod(m_partitionDRGatewayClass,
                                             m_reportDRConflictMID,
                                             partitionId,
-                                            timestamp,
+                                            remoteClusterId,
+                                            remoteTimestamp,
                                             tableNameString,
                                             action,
                                             deleteConflict,
