@@ -59,11 +59,11 @@ const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
 
 static bool isApplyNewRow(int32_t retval) {
-    return (retval & DECISION_BIT) == 1;
+    return (retval & DECISION_BIT) == DECISION_BIT;
 }
 
 static bool isResolved(int32_t retval) {
-    return (retval & RESOLVED_BIT) == 1;
+    return (retval & RESOLVED_BIT) == RESOLVED_BIT;
 }
 
 
@@ -395,13 +395,23 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
    * All conflicting rows are put into @conflictRows.
    */
-static void findConflictTuple(Table *table, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+static void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
     boost::unordered_set<char*> redundancyFilter;
     BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
         if (index->isUniqueIndex()) {
             IndexCursor cursor(index->getTupleSchema());
             if (index->moveToKeyByTuple(searchTuple, cursor)) {
                 TableTuple conflictTuple = index->nextValueAtKey(cursor);
+                if (expectedTuple) {
+                    if (expectedTuple->equals(conflictTuple)) {
+                        // exclude the expected tuple in update
+                        continue;
+                    } else if (existingTuple && existingTuple->equals(conflictTuple)) {
+                        // in update this row was already listed in existingTableForDelete,
+                        // don't include it in existingTableForInsert.
+                        continue;
+                    }
+                }
                 if (expectedTuple && expectedTuple->equals(conflictTuple)) {
                     // exclude the expected tuple
                     continue;
@@ -547,7 +557,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
     // find any rows conflict with the new row
     std::vector< LabeledTableTuple > existingRows;
     if (newTuple) {
-        findConflictTuple(drTable, newTuple, actionType == DR_RECORD_UPDATE ? expectedTuple : NULL, existingRows);
+        findConflictTuple(drTable, existingTuple, newTuple, actionType == DR_RECORD_UPDATE ? expectedTuple : NULL, existingRows);
         if (actionType == DR_RECORD_UPDATE) {
             if (existingRows.size() > 0) {
                 insertConflict = CONFLICT_CONSTRAINT_VIOLATION; // update timestamp mismatch may trigger constraint violation conflict
@@ -566,15 +576,15 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
             }
         }
 
-        newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
-        if (newTuple) {
-           createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
-        }
+    }
+    newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
+    if (newTuple) {
+       createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
-                                                                                      UniqueId::timestamp(uniqueId),
                                                                                       remoteClusterId,
+                                                                                      UniqueId::timestamp(uniqueId),
                                                                                       drTable->name(),
                                                                                       actionType,
                                                                                       deleteConflict,
@@ -586,28 +596,24 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
-    assert(resolved || applyRemoteChange);
+    assert(resolved || !applyRemoteChange);
 
-    TableTuple tempTuple(conflictExportTable->schema());
-    if (deleteConflict != NO_CONFLICT) {
-        if (existingTuple) {
-            if (applyRemoteChange) {
+    if (applyRemoteChange) {
+        if (deleteConflict != NO_CONFLICT) {
+            if (existingTuple) {
                 drTable->deleteTuple(*existingTuple, true);
             }
         }
-    }
-    if (insertConflict != NO_CONFLICT) {
-        TableIterator iterator = existingTableForInsert->iterator();
-        for (int i = 0; iterator.next(tempTuple); i++) {
-            if (applyRemoteChange) {
+        if (insertConflict != NO_CONFLICT) {
+            TableTuple tempTuple(conflictExportTable->schema());
+            TableIterator iterator = existingTableForInsert->iterator();
+            for (int i = 0; iterator.next(tempTuple); i++) {
                 drTable->deleteTuple(*existingRows[i].first.get(), true);
             }
-
         }
-        if (applyRemoteChange) {
+        if (newTuple) {
             drTable->insertPersistentTuple(*newTuple, true);
         }
-
     }
     exportDRConflict(conflictExportTable, applyRemoteChange, resolved, existingTableForDelete.get(), expectedTableForDelete.get(), existingTableForInsert.get(), newTableForInsert.get());
 
