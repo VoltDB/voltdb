@@ -63,11 +63,12 @@ import org.voltdb.types.QuantifierType;
 
 public abstract class AbstractParsedStmt {
 
+    protected String m_contentDeterminismMessage = null;
+
      // Internal statement counter
     public static int NEXT_STMT_ID = 0;
     // Internal parameter counter
     public static int NEXT_PARAMETER_ID = 0;
-
     // The unique id to identify the statement
     public int m_stmtId;
 
@@ -975,6 +976,7 @@ public abstract class AbstractParsedStmt {
         } else {
             assert(tableScan instanceof StmtSubqueryScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
+            leafNode.updateContentDeterminismMessage(((StmtSubqueryScan) tableScan).calculateContentDeterminismMessage());
         }
 
         if (m_joinTree == null) {
@@ -1023,7 +1025,17 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Populate the statement's paramList from the "parameters" element
+     * Populate the statement's paramList from the "parameters" element. Each
+     * parameter has an id and an index, both of which are numeric. It also has
+     * a type and an indication of whether it's a vector parameter. For each
+     * parameter, we create a ParameterValueExpression, named pve, which holds
+     * the type and vector parameter indication. We add the pve to two maps,
+     * m_paramsById and m_paramsByIndex.
+     *
+     * We also set a counter, MAX_PARAMETER_ID, to the largest id in the
+     * expression. This helps give ids to references to correlated expressions
+     * of subqueries.
+     *
      * @param paramsNode
      */
     protected void parseParameters(VoltXMLElement root) {
@@ -1174,6 +1186,7 @@ public abstract class AbstractParsedStmt {
         subQuery.m_paramsById.putAll(m_paramsById);
 
         AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+        updateContentDeterminismMessage(subQuery.calculateContentDeterminismMessage());
         return subQuery;
     }
 
@@ -1665,7 +1678,6 @@ public abstract class AbstractParsedStmt {
                 SelectSubqueryExpression.class);
         return !subqueryExprs.isEmpty();
     }
-
     public abstract boolean isDML();
 
     /**
@@ -1694,4 +1706,39 @@ public abstract class AbstractParsedStmt {
         return m_parentStmt.topmostParentStatementIsDML();
     }
 
+    /**
+     * Return an error message iff this statement is inherently content
+     * deterministic. Some operations can cause non-determinism. Notably,
+     * aggregate functions of floating point type can cause non-deterministic
+     * round-off error. The default is to return null, which means the query is
+     * inherently deterministic.
+     *
+     * Note that this has nothing to do with limit-order non-determinism.
+     *
+     * @return An error message if this statement is *not* inherently content
+     *         deterministic. Otherwise we return null.
+     */
+    public abstract String calculateContentDeterminismMessage();
+
+    /**
+     * Just fetch the content determinism message. Don't do any calculations.
+     */
+    protected final String getContentDeterminismMessage() {
+        return m_contentDeterminismMessage;
+    }
+
+    /**
+     * Set the content determinism message, but only if it's currently non-null.
+     *
+     * @param msg
+     */
+    protected void updateContentDeterminismMessage(String msg) {
+        if (m_contentDeterminismMessage == null) {
+            m_contentDeterminismMessage = msg;
+        }
+    }
+
+    public boolean isContentDetermistic() {
+        return m_contentDeterminismMessage != null;
+    }
 }

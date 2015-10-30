@@ -225,6 +225,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         } else {
             m_aggResultColumns = m_displayColumns;
         }
+        /*
+         * Calculate the content determinism message before we place the TVEs in
+         * the columns. After the TVEs are placed the actual expressions are
+         * hard to find.
+         */
+        calculateContentDeterminismMessage();
         placeTVEsinColumns();
 
         // prepare the limit plan node if it needs one.
@@ -1967,6 +1973,44 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
         return exprs;
+    }
+
+    @Override
+
+    public String calculateContentDeterminismMessage() {
+        String ans = m_contentDeterminismMessage;
+
+        // Don't search if we already know the answer.
+        if (ans == null) {
+            /*
+             * Is there a message in the display columns?
+             */
+            for (ParsedColInfo displayCol : m_displayColumns) {
+                AbstractExpression displayExpr = displayCol.expression;
+                ans = displayExpr.getContentDeterminismMessage();
+                if (ans != null) {
+                    break;
+                }
+            }
+
+            /*
+             * Is there a message in the having expression?
+             */
+            if (ans == null && m_having != null) {
+                ans = m_having.getContentDeterminismMessage();
+            }
+
+            /*
+             * Is there a message in the join tree?
+             */
+            if (ans == null && m_joinTree != null) {
+                ans = m_joinTree.getContentDeterminismMessage();
+            }
+        }
+        if (ans != null) {
+            updateContentDeterminismMessage(ans);
+        }
+        return ans;
     }
 
     @Override

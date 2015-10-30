@@ -89,6 +89,12 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     }
 
     @Override
+    public String calculateContentDeterminismMessage() {
+        updateContentDeterminismMessage(getContentDeterminismMessage());
+        return getContentDeterminismMessage();
+    }
+
+    @Override
     public boolean isDML() { return true; }
 
 }
