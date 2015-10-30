@@ -412,14 +412,7 @@ static void findConflictTuple(Table *table, const TableTuple *existingTuple, con
                         continue;
                     }
                 }
-                if (expectedTuple && expectedTuple->equals(conflictTuple)) {
-                    // exclude the expected tuple
-                    continue;
-                } else if (expectedTuple && searchTuple->equals(conflictTuple)) {
-                    // skip the search tuple if this is an update, in update we report this row
-                    // as a timestamp mismatch not an unique constraint violation
-                    continue;
-                } else if (redundancyFilter.find(conflictTuple.address()) != redundancyFilter.end()) {
+                if (redundancyFilter.find(conflictTuple.address()) != redundancyFilter.end()) {
                     // skip the conflict tuples that are already found
                     continue;
                 } else {
@@ -474,8 +467,8 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (applyRemoteChange) {
                 tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));
             }
-            if (resolved) {
-                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
         }
@@ -484,8 +477,9 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
     if (expectedTableForDelete) {
         TableIterator iterator = expectedTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
-            if (resolved) {
-                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+            //TODO: decision column on expected tuple is meanless.
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
         }
@@ -497,8 +491,8 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (applyRemoteChange) {
                 tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));
             }
-            if (resolved) {
-                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
         }
@@ -510,8 +504,8 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (applyRemoteChange) {
                 tempTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(KEEP_ROW));
             }
-            if (resolved) {
-                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+            if (!resolved) {
+                tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
             exportTable->insertTuple(tempTuple);
         }
@@ -577,9 +571,9 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         }
 
     }
-    newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
     if (newTuple) {
-       createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
+        newTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
+        createConflictExportTuple(newTableForInsert.get(), drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
     int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),

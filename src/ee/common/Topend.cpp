@@ -81,37 +81,44 @@ namespace voltdb {
         this->deleteConflictType = deleteConflict;
         this->insertConflictType = insertConflict;
         char signature[20];
-        if (deleteConflict != NO_CONFLICT) {
-            this->existingRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForDelete->schema()), existingTableForDelete->getColumnNames(), signature));
+
+        if (existingTableForDelete) {
             TableTuple tempTuple(existingTableForDelete->schema());
+            this->existingRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForDelete->schema()), existingTableForDelete->getColumnNames(), signature));
             TableIterator iterator = existingTableForDelete->iterator();
             while (iterator.next(tempTuple)) {
                 this->existingRowsForDelete->insertTuple(tempTuple);
             }
+        }
 
+        if (expectedTableForDelete) {
+            TableTuple tempTuple(expectedTableForDelete->schema());
             this->expectedRowsForDelete = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "expected", TupleSchema::createTupleSchema(expectedTableForDelete->schema()), expectedTableForDelete->getColumnNames(), signature));
-            iterator = expectedTableForDelete->iterator();
+            TableIterator iterator = expectedTableForDelete->iterator();
             while (iterator.next(tempTuple)) {
                 this->expectedRowsForDelete->insertTuple(tempTuple);
             }
         }
-        if (insertConflict != NO_CONFLICT) {
-            this->existingRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForInsert->schema()), existingTableForInsert->getColumnNames(), signature));
+
+        if (existingTableForInsert) {
             TableTuple tempTuple(existingTableForInsert->schema());
+            this->existingRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "existing", TupleSchema::createTupleSchema(existingTableForInsert->schema()), existingTableForInsert->getColumnNames(), signature));
             TableIterator iterator = existingTableForInsert->iterator();
             while (iterator.next(tempTuple)) {
                 this->existingRowsForInsert->insertTuple(tempTuple);
             }
+        }
 
+        if (newTableForInsert) {
+            TableTuple tempTuple(newTableForInsert->schema());
             this->newRowsForInsert = boost::shared_ptr<Table>(TableFactory::getPersistentTable(0, "new", TupleSchema::createTupleSchema(newTableForInsert->schema()), newTableForInsert->getColumnNames(), signature));
-            iterator = newTableForInsert->iterator();
+            TableIterator iterator = newTableForInsert->iterator();
             while (iterator.next(tempTuple)) {
                 this->newRowsForInsert->insertTuple(tempTuple);
             }
         }
 
-        // TODO: implement a mock conflict resolver so we can test the resolution part of code in EE.
-        return true;
+        return 2; /*resolved but not apply remote change*/
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}

@@ -348,10 +348,11 @@ public:
         outputTuple->setNValues(8, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
     }
 
-    void deepCopy(TableTuple &target, TableTuple &copy, boost::shared_array<char> &data) {
+    boost::shared_array<char> deepCopy(TableTuple &target, TableTuple &copy, boost::shared_array<char> data) {
         data.reset(new char[target.tupleLength()]);
         copy.move(data.get());
         copy.copyForPersistentInsert(target);
+        return data;
     }
 
     bool flush(int64_t lastCommittedSpHandle) {
@@ -1177,7 +1178,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
     // do a deep copy because temp tuple of m_table will be rewritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner cleaner(expectedTuple);
     endTxn(true);
     flushAndApply(99);
@@ -1246,7 +1247,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
     // do a deep copy because temp tuple of relica table will be rewritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner expectedTupleCleaner(expectedTuple);
     endTxn(true);
     flushAndApply(99);
@@ -1257,7 +1258,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
     // do a deep copy because temp tuple of relica table will be overwriten when applying binary log
     TableTuple existingTuple(m_tableReplica->schema());
     boost::shared_array<char> data;
-    deepCopy(tempExistingTuple, existingTuple, data);
+    data = deepCopy(tempExistingTuple, existingTuple, data);
     StackCleaner existingTupleCleaner(existingTuple);
     endTxn(true);
     flushButDontApply(100);
@@ -1325,7 +1326,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
     // do a deep copy because temp tuple of relica table will be rewritten later
     TableTuple expectedTuple (m_tableReplica->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner expectedTupleCleaner(expectedTuple);
 
     insertTuple(m_table, prepareTempTuple(m_table, 111, 11111, "11111.1111", "second", "this is starting to get even sillier", 2222));
@@ -1341,7 +1342,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTuple (m_tableReplica->schema());
     boost::shared_array<char> existingData;
-    deepCopy(tempExistingTuple, existingTuple, existingData);
+    existingData = deepCopy(tempExistingTuple, existingTuple, existingData);
     StackCleaner existingTupleCleaner(existingTuple);
     endTxn(true);
     flushButDontApply(100);
@@ -1393,7 +1394,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
  * expectedRow: <42, 55555, X>
  *               <INSERT no conflict>
  * existingRow: <null>
- * newRow:      <null>
+ * newRow:      <42, 54321, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
     m_engine->setIsActiveActiveDREnabled(true);
@@ -1408,7 +1409,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner expectedTupleCleaner(expectedTuple);
     endTxn(true);
     flushAndApply(99);
@@ -1421,7 +1422,12 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
 
     // update the same row on master then wait to trigger conflict on replica
     beginTxn(101, 101, 100, 72);
-    /*TableTuple new_tuple = */updateTupleFirstAndSecondColumn(m_table, expectedTuple, 42, 54321);
+    TableTuple tempNewTuple = updateTupleFirstAndSecondColumn(m_table, expectedTuple, 42, 54321);
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple newTuple (m_table->schema());
+    boost::shared_array<char> newData;
+    newData = deepCopy(tempNewTuple, newTuple, newData);
+    StackCleaner newTupleCleaner(newTuple);
     endTxn(true);
     // trigger a update missing tuple conflict
     flushAndApply(101);
@@ -1434,18 +1440,21 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
     EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
     // verify expected table
     EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
-    TableTuple exportTuple = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NOT_CONFLICT_ON_PK, 70);
+    TableTuple exportTuple1 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NOT_CONFLICT_ON_PK, 70);
 
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
-    ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+    EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
+    TableTuple exportTuple2 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, NO_CONFLICT, NOT_CONFLICT_ON_PK, 72);
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(1, exportStream->receivedTuples.size());
-    TableTuple receivedTuple = exportStream->receivedTuples[0];
-    ASSERT_TRUE(receivedTuple.equals(exportTuple));
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
 }
 
 
@@ -1481,7 +1490,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner expectedTupleCleaner(expectedTuple);
     insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
     insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
@@ -1495,7 +1504,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTuple (m_tableReplica->schema());
     boost::shared_array<char> existingData;
-    deepCopy(tempExistingTuple, existingTuple, existingData);
+    existingData = deepCopy(tempExistingTuple, existingTuple, existingData);
     StackCleaner existingTupleCleaner(existingTuple);
     endTxn(true);
     flushButDontApply(100);
@@ -1553,7 +1562,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
  * expectedRow: <42, 55555, X>
  *               <INSERT no conflict>
  * existingRow: <null>
- * newRow:      <null>
+ * newRow:      <42, 12345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     m_engine->setIsActiveActiveDREnabled(true);
@@ -1568,7 +1577,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner expectedTupleCleaner(expectedTuple);
     insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
     insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
@@ -1581,14 +1590,19 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTuple (m_tableReplica->schema());
     boost::shared_array<char> existingData;
-    deepCopy(tempExistingTuple, existingTuple, existingData);
+    existingData = deepCopy(tempExistingTuple, existingTuple, existingData);
     StackCleaner existingTupleCleaner(existingTuple);
     endTxn(true);
     flushButDontApply(100);
 
     // update the same row on master then wait to trigger conflict on replica
     beginTxn(101, 101, 100, 72);
-    updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345);
+    TableTuple tempNewTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345);
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple newTuple (m_table->schema());
+    boost::shared_array<char> newData;
+    newData = deepCopy(tempNewTuple, newTuple, newData);
+    StackCleaner newTupleCleaner(newTuple);
     endTxn(true);
     // trigger a update timestamp mismatch conflict
     flushAndApply(101);
@@ -1607,15 +1621,18 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
-    ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+    EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
+    TableTuple exportTuple3 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, NO_CONFLICT, NOT_CONFLICT_ON_PK, 72);
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
     TableTuple receivedTuple1 = exportStream->receivedTuples[0];
     ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
     TableTuple receivedTuple2 = exportStream->receivedTuples[1];
     ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+    TableTuple receivedTuple3 = exportStream->receivedTuples[2];
+    ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
 }
 
 /**
@@ -1634,8 +1651,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
  * existingRow: <42, 12345, X>
  * expectedRow: <42, 55555, X>
  *               <INSERT constraint violation>
- * existingRow: <42, 12345, X>
- *              <72, 345, Z>
+ * existingRow: <72, 345, Z>
  * newRow:      <42, 345, X>
  */
 TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
@@ -1651,7 +1667,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
-    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    expectedData = deepCopy(tempExpectedTuple, expectedTuple, expectedData);
     StackCleaner expectedTupleCleaner(expectedTuple);
     insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
     endTxn(true);
@@ -1663,13 +1679,13 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTupleFirst (m_tableReplica->schema());
     boost::shared_array<char> existingDataFirst;
-    deepCopy(tempExistingTupleFirst, existingTupleFirst, existingDataFirst);
+    existingDataFirst = deepCopy(tempExistingTupleFirst, existingTupleFirst, existingDataFirst);
     StackCleaner firstExistingTupleCleaner(existingTupleFirst);
     TableTuple tempExistingTupleSecond = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTupleSecond (m_tableReplica->schema());
     boost::shared_array<char> existingDataSecond;
-    deepCopy(tempExistingTupleSecond, existingTupleSecond, existingDataSecond);
+    existingDataSecond = deepCopy(tempExistingTupleSecond, existingTupleSecond, existingDataSecond);
     StackCleaner secondExistingTupleCleaner(existingTupleSecond);
     endTxn(true);
     flushButDontApply(100);
@@ -1696,16 +1712,15 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
     // verify existing table
-    EXPECT_EQ(2, m_topend.existingRowsForInsert->activeTupleCount());
-    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, CONFLICT_ON_PK, 71);
-    TableTuple exportTuple4 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
+    EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
     // verify new table
     EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
-    TableTuple exportTuple5 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+    TableTuple exportTuple4 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(5, exportStream->receivedTuples.size());
+    EXPECT_EQ(4, exportStream->receivedTuples.size());
     TableTuple receivedTuple1 = exportStream->receivedTuples[0];
     ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
     TableTuple receivedTuple2 = exportStream->receivedTuples[1];
@@ -1714,8 +1729,6 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
     ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
     TableTuple receivedTuple4 = exportStream->receivedTuples[3];
     ASSERT_TRUE(receivedTuple4.equals(exportTuple4));
-    TableTuple receivedTuple5 = exportStream->receivedTuples[4];
-    ASSERT_TRUE(receivedTuple5.equals(exportTuple5));
 }
 
 int main() {
