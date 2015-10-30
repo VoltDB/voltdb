@@ -70,6 +70,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -1990,5 +1991,175 @@ public class TestJSONInterface extends TestCase {
             }
             server = null;
         }
+    }
+
+    public void testConnectionsWithUpdateCatalog() throws Exception {
+        runConnectionsWithUpdateCatalog(false);
+    }
+
+    public void testConnectionsWithUpdateCatalogWithSecurity() throws Exception {
+        runConnectionsWithUpdateCatalog(true);
+    }
+
+    public void runConnectionsWithUpdateCatalog(boolean securityOn) throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE test1 (\n"
+                    + "    fld1 BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (fld1)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("test1", "fld1");
+            builder.addProcedures(WorkerProc.class);
+            UserInfo[] ui = new UserInfo[5];
+            if (securityOn) {
+                RoleInfo ri = new RoleInfo("role1", true, false, true, true, false, false);
+                builder.addRoles(new RoleInfo[] { ri });
+
+                for (int i = 0; i < ui.length; i++) {
+                    ui[i] = new UserInfo("user" + String.valueOf(i), "password" + String.valueOf(i), new String[] { "role1" } );
+                }
+                builder.addUsers(ui);
+
+                builder.setSecurityEnabled(true, true);
+            }
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            TestWorker.s_insertCount = new AtomicLong(0);
+            int poolSize = 25;
+            ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+            int workCount = 200;
+            for (int i=0; i<workCount; i++) {
+                executor.execute(new TestWorker(i, workCount/10,
+                        (securityOn ? ui[workCount%ui.length].name : null),
+                        (securityOn ? ui[workCount%ui.length].password : null) ));
+            }
+
+            // wait for everything to be done and check status
+            executor.shutdown();
+            if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                fail("Workers should have finished execution by now");
+            }
+            assertTrue(TestWorker.s_success);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    private static class TestWorker implements Runnable {
+
+        public static boolean s_success = true; // this is set by worker threads on failure only
+        public static AtomicLong s_insertCount = new AtomicLong(0);
+
+        private final int m_id;
+        private final int m_catUpdateCount;
+        private final String m_username;
+        private final String m_password;
+
+        public TestWorker(int id, int catUpdateCount, String username, String password) {
+            m_id = id;
+            m_catUpdateCount = catUpdateCount;
+            m_username = username;
+            m_password = password;
+        }
+
+        @Override
+        public void run()
+        {
+            try {
+                if (m_id==0) { // do all deployment update from one thread to avoid version error on server side
+                    for (int i=0; i<m_catUpdateCount; i++) {
+                        // update deployment to force a catalog update and resetting connections
+                        String jdep = getUrlOverJSON("http://localhost:8095/deployment", m_username, m_password, "hashed", 200,  "application/json");
+                        ObjectMapper mapper = new ObjectMapper();
+                        DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
+                        int timeout = 100 + m_id;
+                        if (deptype.getHeartbeat() == null) {
+                            HeartbeatType hb = new HeartbeatType();
+                            hb.setTimeout(timeout);
+                            deptype.setHeartbeat(hb);
+                        } else {
+                            deptype.getHeartbeat().setTimeout(timeout);
+                        }
+                        Map<String,String> params = new HashMap<>();
+                        params.put("deployment", mapper.writeValueAsString(deptype));
+                        params.put("admin", "true");
+                        String responseJSON = postUrlOverJSON("http://localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
+                        if (!responseJSON.contains("Deployment Updated.")) {
+                            System.out.println("Failed to update deployment");
+                            s_success = false;
+                        }
+                    }
+                } else {
+                    // do a write and a read
+                    ParameterSet pset = ParameterSet.fromArrayNoCopy("insert into test1 values (" + (m_id) + ")");
+                    String responseJSON = callProcOverJSON("@AdHoc", pset, m_username, m_password, false, false);
+                    //System.out.println("Insert response: " + responseJSON);
+                    if (!responseJSON.contains("\"data\":[[1]]")) {
+                        System.out.println("Insert should have returned 1. Got: " + responseJSON);
+                        s_success = false;
+                        return;
+                    }
+                    s_insertCount.incrementAndGet();
+                    Thread.sleep(200);
+                    pset = ParameterSet.fromArrayNoCopy("select count(*) from test1");
+                    long expectedCount = s_insertCount.get();
+                    responseJSON = callProcOverJSON("@AdHoc", pset, m_username, m_password, false, false);
+                    int startIndex = responseJSON.indexOf(":[[");
+                    int endIndex = responseJSON.indexOf("]]");
+                    if (startIndex==-1 || endIndex==-1) {
+                        System.out.println("Invalid response from select: " + responseJSON);
+                        s_success = false;
+                        return;
+                    }
+                    int count = Integer.parseInt(responseJSON.substring(startIndex+3, endIndex));
+                    if (count < expectedCount) {
+                        System.out.println("Select must have returned at least " + expectedCount + ". Got "+ count);
+                        s_success = false;
+                        return;
+                    }
+                    // do a proc cal that takes longer
+                    pset = ParameterSet.fromArrayNoCopy(500);
+                    responseJSON = callProcOverJSON("TestJSONInterface$WorkerProc", pset, m_username, m_password, false, false);
+                    //System.out.println("WorkperProc response: " + responseJSON);
+                }
+            } catch(Exception e) {
+                e.printStackTrace();
+                s_success = false;
+            }
+        }
+    }
+
+    public static class WorkerProc extends VoltProcedure {
+
+        public long run(long delay) {
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                throw new VoltAbortException(e.getMessage());
+            }
+            return 0;
+        }
+
     }
 }

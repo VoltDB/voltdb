@@ -46,15 +46,13 @@
 #ifndef HSTORERECEIVENODE_H
 #define HSTORERECEIVENODE_H
 
-#include "abstractplannode.h"
+#include "abstractreceivenode.h"
 
 namespace voltdb {
 
-class ReceivePlanNode : public AbstractPlanNode
+class ReceivePlanNode : public AbstractReceivePlanNode
 {
 public:
-    ReceivePlanNode() { }
-    ~ReceivePlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
 

@@ -21,6 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <cstdio>
 #include <string>
 #include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
@@ -73,24 +74,65 @@ public:
 
 class MockVoltDBEngine : public VoltDBEngine {
 public:
-    MockVoltDBEngine(bool isActiveActiveEnabled) {
+    MockVoltDBEngine(bool isActiveActiveEnabled, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
         m_isActiveActiveEnabled = isActiveActiveEnabled;
+        m_context.reset(new ExecutorContext(1, 1, NULL, topend, pool,
+                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, 0));
+
+        std::vector<ValueType> exportColumnType;
+        std::vector<int32_t> exportColumnLength;
+        std::vector<bool> exportColumnAllowNull(14, false);
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+
+        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        exportColumnType.push_back(VALUE_TYPE_DECIMAL);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(15);
+        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(300);
+        exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
+
+        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
+        string exportColumnNamesArray[14] = { "VOLTDB_AUTOGEN_ROW_TYPE", "VOLTDB_AUTOGEN_ACTION_TYPE", "VOLTDB_AUTOGEN_CONFLICT_TYPE", "VOLTDB_AUTOGEN_UPDATE_ON_PK",
+                                           "VOLTDB_AUTOGEN_ROW_DECISION", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP", "VOLTDB_AUTOGEN_DIVERGENCE",
+                                           "C_TINYINT", "C_BIGINT", "C_DECIMAL", "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
+        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 14);
+
+        m_exportStream = new MockExportTupleStream(1, 1);
+        m_conflictExportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
+                                                               m_exportSchema, exportColumnName,
+                                                               m_exportStream, true);
     }
+    ~MockVoltDBEngine() {
+        delete m_conflictExportTable;
+    }
+
     bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
     void setIsActiveActiveDREnabled(bool enabled) { m_isActiveActiveEnabled = enabled; }
+    Table* getDRConflictTable(PersistentTable* drTable) { return m_conflictExportTable; }
+    ExportTupleStream* getExportTupleStream() { return m_exportStream; }
+    ExecutorContext* getExecutorContext() { return m_context.get(); }
 
 private:
     bool m_isActiveActiveEnabled;
+    Table* m_conflictExportTable;
+    MockExportTupleStream* m_exportStream;
+    TupleSchema* m_exportSchema;
+    boost::scoped_ptr<ExecutorContext> m_context;
 };
 
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_undoToken(0)
+      : m_undoToken(0),
+        m_engine (new MockVoltDBEngine(false, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream))
     {
-        m_engine = new MockVoltDBEngine(false);
-        m_context.reset(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
-                                    NULL, m_engine, "localhost", 2, &m_drStream, &m_drReplicatedStream, 0));
         m_drStream.m_enabled = true;
         m_drReplicatedStream.m_enabled = true;
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
@@ -131,9 +173,9 @@ public:
         const vector<string> columnNames(columnNamesArray, columnNamesArray + COLUMN_COUNT);
 
         m_table = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schema, columnNames, tableHandle, false, 0));
-        m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schemaReplica, columnNames, tableHandle, false, 0));
+        m_tableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE_REPLICA", m_schemaReplica, columnNames, tableHandle, false, 0));
         m_replicatedTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE", m_replicatedSchema, columnNames, replicatedTableHandle, false, -1));
-        m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1));
+        m_replicatedTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "R_TABLE_REPLICA", m_replicatedSchemaReplica, columnNames, replicatedTableHandle, false, -1));
 
         m_table->setDR(true);
         m_tableReplica->setDR(true);
@@ -194,32 +236,6 @@ public:
                                                                                                           singleColumnName,
                                                                                                           tableHandle + 1, false, 0));
         m_singleColumnTable->setDR(true);
-
-        // create a export table has the same column of other_table_2, plus 4 additional columns for DR conflict resolution purpose.
-        std::vector<ValueType> exportColumnType;
-        std::vector<int32_t> exportColumnLength;
-        std::vector<bool> exportColumnAllowNull(10, false);
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(7); /* length of 'P_TABLE' */
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        exportColumnType.push_back(VALUE_TYPE_TINYINT);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-        exportColumnType.push_back(VALUE_TYPE_BIGINT);      exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        exportColumnType.push_back(VALUE_TYPE_DECIMAL);     exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(15);
-        exportColumnType.push_back(VALUE_TYPE_VARCHAR);     exportColumnLength.push_back(300);
-        exportColumnType.push_back(VALUE_TYPE_TIMESTAMP);   exportColumnLength.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
-
-        m_exportSchema = TupleSchema::createTupleSchemaForTest(exportColumnType, exportColumnLength, exportColumnAllowNull);
-        string exportColumnNamesArray[10] = { "VOLTDB_AUTOGEN_TABLE_NAME", "VOLTDB_AUTOGEN_CLUSTER_ID", "VOLTDB_AUTOGEN_TIMESTAMP",
-                                            "VOLTDB_AUTOGEN_OPERATION_TYPE", "C_TINYINT", "C_BIGINT", "C_DECIMAL",
-                                            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP"};
-        const vector<string> exportColumnName(exportColumnNamesArray, exportColumnNamesArray + 10);
-
-        m_exportStream = new MockExportTupleStream(1, 1);
-        m_exportTable = voltdb::TableFactory::getStreamedTableForTest(0, "VOLTDB_AUTOGEN_DR_CONFLICTS__P_TABLE",
-                                                                m_exportSchema, exportColumnName,
-                                                                m_exportStream, true);
     }
 
     virtual ~DRBinaryLogTest() {
@@ -236,14 +252,13 @@ public:
         delete m_otherTableWithoutIndex;
         delete m_otherTableWithIndexReplica;
         delete m_otherTableWithoutIndexReplica;
-        delete m_exportTable;
     }
 
     void beginTxn(int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId) {
         m_currTxnUniqueId = addPartitionId(uniqueId);
 
         UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken);
-        m_context->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
+        m_engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
                 addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
     }
 
@@ -270,20 +285,35 @@ public:
         table->deleteTuple(tuple_to_delete, true);
     }
 
-    void updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
+    TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
         TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
-        ASSERT_FALSE(tuple_to_update.isNullTuple());
+        assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
         new_tuple.copy(tuple_to_update);
         new_tuple.setNValue(0, ValueFactory::getTinyIntValue(new_index_value));
         m_cachedStringValues.push_back(ValueFactory::getStringValue(new_nonindex_value));
         new_tuple.setNValue(3, m_cachedStringValues.back());
         table->updateTuple(tuple_to_update, new_tuple);
+        return new_tuple;
+    }
+
+    TableTuple updateTupleFirstAndSecondColumn(PersistentTable* table, TableTuple tuple, int8_t new_tinyint_value, int64_t new_bigint_value) {
+        TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
+        assert(!tuple_to_update.isNullTuple());
+        TableTuple new_tuple = table->tempTuple();
+        new_tuple.copy(tuple_to_update);
+        new_tuple.setNValue(0, ValueFactory::getTinyIntValue(new_tinyint_value));
+        new_tuple.setNValue(1, ValueFactory::getBigIntValue(new_bigint_value));
+        table->updateTuple(tuple_to_update, new_tuple);
+        return new_tuple;
     }
 
     TableTuple prepareTempTuple(PersistentTable* table, int8_t tinyint, int64_t bigint, const std::string& decimal,
             const std::string& short_varchar, const std::string& long_varchar, int64_t timestamp) {
         TableTuple temp_tuple = table->tempTuple();
+        if (table->schema()->hiddenColumnCount() > 0) {
+            temp_tuple.setHiddenNValue(0, NValue::getNullValue(VALUE_TYPE_BIGINT));
+        }
         temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(tinyint));
         temp_tuple.setNValue(1, ValueFactory::getBigIntValue(bigint));
         temp_tuple.setNValue(2, ValueFactory::getDecimalValueFromString(decimal));
@@ -295,16 +325,53 @@ public:
         return temp_tuple;
     }
 
+    void createConflictExportTuple(TableTuple *outputTuple, TableTuple *tupleToBeWrote, DRConflictRowType rowType, DRRecordType actionType,
+            DRConflictType conflictType, DRConflictOnPK changeOnPKType, int8_t clusterId, int64_t timestamp) {
+        outputTuple->setNValue(0, ValueFactory::getTinyIntValue(rowType));
+        outputTuple->setNValue(1, ValueFactory::getTinyIntValue(actionType));
+        outputTuple->setNValue(2, ValueFactory::getTinyIntValue(conflictType));
+        outputTuple->setNValue(3, ValueFactory::getTinyIntValue(changeOnPKType));
+        switch (rowType) {
+        case EXISTING_ROW:
+        case EXPECTED_ROW:
+            outputTuple->setNValue(4, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
+            break;
+        case NEW_ROW:
+            outputTuple->setNValue(4, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
+            break;
+        default:
+            break;
+        }
+        outputTuple->setNValue(5, ValueFactory::getTinyIntValue(clusterId));    // clusterId
+        outputTuple->setNValue(6, ValueFactory::getBigIntValue(timestamp));     // timestamp
+        outputTuple->setNValue(7, ValueFactory::getTinyIntValue(NOT_DIVERGE));
+        outputTuple->setNValues(8, *tupleToBeWrote, 0, tupleToBeWrote->sizeInValues());    // rest of columns, excludes the hidden column
+    }
+
+    void deepCopy(TableTuple &target, TableTuple &copy, boost::shared_array<char> &data) {
+        data.reset(new char[target.tupleLength()]);
+        copy.move(data.get());
+        copy.copyForPersistentInsert(target);
+    }
+
     bool flush(int64_t lastCommittedSpHandle) {
         m_drStream.periodicFlush(-1, addPartitionId(lastCommittedSpHandle));
         m_drReplicatedStream.periodicFlush(-1, addPartitionId(lastCommittedSpHandle));
         return m_topend.receivedDRBuffer;
     }
 
-    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true) {
+    void flushButDontApply(int64_t lastCommittedSpHandle) {
+        flush(lastCommittedSpHandle);
+        for (int i = static_cast<int>(m_topend.blocks.size()); i > 0; i--) {
+            m_topend.blocks.pop_back();
+            m_topend.data.pop_back();
+        }
+    }
+
+    void flushAndApply(int64_t lastCommittedSpHandle, bool success = true, bool isActiveActiveDREnabled = false) {
         ASSERT_TRUE(flush(lastCommittedSpHandle));
 
-        m_context->setupForPlanFragments(m_undoLog.generateUndoQuantum(m_undoToken));
+        m_engine->getExecutorContext()->setupForPlanFragments(m_undoLog.generateUndoQuantum(m_undoToken));
         boost::unordered_map<int64_t, PersistentTable*> tables;
         tables[42] = m_tableReplica;
         tables[43] = m_otherTableWithIndexReplica;
@@ -321,7 +388,7 @@ public:
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[startPos], tables, &m_pool, NULL);
+            m_sink.apply(&data[startPos], tables, &m_pool, m_engine, isActiveActiveDREnabled);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -391,6 +458,57 @@ public:
         temp_tuple.setNValue(4, m_cachedStringValues.back());
         temp_tuple.setNValue(5, NValue::getNullValue(VALUE_TYPE_TIMESTAMP));
         return temp_tuple;
+    }
+
+    void createUniqueIndex(Table* table, int indexColumn, bool isPrimaryKey = false) {
+        vector<int> columnIndices;
+        columnIndices.push_back(indexColumn);
+        TableIndexScheme scheme = TableIndexScheme("UniqueIndex", HASH_TABLE_INDEX,
+                                                    columnIndices,
+                                                    TableIndex::simplyIndexColumns(),
+                                                    true, true, table->schema());
+        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(scheme);
+        assert(pkeyIndex);
+        table->addIndex(pkeyIndex);
+        if (isPrimaryKey) {
+            table->setPrimaryKeyIndex(pkeyIndex);
+        }
+    }
+
+    TableTuple verifyExistingTableForDelete(TableTuple &existingTuple, DRRecordType action, DRConflictType deleteConflict, DRConflictOnPK changeOnPKType, int64_t timestamp) {
+        PersistentTable* existingTable = reinterpret_cast<PersistentTable*>(m_topend.existingRowsForDelete.get());
+        TableTuple tempTuple = existingTable->tempTuple();
+        createConflictExportTuple(&tempTuple, &existingTuple, EXISTING_ROW, action, deleteConflict, changeOnPKType, 0, timestamp);
+        TableTuple tuple = existingTable->lookupTupleByValues(tempTuple);
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
+    }
+
+    TableTuple verifyExpectedTableForDelete(TableTuple &expectedTuple, DRRecordType action, DRConflictType deleteConflict, DRConflictOnPK changeOnPKType, int64_t timestamp) {
+        PersistentTable* expectedTable = reinterpret_cast<PersistentTable*>(m_topend.expectedRowsForDelete.get());
+        TableTuple tempTuple = expectedTable->tempTuple();
+        createConflictExportTuple(&tempTuple, &expectedTuple, EXPECTED_ROW, action, deleteConflict, changeOnPKType, 0, timestamp);
+        TableTuple tuple = expectedTable->lookupTupleByValues(tempTuple);
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
+    }
+
+    TableTuple verifyExistingTableForInsert(TableTuple &existingTuple, DRRecordType action, DRConflictType insertConflict, DRConflictOnPK changeOnPKType, int64_t timestamp) {
+        PersistentTable* existingTable = reinterpret_cast<PersistentTable*>(m_topend.existingRowsForInsert.get());
+        TableTuple tempTuple = existingTable->tempTuple();
+        createConflictExportTuple(&tempTuple, &existingTuple, EXISTING_ROW, action, insertConflict, changeOnPKType, 0, timestamp);
+        TableTuple tuple = existingTable->lookupTupleByValues(tempTuple);
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
+    }
+
+    TableTuple verifyNewTableForInsert(TableTuple &newTuple, DRRecordType action, DRConflictType insertConflict, DRConflictOnPK changeOnPKType, int64_t timestamp) {
+        PersistentTable* newTable = reinterpret_cast<PersistentTable*>(m_topend.newRowsForInsert.get());
+        TableTuple tempTuple = newTable->tempTuple();
+        createConflictExportTuple(&tempTuple, &newTuple, NEW_ROW, action, insertConflict, changeOnPKType, 0, timestamp);
+        TableTuple tuple = newTable->lookupTupleByValues(tempTuple);
+        EXPECT_EQ(tuple.isNullTuple(), false);
+        return tuple;
     }
 
     void simpleDeleteTest() {
@@ -491,7 +609,6 @@ public:
 protected:
     DRTupleStream m_drStream;
     DRTupleStream m_drReplicatedStream;
-    ExportTupleStream* m_exportStream;
 
     TupleSchema* m_schema;
     TupleSchema* m_replicatedSchema;
@@ -514,7 +631,6 @@ protected:
     PersistentTable* m_otherTableWithoutIndexReplica;
     // This table does not exist on the replica
     PersistentTable* m_singleColumnTable;
-    Table* m_exportTable;
 
     UndoLog m_undoLog;
     int64_t m_undoToken;
@@ -523,7 +639,6 @@ protected:
     DummyTopend m_topend;
     Pool m_pool;
     BinaryLogSink m_sink;
-    boost::scoped_ptr<ExecutorContext> m_context;
     MockVoltDBEngine* m_engine;
     char tableHandle[20];
     char replicatedTableHandle[20];
@@ -532,6 +647,16 @@ protected:
     char exportTableHandle[20];
 
     vector<NValue> m_cachedStringValues;//To free at the end of the test
+};
+
+class StackCleaner {
+public:
+    StackCleaner(TableTuple tuple) : m_tuple(tuple) {}
+    ~StackCleaner() {
+        m_tuple.freeObjectColumns();
+    }
+private:
+    TableTuple m_tuple;
 };
 
 TEST_F(DRBinaryLogTest, VerifyHiddenColumns) {
@@ -609,33 +734,6 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     committed = m_drReplicatedStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(-1, committed.seqNum);
 }
-
-// TODO: when we implement conflict detection, the testcase should rewrite to manually create a conflict
-TEST_F(DRBinaryLogTest, WriteDRConflictToExportTable) {
-    ASSERT_FALSE(flush(98));
-
-    // single row write transaction
-    beginTxn(99, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
-    m_sink.exportDRConflict(m_table, m_exportTable, DR_RECORD_INSERT, first_tuple);
-    endTxn(true);
-
-    EXPECT_EQ(1, reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples.size());
-    TableTuple received_tuple = reinterpret_cast<MockExportTupleStream*>(m_exportStream)->receivedTuples[0];
-    ASSERT_FALSE(received_tuple.isNullTuple());
-    ASSERT_TRUE(ValuePeeker::peekStringCopy_withoutNull(received_tuple.getNValue(0)).compare("P_TABLE") == 0);
-    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(1)) == 0);  // clusterId
-    ASSERT_TRUE(ValuePeeker::peekBigInt(received_tuple.getNValue(2)) == 70);  // timestamp
-    ASSERT_TRUE(ValuePeeker::peekTinyInt(received_tuple.getNValue(3)) == DR_RECORD_INSERT); // operation type
-    // Now compare the rest of columns
-    ASSERT_TRUE(first_tuple.getNValue(0).op_equals(received_tuple.getNValue(4)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(1).op_equals(received_tuple.getNValue(5)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(2).op_equals(received_tuple.getNValue(6)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(3).op_equals(received_tuple.getNValue(7)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(4).op_equals(received_tuple.getNValue(8)).isTrue());
-    ASSERT_TRUE(first_tuple.getNValue(5).op_equals(received_tuple.getNValue(9)).isTrue());
-}
-
 
 TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
@@ -954,7 +1052,7 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
 
     // Simulate a second batch within the same txn
     UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
-    m_context->setupForPlanFragments(uq, addPartitionId(99), addPartitionId(99),
+    m_engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(99), addPartitionId(99),
                                      addPartitionId(98), addPartitionId(70));
 
     insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
@@ -984,6 +1082,640 @@ TEST_F(DRBinaryLogTest, UpdateWithNullsAndUniqueIndex) {
     ASSERT_FALSE(indexPairReplica.first == NULL);
     EXPECT_EQ(indexPair.second, indexPairReplica.second);
     updateWithNullsTest();
+}
+
+/*
+ * Conflict detection test case - Insert Unique Constraint Violation
+ *
+ * | Time | DB A                          | DB B                          |
+ * |------+-------------------------------+-------------------------------|
+ * | T71  |                               | insert 99 (pk), 55555 (uk), X |
+ * |      |                               | insert 42 (pk), 34523 (uk), Y |
+ * | T72  | insert 42 (pk), 34523 (uk), X |                               |
+ *
+ * DB B reports: <DELETE no conflict>
+ * existingRow: <null>
+ * expectedRow: <null>
+ *               <INSERT constraint violation>
+ * existingRow: <42, 34523, Y>
+ * newRow:      <42, 34523, X>
+ */
+TEST_F(DRBinaryLogTest, DetectInsertUniqueConstraintViolation) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+    ASSERT_FALSE(flush(99));
+
+    // write transactions on replica
+    beginTxn(100, 100, 99, 71);
+    insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 99, 55555,
+            "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    TableTuple existingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 34523,
+                "7565464.2342", "yes", "no no no, writing more words to make it outline?", 1234));
+    endTxn(true);
+    flushButDontApply(100);
+
+    // write transactions on master
+    beginTxn(101, 101, 100, 72);
+    TableTuple newTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 34523,
+            "92384598.2342", "what", "really, why am I writing anything in these?", 3455));
+    endTxn(true);
+    // trigger a insert unique constraint violation conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_INSERT);
+    EXPECT_EQ(m_topend.deleteConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingRowsForDelete.get() == NULL);
+    ASSERT_TRUE(m_topend.expectedRowsForDelete.get() == NULL);
+
+    EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple1 = verifyExistingTableForInsert(existingTuple, DR_RECORD_INSERT, CONFLICT_CONSTRAINT_VIOLATION, CONFLICT_ON_PK, 71);
+
+    // verify new table
+    EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
+    TableTuple exportTuple2 = verifyNewTableForInsert(newTuple, DR_RECORD_INSERT, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+
+    // check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+}
+
+/*
+ * Conflict detection test case - Delete Missing Tuple
+ *
+ * | Time | DB A                          | DB B                          |
+ * |------+-------------------------------+-------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X | insert 42 (pk), 55555 (uk), X |
+ * | T71  |                               | delete 42 (pk), 55555 (uk), X |
+ * | T72  | delete 42 (pk), 55555 (uk), X |                               |
+ *
+ * DB B reports: <DELETE missing row>
+ * existingRow: <null>
+ * expectedRow: <42, 5555, X>
+ *               <INSERT no conflict>
+ * existingRow: <null>
+ * newRow:      <null>
+ */
+TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert rows on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of m_table will be rewritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner cleaner(expectedTuple);
+    endTxn(true);
+    flushAndApply(99);
+
+    // delete row on replica
+    beginTxn(100, 100, 99, 71);
+    deleteTuple(m_tableReplica, tempExpectedTuple);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // delete the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    deleteTuple(m_table, tempExpectedTuple);
+    endTxn(true);
+    // trigger a delete missing tuple conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_DELETE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISSING);
+    // verify existing table
+    EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
+    // verfiy expected table
+    EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
+    TableTuple exportTuple = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NOT_CONFLICT_ON_PK, 70);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
+    ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(1, exportStream->receivedTuples.size());
+    TableTuple receivedTuple = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple.equals(exportTuple));
+}
+
+/*
+ * Conflict detection test case - Delete Timestamp Mismatch
+ *
+ * | Time | DB A                          | DB B                                    |
+ * |------+-------------------------------+-----------------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X | insert 42 (pk), 55555 (uk), X           |
+ * | T71  |                               | update <42, 55555, X> to <42, 1234, X>  |
+ * | T72  | delete 42 (pk), 55555 (uk), X |                                         |
+ *
+ * DB B reports: <DELETE timestamp mismatch>
+ * existingRow: <42, 1234, X>
+ * expectedRow: <42, 5555, X>
+ *               <INSERT no conflict>
+ * existingRow: <null>
+ * newRow:      <null>
+ */
+TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert one row on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of relica table will be rewritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+    endTxn(true);
+    flushAndApply(99);
+
+    // insert a few rows and update one row on replica
+    beginTxn(100, 100, 99, 71);
+    TableTuple tempExistingTuple = updateTupleFirstAndSecondColumn(m_tableReplica, tempExpectedTuple, 42/*causes a constraint violation*/, 1234);
+    // do a deep copy because temp tuple of relica table will be overwriten when applying binary log
+    TableTuple existingTuple(m_tableReplica->schema());
+    boost::shared_array<char> data;
+    deepCopy(tempExistingTuple, existingTuple, data);
+    StackCleaner existingTupleCleaner(existingTuple);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // delete the row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    deleteTuple(m_table, tempExpectedTuple);
+    endTxn(true);
+    // trigger a delete timestamp mismatch conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_DELETE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingRowsForDelete->activeTupleCount());
+    TableTuple exportTuple1 = verifyExistingTableForDelete(existingTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NOT_CONFLICT_ON_PK, 71);
+    // verify expected table
+    EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
+    TableTuple exportTuple2 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NOT_CONFLICT_ON_PK, 70);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
+    ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+}
+
+/*
+ * Conflict detection test case - Update Unique Constraint Violation
+ *
+ * | Time | DB A                                    | DB B                           |
+ * |------+-----------------------------------------+--------------------------------|
+ * | T70  | insert 24 (pk), 2321 (uk), X            | insert 24 (pk), 2321 (uk), X   |
+ * | T71  |                                         | insert 42 (pk), 55555 (uk), Y  |
+ * |      |                                         | insert 123 (pk), 33333 (uk), Z |
+ * | T72  | update <24, 2321, X> to <12, 33333, X> |                                |
+ *
+ * DB B reports: <DELETE no conflict>
+ * existingRow: <null>
+ * expectedRow: <null>
+ *               <INSERT constraint violation>
+ * existingRow: <123, 33333, Z>
+ * newRow:      <12, 33333, X>
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+    ASSERT_FALSE(flush(98));
+
+    // insert row on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    // do a deep copy because temp tuple of relica table will be rewritten later
+    TableTuple expectedTuple (m_tableReplica->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+
+    insertTuple(m_table, prepareTempTuple(m_table, 111, 11111, "11111.1111", "second", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 65, 22222, "22222.2222", "third", "this is starting to get even sillier", 2222));
+    endTxn(true);
+    flushAndApply(99);
+
+    // insert rows on replica side
+    beginTxn(100, 100, 99, 71);
+    insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+
+    TableTuple tempExistingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 123, 33333, "122308345.34583", "another thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
+    TableTuple existingTuple (m_tableReplica->schema());
+    boost::shared_array<char> existingData;
+    deepCopy(tempExistingTuple, existingTuple, existingData);
+    StackCleaner existingTupleCleaner(existingTuple);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // update row on master to create conflict
+    beginTxn(101, 101, 100, 72);
+    TableTuple newTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 12, 33333/*causes a constraint violation*/);
+    endTxn(true);
+
+    // trigger a update unique constraint violation conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingRowsForDelete.get() == NULL);
+    ASSERT_TRUE(m_topend.expectedRowsForDelete.get() == NULL);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple1 = verifyExistingTableForInsert(existingTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
+    // verify new table
+    EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
+    TableTuple exportTuple2 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+}
+
+/*
+ * Conflict detection test case - Update Missing Tuple
+ *
+ * | Time | DB A                                    | DB B                                     |
+ * |------+-----------------------------------------+------------------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X           | insert 42 (pk), 55555 (uk), X            |
+ * | T71  |                                         | update <42, 55555, X> to <35, 12345, X>  |
+ * | T72  | update <42, 55555, X> to <42, 54321, X> |                                          |
+ *
+ * DB B reports: <DELETE missing row>
+ * existingRow: <null>
+ * expectedRow: <42, 55555, X>
+ *               <INSERT no conflict>
+ * existingRow: <null>
+ * newRow:      <null>
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert rows on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+    endTxn(true);
+    flushAndApply(99);
+
+    // update one row on replica
+    beginTxn(100, 100, 99, 71);
+    updateTupleFirstAndSecondColumn(m_tableReplica, tempExpectedTuple, 35, 12345);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // update the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    /*TableTuple new_tuple = */updateTupleFirstAndSecondColumn(m_table, expectedTuple, 42, 54321);
+    endTxn(true);
+    // trigger a update missing tuple conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISSING);
+    // verify existing table
+    EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
+    // verify expected table
+    EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
+    TableTuple exportTuple = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NOT_CONFLICT_ON_PK, 70);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
+    ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(1, exportStream->receivedTuples.size());
+    TableTuple receivedTuple = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple.equals(exportTuple));
+}
+
+
+/*
+ * Conflict detection test case - Update missing tuple and new row triggers constraint
+ *
+ * | Time | DB A                                    | DB B                                     |
+ * |------+-----------------------------------------+------------------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X           | insert 42 (pk), 55555 (uk), X            |
+ * |      | insert 24 (pk), 2321 (uk), Y            | insert 24 (pk), 2321 (uk), Y             |
+ * |      | insert 72 (pk), 345 (uk), Z             | insert 72 (pk), 345 (uk), Z              |
+ * | T71  |                                         | delete <42, 55555, X>                    |
+ * |      |                                         | insert 36 (pk), 12345 (uk), X            |
+ * | T72  | update <42, 55555, X> to <42, 12345, X> |                                          |
+ *
+ * DB B reports: <DELETE missing row>
+ * existingRow: <null>
+ * expectedRow: <42, 55555, X>
+ *               <INSERT constraint violation>
+ * existingRow: <36, 12345, X>
+ * newRow:      <42, 12345, X>
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert rows on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+    flushAndApply(99);
+
+    // update one row on replica
+    beginTxn(100, 100, 99, 71);
+    deleteTuple(m_tableReplica, tempExpectedTuple);
+    TableTuple tempExistingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 36, 12345, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
+    TableTuple existingTuple (m_tableReplica->schema());
+    boost::shared_array<char> existingData;
+    deepCopy(tempExistingTuple, existingTuple, existingData);
+    StackCleaner existingTupleCleaner(existingTuple);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // update the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    TableTuple newTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345/*causes a constraint violation*/);
+    endTxn(true);
+    // trigger a update missing tuple conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISSING);
+    // verify existing table
+    EXPECT_EQ(0, m_topend.existingRowsForDelete->activeTupleCount());
+    // verify expected table
+    EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
+    TableTuple exportTuple1 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NOT_CONFLICT_ON_PK, 70);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple2 = verifyExistingTableForInsert(existingTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
+    // verify new table
+    EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
+    TableTuple exportTuple3 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+    TableTuple receivedTuple3 = exportStream->receivedTuples[2];
+    ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
+}
+
+/*
+ * Conflict detection test case - Update Timestamp Mismatch
+ *
+ * | Time | DB A                                    | DB B                                     |
+ * |------+-----------------------------------------+------------------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X           | insert 42 (pk), 55555 (uk), X            |
+ * |      | insert 24 (pk), 2321 (uk), Y            | insert 24 (pk), 2321 (uk), Y             |
+ * |      | insert 72 (pk), 345 (uk), Z             | insert 72 (pk), 345 (uk), Z              |
+ * | T71  |                                         | update <42, 55555, X> to <42, 12345, X>  |
+ * | T72  | update <42, 55555, X> to <42, 12345, X> |                                          |
+ *
+ * DB B reports: <DELETE timestamp mismatch>
+ * existingRow: <42, 12345, X>
+ * expectedRow: <42, 55555, X>
+ *               <INSERT no conflict>
+ * existingRow: <null>
+ * newRow:      <null>
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert one row on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    endTxn(true);
+    flushAndApply(99);
+
+    // update one row on replica
+    beginTxn(100, 100, 99, 71);
+    TableTuple tempExistingTuple = updateTupleFirstAndSecondColumn(m_tableReplica, tempExpectedTuple, 42, 12345);
+    // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
+    TableTuple existingTuple (m_tableReplica->schema());
+    boost::shared_array<char> existingData;
+    deepCopy(tempExistingTuple, existingTuple, existingData);
+    StackCleaner existingTupleCleaner(existingTuple);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // update the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 12345);
+    endTxn(true);
+    // trigger a update timestamp mismatch conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
+
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingRowsForDelete->activeTupleCount());
+    TableTuple exportTuple1 = verifyExistingTableForDelete(existingTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NOT_CONFLICT_ON_PK, 71);
+    // verify expected table
+    EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
+    TableTuple exportTuple2 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NOT_CONFLICT_ON_PK, 70);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, NO_CONFLICT);
+    ASSERT_TRUE(m_topend.existingRowsForInsert.get() == NULL);
+    ASSERT_TRUE(m_topend.newRowsForInsert.get() == NULL);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+}
+
+/**
+ * Conflict detection test case - Update timstamp mismatch and new row triggers unique
+ * constraint violation.
+ *
+ * | Time | DB A                                    | DB B                                     |
+ * |------+-----------------------------------------+------------------------------------------|
+ * | T70  | insert 42 (pk), 55555 (uk), X           | insert 42 (pk), 55555 (uk), X            |
+ * |      | insert 24 (pk), 2321 (uk), Y            | insert 24 (pk), 2321 (uk), Y             |
+ * | T71  |                                         | update <42, 55555, X> to <42, 12345, X>  |
+ * |      |                                         | insert 72 (pk), 345 (uk), Z              |
+ * | T72  | update <42, 55555, X> to <42, 345, X> |                                          |
+ *
+ * DB B reports: <DELETE timestamp mismatch>
+ * existingRow: <42, 12345, X>
+ * expectedRow: <42, 55555, X>
+ *               <INSERT constraint violation>
+ * existingRow: <42, 12345, X>
+ *              <72, 345, Z>
+ * newRow:      <42, 345, X>
+ */
+TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
+    m_engine->setIsActiveActiveDREnabled(true);
+    createUniqueIndex(m_table, 0, true);
+    createUniqueIndex(m_tableReplica, 0, true);
+    createUniqueIndex(m_table, 1);
+    createUniqueIndex(m_tableReplica, 1);
+
+    // insert one row on both side
+    beginTxn(99, 99, 98, 70);
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    // do a deep copy because temp tuple of table will be overwritten later
+    TableTuple expectedTuple (m_table->schema());
+    boost::shared_array<char> expectedData;
+    deepCopy(tempExpectedTuple, expectedTuple, expectedData);
+    StackCleaner expectedTupleCleaner(expectedTuple);
+    insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
+    endTxn(true);
+    flushAndApply(99);
+
+    // update one row on replica
+    beginTxn(100, 100, 99, 71);
+    TableTuple tempExistingTupleFirst = updateTupleFirstAndSecondColumn(m_tableReplica, tempExpectedTuple, 42, 12345);
+    // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
+    TableTuple existingTupleFirst (m_tableReplica->schema());
+    boost::shared_array<char> existingDataFirst;
+    deepCopy(tempExistingTupleFirst, existingTupleFirst, existingDataFirst);
+    StackCleaner firstExistingTupleCleaner(existingTupleFirst);
+    TableTuple tempExistingTupleSecond = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
+    // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
+    TableTuple existingTupleSecond (m_tableReplica->schema());
+    boost::shared_array<char> existingDataSecond;
+    deepCopy(tempExistingTupleSecond, existingTupleSecond, existingDataSecond);
+    StackCleaner secondExistingTupleCleaner(existingTupleSecond);
+    endTxn(true);
+    flushButDontApply(100);
+
+    // update the same row on master then wait to trigger conflict on replica
+    beginTxn(101, 101, 100, 72);
+    TableTuple newTuple = updateTupleFirstAndSecondColumn(m_table, tempExpectedTuple, 42, 345/*cause a constraint violation*/);
+    endTxn(true);
+    // trigger a update timestamp mismatch conflict
+    flushAndApply(101, true/*success*/, true/*isActiveActiveDREnabled*/);
+
+    EXPECT_EQ(2, m_table->activeTupleCount());
+    EXPECT_EQ(3, m_tableReplica->activeTupleCount());
+    EXPECT_EQ(m_topend.actionType, DR_RECORD_UPDATE);
+    // 1. check delete conflict part
+    EXPECT_EQ(m_topend.deleteConflictType, CONFLICT_EXPECTED_ROW_MISMATCH);
+    // verify existing table
+    EXPECT_EQ(1, m_topend.existingRowsForDelete->activeTupleCount());
+    TableTuple exportTuple1 = verifyExistingTableForDelete(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NOT_CONFLICT_ON_PK, 71);
+    // verify expected table
+    EXPECT_EQ(1, m_topend.expectedRowsForDelete->activeTupleCount());
+    TableTuple exportTuple2 = verifyExpectedTableForDelete(expectedTuple, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH, NOT_CONFLICT_ON_PK, 70);
+
+    // 2. check insert conflict part
+    EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
+    // verify existing table
+    EXPECT_EQ(2, m_topend.existingRowsForInsert->activeTupleCount());
+    TableTuple exportTuple3 = verifyExistingTableForInsert(existingTupleFirst, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, CONFLICT_ON_PK, 71);
+    TableTuple exportTuple4 = verifyExistingTableForInsert(existingTupleSecond, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 71);
+    // verify new table
+    EXPECT_EQ(1, m_topend.newRowsForInsert->activeTupleCount());
+    TableTuple exportTuple5 = verifyNewTableForInsert(newTuple, DR_RECORD_UPDATE, CONFLICT_CONSTRAINT_VIOLATION, NOT_CONFLICT_ON_PK, 72);
+
+    // 3. check export
+    MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
+    EXPECT_EQ(5, exportStream->receivedTuples.size());
+    TableTuple receivedTuple1 = exportStream->receivedTuples[0];
+    ASSERT_TRUE(receivedTuple1.equals(exportTuple1));
+    TableTuple receivedTuple2 = exportStream->receivedTuples[1];
+    ASSERT_TRUE(receivedTuple2.equals(exportTuple2));
+    TableTuple receivedTuple3 = exportStream->receivedTuples[2];
+    ASSERT_TRUE(receivedTuple3.equals(exportTuple3));
+    TableTuple receivedTuple4 = exportStream->receivedTuples[3];
+    ASSERT_TRUE(receivedTuple4.equals(exportTuple4));
+    TableTuple receivedTuple5 = exportStream->receivedTuples[4];
+    ASSERT_TRUE(receivedTuple5.equals(exportTuple5));
 }
 
 int main() {

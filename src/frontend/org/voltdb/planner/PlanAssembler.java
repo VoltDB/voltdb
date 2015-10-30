@@ -52,6 +52,7 @@ import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
@@ -92,53 +93,53 @@ public class PlanAssembler {
     private static class ParsedResultAccumulator {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
+        public final String m_isContentDeterministic;
 
-        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset)
+        public ParsedResultAccumulator(boolean orderIsDeterministic,
+                                       boolean hasLimitOrOffset,
+                                       String isContentDeterministic)
         {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
+            m_isContentDeterministic = isContentDeterministic;
         }
     }
 
     /** convenience pointer to the cluster object in the catalog */
-    final Cluster m_catalogCluster;
+    private final Cluster m_catalogCluster;
     /** convenience pointer to the database object in the catalog */
-    final Database m_catalogDb;
+    private final Database m_catalogDb;
 
     /** parsed statement for an insert */
-    ParsedInsertStmt m_parsedInsert = null;
+    private ParsedInsertStmt m_parsedInsert = null;
     /** parsed statement for an update */
-    ParsedUpdateStmt m_parsedUpdate = null;
+    private ParsedUpdateStmt m_parsedUpdate = null;
     /** parsed statement for an delete */
-    ParsedDeleteStmt m_parsedDelete = null;
+    private ParsedDeleteStmt m_parsedDelete = null;
     /** parsed statement for an select */
-    ParsedSelectStmt m_parsedSelect = null;
+    private ParsedSelectStmt m_parsedSelect = null;
     /** parsed statement for an union */
-    ParsedUnionStmt m_parsedUnion = null;
+    private ParsedUnionStmt m_parsedUnion = null;
 
     /** plan selector */
-    PlanSelector m_planSelector;
+    private PlanSelector m_planSelector;
 
     /** Describes the specified and inferred partition context. */
     private StatementPartitioning m_partitioning;
 
-    public StatementPartitioning getPartition() {
-        return m_partitioning;
-    }
-
     /** Error message */
-    String m_recentErrorMsg;
+    private String m_recentErrorMsg;
 
     /**
      * Used to generate the table-touching parts of a plan. All join-order and
      * access path selection stuff is done by the SelectSubPlanAssember.
      */
-    SubPlanAssembler subAssembler = null;
+    private SubPlanAssembler m_subAssembler = null;
 
     /**
      * Flag when the only expected plan for a statement has already been generated.
      */
-    boolean m_bestAndOnlyPlanWasGenerated = false;
+    private boolean m_bestAndOnlyPlanWasGenerated = false;
 
     /**
      *
@@ -263,7 +264,7 @@ public class PlanAssembler {
      * getNextPlan() will return the first candidate plan for these parameters.
      *
      */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt) {
+    private void setupForNewPlans(AbstractParsedStmt parsedStmt) {
         m_bestAndOnlyPlanWasGenerated = false;
         m_partitioning.analyzeTablePartitioning(parsedStmt.m_tableAliasMap.values());
 
@@ -287,7 +288,7 @@ public class PlanAssembler {
                     simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
                 }
             }
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
+            m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
             if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
@@ -358,7 +359,7 @@ public class PlanAssembler {
                 valueEquivalence = parsedStmt.analyzeValueEquivalence();
             m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.m_tableAliasMap.values(), valueEquivalence);
         }
-        subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
+        m_subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
 
     private static void failIfNonDeterministicDml(AbstractParsedStmt parsedStmt, CompiledPlan plan) {
@@ -377,14 +378,20 @@ public class PlanAssembler {
             return;
         }
 
-        if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
+        boolean contentDeterministic = plan.isContentDeterministic();
+        if (parsedStmt instanceof ParsedInsertStmt && !(plan.isOrderDeterministic() && contentDeterministic)) {
             ParsedInsertStmt parsedInsert = (ParsedInsertStmt)parsedStmt;
             boolean targetHasLimitRowsTrigger = parsedInsert.targetTableHasLimitRowsTrigger();
+            String contentDeterministicMsg = "";
+            if (!contentDeterministic) {
+                contentDeterministicMsg = "  " + plan.nondeterminismDetail();
+            }
 
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(
                         "UPSERT statement manipulates data in a non-deterministic way.  "
-                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue."
+                        + contentDeterministicMsg);
             }
             else if (targetHasLimitRowsTrigger) {
                 throw new PlanningErrorException(
@@ -392,12 +399,18 @@ public class PlanAssembler {
                         + "non-deterministic.  Since the table being inserted into has a row limit "
                         + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
                         + "to address this issue."
+                        + contentDeterministicMsg
                         );
             }
             else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(
                         "INSERT statement manipulates data in a content non-deterministic way.  "
-                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue.");
+                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue."
+                        + contentDeterministicMsg);
+            }
+            else if (!contentDeterministic) {
+                throw new PlanningErrorException("INSERT statement manipulates data in a non-deterministic way."
+                                                 + contentDeterministicMsg);
             }
         }
 
@@ -416,10 +429,10 @@ public class PlanAssembler {
      * @param parsedStmt Current SQL statement to generate plan for
      * @return The best cost plan or null.
      */
-    public static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
+    static String IN_EXISTS_SCALAR_ERROR_MESSAGE = "Subquery expressions are only supported for "
             + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
+    CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
         List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueryScans();
         ParsedResultAccumulator fromSubqueryResult = null;
@@ -492,6 +505,7 @@ public class PlanAssembler {
         if (fromSubqueryResult != null) {
             // Calculate the combined state of determinism for the parent and child statements
             boolean orderIsDeterministic = retval.isOrderDeterministic();
+            String contentDeterminismDetail = fromSubqueryResult.m_isContentDeterministic;
             if (orderIsDeterministic && ! fromSubqueryResult.m_orderIsDeterministic) {
                 //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
                 // is subject to false negatives for determinism. It misses the subtlety of parent
@@ -509,13 +523,21 @@ public class PlanAssembler {
             }
             boolean hasLimitOrOffset =
                     fromSubqueryResult.m_hasLimitOrOffset || retval.hasLimitOrOffset();
-            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismDetail);
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
+        /*
+         * Find out if the query is inherently content deterministic and
+         * remember it.
+         */
+        String contentDeterminismMessage = parsedStmt.getContentDeterminismMessage();
+        if (contentDeterminismMessage != null) {
+            retval.setNondeterminismDetail(contentDeterminismMessage);
+        }
         failIfNonDeterministicDml(parsedStmt, retval);
 
         if (m_partitioning != null) {
@@ -529,7 +551,7 @@ public class PlanAssembler {
      * Output the best cost plan.
      *
      */
-    public void finalizeBestCostPlan() {
+    void finalizeBestCostPlan() {
         m_planSelector.finalizeOutput();
     }
 
@@ -542,6 +564,7 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
+        String isContentDeterministic = null;
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
@@ -549,6 +572,9 @@ public class PlanAssembler {
                 throw new PlanningErrorException(m_recentErrorMsg);
             }
             orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
+            if (isContentDeterministic != null && !subqueryBestPlan.isContentDeterministic()) {
+                isContentDeterministic = subqueryBestPlan.nondeterminismDetail();
+            }
             // Offsets or limits in subqueries are only significant (only effect content determinism)
             // when they apply to un-ordered subquery contents.
             hasSignificantOffsetOrLimit |=
@@ -558,7 +584,9 @@ public class PlanAssembler {
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 
-        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit);
+        return new ParsedResultAccumulator(orderIsDeterministic,
+                                           hasSignificantOffsetOrLimit,
+                                           isContentDeterministic);
     }
 
 
@@ -649,6 +677,7 @@ public class PlanAssembler {
      * @return A union plan or null.
      */
     private CompiledPlan getNextUnionPlan() {
+        String isContentDeterministic = null;
         // Since only the one "best" plan is considered,
         // this method should be called only once.
         if (m_bestAndOnlyPlanWasGenerated) {
@@ -671,7 +700,7 @@ public class PlanAssembler {
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
-            partitioning = assembler.getPartition();
+            partitioning = assembler.m_partitioning;
 
             // make sure we got a winner
             if (bestChildPlan == null) {
@@ -682,6 +711,11 @@ public class PlanAssembler {
                 return null;
             }
             childrenPlans.add(bestChildPlan);
+            // Remember the content non-determinism message for the
+            // first non-deterministic children we find.
+            if (isContentDeterministic != null) {
+                isContentDeterministic = bestChildPlan.nondeterminismDetail();
+            }
 
             // Make sure that next child's plans won't override current ones.
             planId = processor.m_planId;
@@ -759,7 +793,7 @@ public class PlanAssembler {
         retval.sql = m_planSelector.m_sql;
         boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedUnion.hasLimitOrOffset();
-        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
 
         // compute the cost - total of all children
         retval.cost = 0.0;
@@ -824,12 +858,12 @@ public class PlanAssembler {
     }
 
     private CompiledPlan getNextSelectPlan() {
-        assert (subAssembler != null);
+        assert (m_subAssembler != null);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
 
         if (subSelectRoot == null) {
-            m_recentErrorMsg = subAssembler.m_recentErrorMsg;
+            m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
             return null;
         }
         AbstractPlanNode root = subSelectRoot;
@@ -848,7 +882,7 @@ public class PlanAssembler {
             boolean mvFixInfoCoordinatorNeeded = true;
             boolean mvFixInfoEdgeCaseOuterJoin = false;
 
-            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            ArrayList<AbstractPlanNode> receivers = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             if (receivers.size() == 1) {
                 // The subplan SHOULD be good to go, but just make sure that it doesn't
                 // scan a partitioned table except under the ReceivePlanNode that was just found.
@@ -961,7 +995,8 @@ public class PlanAssembler {
         plan.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
-        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
         // Apply the micro-optimization:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
@@ -997,7 +1032,7 @@ public class PlanAssembler {
             return false;
         }
 
-        if (root.getPlanNodeType() == PlanNodeType.RECEIVE &&
+        if (root instanceof AbstractReceivePlanNode &&
                 m_parsedSelect.hasPartitionColumnInGroupby()) {
             // Top aggregate has been removed, its schema is exactly the same to
             // its local aggregate node.
@@ -1036,13 +1071,13 @@ public class PlanAssembler {
     }
 
     private CompiledPlan getNextDeletePlan() {
-        assert (subAssembler != null);
+        assert (m_subAssembler != null);
 
         // figure out which table we're deleting from
         assert (m_parsedDelete.m_tableList.size() == 1);
         Table targetTable = m_parsedDelete.m_tableList.get(0);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
         if (subSelectRoot == null) {
             return null;
         }
@@ -1135,15 +1170,18 @@ public class PlanAssembler {
         boolean orderIsDeterministic = true;
 
         boolean hasLimitOrOffset = m_parsedDelete.hasLimitOrOffset();
-        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+
+        // The delete statement cannot be inherently content non-deterministic.
+        // So, the last parameter is always null.
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, null);
 
         return plan;
     }
 
     private CompiledPlan getNextUpdatePlan() {
-        assert (subAssembler != null);
+        assert (m_subAssembler != null);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
         if (subSelectRoot == null) {
             return null;
         }
@@ -1237,7 +1275,9 @@ public class PlanAssembler {
         // w/ possibly non-deterministic subqueries.
         // Is there some way to integrate a "subquery determinism" check here?
         // because we didn't support updates with limits, either.
-        retval.statementGuaranteesDeterminism(false, true);
+        // Since the update cannot be inherently non-deterministic, there is
+        // no message, and the last parameter is null.
+        retval.statementGuaranteesDeterminism(false, true, null);
 
         return retval;
     }
@@ -1285,10 +1325,10 @@ public class PlanAssembler {
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
         StmtSubqueryScan subquery = m_parsedInsert.getSubqueryScan();
-
         CompiledPlan retval = null;
+        String isContentDeterministic = null;
         if (subquery != null) {
-
+            isContentDeterministic = subquery.calculateContentDeterminismMessage();
             if (subquery.getBestCostPlan() == null) {
                 // Seems like this should really be caught earlier
                 // in getBestCostPlan, above.
@@ -1392,7 +1432,7 @@ public class PlanAssembler {
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
 
-            retval.statementGuaranteesDeterminism(false, true);
+            retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         } else {
             insertNode.addAndLinkChild(retval.rootPlanGraph);
         }
@@ -1716,10 +1756,10 @@ public class PlanAssembler {
         AbstractPlanNode receiveNode = root;
         AbstractPlanNode reAggParent = null;
         // Find receive plan node and insert the constructed re-aggregation plan node.
-        if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+        if (root instanceof AbstractReceivePlanNode) {
             root = reAggNode;
         } else {
-            List<AbstractPlanNode> recList = root.findAllNodesOfType(PlanNodeType.RECEIVE);
+            List<AbstractPlanNode> recList = root.findAllNodesOfClass(AbstractReceivePlanNode.class);
             assert(recList.size() == 1);
             receiveNode = recList.get(0);
 
@@ -1771,7 +1811,7 @@ public class PlanAssembler {
         return root;
     }
 
-    class IndexGroupByInfo {
+    private static class IndexGroupByInfo {
         boolean m_multiPartition = false;
 
         List<Integer> m_coveredGroupByColumns;
@@ -1779,22 +1819,22 @@ public class PlanAssembler {
 
         AbstractPlanNode m_indexAccess = null;
 
-        public boolean isChangedToSerialAggregate() {
+        boolean isChangedToSerialAggregate() {
             return m_canBeFullySerialized && m_indexAccess != null;
         }
 
-        public boolean isChangedToPartialAggregate() {
+        boolean isChangedToPartialAggregate() {
             return !m_canBeFullySerialized && m_indexAccess != null;
         }
 
-        public boolean needHashAggregator(AbstractPlanNode root) {
+        boolean needHashAggregator(AbstractPlanNode root, ParsedSelectStmt parsedSelect) {
             // A hash is required to build up per-group aggregates in parallel vs.
             // when there is only one aggregation over the entire table OR when the
             // per-group aggregates are being built serially from the ordered output
             // of an index scan.
             // Currently, an index scan only claims to have a sort direction when its output
             // matches the order demanded by the ORDER BY clause.
-            if (! m_parsedSelect.isGrouped()) {
+            if (! parsedSelect.isGrouped()) {
                 return false;
             }
 
@@ -1818,7 +1858,7 @@ public class PlanAssembler {
                 // ORDER BY columns.
                 // Yet, any additional non-ORDER-BY columns in the GROUP BY clause will need
                 // partial aggregate.
-                if (m_parsedSelect.groupByIsAnOrderByPermutation()) {
+                if (parsedSelect.groupByIsAnOrderByPermutation()) {
                     return false;
                 }
             }
@@ -1921,7 +1961,7 @@ public class PlanAssembler {
             AggregatePlanNode topAggNode = null; // i.e., on the coordinator
             IndexGroupByInfo gbInfo = new IndexGroupByInfo();
 
-            if (root.getPlanNodeType() == PlanNodeType.RECEIVE) {
+            if (root instanceof AbstractReceivePlanNode) {
                 // do not apply index scan for serial/partial aggregation
                 // for distinct that does not group by partition column
                 if (!m_parsedSelect.hasAggregateDistinct() || m_parsedSelect.hasPartitionColumnInGroupby()) {
@@ -1932,7 +1972,7 @@ public class PlanAssembler {
             } else if (switchToIndexScanForGroupBy(root, gbInfo)) {
                 root = gbInfo.m_indexAccess;
             }
-            boolean needHashAgg = gbInfo.needHashAggregator(root);
+            boolean needHashAgg = gbInfo.needHashAggregator(root, m_parsedSelect);
 
             // Construct the aggregate nodes
             if (needHashAgg) {
@@ -2598,7 +2638,7 @@ public class PlanAssembler {
      * @return The set of column names affected by indexes with duplicates
      *         removed.
      */
-    public static Set<String> getIndexedColumnSetForTable(Table table) {
+    private static Set<String> getIndexedColumnSetForTable(Table table) {
         HashSet<String> columns = new HashSet<String>();
 
         for (Index index : table.getIndexes()) {
@@ -2610,7 +2650,7 @@ public class PlanAssembler {
         return columns;
     }
 
-    public String getErrorMessage() {
+    String getErrorMessage() {
         return m_recentErrorMsg;
     }
 

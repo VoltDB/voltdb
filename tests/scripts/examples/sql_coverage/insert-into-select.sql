@@ -63,7 +63,7 @@ INSERT INTO _targettable _distinct_agg_subq
 INSERT INTO _targettable _having_subq
 
 -- Join
-INSERT INTO _targettable SELECT SRC1.ID, SRC2.DESC, SRC1.NUM, SRC2.RATIO FROM _sourcetable AS SRC1, _sourcetable AS SRC2 WHERE SRC1.ID = SRC2.ID
+INSERT INTO _targettable SELECT SRC1.ID, SRC2.VCHAR, SRC1.NUM, SRC2.RATIO FROM _sourcetable AS SRC1, _sourcetable AS SRC2 WHERE SRC1.ID = SRC2.ID
 
 -- Limit/offset
 -- We get rounding differences here if we cast float to string
@@ -79,13 +79,13 @@ SELECT * FROM _targettable ORDER BY 1, 2, 3, 4
 TRUNCATE TABLE _targettable
 
 -- Subqueries
-INSERT INTO _targettable SELECT SQ1.ID, SRC2.DESC, SQ1.NUM, SRC2.RATIO FROM (_subq) AS SQ1(ID, DESC, NUM, RATIO), _sourcetable AS SRC2(ID, DESC, NUM, RATIO) WHERE SQ1.ID = SRC2.ID
+INSERT INTO _targettable SELECT SQ1.ID, SRC2.VCHAR, SQ1.NUM, SRC2.RATIO FROM (_subq) AS SQ1(ID, VCHAR, NUM, RATIO), _sourcetable AS SRC2(ID, VCHAR, NUM, RATIO) WHERE SQ1.ID = SRC2.ID
 
 -- dump target, and empty it
 SELECT * FROM _targettable ORDER BY 1, 2, 3, 4
 TRUNCATE TABLE _targettable
 
-INSERT INTO _targettable SELECT SQ1.ID, SQ2.DESC, SQ1.NUM, SQ2.RATIO FROM (_subq) AS SQ1(ID, DESC, NUM, RATIO), (_agg_subq) AS SQ2(ID, DESC, NUM, RATIO) WHERE SQ1.ID = SQ2.ID
+INSERT INTO _targettable SELECT SQ1.ID, SQ2.VCHAR, SQ1.NUM, SQ2.RATIO FROM (_subq) AS SQ1(ID, VCHAR, NUM, RATIO), (_agg_subq) AS SQ2(ID, VCHAR, NUM, RATIO) WHERE SQ1.ID = SQ2.ID
 
 -- dump target, and empty it
 SELECT * FROM _targettable ORDER BY 1, 2, 3, 4

@@ -57,6 +57,7 @@
 #include <ostream>
 #include <iostream>
 #include <vector>
+#include <jsoncpp/jsoncpp.h>
 
 class CopyOnWriteTest_TestTableTupleFlags;
 
@@ -323,6 +324,18 @@ public:
     /** Print out a human readable description of this tuple */
     std::string debug(const std::string& tableName) const;
     std::string debugNoHeader() const;
+
+    std::string toJsonArray() const {
+        int totalColumns = sizeInValues();
+        Json::Value array(Json::arrayValue);
+
+        array.resize(totalColumns);
+        for (int i = 0; i < totalColumns; i++) {
+            array[i] = getNValue(i).toString();
+        }
+
+        return Json::FastWriter().write(array);
+    }
 
     /** Copy values from one tuple into another (uses memcpy) */
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);

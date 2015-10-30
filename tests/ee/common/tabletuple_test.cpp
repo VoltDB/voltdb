@@ -126,6 +126,36 @@ TEST_F(TableTupleTest, HiddenColumns)
     nvalVisibleString.free();
 }
 
+TEST_F(TableTupleTest, ToJsonArray)
+{
+    TupleSchemaBuilder builder(3, 2);
+    builder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    builder.setColumnAtIndex(1, VALUE_TYPE_VARCHAR, 256);
+    builder.setColumnAtIndex(2, VALUE_TYPE_VARCHAR, 256);
+    builder.setHiddenColumnAtIndex(0, VALUE_TYPE_BIGINT);
+    builder.setHiddenColumnAtIndex(1, VALUE_TYPE_VARCHAR, 10);
+    ScopedTupleSchema schema(builder.build());
+
+    StandAloneTupleStorage autoStorage(schema.get());
+    const TableTuple& tuple = autoStorage.tuple();
+
+    NValue nvalVisibleBigint = ValueFactory::getBigIntValue(999);
+    NValue nvalVisibleString = ValueFactory::getStringValue("catdog");
+    NValue nvalHiddenBigint = ValueFactory::getBigIntValue(1066);
+    NValue nvalHiddenString = ValueFactory::getStringValue("platypus");
+
+    tuple.setNValue(0, nvalVisibleBigint);
+    tuple.setNValue(1, nvalVisibleString);
+    tuple.setNValue(2, ValueFactory::getNullValue());
+    tuple.setHiddenNValue(0, nvalHiddenBigint);
+    tuple.setHiddenNValue(1, nvalHiddenString);
+
+    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"catdog\",\"null\"]\n"));
+
+    nvalHiddenString.free();
+    nvalVisibleString.free();
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

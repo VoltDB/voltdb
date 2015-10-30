@@ -273,7 +273,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
     private ScheduledFuture<?> m_maxConnectionUpdater;
 
-    private final boolean m_isConfiguredForHSQL;
+    private final boolean m_isConfiguredForNonVoltDBBackend;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -1213,7 +1213,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
-        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+        BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
+        m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
         bindAdapter(internalAdapter, null, true);
@@ -2262,8 +2264,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
-        // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
+        // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
+        // -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
         int partition = -1;
 
         if (isSinglePartition) {

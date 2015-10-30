@@ -161,7 +161,7 @@ public abstract class VoltTableRow {
         m_hasCalculatedOffsets = true;
     }
 
-    final int getOffset(int index) {
+    public final int getOffset(int index) {
         ensureCalculatedOffsets();
         assert(index >= 0);
         assert(index < m_offsets.length);

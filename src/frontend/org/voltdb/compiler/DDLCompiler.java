@@ -139,11 +139,24 @@ public class DDLCompiler {
     private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
     // Addition columns for DR conflicts table
-    private static final String [] DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS = {
-        "VOLTDB_AUTOGEN_TABLE_NAME VARCHAR",  // actual size of this column will be calculated at runtime
-        "VOLTDB_AUTOGEN_CLUSTER_ID TINYINT",
-        "VOLTDB_AUTOGEN_TIMESTAMP BIGINT",
-        "VOLTDB_AUTOGEN_OPERATION_TYPE TINYINT"
+    public static String DR_ROW_TYPE_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ROW_TYPE";
+    public static String DR_LOG_ACTION_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ACTION_TYPE";
+    public static String DR_CONFLICT_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_CONFLICT_TYPE";
+    public static String DR_CONFLICTS_ON_PK_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_CONFLICTS_ON_PRIMARY_KEY";
+    public static String DR_ROW_DECISION_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_ROW_DECISION";
+    public static String DR_CLUSTER_ID_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_CLUSTER_ID";
+    public static String DR_TIMESTAMP_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_TIMESTAMP";
+    public static String DR_DIVERGENCE_COLUMN_NAME = "VOLTDB_AUTOGEN_DR_DIVERGENCE";
+
+    static final String [][] DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS = {
+        {DR_ROW_TYPE_COLUMN_NAME, "TINYINT"},
+        {DR_LOG_ACTION_COLUMN_NAME, "TINYINT"},
+        {DR_CONFLICT_COLUMN_NAME, "TINYINT"},
+        {DR_CONFLICTS_ON_PK_COLUMN_NAME, "TINYINT"},
+        {DR_ROW_DECISION_COLUMN_NAME, "TINYINT"},
+        {DR_CLUSTER_ID_COLUMN_NAME, "TINYINT"},
+        {DR_TIMESTAMP_COLUMN_NAME, "BIGINT"},
+        {DR_DIVERGENCE_COLUMN_NAME, "TINYINT"},
     };
 
     private static final Pattern drConflictsTablePattern = Pattern.compile(
@@ -240,12 +253,8 @@ public class DDLCompiler {
             // Indexes and constraints are not needed for export table
             if (subnode.name.equals("columns")) {
                 // Insert additional columns to DR conflicts table first
-                for (String column : DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS) {
-                    sb.append(column);
-                    if (column.startsWith("TABLE_NAME")) {
-                        sb.append("(" + node.attributes.get("name").length() + " BYTES" + ")");
-                    }
-                    sb.append(", ");
+                for (String[] column : DR_CONFLICTS_EXPORT_TABLE_ADDITIONAL_COLUMNS) {
+                    sb.append(column[0]).append(" ").append(column[1]).append(", ");
                 }
                 // Then duplicate all columns of the original table
                 int columnIdx = 0;

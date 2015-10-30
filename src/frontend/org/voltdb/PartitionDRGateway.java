@@ -39,14 +39,27 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
     }
 
+    public static enum DRRowType {
+        EXISTING_ROW,
+        EXPECTED_ROW,
+        NEW_ROW
+    }
+
+    public static enum DRRowDecision {
+        KEEP_ROW,
+        DELETE_ROW;
+    }
+
     // Keep sync with EE DRConflictType at types.h
     public static enum DRConflictType {
-        DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
-        DR_CONFLICT_MISSING_TUPLE,
-        DR_CONFLICT_TIMESTAMP_MISMATCH;
+        NO_CONFLICT,
+        CONSTRIANT_VIOLATION,
+        EXPECTED_ROW_MISSING,
+        EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
+
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -124,10 +137,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
-    public int processDRConflict(int partitionId, long remoteSequenceNumber, DRConflictType drConflictType,
-                                 String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
-                                 ByteBuffer newTable, ByteBuffer output) {
-        return 0;
+    public boolean processDRConflict(int partitionId, long remoteTimestamp, String tableName, DRRecordType action,
+                                 DRConflictType deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
+                                 DRConflictType insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
+        return false;
     }
 
     public static long pushDRBuffer(
@@ -146,14 +159,16 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}
 
-    public static int reportDRConflict(int partitionId, long remoteSequenceNumber, int drConflictType,
-                                       String tableName, ByteBuffer existingTable, ByteBuffer expectedTable,
-                                       ByteBuffer newTable, ByteBuffer output) {
+    public static boolean reportDRConflict(int partitionId, long remoteTimestamp, String tableName, int action,
+                                       int deleteConflict, ByteBuffer existingTableForDelete, ByteBuffer expectedTableForDelete,
+                                       int insertConflict, ByteBuffer existingTableForInsert, ByteBuffer newTableForInsert) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.processDRConflict(partitionId, remoteSequenceNumber,DRConflictType.values()[drConflictType],
-                tableName, existingTable, expectedTable, newTable, output);
+
+        return pdrg.processDRConflict(partitionId, remoteTimestamp, tableName, DRRecordType.values()[action],
+                DRConflictType.values()[deleteConflict], existingTableForDelete, expectedTableForDelete,
+                DRConflictType.values()[insertConflict], existingTableForInsert, newTableForInsert);
     }
 }

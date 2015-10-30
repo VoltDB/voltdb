@@ -56,6 +56,7 @@ class AbstractPlanNode;
 class VoltDBEngine;
 
 AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+
 }
 
 #endif
