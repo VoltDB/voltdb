@@ -34,7 +34,7 @@ class TableTuple;
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine);
+    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
 
