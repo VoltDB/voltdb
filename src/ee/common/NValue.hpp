@@ -593,7 +593,7 @@ class NValue {
             return std::string(reinterpret_cast<char*>(getObjectValue_withoutNull()),
                                getObjectLength_withoutNull());
         case VALUE_TYPE_VARBINARY: {
-            char buf[getObjectLength_withoutNull() * 2];
+            char buf[getObjectLength_withoutNull() * 2 + 1];
             catalog::Catalog::hexEncodeString(reinterpret_cast<char*>(getObjectValue_withoutNull()), buf);
             return std::string(buf, getObjectLength_withoutNull() * 2);
         }
