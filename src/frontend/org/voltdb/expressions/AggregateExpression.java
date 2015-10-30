@@ -87,7 +87,9 @@ public class AggregateExpression extends AbstractExpression {
             //
             m_valueType = m_left.getValueType();
             m_valueSize = m_left.getValueSize();
-            if (m_valueType == VoltType.FLOAT) {
+            // Of these aggregate functions, only AVG is
+            // non-deterministic on floating point types.
+            if (m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
                 updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
             }
             break;
