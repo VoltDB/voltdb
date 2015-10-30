@@ -105,7 +105,8 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 // table name prefix of DR conflict table
-const std::string DR_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_DR_CONFLICT_EXPORTS";
+const std::string DR_REPLICATED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_DR_CONFLICT_REPLICATED";
+const std::string DR_PARTITIONED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_DR_CONFLICT_PARTITIONED";
 
 namespace voltdb {
 
@@ -152,7 +153,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_templateSingleLongTable(NULL),
       m_topend(topend),
       m_executorContext(NULL),
-      m_drConflictExportTable(NULL),
+      m_drPartitionedConflictExportTable(NULL),
+      m_drReplicatedConflictExportTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
       m_tuplesModifiedStack()
@@ -536,10 +538,12 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     }
 
     if (getIsActiveActiveDREnabled()) {
-        m_drConflictExportTable = getTable(DR_CONFLICT_TABLE_NAME);
+        m_drPartitionedConflictExportTable = getTable(DR_PARTITIONED_CONFLICT_TABLE_NAME);
+        m_drReplicatedConflictExportTable = getTable(DR_REPLICATED_CONFLICT_TABLE_NAME);
     }
     else {
-        m_drConflictExportTable = NULL;
+        m_drPartitionedConflictExportTable = NULL;
+        m_drReplicatedConflictExportTable = NULL;
     }
 
     return true;

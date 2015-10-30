@@ -577,8 +577,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     TBPtr allocateNextBlock();
 
+    inline bool isReplicatedTable() const {
+        return (m_partitionColumn == -1);
+    }
+
     inline DRTupleStream *getDRTupleStream(ExecutorContext *ec) {
-        if (m_partitionColumn == -1) {
+        if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         } else {
             return ec->drStream();
