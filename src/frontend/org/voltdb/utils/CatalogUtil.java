@@ -2245,6 +2245,12 @@ public abstract class CatalogUtil {
             ksafe.setValue("true");
             defaultConfiguration.getProperty().add(ksafe);
 
+            // skip internal export columns
+            PropertyType skipinternal = new PropertyType();
+            skipinternal.setName("skipinternals");
+            skipinternal.setValue("true");
+            defaultConfiguration.getProperty().add(skipinternal);
+
             export.getConfiguration().add(defaultConfiguration);
         }
         return export;
