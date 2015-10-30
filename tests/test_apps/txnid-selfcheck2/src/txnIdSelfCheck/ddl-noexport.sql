@@ -176,6 +176,7 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
 PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
