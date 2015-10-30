@@ -292,6 +292,34 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     }
 
     /**
+     * Test that Min does not trigger non-determinism errors.
+     *
+     * @throws Exception
+     */
+    public void testMinOfFloatIsOk() throws Exception {
+        String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
+        testCompilationFailure("testMinOfFloat",
+                               simpleSchema,
+                               new String[] { "MinOfFloat", "insert into alpha select lf.ss+rf.ss from (select af as ss from alpha ) as lf inner join ( select min(bf) as ss from beta ) as rf on true;" },
+                               null,
+                               true);
+    }
+
+    /**
+     * Test that Max does not trigger non-determinism errors.
+     *
+     * @throws Exception
+     */
+    public void testMaxOfFloatIsOk() throws Exception {
+        String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
+        testCompilationFailure("testMaxOfFloat",
+                               simpleSchema,
+                               new String[] { "MaxOfFloat", "insert into alpha select lf.ss+rf.ss from (select af as ss from alpha ) as lf inner join ( select max(bf) as ss from beta ) as rf on true;" },
+                               null,
+                               true);
+    }
+
+    /**
      * Test that we haven't broken the obvious good case.
      *
      * @throws Exception
