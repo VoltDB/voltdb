@@ -219,7 +219,7 @@ public:
     }
 
     std::unique_ptr<S2Polygon> toS2Polygon() const {
-        std::unique_ptr<std::vector<S2Loop*> > loops(new std::vector<S2Loop*>());
+        std::vector<S2Loop*> loops;
         auto loopIt = this->loops().begin();
         auto loopEnd = this->loops().end();
         for (; loopIt != loopEnd; ++loopIt) {
@@ -234,14 +234,14 @@ public:
             }
             S2Loop* loop = new S2Loop();
             loop->Init(verts);
-            loops->push_back(loop);
+            loops.push_back(loop);
         }
 
         std::unique_ptr<S2Polygon> s2Poly(new S2Polygon());
 
         // The polygon will take ownership of the loops here.
-        s2Poly->Init(loops.get());
-        assert(loops->empty());
+        s2Poly->Init(&loops);
+        assert(loops.empty());
 
         return s2Poly;
     }
