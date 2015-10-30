@@ -394,10 +394,6 @@ static void findConflictTuple(Table *table, const TableTuple *existingTuple, con
                     if (expectedTuple->equals(conflictTuple)) {
                         // exclude the expected tuple in update
                         continue;
-                    } else if (searchTuple->equals(conflictTuple)) {
-                        // in update we report this row as a timestamp mismatch conflict
-                        // not an unique constraint violation conflict
-                        continue;
                     } else if (existingTuple && existingTuple->equals(conflictTuple)) {
                         // in update this row was already listed in existingTableForDelete,
                         // don't include it in existingTableForInsert.
