@@ -476,24 +476,6 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
     return retval;
 }
 
-static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer, boost::shared_array<char>& backingCharArray) {
-   if (!table) {
-       return;
-   }
-
-   size_t serializeSize = table->getAccurateSizeToSerialize(false);
-   backingCharArray.reset(new char[serializeSize]);
-   ReferenceSerializeOutput conflictSerializeOutput(backingCharArray.get(), serializeSize);
-   table->serializeToWithoutTotalSize(conflictSerializeOutput);
-
-   *buffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingCharArray.get()),
-                                                static_cast<int32_t>(serializeSize));
-   if (*buffer == NULL) {
-       jniEngine->ExceptionDescribe();
-       throw std::exception();
-   }
-}
-
 int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
         DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
         DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
@@ -501,22 +483,74 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
     jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
     // prepare input buffer for delete conflict
-    jobject existingRowsBufferForDelete;
-    boost::shared_array<char> existingArrayForDelete;
-    serializeTable(m_jniEnv, existingTableForDelete, &existingRowsBufferForDelete, existingArrayForDelete);
+    jobject existingRowsBufferForDelete = NULL;
+    char* existingArrayForDelete = NULL;
+    if (existingTableForDelete) {
+        size_t serializeSize = existingTableForDelete->getAccurateSizeToSerialize(false);
+        existingArrayForDelete = new char[serializeSize];
+        ReferenceSerializeOutput conflictSerializeOutput(existingArrayForDelete, serializeSize);
+        existingTableForDelete->serializeToWithoutTotalSize(conflictSerializeOutput);
 
-    jobject expectedRowsBufferForDelete;
-    boost::shared_array<char> expectedArrayForDelete;
-    serializeTable(m_jniEnv, expectedTableForDelete, &expectedRowsBufferForDelete, expectedArrayForDelete);
+        existingRowsBufferForDelete = m_jniEnv->NewDirectByteBuffer(static_cast<void*>(existingArrayForDelete),
+                                                    static_cast<int32_t>(serializeSize));
+        if (existingRowsBufferForDelete == NULL) {
+            delete existingArrayForDelete;
+            m_jniEnv->ExceptionDescribe();
+           throw std::exception();
+        }
+    }
+
+    jobject expectedRowsBufferForDelete = NULL;
+    char* expectedArrayForDelete = NULL;
+    if (expectedTableForDelete) {
+        size_t serializeSize = expectedTableForDelete->getAccurateSizeToSerialize(false);
+        expectedArrayForDelete = new char[serializeSize];
+        ReferenceSerializeOutput conflictSerializeOutput(expectedArrayForDelete, serializeSize);
+        expectedTableForDelete->serializeToWithoutTotalSize(conflictSerializeOutput);
+
+        expectedRowsBufferForDelete = m_jniEnv->NewDirectByteBuffer(static_cast<void*>(expectedArrayForDelete),
+                                                    static_cast<int32_t>(serializeSize));
+        if (expectedRowsBufferForDelete == NULL) {
+            delete expectedArrayForDelete;
+            m_jniEnv->ExceptionDescribe();
+           throw std::exception();
+        }
+    }
 
     // prepare input buffer for insert conflict
-    jobject existingRowsBufferForInsert;
-    boost::shared_array<char> existingArrayForInsert;
-    serializeTable(m_jniEnv, existingTableForInsert, &existingRowsBufferForInsert, existingArrayForInsert);
+    jobject existingRowsBufferForInsert = NULL;
+    char* existingArrayForInsert = NULL;
+    if (existingTableForInsert) {
+        size_t serializeSize = existingTableForInsert->getAccurateSizeToSerialize(false);
+        existingArrayForInsert = new char[serializeSize];
+        ReferenceSerializeOutput conflictSerializeOutput(existingArrayForInsert, serializeSize);
+        existingTableForInsert->serializeToWithoutTotalSize(conflictSerializeOutput);
 
-    jobject newRowsBufferForInsert;
-    boost::shared_array<char> newArrayInsert;
-    serializeTable(m_jniEnv, newTableForInsert, &newRowsBufferForInsert, newArrayInsert);
+        existingRowsBufferForInsert = m_jniEnv->NewDirectByteBuffer(static_cast<void*>(existingArrayForInsert),
+                                                    static_cast<int32_t>(serializeSize));
+        if (existingRowsBufferForInsert == NULL) {
+            delete existingArrayForInsert;
+            m_jniEnv->ExceptionDescribe();
+           throw std::exception();
+        }
+    }
+
+    jobject newRowsBufferForInsert = NULL;
+    char* newArrayInsert = NULL;
+    if (newTableForInsert) {
+        size_t serializeSize = newTableForInsert->getAccurateSizeToSerialize(false);
+        newArrayInsert = new char[serializeSize];
+        ReferenceSerializeOutput conflictSerializeOutput(newArrayInsert, serializeSize);
+        newTableForInsert->serializeToWithoutTotalSize(conflictSerializeOutput);
+
+        newRowsBufferForInsert = m_jniEnv->NewDirectByteBuffer(static_cast<void*>(newArrayInsert),
+                                                    static_cast<int32_t>(serializeSize));
+        if (newRowsBufferForInsert == NULL) {
+            delete newArrayInsert;
+            m_jniEnv->ExceptionDescribe();
+           throw std::exception();
+        }
+    }
 
     int32_t retval = m_jniEnv->CallStaticIntMethod(m_partitionDRGatewayClass,
                                             m_reportDRConflictMID,
