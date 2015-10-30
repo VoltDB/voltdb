@@ -45,9 +45,9 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         NEW_ROW
     }
 
-    public static enum DRRowDecision {
-        KEEP_ROW,
-        DELETE_ROW;
+    public static enum DRConflictResolutionFlag {
+        ACCEPT_CHANGE,
+        CONVERGENT
     }
 
     // Keep sync with EE DRConflictType at types.h
