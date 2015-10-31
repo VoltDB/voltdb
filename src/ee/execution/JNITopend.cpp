@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
             "reportDRConflict",
-            "(IJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)Z");
+            "(IIJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_reportDRConflictMID != NULL);
@@ -476,66 +476,61 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
     return retval;
 }
 
-static void serializeTable(JNIEnv* jniEngine, Table* table, jobject* buffer, boost::shared_array<char>& backingCharArray) {
-   if (!table) {
-       return;
-   }
-
-   size_t serializeSize = table->getAccurateSizeToSerialize(false);
-   backingCharArray.reset(new char[serializeSize]);
-   ReferenceSerializeOutput conflictSerializeOutput(backingCharArray.get(), serializeSize);
-   table->serializeToWithoutTotalSize(conflictSerializeOutput);
-
-   *buffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingCharArray.get()),
-                                                static_cast<int32_t>(serializeSize));
-   if (*buffer == NULL) {
-       jniEngine->ExceptionDescribe();
-       throw std::exception();
-   }
+static boost::shared_ptr<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, Table *table, jobject &byteBuffer) {
+    if (table) {
+        size_t serializeSize = table->getAccurateSizeToSerialize(false);
+        boost::shared_ptr<char> backingArray = boost::shared_ptr<char>(new char[serializeSize]);
+        ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
+        table->serializeToWithoutTotalSize(conflictSerializeOutput);
+        byteBuffer = jniEngine->NewDirectByteBuffer(static_cast<void*>(backingArray.get()),
+                                                            static_cast<int32_t>(serializeSize));
+        if (byteBuffer == NULL) {
+            jniEngine->ExceptionDescribe();
+            throw std::exception();
+        }
+        return backingArray;
+    }
+    return boost::shared_ptr<char>();
 }
 
-bool JNITopend::reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
-        DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
-        DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) {
+int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+        DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTable,
+        DRConflictType insertConflict, Table *existingTableForInsert, Table *newTable) {
+
     // prepare tablename
     jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
-    // prepare input buffer for delete conflict
-    jobject existingRowsBufferForDelete;
-    boost::shared_array<char> existingArrayForDelete;
-    serializeTable(m_jniEnv, existingTableForDelete, &existingRowsBufferForDelete, existingArrayForDelete);
+    jobject existingRowBufferForDelete = NULL;
+    boost::shared_ptr<char> existingArrayForDelete = serializeToDirectByteBuffer(m_jniEnv, existingTableForDelete, existingRowBufferForDelete);
 
-    jobject expectedRowsBufferForDelete;
-    boost::shared_array<char> expectedArrayForDelete;
-    serializeTable(m_jniEnv, expectedTableForDelete, &expectedRowsBufferForDelete, expectedArrayForDelete);
+    jobject expectedRowBuffer = NULL;
+    boost::shared_ptr<char> expectedArray = serializeToDirectByteBuffer(m_jniEnv, expectedTable, expectedRowBuffer);
 
-    // prepare input buffer for insert conflict
-    jobject existingRowsBufferForInsert;
-    boost::shared_array<char> existingArrayForInsert;
-    serializeTable(m_jniEnv, existingTableForInsert, &existingRowsBufferForInsert, existingArrayForInsert);
+    jobject existingRowsBufferForInsert = NULL;
+    boost::shared_ptr<char> existingArrayForInsert = serializeToDirectByteBuffer(m_jniEnv, existingTableForInsert, existingRowsBufferForInsert);
 
-    jobject newRowsBufferForInsert;
-    boost::shared_array<char> newArrayInsert;
-    serializeTable(m_jniEnv, newTableForInsert, &newRowsBufferForInsert, newArrayInsert);
+    jobject newRowBuffer = NULL;
+    boost::shared_ptr<char> newArray = serializeToDirectByteBuffer(m_jniEnv, newTable, newRowBuffer);
 
     int32_t retval = m_jniEnv->CallStaticIntMethod(m_partitionDRGatewayClass,
                                             m_reportDRConflictMID,
                                             partitionId,
-                                            timestamp,
+                                            remoteClusterId,
+                                            remoteTimestamp,
                                             tableNameString,
                                             action,
                                             deleteConflict,
-                                            existingRowsBufferForDelete,
-                                            expectedRowsBufferForDelete,
+                                            existingRowBufferForDelete,
+                                            expectedRowBuffer,
                                             insertConflict,
                                             existingRowsBufferForInsert,
-                                            newRowsBufferForInsert);
+                                            newRowBuffer);
 
     m_jniEnv->DeleteLocalRef(tableNameString);
-    m_jniEnv->DeleteLocalRef(existingRowsBufferForDelete);
-    m_jniEnv->DeleteLocalRef(expectedRowsBufferForDelete);
+    m_jniEnv->DeleteLocalRef(existingRowBufferForDelete);
+    m_jniEnv->DeleteLocalRef(expectedRowBuffer);
     m_jniEnv->DeleteLocalRef(existingRowsBufferForInsert);
-    m_jniEnv->DeleteLocalRef(newRowsBufferForInsert);
+    m_jniEnv->DeleteLocalRef(newRowBuffer);
 
     return retval;
 }

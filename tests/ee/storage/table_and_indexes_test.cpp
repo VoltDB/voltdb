@@ -417,7 +417,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -460,7 +460,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -496,7 +496,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -560,7 +560,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -599,7 +599,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -678,7 +678,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     customerTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     customerTable->setDR(true);
 
@@ -717,7 +717,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     customerTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     customerTable->setDR(true);
 

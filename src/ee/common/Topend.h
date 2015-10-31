@@ -68,7 +68,7 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
-    virtual bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
+    virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
             DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) = 0;
 
@@ -106,7 +106,7 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
-    bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
             DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
             DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert);
 
