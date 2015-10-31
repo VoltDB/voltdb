@@ -18,6 +18,7 @@
 #ifndef EE_COMMON_GEOGRAPHY_HPP
 #define EE_COMMON_GEOGRAPHY_HPP
 
+#include <memory>
 #include <sstream>
 #include <vector>
 
@@ -26,157 +27,73 @@
 
 #include "common/value_defs.h"
 #include "common/Point.hpp"
+#include "common/serializeio.h"
 
 #include "s2geo/s2loop.h"
 #include "s2geo/s2polygon.h"
 
 namespace voltdb {
 
-/**
- * A class for representing loops of a polygon.  A polygon is composed
- * of one or more loops, where the first loop delineates area inside
- * the polygon, and subsequent loops delineate negative areas or
- * "holes."
- *
- * This class can be treated as a container for the vertexes in the
- * loop, and used with a range-based for loop:
- *
- *   Loop loop = ...;
- *   BOOST_FOREACH (const Point& vertex, loop) {
- *       // ...
- *   }
- *
- *   [Or, with C++11...]
- *
- *   Loop loop = ...;
- *   for (const Point& pt : loop) {
- *     ...
- *   }
- */
-class Loop {
-public:
-
-    // BOOST_FOREACH needs these types to work.
-    typedef const Point* iterator;
-    typedef const Point* const_iterator;
-
-    explicit Loop(const char* data) : m_data(data) {}
-
-    int32_t numVertices() const {
-        return reinterpret_cast<const int32_t*>(m_data)[0];
-    }
-
-    const Point* begin() const {
-        const char* pos = m_data + sizeof(int32_t);
-        return reinterpret_cast<const Point*>(pos);
-    }
-
-    const Point* end() const {
-        const char* pos = m_data + sizeof(int32_t) + sizeof(Point) * numVertices();
-        return reinterpret_cast<const Point*>(pos);
-    }
-
-private:
-    const char * const m_data;
-};
+class Geography;
 
 /**
- * A class for representing the collection of loops that make up a
- * polygon.  When compiling with C++11 support (soon?), this class can
- * be used in a range-based for loop to iterate over each loop:
- *
- *   LoopContainer lc = geog.loops();
- *   for (Loop loop : lc) {
- *     ...
- *   }
- *
- * It should be possible to get this class to work with BOOST_FOREACH,
- * but there's some tricky template trickery required to get that to
- * work.
+ * A subclass of S2Loop that allows instances to be initialized from
+ * the EE's serializer classes.
  */
-class LoopContainer {
+class Loop : public S2Loop {
 public:
 
-    class iterator {
-    public:
-
-        iterator(const char* pos, std::size_t numRemainingLoops)
-            : m_pos(pos)
-            , m_numRemainingLoops(numRemainingLoops)
-        {
-        }
-
-        // this constructor is used to create the end iterator
-        iterator()
-            : m_pos(NULL)
-            , m_numRemainingLoops(0)
-        {
-        }
-
-        // pre-increment
-        iterator& operator++() {
-            --m_numRemainingLoops;
-            if (m_numRemainingLoops == 0) {
-                // the end iterator.
-                m_pos = 0;
-                return *this;
-            }
-
-            int32_t numVerts = Loop(m_pos).numVertices();
-            m_pos += sizeof(int32_t) + sizeof(Point) * numVerts;
-            return *this;
-        }
-
-        const Loop operator*() const {
-            return Loop(m_pos);
-        }
-
-        bool operator!=(const iterator& that) const {
-            return m_pos != that.m_pos;
-        }
-
-        bool operator==(const iterator& that) const {
-            return m_pos == that.m_pos;
-        }
-
-    private:
-        const char* m_pos;
-        std::size_t m_numRemainingLoops;
-    };
-
-    LoopContainer(const char* data)
-        : m_data(data)
+    Loop()
+        : S2Loop()
     {
     }
 
-    // return the number of loops
-    // (using std::size_t here to follow convention of std containers)
-    std::size_t size() const {
-        return static_cast<const std::size_t>(reinterpret_cast<const int32_t*>(m_data)[0]);
+    template<class Deserializer>
+    void initFromBuffer(Deserializer& input);
+
+    template<class Serializer>
+    void saveToBuffer(Serializer& output) const;
+
+    template<class Serializer, class Deserializer>
+    static void copyViaSerializers(Serializer& output, Deserializer& input);
+
+    template<class Deserializer>
+    static void pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>* points);
+
+    static std::size_t serializedLength(int32_t numVertices);
+};
+
+/**
+ * A subclass of S2Polygon that allows instances to be initialized from
+ * the EE's serializer classes.
+ */
+class Polygon : public S2Polygon {
+public:
+
+    Polygon()
+        : S2Polygon()
+    {
     }
 
-    iterator begin() const {
-        return iterator(m_data + sizeof(int32_t), size());
-    }
+    void init(std::vector<std::unique_ptr<S2Loop> > *loops);
 
-    iterator end() const {
-        return iterator();
-    }
+    void initFromGeography(const Geography& geog);
 
-private:
-    const char* const m_data;
+    template<class Deserializer>
+    void initFromBuffer(Deserializer& input);
+
+    template<class Serializer>
+    void saveToBuffer(Serializer& output) const;
+
+    template<class Serializer, class Deserializer>
+    static void copyViaSerializers(Serializer& output, Deserializer& input);
+
+    static std::size_t serializedLengthNoLoops();
 };
 
 /**
  * A class for representing instances of geo-spatial geographies.
  * (Currently only polygons can be represented here.)
- *
- * Accepts a pointer to a variable-length byte sequence
- * [4 bytes] number of loops prefix
- * and for each loop:
- *   [4 bytes] number of vertices
- *   and for each vertex:
- *     a serialization of the Point
  *
  * Note that variable length data in the EE is typically prefixed with a length.
  * The pointer here should be to the start of the data just after the length.
@@ -187,161 +104,41 @@ public:
     /** Constructor for a null geography */
     Geography()
         : m_data(NULL)
+        , m_length(0)
     {
     }
 
-    /**
-     * Create a polygon from a variable-length byte sequence.  This
-     * object does not own the data and should not free it---the data
-     * pointer points into a buffer that is managed in the same manner
-     * as VARCHAR and VARBINARY data.
-     */
-    Geography(void* data)
+    Geography(void* data, int32_t length)
         : m_data(static_cast<char*>(data))
+        , m_length(length)
     {
-        assert (m_data != NULL);
     }
 
-    bool isNull() const {
+    bool isNull() const
+    {
         return m_data == NULL;
     }
 
-    int32_t numLoops() const {
-        if (isNull())
-            return 0;
-
-        return reinterpret_cast<const int32_t*>(m_data)[0];
+    char* data() const
+    {
+        return m_data;
     }
 
-    // number of points/vertices polygon has. It is sum of
-    // number of points it's loops has.
-    int32_t numPoints() const {
-        LoopContainer::iterator it = loops().begin();
-        LoopContainer::iterator loopsEnd = loops().end();
-        int32_t numPoints = 0;
-        for (; it != loopsEnd; ++it) {
-            numPoints = numPoints + (*it).numVertices();
-        }
-        return numPoints;
-    }
-
-    LoopContainer loops() const {
-        assert(! isNull());
-        return LoopContainer(m_data);
-    }
-
-    std::unique_ptr<S2Polygon> toS2Polygon() const {
-        std::vector<S2Loop*> loops;
-        auto loopIt = this->loops().begin();
-        auto loopEnd = this->loops().end();
-        for (; loopIt != loopEnd; ++loopIt) {
-            std::vector<S2Point> verts;
-            auto vertIt = (*loopIt).begin();
-            // S2 considers the final closing vertex
-            // (which should be identical to the first vertex)
-            // to be implicit.
-            auto vertEnd = (*loopIt).end() - 1;
-            for (; vertIt != vertEnd; ++vertIt) {
-                verts.push_back(vertIt->toS2Point());
-            }
-            S2Loop* loop = new S2Loop();
-            loop->Init(verts);
-            loops.push_back(loop);
-        }
-
-        std::unique_ptr<S2Polygon> s2Poly(new S2Polygon());
-
-        // The polygon will take ownership of the loops here.
-        s2Poly->Init(&loops);
-        assert(loops.empty());
-
-        return s2Poly;
+    int32_t length() const
+    {
+        return m_length;
     }
 
     /**
      * Do a comparison with another geography (polygon).
-     *
-     * Let's do floating-point comparisons only as a last resort to
-     * help avoid issues with floating-point math.  It doesn't really
-     * matter how we do our comparison as long as we produce a
-     * deterministic order.
-     *
-     *   1. First compare number of loops (polygons with fewer loops sort as smaller).
-     *   2. If the number of loops are the same, compare on the number of vertices
-     *        in the loops.  The polygon with fewer vertices will sort as smaller.
-     *   3. Finally, if all loops have the same number of vertices, sort on the
-     *        points themselves (which will involve doing floating-point comparison)
      */
-    int compareWith(const Geography& rhs) const {
-        assert(! isNull() && !rhs.isNull());
-
-        if (numLoops() < rhs.numLoops()) {
-            return VALUE_COMPARE_LESSTHAN;
-        }
-
-        if (numLoops() > rhs.numLoops()) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
-
-        // number of loops are the same.
-        // compare on number of vertices in each loop
-        LoopContainer::iterator rhsLoopIt = rhs.loops().begin();
-        LoopContainer::iterator lhsLoopIt = loops().begin();
-        LoopContainer::iterator lhsLoopEnd = loops().end();
-        for (; lhsLoopIt != lhsLoopEnd; ++lhsLoopIt) {
-             Loop loop = *lhsLoopIt;
-             if (loop.numVertices() < (*rhsLoopIt).numVertices()) {
-                 return VALUE_COMPARE_LESSTHAN;
-             }
-             else if (loop.numVertices() > (*rhsLoopIt).numVertices()) {
-                 return VALUE_COMPARE_GREATERTHAN;
-             }
-             ++rhsLoopIt;
-        }
-
-        // Each loop has the same number of vertices.
-        // Compare the vertices themselves.
-        rhsLoopIt = rhs.loops().begin();
-        lhsLoopIt = loops().begin();
-        for (; lhsLoopIt != lhsLoopEnd; ++lhsLoopIt) {
-            Loop loop = *lhsLoopIt;
-            Loop::iterator rhsVertexIt = (*rhsLoopIt).begin();
-            BOOST_FOREACH(const Point &vertex, loop) {
-                int cmpResult = vertex.compareWith(*rhsVertexIt);
-                if (cmpResult != VALUE_COMPARE_EQUAL) {
-                    return cmpResult;
-                }
-
-                ++rhsVertexIt;
-            }
-            ++rhsLoopIt;
-        }
-
-        return VALUE_COMPARE_EQUAL;
-    }
+    int compareWith(const Geography& rhs) const;
 
     /**
      * Serialize this geography
      */
     template<class Serializer>
-    void serializeTo(Serializer& output) const {
-        assert (! isNull());
-        int32_t nLoops = numLoops();
-        assert(nLoops > 0);
-        output.writeInt(nLoops);
-
-        LoopContainer::iterator it = loops().begin();
-        LoopContainer::iterator loopsEnd = loops().end();
-        for (; it != loopsEnd; ++it) {
-            Loop loop = *it;
-            int numVerts = loop.numVertices();
-            assert(numVerts > 0);
-            output.writeInt(numVerts);
-            BOOST_FOREACH(const Point& vertex, loop) {
-                vertex.serializeTo(output);
-            }
-        }
-    }
+    void serializeTo(Serializer& output) const;
 
     /**
      * Populate a pointer to storage with the bytes that represent a
@@ -352,73 +149,466 @@ public:
     template<class Deserializer>
     static void deserializeFrom(Deserializer& input,
                                 char* storage,
-                                int32_t length)
+                                int32_t length);
+
+    /**
+     * Hash this geography value (used for hash aggregation where a
+     * geography is group by key).
+     */
+    void hashCombine(std::size_t& seed) const;
+
+    /**
+     * Produce a human-readable summary of this geography
+     */
+    std::string toString() const;
+
+private:
+    char* m_data;
+    int32_t m_length;
+};
+
+/**
+ * A class similar to ReferenceSerializeOutput, except that it doesn't
+ * do any byte-swapping.
+ */
+class SimpleOutputSerializer {
+public:
+    SimpleOutputSerializer(char* const buffer, std::size_t size)
+        : m_buffer(buffer)
+        , m_size(size)
+        , m_cursor(buffer)
     {
-        char *pos = storage;
-        int32_t nLoops = input.readInt();
-        assert(nLoops > 0);
-        reinterpret_cast<int32_t*>(pos)[0] = nLoops;
-        pos += sizeof(nLoops);
-
-        for (int i = 0; i < nLoops; ++i) {
-
-            int32_t numVertices = input.readInt();
-            reinterpret_cast<int32_t*>(pos)[0] = numVertices;
-            pos += sizeof(numVertices);
-
-            for (int j = 0; j < numVertices; ++j) {
-                const Point pt = Point::deserializeFrom(input);
-                reinterpret_cast<Point::Coord*>(pos)[0] = pt.getLatitude();
-                reinterpret_cast<Point::Coord*>(pos)[1] = pt.getLongitude();
-                pos += sizeof(Point::Coord) * 2;
-            }
-        }
     }
 
-    void hashCombine(std::size_t& seed) const {
-
-        if (isNull()) {
-            // Treat a null as a polygon with zero loops
-            boost::hash_combine(seed, 0);
-            return;
-        }
-
-        boost::hash_combine(seed, numLoops());
-        LoopContainer::iterator it = loops().begin();
-        LoopContainer::iterator loopsEnd = loops().end();
-        for (; it != loopsEnd; ++it) {
-            Loop loop = *it;
-            boost::hash_combine(seed, loop.numVertices());
-            BOOST_FOREACH(const Point& pt, loop) {
-                pt.hashCombine(seed);
-            }
-        }
+    ~SimpleOutputSerializer()
+    {
+        // make sure we consumed everything we expected to.
+        assert(m_buffer + m_size == m_cursor);
     }
 
-    std::string toString() const {
-        std::ostringstream oss;
+    void writeByte(int8_t byte) {
+        writeNative(byte);
+    }
 
-        if (isNull()) {
-            oss << "null polygon";
-        }
-        else {
-            oss << "polygon with ";
-            oss << numLoops() << " loops with vertex counts";
-            LoopContainer::iterator it = loops().begin();
-            LoopContainer::iterator loopsEnd = loops().end();
-            for (; it != loopsEnd; ++it) {
-                Loop loop = *it;
-                oss << " " << loop.numVertices();
-            }
-        }
+    void writeBool(bool val) {
+        writeNative(static_cast<int8_t>(val));
+    }
 
-        return oss.str();
+    void writeInt(int32_t val) {
+        writeNative(val);
+    }
+
+    void writeDouble(double val) {
+        writeNative(val);
+    }
+
+    void writeBinaryString(const void* value, size_t length) {
+        ::memcpy(m_cursor, value, length);
+        m_cursor += length;
     }
 
 private:
-    const char* const m_data;
+
+    template<typename T>
+    void writeNative(T val) {
+        assert(m_cursor - m_buffer < m_size);
+        reinterpret_cast<T*>(m_cursor)[0] = val;
+        m_cursor += sizeof(T);
+    }
+
+    char* const m_buffer;
+    const std::size_t m_size;
+
+    char* m_cursor;
 };
 
-} // end namespace
+inline int Geography::compareWith(const Geography& rhs) const {
+    /* Do floating-point comparisons only as a last resort to help
+     * avoid issues with floating-point math.  It doesn't really
+     * matter how we do our comparison as long as we produce a
+     * deterministic order.
+     *
+     *   1. First compare number of loops (polygons with fewer loops sort as smaller).
+     *   2. If the number of loops are the same, compare on the number of vertices
+     *        in the loops.  The polygon with fewer vertices will sort as smaller.
+     *   3. Finally, if all loops have the same number of vertices, sort on the
+     *        points themselves (which will involve doing floating-point comparison)
+     */
+
+    Polygon lhsPoly;
+    lhsPoly.initFromGeography(*this);
+
+    Polygon rhsPoly;
+    rhsPoly.initFromGeography(rhs);
+
+    if (lhsPoly.num_loops() < rhsPoly.num_loops()) {
+        return VALUE_COMPARE_LESSTHAN;
+    }
+
+    if (lhsPoly.num_loops() > rhsPoly.num_loops()) {
+        return VALUE_COMPARE_GREATERTHAN;
+    }
+
+    // number of loops are the same.
+    // compare on number of vertices in each loop
+    for (int i = 0; i < lhsPoly.num_loops(); ++i) {
+        S2Loop* lhsLoop = lhsPoly.loop(i);
+        S2Loop* rhsLoop = rhsPoly.loop(i);
+
+        if (lhsLoop->num_vertices() < rhsLoop->num_vertices()) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+
+        if (lhsLoop->num_vertices() > rhsLoop->num_vertices()) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+    }
+
+    // Each loop has the same number of vertices.
+    // Compare the vertices themselves.
+    for (int i = 0; i < lhsPoly.num_loops(); ++i) {
+        S2Loop* lhsLoop = lhsPoly.loop(i);
+        S2Loop* rhsLoop = rhsPoly.loop(i);
+
+        for (int j = 0; j < lhsLoop->num_vertices(); ++j) {
+            S2LatLng lhsLL(lhsLoop->vertex(j));
+            S2LatLng rhsLL(rhsLoop->vertex(j));
+
+            if (lhsLL < rhsLL) {
+                return VALUE_COMPARE_LESSTHAN;
+            }
+
+            if (lhsLL > rhsLL) {
+                return VALUE_COMPARE_GREATERTHAN;
+            }
+        }
+    }
+
+    return VALUE_COMPARE_EQUAL;
+}
+
+
+inline void Geography::hashCombine(std::size_t& seed) const {
+
+    if (isNull()) {
+        // Treat a null as a polygon with zero loops
+        boost::hash_combine(seed, 0);
+        return;
+    }
+
+    Polygon poly;
+    poly.initFromGeography(*this);
+
+    int numLoops = poly.num_loops();
+    boost::hash_combine(seed, numLoops);
+    for (int i = 0; i < numLoops; ++i) {
+        S2Loop* loop = poly.loop(i);
+        for (int j = 0; j < loop->num_vertices(); ++j) {
+            const S2Point& v = loop->vertex(j);
+            boost::hash_combine(seed, v.x());
+            boost::hash_combine(seed, v.y());
+            boost::hash_combine(seed, v.z());
+        }
+    }
+}
+
+inline std::string Geography::toString() const {
+    std::ostringstream oss;
+
+    if (isNull()) {
+        oss << "null polygon";
+    }
+    else {
+        Polygon poly;
+        poly.initFromGeography(*this);
+        int numLoops = poly.num_loops();
+        oss << "polygon with "
+            << numLoops << " loops with vertex counts";
+        for (int i = 0; i < numLoops; ++i) {
+            oss << " " << poly.loop(i)->num_vertices()
+                << " (depth=" << poly.loop(i)->depth() << ")";
+        }
+    }
+
+    return oss.str();
+}
+
+template<class Deserializer>
+inline void Geography::deserializeFrom(Deserializer& input,
+                                       char* storage,
+                                       int32_t length)
+{
+    SimpleOutputSerializer output(storage, length);
+    Polygon::copyViaSerializers(output, input);
+}
+
+template<class Serializer>
+inline void Geography::serializeTo(Serializer& output) const
+{
+    ReferenceSerializeInputLE input(m_data, m_length);
+    Polygon::copyViaSerializers(output, input);
+}
+
+
+const int8_t INCOMPLETE_ENCODING_FROM_JAVA = 0;
+const int8_t COMPLETE_ENCODING = 1;
+
+const std::size_t BOUND_SERIALIZED_SIZE =
+    sizeof(int8_t)  // encoding version
+    + (sizeof(double) * 4); // 2 corners of bounding box, as min/max lat/lng
+
+
+template<class Deserializer>
+static inline void initBoundFromBuffer(S2LatLngRect *bound, Deserializer& input)
+{
+    int8_t version = input.readByte(); // encoding version
+    assert (version == COMPLETE_ENCODING);
+
+    double latLo = input.readDouble();
+    double latHi = input.readDouble();
+    double lngLo = input.readDouble();
+    double lngHi = input.readDouble();
+    *bound = S2LatLngRect(R1Interval(latLo, latHi), S1Interval(lngLo, lngHi));
+}
+
+template<class Serializer>
+static inline void saveBoundToBuffer(const S2LatLngRect *bound, Serializer& output)
+{
+    output.writeByte(COMPLETE_ENCODING);
+    output.writeDouble(bound->lat().lo());
+    output.writeDouble(bound->lat().hi());
+    output.writeDouble(bound->lng().lo());
+    output.writeDouble(bound->lng().hi());
+}
+
+template<class Serializer, class Deserializer>
+static inline void copyBoundViaSerializers(Serializer& output, Deserializer& input) {
+    output.writeByte(input.readByte()); // encoding version
+    for (int i = 0; i < 4; ++i) {
+        output.writeDouble(input.readDouble());
+    }
+}
+
+template<class Deserializer>
+static inline void skipBound(Deserializer& input)
+{
+    input.readByte();
+    input.readDouble();
+    input.readDouble();
+    input.readDouble();
+    input.readDouble();
+}
+
+
+
+
+inline std::size_t Loop::serializedLength(int32_t numVertices) {
+    return
+        sizeof(int8_t) + // encoding version
+        sizeof(int32_t) + // num vertices
+        (numVertices * 3 * sizeof(double)) + // vertices
+        sizeof(int8_t) + // origin inside
+        sizeof(int32_t) + // depth
+        BOUND_SERIALIZED_SIZE;
+}
+
+template<class Serializer, class Deserializer>
+inline void Loop::copyViaSerializers(Serializer& output, Deserializer& input) {
+    output.writeByte(input.readByte()); // encoding version
+    int numVertices = input.readInt();
+    output.writeInt(numVertices);
+    for (int i = 0; i < numVertices; ++i) {
+        output.writeDouble(input.readDouble());
+        output.writeDouble(input.readDouble());
+        output.writeDouble(input.readDouble());
+    }
+
+    output.writeByte(input.readByte()); // origin inside
+    int32_t depth = input.readInt();
+    assert(depth >= 0 && depth < 2);
+    output.writeInt(depth);
+
+    copyBoundViaSerializers(output, input);
+}
+
+template<class Deserializer>
+inline void Loop::pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>* points)
+{
+    input.readByte(); // encoding version
+    int numVertices = input.readInt();
+    for (int i = 0; i < numVertices; ++i) {
+        double x = input.readDouble();
+        double y = input.readDouble();
+        double z = input.readDouble();
+        points->push_back(S2Point(x, y, z));
+    }
+    input.readByte(); // origin inside
+    input.readInt();  // depth
+
+    skipBound(input);
+}
+
+template<class Deserializer>
+inline void Loop::initFromBuffer(Deserializer& input)
+{
+    int8_t version = input.readByte();
+    assert (version == COMPLETE_ENCODING);
+
+    set_num_vertices(input.readInt());
+
+    assert (!owns_vertices());
+
+    set_vertices(reinterpret_cast<S2Point*>(const_cast<char*>(input.getRawPointer(num_vertices() * sizeof(S2Point)))));
+
+    set_origin_inside(input.readByte());
+    set_depth(input.readInt());
+    assert(depth() >= 0 && depth() < 2);
+
+    S2LatLngRect bound;
+    initBoundFromBuffer(&bound, input);
+    set_rect_bound(bound);
+}
+
+template<class Serializer>
+void Loop::saveToBuffer(Serializer& output) const {
+    output.writeByte(COMPLETE_ENCODING); // encoding version
+    output.writeInt(num_vertices());
+    output.writeBinaryString(vertices(), sizeof(*(vertices())) * num_vertices());
+    output.writeBool(origin_inside());
+    assert(depth() >= 0 && depth() < 2);
+    output.writeInt(depth());
+
+    S2LatLngRect bound = GetRectBound();
+    saveBoundToBuffer(&bound, output);
+}
+
+
+inline void Polygon::init(std::vector<std::unique_ptr<S2Loop> >* loops) {
+    std::vector<S2Loop*> rawPtrVector;
+    rawPtrVector.reserve(loops->size());
+    for (int i = 0; i < loops->size(); ++i) {
+        rawPtrVector.push_back(loops->at(i).release());
+    }
+
+    // base class method accepts a raw pointer vector,
+    // and takes ownership of loops.
+    Init(&rawPtrVector);
+}
+
+inline std::size_t Polygon::serializedLengthNoLoops() {
+    return
+        sizeof(int8_t) + // encoding version
+        sizeof(int8_t) + // owns loops
+        sizeof(int8_t) + // has holes
+        sizeof(int32_t) + // num loops
+        BOUND_SERIALIZED_SIZE;
+}
+
+template<class Serializer, class Deserializer>
+inline void Polygon::copyViaSerializers(Serializer& output, Deserializer& input)
+{
+    int8_t version = input.readByte();
+
+    if (version == COMPLETE_ENCODING) {
+        output.writeByte(COMPLETE_ENCODING);
+        output.writeByte(input.readByte()); // ownsLoops
+        output.writeByte(input.readByte()); // has holes
+
+        int32_t numLoops = input.readInt();
+        output.writeInt(numLoops);
+        for (int i = 0; i < numLoops; ++i) {
+            Loop::copyViaSerializers(output, input);
+        }
+
+        copyBoundViaSerializers(output, input);
+    }
+    else {
+        assert (version == INCOMPLETE_ENCODING_FROM_JAVA);
+
+        // This is a serialized polygon from Java, which won't have
+        // proper bounding boxes defined.  Grab the vertices, build
+        // the loops, and instantiate a polygon, which will
+        // create the bounding boxes.
+
+        input.readByte(); // owns loops
+        input.readByte(); // has holes
+
+        std::vector<std::unique_ptr<S2Loop> > loops;
+        int32_t numLoops = input.readInt();
+        loops.reserve(numLoops);
+        for (int i = 0; i < numLoops; ++i) {
+            std::vector<S2Point> points;
+            Loop::pointArrayFromBuffer(input, &points);
+            loops.push_back(std::unique_ptr<S2Loop>(new S2Loop()));
+            loops.back()->Init(points);
+        }
+
+        skipBound(input);
+
+        Polygon poly;
+        poly.init(&loops);
+        poly.saveToBuffer(output);
+    }
+}
+
+static inline void DeleteLoopsInVector(vector<S2Loop*>* loops) {
+  for (int i = 0; i < loops->size(); ++i) {
+    delete loops->at(i);
+  }
+  loops->clear();
+}
+
+inline void Polygon::initFromGeography(const Geography& geog)
+{
+    ReferenceSerializeInputLE input(geog.data(), geog.length());
+    initFromBuffer(input);
+}
+
+template<class Deserializer>
+inline void Polygon::initFromBuffer(Deserializer& input)
+{
+    int8_t version = input.readByte(); // encoding version
+    assert (version == COMPLETE_ENCODING);
+
+    if (owns_loops()) {
+        DeleteLoopsInVector(&(loops()));
+    }
+
+    set_owns_loops(input.readBool());
+    set_has_holes(input.readBool());
+    int numLoops = input.readInt();
+
+    loops().clear();
+    loops().reserve(numLoops);
+    int num_vertices = 0;
+    for (int i = 0; i < numLoops; ++i) {
+        Loop *loop = new Loop;
+        loops().push_back(loop);
+        loop->initFromBuffer(input);
+        num_vertices += loop->num_vertices();
+    }
+
+    set_num_vertices(num_vertices);
+
+    S2LatLngRect bound;
+    initBoundFromBuffer(&bound, input);
+    set_rect_bound(bound);
+}
+
+template<class Serializer>
+void Polygon::saveToBuffer(Serializer& output) const {
+    output.writeByte(COMPLETE_ENCODING); // encoding version
+    output.writeBool(owns_loops());
+    output.writeBool(has_holes());
+    output.writeInt(loops().size());
+    for (int i = 0; i < num_loops(); ++i) {
+        static_cast<const Loop*>(loop(i))->saveToBuffer(output);
+    }
+
+    S2LatLngRect bound = GetRectBound();
+    saveBoundToBuffer(&bound, output);
+}
+
+} // end namespace voltdb
 
 #endif // EE_COMMON_GEOGRAPHY_HPP

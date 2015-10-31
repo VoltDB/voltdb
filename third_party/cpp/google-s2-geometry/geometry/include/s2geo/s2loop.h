@@ -257,6 +257,44 @@ class S2Loop : public S2Region {
   virtual bool Decode(Decoder* const decoder);
   virtual bool DecodeWithinScope(Decoder* const decoder);
 
+  /* VoltDB specific code: The following protected methods have been
+   * added by VoltDB to support subclasses */
+ protected:
+
+  void set_num_vertices(int num_vertices) {
+      num_vertices_ = num_vertices;
+  }
+
+  void set_vertices(S2Point* vertices) {
+      vertices_ = vertices;
+  }
+
+  S2Point* vertices() const {
+      return vertices_;
+  }
+
+  bool owns_vertices() const {
+      return owns_vertices_;
+  }
+
+  void set_owns_vertices(bool owns_vertices) {
+      owns_vertices_ = owns_vertices;
+  }
+
+  bool origin_inside() const {
+      return origin_inside_;
+  }
+
+  void set_origin_inside(bool origin_inside) {
+      origin_inside_ = origin_inside;
+  }
+
+  void set_rect_bound(const S2LatLngRect& bound) {
+      bound_ = bound;
+  }
+
+  /* End of VoltDB specific code */
+
  private:
   /// Internal constructor used only by Clone() that makes a deep copy of
   /// its argument.

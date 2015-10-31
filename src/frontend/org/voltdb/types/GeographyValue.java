@@ -31,14 +31,16 @@ import java.util.List;
  */
 public class GeographyValue {
 
-    List<List<PointType>> m_loops;
+    private List<List<XYZPoint>> m_loops;
 
     /**
-     * Create a polygon from at least an outer ring, and possibly inner rings.
-     * Some geometry libraries prefer the outer ring to list the vertices in
-     * counter-clockwise (CCW) order, and the inner rings to be in CW order.
-     * At some point we'll need to hash out these requirements and where we
-     * validate them.
+     * Create a polygon from a list of rings.  Each ring is a list of points:
+     *   - The first ring in the list is the outer ring
+     *   - Subsequent rings should be inside of the outer ring and represent
+     *     "holes" in the polygon
+     *   - Each ring should have its vertices listed in counter-clockwise order,
+     *     so that the area inside the ring is on the left side of the line segments
+     *     formed by adjacent vertices.
      *
      * @param loops
      */
@@ -47,11 +49,21 @@ public class GeographyValue {
             throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
         }
 
-        m_loops = loops;
+        m_loops = new ArrayList<List<XYZPoint>>();
+        for (List<PointType> loop : loops) {
+            List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
+            for (int i = 0; i < (loop.size() - 1); ++i) {
+                oneLoop.add(XYZPoint.fromPointType(loop.get(i)));
+            }
+            m_loops.add(oneLoop);
+        }
     }
 
     /**
-     * Create a polygon given the well-known text representation.
+     * Create a polygon given the well-known text representation.  As with the
+     * above constructor, the outer ring should be first and vertices should be
+     * listed on counter-clockwise order.
+     *
      * @param wkt
      */
     public GeographyValue(String wkt) {
@@ -75,7 +87,16 @@ public class GeographyValue {
      * @return  The loops in the polygon as a list of a list of points
      */
     public List<List<PointType>> getLoops() {
-        return m_loops;
+        List<List<PointType>> llLoops = new ArrayList<List<PointType>>();
+
+        for (List<XYZPoint> xyzLoop : m_loops) {
+            List<PointType> llLoop = new ArrayList<PointType>();
+            for (XYZPoint xyz : xyzLoop) {
+                llLoop.add(xyz.toPointType());
+            }
+            llLoops.add(llLoop);
+        }
+        return llLoops;
     }
 
     /**
@@ -87,7 +108,7 @@ public class GeographyValue {
         sb.append("POLYGON(");
 
         boolean isFirstLoop = true;
-        for (List<PointType> loop : m_loops) {
+        for (List<XYZPoint> loop : m_loops) {
             if (isFirstLoop) {
                 isFirstLoop = false;
             }
@@ -96,18 +117,13 @@ public class GeographyValue {
             }
 
             sb.append("(");
-            boolean isFirstVertex = true;
-            for (PointType pt : loop) {
-                if (isFirstVertex) {
-                    isFirstVertex = false;
-                }
-                else {
-                    sb.append(", ");
-                }
-
-                sb.append(pt.getLatitude() + " " + pt.getLongitude());
+            for (XYZPoint xyz : loop) {
+                sb.append(xyz.toPointType().formatLatLng());
+                sb.append(", ");
             }
 
+            // Repeat the first vertex to close the loop as WKT requires.
+            sb.append(loop.get(0).toPointType().formatLatLng());
             sb.append(")");
         }
 
@@ -115,18 +131,48 @@ public class GeographyValue {
         return sb.toString();
     }
 
+    /* Serialization format for polygons.
+     *
+     * This is the format used by S2 in the EE.  Most of the
+     * metadata (especially lat/lng rect bounding boxes) are
+     * ignored here in Java.
+     *
+     * 1 byte       encoding version
+     * 1 byte       boolean owns_loops
+     * 1 byte       boolean has_holes
+     * 4 bytes      number of loops
+     *   And then for each loop:
+     *     1 byte       encoding version
+     *     4 bytes      number of vertices
+     *     ((number of vertices) * sizeof(double) * 3) bytes    vertices as XYZPoints
+     *     1 byte       boolean origin_inside
+     *     4 bytes      depth (nesting level of loop)
+     *     33 bytes     bounding box
+     * 33 bytes     bounding box
+     *
+     * We use S2 in the EE for all geometric computation, so polygons sent to
+     * the EE will be missing bounding box and other info.  We indicate this
+     * by passing INCOMPLETE_ENCODING_FROM_JAVA in the version field.  This
+     * tells the EE to compute bounding boxes and other metadata before storing
+     * the polygon to memory.
+     */
+
+    private static final byte INCOMPLETE_ENCODING_FROM_JAVA = 0;
+    private static final byte COMPLETE_ENCODING = 1;
+
     /**
      * Return the number of bytes in the serialization for this polygon
      * (not including the 4-byte length prefix that precedes variable-length types).
      *  */
     public int getLengthInBytes() {
-        int length = 4; // number of loops prefix
-        for (List<PointType> loop : m_loops) {
-            length += 4; // number of vertices prefix;
-            length += (loop.size() * PointType.getLengthInBytes());
+        long length = 7;
+        for (List<XYZPoint> loop : m_loops) {
+            length += loopLengthInBytes(loop.size());
         }
 
-        return length;
+        length += boundLengthInBytes();
+
+        return (int)length;
     }
 
     /**
@@ -134,22 +180,17 @@ public class GeographyValue {
      * (Assumes that the 4-byte length prefix for variable-length data
      * has already been serialized.)
      *
-     * Here's the serialization format for polygons:
-     *   The number of loops in the polygon as a 4-byte int
-     *   For each loop:
-     *     The number of vertices in the polygon as a 4-byte int
-     *     For each vertex in the loop, a serialization of the PointType object
-     *
      * @param buf  The ByteBuffer into which the serialization will be placed.
      */
     public void flattenToBuffer(ByteBuffer buf) {
+        buf.put(INCOMPLETE_ENCODING_FROM_JAVA); // encoding version
+        buf.put((byte)1); // owns_loops_
+        buf.put((byte)(m_loops.size() > 1 ? 1 : 0)); // has_holes_
         buf.putInt(m_loops.size());
-        for (List<PointType> loop : m_loops) {
-            buf.putInt(loop.size());
-            for (PointType pt : loop) {
-                pt.flattenToBuffer(buf);
-            }
+        for (List<XYZPoint> loop : m_loops) {
+            flattenLoopToBuffer(loop, buf);
         }
+        flattenEmptyBoundToBuffer(buf);
     }
 
     /**
@@ -161,22 +202,11 @@ public class GeographyValue {
      * @return a new GeographyValue
      */
     public static GeographyValue unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
-        int numLoops = inBuffer.getInt(offset);
-        offset += 4;
-
-        List<List<PointType>> loops = new ArrayList<List<PointType>>();
-        for (int i = 0; i < numLoops; ++i){
-            List<PointType> loop = new ArrayList<PointType>();
-            int numVertices = inBuffer.getInt(offset);
-            offset += 4;
-            for (int j = 0; j < numVertices; ++j) {
-                PointType pt = PointType.unflattenFromBuffer(inBuffer, offset);
-                offset += PointType.getLengthInBytes();
-                loop.add(pt);
-            }
-            loops.add(loop);
-        }
-        return new GeographyValue(loops);
+        int origPos = inBuffer.position();
+        inBuffer.position(offset);
+        GeographyValue gv = unflattenFromBuffer(inBuffer);
+        inBuffer.position(origPos);
+        return gv;
     }
 
     /**
@@ -186,34 +216,190 @@ public class GeographyValue {
      * @return a new GeographyValue
      */
     public static GeographyValue unflattenFromBuffer(ByteBuffer inBuffer) {
+        byte version = inBuffer.get(); // encoding version
+        inBuffer.get(); // owns loops
+        inBuffer.get(); // has holes
         int numLoops = inBuffer.getInt();
-
-        List<List<PointType>> loops = new ArrayList<List<PointType>>();
-        for (int i = 0; i < numLoops; ++i){
-            List<PointType> loop = new ArrayList<PointType>();
-            int numVertices = inBuffer.getInt();
-            for (int j = 0; j < numVertices; ++j) {
-                PointType pt = PointType.unflattenFromBuffer(inBuffer);
-                loop.add(pt);
+        List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
+        int indexOfOuterRing = 0;
+        for (int i = 0; i < numLoops; ++i) {
+            List<XYZPoint> loop = new ArrayList<XYZPoint>();
+            int depth = unflattenLoopFromBuffer(inBuffer, loop);
+            if (depth == 0) {
+                indexOfOuterRing = i;
             }
+
             loops.add(loop);
         }
-        return new GeographyValue(loops);
+
+        // S2 will order loops in depth-first order, which will leave the outer ring last.
+        // Make it first so it looks right when converted back to WKT.
+        if (version == COMPLETE_ENCODING && indexOfOuterRing != 0) {
+                    List<XYZPoint> outerRing = loops.get(indexOfOuterRing);
+                    loops.set(indexOfOuterRing, loops.get(0));
+                    loops.set(0, outerRing);
+        }
+        unflattenBoundFromBuffer(inBuffer);
+
+        return polygonFromXyzPoints(loops);
     }
+
+    /**
+     * Google's S2 geometry library uses (x, y, z) representation of polygon vertices,
+     * But the interface we expose to users is (lat, lng).  This class is the
+     * internal representation for vertices.
+     */
+    private static class XYZPoint {
+        private final double m_x;
+        private final double m_y;
+        private final double m_z;
+
+        public static XYZPoint fromPointType(PointType pt) {
+            double latRadians = pt.getLatitude() * (Math.PI / 180);  // AKA phi
+            double lngRadians = pt.getLongitude() * (Math.PI / 180); // AKA theta
+
+            double cosPhi = Math.cos(latRadians);
+            double x = Math.cos(lngRadians) * cosPhi;
+            double y = Math.sin(lngRadians) * cosPhi;
+            double z = Math.sin(latRadians);
+
+            return new XYZPoint(x, y, z);
+        }
+
+        public XYZPoint(double x, double y, double z) {
+            m_x = x;
+            m_y = y;
+            m_z = z;
+        }
+
+        public double x() {
+            return m_x;
+        }
+
+        public double y() {
+            return m_y;
+        }
+
+        public double z() {
+            return m_z;
+        }
+
+        public PointType toPointType() {
+            double latRadians = Math.atan2(m_z, Math.sqrt(m_x * m_x + m_y * m_y));
+            double lngRadians = Math.atan2(m_y, m_x);
+
+            double latDegrees = latRadians * (180 / Math.PI);
+            double lngDegrees = lngRadians * (180 / Math.PI);
+            return new PointType(latDegrees, lngDegrees);
+        }
+    }
+
+
+    private GeographyValue() {
+        m_loops = null;
+    }
+
+    static private GeographyValue polygonFromXyzPoints(List<List<XYZPoint>> loops) {
+
+        if (loops == null || loops.size() < 1) {
+            throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
+        }
+
+        GeographyValue geog = new GeographyValue();
+        geog.m_loops = loops;
+        return geog;
+    }
+
+    private static long boundLengthInBytes() {
+        //     1 byte   for encoding version
+        //    32 bytes  for lat min, lat max, lng min, lng max as doubles
+        return 33;
+    }
+
+    private static long loopLengthInBytes(long numberOfVertices) {
+        //   1 byte     for encoding version
+        //   4 bytes    for number of vertices
+        //   number of vertices * 8 * 3  bytes  for vertices as XYZPoints
+        //   1 byte     for origin_inside_
+        //   4 bytes    for depth_
+        //   length of bound
+        return 5 + (numberOfVertices * 24) + 5 + boundLengthInBytes();
+    }
+
+    private static void flattenEmptyBoundToBuffer(ByteBuffer buf) {
+        buf.put(INCOMPLETE_ENCODING_FROM_JAVA); // for encoding version
+        buf.putDouble(PointType.NULL_COORD);
+        buf.putDouble(PointType.NULL_COORD);
+        buf.putDouble(PointType.NULL_COORD);
+        buf.putDouble(PointType.NULL_COORD);
+    }
+
+    private static void flattenLoopToBuffer(List<XYZPoint> loop, ByteBuffer buf) {
+        //   1 byte     for encoding version
+        //   4 bytes    for number of vertices
+        //   number of vertices * 8 * 3  bytes  for vertices as XYZPoints
+        //   1 byte     for origin_inside_
+        //   4 bytes    for depth_
+        //   length of bound
+        buf.put(INCOMPLETE_ENCODING_FROM_JAVA);
+        buf.putInt(loop.size());
+        for (XYZPoint xyz : loop) {
+            buf.putDouble(xyz.x());
+            buf.putDouble(xyz.y());
+            buf.putDouble(xyz.z());
+        }
+
+        buf.put((byte)0); // origin_inside_
+        buf.putInt(0); // depth_
+        flattenEmptyBoundToBuffer(buf);
+    }
+
+
+    private static void unflattenBoundFromBuffer(ByteBuffer inBuffer) {
+        inBuffer.get(); // for encoding version
+        inBuffer.getDouble();
+        inBuffer.getDouble();
+        inBuffer.getDouble();
+        inBuffer.getDouble();
+    }
+
+    private static int unflattenLoopFromBuffer(ByteBuffer inBuffer, List<XYZPoint> loop) {
+        //   1 byte     for encoding version
+        //   4 bytes    for number of vertices
+        //   number of vertices * 8 * 3  bytes  for vertices as XYZPoints
+        //   1 byte     for origin_inside_
+        //   4 bytes    for depth_
+        //   length of bound
+
+        inBuffer.get(); // encoding version
+        int numVertices = inBuffer.getInt();
+        for (int i = 0; i < numVertices; ++i) {
+            double x = inBuffer.getDouble();
+            double y = inBuffer.getDouble();
+            double z = inBuffer.getDouble();
+            loop.add(new XYZPoint(x, y, z));
+        }
+
+        inBuffer.get(); // origin_inside_
+        int depth = inBuffer.getInt(); // depth
+        unflattenBoundFromBuffer(inBuffer);
+        return depth;
+    }
+
 
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
      */
-    private static List<List<PointType>> loopsFromWkt(String wkt) throws IllegalArgumentException {
+    private static List<List<XYZPoint>> loopsFromWkt(String wkt) throws IllegalArgumentException {
         final String msgPrefix = "Improperly formatted WKT for polygon: ";
 
         StreamTokenizer tokenizer = new StreamTokenizer(new StringReader(wkt));
         tokenizer.lowerCaseMode(true);
         tokenizer.eolIsSignificant(false);
 
-        List<PointType> currentLoop = null;
-        List<List<PointType>> loops = new ArrayList<List<PointType>>();
+        List<XYZPoint> currentLoop = null;
+        List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
         try {
             int token = tokenizer.nextToken();
             if (token != StreamTokenizer.TT_WORD
@@ -236,7 +422,7 @@ public class GeographyValue {
                     if (currentLoop != null) {
                         throw new IllegalArgumentException(msgPrefix + "missing closing parenthesis");
                     }
-                    currentLoop = new ArrayList<PointType>();
+                    currentLoop = new ArrayList<XYZPoint>();
                     break;
                 case StreamTokenizer.TT_NUMBER:
                     if (currentLoop == null) {
@@ -249,7 +435,7 @@ public class GeographyValue {
                         throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
                     }
                     double lng = tokenizer.nval;
-                    currentLoop.add(new PointType(lat, lng));
+                    currentLoop.add(XYZPoint.fromPointType(new PointType(lat, lng)));
 
                     token = tokenizer.nextToken();
                     if (token != ',') {
@@ -263,6 +449,10 @@ public class GeographyValue {
                     if (currentLoop == null) {
                         throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
                     }
+
+                    // We really should check that the last vertex is the same as the first here.
+                    currentLoop.remove(currentLoop.size() - 1);
+
                     loops.add(currentLoop);
                     currentLoop = null;
 

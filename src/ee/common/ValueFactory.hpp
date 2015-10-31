@@ -110,8 +110,9 @@ public:
         return NValue::getNullBinaryValue();
     }
 
-    static inline NValue getTempGeographyValue(const char* rawBuf, int32_t rawLength) {
-        return NValue::getAllocatedValue(VALUE_TYPE_GEOGRAPHY, rawBuf, (size_t)rawLength, NValue::getTempStringPool());
+    /// Returns an NValue of type Geography that points to an uninitialized temp buffer of the given size
+    static inline NValue getUninitializedTempGeographyValue(int32_t length) {
+        return NValue::getUninitializedAllocatedValue(VALUE_TYPE_GEOGRAPHY, (size_t)length, NValue::getTempStringPool());
     }
 
     /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */

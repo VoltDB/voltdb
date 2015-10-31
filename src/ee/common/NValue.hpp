@@ -1023,7 +1023,8 @@ private:
             return Geography();
         }
 
-        return Geography(getObjectValue_withoutNull());
+        return Geography(getObjectValue_withoutNull(),
+                         getObjectLength_withoutNull());
     }
 
     bool isBooleanNULL() const ;
@@ -2370,6 +2371,12 @@ private:
         NValue retval(type);
         char* storage = retval.allocateValueStorage((int32_t)size, stringPool);
         ::memcpy(storage, value, (int32_t)size);
+        return retval;
+    }
+
+    static NValue getUninitializedAllocatedValue(ValueType type, size_t size, Pool* stringPool) {
+        NValue retval(type);
+        retval.allocateValueStorage((int32_t)size, stringPool);
         return retval;
     }
 

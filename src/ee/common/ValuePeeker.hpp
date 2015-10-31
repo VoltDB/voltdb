@@ -84,7 +84,8 @@ public:
 
     static inline void* peekObjectValue_withoutNull(const NValue value) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+               (value.getValueType() == VALUE_TYPE_VARBINARY) ||
+               (value.getValueType() == VALUE_TYPE_GEOGRAPHY));
         return value.getObjectValue_withoutNull();
     }
 

@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <memory>
 #include <sstream>
 
 #include <boost/algorithm/string.hpp>
@@ -32,21 +33,6 @@ namespace voltdb {
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;
 static const int POLY = FUNC_VOLT_POLYGONFROMTEXT;
 
-/**
- * This function is here only to verify that we can
- * link with the S2 Geometry Library.
- */
-void verifyS2Links() {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-    S2LatLng  Bedford{S2LatLng::FromDegrees(42.4906, -71.2767)};
-    S2LatLng  SantCruz{S2LatLng::FromDegrees(39.9719, -122.0264)};
-    // The GetDistance function is out-of-line.  So, we can
-    // see that it's linked in with nm.
-    S1Angle d = Bedford.GetDistance(SantCruz);
-#pragma clang diagnostic pop
-
-}
 typedef boost::tokenizer<boost::char_separator<char> > Tokenizer;
 
 static void throwInvalidWktPoint(const std::string& input)
@@ -137,21 +123,22 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
 static void readLoop(const std::string &wkt,
                      Tokenizer::iterator &it,
                      const Tokenizer::iterator &end,
-                     std::vector<Point::Coord> *loop)
+                     S2Loop *loop)
 {
     if (! boost::iequals(*it, "(")) {
         throwInvalidWktPoly("expected left parenthesis to start a loop");
     }
     ++it;
 
+    std::vector<S2Point> points;
     while (it != end && *it != ")") {
         Point::Coord lat = stringToCoord(POLY, wkt, *it);
-        loop->push_back(lat);
         ++it;
 
         Point::Coord lng = stringToCoord(POLY, wkt, *it);
-        loop->push_back(lng);
         ++it;
+
+        points.push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
 
         if (*it == ",") {
             ++it;
@@ -171,6 +158,24 @@ static void readLoop(const std::string &wkt,
 
     // Advance iterator to next token
     ++it;
+
+    if (points.size() < 4) {
+        throwInvalidWktPoly("A polygon ring must contain at least 4 points (including repeated closing vertex)");
+    }
+
+    const S2Point& first = points.at(0);
+    const S2Point& last = points.at(points.size() - 1);
+
+    if (first != last) {
+        throwInvalidWktPoly("A polygon ring's first vertex must be equal to its last vertex");
+    }
+
+    // S2 format considers the closing vertex in a loop to be
+    // implicit, while in WKT it is explicit.  Remove the closing
+    // vertex here to reflect this.
+    points.pop_back();
+
+    loop->Init(points);
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
@@ -197,13 +202,12 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     }
     ++it;
 
-    std::vector<std::vector<Point::Coord> > loops;
+    std::size_t length = Polygon::serializedLengthNoLoops();
+    std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
-        std::vector<Point::Coord> loop;
-        readLoop(wkt, it, end, &loop);
-        // When we have C++11, use emplace_back here
-        // to avoid a copy.
-        loops.push_back(loop);
+        loops.push_back(std::unique_ptr<S2Loop>(new S2Loop()));
+        readLoop(wkt, it, end, loops.back().get());
+        length += Loop::serializedLength(loops.back()->num_vertices());
         if (*it == ",") {
             ++it;
         }
@@ -221,39 +225,37 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
         throwInvalidWktPoly("unrecognized input after WKT: '" + (*it) + "'");
     }
 
-    std::ostringstream oss;
-    int32_t numLoops = static_cast<int32_t>(loops.size());
-    oss.write(reinterpret_cast<char*>(&numLoops), sizeof (int32_t));
-    BOOST_FOREACH(std::vector<Point::Coord>& loop, loops) {
-        assert(loop.size() % 2 == 0);
-        int32_t numVertices = static_cast<int32_t>(loop.size()) / 2;
-        oss.write(reinterpret_cast<char*>(&numVertices), sizeof (int32_t));
-        BOOST_FOREACH(Point::Coord coord, loop) {
-            oss.write(reinterpret_cast<char*>(&coord), sizeof(coord));
-        }
-    }
+    NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
+    char* storage = static_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(nval));
 
-    return ValueFactory::getTempGeographyValue(oss.str().c_str(),
-                                               static_cast<int32_t>(oss.str().length()));
+    Polygon poly;
+    poly.init(&loops); // polygon takes ownership of loops here.
+    SimpleOutputSerializer output(storage, length);
+    poly.saveToBuffer(output);
+    return nval;
 }
 
 template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments) {
     if (arguments[0].isNull() || arguments[1].isNull())
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
 
-    std::unique_ptr<S2Polygon> s2Poly = arguments[0].getGeography().toS2Polygon();
-    S2Point s2Point = arguments[1].getPoint().toS2Point();
-    return ValueFactory::getBooleanValue(s2Poly->Contains(s2Point));
+    Polygon poly;
+    poly.initFromGeography(arguments[0].getGeography());
+    S2Point pt = arguments[1].getPoint().toS2Point();
+    return ValueFactory::getBooleanValue(poly.Contains(pt));
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_INTEGER);
     }
-    const Geography polygon = getGeography();
+
+    Polygon poly;
+    poly.initFromGeography(getGeography());
+
     NValue retVal(VALUE_TYPE_INTEGER);
     // exclude exterior ring
-    retVal.getInteger() = polygon.numLoops() - 1;
+    retVal.getInteger() = poly.num_loops() - 1;
     return retVal;
 }
 
@@ -261,9 +263,17 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_INTEGER);
     }
-    const Geography polygon = getGeography();
+
+    Polygon poly;
+    poly.initFromGeography(getGeography());
+
+    // the OGC spec suggests that the number of vertices should
+    // include the repeated closing vertex which is implicit in S2's
+    // representation.  So add an extra vertex for each loop.
+    int32_t numPoints = poly.num_vertices() + poly.num_loops();
+
     NValue retVal(VALUE_TYPE_INTEGER);
-    retVal.getInteger() = polygon.numPoints();
+    retVal.getInteger() = numPoints;
     return retVal;
 }
 

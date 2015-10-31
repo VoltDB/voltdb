@@ -18,6 +18,7 @@
 package org.voltdb.types;
 
 import java.nio.ByteBuffer;
+import java.text.DecimalFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,7 +53,7 @@ public class PointType {
     // (Only for sending data over the wire.  The client
     // should receive a null when retrieving null points from a
     // VoltTable.)
-    private static final double NULL_COORD = 360.0;
+    static final double NULL_COORD = 360.0;
 
     public PointType(double latitude, double longitude) {
         m_latitude = latitude;
@@ -102,9 +103,16 @@ public class PointType {
         return m_longitude;
     }
 
+    public String formatLatLng() {
+        // Display a maximum of 9 decimal digits after the point.
+        // This gives us precision of around 1 mm.
+        DecimalFormat df = new DecimalFormat("###.#########");
+        return df.format(m_latitude) + " " + df.format(m_longitude);
+    }
+
     @Override
     public String toString() {
-        return "POINT (" + m_latitude + " " + m_longitude + ")";
+        return "POINT (" + formatLatLng() + ")";
     }
 
     // Returns true for two points that have the same latitude and
