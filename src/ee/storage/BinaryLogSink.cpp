@@ -477,7 +477,7 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
     if (expectedTableForDelete) {
         TableIterator iterator = expectedTableForDelete->iterator();
         while (iterator.next(tempTuple)) {
-            //TODO: decision column on expected tuple is meanless.
+            //decision column on expected table is somewhat meaningless.
             if (!resolved) {
                 tempTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }

@@ -389,7 +389,7 @@ public:
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[startPos], tables, &m_pool, m_engine, 0);
+            m_sink.apply(&data[startPos], tables, &m_pool, m_engine, 1);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
