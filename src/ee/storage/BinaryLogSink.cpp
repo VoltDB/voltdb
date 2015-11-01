@@ -50,7 +50,7 @@ const static int DR_ROW_TYPE_COLUMN_INDEX = 0;
 const static int DR_LOG_ACTION_COLUMN_INDEX = 1;
 const static int DR_CONFLICT_COLUMN_INDEX = 2;
 const static int DR_CONFLICTS_ON_PK_COLUMN_INDEX = 3;
-const static int DR_ROW_DECISION_COLUMN_INDEX = 4;
+const static int DR_ACTION_DECISION_COLUMN_INDEX = 4;
 const static int DR_CLUSTER_ID_COLUMN_INDEX = 5;
 const static int DR_TIMESTAMP_COLUMN_INDEX = 6;
 const static int DR_DIVERGENCE_COLUMN_INDEX = 7;
@@ -60,6 +60,80 @@ const static int DR_TUPLE_COLUMN_INDEX = 9;
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
 
+// Utility functions to convert types to strings. Each type string has a fixed
+// length. Check the schema of the conflict export table for the limits.
+// 3 letters
+static inline std::string DRConflictRowTypeStr(DRConflictRowType type) {
+    switch (type) {
+    case EXISTING_ROW:
+        return "EXT";
+    case EXPECTED_ROW:
+        return "EXP";
+    case NEW_ROW:
+        return "NEW";
+    default:
+        return "";
+    }
+}
+
+// 1 letter
+static inline std::string DRRecordTypeStr(DRRecordType type) {
+    switch (type) {
+    case DR_RECORD_INSERT:
+        return "I";
+    case DR_RECORD_DELETE:
+    case DR_RECORD_DELETE_BY_INDEX:
+        return "D";
+    case DR_RECORD_UPDATE:
+    case DR_RECORD_UPDATE_BY_INDEX:
+        return "U";
+    case DR_RECORD_TRUNCATE_TABLE:
+        return "T";
+    default:
+        return "";
+    }
+}
+
+// 4 letters
+static inline std::string DRConflictTypeStr(DRConflictType type) {
+    switch (type) {
+    case NO_CONFLICT:
+        return "NONE";
+    case CONFLICT_CONSTRAINT_VIOLATION:
+        return "CNST";
+    case CONFLICT_EXPECTED_ROW_MISSING:
+        return "MISS";
+    case CONFLICT_EXPECTED_ROW_MISMATCH:
+        return "MSMT";
+    default:
+        return "";
+    }
+}
+
+// 1 letter
+static inline std::string DRDecisionStr(DRRowDecision type) {
+    switch (type) {
+    case ACCEPT:
+        return "A";
+    case REJECT:
+        return "R";
+    default:
+        return "";
+    }
+}
+
+// 1 letter
+static inline std::string DRDivergenceStr(DRDivergence type) {
+    switch (type) {
+    case NOT_DIVERGE:
+        return "C";
+    case DIVERGE:
+        return "D";
+    default:
+        return "";
+    }
+}
+
 static bool isApplyNewRow(int32_t retval) {
     return (retval & DECISION_BIT) == DECISION_BIT;
 }
@@ -68,12 +142,14 @@ static bool isResolved(int32_t retval) {
     return (retval & RESOLVED_BIT) == RESOLVED_BIT;
 }
 
-static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool deleteRow, bool convergent) {
+static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
     TableTuple tuple(metadataTable->schema());
     TableIterator iter = metadataTable->iterator();
     while (iter.next(tuple)) {
-        tuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(deleteRow ? DELETE_ROW : KEEP_ROW));
-        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(convergent ? NOT_DIVERGE : DIVERGE));
+        tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
+        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
     }
 }
 
@@ -452,25 +528,15 @@ static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *out
         DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
     TableTuple tempMetaTuple = outputMetaTable->tempTuple();
     NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
-    tempMetaTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTinyIntValue(rowType));
-    tempMetaTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTinyIntValue(actionType));
-    tempMetaTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictType));
+    tempMetaTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRConflictRowTypeStr(rowType)));
+    tempMetaTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRRecordTypeStr(actionType)));
+    tempMetaTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTempStringValue(DRConflictTypeStr(conflictType)));
     tempMetaTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
+    tempMetaTuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDecisionStr(REJECT)));
+    tempMetaTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));
+    tempMetaTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));
+    tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDivergenceStr(NOT_DIVERGE)));
     tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
-    switch (rowType) {
-    case EXISTING_ROW:
-    case EXPECTED_ROW:
-        tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(KEEP_ROW));   // decision
-        break;
-    case NEW_ROW:
-        tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));     // decision
-        break;
-    default:
-        break;
-    }
-    tempMetaTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
-    tempMetaTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
-    tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(NOT_DIVERGE));
     tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getNullStringValue());
     // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
     outputMetaTable->insertTupleNonVirtualWithDeepCopy(tempMetaTuple, pool);
@@ -616,13 +682,13 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         setConflictOutcome(existingMetaTableForDelete, applyRemoteChange, resolved);
     }
     if (expectedMetaTableForDelete) {
-        setConflictOutcome(expectedMetaTableForDelete, /* decision is meaningless */ false, resolved);
+        setConflictOutcome(expectedMetaTableForDelete, applyRemoteChange, resolved);
     }
     if (existingMetaTableForInsert) {
         setConflictOutcome(existingMetaTableForInsert, applyRemoteChange, resolved);
     }
     if (newMetaTableForInsert) {
-        setConflictOutcome(newMetaTableForInsert, !applyRemoteChange, resolved);
+        setConflictOutcome(newMetaTableForInsert, applyRemoteChange, resolved);
     }
 
     if (applyRemoteChange) {
