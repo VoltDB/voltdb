@@ -334,7 +334,9 @@ public:
             array[i] = getNValue(i).toString();
         }
 
-        return Json::FastWriter().write(array);
+        std::string retval = Json::FastWriter().write(array);
+        // The FastWritter always writes a newline at the end, ignore it
+        return std::string(retval, 0, retval.length() - 1);
     }
 
     /** Copy values from one tuple into another (uses memcpy) */
