@@ -502,42 +502,42 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
     jstring tableNameString = m_jniEnv->NewStringUTF(tableName.c_str());
 
     // prepare input buffer for delete conflict
-    jobject existingMetaRowsBufferForDelete = NULL
+    jobject existingMetaRowsBufferForDelete = NULL;
     boost::shared_ptr<char> existingMetaArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
                                                                                      existingMetaTableForDelete,
                                                                                      existingMetaRowsBufferForDelete);
 
-    jobject existingTupleRowsBufferForDelete = NULL
+    jobject existingTupleRowsBufferForDelete = NULL;
     boost::shared_ptr<char> existingTupleArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
                                                                                       existingTupleTableForDelete,
                                                                                       existingTupleRowsBufferForDelete);
 
-    jobject expectedMetaRowsBufferForDelete = NULL
+    jobject expectedMetaRowsBufferForDelete = NULL;
     boost::shared_ptr<char> expectedMetaArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
                                                                                      expectedMetaTableForDelete,
                                                                                      expectedMetaRowsBufferForDelete);
 
-    jobject expectedTupleRowsBufferForDelete = NULL
+    jobject expectedTupleRowsBufferForDelete = NULL;
     boost::shared_ptr<char> expectedTupleArrayForDelete = serializeToDirectByteBuffer(m_jniEnv,
                                                                                       expectedTupleTableForDelete,
                                                                                       expectedTupleRowsBufferForDelete);
 
-    jobject existingMetaRowsBufferForInsert = NULL
+    jobject existingMetaRowsBufferForInsert = NULL;
     boost::shared_ptr<char> existingMetaArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
                                                                                      existingMetaTableForInsert,
                                                                                      existingMetaRowsBufferForInsert);
 
-    jobject existingTupleRowsBufferForInsert = NULL
+    jobject existingTupleRowsBufferForInsert = NULL;
     boost::shared_ptr<char> existingTupleArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
                                                                                       existingTupleTableForInsert,
                                                                                       existingTupleRowsBufferForInsert);
 
-    jobject newMetaRowsBufferForInsert = NULL
+    jobject newMetaRowsBufferForInsert = NULL;
     boost::shared_ptr<char> newMetaArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
                                                                                 newMetaTableForInsert,
                                                                                 newMetaRowsBufferForInsert);
 
-    jobject newTupleRowsBufferForInsert = NULL
+    jobject newTupleRowsBufferForInsert = NULL;
     boost::shared_ptr<char> newTupleArrayForInsert = serializeToDirectByteBuffer(m_jniEnv,
                                                                                  newTupleTableForInsert,
                                                                                  newTupleRowsBufferForInsert);

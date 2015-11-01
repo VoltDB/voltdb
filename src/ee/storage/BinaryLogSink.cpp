@@ -437,6 +437,7 @@ static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *out
     tempMetaTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTinyIntValue(actionType));
     tempMetaTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictType));
     tempMetaTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
+    tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
     switch (rowType) {
     case EXISTING_ROW:
     case EXPECTED_ROW:
@@ -479,7 +480,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (!resolved) {
                 tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
-            tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -494,7 +494,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (!resolved) {
                 tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
-            tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -511,7 +510,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (!resolved) {
                 tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
-            tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -528,7 +526,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
             if (!resolved) {
                 tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
             }
-            tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -643,7 +640,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         }
         if (insertConflict != NO_CONFLICT) {
             BOOST_FOREACH(LabeledTableTuple tupleToDelete, existingRows) {
-                drTable->deleteTuple(tupleToDelete.first.get(), true);
+                drTable->deleteTuple(*tupleToDelete.first.get(), true);
             }
         }
         if (newTuple) {
