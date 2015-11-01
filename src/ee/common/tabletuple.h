@@ -506,7 +506,7 @@ private:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
 
-        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+        if (columnType == VALUE_TYPE_VARCHAR || columnType == VALUE_TYPE_VARBINARY) {
             // Null variable length value doesn't take any bytes in
             // export table, so here needs a special handle for VARCHAR
             // and VARBINARY
