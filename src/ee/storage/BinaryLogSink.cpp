@@ -68,6 +68,14 @@ static bool isResolved(int32_t retval) {
     return (retval & RESOLVED_BIT) == RESOLVED_BIT;
 }
 
+static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool deleteRow, bool convergent) {
+    TableTuple tuple(metadataTable->schema());
+    TableIterator iter = metadataTable->iterator();
+    while (iter.next(tuple)) {
+        tuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(deleteRow ? DELETE_ROW : KEEP_ROW));
+        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(convergent ? NOT_DIVERGE : DIVERGE));
+    }
+}
 
 class CachedIndexKeyTuple {
 public:
@@ -474,12 +482,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
         TableIterator metaIter = existingMetaTableForDelete->iterator();
         TableIterator tupleIter = existingTupleTableForDelete->iterator();
         while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-            if (applyRemoteChange) {
-                tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));
-            }
-            if (!resolved) {
-                tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
-            }
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -490,10 +492,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
         TableIterator metaIter = expectedMetaTableForDelete->iterator();
         TableIterator tupleIter = expectedTupleTableForDelete->iterator();
         while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-            //decision column on expected table is somewhat meaningless.
-            if (!resolved) {
-                tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
-            }
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -504,12 +502,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
         TableIterator metaIter = existingMetaTableForInsert->iterator();
         TableIterator tupleIter = existingTupleTableForInsert->iterator();
         while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-            if (applyRemoteChange) {
-                tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(DELETE_ROW));
-            }
-            if (!resolved) {
-                tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
-            }
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -520,12 +512,6 @@ void BinaryLogSink::exportDRConflict(Table *exportTable, bool applyRemoteChange,
         TableIterator metaIter = newMetaTableForInsert->iterator();
         TableIterator tupleIter = newTupleTableForInsert->iterator();
         while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-            if (applyRemoteChange) {
-                tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTinyIntValue(KEEP_ROW));
-            }
-            if (!resolved) {
-                tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTinyIntValue(DIVERGE));
-            }
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
             exportTable->insertTuple(tempMetaTuple);
         }
@@ -631,6 +617,19 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
     assert(resolved || !applyRemoteChange);
+
+    if (existingMetaTableForDelete) {
+        setConflictOutcome(existingMetaTableForDelete, applyRemoteChange, resolved);
+    }
+    if (expectedMetaTableForDelete) {
+        setConflictOutcome(expectedMetaTableForDelete, /* decision is meaningless */ false, resolved);
+    }
+    if (existingMetaTableForInsert) {
+        setConflictOutcome(existingMetaTableForInsert, applyRemoteChange, resolved);
+    }
+    if (newMetaTableForInsert) {
+        setConflictOutcome(newMetaTableForInsert, !applyRemoteChange, resolved);
+    }
 
     if (applyRemoteChange) {
         if (deleteConflict != NO_CONFLICT) {
