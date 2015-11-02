@@ -1709,6 +1709,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t spHandle,
                                   int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
+                                  int32_t remoteClusterId,
                                   int64_t undoToken,
                                   const char *log) {
     DRTupleStreamDisableGuard guard(m_drStream, m_drReplicatedStream, !m_database->isActiveActiveDRed());
@@ -1719,7 +1720,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
+    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
@@ -1789,7 +1790,7 @@ void VoltDBEngine::reportProgressToTopend() {
         VOLT_DEBUG("Interrupt query.");
         char buff[100];
         snprintf(buff, 100,
-                "A SQL query was terminated after %.2f seconds because it exceeded the query timeout period.",
+                "A SQL query was terminated after %.03f seconds because it exceeded the query timeout period.",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
 
         throw InterruptException(std::string(buff));

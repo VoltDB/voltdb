@@ -606,9 +606,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken) throws EEException
+                               int remoteClusterId, long undoToken) throws EEException
     {
-        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
+        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
         if (rowCount < 0) {
             throwExceptionForError((int)rowCount);
         }
