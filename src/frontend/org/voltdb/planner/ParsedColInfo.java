@@ -80,9 +80,12 @@ public class ParsedColInfo implements Cloneable {
         return fromOrderByXml(parsedStmt, orderByXml, adjuster);
     }
 
-    /** Construct a ParsedColInfo from Volt XML.  Allow caller to specify actions to finalize the parsed expression. */
-    static public ParsedColInfo fromOrderByXml(AbstractParsedStmt parsedStmt, VoltXMLElement orderByXml, ExpressionAdjuster adjuster) {
-
+    /**
+     * Construct a ParsedColInfo from Volt XML.
+     * Allow caller to specify actions to finalize the parsed expression.
+     */
+    static public ParsedColInfo fromOrderByXml(AbstractParsedStmt parsedStmt, VoltXMLElement orderByXml,
+            ExpressionAdjuster adjuster) {
         // make sure everything is kosher
         assert(orderByXml.name.equalsIgnoreCase("orderby"));
 

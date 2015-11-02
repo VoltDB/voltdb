@@ -2064,7 +2064,7 @@ public class ParserDQL extends ParserBase {
      *
      */
     Expression XreadValueExpression() {
-        return XreadAllTypesCommonValueExpression(true);
+        return XreadAllTypesCommonValueExpression(false);
     }
 
     // union of <numeric | datetime | string | interval value expression>
