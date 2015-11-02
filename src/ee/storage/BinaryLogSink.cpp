@@ -50,7 +50,7 @@ const static int DR_ROW_TYPE_COLUMN_INDEX = 0;
 const static int DR_LOG_ACTION_COLUMN_INDEX = 1;
 const static int DR_CONFLICT_COLUMN_INDEX = 2;
 const static int DR_CONFLICTS_ON_PK_COLUMN_INDEX = 3;
-const static int DR_ROW_DECISION_COLUMN_INDEX = 4;
+const static int DR_ACTION_DECISION_COLUMN_INDEX = 4;
 const static int DR_CLUSTER_ID_COLUMN_INDEX = 5;
 const static int DR_TIMESTAMP_COLUMN_INDEX = 6;
 const static int DR_DIVERGENCE_COLUMN_INDEX = 7;
@@ -111,12 +111,12 @@ static inline std::string DRConflictTypeStr(DRConflictType type) {
 }
 
 // 1 letter
-static inline std::string DRRowDecisionStr(DRRowDecision type) {
+static inline std::string DRDecisionStr(DRRowDecision type) {
     switch (type) {
-    case KEEP_ROW:
-        return "K";
-    case DELETE_ROW:
-        return "D";
+    case ACCEPT:
+        return "A";
+    case REJECT:
+        return "R";
     default:
         return "";
     }
@@ -142,12 +142,12 @@ static bool isResolved(int32_t retval) {
     return (retval & RESOLVED_BIT) == RESOLVED_BIT;
 }
 
-static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool deleteRow, bool convergent) {
+static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
     TableTuple tuple(metadataTable->schema());
     TableIterator iter = metadataTable->iterator();
     while (iter.next(tuple)) {
-        tuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX,
-                        ValueFactory::getTempStringValue(DRRowDecisionStr(deleteRow ? DELETE_ROW : KEEP_ROW)));
+        tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
         tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
                         ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
     }
@@ -535,10 +535,10 @@ static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *out
     switch (rowType) {
     case EXISTING_ROW:
     case EXPECTED_ROW:
-        tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRRowDecisionStr(KEEP_ROW)));
+        tempMetaTuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDecisionStr(REJECT)));
         break;
     case NEW_ROW:
-        tempMetaTuple.setNValue(DR_ROW_DECISION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRRowDecisionStr(DELETE_ROW)));
+        tempMetaTuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDecisionStr(REJECT)));
         break;
     default:
         break;
@@ -692,13 +692,13 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
         setConflictOutcome(existingMetaTableForDelete, applyRemoteChange, resolved);
     }
     if (expectedMetaTableForDelete) {
-        setConflictOutcome(expectedMetaTableForDelete, /* decision is meaningless */ false, resolved);
+        setConflictOutcome(expectedMetaTableForDelete, applyRemoteChange, resolved);
     }
     if (existingMetaTableForInsert) {
         setConflictOutcome(existingMetaTableForInsert, applyRemoteChange, resolved);
     }
     if (newMetaTableForInsert) {
-        setConflictOutcome(newMetaTableForInsert, !applyRemoteChange, resolved);
+        setConflictOutcome(newMetaTableForInsert, applyRemoteChange, resolved);
     }
 
     if (applyRemoteChange) {

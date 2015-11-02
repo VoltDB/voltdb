@@ -142,7 +142,7 @@ public class DDLCompiler {
     public static String DR_LOG_ACTION_COLUMN_NAME = "ACTION_TYPE";
     public static String DR_CONFLICT_COLUMN_NAME = "CONFLICT_TYPE";
     public static String DR_CONFLICTS_ON_PK_COLUMN_NAME = "CONFLICTS_ON_PRIMARY_KEY";
-    public static String DR_ROW_DECISION_COLUMN_NAME = "ROW_DECISION";
+    public static String DR_ROW_DECISION_COLUMN_NAME = "ACTION_DECISION";
     public static String DR_CLUSTER_ID_COLUMN_NAME = "CLUSTER_ID";
     public static String DR_TIMESTAMP_COLUMN_NAME = "TIMESTAMP";
     public static String DR_DIVERGENCE_COLUMN_NAME = "DIVERGENCE";

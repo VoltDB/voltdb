@@ -542,8 +542,8 @@ enum DRConflictRowType {
 };
 
 enum DRRowDecision {
-   KEEP_ROW,
-   DELETE_ROW
+   ACCEPT,
+   REJECT,
 };
 
 enum DRDivergence {
