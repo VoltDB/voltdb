@@ -333,7 +333,7 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */, scheme, -1);
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme, int procCallTimeout) throws Exception {
@@ -344,7 +344,7 @@ public class TestJSONInterface extends TestCase {
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
         if (procCallTimeout > 0) {
-            params.put("ProcTimeout", String.valueOf(procCallTimeout));
+            params.put(HTTPClientInterface.QUERY_TIMEOUT_PARAM, String.valueOf(procCallTimeout));
         }
         if (username != null) {
             params.put("User", username);

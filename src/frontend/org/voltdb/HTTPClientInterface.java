@@ -45,6 +45,8 @@ import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
 
+    public static final String QUERY_TIMEOUT_PARAM = "Querytimeout";
+
     private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
@@ -164,12 +166,12 @@ public class HTTPClientInterface {
 
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
-            String timeoutStr = request.getParameter("ProcTimeout");
-            int procCallTimeout = -1;
+            String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
+            int queryTimeout = -1;
             if (timeoutStr != null) {
                 try {
-                    procCallTimeout = Integer.parseInt(timeoutStr);
-                    if (procCallTimeout <= 0) {
+                    queryTimeout = Integer.parseInt(timeoutStr);
+                    if (queryTimeout <= 0) {
                         throw new NumberFormatException();
                     }
                 } catch(NumberFormatException e) {
@@ -229,17 +231,17 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                if (procCallTimeout==-1) {
+                if (queryTimeout==-1) {
                     success = authResult.m_client.callProcedure(cb, procName, paramSet.toArray());
                 } else {
-                    success = authResult.m_client.callProcedureWithTimeout(cb, procCallTimeout, procName, paramSet.toArray());
+                    success = authResult.m_client.callProcedureWithTimeout(cb, queryTimeout, procName, paramSet.toArray());
                 }
             }
             else {
-                if (procCallTimeout==-1) {
+                if (queryTimeout==-1) {
                     success = authResult.m_client.callProcedure(cb, procName);
                 } else {
-                    success = authResult.m_client.callProcedureWithTimeout(cb, procCallTimeout, procName);
+                    success = authResult.m_client.callProcedureWithTimeout(cb, queryTimeout, procName);
                 }
             }
             if (!success) {
