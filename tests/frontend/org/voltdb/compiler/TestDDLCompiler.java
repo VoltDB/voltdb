@@ -782,7 +782,7 @@ public class TestDDLCompiler extends TestCase {
         Column c4 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_ON_PK_COLUMN_NAME);
         assertNotNull(c4);
         assertTrue(c4.getType() == VoltType.TINYINT.getValue());
-        Column c5 = t.getColumns().get(DDLCompiler.DR_ROW_DECISION_COLUMN_NAME);
+        Column c5 = t.getColumns().get(DDLCompiler.DR_DECISION_COLUMN_NAME);
         assertNotNull(c5);
         assertTrue(c5.getType() == VoltType.STRING.getValue());
         Column c6 = t.getColumns().get(DDLCompiler.DR_CLUSTER_ID_COLUMN_NAME);
