@@ -532,7 +532,6 @@ static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *out
     tempMetaTuple.setNValue(DR_LOG_ACTION_COLUMN_INDEX, ValueFactory::getTempStringValue(DRRecordTypeStr(actionType)));
     tempMetaTuple.setNValue(DR_CONFLICT_COLUMN_INDEX, ValueFactory::getTempStringValue(DRConflictTypeStr(conflictType)));
     tempMetaTuple.setNValue(DR_CONFLICTS_ON_PK_COLUMN_INDEX, ValueFactory::getTinyIntValue(conflictOnPKType));
-    tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
     switch (rowType) {
     case EXISTING_ROW:
     case EXPECTED_ROW:
@@ -547,6 +546,7 @@ static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *out
     tempMetaTuple.setNValue(DR_CLUSTER_ID_COLUMN_INDEX, ValueFactory::getTinyIntValue((ExecutorContext::getClusterIdFromHiddenNValue(hiddenValue))));    // clusterId
     tempMetaTuple.setNValue(DR_TIMESTAMP_COLUMN_INDEX, ValueFactory::getBigIntValue(ExecutorContext::getDRTimestampFromHiddenNValue(hiddenValue)));     // timestamp
     tempMetaTuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRDivergenceStr(NOT_DIVERGE)));
+    tempMetaTuple.setNValue(DR_TABLE_NAME_COLUMN_INDEX, ValueFactory::getTempStringValue(drTable->name()));
     tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getNullStringValue());
     // Must have to deep copy non-inlined data, because tempTuple may be overwritten by following call of this function.
     outputMetaTable->insertTupleNonVirtualWithDeepCopy(tempMetaTuple, pool);

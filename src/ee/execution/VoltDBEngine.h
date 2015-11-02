@@ -134,8 +134,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(std::string name) const;
         virtual bool getIsActiveActiveDREnabled() const;
-        Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
-        Table* getReplicatedDRConflictTable() const { return m_drReplicatedConflictExportTable; }
+        // virtual keyword here is used to override the functions in test case
+        virtual Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
+        virtual Table* getReplicatedDRConflictTable() const { return m_drReplicatedConflictExportTable; }
 
         // -------------------------------------------------
         // Execution Functions
