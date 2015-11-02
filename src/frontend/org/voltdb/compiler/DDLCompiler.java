@@ -17,9 +17,7 @@
 
 package org.voltdb.compiler;
 
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.LineNumberReader;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -79,6 +77,7 @@ import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -98,43 +97,43 @@ import org.voltdb.utils.InMemoryJarfile;
  */
 public class DDLCompiler {
 
-    static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
-    static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
-    static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
+    private static final int MAX_COLUMNS = 1024; // KEEP THIS < MAX_PARAM_COUNT to enable default CRUD update.
+    private static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+    private static final int MAX_BYTES_PER_UTF8_CHARACTER = 4;
 
-    static final String TABLE = "TABLE";
-    static final String PROCEDURE = "PROCEDURE";
-    static final String PARTITION = "PARTITION";
-    static final String REPLICATE = "REPLICATE";
-    static final String EXPORT = "EXPORT";
-    static final String ROLE = "ROLE";
-    static final String DR = "DR";
+    private static final String TABLE = "TABLE";
+    private static final String PROCEDURE = "PROCEDURE";
+    private static final String PARTITION = "PARTITION";
+    private static final String REPLICATE = "REPLICATE";
+    private static final String EXPORT = "EXPORT";
+    private static final String ROLE = "ROLE";
+    private static final String DR = "DR";
 
-    HSQLInterface m_hsql;
-    VoltCompiler m_compiler;
-    String m_fullDDL = "";
-    int m_currLineNo = 1;
+    private final HSQLInterface m_hsql;
+    private final VoltCompiler m_compiler;
+    private String m_fullDDL = "";
+    private int m_currLineNo = 1;
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
-    final VoltDDLElementTracker m_tracker;
-    VoltXMLElement m_schema = new VoltXMLElement(HSQLInterface.XML_SCHEMA_NAME);
+    private final VoltDDLElementTracker m_tracker;
+    private final VoltXMLElement m_schema =
+            new VoltXMLElement(HSQLInterface.XML_SCHEMA_NAME)
+            .withValue("name", HSQLInterface.XML_SCHEMA_NAME);
 
     // used to match imported class with those in the classpath
     // For internal cluster compilation, this will point to the
     // InMemoryJarfile for the current catalog, so that we can
     // find classes provided as part of the application.
-    ClassMatcher m_classMatcher = new ClassMatcher();
+    private ClassMatcher m_classMatcher = new ClassMatcher();
 
-    HashMap<String, Column> columnMap = new HashMap<String, Column>();
-    HashMap<String, Index> indexMap = new HashMap<String, Index>();
-    HashMap<Table, String> matViewMap = new HashMap<Table, String>();
+    private final HashMap<Table, String> m_matViewMap = new HashMap<>();
 
     /** A cache of the XML used to do validation on LIMIT DELETE statements
      * Preserved here to avoid having to re-parse for planning */
     private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
 
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
-    final ClassLoader m_classLoader;
+    private final ClassLoader m_classLoader;
 
     private final Set<String> tableLimitConstraintCounter = new HashSet<>();
 
@@ -166,9 +165,8 @@ public class DDLCompiler {
             ")"                                                 /* end of group 1 */
     );
 
-    private class DDLStatement {
-        public DDLStatement() {
-        }
+    private static class DDLStatement {
+        public DDLStatement() { }
         String statement = "";
         int lineNo;
     }
@@ -180,11 +178,10 @@ public class DDLCompiler {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);
-        this.m_hsql = hsql;
-        this.m_compiler = compiler;
-        this.m_tracker = tracker;
-        this.m_classLoader = classLoader;
-        m_schema.attributes.put("name", HSQLInterface.XML_SCHEMA_NAME);
+        m_hsql = hsql;
+        m_compiler = compiler;
+        m_tracker = tracker;
+        m_classLoader = classLoader;
     }
 
     /**
@@ -194,7 +191,7 @@ public class DDLCompiler {
      * @param whichProcs  which type(s) of procedures to load
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
+    void loadSchema(Reader reader, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompiler.VoltCompilerException {
         m_currLineNo = 1;
 
@@ -211,6 +208,7 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
+                    //* enable to debug */ System.out.println("DEBUG: " + stmt.statement);
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
@@ -354,7 +352,8 @@ public class DDLCompiler {
      * @param whichProcs  which type(s) of procedures to load
      * @throws VoltCompilerException
      */
-    public void loadAutogenExportTableSchema(Database db, Database previousDBIfAny, DdlProceduresToLoad whichProcs)
+    void loadAutogenExportTableSchema(Database db, Database previousDBIfAny,
+            DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
         Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny));
         loadSchema(reader, db, whichProcs);
@@ -829,7 +828,7 @@ public class DDLCompiler {
                         "Role name \"%s\" in CREATE ROLE statement already exists.",
                         roleName));
             }
-            org.voltdb.catalog.Group catGroup = groupMap.add(roleName);
+            Group catGroup = groupMap.add(roleName);
             if (statementMatcher.group(2) != null) {
                 try {
                     EnumSet<Permission> permset =
@@ -1117,16 +1116,23 @@ public class DDLCompiler {
         m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }
 
-    public void compileToCatalog(Database db) throws VoltCompilerException {
+    void compileToCatalog(Database db) throws VoltCompilerException {
         // note this will need to be decompressed to be used
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
 
         // output the xml catalog to disk
+        //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
         // build the local catalog from the xml catalog
-        fillCatalogFromXML(db, m_schema);
+        for (VoltXMLElement node : m_schema.children) {
+            if (node.name.equals("table")) {
+                addTableToCatalog(db, node);
+            }
+        }
+
+        processMaterializedViews(db);
         fillTrackerFromXML();
     }
 
@@ -1158,19 +1164,6 @@ public class DDLCompiler {
             }
         }
     }
-
-    /**
-     * Read until the next newline
-     * @throws IOException
-     */
-    String readToEndOfLine(FileReader reader) throws IOException {
-        LineNumberReader lnr = new LineNumberReader(reader);
-        String retval = lnr.readLine();
-        m_currLineNo++;
-        return retval;
-    }
-
-
 
     // Parsing states. Start in kStateInvalid
     private static int kStateInvalid = 0;                         // have not yet found start of statement
@@ -1323,7 +1316,7 @@ public class DDLCompiler {
         return kStateReadingComment;
     }
 
-    DDLStatement getNextStatement(Reader reader, VoltCompiler compiler)
+    private DDLStatement getNextStatement(Reader reader, VoltCompiler compiler)
             throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;
@@ -1435,28 +1428,13 @@ public class DDLCompiler {
         }
     }
 
-    public void fillCatalogFromXML(Database db, VoltXMLElement xml)
-    throws VoltCompiler.VoltCompilerException {
-
-        if (xml == null)
-            throw m_compiler.new VoltCompilerException("Unable to parse catalog xml file from hsqldb");
-
-        assert xml.name.equals("databaseschema");
-
-        for (VoltXMLElement node : xml.children) {
-            if (node.name.equals("table"))
-                addTableToCatalog(db, node);
-        }
-
-        processMaterializedViews(db);
-    }
-
-    void addTableToCatalog(Database db, VoltXMLElement node) throws VoltCompilerException {
+    private void addTableToCatalog(Database db, VoltXMLElement node)
+            throws VoltCompilerException {
         assert node.name.equals("table");
 
-        // clear these maps, as they're table specific
-        columnMap.clear();
-        indexMap.clear();
+        // Construct table-specific maps
+        HashMap<String, Column> columnMap = new HashMap<String, Column>();
+        HashMap<String, Index> indexMap = new HashMap<String, Index>();
 
         String name = node.attributes.get("name");
 
@@ -1473,7 +1451,7 @@ public class DDLCompiler {
         String query = node.attributes.get("query");
         if (query != null) {
             assert(query.length() > 0);
-            matViewMap.put(table, query);
+            m_matViewMap.put(table, query);
         }
 
         // all tables start replicated
@@ -1492,7 +1470,8 @@ public class DDLCompiler {
                 int colIndex = 0;
                 for (VoltXMLElement columnNode : subNode.children) {
                     if (columnNode.name.equals("column")) {
-                        addColumnToCatalog(table, columnNode, columnTypes);
+                        addColumnToCatalog(table, columnNode, columnTypes,
+                                columnMap, m_compiler);
                         colIndex++;
                     }
                 }
@@ -1511,7 +1490,8 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == false) {
-                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap,
+                                indexMap, columnMap, m_compiler);
                     }
                 }
 
@@ -1520,7 +1500,8 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith(HSQLInterface.AUTO_GEN_IDX_PREFIX) == true) {
-                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap,
+                                indexMap, columnMap, m_compiler);
                     }
                 }
             }
@@ -1528,7 +1509,8 @@ public class DDLCompiler {
             if (subNode.name.equals("constraints")) {
                 for (VoltXMLElement constraintNode : subNode.children) {
                     if (constraintNode.name.equals("constraint")) {
-                        addConstraintToCatalog(table, constraintNode, indexReplacementMap);
+                        addConstraintToCatalog(table, constraintNode,
+                                indexReplacementMap, indexMap);
                     }
                 }
             }
@@ -1597,8 +1579,11 @@ public class DDLCompiler {
         }
     }
 
-    void addColumnToCatalog(Table table, VoltXMLElement node,
-                            SortedMap<Integer, VoltType> columnTypes) throws VoltCompilerException
+    private static void addColumnToCatalog(Table table,
+                            VoltXMLElement node,
+                            SortedMap<Integer, VoltType> columnTypes,
+                            Map<String, Column> columnMap,
+                            VoltCompiler compiler) throws VoltCompilerException
     {
         assert node.name.equals("column");
 
@@ -1690,7 +1675,7 @@ public class DDLCompiler {
                 if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
                     String msg = type.toSQLString() + " column " + name +
                         " in table " + table.getTypeName() + " has unsupported length " + sizeString;
-                    throw m_compiler.new VoltCompilerException(msg);
+                    throw compiler.new VoltCompilerException(msg);
                 }
                 if (!inBytes && type == VoltType.STRING) {
                     if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
@@ -1699,7 +1684,7 @@ public class DDLCompiler {
                                 "To eliminate this warning, specify \"VARCHAR(%d BYTES)\"",
                                 name, table.getTypeName(),
                                 VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
-                        m_compiler.addWarn(msg);
+                        compiler.addWarn(msg);
                         inBytes = true;
                     }
                 }
@@ -1730,7 +1715,7 @@ public class DDLCompiler {
     /**
      * Return true if the two indexes are identical with a different name.
      */
-    boolean indexesAreDups(Index idx1, Index idx2) {
+    private static boolean indexesAreDups(Index idx1, Index idx2) {
         // same attributes?
         if (idx1.getType() != idx2.getType()) {
             return false;
@@ -1786,13 +1771,20 @@ public class DDLCompiler {
         // Check the predicates
         if (idx1.getPredicatejson().length() > 0) {
             return idx1.getPredicatejson().equals(idx2.getPredicatejson());
-        } else if (idx2.getPredicatejson().length() > 0) {
+        }
+        if (idx2.getPredicatejson().length() > 0) {
             return idx2.getPredicatejson().equals(idx1.getPredicatejson());
         }
         return true;
     }
 
-    void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    private static void addIndexToCatalog(Database db,
+            Table table,
+            VoltXMLElement node,
+            Map<String, String> indexReplacementMap,
+            HashMap<String, Index> indexMap,
+            HashMap<String, Column> columnMap,
+            VoltCompiler compiler)
             throws VoltCompilerException
     {
         assert node.name.equals("index");
@@ -1823,16 +1815,20 @@ public class DDLCompiler {
                     checkExpressions.add(expr);
                     exprs.add(expr);
                 }
-            } else if (subNode.name.equals("predicate")) {
+            }
+            else if (subNode.name.equals("predicate")) {
                 assert(subNode.children.size() == 1);
-                predicate = buildPartialIndexPredicate(dummy, name, subNode.children.get(0), table);
+                VoltXMLElement predicateXML = subNode.children.get(0);
+                assert(predicateXML != null);
+                predicate = buildPartialIndexPredicate(dummy, name,
+                        predicateXML, table, compiler);
             }
         }
 
         // Check all the subexpressions we gathered up.
         if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
@@ -1855,7 +1851,8 @@ public class DDLCompiler {
                     nonint_col_name = colNames[i];
                 }
             }
-        } else {
+        }
+        else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
                 if (! colType.isBackendIntegerType()) {
@@ -1884,14 +1881,13 @@ public class DDLCompiler {
             if (has_nonint_col) {
                 String emsg = "Index " + name + " in table " + table.getTypeName() +
                              " uses a non-hashable column " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(emsg);
+                throw compiler.new VoltCompilerException(emsg);
             }
             index.setType(IndexType.HASH_TABLE.getValue());
         }
-        else
-        {
+        else {
             index.setType(IndexType.BALANCED_TREE.getValue());
-                index.setCountable(true);
+            index.setCountable(true);
         }
 
         // Countable is always on right now. Fix it when VoltDB can pack memory for TreeNode.
@@ -1913,7 +1909,7 @@ public class DDLCompiler {
             try {
                 index.setExpressionsjson(convertToJSONArray(exprs));
             } catch (JSONException e) {
-                throw m_compiler.new VoltCompilerException("Unexpected error serializing non-column expressions for index '" +
+                throw compiler.new VoltCompilerException("Unexpected error serializing non-column expressions for index '" +
                                                            name + "' on type '" + table.getTypeName() + "': " + e.toString());
             }
         }
@@ -1928,7 +1924,7 @@ public class DDLCompiler {
             try {
                 index.setPredicatejson(convertToJSONObject(predicate));
             } catch (JSONException e) {
-                throw m_compiler.new VoltCompilerException("Unexpected error serializing predicate for partial index '" +
+                throw compiler.new VoltCompilerException("Unexpected error serializing predicate for partial index '" +
                         name + "' on type '" + table.getTypeName() + "': " + e.toString());
             }
         }
@@ -1953,7 +1949,7 @@ public class DDLCompiler {
                     // on dup-detection, add a warning but don't fail
                     String emsg = String.format("Dropping index %s on table %s because it duplicates index %s.",
                             index.getTypeName(), table.getTypeName(), existingIndex.getTypeName());
-                    m_compiler.addWarn(emsg);
+                    compiler.addWarn(emsg);
                 }
 
                 // drop the index and GTFO
@@ -1965,7 +1961,7 @@ public class DDLCompiler {
         String smsg = "Created index: " + name + " on table: " +
                    table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
-        m_compiler.addInfo(smsg);
+        compiler.addInfo(smsg);
 
         indexMap.put(name, index);
     }
@@ -2024,7 +2020,7 @@ public class DDLCompiler {
     }
 
     /** Accessor */
-    public Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
+    Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
         return Collections.unmodifiableCollection(m_limitDeleteStmtToXml.entrySet());
     }
 
@@ -2035,7 +2031,10 @@ public class DDLCompiler {
      * @param indexReplacementMap
      * @throws VoltCompilerException
      */
-    void addConstraintToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    private void addConstraintToCatalog(Table table,
+            VoltXMLElement node,
+            Map<String, String> indexReplacementMap,
+            Map<String, Index> indexMap)
             throws VoltCompilerException
     {
         assert node.name.equals("constraint");
@@ -2119,10 +2118,10 @@ public class DDLCompiler {
     }
 
     // Compile the fallback query XMLs, add the plans into the catalog statement (ENG-8641).
-    void compileFallbackQueriesAndUpdateCatalog(Database db,
+    private void compileFallbackQueriesAndUpdateCatalog(Database db,
                                                 List<VoltXMLElement> fallbackQueryXMLs,
                                                 MaterializedViewInfo matviewinfo) throws VoltCompilerException {
-        org.voltdb.compiler.DatabaseEstimates estimates = new org.voltdb.compiler.DatabaseEstimates();
+        DatabaseEstimates estimates = new DatabaseEstimates();
         for (int i=0; i<fallbackQueryXMLs.size(); ++i) {
             String key = String.valueOf(i);
             Statement fallbackQueryStmt = matviewinfo.getFallbackquerystmts().add(key);
@@ -2144,7 +2143,7 @@ public class DDLCompiler {
                               fallbackQueryStmt.getSqltext(),
                               null, // no user-supplied join order
                               DeterminismMode.FASTER,
-                              org.voltdb.planner.StatementPartitioning.forceSP());
+                              StatementPartitioning.forceSP());
         }
     }
 
@@ -2152,14 +2151,14 @@ public class DDLCompiler {
      * Add materialized view info to the catalog for the tables that are
      * materialized views.
      */
-    void processMaterializedViews(Database db) throws VoltCompiler.VoltCompilerException {
+    private void processMaterializedViews(Database db) throws VoltCompilerException {
         HashSet <String> viewTableNames = new HashSet<>();
-        for (Entry<Table, String> entry : matViewMap.entrySet()) {
+        for (Entry<Table, String> entry : m_matViewMap.entrySet()) {
             viewTableNames.add(entry.getKey().getTypeName());
         }
 
 
-        for (Entry<Table, String> entry : matViewMap.entrySet()) {
+        for (Entry<Table, String> entry : m_matViewMap.entrySet()) {
             Table destTable = entry.getKey();
             String query = entry.getValue();
 
@@ -2185,7 +2184,7 @@ public class DDLCompiler {
 
             String viewName = destTable.getTypeName();
             // throw an error if the view isn't within voltdb's limited worldview
-            checkViewMeetsSpec(viewName, stmt);
+            checkViewMeetsSpec(viewName, stmt, m_compiler);
 
             // Allow only non-unique indexes other than the primary key index.
             // The primary key index is yet to be defined (below).
@@ -2622,15 +2621,13 @@ public class DDLCompiler {
      * @throws VoltCompilerException
      * @return AbstractExpression
      */
-    private AbstractExpression buildPartialIndexPredicate(
-            AbstractParsedStmt dummy, String indexName, VoltXMLElement predicateXML, Table table) throws VoltCompilerException {
-
-        if (predicateXML == null) {
-            return null;
-        }
-
-        // Make sure all column expressions refer to the same index table before we can parse the XML
-        // to avoid the AbstractParsedStmt exception/assertion
+    private static AbstractExpression buildPartialIndexPredicate(
+            AbstractParsedStmt dummy, String indexName,
+            VoltXMLElement predicateXML, Table table,
+            VoltCompiler compiler) throws VoltCompilerException {
+        // Make sure all column expressions refer to the same index table
+        // before we can parse the XML to avoid the AbstractParsedStmt
+        // exception/assertion
         String tableName = table.getTypeName();
         assert(tableName != null);
         String msg = "Partial index \"" + indexName + "\" ";
@@ -2641,7 +2638,7 @@ public class DDLCompiler {
             String columnRefTableName = columnRef.attributes.get("table");
             if (columnRefTableName != null && !tableName.equals(columnRefTableName)) {
                 msg += "with expression(s) involving other tables is not supported.";
-                throw m_compiler.new VoltCompilerException(msg);
+                throw compiler.new VoltCompilerException(msg);
             }
         }
         // Now it safe to parse the expression tree
@@ -2649,11 +2646,11 @@ public class DDLCompiler {
 
         if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
             msg += "with aggregate expression(s) is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
+            throw compiler.new VoltCompilerException(msg);
         }
         if (!predicate.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class).isEmpty()) {
             msg += "with subquery expression(s) is not supported.";
-            throw m_compiler.new VoltCompilerException(msg);
+            throw compiler.new VoltCompilerException(msg);
         }
         return predicate;
     }
@@ -2667,7 +2664,8 @@ public class DDLCompiler {
      * @param stmt The output from the parser describing the select statement that creates the view.
      * @throws VoltCompilerException
      */
-    private void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt) throws VoltCompilerException {
+    private static void checkViewMeetsSpec(String viewName, ParsedSelectStmt stmt,
+            VoltCompiler compiler) throws VoltCompilerException {
         int groupColCount = stmt.m_groupByColumns.size();
         int displayColCount = stmt.m_displayColumns.size();
         StringBuffer msg = new StringBuffer();
@@ -2684,7 +2682,7 @@ public class DDLCompiler {
             // The columns must be equal.
             if (!outcol.expression.equals(gbcol.expression)) {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
-                throw m_compiler.new VoltCompilerException(msg.toString());
+                throw compiler.new VoltCompilerException(msg.toString());
             }
             checkExpressions.add(outcol.expression);
         }
@@ -2692,7 +2690,7 @@ public class DDLCompiler {
         AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
         if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
             msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         // Finally, the display columns must have aggregate
@@ -2709,7 +2707,7 @@ public class DDLCompiler {
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MAX)) {
                 msg.append("must have non-group by columns aggregated by sum, count, min or max.");
-                throw m_compiler.new VoltCompilerException(msg.toString());
+                throw compiler.new VoltCompilerException(msg.toString());
             }
             // Don't push the expression, though.  Push the argument.
             // We will check for aggregate calls and fail, and we don't
@@ -2729,44 +2727,44 @@ public class DDLCompiler {
         // Check all the subexpressions we gathered up.
         if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         // Check some other materialized view specific things.
         if (stmt.hasSubquery()) {
             msg.append("with subquery sources is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.m_tableList.size() != 1) {
             msg.append("has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
                        "Only one source table is allowed.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.orderByColumns().size() != 0) {
             msg.append("with ORDER BY clause is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.hasLimitOrOffset()) {
             msg.append("with LIMIT or OFFSET clause is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         if (stmt.m_having != null) {
             msg.append("with HAVING clause is not supported.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
         if (displayColCount <= groupColCount) {
             msg.append("has too few columns.");
-            throw m_compiler.new VoltCompilerException(msg.toString());
+            throw compiler.new VoltCompilerException(msg.toString());
         }
 
      }
 
-    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
+    private static void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr)
             throws VoltCompiler.VoltCompilerException {
 
