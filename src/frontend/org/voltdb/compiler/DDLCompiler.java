@@ -142,7 +142,7 @@ public class DDLCompiler {
     public static String DR_LOG_ACTION_COLUMN_NAME = "ACTION_TYPE";
     public static String DR_CONFLICT_COLUMN_NAME = "CONFLICT_TYPE";
     public static String DR_CONFLICTS_ON_PK_COLUMN_NAME = "CONFLICTS_ON_PRIMARY_KEY";
-    public static String DR_ROW_DECISION_COLUMN_NAME = "ROW_DECISION";
+    public static String DR_DECISION_COLUMN_NAME = "DECISION";
     public static String DR_CLUSTER_ID_COLUMN_NAME = "CLUSTER_ID";
     public static String DR_TIMESTAMP_COLUMN_NAME = "TIMESTAMP";
     public static String DR_DIVERGENCE_COLUMN_NAME = "DIVERGENCE";
@@ -155,15 +155,13 @@ public class DDLCompiler {
         {DR_LOG_ACTION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
         {DR_CONFLICT_COLUMN_NAME, "VARCHAR(4 BYTES)"},
         {DR_CONFLICTS_ON_PK_COLUMN_NAME, "TINYINT"},
-        {DR_ROW_DECISION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
+        {DR_DECISION_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
         {DR_CLUSTER_ID_COLUMN_NAME, "TINYINT NOT NULL"},
         {DR_TIMESTAMP_COLUMN_NAME, "BIGINT NOT NULL"},
         {DR_DIVERGENCE_COLUMN_NAME, "VARCHAR(1 BYTES) NOT NULL"},
         {DR_TABLE_NAME_COLUMN_NAME, "VARCHAR(1024 BYTES)"},
         {DR_TUPLE_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
     };
-
-    static final int DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS_SIZE = 1 + 1 + 1 + 1 + 1 + 1 + 8 + 1;
 
     private class DDLStatement {
         public DDLStatement() {
