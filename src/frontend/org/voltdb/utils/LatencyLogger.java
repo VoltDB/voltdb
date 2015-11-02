@@ -125,13 +125,17 @@ public class LatencyLogger {
         }
     }
 
+    public static String usage() {
+        return "Usage server port reportIntervalSeconds [hostname]";
+    }
+
     public static void main(String[] args) throws Exception {
         final String hostname;
         if (args.length != 3) {
             if (args.length == 4)
                 hostname = args[3];
             else {
-                System.out.println("Usage server port reportIntervalSeconds [hostname]");
+                System.out.println(usage());
                 return;
             }
         } else
@@ -145,7 +149,7 @@ public class LatencyLogger {
                 throw new NumberFormatException();
         } catch (NumberFormatException e) {
             System.out.println("reportIntervalSeconds should be greater than or equal to 1");
-            System.out.println("Usage server port reportIntervalSeconds [hostname]");
+            System.out.println(usage());
             System.exit(0);
         }
 

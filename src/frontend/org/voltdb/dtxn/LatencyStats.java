@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.AtomicHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
@@ -47,26 +48,25 @@ public class LatencyStats extends SiteStatsSource {
      *
      */
     private static class DummyIterator implements Iterator<Object> {
-        boolean returnRow = true;
+        boolean oneRow = false;
 
         @Override
         public boolean hasNext() {
-            return returnRow;
+            if (!oneRow) {
+                oneRow = true;
+                return true;
+            }
+            return false;
         }
 
         @Override
         public Object next() {
-            if (returnRow) {
-                returnRow = false;
-                return new Object();
-            } else {
-                return null;
-            }
+            return null;
         }
 
         @Override
         public void remove() {
-            throw new UnsupportedOperationException();
+
         }
     }
 
