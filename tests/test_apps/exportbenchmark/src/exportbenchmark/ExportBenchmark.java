@@ -154,7 +154,7 @@ public class ExportBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (!target.equals("socket") && !target.equals("kafka")) {
-            	exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\"");
+                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\"");
             }
         }
     }
@@ -397,7 +397,7 @@ public class ExportBenchmark {
 
         testFinished.set(true);
         if (config.target.equals("socket")) {
-        	statsSocketSelector.wakeup();
+            statsSocketSelector.wakeup();
         }
     }
 
@@ -566,8 +566,8 @@ public class ExportBenchmark {
         Thread.sleep(config.warmup * 1000);
         // don't do this for Kafka -- nothing to listen to
         if (config.target.equals("socket")) {
-        	setupSocketListener();
-        	listenForStats();
+            setupSocketListener();
+            listenForStats();
         }
 
         writes.join();
