@@ -203,10 +203,10 @@ public class HTTPClientInterface {
                     msg = String.format("%s( %s )", jsonp, msg);
                 }
                 response.setStatus(HttpServletResponse.SC_OK);
+                request.setHandled(true);
                 try {
                     response.getWriter().print(msg);
                 } catch (IOException e1) {} // Ignore this as browser must have closed.
-                request.setHandled(true);
                 return;
             }
 
