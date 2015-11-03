@@ -706,11 +706,15 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
             drTable->insertPersistentTuple(*newTuple, true);
         }
     }
-    exportDRConflict(conflictExportTable, applyRemoteChange, resolved,
-            existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
-            expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
-            existingMetaTableForInsert.get(), existingTupleTableForInsert.get(),
-            newMetaTableForInsert.get(), newTupleTableForInsert.get());
+
+    // For replicated table, pick partition 0 to export the conflicts.
+    if (!drTable->isReplicatedTable() || engine->getPartitionId() == 0) {
+        exportDRConflict(conflictExportTable, applyRemoteChange, resolved,
+                existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
+                expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
+                existingMetaTableForInsert.get(), existingTupleTableForInsert.get(),
+                newMetaTableForInsert.get(), newTupleTableForInsert.get());
+    }
 
     if (existingMetaTableForDelete.get()) {
         existingMetaTableForDelete.get()->deleteAllTuples(true);
