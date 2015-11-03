@@ -436,7 +436,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     /*
      * Test that update propagates
      */
-    TableTuple toUpdate = districtTable->lookupTupleByValues(temp_tuple);
+    TableTuple toUpdate = districtTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toUpdate.isNullTuple());
 
     //Use a different string value for one column
@@ -468,11 +468,11 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
 
     //Validate the update took place
-    TableTuple updated = districtTableReplica->lookupTupleByValues(temp_tuple);
+    TableTuple updated = districtTableReplica->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(updated.isNullTuple());
     EXPECT_EQ(0, updated.getNValue(3).compare(cachedStringValues.back()));
 
-    TableTuple toDelete = districtTable->lookupTupleByValues(temp_tuple);
+    TableTuple toDelete = districtTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toDelete.isNullTuple());
 
     //Prep another transaction to test propagating a delete
@@ -579,7 +579,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     /*
      * Test that delete propagates
      */
-    TableTuple toDelete = districtTable->lookupTupleByValues(temp_tuple);
+    TableTuple toDelete = districtTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toDelete.isNullTuple());
     districtTable->deleteTuple(toDelete, true);
 
@@ -697,7 +697,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     /*
      * Test that delete propagates
      */
-    TableTuple toDelete = customerTable->lookupTupleByValues(temp_tuple);
+    TableTuple toDelete = customerTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toDelete.isNullTuple());
     customerTable->deleteTuple(toDelete, true);
 

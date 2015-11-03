@@ -265,7 +265,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE rowInput(rowData, rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
 
-            TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
+            TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
             if (deleteTuple.isNullTuple()) {
                 if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
@@ -323,7 +323,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
             tempTuple.deserializeFromDR(newRowInput, pool);
 
-            TableTuple oldTuple = table->lookupTupleByValues(expectedTuple);
+            TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
             if (oldTuple.isNullTuple()) {
                 if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, &expectedTuple, &tempTuple, uniqueId, remoteClusterId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {

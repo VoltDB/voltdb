@@ -930,7 +930,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     deleteTupleFinalize(target); // also frees object columns
 }
 
-TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
+TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType) {
     TableTuple nullTuple(m_schema);
 
     TableIndex *pkeyIndex = primaryKeyIndex();
@@ -940,8 +940,16 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
          */
         TableTuple tableTuple(m_schema);
         TableIterator ti(this, m_data.begin());
-        if (forUndo || m_schema->getUninlinedObjectColumnCount() == 0) {
-            size_t tuple_length = m_schema->tupleLength();
+        if (lookupType == LOOKUP_FOR_UNDO || m_schema->getUninlinedObjectColumnCount() == 0) {
+            size_t tuple_length;
+            if (lookupType == LOOKUP_BY_VALUES && m_schema->hiddenColumnCount() > 0) {
+                // Looking up a tuple by values should not include any internal
+                // hidden column values, which are appended to the end of the
+                // tuple
+                tuple_length = m_schema->offsetOfHiddenColumns();
+            } else {
+                tuple_length = m_schema->tupleLength();
+            }
             // Do an inline tuple byte comparison
             // to avoid matching duplicate tuples with different pointers to Object storage
             // -- which would cause erroneous releases of the wrong Object storage copy.
@@ -954,9 +962,10 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
                 }
             }
         } else {
+            bool includeHiddenColumns = (lookupType == LOOKUP_FOR_DR);
             while (ti.hasNext()) {
                 ti.next(tableTuple);
-                if (tableTuple.equalsNoSchemaCheck(tuple)) {
+                if (tableTuple.equalsNoSchemaCheck(tuple, includeHiddenColumns)) {
                     return tableTuple;
                 }
             }
