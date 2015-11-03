@@ -93,7 +93,7 @@ class PersistentTableSurgeon {
 
 public:
 
-    TBMap &getData();
+    TBMap &getData() const;
     PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
@@ -420,7 +420,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         m_tupleLimit = newLimit;
     }
 
-    bool isPersistentTableEmpty()
+    bool isPersistentTableEmpty() const
     {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
@@ -436,7 +436,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() {
+    PersistentTable * getPreTruncateTable() const {
         return m_preTruncateTable;
     }
 
@@ -493,6 +493,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
+    inline bool isTruncateFavorable() const;
 
   private:
 
@@ -658,6 +659,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     TableIndex* m_smallestUniqueIndex;
     uint32_t m_smallestUniqueIndexCrc;
     int m_drTimestampColumnIndex;
+
+    // threshold cutoff in terms of block load factor at which truncate is better
+    // than tuple-by-tuple delete. Cut-off values are picked based on worst case
+    // scenarios with intent to improve performance and to avoid performance
+    // regression by not getting too greedy for performance by favoring truncate
+    // truncate instead of tuple-by-tuple delete.
+
+    // cut-off for table with no views
+    static const double TABLE_LF_CUTOFF_FOR_TRUNC = 0.105666;
+    //cut-off for table with views
+    static const double TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC = 0.015416;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -668,7 +680,7 @@ inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
 inline PersistentTableSurgeon::~PersistentTableSurgeon()
 {}
 
-inline TBMap &PersistentTableSurgeon::getData() {
+inline TBMap &PersistentTableSurgeon::getData() const {
     return m_table.m_data;
 }
 
@@ -949,6 +961,24 @@ inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
 
 inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
     return lookupTuple(tuple, true);
+}
+
+inline bool PersistentTable::isTruncateFavorable() const {
+    // truncate may not optimal way to delete entries from table
+    // for case where there is only block and block load factor
+    // is below certain threshold value. the threshold value is
+    // different if the table has views on it
+    if (m_data.size() == 1) {
+        //const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
+        const double blockLoadFactor = (double) visibleTupleCount() / m_tuplesPerBlock;
+        if ((blockLoadFactor <= TABLE_LF_CUTOFF_FOR_TRUNC) ||
+            (m_views.size() > 0 && blockLoadFactor <= TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC)) {
+            return false;
+        }
+    } else if (isPersistentTableEmpty() == true) {
+        return false;
+    }
+    return true;
 }
 
 }
