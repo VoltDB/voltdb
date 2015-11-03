@@ -1790,7 +1790,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(db.getIsactiveactivedred());
         assertTrue(db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP) != null);
         // check default setting of DR conflict exporter
-        assertEquals("MyExport", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("nonce").getValue());
+        assertEquals("LOG", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("nonce").getValue());
         assertEquals(cat.getClusters().get("cluster").getVoltroot() + "/" + CatalogUtil.DEFAULT_DR_CONFLICTS_DIR,
                 db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("outdir").getValue());
         assertEquals("true", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("replicated").getValue());
