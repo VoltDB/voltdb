@@ -47,10 +47,13 @@ private:
     /**
      * Export the conflict log to downstream
      */
-    void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool resolved, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
+    void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool diverge,
+            TempTable *existingMetaTableForDelete, TempTable *existingTupleTableForDelete,
+            TempTable *expectedMetaTableForDelete, TempTable *expectedTupleTableForDelete,
+            TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
+            TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert);
 };
 
 
 }
 #endif
-
