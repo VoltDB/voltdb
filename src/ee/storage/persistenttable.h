@@ -397,6 +397,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    inline bool isReplicatedTable() const {
+        return (m_partitionColumn == -1);
+    }
+
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 
@@ -578,7 +582,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     TBPtr allocateNextBlock();
 
     inline DRTupleStream *getDRTupleStream(ExecutorContext *ec) {
-        if (m_partitionColumn == -1) {
+        if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         } else {
             return ec->drStream();

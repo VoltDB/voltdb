@@ -1897,9 +1897,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             }
-            else if (task.procName.equals("@ResetDR")) {
-                return dispatchResetDR(task);
-            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -2233,15 +2230,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.instance().getHostMessenger().sendPoisonPill("@StopNode", ihid, ForeignHost.CRASH_ME);
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
-    }
-
-    private ClientResponseImpl dispatchResetDR(StoredProcedureInvocation task) {
-        if (VoltDB.instance().getNodeDRGateway() != null) {
-            VoltDB.instance().getNodeDRGateway().resetDRProducer();
-        }
-        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        t.addRow(VoltSystemProcedure.STATUS_OK);
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] {t}, "SUCCESS", task.clientHandle);
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
