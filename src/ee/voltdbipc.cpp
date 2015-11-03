@@ -134,9 +134,14 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
-    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
-                        voltdb::DRConflictType deleteConflict, voltdb::Table *existingTableForDelete, voltdb::Table *expectedTableForDelete,
-                        voltdb::DRConflictType insertConflict, voltdb::Table *existingTableForInsert, voltdb::Table *newTableForInsert);
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName,
+                         voltdb::DRRecordType action,
+                         voltdb::DRConflictType deleteConflict,
+                         voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
+                         voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
+                         voltdb::DRConflictType insertConflict,
+                         voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
+                         voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;
@@ -1551,10 +1556,13 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
 }
 
 int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp,
-                        std::string tableName, voltdb::DRRecordType action,
-                        voltdb::DRConflictType deleteConflict, voltdb::Table *existingTableForDelete,
-                        voltdb::Table *expectedTableForDelete, voltdb::DRConflictType insertConflict,
-                        voltdb::Table *existingTableForInsert, voltdb::Table *newTableForInsert) {
+                                std::string tableName, voltdb::DRRecordType action,
+                                voltdb::DRConflictType deleteConflict,
+                                voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
+                                voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
+                                voltdb::DRConflictType insertConflict,
+                                voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
+                                voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert) {
     return 0;
 }
 
