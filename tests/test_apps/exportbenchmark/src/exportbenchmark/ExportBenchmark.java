@@ -145,11 +145,17 @@ public class ExportBenchmark {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
+        @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka)")
+        String target = "socket";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (!target.equals("socket") && !target.equals("kafka")) {
+                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\"");
+            }
         }
     }
 
@@ -243,7 +249,7 @@ public class ExportBenchmark {
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
-                //Get highest timestamp and watch is change
+                //Get highest timestamp and watch it change
                 if (tts > ts) {
                     ts = tts;
                 }
@@ -390,7 +396,9 @@ public class ExportBenchmark {
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
 
         testFinished.set(true);
-        statsSocketSelector.wakeup();
+        if (config.target.equals("socket")) {
+            statsSocketSelector.wakeup();
+        }
     }
 
     /**
@@ -556,8 +564,11 @@ public class ExportBenchmark {
 
         // Listen for stats until we stop
         Thread.sleep(config.warmup * 1000);
-        setupSocketListener();
-        listenForStats();
+        // don't do this for Kafka -- nothing to listen to
+        if (config.target.equals("socket")) {
+            setupSocketListener();
+            listenForStats();
+        }
 
         writes.join();
         periodicStatsTimer.cancel();
@@ -582,7 +593,7 @@ public class ExportBenchmark {
         client.close();
 
         // Make sure we got serverside stats
-        if (serverStats.size() == 0) {
+        if (config.target.equals("socket") && serverStats.size() == 0) {
             System.err.println("ERROR: Never received stats from export clients");
             success = false;
         }
