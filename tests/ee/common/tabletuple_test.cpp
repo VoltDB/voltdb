@@ -150,7 +150,7 @@ TEST_F(TableTupleTest, ToJsonArray)
     tuple.setHiddenNValue(0, nvalHiddenBigint);
     tuple.setHiddenNValue(1, nvalHiddenString);
 
-    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]\n"));
+    EXPECT_EQ(0, strcmp(tuple.toJsonArray().c_str(), "[\"999\",\"数据库\",\"null\"]"));
 
     nvalHiddenString.free();
     nvalVisibleString.free();

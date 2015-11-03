@@ -334,7 +334,9 @@ public:
             array[i] = getNValue(i).toString();
         }
 
-        return Json::FastWriter().write(array);
+        std::string retval = Json::FastWriter().write(array);
+        // The FastWritter always writes a newline at the end, ignore it
+        return std::string(retval, 0, retval.length() - 1);
     }
 
     /** Copy values from one tuple into another (uses memcpy) */
@@ -506,7 +508,7 @@ private:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
 
-        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+        if (columnType == VALUE_TYPE_VARCHAR || columnType == VALUE_TYPE_VARBINARY) {
             // Null variable length value doesn't take any bytes in
             // export table, so here needs a special handle for VARCHAR
             // and VARBINARY
