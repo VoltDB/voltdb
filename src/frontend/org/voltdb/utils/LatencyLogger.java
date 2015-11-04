@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -93,7 +94,7 @@ public class LatencyLogger {
                         e.printStackTrace();
                         System.exit(0);
                     }
-                    ArrayList<String> hostnames = new ArrayList<String>();
+                    List<String> hostnames = new ArrayList<String>();
                     String tableHostname = "";
                     while (!hostname.equalsIgnoreCase(tableHostname)) {
                         if (!table.advanceRow()) {
@@ -127,7 +128,7 @@ public class LatencyLogger {
                         System.out.printf("%12s, %10d, %10d, %8.2fms, %8.2fms, %8.2fms, %8.2fms, %8.2fms\n",
                                           sdf.format(now),
                                           totalCount,
-                                          (totalCount / duration),
+                                          0,
                                           0D, 0D, 0D, 0D, 0D);
 
                     m_histogramData = newHistogram;
