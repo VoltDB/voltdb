@@ -1261,7 +1261,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
  *
  * DB B reports: <DELETE no conflict>
  * existingRow: <null>
- * expectedRow: <null>
+ * expectedRow: <24, 2321, X>
  *               <INSERT constraint violation>
  * existingRow: <123, 33333, Z>
  * newRow:      <12, 33333, X>
@@ -1314,7 +1314,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
     // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingTupleRowsForDelete.get() == NULL);
-    ASSERT_TRUE(m_topend.expectedTupleRowsForDelete.get() == NULL);
+    EXPECT_EQ(1, m_topend.expectedTupleRowsForDelete->activeTupleCount());
+    verifyExpectedTableForDelete(expectedTuple);
 
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
@@ -1327,7 +1328,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
 }
 
 /*

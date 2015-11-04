@@ -567,8 +567,10 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     // Set DR flag based on current catalog state
     m_drStream->m_enabled = catalogCluster->drProducerEnabled();
+    m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
     if (m_drReplicatedStream) {
         m_drReplicatedStream->m_enabled = m_drStream->m_enabled;
+        m_drReplicatedStream->m_flushInterval = m_drStream->m_flushInterval;
     }
 
     // load up all the tables, adding all tables
@@ -980,9 +982,12 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
     m_catalog->execute(catalogPayload);
 
     // Set DR flag based on current catalog state
-    m_drStream->m_enabled = m_catalog->clusters().get("cluster")->drProducerEnabled();
+    catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
+    m_drStream->m_enabled = catalogCluster->drProducerEnabled();
+    m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
     if (m_drReplicatedStream) {
         m_drReplicatedStream->m_enabled = m_drStream->m_enabled;
+        m_drReplicatedStream->m_flushInterval = m_drStream->m_flushInterval;
     }
 
     if (updateCatalogDatabaseReference() == false) {
