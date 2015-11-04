@@ -133,11 +133,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     int m_colCount = -1;
 
     // non-positive value that probably shouldn't be -1 to avoid off-by-one errors
-    static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
+    private static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
 
     // memoized offsets used when users iterate rows with fetchrow()
-    int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
-    int m_memoizedBufferOffset;
+    private int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
+    private int m_memoizedBufferOffset;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
