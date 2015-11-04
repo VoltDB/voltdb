@@ -107,6 +107,12 @@ private:
     TableTuple &m_target;
 };
 
+
+// cut-off for table with no views
+const double PersistentTable::TABLE_LF_CUTOFF_FOR_TRUNC = 0.105666;
+//cut-off for table with views
+const double PersistentTable::TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC = 0.015416;
+
 PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this),

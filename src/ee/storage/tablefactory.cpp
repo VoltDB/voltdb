@@ -92,7 +92,7 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(databaseId, name, table);
 
-    return dynamic_cast<Table*>(table);
+    return table;
 }
 
 // This is a convenient wrapper for test only.

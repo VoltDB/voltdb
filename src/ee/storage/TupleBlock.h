@@ -101,7 +101,7 @@ public:
     { return ThreadLocalPool::freeExactSizedObject(sizeof(TupleBlock), object); }
 
     double loadFactor() {
-        return m_activeTuples / m_tuplesPerBlock;
+        return (double) m_activeTuples / m_tuplesPerBlock;
     }
 
     inline bool hasFreeTuples() {
