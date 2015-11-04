@@ -116,7 +116,6 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
             // delete tuple by tuple
             targetTable->deleteAllTuples(true);
         }
-        assert(targetTable->visibleTupleCount() == 0);
     }
     else {
         assert(m_inputTable);
