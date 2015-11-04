@@ -667,9 +667,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // truncate instead of tuple-by-tuple delete.
 
     // cut-off for table with no views
-    static const double TABLE_LF_CUTOFF_FOR_TRUNC = 0.105666;
+    static const double TABLE_LF_CUTOFF_FOR_TRUNC;
     //cut-off for table with views
-    static const double TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC = 0.015416;
+    static const double TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
