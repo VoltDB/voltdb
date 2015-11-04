@@ -969,8 +969,8 @@ inline bool PersistentTable::isTruncateFavorable() const {
     // is below certain threshold value. the threshold value is
     // different if the table has views on it
     if (m_data.size() == 1) {
-        //const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
-        const double blockLoadFactor = (double) visibleTupleCount() / m_tuplesPerBlock;
+        const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
+        //const double blockLoadFactor = (double) visibleTupleCount() / m_tuplesPerBlock;
         if ((blockLoadFactor <= TABLE_LF_CUTOFF_FOR_TRUNC) ||
             (m_views.size() > 0 && blockLoadFactor <= TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC)) {
             return false;
