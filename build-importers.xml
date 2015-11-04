@@ -26,9 +26,9 @@
     <target name="socketstream">
         <antcall target="osgibundle">
             <param name="bundle.name" value="socketstream"/>
-            <param name="activator" value="org.voltdb.importclient.SocketStreamImporter"/>
+            <param name="activator" value="org.voltdb.importclient.socket.SocketServerImporter"/>
             <param name="bundle.displayname" value="SocketStreamImporter"/>
-            <param name="include.classpattern" value="SocketStream*.class"/>
+            <param name="include.classpattern" value="socket/Socket*.class"/>
         </antcall>
     </target>
 

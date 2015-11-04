@@ -53,8 +53,7 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
- * End to end Import tests using the injected socket importer.
- *
+ * Import statistics tests using the socket importer and a test log4j importer.
  */
 
 public class TestImportStatistics extends RegressionSuite {
@@ -259,7 +258,7 @@ public class TestImportStatistics extends RegressionSuite {
             String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
             long expectedFailures = 0;
             String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
-            if (name.equals("SocketImporter")) {
+            if (name.equals("SocketServerImporter")) {
                 expectedFailures = m_expectedSocketFailures.get(procName);
                 numSocketsFound++;
             } else if (name.equals("Log4jSocketHandlerImporter")) {
@@ -295,7 +294,7 @@ public class TestImportStatistics extends RegressionSuite {
             long lastFailures = 0;
             long lastSuccesses = 0;
             String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
-            if (name.equals("SocketImporter")) {
+            if (name.equals("SocketServerImporter")) {
                 expectedFailures = m_expectedSocketFailures.get(procName);
                 lastFailures = m_lastSocketFailures.containsKey(procName) ? m_lastSocketFailures.get(procName) : 0;
                 lastSuccesses = m_lastSocketSuccesses.containsKey(procName) ? m_lastSocketSuccesses.get(procName) : 0;
@@ -312,7 +311,7 @@ public class TestImportStatistics extends RegressionSuite {
             assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
             assertEquals(expectedFailures-lastFailures, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));
             assertEquals(count-expectedFailures-lastSuccesses, row.getLong(ImporterStatsCollector.SUCCESS_COUNT_COL));
-            if (name.equals("SocketImporter")) {
+            if (name.equals("SocketServerImporter")) {
                 m_lastSocketFailures.put(procName, expectedFailures);
                 m_lastSocketSuccesses.put(procName, count-expectedFailures);
             } else if (name.equals("Log4jSocketHandlerImporter")) {
@@ -402,7 +401,7 @@ public class TestImportStatistics extends RegressionSuite {
             VoltTableRow row = stats.fetchRow(i);
             String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
             String procName = row.getString(ImporterStatsCollector.PROC_NAME_COL);
-            if (!name.equals("SocketImporter")) {
+            if (!name.equals("SocketServerImporter")) {
                 continue;
             }
             assertEquals(procName, row.getString(ImporterStatsCollector.PROC_NAME_COL));
@@ -427,7 +426,7 @@ public class TestImportStatistics extends RegressionSuite {
             for (int i=0; i<stats.getRowCount(); i++) {
                 VoltTableRow row = stats.fetchRow(i);
                 String name = row.getString(ImporterStatsCollector.IMPORTER_NAME_COL);
-                if (!name.equals("SocketImporter")) {
+                if (!name.equals("SocketServerImporter")) {
                     continue;
                 }
                 assertEquals(0, row.getLong(ImporterStatsCollector.FAILURE_COUNT_COL));

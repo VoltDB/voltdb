@@ -46,7 +46,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     // Register ImportHandlerProxy service.
     @Override
     public void start(BundleContext context) throws Exception {
-        context.registerService(SocketStreamImporter.class.getName(), this, null);
+        //context.registerService(SocketStreamImporter.class.getName(), this, null);
     }
 
     @Override
@@ -67,7 +67,7 @@ public class SocketStreamImporter extends ImportHandlerProxy implements BundleAc
     public void stop() {
         for (SocketImporterImpl impl : m_instances) {
             try {
-            impl.stop();
+                impl.stop();
             } catch(Exception e) {
                 warn(e, "Error trying to stop importer");
             }

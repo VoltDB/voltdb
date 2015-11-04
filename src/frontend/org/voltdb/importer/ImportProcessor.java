@@ -38,6 +38,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ImportHandler;
+import org.voltdb.ImporterServerAdapterImpl;
+import org.voltdb.InternalConnectionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
 
@@ -53,26 +55,40 @@ public class ImportProcessor implements ImportDataProcessor {
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
     private final ImporterStatsCollector m_importStatsCollector;
+    private final ImporterServerAdapter m_importServerAdapter;
 
     public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework, ImporterStatsCollector statsCollector)
             throws BundleException {
         m_framework = framework;
         m_distributer = distributer;
         m_importStatsCollector = statsCollector;
+        m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
     }
 
     //This abstracts OSGi based and class based importers.
     public class BundleWrapper {
-        public final Bundle m_bundle;
-        public final Properties m_properties;
-        public final ImportHandlerProxy m_handlerProxy;
+        private final Bundle m_bundle;
+        private ImportHandlerProxy m_handlerProxy;
+        private AbstractImporter m_importer;
         private ImportHandler m_handler;
         private ChannelDistributer m_channelDistributer;
 
-        public BundleWrapper(ImportHandlerProxy handler, Properties properties, Bundle bundle) {
+        public BundleWrapper(Object o, Bundle bundle) {
             m_bundle = bundle;
-            m_handlerProxy = handler;
-            m_properties = properties;
+            if (o instanceof ImportHandlerProxy) {
+                m_handlerProxy = (ImportHandlerProxy) o;;
+            } else {
+                m_importer = (AbstractImporter) o;
+                m_importer.setImportServerAdapter(m_importServerAdapter);
+            }
+        }
+
+        public void configure(Properties props) {
+            if (m_handlerProxy != null) {
+                m_handlerProxy.configure(props);
+            } else {
+                m_importer.configure(props);
+            }
         }
 
         public void setChannelDistributer(ChannelDistributer distributer) {
@@ -95,6 +111,9 @@ public class ImportProcessor implements ImportDataProcessor {
                 if (m_handler != null) {
                     m_handler.stop();
                 }
+                if (m_importer != null) {
+                    m_importer.stop();
+                }
                 if (m_bundle != null) {
                     m_bundle.stop();
                 }
@@ -115,7 +134,7 @@ public class ImportProcessor implements ImportDataProcessor {
 
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
-            ImportHandlerProxy importHandlerProxy = null;
+            InternalConnectionContext importer = null;
             if (wrapper == null) {
                 if (moduleType.equalsIgnoreCase("osgi")) {
 
@@ -130,8 +149,8 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
                     Object o = bundle.getBundleContext().getService(reference);
-                    importHandlerProxy = (ImportHandlerProxy )o;
-                    wrapper = new BundleWrapper(importHandlerProxy, properties, bundle);
+                    importer = (InternalConnectionContext) o;
+                    wrapper = new BundleWrapper(o, bundle);
                 } else {
                     //Class based importer.
                     Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
@@ -140,19 +159,19 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
 
-                    importHandlerProxy = (ImportHandlerProxy )reference.newInstance();
-                     wrapper = new BundleWrapper(importHandlerProxy, properties, null);
+                    importer = (ImportHandlerProxy) reference.newInstance();
+                     wrapper = new BundleWrapper(importer, null);
                 }
-                String name = importHandlerProxy.getName();
+                String name = importer.getName();
                 if (name == null || name.trim().length() == 0) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                importHandlerProxy.configure(properties);
+                wrapper.configure(properties);
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             } else {
-                wrapper.m_handlerProxy.configure(properties);
+                wrapper.configure(properties);
             }
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
@@ -168,21 +187,25 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, m_importStatsCollector);
-                        //Set the internal handler
-                        bw.setHandler(importHandler);
-                        if (!bw.m_handlerProxy.isRunEveryWhere()) {
-                            //This is a distributed and fault tolerant importer so get the resources.
-                            Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
-                            m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
+                        if (bw.m_handlerProxy != null) { // TODO: move this out to separate method or something. Old style importer
+                            ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, m_importStatsCollector);
+                            //Set the internal handler
+                            bw.setHandler(importHandler);
+                            if (!bw.m_handlerProxy.isRunEveryWhere()) {
+                                //This is a distributed and fault tolerant importer so get the resources.
+                                Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
+                                m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
 
-                            bw.setChannelDistributer(m_distributer);
-                            //Register callback
-                            m_distributer.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
-                            m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
+                                bw.setChannelDistributer(m_distributer);
+                                //Register callback
+                                m_distributer.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
+                                m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
+                            }
+                            importHandler.readyForData();
+                            m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
+                        } else {
+                            bw.m_importer.readyForData();
                         }
-                        importHandler.readyForData();
-                        m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
                     } catch (Exception ex) {
                         //Should never fail. crash.
                         VoltDB.crashLocalVoltDB("Import failed to set Handler", true, ex);
