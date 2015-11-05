@@ -51,6 +51,7 @@ using namespace voltdb;
 
 const int COLUMN_COUNT = 6;
 const int HIDDEN_COLUMN_COUNT = 1;
+const int CLUSTER_ID = 0;
 
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
@@ -77,7 +78,7 @@ public:
     MockVoltDBEngine(bool isActiveActiveEnabled, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
         m_isActiveActiveEnabled = isActiveActiveEnabled;
         m_context.reset(new ExecutorContext(1, 1, NULL, topend, pool,
-                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, 0));
+                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, CLUSTER_ID));
 
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
@@ -273,19 +274,23 @@ public:
 
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
         table->insertTuple(temp_tuple);
-        TableTuple tuple = table->lookupTupleByValues(temp_tuple);
+        if (table->schema()->hiddenColumnCount() > 0) {
+            int64_t expectedTimestamp = ExecutorContext::createDRTimestampHiddenValue(static_cast<int64_t>(CLUSTER_ID), m_currTxnUniqueId);
+            temp_tuple.setHiddenNValue(table->getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(expectedTimestamp));
+        }
+        TableTuple tuple = table->lookupTupleForDR(temp_tuple);
         assert(!tuple.isNullTuple());
         return tuple;
     }
 
     void deleteTuple(PersistentTable* table, TableTuple tuple) {
-        TableTuple tuple_to_delete = table->lookupTupleByValues(tuple);
+        TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
         table->deleteTuple(tuple_to_delete, true);
     }
 
     TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
-        TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
+        TableTuple tuple_to_update = table->lookupTupleForDR(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
         new_tuple.copy(tuple_to_update);
@@ -453,25 +458,25 @@ public:
     }
 
     TableTuple verifyExistingTableForDelete(TableTuple &existingTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleByValues(existingTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleForDR(existingTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
 
     TableTuple verifyExpectedTableForDelete(TableTuple &expectedTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.expectedTupleRowsForDelete.get())->lookupTupleByValues(expectedTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.expectedTupleRowsForDelete.get())->lookupTupleForDR(expectedTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
 
     TableTuple verifyExistingTableForInsert(TableTuple &existingTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForInsert.get())->lookupTupleByValues(existingTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForInsert.get())->lookupTupleForDR(existingTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
 
     TableTuple verifyNewTableForInsert(TableTuple &newTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.newTupleRowsForInsert.get())->lookupTupleByValues(newTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.newTupleRowsForInsert.get())->lookupTupleForDR(newTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
@@ -501,7 +506,7 @@ public:
         flushAndApply(100);
 
         EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-        TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+        TableTuple tuple = m_tableReplica->lookupTupleForDR(third_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
@@ -526,7 +531,7 @@ public:
         TableTuple expected_tuple = prepareTempTuple(m_table, 42, 55555, "349508345.34583", "not that", "a totally different thing altogether", 5433);
         TableTuple tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
-        tuple = m_table->lookupTupleByValues(second_tuple);
+        tuple = m_table->lookupTupleForDR(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
 
         beginTxn(101, 101, 100, 72);
@@ -537,10 +542,10 @@ public:
         flushAndApply(101);
 
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-        tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        tuple = m_tableReplica->lookupTupleForDR(expected_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
         expected_tuple = prepareTempTuple(m_table, 99, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222);
-        tuple = m_table->lookupTupleByValues(second_tuple);
+        tuple = m_table->lookupTupleForDR(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
@@ -555,7 +560,7 @@ public:
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
 
         beginTxn(100, 100, 99, 71);
-        TableTuple tuple_to_update = m_table->lookupTupleByValues(first_tuple);
+        TableTuple tuple_to_update = m_table->lookupTupleForDR(first_tuple);
         ASSERT_FALSE(tuple_to_update.isNullTuple());
         TableTuple updated_tuple = secondTupleWithNulls(m_table);
         m_table->updateTuple(tuple_to_update, updated_tuple);
@@ -565,9 +570,9 @@ public:
 
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
         TableTuple expected_tuple = secondTupleWithNulls(m_table);
-        TableTuple tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        TableTuple tuple = m_tableReplica->lookupTupleForDR(expected_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
-        tuple = m_table->lookupTupleByValues(second_tuple);
+        tuple = m_table->lookupTupleForDR(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
@@ -634,11 +639,49 @@ TEST_F(DRBinaryLogTest, VerifyHiddenColumns) {
 
     flushAndApply(99);
 
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
     NValue drTimestampReplica = tuple.getHiddenNValue(m_tableReplica->getDRTimestampColumnIndex());
     EXPECT_EQ(ValuePeeker::peekAsBigInt(drTimestamp), 70);
     EXPECT_EQ(0, drTimestamp.compare(drTimestampReplica));
+}
+
+TEST_F(DRBinaryLogTest, VerifyHiddenColumnLookup) {
+    beginTxn(98, 98, 97, 69);
+    for (int i = 0; i < 10; i++) {
+        insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    }
+    endTxn(true);
+
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    endTxn(true);
+
+    beginTxn(100, 100, 98, 71);
+    for (int i = 0; i < 10; i++) {
+        insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    }
+    endTxn(true);
+
+    NValue expectedTimestamp = first_tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
+    TableTuple lookup_tuple = prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433);
+    lookup_tuple.setHiddenNValue(m_table->getDRTimestampColumnIndex(), expectedTimestamp);
+    TableTuple tuple = m_table->lookupTupleForDR(lookup_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+    NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
+    EXPECT_EQ(0, expectedTimestamp.compare(drTimestamp));
+
+    beginTxn(101, 101, 99, 72);
+    deleteTuple(m_table, tuple);
+    endTxn(true);
+
+    flushAndApply(101);
+
+    EXPECT_EQ(20, m_tableReplica->activeTupleCount());
+    tuple = m_tableReplica->lookupTupleForDR(lookup_tuple);
+    ASSERT_TRUE(tuple.isNullTuple());
+    tuple = m_tableReplica->lookupTupleByValues(lookup_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
@@ -657,9 +700,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     flushAndApply(100);
 
     EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // multiple row, multipart write transaction
@@ -682,7 +725,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     flushAndApply(101);
 
     EXPECT_EQ(4, m_tableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
     tuple = m_tableReplica->lookupTupleByValues(prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
     ASSERT_FALSE(tuple.isNullTuple());
@@ -690,9 +733,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     // Propagate the delete
     flushAndApply(102);
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
@@ -730,7 +773,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     flushAndApply(101);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
@@ -747,7 +790,7 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
 
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
     EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // write to both the partitioned and replicated table
@@ -760,9 +803,9 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
     EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // write to the partitioned and replicated table and roll it back
@@ -781,7 +824,7 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     flushAndApply(102);
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
     EXPECT_EQ(3, m_replicatedTableReplica->activeTupleCount());
-    tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
@@ -799,9 +842,9 @@ TEST_F(DRBinaryLogTest, SerializeNulls) {
     flushAndApply(99);
 
     EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -817,7 +860,7 @@ TEST_F(DRBinaryLogTest, RollbackNulls) {
     flushAndApply(100);
 
     EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(source_tuple);
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -840,7 +883,7 @@ TEST_F(DRBinaryLogTest, RollbackOnReplica) {
     flushAndApply(100);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // inserts followed by some deletes
@@ -855,7 +898,7 @@ TEST_F(DRBinaryLogTest, RollbackOnReplica) {
     flushAndApply(101, false);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -910,7 +953,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
     flushAndApply(100);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(third_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -956,7 +999,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
 
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
     EXPECT_EQ(1, m_otherTableWithIndexReplica->activeTupleCount());
-    TableTuple tuple = m_otherTableWithIndexReplica->lookupTupleByValues(fifth_tuple);
+    TableTuple tuple = m_otherTableWithIndexReplica->lookupTupleForDR(fifth_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
     EXPECT_EQ(0, m_otherTableWithoutIndexReplica->activeTupleCount());
 }
@@ -1029,9 +1072,9 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
     flushAndApply(100);
 
     EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 

@@ -307,6 +307,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      */
     voltdb::TableTuple lookupTupleForUndo(TableTuple tuple);
 
+    /*
+     * Functions the same as lookupTupleByValues(), but takes the DR hidden timestamp
+     * column into account.
+     */
+    voltdb::TableTuple lookupTupleForDR(TableTuple tuple);
+
     // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
@@ -577,7 +583,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRows);
 
-    TableTuple lookupTuple(TableTuple tuple, bool forUndo);
+    enum LookupType {
+        LOOKUP_BY_VALUES,
+        LOOKUP_FOR_DR,
+        LOOKUP_FOR_UNDO
+    };
+    TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
     TBPtr allocateNextBlock();
 
@@ -944,11 +955,15 @@ inline TBPtr PersistentTable::allocateNextBlock()
 }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
-    return lookupTuple(tuple, false);
+    return lookupTuple(tuple, LOOKUP_BY_VALUES);
 }
 
 inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
-    return lookupTuple(tuple, true);
+    return lookupTuple(tuple, LOOKUP_FOR_UNDO);
+}
+
+inline TableTuple PersistentTable::lookupTupleForDR(TableTuple tuple) {
+    return lookupTuple(tuple, LOOKUP_FOR_DR);
 }
 
 }
