@@ -96,7 +96,6 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     int64_t modified_tuples = 0;
 
     if (m_truncate) {
-        bool truncate = false;
         VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
         // count the truncated tuples as deleted
         modified_tuples = targetTable->visibleTupleCount();
@@ -107,15 +106,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    (int)targetTable->visibleTupleCount(),
                    (int)targetTable->allocatedTupleCount());
 
-        truncate = targetTable->isTruncateFavorable();
-        if (truncate) {
-            // delete using table swap: undo by table not by each tuple.
-            targetTable->truncateTable(m_engine);
-        }
-        else {
-            // delete tuple by tuple
-            targetTable->deleteAllTuples(true);
-        }
+        // empty the table either by table swap or iteratively deleting tuple-by-tuple
+        targetTable->truncateTable(m_engine);
     }
     else {
         assert(m_inputTable);

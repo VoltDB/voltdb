@@ -499,7 +499,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
-    inline bool isTruncateFavorable() const;
 
   private:
 
@@ -670,17 +669,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     TableIndex* m_smallestUniqueIndex;
     uint32_t m_smallestUniqueIndexCrc;
     int m_drTimestampColumnIndex;
-
-    // threshold cutoff in terms of block load factor at which truncate is better
-    // than tuple-by-tuple delete. Cut-off values are picked based on worst case
-    // scenarios with intent to improve performance and to avoid performance
-    // regression by not getting too greedy for performance by favoring truncate
-    // truncate instead of tuple-by-tuple delete.
-
-    // cut-off for table with no views
-    static const double TABLE_LF_CUTOFF_FOR_TRUNC;
-    //cut-off for table with views
-    static const double TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -976,24 +964,6 @@ inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
 
 inline TableTuple PersistentTable::lookupTupleForDR(TableTuple tuple) {
     return lookupTuple(tuple, LOOKUP_FOR_DR);
-}
-
-inline bool PersistentTable::isTruncateFavorable() const {
-    // truncate may not optimal way to delete entries from table
-    // for case where there is only block and block load factor
-    // is below certain threshold value. the threshold value is
-    // different if the table has views on it
-    if (m_data.size() == 1) {
-        const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
-        //const double blockLoadFactor = (double) visibleTupleCount() / m_tuplesPerBlock;
-        if ((blockLoadFactor <= TABLE_LF_CUTOFF_FOR_TRUNC) ||
-            (m_views.size() > 0 && blockLoadFactor <= TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC)) {
-            return false;
-        }
-    } else if (isPersistentTableEmpty() == true) {
-        return false;
-    }
-    return true;
 }
 
 }
