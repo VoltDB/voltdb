@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
@@ -27,6 +28,7 @@ import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
  * This class is not thread-safe. Most of its usage is on the Site thread.
  */
 public class SpDurabilityListener implements DurabilityListener {
+    private static final VoltLogger LOG = new VoltLogger("LOGGING");
 
     // No command logging
     class NoCompletionChecks implements CommandLog.CompletionChecks {
@@ -83,6 +85,10 @@ public class SpDurabilityListener implements DurabilityListener {
         @Override
         public void processChecks() {
             // Notify the SP UniqueId listeners
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Command Logging generated durability update for sp: " + UniqueIdGenerator.toShortString(m_lastSpUniqueId) +
+                        " and mp: " + UniqueIdGenerator.toShortString(m_lastMpUniqueId));
+            }
             for (DurableUniqueIdListener listener : m_uniqueIdListeners) {
                 listener.lastUniqueIdsMadeDurable(m_lastSpUniqueId, m_lastMpUniqueId);
             }
