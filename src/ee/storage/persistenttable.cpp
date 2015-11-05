@@ -339,13 +339,13 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         // - tables with indexes
 
         // cut-off for table with no views
-        const double TABLE_LF_CUTOFF_FOR_TRUNC = 0.105666;
+        const double tableLFCutoffForTrunc = 0.105666;
         //cut-off for table with views
-        const double TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC = 0.015416;
+        const double tableWithViewsLFCutoffForTrunc = 0.015416;
 
         const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
-        if ((blockLoadFactor <= TABLE_LF_CUTOFF_FOR_TRUNC) ||
-            (m_views.size() > 0 && blockLoadFactor <= TABLE_WITH_VIEWS_LF_CUTOFF_FOR_TRUNC)) {
+        if ((blockLoadFactor <= tableLFCutoffForTrunc) ||
+            (m_views.size() > 0 && blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) {
             return deleteAllTuples(true);
         }
     }
