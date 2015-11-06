@@ -320,8 +320,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         return;
     }
 
-    // if is the only tuple-storage block table has, it may be better to truncate
-    // table by iteratively deleting table rows. Evalute if that's the case
+    // If the table has only one tuple-storage block, it may be better to truncate
+    // table by iteratively deleting table rows. Evalute if this is the case
     // based on the block and tuple block load factor
     if (m_data.size() == 1) {
         // threshold cutoff in terms of block load factor at which truncate is
