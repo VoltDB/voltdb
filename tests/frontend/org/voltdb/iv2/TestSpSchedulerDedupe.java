@@ -117,7 +117,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                        Long.MIN_VALUE, // coordHSID
                                        txnId - 1, // truncationHandle
                                        txnId,     // txnId
-                                       System.currentTimeMillis(), // timestamp
+                                       UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, 0), // uniqueID
                                        readOnly, // readonly
                                        singlePart, // single-part
                                        spi, // invocation

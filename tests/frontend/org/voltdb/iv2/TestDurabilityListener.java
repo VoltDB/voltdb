@@ -32,6 +32,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 public class TestDurabilityListener {
@@ -44,12 +46,19 @@ public class TestDurabilityListener {
     class SimpleListener implements SpScheduler.DurableUniqueIdListener {
         public long m_spUniqueId = Long.MIN_VALUE;
         public long m_mpUniqueId = Long.MIN_VALUE;
+        public boolean m_notified = false;
 
         @Override
         public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId)
         {
             m_spUniqueId = spUniqueId;
             m_mpUniqueId = mpUniqueId;
+            m_notified = true;
+        }
+
+        public void resetNotified()
+        {
+            m_notified = false;
         }
     }
 
@@ -106,6 +115,39 @@ public class TestDurabilityListener {
 
             assertEquals(Long.MIN_VALUE, m_listener.m_spUniqueId);
             assertEquals(mpUniqIds.get(2).longValue(), m_listener.m_mpUniqueId);
+        }
+    }
+
+    @Test
+    public void testInitializeID()
+    {
+        for (boolean isSync : new boolean[] {false, true}) {
+            dut.createFirstCompletionCheck(isSync, true);
+
+            dut.initializeLastDurableUniqueId(UniqueIdGenerator.makeIdFromComponents(5, 0, 0));
+            dut.startNewTaskList(dut.getNumberOfTasks()).processChecks();
+
+            assertEquals(UniqueIdGenerator.makeIdFromComponents(5, 0, 0), m_listener.m_spUniqueId);
+        }
+    }
+
+    @Test
+    public void testNoDuplicateNotifications()
+    {
+        for (boolean isSync : new boolean[] {false, true}) {
+            dut.createFirstCompletionCheck(isSync, true);
+
+            final List<Long> spUniqIds = logSp(0, 1, 2);
+            dut.startNewTaskList(dut.getNumberOfTasks()).processChecks();
+
+            assertEquals(spUniqIds.get(2).longValue(), m_listener.m_spUniqueId);
+            assertEquals(Long.MIN_VALUE, m_listener.m_mpUniqueId);
+            assertTrue(m_listener.m_notified);
+
+            // No new txns before this sync, should not have notified the listener
+            m_listener.resetNotified();
+            dut.startNewTaskList(dut.getNumberOfTasks()).processChecks();
+            assertFalse(m_listener.m_notified);
         }
     }
 
