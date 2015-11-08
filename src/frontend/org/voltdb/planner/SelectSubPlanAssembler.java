@@ -92,14 +92,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         List<JoinNode> subTrees = clonedTree.extractSubTrees();
         assert(!subTrees.isEmpty());
         // Generate possible join orders for each sub-tree separately
-        ArrayList<ArrayList<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
+        ArrayList<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
         ArrayDeque<JoinNode> joinOrders = new ArrayDeque<JoinNode>();
         queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>(), joinOrders, findAll);
         return joinOrders;
     }
 
-    private static void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx,
+    private static void queueSubJoinOrders(List<List<JoinNode>> joinOrderList, int joinOrderListIdx,
             ArrayList<JoinNode> currentJoinOrder, ArrayDeque<JoinNode> joinOrders, boolean findAll) {
         if (!findAll && joinOrders.size() > 0) {
             // At least find one valid join order
@@ -114,7 +114,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
         // Recursive step
-        ArrayList<JoinNode> nextTrees = joinOrderList.get(joinOrderListIdx);
+        List<JoinNode> nextTrees = joinOrderList.get(joinOrderListIdx);
         for (JoinNode headTree: nextTrees) {
             ArrayList<JoinNode> updatedJoinOrder = new ArrayList<JoinNode>();
             // Order is important: The top sub-trees must be first
@@ -133,41 +133,123 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param subTrees the list of join trees.
      * @return The list containing the list of trees of all possible permutations of the input trees
      */
-    private static ArrayList<ArrayList<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
-        ArrayList<ArrayList<JoinNode>> permutations = new ArrayList<ArrayList<JoinNode>>();
+    private static ArrayList<List<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
+        ArrayList<List<JoinNode>> permutations = new ArrayList<>();
         for (JoinNode subTree : subTrees) {
-            permutations.add(generateJoinOrder(subTree));
+            permutations.add(generateJoinOrdersForTree(subTree));
         }
         return permutations;
     }
 
-    private static ArrayList<JoinNode> generateJoinOrder(JoinNode subTree) {
-        ArrayList<JoinNode> treePermutations = new ArrayList<JoinNode>();
-        if (subTree instanceof BranchNode && ((BranchNode)subTree).getJoinType() != JoinType.INNER) {
-            // Permutations for Outer Join are not supported yet
-            treePermutations.add(subTree);
+    private static List<JoinNode> generateJoinOrdersForTree(JoinNode subTree) {
+        if (subTree instanceof BranchNode) {
+            BranchNode branchSubTree = (BranchNode) subTree;
+            JoinType joinType = branchSubTree.getJoinType();
+            if (joinType == JoinType.INNER) {
+                return generateInnerJoinOrdersForTree(subTree);
+            } else if (joinType == JoinType.LEFT) {
+                return generateOuteroinOrdersForTree(subTree);
+            } else if (joinType == JoinType.FULL) {
+                return generateFullJoinOrdersForTree(subTree);
+            } else {
+                // Shouldn't get there
+                assert(false);
+                return null;
+            }
         } else {
-            // if all joins are inner then join orders can be obtained by the permutation of
-            // the original tables. Get a list of the leaf nodes(tables) to permute them
-            List<JoinNode> tableNodes = subTree.generateLeafNodesJoinOrder();
-            List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
-            List<JoinNode> newTrees = new ArrayList<JoinNode>();
-            for (List<JoinNode> joinOrder: joinOrders) {
-                newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder));
+            // Single tables and subqueries
+            return generateInnerJoinOrdersForTree(subTree);
+        }
+    }
+
+    /**
+     * Helper method to generate join orders for a join tree containing only INNER joins that
+     * can be obtained by the permutation of the original tables.
+     *
+     * @param subTree join tree
+     * @return list of valid join orders
+     */
+    private static List<JoinNode> generateInnerJoinOrdersForTree(JoinNode subTree) {
+        // Get a list of the leaf nodes(tables) to permute them
+        List<JoinNode> tableNodes = subTree.generateLeafNodesJoinOrder();
+        List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
+        List<JoinNode> newTrees = new ArrayList<JoinNode>();
+        for (List<JoinNode> joinOrder: joinOrders) {
+            newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder, JoinType.INNER));
+        }
+        //Collect all the join/where conditions to reassign them later
+        AbstractExpression combinedWhereExpr = subTree.getAllFilters();
+        List<JoinNode> treePermutations = new ArrayList<>();
+        for (JoinNode newTree : newTrees) {
+            if (combinedWhereExpr != null) {
+                newTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
             }
-            //Collect all the join/where conditions to reassign them later
-            AbstractExpression combinedWhereExpr = subTree.getAllFilters();
-            for (JoinNode newTree : newTrees) {
-                if (combinedWhereExpr != null) {
-                    newTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
-                }
-                // The new tree root node id must match the original one to be able to reconnect the
-                // subtrees
-                newTree.setId(subTree.getId());
-                treePermutations.add(newTree);
-            }
+            // The new tree root node id must match the original one to be able to reconnect the
+            // subtrees
+            newTree.setId(subTree.getId());
+            treePermutations.add(newTree);
         }
         return treePermutations;
+    }
+
+    /**
+     * Helper method to generate join orders for an OUTER join tree.
+     * At the moment, permutations for LEFT Joins are not supported yet
+     *
+     * @param subTree join tree
+     * @return list of valid join orders
+     */
+    private static List<JoinNode> generateOuteroinOrdersForTree(JoinNode subTree) {
+        List<JoinNode> treePermutations = new ArrayList<>();
+        treePermutations.add(subTree);
+        return treePermutations;
+    }
+
+    /**
+     * Helper method to generate join orders for a join tree containing only FULL joins.
+     * The only allowed permutation is a join order that has original left and right nodes
+     * swapped.
+     *
+     * @param subTree  join tree
+     * @return list of valid join orders
+     */
+    private static List<JoinNode> generateFullJoinOrdersForTree(JoinNode subTree) {
+        assert(subTree != null);
+        List<JoinNode> joinOrders = new ArrayList<>();
+        if (!(subTree instanceof BranchNode)) {
+            // End of recursion
+            joinOrders.add(subTree);
+            return joinOrders;
+        }
+        BranchNode branchNode = (BranchNode) subTree;
+        // Descend to the left branch
+        assert(branchNode.getLeftNode() != null);
+        List<JoinNode> leftJoinOrders = generateFullJoinOrdersForTree(branchNode.getLeftNode());
+        assert(!leftJoinOrders.isEmpty());
+        // Descend to the right branch
+        assert(branchNode.getRightNode() != null);
+        List<JoinNode> rightJoinOrders = generateFullJoinOrdersForTree(branchNode.getRightNode());
+        assert(!rightJoinOrders.isEmpty());
+        // Create permutation pairing left and right nodes and the revere variant
+        for (JoinNode leftNode : leftJoinOrders) {
+            for (JoinNode rightNode : rightJoinOrders) {
+                JoinNode resultOne = new BranchNode(branchNode.getId(), branchNode.getJoinType(),
+                        (JoinNode) leftNode.clone(), (JoinNode) rightNode.clone());
+                JoinNode resultTwo = new BranchNode(branchNode.getId(), branchNode.getJoinType(),
+                        (JoinNode) rightNode.clone(), (JoinNode) leftNode.clone());
+                if (branchNode.getJoinExpression() != null) {
+                    resultOne.setJoinExpression((AbstractExpression) branchNode.getJoinExpression().clone());
+                    resultTwo.setJoinExpression((AbstractExpression) branchNode.getJoinExpression().clone());
+                }
+                if (branchNode.getWhereExpression() != null) {
+                    resultOne.setWhereExpression((AbstractExpression) branchNode.getWhereExpression().clone());
+                    resultTwo.setWhereExpression((AbstractExpression) branchNode.getWhereExpression().clone());
+                }
+                joinOrders.add(resultOne);
+                joinOrders.add(resultTwo);
+            }
+        }
+        return joinOrders;
     }
 
     /**
@@ -292,7 +374,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private void generateOuterAccessPaths(BranchNode parentNode) {
         JoinNode outerChildNode = parentNode.getLeftNode();
         assert(outerChildNode != null);
-        List<AbstractExpression> joinOuterList =  (parentNode.getJoinType() == JoinType.INNER) ?
+        JoinType joinType = parentNode.getJoinType();
+        // For LEFT and FULL join types, the outer join expressions are kept as a pre-join predicate
+        // at the join node to pre-qualify the outer rows
+        List<AbstractExpression> joinOuterList =  (joinType == JoinType.INNER) ?
                 parentNode.m_joinOuterList : null;
         if (outerChildNode instanceof BranchNode) {
             generateOuterAccessPaths((BranchNode)outerChildNode);
@@ -303,9 +388,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             assert(outerChildNode.m_accessPaths.size() > 0);
             return;
         }
+        // WHERE Outer expressions must stay at the join node for the FULL joins
+        // They will be added later as part of the WHERE predicate of the join node
+        List<AbstractExpression> whereOuterList =  (joinType == JoinType.FULL) ?
+                null : parentNode.m_whereOuterList;
         outerChildNode.m_accessPaths.addAll(
                 getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
-                        joinOuterList, parentNode.m_whereOuterList, null));
+                        joinOuterList, whereOuterList, null));
     }
 
     /**
@@ -335,11 +424,25 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return;
         }
 
+        // For the FULL join type, the inner join expressions must stay at the join node and
+        // not go down as a filter to the inner node like in case of other join types
+        List<AbstractExpression> joinExpressions;
+        List<AbstractExpression> filterExpressions;
+        if (parentNode.getJoinType() == JoinType.FULL) {
+            joinExpressions = new ArrayList<>();
+            joinExpressions.addAll(parentNode.m_joinInnerOuterList);
+            joinExpressions.addAll(parentNode.m_joinInnerList);
+            filterExpressions = null;
+        } else {
+            joinExpressions = parentNode.m_joinInnerOuterList;
+            filterExpressions = parentNode.m_joinInnerList;
+        }
+
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
         innerChildNode.m_accessPaths.addAll(
                 getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                        parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList, null));
+                        joinExpressions, filterExpressions, null));
 
         // If there are inner expressions AND inner-outer expressions, it could be that there
         // are indexed access paths that use elements of both in the indexing expressions,
@@ -493,6 +596,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ArrayList<AbstractExpression> whereClauses  = new ArrayList<AbstractExpression>();
         whereClauses.addAll(joinNode.m_whereInnerList);
         whereClauses.addAll(joinNode.m_whereInnerOuterList);
+        if (joinNode.getJoinType() == JoinType.FULL) {
+            // For all other join types, the whereOuterList expressions were pushed down
+            // to the outer node
+            whereClauses.addAll(joinNode.m_whereOuterList);
+        }
 
         // The usual approach of calculating a local (partial) join result on each partition,
         // then sending and merging them with other partial results on the coordinator does not

@@ -1086,11 +1086,6 @@ public class TestPlansJoin extends PlannerTestCase {
        // JOIN with join hierarchy (HSQL limitation)
        failToCompile("select * FROM R1 JOIN R2 JOIN R3 ON R1.C = R2.C ON R1.C = R3.C",
                      "unexpected token");
-       // FUUL JOIN. Temporary restriction
-       failToCompile("select R1.C FROM R1 FULL JOIN R2 ON R1.C = R2.C",
-                     "VoltDB does not support full outer joins");
-       failToCompile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C",
-                     "VoltDB does not support full outer joins");
    }
 
 
