@@ -284,13 +284,13 @@ public class PlanAssembler {
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
             // Simplify the outer join if possible
             if (m_parsedSelect.m_joinTree instanceof BranchNode) {
-                // The execution engine expects to see the outer table on the left side only
-                // which means that RIGHT joins need to be converted to the LEFT ones
-                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
-
                 if (! m_parsedSelect.hasJoinOrder()) {
                     simplifyOuterJoin((BranchNode)m_parsedSelect.m_joinTree);
                 }
+
+                // Convert RIGHT joins to the LEFT ones
+                ((BranchNode)m_parsedSelect.m_joinTree).toLeftJoin();
+
             }
             m_subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
@@ -2755,9 +2755,12 @@ public class PlanAssembler {
      *  For each join node n1 do:
      *    For each expression expr (join and where) at the node n1
      *      For each join node n2 descended from n1 do:
-     *          If expr rejects nulls introduced by n2 inner table,
-     *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
-     *          for n2 inner and outer tables
+     *          If expr rejects nulls introduced by n2 inner table, then
+     *              - convert LEFT OUTER n2 to an INNER join.
+     *              - convert FULL OUTER n2 to RIGHT OUTER join
+     *          If expr rejects nulls introduced by n2 outer table, then
+     *              - convert RIGHT OUTER n2 to an INNER join.
+     *              - convert FULL OUTER n2 to LEFT OUTER join
      */
     private static void simplifyOuterJoin(BranchNode joinTree) {
         assert(joinTree != null);
@@ -2779,25 +2782,33 @@ public class PlanAssembler {
         JoinNode leftNode = joinNode.getLeftNode();
         JoinNode rightNode = joinNode.getRightNode();
         if (joinNode.getJoinType() == JoinType.LEFT) {
-            for (AbstractExpression expr : exprs) {
-                // Get all the tables underneath this node and
-                // see if the expression is NULL-rejecting for any of them
-                Collection<String> tableAliases = rightNode.generateTableJoinOrder();
-                boolean rejectNull = false;
-                for (String tableAlias : tableAliases) {
-                    if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
-                        // We are done at this level
-                        joinNode.setJoinType(JoinType.INNER);
-                        rejectNull = true;
-                        break;
-                    }
-                }
-                if (rejectNull) {
-                    break;
+            // Get all the inner tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.INNER);
+            }
+        } else if (joinNode.getJoinType() == JoinType.RIGHT) {
+            // Get all the outer tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.INNER);
+            }
+        } else if (joinNode.getJoinType() == JoinType.FULL) {
+            // Get all the outer tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(leftNode.generateTableJoinOrder(), exprs)) {
+                joinNode.setJoinType(JoinType.LEFT);
+            }
+            // Get all the inner tables underneath this node and
+            // see if the expression is NULL-rejecting for any of them
+            if (isNullRejecting(rightNode.generateTableJoinOrder(), exprs)) {
+                if (JoinType.FULL == joinNode.getJoinType()) {
+                    joinNode.setJoinType(JoinType.RIGHT);
+                } else {
+                    // LEFT join was just removed
+                    joinNode.setJoinType(JoinType.INNER);
                 }
             }
-        } else {
-            assert(joinNode.getJoinType() == JoinType.INNER);
         }
 
         // Now add this node expression to the list and descend
@@ -2818,7 +2829,7 @@ public class PlanAssembler {
             exprs.add(rightNode.getWhereExpression());
         }
 
-        if (joinNode.getJoinType() == JoinType.INNER) {
+        if (joinNode.getJoinType() == JoinType.INNER || joinNode.getJoinType() == JoinType.FULL) {
             exprs.addAll(newExprs);
             if (leftNode instanceof BranchNode) {
                 simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
@@ -2826,7 +2837,7 @@ public class PlanAssembler {
             if (rightNode instanceof BranchNode) {
                 simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
             }
-        } else {
+        } else if (joinNode.getJoinType() == JoinType.LEFT){
             if (rightNode instanceof BranchNode) {
                 newExprs.addAll(exprs);
                 simplifyOuterJoinRecursively((BranchNode)rightNode, newExprs);
@@ -2834,6 +2845,35 @@ public class PlanAssembler {
             if (leftNode instanceof BranchNode) {
                 simplifyOuterJoinRecursively((BranchNode)leftNode, exprs);
             }
+        } else {
+            // RIGHT join
+            assert(joinNode.getJoinType() == JoinType.RIGHT);
+            if (rightNode instanceof BranchNode) {
+                simplifyOuterJoinRecursively((BranchNode)rightNode, exprs);
+            }
+            if (leftNode instanceof BranchNode) {
+                newExprs.addAll(exprs);
+                simplifyOuterJoinRecursively((BranchNode)leftNode, newExprs);
+            }
         }
     }
+
+    /**
+     * Verify if an expression from the input list is NULL-rejecting for any of the table from the list
+     * @param tableAliases list of tables
+     * @param exprs list of expressions
+     * @return TRUE if there is a NULL-rejection expression
+     */
+    private static boolean isNullRejecting(Collection<String> tableAliases, List<AbstractExpression> exprs) {
+        for (AbstractExpression expr : exprs) {
+            for (String tableAlias : tableAliases) {
+                if (ExpressionUtil.isNullRejectingExpression(expr, tableAlias)) {
+                    // We are done at this level
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }

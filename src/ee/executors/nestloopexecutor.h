@@ -52,9 +52,9 @@
 
 namespace voltdb {
 
-class UndoLog;
-class ReadWriteSet;
 class AggregateExecutorBase;
+class ProgressMonitorProxy;
+class TableTuple;
 
 /**
  *
@@ -63,12 +63,17 @@ class NestLoopExecutor : public AbstractExecutor {
     public:
         NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
             AbstractExecutor(engine, abstract_node) { }
-    protected:
+    private:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
-        StandAloneTupleStorage m_null_tuple;
+        // Write tuple to the output table. If inline aggregate is set and reached the limit
+        // return TRUE indicating the end of iteration. Otherwise return FALSE
+        bool outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp);
+
+        StandAloneTupleStorage m_null_outer_tuple;
+        StandAloneTupleStorage m_null_inner_tuple;
 
         AggregateExecutorBase* m_aggExec;
 };

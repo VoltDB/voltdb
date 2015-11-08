@@ -862,6 +862,168 @@ public class TestJoinsSuite extends RegressionSuite {
         validateTableOfLongs(client, sql, new long[][]{{1, 1, 1}});
     }
 
+    public void testFullJoins() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        clearSeqTables(client);
+        subtestTwoReplicatedTableFullNLJoin(client);
+        clearSeqTables(client);
+        subtestPartitionTableFullNLJoin(client);
+    }
+
+    private void subtestTwoReplicatedTableFullNLJoin(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(3, 3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(4, 4, 4);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, NULL);");
+
+        String sql;
+        long MINVAL = Long.MIN_VALUE;
+
+        // case 1: equality join on two columns
+        sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A AND R1.D = R2.C ORDER BY R1.A, R1.D, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, 1, 1},
+                {MINVAL, MINVAL, 2, 2},
+                {MINVAL, MINVAL, 5, MINVAL},
+                {MINVAL, MINVAL, 5, 5},
+                {1, MINVAL, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, 2, 1},
+                {3, 3, 3, 3},
+                {4, 4, MINVAL, MINVAL}
+                });
+
+        // case 2: equality join on two columns plus outer join expression
+        sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A AND R1.D = R2.C AND R1.C = 1 ORDER BY R1.A, R1.D, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, 1, 1},
+                {MINVAL, MINVAL, 2, 2},
+                {MINVAL, MINVAL, 3, 3},
+                {MINVAL, MINVAL, 5, MINVAL},
+                {MINVAL, MINVAL, 5, 5},
+                {1, MINVAL, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, 2, 1},
+                {3, 3, MINVAL, MINVAL},
+                {4, 4, MINVAL, MINVAL}
+                });
+
+            // case 3: equality join on two columns with limit and offset
+            // offset starts at outer row and limit is reached at the non-matched inner rows
+            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                    "R1.A = R2.A AND R1.D = R2.C OFFSET 2 LIMIT 5";
+            VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            assertEquals(5, vt.getRowCount());
+
+            // case 4: equality join on two columns with limit and offset
+            // offset starts at outer row and limit is reached at the non-matched inner rows
+            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                    "R1.A = R2.A AND R1.D = R2.C OFFSET 6 LIMIT 1";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+
+            // case 5: equality join on single column
+            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                    "R1.A = R2.A ORDER BY R1.A, R1.D, R2.A, R2.C";
+            validateTableOfLongs(client, sql, new long[][]{
+                    {MINVAL, MINVAL, 5, MINVAL},
+                    {MINVAL, MINVAL, 5, 5},
+                    {1, MINVAL, 1, 1},
+                    {1, 2, 1, 1},
+                    {2, 1, 2, 1},
+                    {2, 1, 2, 2},
+                    {3, 3, 3, 3},
+                    {4, 4, MINVAL, MINVAL}
+                    });
+
+            // case 6: equality join on single column and WHERE inner expression
+            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                    "R1.A = R2.A WHERE R2.C = 3 OR R2.C IS NULL ORDER BY R1.A, R1.D, R2.A, R2.C";
+            validateTableOfLongs(client, sql, new long[][]{
+                    {MINVAL, MINVAL, 5, MINVAL},
+                    {3, 3, 3, 3},
+                    {4, 4, MINVAL, MINVAL}
+                    });
+
+            if (!isHSQL()) {
+                // case 7: equality join on single column and WHERE outer expression
+                // HSQL incorrectly returns
+                //   NULL,NULL,1,1
+                //   NULL,NULL,2,1
+                //   NULL,NULL,2,2
+                //   NULL,NULL,5,NULL
+                //   NULL,NULL,5,5
+                //   3,3,3,3
+
+                sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                        "R1.A = R2.A WHERE R1.A = 3 OR R1.A IS NULL ORDER BY R1.A, R1.D, R2.A, R2.C";
+                validateTableOfLongs(client, sql, new long[][]{
+                        {MINVAL, MINVAL, 5, MINVAL},
+                        {MINVAL, MINVAL, 5, 5},
+                        {3, 3, 3, 3}
+                });
+            }
+
+            // case 8: equality join on single column and WHERE inner-outer expression
+            sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                    "R1.A = R2.A WHERE R1.A = 3 OR R2.C IS NULL ORDER BY R1.A, R1.D, R2.A, R2.C";
+            validateTableOfLongs(client, sql, new long[][]{
+                    {MINVAL, MINVAL, 5, MINVAL},
+                    {3, 3, 3, 3},
+                    {4, 4, MINVAL, MINVAL}
+                    });
+
+    }
+
+    private void subtestPartitionTableFullNLJoin(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(1, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(2, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(4, 4);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, NULL);");
+
+        String sql;
+        long MINVAL = Long.MIN_VALUE;
+
+        // case 1: equality join on the coordinator node (R2, P1)
+        sql = "select P1.A, P1.C, R2.A, R2.C FROM P1 FULL JOIN R2 ON P1.A = R2.A " +
+                " ORDER BY P1.A, P1.C, R2.A, R2.C";
+;
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, 5, MINVAL},
+                {MINVAL, MINVAL, 5, 5},
+                {1, 1, 1, 1},
+                {1, 2, 1, 1},
+                {2, 1, 2, 1},
+                {2, 1, 2, 2},
+                {3, 3, 3, 3},
+                {4, 4, MINVAL, MINVAL}
+                });
+
+     // case 1: equality join of two partitioned tables (P1, P2) on a partition column
+        // @TODO
+    }
 
     static public junit.framework.Test suite()
     {
@@ -876,18 +1038,18 @@ public class TestJoinsSuite extends RegressionSuite {
         project.addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);");
         project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
         project.addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);");
-        /*
-        config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+//        /*
+        config = new LocalCluster("testjoin-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
-        */
+//        */
         // Cluster
-        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("testjoin-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         // HSQLDB
-        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("testjoin-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
         return builder;

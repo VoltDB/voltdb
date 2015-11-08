@@ -1451,7 +1451,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         joinOrderSubNodes.add(subTableNodes.get(j));
                     }
                 }
-                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
+                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes, JoinType.INNER);
                 //Collect all the join/where conditions to reassign them later
                 AbstractExpression combinedWhereExpr = subTree.getAllFilters();
                 if (combinedWhereExpr != null) {
