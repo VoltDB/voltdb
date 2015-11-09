@@ -857,12 +857,6 @@ var loadPage = function (serverName, portid) {
                             //show master/replica table
                             voltDbRenderer.GetDrConsumerInformation(function(drConsumerDetails){
                                 VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
-                                VoltDbUI.drReplicationRole = 'Replica'
-                                VoltDbUI.drMasterEnabled = true;
-                                VoltDbUI.drMasterState = 'pending';
-                                VoltDbUI.drConsumerState = 'DISABLE';
-                                //VoltDbUI.drConsumerState = 'RECEIVE'
-
                                 if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
                                     var userPreference = getUserPreferences();
                                     VoltDbUI.isDRInfoRequired = true;
