@@ -129,9 +129,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_HEX                    = 20029;
         static final int FUNC_VOLT_BIN                    = 20030;
 
-        static final int FUNC_VOLT_POINTFROMTEXT        = 20031;
-        static final int FUNC_VOLT_POLYGONFROMTEXT      = 20032;
-        static final int FUNC_VOLT_CONTAINS             = 20033;
+        static final int FUNC_VOLT_POINTFROMTEXT                = 20031;
+        static final int FUNC_VOLT_POLYGONFROMTEXT              = 20032;
+        static final int FUNC_VOLT_CONTAINS                     = 20033;
+        static final int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS   = 20034;
+        static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 20035;
+        static final int FUNC_VOLT_POINT_LATITUDE               = 20036;
+        static final int FUNC_VOLT_POINT_LONGITUDE              = 20037;
 
         private static final FunctionId[] instances = {
 
@@ -235,10 +239,27 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-                    new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
+            new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_POINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
-                    Tokens.QUESTION, Tokens.CLOSEBRACKET })
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("numinteriorring", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("numpoints", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_POINTS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("latitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LATITUDE, -1,
+                    new Type[] { Type.VOLT_POINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("longitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LONGITUDE, -1,
+                    new Type[] { Type.VOLT_POINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();

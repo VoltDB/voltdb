@@ -802,6 +802,10 @@ public class RegressionSuite extends TestCase {
                 long val = ((Integer)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             }
+            else if (expectedObj instanceof Double) {
+                double val = (Double)expectedObj;
+                assertEquals(msg, val, actualRow.getDouble(i));
+            }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
                 assertEquals(msg, val, actualRow.getString(i));

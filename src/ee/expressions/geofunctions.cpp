@@ -246,4 +246,31 @@ template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& ar
     return ValueFactory::getBooleanValue(s2Poly->Contains(s2Point));
 }
 
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() const {
+	const Geography polygon = getGeography();
+	NValue retVal(VALUE_TYPE_INTEGER);
+	retVal.getInteger() = polygon.numLoops();
+	return retVal;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
+    const Geography polygon = getGeography();
+    NValue retVal(VALUE_TYPE_INTEGER);
+    retVal.getInteger() = polygon.numVertices();
+    return retVal;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
+	const Point point = getPoint();
+	NValue retVal(VALUE_TYPE_DOUBLE);
+	retVal.getDouble() = point.getLatitude();
+	return retVal;
+}
+template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
+	const Point point = getPoint();
+	NValue retVal(VALUE_TYPE_DOUBLE);
+	retVal.getDouble() = point.getLongitude();
+	return retVal;
+}
+
 } // end namespace voltdb

@@ -25,6 +25,10 @@ namespace voltdb {
 template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_CONTAINS>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const;
 }
 
 #endif

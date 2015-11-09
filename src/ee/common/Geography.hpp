@@ -213,6 +213,18 @@ public:
         return reinterpret_cast<const int32_t*>(m_data)[0];
     }
 
+    // number of points/vertices polygon has. It is sum of
+    // number of points it's loops has.
+    int32_t numVertices() const {
+        LoopContainer::iterator it = loops().begin();
+        LoopContainer::iterator loopsEnd = loops().end();
+        int32_t numPoints = 0;
+        for (; it != loopsEnd; ++it) {
+            numPoints = numPoints + (*it).numVertices();
+        }
+        return numPoints;
+    }
+
     LoopContainer loops() const {
         assert(! isNull());
         return LoopContainer(m_data);
