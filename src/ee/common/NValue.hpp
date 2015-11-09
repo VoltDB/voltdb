@@ -40,7 +40,6 @@
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
 #include "common/StringRef.h"
-#include "common/ThreadLocalPool.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
@@ -716,6 +715,16 @@ class NValue {
         return copy;
     }
 
+    std::size_t getAllocationSizeForObject() const
+    {
+        if (isNull()) {
+            return 0;
+        }
+        assert( ! m_sourceInlined);
+        StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+        return sref->getAllocatedSize();
+    }
+
 private:
     /*
      * Private methods are private for a reason. Don't expose the raw
@@ -988,9 +997,6 @@ private:
     }
 
     bool isBooleanNULL() const ;
-
-    std::size_t getAllocationSizeForObject() const;
-    static std::size_t getAllocationSizeForObject(int32_t length);
 
     static void throwCastSQLException(const ValueType origType,
                                       const ValueType newType)
