@@ -215,7 +215,7 @@ public:
 
     // number of points/vertices polygon has. It is sum of
     // number of points it's loops has.
-    int32_t numVertices() const {
+    int32_t numPoints() const {
         LoopContainer::iterator it = loops().begin();
         LoopContainer::iterator loopsEnd = loops().end();
         int32_t numPoints = 0;

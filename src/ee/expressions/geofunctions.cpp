@@ -256,7 +256,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() cons
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
     const Geography polygon = getGeography();
     NValue retVal(VALUE_TYPE_INTEGER);
-    retVal.getInteger() = polygon.numVertices();
+    retVal.getInteger() = polygon.numPoints();
     return retVal;
 }
 
