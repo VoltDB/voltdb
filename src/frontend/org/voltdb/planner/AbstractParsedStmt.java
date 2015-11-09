@@ -295,6 +295,7 @@ public abstract class AbstractParsedStmt {
         // The assumption is that FALSE boolean results can replace NULL
         // boolean results in this context without a change in behavior.
         expr = optimizeInExpressions(expr);
+        rejectDisallowedRowOpExpressions(expr);
         // If there were any subquery expressions appearing in a scalar context,
         // we must wrap them in ScalarValueExpressions to avoid wrong answers.
         // See ENG-8226.
@@ -664,6 +665,58 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
+    private void rejectDisallowedRowOpExpressions(AbstractExpression expr) {
+        ExpressionType exprType = expr.getExpressionType();
+
+        // Recurse into the operands of logical operators
+        // searching for row op subquery expressions.
+        if (ExpressionType.CONJUNCTION_AND == exprType ||
+                ExpressionType.CONJUNCTION_OR == exprType) {
+            rejectDisallowedRowOpExpressions(expr.getLeft());
+            rejectDisallowedRowOpExpressions(expr.getRight());
+            return;
+        }
+        if (ExpressionType.OPERATOR_NOT == exprType) {
+            rejectDisallowedRowOpExpressions(expr.getLeft());
+        }
+
+        // The problem cases are all comparison ops.
+        if ( ! (expr instanceof ComparisonExpression)) {
+            return;
+        }
+
+        // The problem cases all have row expressions as left hand operands.
+        AbstractExpression rowExpression = expr.getLeft();
+        if ( ! (rowExpression instanceof RowSubqueryExpression)) {
+            return;
+        }
+
+        // The problem cases all have select statements as right hand operands.
+        AbstractExpression rightExpr = expr.getRight();
+        if (!(rightExpr instanceof SelectSubqueryExpression)) {
+            return;
+        }
+        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) rightExpr;
+        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
+        if (!(subquery instanceof ParsedSelectStmt)) {
+            return;
+        }
+
+        // Verify that the ROW OP SUBQUERY expression's ROW operand only
+        // contains column arguments that reference exactly one column.
+        for (AbstractExpression arg : rowExpression.getArgs()) {
+            List<AbstractExpression> tves = arg.findBaseTVEs();
+            if (tves.size() != 1) {
+                if (tves.isEmpty()) {
+                    throw new PlanningErrorException(
+                            "Unsupported use of a constant value in a row column expression.");
+                }
+                throw new PlanningErrorException(
+                        "Unsupported combination of column values in a row column expression.");
+            }
+        }
+    }
+
     /**
      * Perform various optimizations for IN/EXISTS subqueries if possible
      *
@@ -679,7 +732,7 @@ public abstract class AbstractParsedStmt {
             expr.setRight(optimizedRight);
             return expr;
         }
-        if (ExpressionType.COMPARE_EQUAL != expr.getExpressionType()) {
+        if (ExpressionType.COMPARE_EQUAL != exprType) {
             return expr;
         }
         assert(expr instanceof ComparisonExpression);
@@ -690,11 +743,7 @@ public abstract class AbstractParsedStmt {
          * Verify that an IN expression can be safely converted to an EXISTS one
          * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) =>
          * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
-         *
-         * @param expr
-         * @return existsExpr
          */
-
         AbstractExpression inColumns = expr.getLeft();
         if (inColumns instanceof SelectSubqueryExpression) {
             // If the left child is a (SELECT ...) expression itself we can't convert it
@@ -703,12 +752,12 @@ public abstract class AbstractParsedStmt {
             return expr;
         }
 
-        // Must be a SELECT statement
+        // The right hand operand of the equality operation must be a SELECT statement
         AbstractExpression rightExpr = expr.getRight();
         if (!(rightExpr instanceof SelectSubqueryExpression)) {
             return expr;
         }
-        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr.getRight();
+        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) rightExpr;
         AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
         if (!(subquery instanceof ParsedSelectStmt)) {
             return expr;
@@ -1546,7 +1595,6 @@ public abstract class AbstractParsedStmt {
         for (ParsedColInfo colInfo : candidateColumns) {
             AbstractExpression colExpr = colInfo.expression;
             if (colExpr instanceof TupleValueExpression) {
-                TupleValueExpression tve = (TupleValueExpression)colExpr;
                 Set<AbstractExpression> tveEquivs = valueEquivalence.get(colExpr);
                 if (tveEquivs != null) {
                     for (AbstractExpression expr : tveEquivs) {
