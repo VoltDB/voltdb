@@ -35,6 +35,7 @@
 #include <deque>
 
 namespace voltdb {
+#define INVALID_NEW_BUCKET_INDEX -1
 class TupleBlock;
 }
 
@@ -81,7 +82,7 @@ typedef TBMap::iterator TBMapI;
 typedef CompactingSet<TBPtr> TBBucket;
 typedef TBBucket::iterator TBBucketI;
 typedef boost::shared_ptr<TBBucket> TBBucketPtr;
-typedef std::vector<TBBucketPtr> TBBucketMap;
+typedef std::vector<TBBucketPtr> TBBucketPtrVector;
 const int TUPLE_BLOCK_NUM_BUCKETS = 20;
 
 class TupleBlock {
@@ -114,37 +115,35 @@ public:
         return false;
     }
 
+    /**
+     * If the next free tuple is not able to be in the current bucket, return the new bucket index,
+     * otherwise return INVALID_NEW_BUCKET_INDEX index as the second element in the pair.
+     */
     inline int calculateBucketIndex(uint32_t tuplesPendingDeleteOnUndoRelease = 0) {
-        if (!hasFreeTuples()) {
+        if (!hasFreeTuples() || tuplesPendingDeleteOnUndoRelease == m_activeTuples) {
+            //(1)
             //Completely full, don't need be considered for merging
-            //Remove self from current bucket and null out the bucket
-            if (m_bucket.get() != NULL) {
-                //std::cout << static_cast<void*>(this) << " is full, erasing from bucket" << std::endl;
-                m_bucket->erase(TBPtr(this));
-                m_bucket = TBBucketPtr();
-            }
-            return -1;
-        } else if (tuplesPendingDeleteOnUndoRelease == m_activeTuples) {
+            //Remove itself from current bucket and null out the bucket
+
+            //(2)
             //Someone was kind enough to scan the whole block, move all tuples
             //not pending delete on undo release to another block as part
             //of compaction. Now this block doesn't need to be considered
             //for compaction anymore. The block will be completely discard along with the undo
             //information. Any tuples pending delete due to a snapshot will moved and picked up
             //by the snapshot scan from the other block
+
             if (m_bucket.get() != NULL) {
-                //std::cout << static_cast<void*>(this) << " has only deleted tuples that are pending undo release "
-                //        << tuplesPendingDeleteOnUndoRelease << std::endl;
                 m_bucket->erase(TBPtr(this));
                 m_bucket = TBBucketPtr();
             }
-            return -1;
+            return INVALID_NEW_BUCKET_INDEX;
         }
-        else {
-            int index = static_cast<int>(::floor(m_activeTuples / m_tuplesPerBlockDivNumBuckets));
-            assert(index < TUPLE_BLOCK_NUM_BUCKETS);
-            assert(index >= 0);
-            return index;
-        }
+
+        int index = static_cast<int>(::floor(m_activeTuples / m_tuplesPerBucket));
+        assert(index < TUPLE_BLOCK_NUM_BUCKETS);
+        assert(index >= 0);
+        return index;
     }
 
     inline int getBucketIndex() {
@@ -153,6 +152,9 @@ public:
 
     std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
 
+    /**
+     * Find next free tuple storage address and its bucket index position.
+     */
     inline std::pair<char*, int> nextFreeTuple() {
         char *retval = NULL;
         if (!m_freeList.empty()) {
@@ -167,12 +169,14 @@ public:
         }
         m_activeTuples++;
         int newBucketIndex = calculateBucketIndex();
-        if (newBucketIndex != m_bucketIndex) {
-            m_bucketIndex = newBucketIndex;
-            return std::pair<char*, int>(retval, newBucketIndex);
-        } else {
-            return std::pair<char*, int>(retval, -1);
+        if (newBucketIndex == m_bucketIndex) {
+            // have space in current bucket
+            return std::pair<char*, int>(retval, INVALID_NEW_BUCKET_INDEX);
         }
+
+        // needs a new bucket and update bucket index
+        m_bucketIndex = newBucketIndex;
+        return std::pair<char*, int>(retval, newBucketIndex);
     }
 
     void swapToBucket(TBBucketPtr newBucket) {
@@ -192,12 +196,12 @@ public:
         uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage);
         m_freeList.push_back(offset);
         int newBucketIndex = calculateBucketIndex();
-        if (newBucketIndex != m_bucketIndex) {
-            m_bucketIndex = newBucketIndex;
-            return newBucketIndex;
-        } else {
-            return -1;
+        if (newBucketIndex == m_bucketIndex) {
+            return INVALID_NEW_BUCKET_INDEX;
         }
+
+        m_bucketIndex = newBucketIndex;
+        return newBucketIndex;
     }
 
     inline char * address() {
@@ -239,7 +243,7 @@ private:
     uint32_t m_activeTuples;
     uint32_t m_nextFreeTuple;
     uint32_t m_lastCompactionOffset;
-    const double m_tuplesPerBlockDivNumBuckets;
+    const double m_tuplesPerBucket;
 
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
