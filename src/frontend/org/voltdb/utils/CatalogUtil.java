@@ -148,13 +148,13 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_DELIMITER = ",";
 
     // DR conflicts export table name prefix
-    public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
-    public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_DR_CONFLICTS_REPLICATED";
+    public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
+    public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
     // DR conflicts export group name
-    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_DR_CONFLICTS";
+    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_XDCR_CONFLICTS";
     public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
     public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
-    public static final String DEFAULT_DR_CONFLICTS_DIR = "dr_conflicts";
+    public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
