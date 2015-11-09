@@ -1279,12 +1279,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "      IS NULL;";
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{100}});
+
             sql =   "select ID from R1 " +
                     "where (WAGE, DEPT) NOT IN " +
                     "      (select WAGE, DEPT from R2 " +
                     "       where ID < 104) " +
                     "order by ID;";
-            /* enable for debug */ dumpQueryPlans(client, sql);
+            //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             sql =   "select ID from R1 " +
@@ -1294,6 +1295,29 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+
+            // Try a hard-coded constant as a row column.
+            // This currently works only in the cases like this where the
+            // IN rewrites as an EXISTS.
+            sql =   "select ID from R1 " +
+                    "where (ID, 2) IN " +
+                    "      (select ID, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            /* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+
+            // Try a multi-column expression as a row column.
+            // This currently works only in the cases like this where the
+            // IN rewrites as an EXISTS.
+            sql =   "select ID from R1 " +
+                    "where (ID, ID+DEPT-ID) IN " +
+                    "      (select ID, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            /* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+
         }
 
         // IN should evaluate to NULL
@@ -1333,6 +1357,74 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+
+            // Try non-working cases of a constant-valued row column.
+            // NOT IN does not rewrite as EXISTS, so the constant row column is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, 2) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting constant row column to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "use of a constant value";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
+            // A subquery with a limit does not rewrite as EXISTS,
+            // so the constant row column is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, 2) IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104 limit 1) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting constant row column to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "use of a constant value";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
+
+            // Try non-working cases of a multi-column-expression in a row column.
+            // NOT IN does not rewrite as EXISTS, so the multi-column-based
+            // row column expression is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, ID+DEPT-ID) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting multi-column expression to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "combination of column values";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
+            // A subquery with a limit does not rewrite as EXISTS,
+            // so the multi-column-based row column expression
+            // is rejected.
+            sql =   "select ID from R1 " +
+                    "where (WAGE, ID+DEPT-ID) IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104 limit 1) " +
+                    "order by ID;";
+            try {
+                //* enable for debug */ dumpQueryPlans(client, sql);
+                validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+                fail("Was not expecting multi-column expression to survive planning");
+            }
+            catch (ProcCallException ex) {
+                String errMsg = "combination of column values";
+                assertTrue(ex.getMessage().contains(errMsg));
+            }
         }
     }
 
