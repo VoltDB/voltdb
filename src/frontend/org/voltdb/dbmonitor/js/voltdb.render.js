@@ -487,6 +487,17 @@ function alertNodeClicked(obj) {
         };
         //
 
+        //Render DR Replication Graph
+        this.GetDrConsumerInformation = function (onInformationLoaded) {
+            var drConsumerData = {};
+
+            VoltDBService.GetDrReplicationInformation(function (connection) {
+                getDrConsumerData(connection, drConsumerData);
+                onInformationLoaded(drConsumerData);
+            });
+        };
+        //
+
         //Get Cluster Id 
         this.GetDrInformations = function (onInformationLoaded) {
             var replicationData = {};
@@ -2265,6 +2276,28 @@ function alertNodeClicked(obj) {
             replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
             replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
         };
+
+        var getDrConsumerData = function(connection, drConsumerDetails) {
+            var colIndex = {};
+            var counter = 0;
+            if (connection.Metadata['@Statistics_DRCONSUMER'] == null) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "STATE")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]].split('/')[0];
+                if (!drConsumerDetails.hasOwnProperty(hostName)) {
+                    drConsumerDetails[hostName] = {};
+                }
+                drConsumerDetails[hostName]['STATE'] = info[colIndex["STATE"]];
+            });
+        }
 
         var getDrInformations = function (connection, replicationDetails) {
             var colIndex = {};

@@ -850,109 +850,132 @@ var loadPage = function (serverName, portid) {
                 voltDbRenderer.GetDrStatusInformation(function (drDetails) {
                     if (getCurrentServer() != undefined) {
                         var drResult = drDetails["Details"]["STATUS"];
-                        var drReplicationSpanSelector = $('#liDrReplication').find("span");
-                        var drReplicationInputSelector = $('#liDrReplication').find("input");
                         var drTablesSpanSelector = $('#liDrTables').find("span");
-                        var drTablesInputSelector = $('#liDrTables').find("input");
                         if (drResult != -2) {
                             VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
                             VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
                             //show master/replica table
-                            if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
-                                var userPreference = getUserPreferences();
-                                VoltDbUI.isDRInfoRequired = true;
-                                VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
-                                //show replicaDetail table
-                                if (userPreference["DRTables"]) {
-                                    $("#divDrReplication").show();
-                                }
+                            voltDbRenderer.GetDrConsumerInformation(function(drConsumerDetails){
+                                VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
+                                VoltDbUI.drReplicationRole = 'Replica'
+                                VoltDbUI.drMasterEnabled = true;
+                                VoltDbUI.drMasterState = 'pending';
+                                VoltDbUI.drConsumerState = 'DISABLE';
+                                //VoltDbUI.drConsumerState = 'RECEIVE'
 
-                                if (drTablesSpanSelector != undefined) {
-                                    drTablesSpanSelector.html('Data Replication Tables');
-                                    drTablesSpanSelector.removeClass("notActive");
-                                    drTablesInputSelector.removeAttr("disabled");
-                                    drTablesInputSelector.removeAttr("title");
-                                }
-                                // showHideLastLineClass(true);
-
-                                $("#divDrWrapperAdmin").show();
-
-                                if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
-                                    
-                                    drReplicationSpanSelector.html('Data Replication (DR)');
-                                    drReplicationSpanSelector.removeClass("notActive");
-                                    drReplicationInputSelector.removeAttr("disabled");
-                                    drReplicationInputSelector.removeAttr("title");
-                                    if (userPreference["DrReplicationRate"]) {
-                                        $("#ChartDrReplicationRate").show();
-                                        MonitorGraphUI.refreshGraphDR();
+                                if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
+                                    var userPreference = getUserPreferences();
+                                    VoltDbUI.isDRInfoRequired = true;
+                                    VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
+                                    //show replicaDetail table
+                                    if (userPreference["DRTables"]) {
+                                        $("#divDrReplication").show();
                                     }
-                                    refreshDrReplicaSection(graphView, currentTab);
-                                    //to show DR Mode and DR tables
-                                    if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
-                                        $("#dbDrMode").text("Both");
-                                        $('#drMasterSection').css('display', 'block');
-                                        refreshDrMasterSection();
-                                        $(".replicaWrapper").css('top', '-27px');
+                                    if (drTablesSpanSelector != undefined) {
+                                        enableDisableDrTableChk(true);
+                                    }
+                                    // showHideLastLineClass(true);
+                                    $("#divDrWrapperAdmin").show();
+                                    if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
+                                        if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
+                                            if (userPreference["DrReplicationRate"]) {
+                                                $("#ChartDrReplicationRate").show();
+                                                MonitorGraphUI.refreshGraphDR();
+                                            }
+                                            $('#drReplicaSection').css('display', 'block');
+                                            enableDisableDrReplicationChk(true);
+                                        }
+                                        else {
+                                            $('#drReplicaSection').css('display', 'none');
+                                            enableDisableDrReplicationChk(false);
+                                            $("#ChartDrReplicationRate").hide();
+                                        }
+                                        refreshDrReplicaSection(graphView, currentTab);
+                                        //to show DR Mode and DR tables
+                                        if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
+                                            $("#dbDrMode").text("Both");
+                                            $('#drMasterSection').css('display', 'block');
+                                            refreshDrMasterSection();
+                                            $(".replicaWrapper").css('top', '-27px');
+                                        } else {
+                                            if(VoltDbUI.drConsumerState.toLowerCase() == 'disable'){
+                                                enableDisableDrReplicationChk(false);
+                                                enableDisableDrTableChk(false);
+                                                $("#divDrReplication").hide();
+                                            }else {
+                                                enableDisableDrReplicationChk(true);
+                                                enableDisableDrTableChk(true);
+                                                $("#dbDrMode").text("Replica");
+                                                $(".replicaWrapper").css('top', '0px');
+                                                $('#drMasterSection').css('display', 'none');
+                                                $("#divDrReplication").show();
+                                            }
+                                        }
+
                                     } else {
-                                        $("#dbDrMode").text("Replica");
-                                        $(".replicaWrapper").css('top', '0px');
-                                        $('#drMasterSection').css('display', 'none');
+                                        voltDbRenderer.GetDrInformations(function (clusterInfo) {
+                                            $('#clusterId').show();
+                                            $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
+                                        });
+                                        enableDisableDrReplicationChk(false);
+                                        $("#ChartDrReplicationRate").hide();
+                                        //to show DR Mode
+                                        if (VoltDbUI.drMasterEnabled) {
+                                            $("#dbDrMode").text("Master");
+                                            $('#drMasterSection').css('display', 'block');
+                                            refreshDrMasterSection();
+                                        }
+                                        if(VoltDbUI.drMasterEnabled && VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
+                                            if (userPreference["DrReplicationRate"]) {
+                                                $("#ChartDrReplicationRate").show();
+                                                MonitorGraphUI.refreshGraphDR();
+                                            }
+                                            $('#drReplicaSection').css('display', 'block');
+                                            enableDisableDrReplicationChk(true);
+                                            refreshDrReplicaSection(graphView, currentTab);
+                                        } else {
+                                            $("#ChartDrReplicationRate").hide();
+                                            $('#drReplicaSection').css('display', 'none');
+                                            enableDisableDrReplicationChk(false);
+                                        }
                                     }
-                                    $('#drReplicaSection').css('display', 'block');
                                 } else {
+                                    var userPreference = getUserPreferences();
                                     voltDbRenderer.GetDrInformations(function (clusterInfo) {
                                         $('#clusterId').show();
                                         $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
                                     });
-                                    drReplicationSpanSelector.html('Data Replication (DR) (not active)');
-                                    drReplicationSpanSelector.addClass("notActive");
-                                    drReplicationInputSelector.attr("disabled", true);
-                                    drReplicationInputSelector.attr("title", "This feature is not active.");
-                                    drReplicationInputSelector.attr("checked", false);
-                                    $("#ChartDrReplicationRate").hide();
-                                    //to show DR Mode
-                                    if (VoltDbUI.drMasterEnabled) {
-                                        $("#dbDrMode").text("Master");
-                                        $('#drMasterSection').css('display', 'block');
-                                        refreshDrMasterSection();
+                                    VoltDbUI.isDRInfoRequired = true;
+                                    $("#divDrReplication").hide();
+                                    $("#divDrWrapperAdmin").show();
+                                    if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
+                                        $("#divDrReplication").show();
+                                        $('#drReplicaSection').css('display', 'block');
+                                        enableDisableDrReplicationChk(true);
+                                        enableDisableDrTableChk(true);
+                                        if (userPreference["DrReplicationRate"]) {
+                                            $("#ChartDrReplicationRate").show();
+                                            MonitorGraphUI.refreshGraphDR();
+                                        }
+                                        refreshDrReplicaSection(graphView, currentTab);
+                                    } else {
+                                        $("#divDrReplication").hide();
+                                        $('#drReplicaSection').css('display', 'none');
+                                        enableDisableDrReplicationChk(false);
+                                        enableDisableDrTableChk(false);
+                                        $("#ChartDrReplicationRate").hide();
                                     }
-                                    $('#drReplicaSection').css('display', 'none');
+                                    $('#drMasterSection').css('display', 'none');
                                 }
-                            } else {
-                                voltDbRenderer.GetDrInformations(function (clusterInfo) {
-                                    $('#clusterId').show();
-                                    $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
-                                });
-                                VoltDbUI.isDRInfoRequired = true;
-                                $("#divDrReplication").hide();
-                                drReplicationSpanSelector.html('Data Replication (DR) (not active)');
-                                drReplicationSpanSelector.addClass("notActive");
-                                drReplicationInputSelector.attr("disabled", true);
-                                drReplicationInputSelector.attr("title", "This feature is not active.");
-                                drReplicationInputSelector.attr("checked", false);
-                                drTablesSpanSelector.html('Data Replication Tables (not active)');
-                                drTablesSpanSelector.addClass("notActive");
-                                drTablesInputSelector.attr("disabled", true);
-                                drTablesInputSelector.attr("title", "This feature is not active.");
-                                drTablesInputSelector.attr("checked", false);
-                                $("#divDrWrapperAdmin").show();
-                            }
+                            })
+
                         } else {
                             $('#clusterId').hide();
                             $('#clusterId').html("");
                             VoltDbUI.isDRInfoRequired = false;
                             $("#divDrReplication").hide();
-                            drReplicationSpanSelector.html('Data Replication (DR) (not active)');
-                            drReplicationSpanSelector.addClass("notActive");
-                            drReplicationInputSelector.attr("disabled", true);
-                            drReplicationInputSelector.attr("title", "This feature is not active.");
-                            drReplicationInputSelector.attr("checked", false);
-                            drTablesSpanSelector.html('Data Replication Tables (not active)');
-                            drTablesSpanSelector.addClass("notActive");
-                            drTablesInputSelector.attr("disabled", true);
-                            drTablesInputSelector.attr("title", "This feature is not active.");
-                            drTablesInputSelector.attr("checked", false);
+                            enableDisableDrReplicationChk(false);
+                            enableDisableDrTableChk(false);
                             $("#ChartDrReplicationRate").hide();
                             $("#divDrWrapperAdmin").hide();
                         }
@@ -961,6 +984,39 @@ var loadPage = function (serverName, portid) {
             }
         });
 
+        var enableDisableDrReplicationChk = function(isEnable){
+            var drReplicationSpanSelector = $('#liDrReplication').find("span");
+            var drReplicationInputSelector = $('#liDrReplication').find("input");
+            if(isEnable){
+                drReplicationSpanSelector.html('Data Replication (DR)');
+                drReplicationSpanSelector.removeClass("notActive");
+                drReplicationInputSelector.removeAttr("disabled");
+                drReplicationInputSelector.removeAttr("title");
+            }else {
+                drReplicationSpanSelector.html('Data Replication (DR) (not active)');
+                drReplicationSpanSelector.addClass("notActive");
+                drReplicationInputSelector.attr("disabled", true);
+                drReplicationInputSelector.attr("title", "This feature is not active.");
+                drReplicationInputSelector.attr("checked", false);
+            }
+        }
+
+        var enableDisableDrTableChk = function(isEnable){
+            var drTablesSpanSelector = $('#liDrTables').find("span");
+            var drTablesInputSelector = $('#liDrTables').find("input");
+            if(isEnable){
+                drTablesSpanSelector.html('Data Replication Tables');
+                drTablesSpanSelector.removeClass("notActive");
+                drTablesInputSelector.removeAttr("disabled");
+                drTablesInputSelector.removeAttr("title");
+            }else {
+                drTablesSpanSelector.html('Data Replication Tables (not active)');
+                drTablesSpanSelector.addClass("notActive");
+                drTablesInputSelector.attr("disabled", true);
+                drTablesInputSelector.attr("title", "This feature is not active.");
+                drTablesInputSelector.attr("checked", false);
+            }
+        }
 
         //Commented after task VMC-253 Sujesh
         
@@ -2275,13 +2331,23 @@ var showHideGraph = function (userpreferences) {
     else
         $("#chartPartitionIdleTime").show();
 
-    if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
+    //if (VoltDbUI.drReplicationRole.toLowerCase() == "replica") {
+    //    if (userpreferences["DrReplicationRate"] == true) {
+    //        $("#ChartDrReplicationRate").show();
+    //    } else {
+    //        $("#ChartDrReplicationRate").hide();
+    //    }
+    //} else {
+    //
+    //}
+
+    if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' && VoltDbUI.drConsumerState != '' ){
         if (userpreferences["DrReplicationRate"] == true) {
             $("#ChartDrReplicationRate").show();
         } else {
             $("#ChartDrReplicationRate").hide();
         }
-    } else {
+    }else{
         $("#ChartDrReplicationRate").hide();
     }
 
@@ -2385,6 +2451,7 @@ var adjustGraphSpacing = function () {
         this.isSchemaTabLoading = false;
         this.drMasterEnabled = false;
         this.drMasterState = '';
+        this.drConsumerState = '';
         this.drStatus = '';
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;
