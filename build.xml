@@ -131,8 +131,6 @@
 <property name="j2se_api" value="http://docs.oracle.com/javase/7/docs/api/"/>
 
 <path id='project.classpath'>
-    <!-- TODO: tweak this to work on the Jenkins machines (and elsewhere?) -->
-    <pathelement location='/Library/PostgreSQL/pgJDBC/postgresql-9.4-1203.jdbc41.jar' />
     <pathelement location='${build.instr.dir}' />
     <pathelement location='${build.client.dir}' />
     <pathelement location='${build.prod.dir}' />
