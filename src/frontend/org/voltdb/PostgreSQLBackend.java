@@ -22,6 +22,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -60,6 +62,40 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("char", "CHARACTER");
         m_PostgreSQLTypeNames.put("text", "VARCHAR");
     }
+    // Captures up to 6 order-by columns; beyond those will be ignored
+    // (similar to tests/scripts/examples/sql_coverage/StandardNormalzer.py)
+    private static final Pattern orderByQuery = Pattern.compile(
+            "ORDER BY(?<column1>\\s+(\\w+\\.)?\\w+(\\s+(ASC|DESC))?)"
+            + "((?<column2>\\s*,\\s*(\\w+\\.)?\\w+(\\s+(ASC|DESC))?))?"
+            + "((?<column3>\\s*,\\s*(\\w+\\.)?\\w+(\\s+(ASC|DESC))?))?"
+            + "((?<column4>\\s*,\\s*(\\w+\\.)?\\w+(\\s+(ASC|DESC))?))?"
+            + "((?<column5>\\s*,\\s*(\\w+\\.)?\\w+(\\s+(ASC|DESC))?))?"
+            + "((?<column6>\\s*,\\s*(\\w+\\.)?\\w+(\\s+(ASC|DESC))?))?",
+            Pattern.CASE_INSENSITIVE);
+    // Captures the use of EXTRACT(DAY_OF_WEEK FROM ...) or
+    // EXTRACT(DAY_OF_YEAR FROM ...), which PostgreSQL does not support
+    private static final Pattern dayOfWeekOrYearQuery = Pattern.compile(
+            "EXTRACT\\s*\\(\\s*(?<weekOrYear>DAY_OF_WEEK|DAY_OF_YEAR)\\s+FROM(?<column>\\s+\\w+\\s*)\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Captures the use of AVG(columnName), which PostgreSQL handles
+    // differently, when the columnName is of one of the integer types
+    private static final Pattern avgQuery = Pattern.compile(
+            "AVG\\s*\\(\\s*(?<column>\\w+)\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
+    // Captures up to 6 table names, for each FROM clause used in the query
+    // TODO: fix/finish this!
+//    private static final Pattern tableNames = Pattern.compile(
+//              "FROM\\s*\\(?<table1>\\w+)\\s*"
+//            + "(\\s*,s*\\(?<table2>\\w+)\\s*)?"
+//            + "(\\s*,s*\\(?<table3>\\w+)\\s*)?"
+//            + "(\\s*,s*\\(?<table4>\\w+)\\s*)?"
+//            + "(\\s*,s*\\(?<table5>\\w+)\\s*)?"
+//            + "(\\s*,s*\\(?<table6>\\w+)\\s*)?",
+//            Pattern.CASE_INSENSITIVE);
+    // Captures the use of VARCHAR(n BYTES), which PostgreSQL does not support
+    private static final Pattern varcharBytesDdl = Pattern.compile(
+            "VARCHAR\\s*\\(\\s*(?<numBytes>\\w+)\\s+BYTES\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -121,6 +157,192 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         super(dbconn);
     }
 
+    /** Modify queries containing an ORDER BY clause, in such a way that
+     *  PostgreSQL results will match VoltDB results, generally by adding
+     *  NULLS FIRST or NULLS LAST. */
+    private String transformOrderByQueries(String dml) {
+        // TODO: should we only add "NULLS FIRST|LAST" when we find "LIMIT" and/or "OFFSET"??
+        StringBuffer modified_dml = new StringBuffer();
+        Matcher matcher = orderByQuery.matcher(dml);
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer("ORDER BY");
+            // 100 is arbitrary; the real limitation is in the orderByQuery Pattern
+            for (int i=1; i < 100; i++) {
+                String column_i = null;
+                try {
+                    column_i = matcher.group("column" + i);
+                } catch (IllegalArgumentException e) {
+                    //System.out.println("In PostgreSQLBackend.transformOrderByQueries, caught:\n" + e);
+                    // do nothing: column_i remains null
+                }
+                if (column_i == null) {
+                    break;
+                } else if (column_i.toUpperCase().endsWith("DESC")) {
+                    replaceText.append(column_i + " NULLS LAST");
+                } else {
+                    replaceText.append(column_i + " NULLS FIRST");
+                }
+            }
+            matcher.appendReplacement(modified_dml, replaceText.toString());
+        }
+        matcher.appendTail(modified_dml);
+        return modified_dml.toString();
+    }
+
+    /** Modify queries containing an EXTRACT(DAY_OF_WEEK FROM ...) or
+     *  EXTRACT(DAY_OF_YEAR FROM ...) function, which PostgreSQL does not
+     *  support, and replace it with EXTRACT(DOW FROM ...)+1 or
+     *  DATE_PART('DOY', ...), respectively, which is an equivalent that
+     *  PostgreSQL does support. (The '+1' for DOW is because PostgreSQL
+     *  counts Sunday as 0 and Saturday as 6, etc., whereas VoltDB counts
+     *  Sunday as 1 and Saturday as 7, etc.) */
+    private String transformDayOfWeekOrYearQueries(String dml) {
+        // TODO: temp debug:
+//        System.out.println("Entered PostgreSQLBackend.transformDayOfWeekOrYearQueries,\n  with dml       : " + dml);
+        StringBuffer modified_dml = new StringBuffer();
+        Matcher matcher = dayOfWeekOrYearQuery.matcher(dml);
+        // TODO: temp debug:
+//        System.out.println("  matcher: " + matcher);
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer("EXTRACT ( ");
+            String weekOrYear = null, column = null;
+            try {
+                weekOrYear = matcher.group("weekOrYear");
+                column     = matcher.group("column");
+                // TODO: temp debug:
+//                System.out.println("  weekOrYear: " + weekOrYear);
+//                System.out.println("  column    : " + column);
+            } catch (IllegalArgumentException e) {
+                // TODO: temp debug:
+//                System.out.println("In PostgreSQLBackend.transformDayOfWeekOrYearQueries, caught:\n" + e);
+                // do nothing: weekOrYear remains null
+                break;
+            }
+            if (weekOrYear == null) {
+                throw new ExpectedProcedureException("Programming error: weekOrYear should be 'DAY_OF_WEEK' " +
+                        "or 'DAY_OF_YEAR', but is null (" + weekOrYear + "), for SQL statement:\n" + dml);
+            } else if (weekOrYear.equalsIgnoreCase("DAY_OF_WEEK")) {
+                // Off-by-one mismatch: VoltDB counts Sunday as 1; PostgreSQL
+                // counts it as 0, so we need to always add one to 'DOW'
+                replaceText.append("DOW FROM" + column + ")+1");
+            } else if (weekOrYear.equalsIgnoreCase("DAY_OF_YEAR")) {
+                replaceText.append("DOY FROM" + column + ")");
+            } else {
+                throw new ExpectedProcedureException("Programming error: weekOrYear should be 'DAY_OF_WEEK' " +
+                        "or 'DAY_OF_YEAR', but is '" + weekOrYear + "', for SQL statement:\n" + dml);
+            }
+            // TODO: temp debug:
+//            System.out.println("  replaceText: " + replaceText);
+            matcher.appendReplacement(modified_dml, replaceText.toString());
+            // TODO: temp debug:
+//            System.out.println("  modified_dml(1): " + modified_dml);
+        }
+        matcher.appendTail(modified_dml);
+        // TODO: temp debug:
+//        System.out.println("  modified_dml(2): " + modified_dml);
+        return modified_dml.toString();
+    }
+
+    /** TODO */
+    private boolean isIntegerColumn(String columnName, String... tableNames) {
+        // TODO: Temporary method, which will mostly work, for now:
+        return  columnName.equalsIgnoreCase("ID") ||
+                columnName.equalsIgnoreCase("NUM") ||
+                columnName.equalsIgnoreCase("TINY") ||
+                columnName.equalsIgnoreCase("SMALL") ||
+                columnName.equalsIgnoreCase("BIG");
+    }
+
+    /** Modify queries containing an AVG(columnName) where <i>columnName</i>
+     *  is of an integer type, for which PostgreSQL returns a numeric
+     *  (non-integer) value, unlike VoltDB, which returns an integer. */
+    private String transformAvgOfIntegerQueries(String dml) {
+        // TODO: temp debug:
+//        System.out.println("Entered PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml       : " + dml);
+        StringBuffer modified_dml = new StringBuffer();
+        Matcher matcher = avgQuery.matcher(dml);
+        // TODO: temp debug:
+//        System.out.println("  matcher: " + matcher);
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer();
+            String column = null, avgFunc = null;
+            try {
+                column  = matcher.group("column");
+                avgFunc = matcher.group(0);
+                // TODO: temp debug:
+//                System.out.println("  avgFunc: " + avgFunc);
+//                System.out.println("  column : " + column);
+            } catch (IllegalArgumentException e) {
+                // TODO: temp debug:
+//                System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries, caught:\n" + e);
+                // do nothing: group remains null
+                break;
+            }
+            if (column == null) {
+                throw new ExpectedProcedureException("Programming error: column should not "
+                        + "be null, but is (" + column + "), for SQL statement:\n" + dml);
+            } else if (isIntegerColumn(column)) {
+                replaceText.append("FLOOR ( " + avgFunc + " )");
+            } else {
+                replaceText.append(avgFunc);
+            }
+            // TODO: temp debug:
+//            System.out.println("  replaceText: " + replaceText);
+            matcher.appendReplacement(modified_dml, replaceText.toString());
+            // TODO: temp debug:
+//            System.out.println("  modified_dml(1): " + modified_dml);
+        }
+        matcher.appendTail(modified_dml);
+        // TODO: temp debug:
+//        System.out.println("  modified_dml(2): " + modified_dml);
+        return modified_dml.toString();
+    }
+
+    /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
+     *  support, and replace it with VARCHAR(m), where m = n / 3 (???). */
+    private String transformVarcharOfBytes(String dml) {
+        // TODO: finish this!
+        // TODO: temp debug:
+//        System.out.println("Entered PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml       : " + dml);
+        StringBuffer modified_dml = new StringBuffer();
+        Matcher matcher = varcharBytesDdl.matcher(dml);
+        // TODO: temp debug:
+//        System.out.println("  matcher: " + matcher);
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer();
+            String numBytes = null, varcharBytes = null;
+            try {
+                numBytes = matcher.group("numBytes");
+                varcharBytes = matcher.group(0);
+                // TODO: temp debug:
+//                System.out.println("  avgFunc: " + avgFunc);
+//                System.out.println("  column : " + column);
+            } catch (IllegalArgumentException e) {
+                // TODO: temp debug:
+//                System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries, caught:\n" + e);
+                // do nothing: group remains null
+                break;
+            }
+            if (numBytes == null) {
+                throw new ExpectedProcedureException("Programming error: column should not "
+                        + "be null, but is (" + numBytes + "), for SQL statement:\n" + dml);
+            } else if (isIntegerColumn(numBytes)) {
+                replaceText.append("FLOOR ( " + varcharBytes + " )");
+            } else {
+                replaceText.append(varcharBytes);
+            }
+            // TODO: temp debug:
+//            System.out.println("  replaceText: " + replaceText);
+            matcher.appendReplacement(modified_dml, replaceText.toString());
+            // TODO: temp debug:
+//            System.out.println("  modified_dml(1): " + modified_dml);
+        }
+        matcher.appendTail(modified_dml);
+        // TODO: temp debug:
+//        System.out.println("  modified_dml(2): " + modified_dml);
+        return modified_dml.toString();
+    }
+
     /** Before running the specified SQL DDL, replace keywords not supported
      *  by PostgreSQL with similar terms. */
     @Override
@@ -143,6 +365,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             typeName = equivalentTypeName;
         }
         return super.getColumnInfo(typeName, colName);
+    }
+
+    /** Modifies queries in such a way that PostgreSQL results will match VoltDB
+     *  results, and then passes the remaining work to the base class version. */
+    @Override
+    public VoltTable runDML(String dml) {
+        return super.runDML(transformOrderByQueries(
+                transformDayOfWeekOrYearQueries(
+                transformAvgOfIntegerQueries(dml) )));
     }
 
     private Connection getConnection() {
