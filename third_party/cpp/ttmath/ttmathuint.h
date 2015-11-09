@@ -48,7 +48,7 @@
 
 #include "ttmathtypes.h"
 #include "ttmathmisc.h"
-
+#include "boost/functional/hash/hash.hpp"
 /*!
  \brief a namespace for the TTMath library
  */
@@ -853,17 +853,21 @@ void MulBig(const UInt<value_size> & ss2,
     switch( algorithm )
     {
         case 1:
-        return Mul1Big(ss2, result);
+        Mul1Big(ss2, result);
+        return;
 
         case 2:
-        return Mul2Big(ss2, result);
+        Mul2Big(ss2, result);
+        return;
 
         case 3:
-        return Mul3Big(ss2, result);
+        Mul3Big(ss2, result);
+        return;
 
         case 100:
         default:
-        return MulFastestBig(ss2, result);
+        MulFastestBig(ss2, result);
+        return;
     }
 }
 
@@ -1306,8 +1310,10 @@ uint MulFastest(const UInt<value_size> & ss2)
  */
 void MulFastestBig(const UInt<value_size> & ss2, UInt<value_size*2> & result)
 {
-    if( value_size < TTMATH_USE_KARATSUBA_MULTIPLICATION_FROM_SIZE )
-    return Mul2Big(ss2, result);
+    if( value_size < TTMATH_USE_KARATSUBA_MULTIPLICATION_FROM_SIZE ) {
+    	Mul2Big(ss2, result);
+    	return;
+    }
 
     uint x1size = value_size, x2size = value_size;
     uint x1start = 0, x2start = 0;
@@ -1328,10 +1334,12 @@ void MulFastestBig(const UInt<value_size> & ss2, UInt<value_size*2> & result)
     uint distancex1 = x1size - x1start;
     uint distancex2 = x2size - x2start;
 
-    if( distancex1 < 3 || distancex2 < 3 )
-    // either 'this' or 'ss2' have only 2 (or 1) items different from zero (side by side)
-    // (this condition in the future can be improved)
-    return Mul2Big3<value_size>(table, ss2.table, result, x1start, x1size, x2start, x2size);
+    if( distancex1 < 3 || distancex2 < 3 ) {
+    	// either 'this' or 'ss2' have only 2 (or 1) items different from zero (side by side)
+    	// (this condition in the future can be improved)
+    	Mul2Big3<value_size>(table, ss2.table, result, x1start, x1size, x2start, x2size);
+    	return;
+    }
 
     // Karatsuba multiplication
     Mul3Big(ss2, result);

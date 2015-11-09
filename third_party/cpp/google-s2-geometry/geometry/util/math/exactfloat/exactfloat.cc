@@ -16,8 +16,7 @@ using std::numeric_limits;
 
 #include "s2geo/base/integral_types.h"
 #include "s2geo/base/logging.h"
-#include "openssl/crypto.h"
-
+#include "s2geo/util/math/exactfloat/bignum.h"
 /// Define storage for constants.
 const int ExactFloat::kMinExp;
 const int ExactFloat::kMaxExp;
@@ -70,6 +69,7 @@ inline static uint64 BN_ext_get_uint64(const BIGNUM* bn) {
 /// Count the number of low-order zero bits in the given BIGNUM (ignoring its
 /// sign).  Returns 0 if the argument is zero.
 static int BN_ext_count_low_zero_bits(const BIGNUM* bn) {
+#if 0
   int count = 0;
   for (int i = 0; i < bn->top; ++i) {
     BN_ULONG w = bn->d[i];
@@ -83,6 +83,9 @@ static int BN_ext_count_low_zero_bits(const BIGNUM* bn) {
     }
   }
   return count;
+#else
+  return bn->ext_count_low_zero_bits();
+#endif
 }
 
 ExactFloat::ExactFloat(double v) {
@@ -384,7 +387,7 @@ int ExactFloat::GetDecimalDigits(int max_digits, string* digits) const {
     bn_exp10 = bn_exp_;
   }
   /// Now convert "bn" to a decimal string.
-  char* all_digits = BN_bn2dec(bn);
+  const char* all_digits = BN_bn2dec(bn);
   DCHECK(all_digits != NULL);
   BN_free(bn);
   /// Check whether we have too many digits and round if necessary.

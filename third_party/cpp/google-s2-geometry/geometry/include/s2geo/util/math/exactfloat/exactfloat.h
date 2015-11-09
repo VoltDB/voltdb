@@ -106,7 +106,7 @@ using std::string;
 
 #include "s2geo/base/logging.h"
 #include "s2geo/base/integral_types.h"
-#include "openssl/bn.h"
+#include "s2geo/util/math/exactfloat/bignum.h"
 
 class ExactFloat {
  public:
@@ -564,7 +564,7 @@ inline ExactFloat::ExactFloat() : sign_(1), bn_exp_(kExpZero) {
 }
 
 inline ExactFloat::~ExactFloat() {
-  BN_free(&bn_);
+  BN_free_contents(&bn_);
 }
 
 inline bool ExactFloat::is_zero() const { return bn_exp_ == kExpZero; }

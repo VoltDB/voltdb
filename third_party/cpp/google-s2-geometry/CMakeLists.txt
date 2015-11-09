@@ -5,14 +5,6 @@ include(CheckCXXCompilerFlag)
 include(FindPackageHandleStandardArgs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-if (APPLE)
-    set(ENV{OPENSSL_ROOT_DIR} "/usr/local/opt/openssl/include")
-endif(APPLE)
-find_package(OpenSSL REQUIRED)
-
-message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
-message("OpenSSL libraries: ${OPENSSL_LIBRARIES}")
-
 # These are set by the ant task.
 # set(VOLTDB_SOURCE_DIR "../../..")
 # set(VOLTDB_THIRD_PARTY_DIR "${VOLTDB_SOURCE_DIR}/third_party")
@@ -28,10 +20,10 @@ endif()
 
 ADD_DEFINITIONS (-Wno-deprecated-declarations -Wno-conversion -DNDEBUG ${CXX_VERSION_FLAG})
 
-include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(geometry)
 include_directories(geometry/include)
 include_directories(geometry/util/endian)
+include_directories(${VOLTDB_THIRD_PARTY_CPP_DIR})
 
 file(GLOB S2Glob geometry/s2.cc geometry/s1interval.cc geometry/base/strtoint.cc geometry/util/math/exactfloat/exactfloat.cc geometry/strings/strutil.cc geometry/strings/split.cc geometry/base/stringprintf.cc geometry/s2cap.cc geometry/s1angle.cc geometry/s2cell.cc geometry/s2cellunion.cc geometry/s2cellid.cc geometry/s2edgeindex.cc geometry/s2edgeutil.cc geometry/s2latlngrect.cc geometry/s2loop.cc geometry/s2pointregion.cc geometry/s2latlng.cc geometry/s2polygon.cc geometry/s2polygonbuilder.cc geometry/s2polyline.cc geometry/s2r2rect.cc geometry/s2regionunion.cc geometry/s2region.cc geometry/s2regioncoverer.cc geometry/s2regionintersection.cc geometry/base/logging.cc geometry/util/coding/*.cc)
 
