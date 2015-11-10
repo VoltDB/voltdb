@@ -953,7 +953,9 @@ var loadPage = function (serverName, portid) {
                                     $("#divDrReplication").hide();
                                     $("#divDrWrapperAdmin").show();
                                     if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
-                                        $("#divDrReplication").show();
+                                        if (userPreference["DRTables"]) {
+                                            $("#divDrReplication").show();
+                                        }
                                         $('#drReplicaSection').css('display', 'block');
                                         enableDisableDrReplicationChk(true);
                                         enableDisableDrTableChk(true);
