@@ -574,16 +574,20 @@ public class ExportBenchmark {
         periodicStatsTimer.cancel();
         System.out.println("Client flushed; waiting for export to finish");
 
-        // Wait until export is done
+        // Wait until export is done -- socket target only
         boolean success = false;
-        try {
-            success = waitForStreamedAllocatedMemoryZero();
-        } catch (IOException e) {
-            System.err.println("Error while waiting for export: ");
-            e.getLocalizedMessage();
-        } catch (ProcCallException e) {
-            System.err.println("Error while calling procedures: ");
-            e.getLocalizedMessage();
+        if (config.target.equals("socket")) {
+            try {
+                success = waitForStreamedAllocatedMemoryZero();
+            } catch (IOException e) {
+                System.err.println("Error while waiting for export: ");
+                e.getLocalizedMessage();
+            } catch (ProcCallException e) {
+                System.err.println("Error while calling procedures: ");
+                e.getLocalizedMessage();
+            }
+        } else {
+            success = true; // kafka case -- no waiting
         }
 
         System.out.println("Finished benchmark");
