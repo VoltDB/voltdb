@@ -20,6 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 /*
  * This program exercises the socket import capability by writing
  * <key, value> pairs to one or more VoltDB socket importers.
@@ -44,6 +45,7 @@
 package socketimporter.client.socketimporter;
 
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -57,15 +59,14 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.IOException;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatsContext;
-import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -160,8 +161,6 @@ public class AsyncBenchmark {
         //AsyncBenchmark.config = config;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
-
-
     }
 
     /**
@@ -272,6 +271,8 @@ public class AsyncBenchmark {
             e.printStackTrace( new PrintWriter(writer,true ));
             System. out.println("exeption stack is :\n"+writer.toString());
         }
+        System.out.println("Calling import stats");
+        long outstandingRequests = UtilQueries.getImportStats(client);
     }
 
     /**

@@ -217,6 +217,7 @@ public class KafkaImportBenchmark {
             log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
                     thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
+            long outstandingRequests = MatchChecks.getImportStats(client);
         } catch (Exception ex) {
             log.error("Exception in printStatistics", ex);
         }
@@ -365,7 +366,8 @@ public class KafkaImportBenchmark {
         long importRowCount = MatchChecks.getImportRowCount(client);
         boolean testResult = true;
 
-        // so counts that might help debugging....
+        // some counts that might help debugging....
+        log.info("outstandingRequests: " + MatchChecks.getImportStats(client));
         log.info("mirrorRows: " + mirrorRows);
         log.info("importRows: " + importRows);
         log.info("importRowCount: " + importRowCount);
