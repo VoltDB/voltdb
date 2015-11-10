@@ -105,8 +105,8 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 // table name prefix of DR conflict table
-const std::string DR_REPLICATED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_DR_CONFLICTS_REPLICATED";
-const std::string DR_PARTITIONED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_DR_CONFLICTS_PARTITIONED";
+const std::string DR_REPLICATED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
+const std::string DR_PARTITIONED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
 
 namespace voltdb {
 
