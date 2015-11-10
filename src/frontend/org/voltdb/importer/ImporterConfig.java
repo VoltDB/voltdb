@@ -17,6 +17,7 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
 import java.util.Properties;
 import java.util.Set;
 
@@ -28,5 +29,5 @@ public interface ImporterConfig {
 
     public void addConfiguration(Properties props);
 
-    public Set<String> getAvailalbleResources();
+    public Set<URI> getAvailalbleResources();
 }

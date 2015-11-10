@@ -19,6 +19,8 @@ package org.voltdb.importclient.socket;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,8 +33,11 @@ import org.voltdb.importer.ImporterConfig;
  */
 public class SocketImporterConfig implements ImporterConfig {
 
-    private Map<String, InstanceConfiguration> m_instanceConfigs = new HashMap<>();
+    private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
+    private Map<URI, InstanceConfiguration> m_instanceConfigs = new HashMap<>();
+
+    @SuppressWarnings("resource")
     @Override
     public void addConfiguration(Properties props)
     {
@@ -55,7 +60,7 @@ public class SocketImporterConfig implements ImporterConfig {
                 throw new NumberFormatException();
             }
         } catch(NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid port: " + portStr);
+            throw new IllegalArgumentException("Invalid port specification: " + portStr);
         }
 
         ServerSocket sSocket = null;
@@ -65,16 +70,21 @@ public class SocketImporterConfig implements ImporterConfig {
             throw new IllegalArgumentException("Error starting socket importer listener on port: " + port, e);
         }
 
-        m_instanceConfigs.put(portStr, new InstanceConfiguration(port, procedure, sSocket));
+        try {
+            m_instanceConfigs.put(new URI(SOCKET_IMPORTER_URI_SCHEME, portStr, null),
+                    new InstanceConfiguration(port, procedure, sSocket));
+        } catch(URISyntaxException e) { // Will not happen
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
-    public Set<String> getAvailalbleResources()
+    public Set<URI> getAvailalbleResources()
     {
         return m_instanceConfigs.keySet();
     }
 
-    InstanceConfiguration getInstanceConfiguration(String resourceID) {
+    InstanceConfiguration getInstanceConfiguration(URI resourceID) {
         return m_instanceConfigs.get(resourceID);
     }
 

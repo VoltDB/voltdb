@@ -21,6 +21,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,15 +51,7 @@ public class SocketServerImporter extends AbstractImporter {
     }
 
     @Override
-    public void setBackPressure(boolean hasBackPressure)
-    {
-        for (ClientConnectionHandler client : m_clients) {
-            client.hasBackPressure(hasBackPressure);
-        }
-    }
-
-    @Override
-    protected void readyForData(String resourceID)
+    protected void accept(URI resourceID)
     {
         SocketImporterConfig.InstanceConfiguration instanceConfig = m_config.getInstanceConfiguration(resourceID);
         //TODO: Make sure we don't need null check here. Merge 2 lines, if we don't need null check.
@@ -66,7 +59,7 @@ public class SocketServerImporter extends AbstractImporter {
     }
 
     @Override
-    protected void stopImporter()
+    protected void stop()
     {
         for (SocketImporterConfig.InstanceConfiguration aconfig : m_config.getAllInstanceConfigurations()) {
             try {
@@ -100,7 +93,6 @@ public class SocketServerImporter extends AbstractImporter {
     {
         private final Socket m_clientSocket;
         private final String m_procedure;
-        private volatile boolean m_hasBackPressure;
         private volatile boolean m_isStopping;
 
         public ClientConnectionHandler(Socket clientSocket, String procedure)
@@ -109,37 +101,23 @@ public class SocketServerImporter extends AbstractImporter {
             m_procedure = procedure;
         }
 
-        public void hasBackPressure(boolean flag)
-        {
-            m_hasBackPressure = flag;
-        }
-
         @Override
         public void run()
         {
             try {
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(m_clientSocket.getInputStream()));
                 while (!m_isStopping) {
-                    BufferedReader in = new BufferedReader(
-                            new InputStreamReader(m_clientSocket.getInputStream()));
-                    while (true) {
-                        String line = in.readLine();
-                        //You should convert your data to params here.
-                        if (line == null) break;
-                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
-                        if (!callProcedure(invocation)) {
-                            rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
-                        }
-                        if (m_hasBackPressure) {
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException ioe) {
-                                //
-                            }
-                        }
+                    String line = in.readLine();
+                    //You should convert your data to params here.
+                    if (line == null) break;
+                    CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                    if (!callProcedure(invocation)) {
+                        rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                     }
-                    m_clientSocket.close();
-                    getLogger().info("Client Closed.");
                 }
+                m_clientSocket.close();
+                getLogger().info("Client Closed.");
             } catch (IOException ioe) {
                 getLogger().error("IO exception reading from client socket connection in socket importer", ioe);
             }

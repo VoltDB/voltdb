@@ -17,12 +17,14 @@
 
 package org.voltdb.importer;
 
+import java.net.URI;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.osgi.framework.BundleActivator;
@@ -57,6 +59,7 @@ public abstract class AbstractImporter
     private final VoltLogger m_logger;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
+    private AtomicInteger m_backPressureCount = new AtomicInteger(0);
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
@@ -86,22 +89,22 @@ public abstract class AbstractImporter
             throw new RuntimeException("Importer has already been started and is running");
         }
 
-        Set<String> resources = m_config.getAvailalbleResources();
+        Set<URI> resources = m_config.getAvailalbleResources();
         m_executorService = Executors.newFixedThreadPool(resources.size(),
                 getThreadFactory(getName(), ImportHandlerProxy.MEDIUM_STACK_SIZE));
-        for (final String res : resources) {
+        for (final URI res : resources) {
             m_executorService.submit(new Runnable() {
                 @Override
                 public void run() {
-                    readyForData(res);
+                    accept(res);
                 }
             });
         }
     }
 
-    public final void stop() {
+    public final void stopImporter() {
         m_stopping = true;
-        stopImporter();
+        stop();
         if (m_executorService != null) {
             m_executorService.shutdown();
             try {
@@ -125,11 +128,40 @@ public abstract class AbstractImporter
         try {
             boolean result = m_importServerAdapter.callProcedure(this, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
+            applyBackPressureAsNeeded();
             return result;
         } catch (Exception ex) {
             rateLimitedLog(Level.ERROR, ex, "%s: Error trying to import", getName());
             reportFailureStat(invocation.getProcedure());
             return false;
+        }
+    }
+
+    private void applyBackPressureAsNeeded()
+    {
+        int count = m_backPressureCount.get();
+        if (count > 0) {
+            try { // increase sleep time exponentially to a max of 128ms
+                if (count > 7) {
+                    Thread.sleep(128);
+                } else {
+                    Thread.sleep(1<<count);
+                }
+            } catch(InterruptedException e) {
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("Sleep for back pressure interrupted", e);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void setBackPressure(boolean hasBackPressure)
+    {
+        if (hasBackPressure) {
+            m_backPressureCount.incrementAndGet();
+        } else {
+            m_backPressureCount.set(0);
         }
     }
 
@@ -168,7 +200,7 @@ public abstract class AbstractImporter
 
     protected abstract ImporterConfig createImporterConfig();
 
-    protected abstract void readyForData(String resourceID);
+    protected abstract void accept(URI resourceID);
 
-    protected abstract void stopImporter();
+    protected abstract void stop();
 }

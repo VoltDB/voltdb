@@ -112,7 +112,7 @@ public class ImportProcessor implements ImportDataProcessor {
                     m_handler.stop();
                 }
                 if (m_importer != null) {
-                    m_importer.stop();
+                    m_importer.stopImporter();
                 }
                 if (m_bundle != null) {
                     m_bundle.stop();

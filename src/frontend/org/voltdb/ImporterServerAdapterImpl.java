@@ -33,7 +33,7 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
      * Returns true if a table with the given name exists in the server catalog.
      */
     public boolean hasTable(String name) {
-        return VoltDB.instance().getClientInterface().getInternalConnectionHandler().hasTable(name);
+        return getInternalConnectionHandler().hasTable(name);
     }
 
     @Override
@@ -50,10 +50,12 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
         return VoltDB.instance().getClientInterface().getInternalConnectionHandler();
     }
 
+    @Override
     public void reportFailure(String importerName, String procName, boolean decrementPending) {
         m_statsCollector.reportFailure(importerName, procName, decrementPending);
     }
 
+    @Override
     public void reportQueued(String importerName, String procName) {
         m_statsCollector.reportQueued(importerName, procName);
     }
