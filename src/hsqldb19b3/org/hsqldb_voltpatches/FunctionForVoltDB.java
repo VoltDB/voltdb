@@ -248,6 +248,11 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+             // numinteriorrings() is synonm to numinteriorring()
+            new FunctionId("numinteriorrings", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
             new FunctionId("numpoints", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_POINTS, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),

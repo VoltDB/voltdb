@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyValue;
@@ -104,51 +105,51 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
-        // polygon with no holes
-        VoltTable vt = client.callProcedure("@AdHoc",
-                "select borders.name from borders "
-                + "where numInteriorRing(borders.region) = 1 "
-                + "order by borders.pk").getResults()[0];
+        String sql = "select borders.name,  numInteriorRing(borders.region) "
+                        + "from borders order by borders.pk";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
-                {{"Colorado"},
-                 {"Wyoming"}
+                {{"Colorado",                           0},
+                 {"Wyoming",                            0},
+                 {"Colorado with a hole around Denver", 1},
+                 {"Wonderland",                         Integer.MIN_VALUE},
                 }, vt);
-
-        // polygon with holes
-        vt = client.callProcedure("@AdHoc",
-                "select borders.name from borders "
-                + "where numInteriorRing(borders.region) > 1 "
-                + "order by borders.pk").getResults()[0];
-        assertContentOfTable(new Object[][]
-                {{"Colorado with a hole around Denver"}
-                }, vt);
-
     }
 
     public void testPolygonNumberOfPoints() throws Exception {
         Client client = getClient();
         populateTables(client);
 
-        // polygon with no holes have one ring only
-        // number of points will be as that on the only ring
-        VoltTable vt = client.callProcedure("@AdHoc",
-                "select borders.name, numPoints(borders.region) from borders "
-                + "where numInteriorRing(borders.region) = 1 "
-                + "order by borders.pk").getResults()[0];
+        // polygon with no holes has exterior ring.
+        // number of points will be number of them on the exterior ring
+        String sql = "select borders.name, numPoints(borders.region) from borders "
+                        + "where numInteriorRing(borders.region) = 0 "
+                        + "order by borders.pk";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
-                {{"Colorado", 5},
-                 {"Wyoming", 5}
+                {{"Colorado",   5},
+                 {"Wyoming",    5}
                 }, vt);
 
 
-        // polygon with holes will have multiple interior rings
-        // number of points will be sum of points on all the rings
-        vt = client.callProcedure("@AdHoc",
-                "select borders.name, numPoints(borders.region) from borders "
-                + "where numInteriorRing(borders.region) > 1 "
-                + "order by borders.pk").getResults()[0];
+        // polygon with holes will atleast exterior and interior ring
+        // number of points will be sum of points on interior and exterior ring
+        // query uses alias function numinteriorrings
+        sql = "select borders.name, numPoints(borders.region) from borders "
+                + "where numInteriorRings(borders.region) = 1 "
+                + "order by borders.pk";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
                 {{"Colorado with a hole around Denver", 10}
+                }, vt);
+
+        // null rings for null valued polygon
+        sql = "select borders.name, numPoints(borders.region) from borders "
+                + "where borders.region is NULL "
+                + "order by borders.pk";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertContentOfTable(new Object[][]
+                {{"Wonderland", Integer.MIN_VALUE}
                 }, vt);
 
     }
@@ -157,29 +158,27 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
-        VoltTable vt = client.callProcedure("@AdHoc",
-                "select places.name, LATITUDE(places.loc), LONGITUDE(places.loc) " +
-                "from places " +
-                "order by places.pk").getResults()[0];
+        String sql = "select places.name, LATITUDE(places.loc), LONGITUDE(places.loc) "
+                        + "from places order by places.pk";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
                 {{"Denver",         39.70399856567383,  -104.95899963378906},
                  {"Albuquerque",    35.112998962402344, -106.5989990234375},
                  {"Cheyenne",       41.13399887084961,  -104.81300354003906},
                  {"Fort Collins",   40.584999084472656, -105.0770034790039},
-                 {"Neverwhere",     360.0,              360.0},
+                 {"Neverwhere",     Double.MIN_VALUE,   Double.MIN_VALUE},
                 }, vt);
 
-
-        vt = client.callProcedure("@AdHoc",
-                "select places.name, LATITUDE(places.loc), LONGITUDE(places.loc) "
+        sql = "select places.name, LATITUDE(places.loc), LONGITUDE(places.loc) "
                 + "from places, borders "
                 + "where contains(borders.region, places.loc) "
                 + "group by places.name, places.loc "
-                + "order by places.name").getResults()[0];
+                + "order by places.name";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
-                {{"Cheyenne",41.13399887084961,-104.81300354003906},
-                 {"Denver", 39.70399856567383,-104.95899963378906},
-                 {"Fort Collins",40.584999084472656,-105.0770034790039}
+                {{"Cheyenne",       41.13399887084961,  -104.81300354003906},
+                 {"Denver",         39.70399856567383,  -104.95899963378906},
+                 {"Fort Collins",   40.584999084472656, -105.0770034790039}
                 }, vt);
     }
 
