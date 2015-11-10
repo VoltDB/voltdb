@@ -100,10 +100,8 @@ TEST(R1Interval, TestBasic) {
   EXPECT_TRUE(R1Interval(5,3).Union(R1Interval(0,-2)).is_empty());
   EXPECT_TRUE(R1Interval(0,-2).Union(R1Interval(5,3)).is_empty());
   R1Interval u{unit.Union(unit)};
-  std::cout << "unit.Union(unit) == [" << u.lo() << ", " << u.hi() << "]\n";
   EXPECT_EQ(0, u.lo());
   EXPECT_EQ(1, u.hi());
-  std::cout << "is equal: " << (unit == u ? "true" : "false") << "\n";
   EXPECT_EQ(unit, unit.Union(unit));
   EXPECT_EQ(R1Interval(-1, 1), unit.Union(negunit));
   EXPECT_EQ(R1Interval(-1, 1), negunit.Union(unit));

@@ -94,6 +94,93 @@
 #ifndef UTIL_MATH_EXACTFLOAT_EXACTFLOAT_H_
 #define UTIL_MATH_EXACTFLOAT_EXACTFLOAT_H_
 
+// Define this if we are using VoltDB's implementation of ExactFloat
+// using ttmath.
+#define USE_VOLTDB_EXACTFLOAT
+// Define this if we are using Google's implementation of ExactFloat
+// using the openssl BN interface.
+#undef  USE_GOOGLE_EXACTFLOAT
+#if     defined(USE_GOOGLE_EXACTFLOAT)
+// Define this if we are using Google's implementation of ExactFloat,
+// but are using the VoltDB implementation of the OpenSSL bignum
+// interface.  If this is not defined we use the OpenSSL BN functions
+// themselves.  In this case the VoltDB JNI library must be built
+// with -lcrypto linker option.
+#undef  USE_GOOGLE_EXACTFLOAT_WITH_VOLTDB_OPENSSL
+#endif
+
+#if  defined(USE_VOLTDB_EXACTFLOAT)
+/// The original S2 library used its own notion of ExactFloat, using either
+/// MPFloat or the OpenSSL libcrypto bignum library.  The former is licensed
+/// with the GPL, so it is not usable by us.  The latter is troublesome.
+/// We replace both of these implementations with our implementation
+/// of ExactFLoat, using ttmath.
+#include <ttmath/ttmathbig.h>
+
+class ExactFloat {
+	/// This is the number of 64-bit words in a mantissa.
+	static const unsigned int EF_MANTISSA_SIZE = 32;
+	/// This is the number of 64-bit words in an exponent.
+	static const unsigned int EF_EXPONENT_SIZE = 1;
+public:
+    ExactFloat(double a) {
+        m_value = a;
+    }
+    ExactFloat() {
+    	m_value = 0.0;
+    }
+    ExactFloat(const ExactFloat &other) {
+    	m_value = other.get_value();
+    }
+
+    inline int sgn() {
+        if (this < 0) {
+            return -1;
+        } else if (this > 0) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+
+    inline int max_prec() {
+    	return EF_MANTISSA_SIZE * 64;
+    }
+    inline int prec() {
+    	return EF_MANTISSA_SIZE * 64;
+    }
+    inline bool is_nan() {
+    	return m_value.IsNan();
+    }
+    inline ExactFloat operator+(ExactFloat a) const {
+        return ExactFloat(m_value + a.get_value());
+    }
+    inline ExactFloat operator-(ExactFloat a) const {
+    	return ExactFloat(m_value - a.get_value());
+    }
+    inline ExactFloat operator*(ExactFloat a) const {
+    	return ExactFloat(m_value * a.get_value());
+    }
+    inline ExactFloat operator/(ExactFloat a) const {
+    	return ExactFloat(m_value / a.get_value());
+    }
+    inline bool operator==(ExactFloat a) const {
+    	return m_value == a.get_value();
+    }
+protected:
+    typedef ttmath::Big<EF_EXPONENT_SIZE, EF_MANTISSA_SIZE> tt_big_float;
+
+    ExactFloat(const tt_big_float a) {
+    	m_value = a;
+    }
+    inline tt_big_float get_value() const {
+    	return m_value;
+    }
+private:
+    tt_big_float m_value;
+};
+
+#elif defined(USE_GOOGLE_EXACTFLOAT)
 #include <math.h>
 #include <limits.h>
 #include <iostream>
@@ -106,7 +193,11 @@ using std::string;
 
 #include "s2geo/base/logging.h"
 #include "s2geo/base/integral_types.h"
+#if  defined(USE_GOOGLE_EXACTFLOAT_WITH_VOLTDB_OPENSSL)
 #include "s2geo/util/math/exactfloat/bignum.h"
+#else
+#include "openssl/bn.h"
+#endif
 
 class ExactFloat {
  public:
@@ -601,5 +692,5 @@ inline ExactFloat ExactFloat::CopyWithSign(int sign) const {
   r.sign_ = sign;
   return r;
 }
-
+#endif  // defined(USE_GOOGLE_EXACTFLOAT)
 #endif  // UTIL_MATH_EXACTFLOAT_EXACTFLOAT_H_

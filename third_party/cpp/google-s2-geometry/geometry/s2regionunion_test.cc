@@ -35,20 +35,6 @@ TEST(S2RegionUnionTest, Basic) {
 
   scoped_ptr<S2RegionUnion> two_points(two_points_orig->Clone());
   delete two_points_orig;
-  if (two_points->GetRectBound() != S2LatLngRect(S2LatLng::FromDegrees(-35, -40),
-                         S2LatLng::FromDegrees(35, 40))) {
-	  S2LatLngRect rect = two_points->GetRectBound();
-	  std::cout << "Different.\n";
-	  std::cout << "Lat: [" << rect.lat_lo() << ", " << rect.lat_hi() << "]\n";
-	  std::cout << "Lng: [" << rect.lng_lo() << ", " << rect.lng_hi() << "]\n";
-  }
-  if (two_points->GetRectBound() != two_points->GetRectBound()) {
-	  S2LatLngRect rect = two_points->GetRectBound();
-	  std::cout << "Different2.\n";
-	  std::cout << "Lat: [" << rect.lat_lo() << ", " << rect.lat_hi() << "]\n";
-	  std::cout << "Lng: [" << rect.lng_lo() << ", " << rect.lng_hi() << "]\n";
-  }
-
   EXPECT_EQ(S2LatLngRect(S2LatLng::FromDegrees(-35, -40),
                          S2LatLng::FromDegrees(35, 40)),
             two_points->GetRectBound());

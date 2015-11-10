@@ -1,6 +1,8 @@
 /// Copyright 2009 Google Inc. All Rights Reserved.
 
 #include "s2geo/util/math/exactfloat/exactfloat.h"
+
+#if  defined(USE_GOOGLE_EXACTFLOAT)
 #include <cstring>
 #include <cmath>
 
@@ -16,7 +18,13 @@ using std::numeric_limits;
 
 #include "s2geo/base/integral_types.h"
 #include "s2geo/base/logging.h"
+
+#if    defined(USE_GOOGLE_EXACTFLOAT_WITH_VOLTDB_OPENSSL)
 #include "s2geo/util/math/exactfloat/bignum.h"
+// Note: The rest of this file is exactly as we got it from the google code
+//       repository.  We have reimplemented the portion of the OpenSSL BN
+//       library which this needs.
+#endif
 /// Define storage for constants.
 const int ExactFloat::kMinExp;
 const int ExactFloat::kMaxExp;
@@ -751,3 +759,4 @@ ExactFloat ExactFloat::Unimplemented() {
   LOG(FATAL) << "Unimplemented ExactFloat method called";
   return NaN();
 }
+#endif  // defined(USE_GOOGLE_EXACTFLOAT)
