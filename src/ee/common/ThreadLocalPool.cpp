@@ -52,7 +52,37 @@ static pthread_key_t m_stringKey;
 static pthread_key_t m_keyAllocated;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
-typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
+class PoolWithDebugMethod : public boost::pool<voltdb_pool_allocator_new_delete> {
+public:
+    explicit PoolWithDebugMethod(const size_type nrequested_size,
+                                 const size_type nnext_size = 32,
+                                 const size_type nmax_size = 0)
+        : boost::pool<voltdb_pool_allocator_new_delete>(nrequested_size, nnext_size, nmax_size)
+    {
+    }
+
+    std::string debug() const {
+        typedef std::map<std::size_t, int> SizeToCount;
+        SizeToCount sizeToBlockCount;
+
+        boost::details::PODptr<size_type> iter = list;
+        while (iter.valid()) {
+            ++(sizeToBlockCount[iter.total_size()]);
+
+            iter = iter.next();
+        }
+
+        std::ostringstream oss;
+        oss << "boost::pool with requested size of: " << requested_size;
+        SizeToCount::iterator it = sizeToBlockCount.begin();
+        for (; it != sizeToBlockCount.end(); ++it) {
+            oss << ", " << it->first << "bytes (" << it->second << " blocks)";
+        }
+        return oss.str();
+    }
+};
+
+typedef PoolWithDebugMethod PoolForObjectSize;
 typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
 typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
 
@@ -68,6 +98,8 @@ static void createThreadLocalKey() {
 ThreadLocalPool::ThreadLocalPool() {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     if (pthread_getspecific(m_key) == NULL) {
+        std::cout << "Hello world!!  From constructor\n";
+
         pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
         pthread_setspecific( m_key, static_cast<const void *>(
                 new PairType(
@@ -270,6 +302,20 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
     return pool->malloc();
 }
 
+    static void dumpPools(PoolsByObjectSize& pools) {
+        static int ctr = 0;
+        if (ctr % 1000 == 0) {
+            PoolsByObjectSize::iterator it = pools.begin();
+            PoolsByObjectSize::iterator end = pools.end();
+            std::cout << "Pools status:\n";
+            for (; it != end; ++it) {
+                std::cout << "  " << it->second->debug() << "\n";
+            }
+        }
+
+        ++ctr;
+    }
+
 void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 {
     PoolsByObjectSize& pools =
@@ -282,6 +328,8 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
     }
     PoolForObjectSize* pool = iter->second.get();
     pool->free(object);
+
+    dumpPools(pools);
 }
 
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
