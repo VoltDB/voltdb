@@ -900,9 +900,11 @@ var loadPage = function (serverName, portid) {
                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' || VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE'){
                                             if (userPreference["DRTables"]) {
                                                 $("#divDrReplication").show();
+                                                enableDisableDrTableChk(true);
                                             }
                                         } else {
                                             $("#divDrReplication").hide();
+                                            enableDisableDrTableChk(false);
                                         }
                                     } else {
                                         voltDbRenderer.GetDrInformations(function (clusterInfo) {
@@ -933,9 +935,11 @@ var loadPage = function (serverName, portid) {
 
                                         if(VoltDbUI.drMasterEnabled || VoltDbUI.drConsumerState.toLowerCase() != 'disable'){
                                             if (userPreference["DRTables"]) {
+                                                enableDisableDrTableChk(true);
                                                 $("#divDrReplication").show();
                                             }
                                         }else {
+                                            enableDisableDrTableChk(false);
                                             $("#divDrReplication").hide();
                                         }
                                     }
