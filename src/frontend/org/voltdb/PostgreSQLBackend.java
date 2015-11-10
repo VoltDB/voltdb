@@ -282,7 +282,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 throw new ExpectedProcedureException("Programming error: column should not "
                         + "be null, but is (" + column + "), for SQL statement:\n" + dml);
             } else if (isIntegerColumn(column)) {
-                replaceText.append("FLOOR ( " + avgFunc + " )");
+                replaceText.append("TRUNC ( " + avgFunc + " )");
             } else {
                 replaceText.append(avgFunc);
             }
@@ -299,56 +299,52 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     }
 
     /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
-     *  support, and replace it with VARCHAR(m), where m = n / 3 (???). */
-    private String transformVarcharOfBytes(String dml) {
-        // TODO: finish this!
+     *  support, and replace it with VARCHAR(m), where m = n / 4 (but m is
+     *  always at least 14, since many SQLCoverage tests use strings of that
+     *  length). */
+    private String transformVarcharOfBytes(String ddl) {
         // TODO: temp debug:
-//        System.out.println("Entered PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml       : " + dml);
-        StringBuffer modified_dml = new StringBuffer();
-        Matcher matcher = varcharBytesDdl.matcher(dml);
+//        System.out.println("Entered PostgreSQLBackend.transformVarcharOfBytes,\n  with ddl       : " + ddl);
+        StringBuffer modified_ddl = new StringBuffer();
+        Matcher matcher = varcharBytesDdl.matcher(ddl);
         // TODO: temp debug:
 //        System.out.println("  matcher: " + matcher);
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer();
-            String numBytes = null, varcharBytes = null;
+            String numBytesStr = null;
+            int numBytes = -1;
             try {
-                numBytes = matcher.group("numBytes");
-                varcharBytes = matcher.group(0);
+                numBytesStr = matcher.group("numBytes");
+                numBytes = Integer.parseInt(numBytesStr);
                 // TODO: temp debug:
-//                System.out.println("  avgFunc: " + avgFunc);
-//                System.out.println("  column : " + column);
+//                System.out.println("  numBytesStr: " + numBytesStr);
+//                System.out.println("  numBytes   : " + numBytes);
             } catch (IllegalArgumentException e) {
                 // TODO: temp debug:
 //                System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries, caught:\n" + e);
-                // do nothing: group remains null
+                // do nothing: numBytes remains -1
                 break;
             }
-            if (numBytes == null) {
-                throw new ExpectedProcedureException("Programming error: column should not "
-                        + "be null, but is (" + numBytes + "), for SQL statement:\n" + dml);
-            } else if (isIntegerColumn(numBytes)) {
-                replaceText.append("FLOOR ( " + varcharBytes + " )");
-            } else {
-                replaceText.append(varcharBytes);
-            }
+            replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 14) + ")");
             // TODO: temp debug:
 //            System.out.println("  replaceText: " + replaceText);
-            matcher.appendReplacement(modified_dml, replaceText.toString());
+            matcher.appendReplacement(modified_ddl, replaceText.toString());
             // TODO: temp debug:
-//            System.out.println("  modified_dml(1): " + modified_dml);
+//            System.out.println("  modified_ddl(1): " + modified_ddl);
         }
-        matcher.appendTail(modified_dml);
+        matcher.appendTail(modified_ddl);
         // TODO: temp debug:
-//        System.out.println("  modified_dml(2): " + modified_dml);
-        return modified_dml.toString();
+//        System.out.println("  modified_ddl(2): " + modified_ddl);
+        return modified_ddl.toString();
     }
 
     /** Before running the specified SQL DDL, replace keywords not supported
      *  by PostgreSQL with similar terms. */
     @Override
     public void runDDL(String ddl) {
-        String modified_ddl = ddl.replace("TINYINT", "SMALLINT")
-                                 .replace("ASSUMEUNIQUE", "UNIQUE");
+        String modified_ddl = transformVarcharOfBytes(ddl)
+                                .replace("TINYINT", "SMALLINT")
+                                .replace("ASSUMEUNIQUE", "UNIQUE");
         super.runDDL(modified_ddl);
     }
 
