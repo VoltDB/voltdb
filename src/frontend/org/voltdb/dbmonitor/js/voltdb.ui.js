@@ -862,9 +862,9 @@ var loadPage = function (serverName, portid) {
                                     VoltDbUI.isDRInfoRequired = true;
                                     VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
                                     //show replicaDetail table
-                                    if (userPreference["DRTables"]) {
-                                        $("#divDrReplication").show();
-                                    }
+                                    //if (userPreference["DRTables"]) {
+                                    //    $("#divDrReplication").show();
+                                    //}
                                     if (drTablesSpanSelector != undefined) {
                                         enableDisableDrTableChk(true);
                                     }
@@ -881,8 +881,8 @@ var loadPage = function (serverName, portid) {
                                         }
                                         else {
                                             $('#drReplicaSection').css('display', 'none');
-                                            enableDisableDrReplicationChk(false);
                                             $("#ChartDrReplicationRate").hide();
+                                            enableDisableDrReplicationChk(false);
                                         }
                                         refreshDrReplicaSection(graphView, currentTab);
                                         //to show DR Mode and DR tables
@@ -892,20 +892,18 @@ var loadPage = function (serverName, portid) {
                                             refreshDrMasterSection();
                                             $(".replicaWrapper").css('top', '-27px');
                                         } else {
-                                            if(VoltDbUI.drConsumerState.toLowerCase() == 'disable'){
-                                                enableDisableDrReplicationChk(false);
-                                                enableDisableDrTableChk(false);
-                                                $("#divDrReplication").hide();
-                                            }else {
-                                                enableDisableDrReplicationChk(true);
-                                                enableDisableDrTableChk(true);
-                                                $("#dbDrMode").text("Replica");
-                                                $(".replicaWrapper").css('top', '0px');
-                                                $('#drMasterSection').css('display', 'none');
-                                                $("#divDrReplication").show();
-                                            }
+                                            $("#dbDrMode").text("Replica");
+                                            $(".replicaWrapper").css('top', '0px');
+                                            $('#drMasterSection').css('display', 'none');
                                         }
 
+                                        if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' || VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE'){
+                                            if (userPreference["DRTables"]) {
+                                                $("#divDrReplication").show();
+                                            }
+                                        } else {
+                                            $("#divDrReplication").hide();
+                                        }
                                     } else {
                                         voltDbRenderer.GetDrInformations(function (clusterInfo) {
                                             $('#clusterId').show();
@@ -931,6 +929,14 @@ var loadPage = function (serverName, portid) {
                                             $("#ChartDrReplicationRate").hide();
                                             $('#drReplicaSection').css('display', 'none');
                                             enableDisableDrReplicationChk(false);
+                                        }
+
+                                        if(VoltDbUI.drMasterEnabled || VoltDbUI.drConsumerState.toLowerCase() != 'disable'){
+                                            if (userPreference["DRTables"]) {
+                                                $("#divDrReplication").show();
+                                            }
+                                        }else {
+                                            $("#divDrReplication").hide();
                                         }
                                     }
                                 } else {
@@ -2361,15 +2367,26 @@ var showHideGraph = function (userpreferences) {
         $("#firstpane").show();
 
     if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
-        if (userpreferences["DRTables"]) {
+        if(VoltDbUI.drReplicationRole.toLowerCase() == 'replica'){
+            if((VoltDbUI.drConsumerState.toLowerCase() != 'disable' || VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') && VoltDbUI.drConsumerState.toLowerCase() != '' &&  VoltDbUI.drMasterState.toUpperCase() != ''){
+                $("#divDrReplication").show();
+            }else {
+                $("#divDrReplication").hide();
+            }
+        } else {
+            if(VoltDbUI.drMasterEnabled || VoltDbUI.drConsumerState.toLowerCase() != 'disable'){
+                $("#divDrReplication").show();
+            } else {
+                $("#divDrReplication").hide();
+            }
+        }
+    }else{
+        if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
             $("#divDrReplication").show();
         } else {
             $("#divDrReplication").hide();
         }
-    } else {
-        $("#divDrReplication").hide();
     }
-
 
     if (VoltDbUI.isCommandLogEnabled == 'true') {
         if (userpreferences["CommandLogStat"] == true) {
