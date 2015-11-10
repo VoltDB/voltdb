@@ -593,9 +593,10 @@ class NValue {
             return std::string(reinterpret_cast<char*>(getObjectValue_withoutNull()),
                                getObjectLength_withoutNull());
         case VALUE_TYPE_VARBINARY: {
-            char buf[getObjectLength_withoutNull() * 2 + 1];
-            catalog::Catalog::hexEncodeString(reinterpret_cast<char*>(getObjectValue_withoutNull()), buf);
-            return std::string(buf, getObjectLength_withoutNull() * 2);
+            size_t objLen = getObjectLength_withoutNull();
+            char buf[objLen * 2 + 1];
+            catalog::Catalog::hexEncodeString(reinterpret_cast<char*>(getObjectValue_withoutNull()), buf, objLen);
+            return std::string(buf, objLen * 2);
         }
         case VALUE_TYPE_TIMESTAMP: {
             streamTimestamp(value);
