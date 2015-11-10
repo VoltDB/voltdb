@@ -851,6 +851,8 @@ var loadPage = function (serverName, portid) {
                     if (getCurrentServer() != undefined) {
                         var drResult = drDetails["Details"]["STATUS"];
                         var drTablesSpanSelector = $('#liDrTables').find("span");
+                        var drTablesInputSelector = $('#liDrTables').find("input");
+                        var drReplicationInputSelector = $('#liDrReplication').find("input");
                         if (drResult != -2) {
                             VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
                             VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
@@ -873,6 +875,7 @@ var loadPage = function (serverName, portid) {
                                     if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
                                             if (userPreference["DrReplicationRate"]) {
+                                                drReplicationInputSelector.attr("checked", true);
                                                 $("#ChartDrReplicationRate").show();
                                                 MonitorGraphUI.refreshGraphDR();
                                             }
@@ -899,6 +902,7 @@ var loadPage = function (serverName, portid) {
 
                                         if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' || VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE'){
                                             if (userPreference["DRTables"]) {
+                                                drTablesInputSelector.attr("checked", true);
                                                 $("#divDrReplication").show();
                                                 enableDisableDrTableChk(true);
                                             }
@@ -921,6 +925,7 @@ var loadPage = function (serverName, portid) {
                                         }
                                         if(VoltDbUI.drMasterEnabled && VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
                                             if (userPreference["DrReplicationRate"]) {
+                                                drReplicationInputSelector.attr("checked", true);
                                                 $("#ChartDrReplicationRate").show();
                                                 MonitorGraphUI.refreshGraphDR();
                                             }
@@ -935,6 +940,7 @@ var loadPage = function (serverName, portid) {
 
                                         if(VoltDbUI.drMasterEnabled || VoltDbUI.drConsumerState.toLowerCase() != 'disable'){
                                             if (userPreference["DRTables"]) {
+                                                drTablesInputSelector.attr("checked", true);
                                                 enableDisableDrTableChk(true);
                                                 $("#divDrReplication").show();
                                             }
@@ -954,12 +960,14 @@ var loadPage = function (serverName, portid) {
                                     $("#divDrWrapperAdmin").show();
                                     if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
                                         if (userPreference["DRTables"]) {
+                                            drTablesInputSelector.attr("checked", true);
                                             $("#divDrReplication").show();
                                         }
                                         $('#drReplicaSection').css('display', 'block');
                                         enableDisableDrReplicationChk(true);
                                         enableDisableDrTableChk(true);
                                         if (userPreference["DrReplicationRate"]) {
+                                            drReplicationInputSelector.attr("checked", true);
                                             $("#ChartDrReplicationRate").show();
                                             MonitorGraphUI.refreshGraphDR();
                                         }
