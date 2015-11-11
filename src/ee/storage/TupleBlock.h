@@ -117,7 +117,7 @@ public:
 
     /**
      * If the tuple block with its current fullness is not able to be in the current bucket,
-     * return the new bucket index, otherwise return INVALID_NEW_BUCKET_INDEX index.
+     * return the new bucket index, otherwise return NO_NEW_BUCKET_INDEX index.
      */
     inline int calculateBucketIndex(uint32_t tuplesPendingDeleteOnUndoRelease = 0) {
         if (!hasFreeTuples() || tuplesPendingDeleteOnUndoRelease == m_activeTuples) {
@@ -140,7 +140,7 @@ public:
             return NO_NEW_BUCKET_INDEX;
         }
 
-        int index = static_cast<int>(::floor(TUPLE_BLOCK_NUM_BUCKETS * m_activeTuples / m_tuplesPerBlock));
+        int index = TUPLE_BLOCK_NUM_BUCKETS * m_activeTuples / m_tuplesPerBlock;
         assert(index < TUPLE_BLOCK_NUM_BUCKETS);
         return index;
     }
