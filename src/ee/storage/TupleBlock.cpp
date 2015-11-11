@@ -32,7 +32,6 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_activeTuples(0),
         m_nextFreeTuple(0),
         m_lastCompactionOffset(0),
-        m_tuplesPerBucket(m_tuplesPerBlock / static_cast<double>(TUPLE_BLOCK_NUM_BUCKETS)),
         m_bucket(bucket),
         m_bucketIndex(0)
 {
@@ -129,7 +128,7 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
     } else {
         //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")";
         //std::cout << " found " << sourceTuplesPendingDeleteOnUndoRelease << " tuples pending delete on undo release "<< std::endl;
-        return std::pair<int, int>(INVALID_NEW_BUCKET_INDEX, source->calculateBucketIndex(sourceTuplesPendingDeleteOnUndoRelease));
+        return std::pair<int, int>(NO_NEW_BUCKET_INDEX, source->calculateBucketIndex(sourceTuplesPendingDeleteOnUndoRelease));
     }
 }
 }

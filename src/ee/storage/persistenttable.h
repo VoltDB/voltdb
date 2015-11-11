@@ -526,7 +526,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         if (finishedBlock != NULL && !finishedBlock->isEmpty()) {
             m_blocksNotPendingSnapshot.insert(finishedBlock);
             int bucketIndex = finishedBlock->calculateBucketIndex();
-            if (bucketIndex != INVALID_NEW_BUCKET_INDEX) {
+            if (bucketIndex != NO_NEW_BUCKET_INDEX) {
                 finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
             }
         }
@@ -898,7 +898,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 
     int retval = block->freeTuple(tuple.address());
-    if (retval != INVALID_NEW_BUCKET_INDEX) {
+    if (retval != NO_NEW_BUCKET_INDEX) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;

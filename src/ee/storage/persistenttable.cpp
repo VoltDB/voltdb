@@ -196,7 +196,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
         /**
          * Check to see if the block needs to move to a new bucket
          */
-        if (retval.second != INVALID_NEW_BUCKET_INDEX) {
+        if (retval.second != NO_NEW_BUCKET_INDEX) {
             //Check if if the block is currently pending snapshot
             if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
                 block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
@@ -230,7 +230,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     /**
      * Check to see if the block needs to move to a new bucket
      */
-    if (retval.second != INVALID_NEW_BUCKET_INDEX) {
+    if (retval.second != NO_NEW_BUCKET_INDEX) {
         //Check if the block goes into the pending snapshot set of buckets
         if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
             //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
@@ -1416,7 +1416,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector *bucketVector) 
         return false;
     }
 
-    int fullestBucketChange = -1;
+    int fullestBucketChange = NO_NEW_BUCKET_INDEX;
     while (fullest->hasFreeTuples()) {
         TBPtr lightest;
         TBBucketI lightestIterator;
@@ -1429,13 +1429,13 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector *bucketVector) 
                 if (lightest != fullest) {
                     foundLightest = true;
                     break;
-                } else {
-                    lightestIterator++;
-                    if (lightestIterator != (*bucketVector)[ii]->end()) {
-                        lightest = lightestIterator.key();
-                        foundLightest = true;
-                        break;
-                    }
+                }
+                assert(lightest == fullest);
+                lightestIterator++;
+                if (lightestIterator != (*bucketVector)[ii]->end()) {
+                    lightest = lightestIterator.key();
+                    foundLightest = true;
+                    break;
                 }
             }
         }
@@ -1446,7 +1446,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector *bucketVector) 
 
         std::pair<int, int> bucketChanges = fullest->merge(this, lightest, this);
         int tempFullestBucketChange = bucketChanges.first;
-        if (tempFullestBucketChange != -1) {
+        if (tempFullestBucketChange != NO_NEW_BUCKET_INDEX) {
             fullestBucketChange = tempFullestBucketChange;
         }
 
@@ -1459,13 +1459,13 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector *bucketVector) 
             lightest->swapToBucket(TBBucketPtr());
         } else {
             int lightestBucketChange = bucketChanges.second;
-            if (lightestBucketChange != -1) {
+            if (lightestBucketChange != NO_NEW_BUCKET_INDEX) {
                 lightest->swapToBucket((*bucketVector)[lightestBucketChange]);
             }
         }
     }
 
-    if (fullestBucketChange != -1) {
+    if (fullestBucketChange != NO_NEW_BUCKET_INDEX) {
         fullest->swapToBucket((*bucketVector)[fullestBucketChange]);
     }
     if (!fullest->hasFreeTuples()) {

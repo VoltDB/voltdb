@@ -35,7 +35,7 @@
 #include <deque>
 
 namespace voltdb {
-#define INVALID_NEW_BUCKET_INDEX -1
+const int NO_NEW_BUCKET_INDEX = -1;
 class TupleBlock;
 }
 
@@ -116,8 +116,8 @@ public:
     }
 
     /**
-     * If the next free tuple is not able to be in the current bucket, return the new bucket index,
-     * otherwise return INVALID_NEW_BUCKET_INDEX index as the second element in the pair.
+     * If the tuple block with its current fullness is not able to be in the current bucket,
+     * return the new bucket index, otherwise return INVALID_NEW_BUCKET_INDEX index.
      */
     inline int calculateBucketIndex(uint32_t tuplesPendingDeleteOnUndoRelease = 0) {
         if (!hasFreeTuples() || tuplesPendingDeleteOnUndoRelease == m_activeTuples) {
@@ -137,12 +137,11 @@ public:
                 m_bucket->erase(TBPtr(this));
                 m_bucket = TBBucketPtr();
             }
-            return INVALID_NEW_BUCKET_INDEX;
+            return NO_NEW_BUCKET_INDEX;
         }
 
-        int index = static_cast<int>(::floor(m_activeTuples / m_tuplesPerBucket));
+        int index = static_cast<int>(::floor(TUPLE_BLOCK_NUM_BUCKETS * m_activeTuples / m_tuplesPerBlock));
         assert(index < TUPLE_BLOCK_NUM_BUCKETS);
-        assert(index >= 0);
         return index;
     }
 
@@ -153,7 +152,8 @@ public:
     std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
 
     /**
-     * Find next free tuple storage address and its bucket index position.
+     * Find next free tuple storage address and its tupleblock's bucket index,
+     * return them as a pair.
      */
     inline std::pair<char*, int> nextFreeTuple() {
         char *retval = NULL;
@@ -170,12 +170,12 @@ public:
         m_activeTuples++;
         int newBucketIndex = calculateBucketIndex();
         if (newBucketIndex == m_bucketIndex) {
-            // have space in current bucket
-            return std::pair<char*, int>(retval, INVALID_NEW_BUCKET_INDEX);
+            // tuple block is not too full for its current bucket
+            newBucketIndex = NO_NEW_BUCKET_INDEX;
+        } else {
+            // needs a new bucket and update bucket index
+            m_bucketIndex = newBucketIndex;
         }
-
-        // needs a new bucket and update bucket index
-        m_bucketIndex = newBucketIndex;
         return std::pair<char*, int>(retval, newBucketIndex);
     }
 
@@ -197,7 +197,7 @@ public:
         m_freeList.push_back(offset);
         int newBucketIndex = calculateBucketIndex();
         if (newBucketIndex == m_bucketIndex) {
-            return INVALID_NEW_BUCKET_INDEX;
+            return NO_NEW_BUCKET_INDEX;
         }
 
         m_bucketIndex = newBucketIndex;
@@ -243,7 +243,6 @@ private:
     uint32_t m_activeTuples;
     uint32_t m_nextFreeTuple;
     uint32_t m_lastCompactionOffset;
-    const double m_tuplesPerBucket;
 
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
