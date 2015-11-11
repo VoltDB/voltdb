@@ -105,7 +105,7 @@ public:
     static void hexDecodeString(const std::string &hexString, char *buffer);
 
     /** pass in a buffer at twice as long as the string */
-    static void hexEncodeString(const char *string, char *buffer);
+    static void hexEncodeString(const char *string, char *buffer, size_t len);
 
     /** return by out-param a copy of the recently deleted paths. */
     void getDeletedPaths(std::vector<std::string> &deletions);
