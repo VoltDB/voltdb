@@ -345,7 +345,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 // do nothing: numBytes remains -1
                 break;
             }
-            replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 14) + ")");
+            // TODO: figure out why 14 is not big enough
+            replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 42) + ")");
             // TODO: temp debug:
 //            System.out.println("  replaceText: " + replaceText);
             matcher.appendReplacement(modified_ddl, replaceText.toString());
