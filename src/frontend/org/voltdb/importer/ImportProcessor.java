@@ -112,7 +112,7 @@ public class ImportProcessor implements ImportDataProcessor {
                     m_handler.stop();
                 }
                 if (m_importer != null) {
-                    m_importer.stopImporter();
+                    m_importer.stopImporter(m_distributer);
                 }
                 if (m_bundle != null) {
                     m_bundle.stop();
@@ -204,7 +204,7 @@ public class ImportProcessor implements ImportDataProcessor {
                             importHandler.readyForData();
                             m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
                         } else {
-                            bw.m_importer.readyForData();
+                            bw.m_importer.readyForData(m_distributer);
                         }
                     } catch (Exception ex) {
                         //Should never fail. crash.

@@ -29,5 +29,5 @@ public interface ImporterConfig {
 
     public void addConfiguration(Properties props);
 
-    public Set<URI> getAvailalbleResources();
+    public Set<URI> getAvailableResources();
 }

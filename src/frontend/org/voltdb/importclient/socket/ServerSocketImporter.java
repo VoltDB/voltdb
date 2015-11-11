@@ -32,15 +32,15 @@ import org.voltdb.importer.ImporterConfig;
 
 /**
  */
-public class SocketServerImporter extends AbstractImporter {
+public class ServerSocketImporter extends AbstractImporter {
 
-    private SocketImporterConfig m_config;
+    private ServerSocketImporterConfig m_config;
     private List<ClientConnectionHandler> m_clients = new ArrayList<>();
 
     @Override
     protected ImporterConfig createImporterConfig()
     {
-        m_config = new SocketImporterConfig();
+        m_config = new ServerSocketImporterConfig();
         return m_config;
     }
 
@@ -53,7 +53,7 @@ public class SocketServerImporter extends AbstractImporter {
     @Override
     protected void accept(URI resourceID)
     {
-        SocketImporterConfig.InstanceConfiguration instanceConfig = m_config.getInstanceConfiguration(resourceID);
+        ServerSocketImporterConfig.InstanceConfiguration instanceConfig = m_config.getInstanceConfiguration(resourceID);
         //TODO: Make sure we don't need null check here. Merge 2 lines, if we don't need null check.
         startListening(instanceConfig);
     }
@@ -61,7 +61,7 @@ public class SocketServerImporter extends AbstractImporter {
     @Override
     protected void stop()
     {
-        for (SocketImporterConfig.InstanceConfiguration aconfig : m_config.getAllInstanceConfigurations()) {
+        for (ServerSocketImporterConfig.InstanceConfiguration aconfig : m_config.getAllInstanceConfigurations()) {
             try {
                 aconfig.m_serverSocket.close();
             } catch(IOException e) {
@@ -74,7 +74,12 @@ public class SocketServerImporter extends AbstractImporter {
         }
     }
 
-    private void startListening(SocketImporterConfig.InstanceConfiguration instanceConfig)
+    @Override
+    protected void stop(URI resourceID) {
+        throw new UnsupportedOperationException("Stopping for a specific URI is not supported for SocketServerImporter");
+    }
+
+    private void startListening(ServerSocketImporterConfig.InstanceConfiguration instanceConfig)
     {
         try {
             while (shouldRun()) {
@@ -127,5 +132,11 @@ public class SocketServerImporter extends AbstractImporter {
         {
             m_isStopping = true;
         }
+    }
+
+    @Override
+    protected boolean isRunEveryWhere()
+    {
+        return true;
     }
 }

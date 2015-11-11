@@ -18,6 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -52,7 +53,7 @@ import org.voltdb.InternalConnectionContext;
  * TODO: Should we call interrupt as well on the importer instance.
  */
 public abstract class AbstractImporter
-    implements InternalConnectionContext, BundleActivator {
+    implements InternalConnectionContext, ChannelChangeCallback, BundleActivator {
 
     private ExecutorService m_executorService;
     private final ImporterConfig m_config;
@@ -84,27 +85,63 @@ public abstract class AbstractImporter
         m_config.addConfiguration(props);
     }
 
-    public final void readyForData() {
+    public final void readyForData(ChannelDistributer distributer) {
         if (m_executorService != null) { // Should be caused by coding error. Hence generic RuntimeException is OK
             throw new RuntimeException("Importer has already been started and is running");
         }
 
-        Set<URI> resources = m_config.getAvailalbleResources();
+        Set<URI> resources = m_config.getAvailableResources();
         m_executorService = Executors.newFixedThreadPool(resources.size(),
                 getThreadFactory(getName(), ImportHandlerProxy.MEDIUM_STACK_SIZE));
-        for (final URI res : resources) {
+
+        if (isRunEveryWhere()) {
+            for (final URI res : resources) {
+                m_executorService.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        accept(res);
+                    }
+                });
+            }
+        } else {
+            distributer.registerCallback(getName(), this);
+            distributer.registerChannels(getName(), resources);
+        }
+    }
+
+    @Override
+    public final void onChange(ImporterChannelAssignment assignment) {
+        if (m_stopping) return;
+
+        for (URI removed: assignment.getRemoved()) {
+            stop(removed);
+        }
+
+        for (final URI added: assignment.getAdded()) {
             m_executorService.submit(new Runnable() {
                 @Override
                 public void run() {
-                    accept(res);
+                    accept(added);
                 }
             });
         }
     }
 
-    public final void stopImporter() {
+    @Override
+    public void onClusterStateChange(VersionedOperationMode mode) {
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug(getName() + ".onChange");
+        }
+    }
+
+    public final void stopImporter(ChannelDistributer distributer) {
         m_stopping = true;
+
+        if (!isRunEveryWhere()) {
+            distributer.registerChannels(getName(), new HashSet<URI>());
+        }
         stop();
+
         if (m_executorService != null) {
             m_executorService.shutdown();
             try {
@@ -203,4 +240,8 @@ public abstract class AbstractImporter
     protected abstract void accept(URI resourceID);
 
     protected abstract void stop();
+
+    protected abstract void stop(URI resourceID);
+
+    protected abstract boolean isRunEveryWhere();
 }

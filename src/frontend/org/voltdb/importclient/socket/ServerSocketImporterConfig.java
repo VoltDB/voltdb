@@ -31,7 +31,7 @@ import org.voltdb.importer.ImporterConfig;
 
 /**
  */
-public class SocketImporterConfig implements ImporterConfig {
+public class ServerSocketImporterConfig implements ImporterConfig {
 
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
@@ -79,7 +79,7 @@ public class SocketImporterConfig implements ImporterConfig {
     }
 
     @Override
-    public Set<URI> getAvailalbleResources()
+    public Set<URI> getAvailableResources()
     {
         return m_instanceConfigs.keySet();
     }
