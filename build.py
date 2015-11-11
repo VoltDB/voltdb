@@ -194,13 +194,10 @@ CTX.INPUT['catalog'] = """
 """
 
 CTX.INPUT['structures'] = """
- CompactingPool.cpp
  ContiguousAllocator.cpp
 """
 
 CTX.INPUT['common'] = """
- CompactingStringPool.cpp
- CompactingStringStorage.cpp
  FatalException.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
