@@ -95,6 +95,7 @@ public class KafkaImportBenchmark {
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
     static List<Integer> importProgress = new ArrayList<Integer>();
+    static List<Integer> outstandingRequests = new ArrayList<Integer>();
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
@@ -214,10 +215,10 @@ public class KafkaImportBenchmark {
             long rows = MatchChecks.getExportRowCount(client);
             if (rows == VoltType.NULL_BIGINT)
                 rows = 0;
+            log.info("Importer stats: " + MatchChecks.getImportStats(client));
             log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
                     thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
-            long outstandingRequests = MatchChecks.getImportStats(client);
         } catch (Exception ex) {
             log.error("Exception in printStatistics", ex);
         }
@@ -355,7 +356,7 @@ public class KafkaImportBenchmark {
         // not all the rows got to Kafka or not all the rows got imported back.
         do {
             Thread.sleep(END_WAIT * 1000);
-            // importProgress is an array of sampled counts of the importedcounts table, showing importProgressress of import
+            // importProgress is an array of sampled counts of the importedcounts table, showing import progress
             // samples are recorded by the checkTimer thread
         } while (importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
