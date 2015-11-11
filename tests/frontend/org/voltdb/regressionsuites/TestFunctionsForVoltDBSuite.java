@@ -47,6 +47,238 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
+    //
+    // JUnit / RegressionSuite boilerplate
+    //
+    public TestFunctionsForVoltDBSuite(String name) {
+        super(name);
+    }
+
+    static public junit.framework.Test suite() {
+
+        VoltServerConfig config = null;
+        MultiConfigSuiteBuilder builder =
+            new MultiConfigSuiteBuilder(TestFunctionsForVoltDBSuite.class);
+        boolean success;
+
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        final String literalSchema =
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P1 ON COLUMN ID;" +
+
+                "CREATE TABLE P2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P2 ON COLUMN ID;\n" +
+
+                "CREATE TABLE P3_INLINE_DESC ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(15), " +
+                "DESC2 VARCHAR(15), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
+
+                "CREATE TABLE R3 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TINY TINYINT, " +
+                "SMALL SMALLINT, " +
+                "NUM INTEGER, " +
+                "BIG BIGINT, " +
+                "RATIO FLOAT, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "VAR VARCHAR(300), " +
+                "DEC DECIMAL, " +
+                "PRIMARY KEY (ID) ); " +
+
+                "CREATE INDEX R3_IDX_HEX ON R3 (hex(big));" +
+                "CREATE INDEX R3_IDX_bit_shift_left ON R3 (bit_shift_left(big, 3));" +
+                "CREATE INDEX R3_IDX_bit_shift_right ON R3 (bit_shift_right(big, 3));" +
+
+                "CREATE TABLE JS1 (\n" +
+                "  ID INTEGER NOT NULL, \n" +
+                "  DOC VARCHAR(8192),\n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+
+                "CREATE TABLE D1 (\n" +
+                "  ID INTEGER NOT NULL, \n" +
+                "  DEC DECIMAL, \n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+
+                "CREATE PROCEDURE IdFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE InnerFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE IdArrayProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullArrayProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE IdArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) = ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE SmallArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) BETWEEN 0 AND ? ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
+                ";\n" +
+
+                "CREATE TABLE JSBAD (\n" +
+                "  ID INTEGER NOT NULL,\n" +
+                "  DOC VARCHAR(8192),\n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdFieldProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdArrayProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_ELEMENT(FIELD(DOC, ?), 1) = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
+                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
+                ";\n" +
+
+                "CREATE TABLE PAULTEST (ID INTEGER, NAME VARCHAR(12), LOCK_TIME TIMESTAMP, PRIMARY KEY(ID));" +
+                "\n" +
+                "CREATE PROCEDURE GOT_BAD_PARAM_COUNTS_INLINE AS \n" +
+                "    SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                "                                       (LOCK_TIME IS NULL OR " +
+                "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
+                "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
+                ";\n" +
+
+                "CREATE INDEX ENG7792_UNUSED_INDEX_USES_CONCAT ON P3_INLINE_DESC (CONCAT(DESC, DESC2))" +
+                ";\n" +
+
+                "";
+        try {
+            project.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            assertFalse(true);
+        }
+
+        // load the procedures for the test
+        loadProcedures(project);
+
+        // CONFIG #1: Local Site/Partition running on JNI backend
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        // CONFIG #2: Local Site/Partitions running on JNI backend
+        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+/*
+
+        // CONFIG #2: HSQL -- disabled, the functions being tested are not HSQL compatible
+        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+*/
+        // no clustering tests for functions
+
+        return builder;
+    }
+
+    static private void loadProcedures(VoltProjectBuilder project) {
+        // Test DECODE
+        project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
+                        "'Microsoft','li'," +
+                        "'Hewlett Packard','at'," +
+                        "'Gateway','VoltDB'," +
+                        "'where') from P1 where id = ?");
+        project.addStmtProcedure("DECODEND", "select desc,  DECODE (desc,'zheng','a') from P1 where id = ?");
+        project.addStmtProcedure("DECODEVERYLONG", "select desc,  DECODE (desc,'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'where') from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'贾鑫') from P1 where id = ?");
+        // Test OCTET_LENGTH
+        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
+        // Test POSITION and CHAR_LENGTH
+        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
+        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
+        project.addStmtProcedure("CHAR_LGTH_PARAM", "select desc, CHAR_LENGTH (?) from P1 where id = ?");
+        // Test SINCE_EPOCH
+        project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLISECOND", "select SINCE_EPOCH (MILLISECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROSECOND", "select SINCE_EPOCH (MICROSECOND, TM) from P2 where id = ?");
+        // Test TO_TIMESTAMP
+        project.addStmtProcedure("TO_TIMESTAMP_SECOND", "select TO_TIMESTAMP (SECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLIS", "select TO_TIMESTAMP (MILLIS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
+
+        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
+                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
+                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
+
+        project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNull", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = ?");
+        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
+                "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
+                "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
+                "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
+                "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
+
+        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
+        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
+        project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
+
+        project.addProcedures(GotBadParamCountsInJava.class);
+    }
+
     public void testExplicitErrorUDF() throws Exception
     {
         System.out.println("STARTING testExplicitErrorUDF");
@@ -181,7 +413,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, "क्षीण", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 4, null, 10, 1.1);
+
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("CHAR_LENGTH", 1);
@@ -198,13 +432,28 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(8, result.getLong(1));
 
-        // null case
         cr = client.callProcedure("CHAR_LENGTH", 3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        assertEquals(5, result.getLong(1));
+
+        cr = client.callProcedure("CHAR_LGTH_PARAM", "क्षीण", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(5, result.getLong(1));
+
+        // null case
+        cr = client.callProcedure("CHAR_LENGTH", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
+
     }
 
     public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
@@ -1796,230 +2045,5 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = client.callProcedure("@AdHoc", String.format("select bin(%d) from R3 where big = %d", val, val)).getResults()[0];
             validateTableColumnOfScalarVarchar(result, new String[]{binString});
         }
-    }
-
-    //
-    // JUnit / RegressionSuite boilerplate
-    //
-    public TestFunctionsForVoltDBSuite(String name) {
-        super(name);
-    }
-
-    static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestFunctionsForVoltDBSuite.class);
-        boolean success;
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        final String literalSchema =
-                "CREATE TABLE P1 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(300), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PRIMARY KEY (ID) ); " +
-                "PARTITION TABLE P1 ON COLUMN ID;" +
-
-                "CREATE TABLE P2 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) ); " +
-                "PARTITION TABLE P2 ON COLUMN ID;\n" +
-
-                "CREATE TABLE P3_INLINE_DESC ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(15), " +
-                "DESC2 VARCHAR(15), " +
-                "NUM INTEGER, " +
-                "RATIO FLOAT, " +
-                "PRIMARY KEY (ID) ); " +
-                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
-
-                "CREATE TABLE R3 ( " +
-                "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "TINY TINYINT, " +
-                "SMALL SMALLINT, " +
-                "NUM INTEGER, " +
-                "BIG BIGINT, " +
-                "RATIO FLOAT, " +
-                "TM TIMESTAMP DEFAULT NULL, " +
-                "VAR VARCHAR(300), " +
-                "DEC DECIMAL, " +
-                "PRIMARY KEY (ID) ); " +
-
-                "CREATE INDEX R3_IDX_HEX ON R3 (hex(big));" +
-                "CREATE INDEX R3_IDX_bit_shift_left ON R3 (bit_shift_left(big, 3));" +
-                "CREATE INDEX R3_IDX_bit_shift_right ON R3 (bit_shift_right(big, 3));" +
-
-                "CREATE TABLE JS1 (\n" +
-                "  ID INTEGER NOT NULL, \n" +
-                "  DOC VARCHAR(8192),\n" +
-                "  PRIMARY KEY(ID))\n" +
-                ";\n" +
-
-                "CREATE TABLE D1 (\n" +
-                "  ID INTEGER NOT NULL, \n" +
-                "  DEC DECIMAL, \n" +
-                "  PRIMARY KEY(ID))\n" +
-                ";\n" +
-
-                "CREATE PROCEDURE IdFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE InnerFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(FIELD(DOC, 'inner'), ?) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE NullFieldProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) IS NULL ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE IdArrayProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE NullArrayProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_ELEMENT(FIELD(DOC, ?), ?) IS NULL ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE IdArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) = ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE NullArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) IS NULL ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE SmallArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) BETWEEN 0 AND ? ORDER BY ID\n" +
-                ";\n" +
-                "CREATE PROCEDURE LargeArrayLengthProc AS\n" +
-                "   SELECT ID FROM JS1 WHERE ARRAY_LENGTH(FIELD(DOC, ?)) > ? ORDER BY ID\n" +
-                ";\n" +
-
-                "CREATE TABLE JSBAD (\n" +
-                "  ID INTEGER NOT NULL,\n" +
-                "  DOC VARCHAR(8192),\n" +
-                "  PRIMARY KEY(ID))\n" +
-                ";\n" +
-                "CREATE PROCEDURE BadIdFieldProc AS\n" +
-                "  SELECT ID FROM JSBAD WHERE ID = ? AND FIELD(DOC, ?) = ?\n" +
-                ";\n" +
-                "CREATE PROCEDURE BadIdArrayProc AS\n" +
-                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_ELEMENT(FIELD(DOC, ?), 1) = ?\n" +
-                ";\n" +
-                "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
-                "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
-                ";\n" +
-
-                "CREATE TABLE PAULTEST (ID INTEGER, NAME VARCHAR(12), LOCK_TIME TIMESTAMP, PRIMARY KEY(ID));" +
-                "\n" +
-                "CREATE PROCEDURE GOT_BAD_PARAM_COUNTS_INLINE AS \n" +
-                "    SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
-                "                                       (LOCK_TIME IS NULL OR " +
-                "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
-                "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
-                ";\n" +
-
-                "CREATE INDEX ENG7792_UNUSED_INDEX_USES_CONCAT ON P3_INLINE_DESC (CONCAT(DESC, DESC2))" +
-                ";\n" +
-
-                "";
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-
-        // Test DECODE
-        project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
-                        "'Microsoft','li'," +
-                        "'Hewlett Packard','at'," +
-                        "'Gateway','VoltDB'," +
-                        "'where') from P1 where id = ?");
-        project.addStmtProcedure("DECODEND", "select desc,  DECODE (desc,'zheng','a') from P1 where id = ?");
-        project.addStmtProcedure("DECODEVERYLONG", "select desc,  DECODE (desc,'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'a','a'," +
-                "'where') from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_STRING", "select desc,  DECODE (desc,?,?,desc) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_INT", "select desc,  DECODE (id,?,?,id) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_DEFAULT", "select desc,  DECODE (?,?,?,?) from P1 where id = ?");
-        project.addStmtProcedure("DECODE_PARAM_INFER_CONFLICTING", "select desc,  DECODE (id,1,?,2,99,'贾鑫') from P1 where id = ?");
-        // Test OCTET_LENGTH
-        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
-        // Test POSITION and CHAR_LENGTH
-        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
-        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
-        // Test SINCE_EPOCH
-        project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MILLISECOND", "select SINCE_EPOCH (MILLISECOND, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
-        project.addStmtProcedure("SINCE_EPOCH_MICROSECOND", "select SINCE_EPOCH (MICROSECOND, TM) from P2 where id = ?");
-        // Test TO_TIMESTAMP
-        project.addStmtProcedure("TO_TIMESTAMP_SECOND", "select TO_TIMESTAMP (SECOND, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MILLIS", "select TO_TIMESTAMP (MILLIS, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
-        project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
-
-        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
-                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
-                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
-
-        project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
-
-        project.addStmtProcedure("TestDecodeNull", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
-                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
-                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
-                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
-                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = ?");
-        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
-                "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
-                "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
-                "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
-                "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
-
-        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
-
-        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
-        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
-
-        project.addStmtProcedure("BITWISE_SHIFT_PARAM_1", "select BIT_SHIFT_LEFT(?, BIG), BIT_SHIFT_RIGHT(?, BIG) from R3 where id = ?");
-        project.addStmtProcedure("BITWISE_SHIFT_PARAM_2", "select BIT_SHIFT_LEFT(BIG, ?), BIT_SHIFT_RIGHT(BIG, ?) from R3 where id = ?");
-
-        project.addProcedures(GotBadParamCountsInJava.class);
-        // CONFIG #1: Local Site/Partition running on JNI backend
-        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // CONFIG #2: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-/*
-
-        // CONFIG #2: HSQL -- disabled, the functions being tested are not HSQL compatible
-        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-*/
-        // no clustering tests for functions
-
-        return builder;
     }
 }

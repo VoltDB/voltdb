@@ -1309,18 +1309,14 @@ public class FunctionSQL extends Expression {
                 break;
             }
             case FUNC_CHAR_LENGTH :
-                if (!nodes[0].dataType.isCharacterType()) {
-                    throw Error.error(ErrorCode.X_42565);
-                }
-
-            // $FALL-THROUGH$
             case FUNC_OCTET_LENGTH : {
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
                 }
 
                 if (!nodes[0].dataType.isCharacterType()
-                        && !nodes[0].dataType.isBinaryType()) {
+                        && (!nodes[0].dataType.isBinaryType() &&
+                            (funcType == FUNC_CHAR_LENGTH))) {
                     throw Error.error(ErrorCode.X_42565);
                 }
 

@@ -158,6 +158,18 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
                 fail("Should be able to drop procedure FOOCOUNT");
             }
             assertFalse(findProcedureInSystemCatalog("FOOCOUNT"));
+
+            // trying adding invalid procedure
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create procedure FOOCOUNT as select CHAR_LENGTH(ID) from FOO where ID=?");
+              fail("Should not be able to insert procedure with incompatible data type");
+            }
+            catch (ProcCallException pce) {
+                assertTrue(pce.getMessage().contains("incompatible data type in operation"));
+
+            }
+            assertFalse(findProcedureInSystemCatalog("FOOCOUNT"));
         }
         finally {
             teardownSystem();
