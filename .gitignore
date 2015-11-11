@@ -11,6 +11,7 @@
 /.DS_Store
 .DS_Store
 .cache/
+.pydevproject
 *.pyc
 *.swp
 *~
@@ -39,6 +40,7 @@ doc/tutorials/*/*.jar
 doc/tutorials/auction/csvloader_*.csv
 /src/ee/.cproject
 /src/ee/.project
+/src/ee/.settings/
 /src/catgen/out
 /src/ee/catalog/*
 /src/ee/tags
@@ -53,6 +55,7 @@ doc/tutorials/auction/csvloader_*.csv
 /testobjects/
 /tests/ee/.cproject
 /tests/ee/.project
+/tests/ee/.settings/
 /tests/sqlcmd/scripts/**/*.err
 /tests/sqlcmd/scripts/**/*.errclean
 /tests/sqlcmd/scripts/**/*.errdiffs
