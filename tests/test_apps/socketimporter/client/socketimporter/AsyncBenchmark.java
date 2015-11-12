@@ -263,8 +263,10 @@ public class AsyncBenchmark {
             long max_insert_time = checkDB.maxInsertTime();
             thrup = (long) (runCount.get() / ((max_insert_time-benchmarkStartTS)/1000.0));
 
-            log.info(String.format("Import Throughput %d/s, Total Rows %d",
+            if (thrup > 0) { // first time through, calc can be whacky
+                log.info(String.format("Import Throughput %d/s, Total Rows %d",
                     thrup, runCount.get()+warmupCount.get()));
+            }
         } catch (Exception e) {
             log.info("Exception in printStatistics" + e);
             StringWriter writer = new StringWriter();
@@ -475,12 +477,12 @@ public class AsyncBenchmark {
             while (queueEndTime > System.currentTimeMillis()) {
                 checkDB.processQueue();
             }
+            long outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
+            if (outstandingRequests != 0) {
+                log.error("Importer outstanding requests is " + outstandingRequests + " after extended wait. Zero expected.");
+            }
         }
 
-        long outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
-        if (outstandingRequests != 0) {
-            log.error("Importer outstanding requests is " + outstandingRequests + " Zero expected.");
-        }
         client.drain();
         client.close();
 

@@ -397,8 +397,8 @@ public class KafkaImportBenchmark {
         }
 
         if (outstandingRequests != 0) {
-        	testResult = false;
-        	log.error("Import stream still has outstanding (not inserted) requests: " + outstandingRequests);
+            testResult = false;
+            log.error("Import stream still has outstanding (not inserted) requests: " + outstandingRequests);
         }
 
         client.drain();
