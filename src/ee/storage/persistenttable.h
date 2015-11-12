@@ -266,7 +266,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
                                                 std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true);
+                                                bool fallible=true,
+                                                bool updateDRTimestamp=true);
 
     virtual void addIndex(TableIndex *index) {
         Table::addIndex(index);

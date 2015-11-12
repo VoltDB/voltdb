@@ -560,7 +560,8 @@ void PersistentTable::insertTupleForUndo(char *tuple)
 bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      TableTuple &sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> const &indexesToUpdate,
-                                                     bool fallible)
+                                                     bool fallible,
+                                                     bool updateDRTimestamp)
 {
     UndoQuantum *uq = NULL;
     char* oldTupleData = NULL;
@@ -634,7 +635,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn()) {
+    if (hasDRTimestampColumn() && updateDRTimestamp) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 

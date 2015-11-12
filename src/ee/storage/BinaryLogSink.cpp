@@ -348,7 +348,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             }
 
             try {
-                table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+                table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
             } catch (ConstraintFailureException &e) {
                 if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(), const_cast<TableTuple *>(e.getConflictTuple()), uniqueId, remoteClusterId, DR_RECORD_UPDATE, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
@@ -426,7 +426,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
             tempTuple.deserializeFromDR(newRowInput, pool);
 
-            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
