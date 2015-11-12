@@ -713,7 +713,6 @@ public class Inits {
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
                                                       m_config.m_startAction,
-                                                      m_rvdb.m_catalogContext.cluster.getDrproducerenabled(),
                                                       cl.getEnabled(),
                                                       cl.getLogpath(),
                                                       cl.getInternalsnapshotpath(),

@@ -81,7 +81,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void generateReplayPlan(int newPartitionCount, boolean isMpiNode, boolean drEnabled) {
+    public void generateReplayPlan(int newPartitionCount, boolean isMpiNode) {
     }
 
     @Override
