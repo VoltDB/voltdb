@@ -1313,10 +1313,9 @@ public class FunctionSQL extends Expression {
                 if (nodes[0].dataType == null) {
                     nodes[0].dataType = Type.SQL_VARCHAR_DEFAULT;
                 }
-                else if ((!nodes[0].dataType.isCharacterType() && (funcType == FUNC_CHAR_LENGTH))
-                        ||
-                        (!nodes[0].dataType.isCharacterType() && !nodes[0].dataType.isBinaryType()
-                           && (funcType == FUNC_OCTET_LENGTH))) {
+                else if (!nodes[0].dataType.isCharacterType() &&
+                             ((funcType == FUNC_CHAR_LENGTH) ||
+                              (!nodes[0].dataType.isBinaryType() && (funcType == FUNC_OCTET_LENGTH)))) {
                     throw Error.error(ErrorCode.X_42565);
                 }
 
