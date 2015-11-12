@@ -122,6 +122,7 @@ SnapshotCompletionInterest, Promotable
     private final Integer m_hostId;
     private final StartAction m_action;
     private final boolean m_clEnabled;
+    private final boolean m_drEnabled;
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
@@ -443,7 +444,7 @@ SnapshotCompletionInterest, Promotable
             };
 
     public RestoreAgent(HostMessenger hostMessenger, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, StartAction action, boolean clEnabled,
+                        Callback callback, StartAction action, boolean drEnabled, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
                         String voltdbrootPath)
@@ -454,6 +455,7 @@ SnapshotCompletionInterest, Promotable
         m_callback = callback;
         m_action = action;
         m_zk = hostMessenger.getZK();
+        m_drEnabled = drEnabled;
         m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
@@ -690,7 +692,7 @@ SnapshotCompletionInterest, Promotable
                 // The expected partition count could be determined by the new partition count recorded
                 // in the truncation snapshot. Truncation snapshot taken at the end of the join process
                 // actually records the new partition count in the digest.
-                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader);
+                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader, m_drEnabled);
             }
         }
 
