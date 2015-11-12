@@ -41,24 +41,38 @@ public class UtilQueries {
     static VoltLogger log = new VoltLogger("SocketImporter.UtilQueries");
 
     protected static String getImportStats(Client client) {
-        // check row count in mirror table -- the "master" of what should come back
-        // eventually via import
-        VoltTable importStats = null;
+        VoltTable importStats = statsCall(client);
         String statsString = null;
+
+        while (importStats.advanceRow()) {
+            statsString = importStats.getString("IMPORTER_NAME") + ", " +
+                    importStats.getString("PROCEDURE_NAME") + ", " + importStats.getLong("SUCCESSES") + ", " +
+                    importStats.getLong("FAILURES") + ", " + importStats.getLong("OUTSTANDING_REQUESTS") + ", " +
+                    importStats.getLong("RETRIES");
+            //log.info("statsString:" + statsString);
+        }
+        return statsString;
+    }
+
+    protected static long getImportOutstandingRequests(Client client) {
+        VoltTable importStats = statsCall(client);
+        long outstandingRequests = 0;
+
+        while (importStats.advanceRow()) {
+            outstandingRequests = importStats.getLong("OUTSTANDING_REQUESTS");
+        }
+        return outstandingRequests;
+    }
+
+    protected static VoltTable statsCall(Client client) {
+        VoltTable importStats = null;
 
         try {
             importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         } catch (Exception e) {
             log.error("Stats query failed");
         }
-        while (importStats.advanceRow()) {
-            statsString = importStats.getString(4) + ", " +
-                    importStats.getString(5) + ", " + importStats.getLong(6) + ", " +
-                    importStats.getLong(7) + ", " + importStats.getLong(8) + ", " +
-                    importStats.getLong(9);
-            log.info("statsString:" + statsString);
-        }
-        return statsString;
+        return importStats;
     }
 }
 

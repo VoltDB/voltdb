@@ -60,10 +60,10 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
-import com.google_voltpatches.common.net.HostAndPort;
 //import client.kafkaimporter.MatchChecks;
 //import client.kafkaimporter.TableChangeMonitor;
 import com.google_voltpatches.common.base.Splitter;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class KafkaImportBenchmark {
 
@@ -364,13 +364,14 @@ public class KafkaImportBenchmark {
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
+        long outstandingRequests = MatchChecks.getImportOutstandingRequests(client);
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
         boolean testResult = true;
 
         // some counts that might help debugging....
-        log.info("Importer statistics: " + MatchChecks.getImportStats(client));
+        log.info("importer outstanding requests: " + outstandingRequests);
         log.info("mirrorRows: " + mirrorRows);
         log.info("importRows: " + importRows);
         log.info("importRowCount: " + importRowCount);
@@ -396,6 +397,11 @@ public class KafkaImportBenchmark {
 
         if (!config.useexport) {
             testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
+        }
+
+        if (outstandingRequests != 0) {
+        	testResult = false;
+        	log.error("Import stream still has outstanding (not inserted) requests: " + outstandingRequests);
         }
 
         client.drain();

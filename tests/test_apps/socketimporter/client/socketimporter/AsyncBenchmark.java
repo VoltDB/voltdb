@@ -476,6 +476,11 @@ public class AsyncBenchmark {
                 checkDB.processQueue();
             }
         }
+
+        long outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
+        if (outstandingRequests != 0) {
+        	log.error("Importer outstanding requests is " + outstandingRequests + " Zero expected.");
+        }
         client.drain();
         client.close();
 
