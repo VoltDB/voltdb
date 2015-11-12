@@ -136,12 +136,14 @@ FIPSCANLIB=
 
 BASEADDR=
 
-DIRS=   crypto ssl engines apps test tools
+DIRS=   crypto # ssl engines apps test tools
+ORIGINAL_DIRS=   crypto ssl engines apps test tools
 ENGDIRS= ccgost
 SHLIBDIRS= crypto ssl
 
 # dirs in crypto to build
-SDIRS=  \
+SDIRS = objects bn buffer bio stack lhash rand err asn1
+ORIGINAL_SDIRS=  \
 	objects \
 	md2 md4 md5 sha mdc2 hmac ripemd whrlpool \
 	des aes rc2 rc4 rc5 idea bf cast camellia seed modes \
@@ -270,7 +272,8 @@ reflect:
 
 sub_all: build_all
 
-build_all: build_libs build_apps build_tests build_tools
+build_all: build_libs # build_apps build_tests build_tools
+original_build_all: build_libs build_apps build_tests build_tools
 
 build_libs: build_libcrypto build_libssl openssl.pc
 
@@ -527,7 +530,9 @@ dist:
 dist_pem_h:
 	(cd crypto/pem; $(MAKE) -e $(BUILDENV) pem.h; $(MAKE) clean)
 
-install: all install_docs install_sw
+install: all install_sw # install_doc
+
+original_install: all install_doc install_sw
 
 install_sw:
 	@$(PERL) $(TOP)/util/mkdir-p.pl $(INSTALL_PREFIX)$(INSTALLTOP)/bin \

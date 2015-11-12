@@ -63,8 +63,8 @@ class BuildContext:
             return "darwin64-x86_64-cc"
         if self.PLATFORM == 'Linux':
             if self.compilerName() == 'gcc':
-                return "linux-x86_64"
-        print "ERROR: Don't know how to configure openssl."
+                return "linux-x86_64:gcc -fpic"
+        print "ERROR: Don't know what platform to use to configure openssl."
         sys.exit(-1)
 
     def compilerName(self):
@@ -449,7 +449,7 @@ def buildMakefile(CTX):
     makefile.write('configure-openssl:\n')
     makefile.write('\t(cd "${OPENSSL_SRC}"; \\\n')
     makefile.write('\t if [ ! -f Makefile ] ; then \\\n')
-    makefile.write('\t   ./Configure %s; \\\n' % CTX.getOpenSSLToken() )
+    makefile.write('\t   ./Configure "%s"; \\\n' % CTX.getOpenSSLToken() )
     makefile.write('\t fi )\n')
     makefile.write('\n')
     makefile.write('compile-openssl: | configure-openssl\n')
