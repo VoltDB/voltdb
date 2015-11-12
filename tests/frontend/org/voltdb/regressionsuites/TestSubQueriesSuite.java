@@ -1296,6 +1296,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
             //* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
+            // Try single-column-based expressions as row columns.
+            sql =   "select ID from R1 " +
+                    "where (abs(ID), 2*DEPT-DEPT) IN " +
+                    "      (select ID, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            /* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{100}});
+
             // Try a hard-coded constant as a row column.
             // This currently works only in the cases like this where the
             // IN rewrites as an EXISTS.
@@ -1356,6 +1365,16 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "       where ID < 104) " +
                     "order by ID;";
             //* enable for debug */ dumpQueryPlans(client, sql);
+            validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
+
+            // Try single-column-based expressions as row columns in a
+            // NOT IN query that will not get rewritten as an EXISTS query.
+            sql =   "select ID from R1 " +
+                    "where (abs(WAGE), 2+DEPT-2) NOT IN " +
+                    "      (select WAGE, DEPT from R2 " +
+                    "       where ID < 104) " +
+                    "order by ID;";
+            /* enable for debug */ dumpQueryPlans(client, sql);
             validateTableOfLongs(client, sql, new long[][] {{10}, {300}});
 
             // Try non-working cases of a constant-valued row column.

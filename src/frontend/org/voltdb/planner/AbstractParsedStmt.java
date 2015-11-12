@@ -685,25 +685,30 @@ public abstract class AbstractParsedStmt {
             return;
         }
 
-        // The problem cases all have row expressions as left hand operands.
+        // The problem cases all have row expressions as an operand.
         AbstractExpression rowExpression = expr.getLeft();
-        if ( ! (rowExpression instanceof RowSubqueryExpression)) {
-            return;
+        if (rowExpression instanceof RowSubqueryExpression) {
+            rejectDisallowedRowColumns(rowExpression);
         }
+        rowExpression = expr.getRight();
+        if (rowExpression instanceof RowSubqueryExpression) {
+            rejectDisallowedRowColumns(rowExpression);
+        }
+    }
 
-        // The problem cases all have select statements as right hand operands.
-        AbstractExpression rightExpr = expr.getRight();
-        if (!(rightExpr instanceof SelectSubqueryExpression)) {
-            return;
-        }
-        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) rightExpr;
-        AbstractParsedStmt subquery = subqueryExpr.getSubqueryStmt();
-        if (!(subquery instanceof ParsedSelectStmt)) {
-            return;
-        }
-
+    private void rejectDisallowedRowColumns(AbstractExpression rowExpression) {
         // Verify that the ROW OP SUBQUERY expression's ROW operand only
         // contains column arguments that reference exactly one column.
+        // I (--paul) don't know if it's possible -- in spite of the name
+        // for a RowSubqueryExpression to be used in a context other than
+        // a comparison with a subquery, AND I don't know if that context
+        // needs to have the same guards as the normal subquery comparison
+        // case, but let's err on the side of caution and use the same
+        // guard condition for RowSubqueryExpressions until the current
+        // problematic cases see ENG-9380 can be fully supported and have
+        // been validated with tests.
+        // The only known-safe case is where each (column) argument to a
+        // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
             List<AbstractExpression> tves = arg.findBaseTVEs();
             if (tves.size() != 1) {
