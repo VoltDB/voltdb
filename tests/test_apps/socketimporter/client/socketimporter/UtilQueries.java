@@ -48,21 +48,21 @@ public class UtilQueries {
     protected static long getImportStats(Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-    	VoltTable importStats = null;
-    	long outstandingRequests = 0;
-    	try {
-        	importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
+        VoltTable importStats = null;
+        long outstandingRequests = 0;
+        try {
+            importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         } catch (Exception e) {
-        	System.err.print("Stats query failed");
+            System.err.print("Stats query failed");
         }
         while (importStats.advanceRow()) {
-        	System.out.println("Importer: " + importStats.getString(4));
-        	System.out.println("Procedure: " + importStats.getString(5));
-        	System.out.println("Successes: " + importStats.getLong(6));
-        	System.out.println("Failures: " + importStats.getLong(7));
-        	System.out.println("Outstanding Requests: " + importStats.getLong(8));
-        	System.out.println("Retries: " + importStats.getLong(9));
-    	}
+            System.out.println("Importer: " + importStats.getString(4));
+            System.out.println("Procedure: " + importStats.getString(5));
+            System.out.println("Successes: " + importStats.getLong(6));
+            System.out.println("Failures: " + importStats.getLong(7));
+            System.out.println("Outstanding Requests: " + importStats.getLong(8));
+            System.out.println("Retries: " + importStats.getLong(9));
+        }
         return outstandingRequests;
     }
 

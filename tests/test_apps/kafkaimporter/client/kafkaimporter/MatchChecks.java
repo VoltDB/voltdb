@@ -179,28 +179,22 @@ public class MatchChecks {
     protected static String getImportStats(Client client) {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
-    	VoltTable importStats = null;
-    	long outstandingRequests = 0;
-    	String statsString = null;
+        VoltTable importStats = null;
+        long outstandingRequests = 0;
+        String statsString = null;
 
-    	try {
-        	importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
+        try {
+            importStats = client.callProcedure("@Statistics", "importer", 0).getResults()[0];
         } catch (Exception e) {
-        	log.error("Stats query failed");
+            log.error("Stats query failed");
         }
         while (importStats.advanceRow()) {
-        	statsString = importStats.getString(4) + ", " +
-        			importStats.getString(5) + ", " + importStats.getLong(6) + ", " +
-        			importStats.getLong(7) + ", " + importStats.getLong(8) + ", " +
-        			importStats.getLong(9);
-        	log.info("statsString:" + statsString);
-//        	log.info("Importer: " + importStats.getString(4));
-//        	log.info("Procedure: " + importStats.getString(5));
-//        	log.info("Successes: " + importStats.getLong(6));
-//        	log.info("Failures: " + importStats.getLong(7));
-//        	log.info("Outstanding Requests: " + importStats.getLong(8));
-//        	log.info("Retries: " + importStats.getLong(9));
-    	}
+            statsString = importStats.getString(4) + ", " +
+                    importStats.getString(5) + ", " + importStats.getLong(6) + ", " +
+                    importStats.getLong(7) + ", " + importStats.getLong(8) + ", " +
+                    importStats.getLong(9);
+            log.info("statsString:" + statsString);
+        }
         return statsString;
     }
 }

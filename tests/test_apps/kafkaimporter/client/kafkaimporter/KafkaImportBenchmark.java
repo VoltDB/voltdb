@@ -368,7 +368,7 @@ public class KafkaImportBenchmark {
         boolean testResult = true;
 
         // some counts that might help debugging....
-        log.info("outstandingRequests: " + MatchChecks.getImportStats(client));
+        log.info("importStats: " + MatchChecks.getImportStats(client));
         log.info("mirrorRows: " + mirrorRows);
         log.info("importRows: " + importRows);
         log.info("importRowCount: " + importRowCount);
@@ -387,8 +387,8 @@ public class KafkaImportBenchmark {
             }
         }
 
-        if (importRows < exportRowCount && config.useexport) {
-            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRows + "' test fails.");
+        if ((importRowCount != exportRowCount) && config.useexport) {
+            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
             testResult = false;
         }
 
