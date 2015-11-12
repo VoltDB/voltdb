@@ -60,8 +60,10 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
-import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
+//import client.kafkaimporter.MatchChecks;
+//import client.kafkaimporter.TableChangeMonitor;
+import com.google_voltpatches.common.base.Splitter;
 
 public class KafkaImportBenchmark {
 
@@ -368,7 +370,7 @@ public class KafkaImportBenchmark {
         boolean testResult = true;
 
         // some counts that might help debugging....
-        log.info("importStats: " + MatchChecks.getImportStats(client));
+        log.info("Importer statistics: " + MatchChecks.getImportStats(client));
         log.info("mirrorRows: " + mirrorRows);
         log.info("importRows: " + importRows);
         log.info("importRowCount: " + importRowCount);

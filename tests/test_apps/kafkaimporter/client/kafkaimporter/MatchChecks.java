@@ -180,7 +180,6 @@ public class MatchChecks {
         // check row count in mirror table -- the "master" of what should come back
         // eventually via import
         VoltTable importStats = null;
-        long outstandingRequests = 0;
         String statsString = null;
 
         try {

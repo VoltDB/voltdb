@@ -271,8 +271,7 @@ public class AsyncBenchmark {
             e.printStackTrace( new PrintWriter(writer,true ));
             System. out.println("exeption stack is :\n"+writer.toString());
         }
-        System.out.println("Calling import stats");
-        long outstandingRequests = UtilQueries.getImportStats(client);
+        System.out.println("Import stats: " +UtilQueries.getImportStats(client));
     }
 
     /**
