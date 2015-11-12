@@ -79,10 +79,9 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // and executed in single SP call.
         int rowsToInsert = 50000;
         final int rowsInsertionEachChunk = 10000;
-        for (int rowsInserted = 0; rowsInserted < rowsToInsert;) {
+        for (int rowsInserted = 0; rowsInserted < rowsToInsert; rowsInserted += rowsInsertionEachChunk) {
             // Insert data
             client.callProcedure("PopulateTruncateTable", rowsInserted + 1, rowsInsertionEachChunk);
-            rowsInserted = rowsInserted + rowsInsertionEachChunk;
         }
 
         for (String tb: tbs) {
