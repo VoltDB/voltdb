@@ -408,6 +408,13 @@
     <xs:attribute name="id" type="clusterIdType" use="required"/>
     <xs:attribute name="listen" type="xs:boolean" default="true" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
+    <xs:attribute name="flushInterval" default="1000">
+        <xs:simpleType>
+            <xs:restriction base="xs:int">
+                <xs:minInclusive value="20"/>
+            </xs:restriction>
+        </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
 
   <xs:complexType name="connectionType">

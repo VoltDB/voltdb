@@ -36,12 +36,13 @@ public enum StatsSelector {
     PROCEDUREOUTPUT,
 
     /*
-     * DRPARTITION and DRNODE are internal names
-     * Externally the selector is just "DR"
+     * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
+     * Externally the selector is "DRPRODUCER", or just "DR"
      */
     DR,
-    DRPARTITION,
-    DRNODE,
+    DRPRODUCER,
+    DRPRODUCERPARTITION,
+    DRPRODUCERNODE,
 
     DRCONSUMER,
     DRCONSUMERNODE,

@@ -520,7 +520,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
-            uniqueId = msg.getUniqueId();
+
+            // Don't update the uniqueID if this is a run-everywhere txn, because it has an MPI unique ID.
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(msg.getUniqueId()) == m_partitionId) {
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(msg.getUniqueId());
+            }
         }
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
         doLocalInitiateOffer(msg);
@@ -965,6 +969,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the provided SP handle
         writeIv2ViableReplayEntryInternal(message.getSpHandle());
         setMaxSeenTxnId(message.getSpHandle());
+
+        // Also initialize the unique ID generator and the last durable unique ID using
+        // the value sent by the master
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
+        m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
     }
 
     public void handleDumpMessage()
@@ -1017,7 +1026,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 long faultSpHandle = advanceTxnEgo().getTxnId();
                 writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
-                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
+                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
                 m_mailbox.send(m_sendToHSIds,
                         faultMsg);
             }
@@ -1059,24 +1068,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
             m_tasks.offer(r);
         } else {
-            r.run();
-        }
-    }
-
-    public void checkForSyncLoggedSysProcs(final CommandLog.CompletionChecks currentChecks) {
-        final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
-            @Override
-            void run() {
-                assert (currentChecks != null);
-                synchronized (m_lock) {
-                    currentChecks.checkForSyncLoggedSysProcs();
-                }
-            }
-        };
-        if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
-            m_tasks.offer(r);
-        }
-        else {
             r.run();
         }
     }
