@@ -82,8 +82,13 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     private static final Pattern avgQuery = Pattern.compile(
             "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\))*\\s*\\)",
             Pattern.CASE_INSENSITIVE);
+    // TODO: Captures the use of x / y, which PostgreSQL handles differently,
+    // when both values are integer types
+    private static final Pattern divisionQuery = Pattern.compile(
+            "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\))*\\s*\\)",
+            Pattern.CASE_INSENSITIVE);
     // Captures up to 6 table names, for each FROM clause used in the query
-    // TODO: fix/finish this!
+    // TODO: fix/finish this! (Use for AVG, / queries)
 //    private static final Pattern tableNames = Pattern.compile(
 //              "FROM\\s*\\(?<table1>\\w+)\\s*"
 //            + "(\\s*,s*\\(?<table2>\\w+)\\s*)?"
@@ -98,7 +103,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             Pattern.CASE_INSENSITIVE);
     // Captures the use of VARBINARY(n), which PostgreSQL does not support
     private static final Pattern varbinaryDdl = Pattern.compile(
-            "VARBINARY\\s*\\(\\s*\\d+\\s*\\)",
+            "VARBINARY\\s*\\(\\s*(?<numBytes>\\d+)\\s*\\)",
             Pattern.CASE_INSENSITIVE);
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
@@ -161,6 +166,36 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         super(dbconn);
     }
 
+    /** TODO */
+    static private boolean isIntegerConstant(String columnName) {
+        try {
+            Integer.parseInt(columnName);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** TODO */
+    static private boolean isIntegerColumn(String columnName, String... tableNames) {
+        // TODO: Temporary method, which will mostly work, for now:
+        return  columnName.equalsIgnoreCase("ID")   || columnName.equalsIgnoreCase("NUM") ||
+                columnName.equalsIgnoreCase("TINY") || columnName.equalsIgnoreCase("SMALL") ||
+                columnName.equalsIgnoreCase("BIG")  || columnName.equalsIgnoreCase("POINTS") ||
+                columnName.equalsIgnoreCase("WAGE") || columnName.equalsIgnoreCase("DEPT") ||
+                columnName.equalsIgnoreCase("AGE")  || columnName.equalsIgnoreCase("RENT") ||
+                columnName.equalsIgnoreCase("A1")   || columnName.equalsIgnoreCase("A2") ||
+                columnName.equalsIgnoreCase("A3")   || columnName.equalsIgnoreCase("A4") ||
+                columnName.equalsIgnoreCase("V_G1") || columnName.equalsIgnoreCase("V_CNT") ||
+                columnName.equalsIgnoreCase("V_G2") || columnName.equalsIgnoreCase("V_SUM_AGE") ||
+                columnName.equalsIgnoreCase("V_SUM_RENT");
+    }
+
+    /** TODO */
+    static private boolean isInteger(String columnName, String... tableNames) {
+        return isIntegerConstant(columnName) || isIntegerColumn(columnName, tableNames);
+    }
+
     /** Modify queries containing an ORDER BY clause, in such a way that
      *  PostgreSQL results will match VoltDB results, generally by adding
      *  NULLS FIRST or NULLS LAST. */
@@ -176,7 +211,6 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 try {
                     column_i = matcher.group("column" + i);
                 } catch (IllegalArgumentException e) {
-                    //System.out.println("In PostgreSQLBackend.transformOrderByQueries, caught:\n" + e);
                     // do nothing: column_i remains null
                 }
                 if (column_i == null) {
@@ -207,23 +241,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  Sunday as 1 and Saturday as 7, etc.) */
     static private String transformDayOfWeekOrYearQueries(String dml) {
         // TODO: temp debug:
-//        System.out.println("Entered PostgreSQLBackend.transformDayOfWeekOrYearQueries,\n  with dml       : " + dml);
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = dayOfWeekOrYearQuery.matcher(dml);
-        // TODO: temp debug:
-//        System.out.println("  matcher: " + matcher);
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer("EXTRACT ( ");
             String weekOrYear = null, column = null;
             try {
                 weekOrYear = matcher.group("weekOrYear");
                 column     = matcher.group("column");
-                // TODO: temp debug:
-//                System.out.println("  weekOrYear: " + weekOrYear);
-//                System.out.println("  column    : " + column);
             } catch (IllegalArgumentException e) {
-                // TODO: temp debug:
-//                System.out.println("In PostgreSQLBackend.transformDayOfWeekOrYearQueries, caught:\n" + e);
                 // do nothing: weekOrYear remains null
                 break;
             }
@@ -240,15 +266,9 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 throw new ExpectedProcedureException("Programming error: weekOrYear should be 'DAY_OF_WEEK' " +
                         "or 'DAY_OF_YEAR', but is '" + weekOrYear + "', for SQL statement:\n" + dml);
             }
-            // TODO: temp debug:
-//            System.out.println("  replaceText: " + replaceText);
             matcher.appendReplacement(modified_dml, replaceText.toString());
-            // TODO: temp debug:
-//            System.out.println("  modified_dml(1): " + modified_dml);
         }
         matcher.appendTail(modified_dml);
-        // TODO: temp debug:
-//        System.out.println("  modified_dml(2): " + modified_dml);
 //        // TODO: temp debug:
 //        if (!dml.equalsIgnoreCase(modified_dml.toString())) {
 //            System.out.println("In PostgreSQLBackend.transformDayOfWeekOrYearQueries,\n  with dml    : " + dml);
@@ -257,27 +277,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return modified_dml.toString();
     }
 
-    /** TODO */
-    static private boolean isIntegerColumn(String columnName, String... tableNames) {
-        // TODO: Temporary method, which will mostly work, for now:
-        String columnNameUpper = columnName.toUpperCase();
-        return  columnNameUpper.endsWith("ID") ||
-                columnNameUpper.endsWith("NUM") ||
-                columnNameUpper.endsWith("TINY") ||
-                columnNameUpper.endsWith("SMALL") ||
-                columnNameUpper.endsWith("BIG");
-    }
-
     /** Modify queries containing an AVG(columnName) where <i>columnName</i>
      *  is of an integer type, for which PostgreSQL returns a numeric
-     *  (non-integer) value, unlike VoltDB, which returns an integer. */
+     *  (non-integer) value, unlike VoltDB, which returns an integer;
+     *  so change it to: TRUNC ( AVG(columnName) ). */
     static private String transformAvgOfIntegerQueries(String dml) {
         // TODO: temp debug:
 //        System.out.println("Entered PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml       : " + dml);
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = avgQuery.matcher(dml);
-        // TODO: temp debug:
-//        System.out.println("  matcher: " + matcher);
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer();
             String column = null, avgFunc = null;
@@ -285,12 +293,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 column  = matcher.group("column");
                 avgFunc = matcher.group(0);
                 // TODO: temp debug:
-//                System.out.println("  avgFunc: " + avgFunc);
 //                System.out.println("  column : " + column);
+//                System.out.println("  avgFunc: " + avgFunc);
             } catch (IllegalArgumentException e) {
-                // TODO: temp debug:
-//                System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries, caught:\n" + e);
-                // do nothing: group remains null
+                // do nothing: column remains null
                 break;
             }
             if (column == null) {
@@ -301,16 +307,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             } else {
                 replaceText.append(avgFunc);
             }
-            // TODO: temp debug:
-//            System.out.println("  replaceText: " + replaceText);
             matcher.appendReplacement(modified_dml, replaceText.toString());
-            // TODO: temp debug:
-//            System.out.println("  modified_dml(1): " + modified_dml);
         }
         matcher.appendTail(modified_dml);
         // TODO: temp debug:
-//        System.out.println("  modified_dml(2): " + modified_dml);
-//        // TODO: temp debug:
 //        if (!dml.equalsIgnoreCase(modified_dml.toString())) {
 //            System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml    : " + dml);
 //            System.out.println("  modified_dml: " + modified_dml);
@@ -323,12 +323,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  always at least 14, since many SQLCoverage tests use strings of that
      *  length). */
     static private String transformVarcharOfBytes(String ddl) {
-        // TODO: temp debug:
-//        System.out.println("Entered PostgreSQLBackend.transformVarcharOfBytes,\n  with ddl       : " + ddl);
         StringBuffer modified_ddl = new StringBuffer();
         Matcher matcher = varcharBytesDdl.matcher(ddl);
-        // TODO: temp debug:
-//        System.out.println("  matcher: " + matcher);
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer();
             String numBytesStr = null;
@@ -336,26 +332,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             try {
                 numBytesStr = matcher.group("numBytes");
                 numBytes = Integer.parseInt(numBytesStr);
-                // TODO: temp debug:
-//                System.out.println("  numBytesStr: " + numBytesStr);
-//                System.out.println("  numBytes   : " + numBytes);
             } catch (IllegalArgumentException e) {
-                // TODO: temp debug:
-//                System.out.println("In PostgreSQLBackend.transformVarcharOfBytes, caught:\n" + e);
                 // do nothing: numBytes remains -1
                 break;
             }
             // TODO: figure out why 14 is not big enough
             replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 42) + ")");
-            // TODO: temp debug:
-//            System.out.println("  replaceText: " + replaceText);
             matcher.appendReplacement(modified_ddl, replaceText.toString());
-            // TODO: temp debug:
-//            System.out.println("  modified_ddl(1): " + modified_ddl);
         }
         matcher.appendTail(modified_ddl);
-        // TODO: temp debug:
-//        System.out.println("  modified_ddl(2): " + modified_ddl);
 //        // TODO: temp debug:
 //        if (!ddl.equalsIgnoreCase(modified_ddl.toString())) {
 //            System.out.println("In PostgreSQLBackend.transformVarcharOfBytes,\n  with dml    : " + ddl);
@@ -367,34 +352,21 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     /** Modify DDL containing VARBINARY(n), which PostgreSQL does not
      *  support, and replace it with BYTEA (which it does). */
     static private String transformVarbinary(String ddl) {
-        // TODO: temp debug:
-        System.out.println("Entered PostgreSQLBackend.transformVarbinary,\n  with ddl       : " + ddl);
         StringBuffer modified_ddl = new StringBuffer();
         Matcher matcher = varbinaryDdl.matcher(ddl);
-        // TODO: temp debug:
-//        System.out.println("  matcher: " + matcher);
         while (matcher.find()) {
             String varbinary = null;
             try {
                 varbinary = matcher.group();
-                // TODO: temp debug:
-                System.out.println("  varbinary: " + varbinary);
             } catch (IllegalArgumentException e) {
-                // TODO: temp debug:
-                System.out.println("In PostgreSQLBackend.transformVarbinary, caught:\n" + e);
-                // do nothing: numBytes remains -1
-                break;
+                // do nothing: varbinary remains null
             }
             matcher.appendReplacement(modified_ddl, "BYTEA");
-            // TODO: temp debug:
-            System.out.println("  modified_ddl(1): " + modified_ddl);
         }
         matcher.appendTail(modified_ddl);
         // TODO: temp debug:
-        System.out.println("  modified_ddl(2): " + modified_ddl);
-        // TODO: temp debug:
         if (!ddl.equalsIgnoreCase(modified_ddl.toString())) {
-            System.out.println("In PostgreSQLBackend.transformVarbinary,\n  with dml    : " + ddl);
+            System.out.println("In PostgreSQLBackend.transformVarbinary,\n  with ddl    : " + ddl);
             System.out.println("  modified_dml: " + modified_ddl);
         }
         return modified_ddl.toString();
