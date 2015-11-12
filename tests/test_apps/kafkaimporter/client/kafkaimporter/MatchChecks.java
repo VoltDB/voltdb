@@ -190,14 +190,18 @@ public class MatchChecks {
         return statsString;
     }
 
-    protected static long getImportOutstandingRequests(Client client) {
+    protected static long[] getImportValues(Client client) {
         VoltTable importStats = statsCall(client);
-        long outstandingRequests = 0;
+        long stats[] = {0, 0, 0, 0};
 
         while (importStats.advanceRow()) {
-            outstandingRequests = importStats.getLong("OUTSTANDING_REQUESTS");
+            int statnum = 0;
+            stats[statnum++] = importStats.getLong("SUCCESSES");
+            stats[statnum++] = importStats.getLong("FAILURES");
+            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
+            stats[statnum++] = importStats.getLong("RETRIES");
         }
-        return outstandingRequests;
+        return stats;
     }
 
     protected static VoltTable statsCall(Client client) {

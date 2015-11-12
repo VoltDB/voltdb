@@ -71,7 +71,10 @@ public class KafkaImportBenchmark {
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------";
-
+    static final int SUCCESSES = 0;
+    static final int FAILURES = 1;
+    static final int OUTSTANDING_REQUESTS = 2;
+    static final int RETRIES = 3;
     // Statistics manager objects from the client
     static ClientStatsContext periodicStatsContext;
 
@@ -328,6 +331,7 @@ public class KafkaImportBenchmark {
      * @throws Exception if anything goes wrong.
      */
     public static void main(String[] args) throws Exception {
+
         VoltLogger log = new VoltLogger("Benchmark.main");
         // create a configuration from the arguments
         Config config = new Config();
@@ -361,14 +365,14 @@ public class KafkaImportBenchmark {
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
-        long outstandingRequests = MatchChecks.getImportOutstandingRequests(client);
+        long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
         boolean testResult = true;
 
         // some counts that might help debugging....
-        log.info("importer outstanding requests: " + outstandingRequests);
+        log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
         log.info("mirrorRows: " + mirrorRows);
         log.info("importRows: " + importRows);
         log.info("importRowCount: " + importRowCount);
@@ -387,18 +391,16 @@ public class KafkaImportBenchmark {
             }
         }
 
-        if ((importRowCount != exportRowCount) && config.useexport) {
-            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRowCount + "' test fails.");
+        if ((exportRowCount != (importStatValues[SUCCESSES] + importStatValues[FAILURES])) && config.useexport) {
+            log.error("Export count '" + exportRowCount + 
+                "' does not match import stats count '" +
+                (importStatValues[SUCCESSES] + importStatValues[FAILURES]) +
+                "' test fails.");
             testResult = false;
         }
-
+            
         if (!config.useexport) {
             testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
-        }
-
-        if (outstandingRequests != 0) {
-            testResult = false;
-            log.error("Import stream still has outstanding (not inserted) requests: " + outstandingRequests);
         }
 
         client.drain();
