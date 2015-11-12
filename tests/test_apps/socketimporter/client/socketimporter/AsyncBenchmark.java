@@ -479,7 +479,7 @@ public class AsyncBenchmark {
 
         long outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
         if (outstandingRequests != 0) {
-        	log.error("Importer outstanding requests is " + outstandingRequests + " Zero expected.");
+            log.error("Importer outstanding requests is " + outstandingRequests + " Zero expected.");
         }
         client.drain();
         client.close();

@@ -60,8 +60,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
-//import client.kafkaimporter.MatchChecks;
-//import client.kafkaimporter.TableChangeMonitor;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -97,7 +95,6 @@ public class KafkaImportBenchmark {
     private static final int END_WAIT = 10; // wait at the end for import to settle after export completes
 
     static List<Integer> importProgress = new ArrayList<Integer>();
-    static List<Integer> outstandingRequests = new ArrayList<Integer>();
 
     static InsertExport exportProc;
     static TableChangeMonitor exportMon;
