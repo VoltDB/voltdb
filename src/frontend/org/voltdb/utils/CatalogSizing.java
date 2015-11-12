@@ -211,8 +211,8 @@ public abstract class CatalogSizing {
         }
         // Larger capacities use pooled buffers sized in powers of 2 or values halfway
         // between powers of 2.
-        // The 12 byte overhead includes a 4 byte length and an 8 byte reverse pointer.
-        int content = 4 + 8 + dataSize;
+        // The rounded buffer size includes an object length, typically 4 bytes.
+        int content = 4 + dataSize;
         int bufferSize = 64;
         while (bufferSize < content) {
             int increment = bufferSize / 2;
@@ -222,7 +222,10 @@ public abstract class CatalogSizing {
             }
             bufferSize += increment;
         }
-        return bufferSize + 8 + 24;
+        // The rounded buffer size has an additional 4-byte allocation size and
+        // 8-byte back pointer overhead. There is also has an 8-byte pointer
+        // in the tuple and an 8-byte StringRef indirection pointer.
+        return bufferSize + 4 + 8 + 8 + 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex) {
