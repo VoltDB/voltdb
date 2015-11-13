@@ -65,12 +65,12 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // Captures up to 6 order-by columns; beyond those will be ignored
     // (similar to tests/scripts/examples/sql_coverage/StandardNormalzer.py)
     private static final Pattern orderByQuery = Pattern.compile(
-            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?)"
-            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?",
+            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?)"
+            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+(AS|FROM)\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?",
             Pattern.CASE_INSENSITIVE);
     // Captures the use of EXTRACT(DAY_OF_WEEK FROM ...) or
     // EXTRACT(DAY_OF_YEAR FROM ...), which PostgreSQL does not support
@@ -97,6 +97,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 //            + "(\\s*,s*\\(?<table5>\\w+)\\s*)?"
 //            + "(\\s*,s*\\(?<table6>\\w+)\\s*)?",
 //            Pattern.CASE_INSENSITIVE);
+    // Captures the use of string concatenation using 'str' + ..., which
+    // PostgreSQL does not support, and replaces the '+' with the '||'
+    // concatenation operator, which it does
+    private static final Pattern stringConcatQuery = Pattern.compile(
+            "'\\w+'\\s*\\+", Pattern.CASE_INSENSITIVE);
     // Captures the use of VARCHAR(n BYTES), which PostgreSQL does not support
     private static final Pattern varcharBytesDdl = Pattern.compile(
             "VARCHAR\\s*\\(\\s*(?<numBytes>\\w+)\\s+BYTES\\s*\\)",
@@ -221,6 +226,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     /** Modify queries containing an ORDER BY clause, in such a way that
      *  PostgreSQL results will match VoltDB results, generally by adding
      *  NULLS FIRST or NULLS LAST. */
+    @SuppressWarnings("unused")
     static private String transformOrderByQueries(String dml) {
         // TODO: should we only add "NULLS FIRST|LAST" when we find "LIMIT" and/or "OFFSET"??
         StringBuffer modified_dml = new StringBuffer();
@@ -260,6 +266,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  PostgreSQL does support. (The '+1' for DOW is because PostgreSQL
      *  counts Sunday as 0 and Saturday as 6, etc., whereas VoltDB counts
      *  Sunday as 1 and Saturday as 7, etc.) */
+    @SuppressWarnings("unused")
     static private String transformDayOfWeekOrYearQueries(String dml) {
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = dayOfWeekOrYearQuery.matcher(dml);
@@ -296,10 +303,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return modified_dml.toString();
     }
 
-    /** Modify queries containing an AVG(columnName) where <i>columnName</i>
+    /** Modify queries containing an AVG(columnName), where <i>columnName</i>
      *  is of an integer type, for which PostgreSQL returns a numeric
      *  (non-integer) value, unlike VoltDB, which returns an integer;
      *  so change it to: TRUNC ( AVG(columnName) ). */
+    @SuppressWarnings("unused")
     static private String transformAvgOfIntegerQueries(String dml) {
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = avgQuery.matcher(dml);
@@ -341,10 +349,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return modified_dml.toString();
     }
 
-    /** Modify queries containing an AVG(columnName) where <i>columnName</i>
-     *  is of an integer type, for which PostgreSQL returns a numeric
-     *  (non-integer) value, unlike VoltDB, which returns an integer;
-     *  so change it to: TRUNC ( AVG(columnName) ). */
+    /** Modify queries containing a CEILING(columnName) or FLOOR() where
+     *  <i>columnName</i> is of an integer type, for which PostgreSQL returns
+     *  a numeric (non-integer) value, unlike VoltDB, which returns an integer;
+     *  so change it to: CAST ( CEILING(columnName) as INTEGER ). */
+    @SuppressWarnings("unused")
     static private String transformCeilingOrFloorOfIntegerQueries(String dml) {
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = ceilingOrFloorQuery.matcher(dml);
@@ -390,10 +399,44 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return modified_dml.toString();
     }
 
+    /** Modify queries containing an AVG(columnName) where <i>columnName</i>
+     *  is of an integer type, for which PostgreSQL returns a numeric
+     *  (non-integer) value, unlike VoltDB, which returns an integer;
+     *  so change it to: TRUNC ( AVG(columnName) ). */
+    @SuppressWarnings("unused")
+    static private String transformStringConcatQueries(String dml) {
+        StringBuffer modified_dml = new StringBuffer();
+        Matcher matcher = stringConcatQuery.matcher(dml);
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer();
+            String concat = null;
+            try {
+                concat = matcher.group();
+            } catch (IllegalArgumentException e) {
+                // do nothing: column remains null
+                break;
+            }
+            if (concat == null) {
+                throw new ExpectedProcedureException("Programming error: concat should not "
+                        + "be null, but is (" + concat + "), for SQL statement:\n" + dml);
+            } else {
+                replaceText.append(concat.replace("+", "||"));
+            }
+            matcher.appendReplacement(modified_dml, replaceText.toString());
+        }
+        matcher.appendTail(modified_dml);
+        if (DEBUG && !dml.equalsIgnoreCase(modified_dml.toString())) {
+            System.out.println("In PostgreSQLBackend.transformStringConcatQueries,\n  with dml    : " + dml);
+            System.out.println("  modified_dml: " + modified_dml);
+        }
+        return modified_dml.toString();
+    }
+
     /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
      *  support, and replace it with VARCHAR(m), where m = n / 4 (but m is
      *  always at least 14, since many SQLCoverage tests use strings of that
      *  length). */
+    @SuppressWarnings("unused")
     static private String transformVarcharOfBytes(String ddl) {
         StringBuffer modified_ddl = new StringBuffer();
         Matcher matcher = varcharBytesDdl.matcher(ddl);
@@ -421,6 +464,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
 
     /** Modify DDL containing VARBINARY(n), which PostgreSQL does not
      *  support, and replace it with BYTEA (which it does). */
+    @SuppressWarnings("unused")
     static private String transformVarbinary(String ddl) {
         StringBuffer modified_ddl = new StringBuffer();
         Matcher matcher = varbinaryDdl.matcher(ddl);
@@ -453,10 +497,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  which behave differently in PostgreSQL than in VoltDB, with other,
      *  similar terms, so that the results will match. */
     static public String transformDML(String dml) {
-        return transformDayOfWeekOrYearQueries(
-                transformCeilingOrFloorOfIntegerQueries(
-                    transformAvgOfIntegerQueries(
-                        transformOrderByQueries(dml) )));
+        return transformStringConcatQueries(
+                transformDayOfWeekOrYearQueries(
+                    transformCeilingOrFloorOfIntegerQueries(
+                        transformAvgOfIntegerQueries(
+                            transformOrderByQueries(dml) ))));
     }
 
     /** Modifies DDL statements in such a way that PostgreSQL results will
