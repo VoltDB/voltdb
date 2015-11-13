@@ -39,20 +39,6 @@ message Subscribe {
     optional bool isSyncing = 5;
 }
 
-message EventAck {
-    optional int32 partitionId = 1;
-    // poison pill, cluster restart, rejoin
-    optional int32 eventType = 2;
-    // if true, the recipient should expect to have
-    // a corresponding event to discard
-    // if false, this is just a query for the next
-    // unique id available for this partition
-    optional bool lookForEvent = 3;
-    // unique id of the last thing the receiver has
-    // acked for this partition
-    optional fixed64 lastAckedUniqueId = 4;
-}
-
 message Response {
     enum ReplicationMode {
         IDLE = 1;
@@ -120,7 +106,6 @@ message CtrlEnvelope {
         STOP_SYNC = 8;
         CONNECT = 9;
         SUBSCRIBE = 10;
-        EVENT_ACK = 11;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -130,6 +115,5 @@ message CtrlEnvelope {
     optional Response response = 6;
     optional SnapshotReq snapshotReq = 7;
     optional Subscribe subscribe = 8;
-    optional EventAck eventAck = 9;
-    optional Connect connect = 10;
+    optional Connect connect = 9;
 }
