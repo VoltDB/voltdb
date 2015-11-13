@@ -343,6 +343,18 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_POLYGONFROMTEXT:
             ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGONFROMTEXT>((*arguments)[0]);
             break;
+        case FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_POINTS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_POINTS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LATITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LATITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LONGITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LONGITUDE>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
