@@ -254,6 +254,7 @@ public class KafkaImportBenchmark {
                 if (sz > 1) {
                     log.info("Import Throughput " + (count - importProgress.get(sz - 2)) / period + "/s, Total Rows: " + count);
                 }
+                log.info("Import stats: " + MatchChecks.getImportStats(client));
             }
         },
         config.displayinterval * 1000,
@@ -392,13 +393,13 @@ public class KafkaImportBenchmark {
         }
 
         if ((exportRowCount != (importStatValues[SUCCESSES] + importStatValues[FAILURES])) && config.useexport) {
-            log.error("Export count '" + exportRowCount + 
+            log.error("Export count '" + exportRowCount +
                 "' does not match import stats count '" +
                 (importStatValues[SUCCESSES] + importStatValues[FAILURES]) +
                 "' test fails.");
             testResult = false;
         }
-            
+
         if (!config.useexport) {
             testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
         }
