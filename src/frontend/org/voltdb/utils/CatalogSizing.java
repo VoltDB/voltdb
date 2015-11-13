@@ -298,7 +298,8 @@ public abstract class CatalogSizing {
         if (cardinality <= 0) {
             cardinality = 1000;
         }
-        boolean bAdjustForDrAA = table.getIsdred() && bActiveActiveEnabled;
+        //Do we need to adjust for DR-AA?
+        boolean bAdjustForDrAA = (table.getIsdred() && bActiveActiveEnabled);
 
         // Add up the column widths.
         CatalogMap<Column> columnsMap = table.getColumns();
