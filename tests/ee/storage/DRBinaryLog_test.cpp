@@ -49,8 +49,9 @@
 using namespace std;
 using namespace voltdb;
 
-const int COLUMN_COUNT = 6;
+const int COLUMN_COUNT = 7;
 const int HIDDEN_COLUMN_COUNT = 1;
+const int CLUSTER_ID = 0;
 
 static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 42;
@@ -77,7 +78,7 @@ public:
     MockVoltDBEngine(bool isActiveActiveEnabled, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
         m_isActiveActiveEnabled = isActiveActiveEnabled;
         m_context.reset(new ExecutorContext(1, 1, NULL, topend, pool,
-                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, 0));
+                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, CLUSTER_ID));
 
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;
@@ -151,6 +152,7 @@ public:
         columnTypes.push_back(VALUE_TYPE_VARCHAR);   columnLengths.push_back(15);
         columnTypes.push_back(VALUE_TYPE_VARCHAR);   columnLengths.push_back(300);
         columnTypes.push_back(VALUE_TYPE_TIMESTAMP); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
+        columnTypes.push_back(VALUE_TYPE_VARBINARY); columnLengths.push_back(300);
 
         std::vector<ValueType> hiddenTypes;
         std::vector<int32_t> hiddenColumnLengths;
@@ -168,7 +170,7 @@ public:
 
         string columnNamesArray[COLUMN_COUNT] = {
             "C_TINYINT", "C_BIGINT", "C_DECIMAL",
-            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP" };
+            "C_INLINE_VARCHAR", "C_OUTLINE_VARCHAR", "C_TIMESTAMP", "C_OUTLINE_VARBINARY" };
         const vector<string> columnNames(columnNamesArray, columnNamesArray + COLUMN_COUNT);
 
         m_table = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "P_TABLE", m_schema, columnNames, tableHandle, false, 0));
@@ -273,19 +275,23 @@ public:
 
     TableTuple insertTuple(PersistentTable* table, TableTuple temp_tuple) {
         table->insertTuple(temp_tuple);
-        TableTuple tuple = table->lookupTupleByValues(temp_tuple);
+        if (table->schema()->hiddenColumnCount() > 0) {
+            int64_t expectedTimestamp = ExecutorContext::createDRTimestampHiddenValue(static_cast<int64_t>(CLUSTER_ID), m_currTxnUniqueId);
+            temp_tuple.setHiddenNValue(table->getDRTimestampColumnIndex(), ValueFactory::getBigIntValue(expectedTimestamp));
+        }
+        TableTuple tuple = table->lookupTupleForDR(temp_tuple);
         assert(!tuple.isNullTuple());
         return tuple;
     }
 
     void deleteTuple(PersistentTable* table, TableTuple tuple) {
-        TableTuple tuple_to_delete = table->lookupTupleByValues(tuple);
+        TableTuple tuple_to_delete = table->lookupTupleForDR(tuple);
         ASSERT_FALSE(tuple_to_delete.isNullTuple());
         table->deleteTuple(tuple_to_delete, true);
     }
 
     TableTuple updateTuple(PersistentTable* table, TableTuple tuple, int8_t new_index_value, const std::string& new_nonindex_value) {
-        TableTuple tuple_to_update = table->lookupTupleByValues(tuple);
+        TableTuple tuple_to_update = table->lookupTupleForDR(tuple);
         assert(!tuple_to_update.isNullTuple());
         TableTuple new_tuple = table->tempTuple();
         new_tuple.copy(tuple_to_update);
@@ -321,6 +327,8 @@ public:
         m_cachedStringValues.push_back(ValueFactory::getStringValue(long_varchar));
         temp_tuple.setNValue(4, m_cachedStringValues.back());
         temp_tuple.setNValue(5, ValueFactory::getTimestampValue(timestamp));
+        m_cachedStringValues.push_back(ValueFactory::getBinaryValue("74686973206973206120726174686572206C6F6E6720737472696E67206F6620746578742074686174206973207573656420746F206361757365206E76616C756520746F20757365206F75746C696E652073746F7261676520666F722074686520756E6465726C79696E6720646174612E2049742073686F756C64206265206C6F6E676572207468616E2036342062797465732E"));
+        temp_tuple.setNValue(6, m_cachedStringValues.back());
         return temp_tuple;
     }
 
@@ -453,25 +461,25 @@ public:
     }
 
     TableTuple verifyExistingTableForDelete(TableTuple &existingTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleByValues(existingTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForDelete.get())->lookupTupleForDR(existingTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
 
     TableTuple verifyExpectedTableForDelete(TableTuple &expectedTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.expectedTupleRowsForDelete.get())->lookupTupleByValues(expectedTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.expectedTupleRowsForDelete.get())->lookupTupleForDR(expectedTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
 
     TableTuple verifyExistingTableForInsert(TableTuple &existingTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForInsert.get())->lookupTupleByValues(existingTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.existingTupleRowsForInsert.get())->lookupTupleForDR(existingTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
 
     TableTuple verifyNewTableForInsert(TableTuple &newTuple) {
-        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.newTupleRowsForInsert.get())->lookupTupleByValues(newTuple);
+        TableTuple tuple = reinterpret_cast<PersistentTable*>(m_topend.newTupleRowsForInsert.get())->lookupTupleForDR(newTuple);
         EXPECT_EQ(tuple.isNullTuple(), false);
         return tuple;
     }
@@ -484,7 +492,7 @@ public:
         EXPECT_EQ(indexPair.second, indexPairReplica.second);
 
         beginTxn(99, 99, 98, 70);
-        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
         TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
         TableTuple third_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
         endTxn(true);
@@ -501,13 +509,13 @@ public:
         flushAndApply(100);
 
         EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-        TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+        TableTuple tuple = m_tableReplica->lookupTupleForDR(third_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
     void simpleUpdateTest() {
         beginTxn(99, 99, 98, 70);
-        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
         TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
         endTxn(true);
 
@@ -523,10 +531,10 @@ public:
         flushAndApply(100);
 
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-        TableTuple expected_tuple = prepareTempTuple(m_table, 42, 55555, "349508345.34583", "not that", "a totally different thing altogether", 5433);
+        TableTuple expected_tuple = prepareTempTuple(m_table, 42, 55555, "349508345.34583", "not that", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433);
         TableTuple tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
-        tuple = m_table->lookupTupleByValues(second_tuple);
+        tuple = m_table->lookupTupleForDR(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
 
         beginTxn(101, 101, 100, 72);
@@ -537,16 +545,16 @@ public:
         flushAndApply(101);
 
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-        tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        tuple = m_tableReplica->lookupTupleForDR(expected_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
         expected_tuple = prepareTempTuple(m_table, 99, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222);
-        tuple = m_table->lookupTupleByValues(second_tuple);
+        tuple = m_table->lookupTupleForDR(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
     void updateWithNullsTest() {
         beginTxn(99, 99, 98, 70);
-        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 31241, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+        TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 31241, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
         TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
         endTxn(true);
 
@@ -555,7 +563,7 @@ public:
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
 
         beginTxn(100, 100, 99, 71);
-        TableTuple tuple_to_update = m_table->lookupTupleByValues(first_tuple);
+        TableTuple tuple_to_update = m_table->lookupTupleForDR(first_tuple);
         ASSERT_FALSE(tuple_to_update.isNullTuple());
         TableTuple updated_tuple = secondTupleWithNulls(m_table);
         m_table->updateTuple(tuple_to_update, updated_tuple);
@@ -565,9 +573,9 @@ public:
 
         EXPECT_EQ(2, m_tableReplica->activeTupleCount());
         TableTuple expected_tuple = secondTupleWithNulls(m_table);
-        TableTuple tuple = m_tableReplica->lookupTupleByValues(expected_tuple);
+        TableTuple tuple = m_tableReplica->lookupTupleForDR(expected_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
-        tuple = m_table->lookupTupleByValues(second_tuple);
+        tuple = m_table->lookupTupleForDR(second_tuple);
         ASSERT_FALSE(tuple.isNullTuple());
     }
 
@@ -629,16 +637,54 @@ TEST_F(DRBinaryLogTest, VerifyHiddenColumns) {
 
     // single row write transaction
     beginTxn(99, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     endTxn(true);
 
     flushAndApply(99);
 
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
     NValue drTimestampReplica = tuple.getHiddenNValue(m_tableReplica->getDRTimestampColumnIndex());
     EXPECT_EQ(ValuePeeker::peekAsBigInt(drTimestamp), 70);
     EXPECT_EQ(0, drTimestamp.compare(drTimestampReplica));
+}
+
+TEST_F(DRBinaryLogTest, VerifyHiddenColumnLookup) {
+    beginTxn(98, 98, 97, 69);
+    for (int i = 0; i < 10; i++) {
+        insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+    }
+    endTxn(true);
+
+    beginTxn(99, 99, 98, 70);
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+    endTxn(true);
+
+    beginTxn(100, 100, 98, 71);
+    for (int i = 0; i < 10; i++) {
+        insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
+    }
+    endTxn(true);
+
+    NValue expectedTimestamp = first_tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
+    TableTuple lookup_tuple = prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433);
+    lookup_tuple.setHiddenNValue(m_table->getDRTimestampColumnIndex(), expectedTimestamp);
+    TableTuple tuple = m_table->lookupTupleForDR(lookup_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
+    NValue drTimestamp = tuple.getHiddenNValue(m_table->getDRTimestampColumnIndex());
+    EXPECT_EQ(0, expectedTimestamp.compare(drTimestamp));
+
+    beginTxn(101, 101, 99, 72);
+    deleteTuple(m_table, tuple);
+    endTxn(true);
+
+    flushAndApply(101);
+
+    EXPECT_EQ(20, m_tableReplica->activeTupleCount());
+    tuple = m_tableReplica->lookupTupleForDR(lookup_tuple);
+    ASSERT_TRUE(tuple.isNullTuple());
+    tuple = m_tableReplica->lookupTupleByValues(lookup_tuple);
+    ASSERT_FALSE(tuple.isNullTuple());
 }
 
 TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
@@ -646,7 +692,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
 
     // single row write transaction
     beginTxn(99, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     endTxn(true);
 
     // single row write transaction
@@ -657,9 +703,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     flushAndApply(100);
 
     EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // multiple row, multipart write transaction
@@ -682,7 +728,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     flushAndApply(101);
 
     EXPECT_EQ(4, m_tableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
     tuple = m_tableReplica->lookupTupleByValues(prepareTempTuple(m_table, 7, 234, "23452436.54", "what", "this is starting to get silly", 2342));
     ASSERT_FALSE(tuple.isNullTuple());
@@ -690,9 +736,9 @@ TEST_F(DRBinaryLogTest, PartitionedTableNoRollbacks) {
     // Propagate the delete
     flushAndApply(102);
     EXPECT_EQ(3, m_tableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
     ASSERT_TRUE(tuple.isNullTuple());
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
     EXPECT_EQ(3, committed.seqNum);
@@ -704,7 +750,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     m_singleColumnTable->setDR(false);
 
     beginTxn(99, 99, 98, 70);
-    TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple source_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     endTxn(false);
 
     // Intentionally ignore the fact that a rollback wouldn't have actually advanced the
@@ -730,7 +776,7 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
     flushAndApply(101);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
@@ -740,14 +786,14 @@ TEST_F(DRBinaryLogTest, PartitionedTableRollbacks) {
 TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     // write to only the replicated table
     beginTxn(109, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple first_tuple = insertTuple(m_replicatedTable, prepareTempTuple(m_replicatedTable, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     endTxn(true);
 
     flushAndApply(99);
 
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
     EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // write to both the partitioned and replicated table
@@ -760,9 +806,9 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
     EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // write to the partitioned and replicated table and roll it back
@@ -781,7 +827,7 @@ TEST_F(DRBinaryLogTest, ReplicatedTableWrites) {
     flushAndApply(102);
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
     EXPECT_EQ(3, m_replicatedTableReplica->activeTupleCount());
-    tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     DRCommittedInfo committed = m_drStream.getLastCommittedSequenceNumberAndUniqueIds();
@@ -799,9 +845,9 @@ TEST_F(DRBinaryLogTest, SerializeNulls) {
     flushAndApply(99);
 
     EXPECT_EQ(2, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_replicatedTableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_replicatedTableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -817,14 +863,14 @@ TEST_F(DRBinaryLogTest, RollbackNulls) {
     flushAndApply(100);
 
     EXPECT_EQ(1, m_replicatedTableReplica->activeTupleCount());
-    TableTuple tuple = m_replicatedTableReplica->lookupTupleByValues(source_tuple);
+    TableTuple tuple = m_replicatedTableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
 TEST_F(DRBinaryLogTest, RollbackOnReplica) {
     // single row write transaction
     beginTxn(99, 99, 98, 70);
-    insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     endTxn(true);
 
     // try and fail to apply this on the replica
@@ -840,7 +886,7 @@ TEST_F(DRBinaryLogTest, RollbackOnReplica) {
     flushAndApply(100);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 
     // inserts followed by some deletes
@@ -855,7 +901,7 @@ TEST_F(DRBinaryLogTest, RollbackOnReplica) {
     flushAndApply(101, false);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    tuple = m_tableReplica->lookupTupleByValues(source_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(source_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -893,7 +939,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
     EXPECT_EQ(indexPairReplica.second, 0);
 
     beginTxn(99, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
     TableTuple third_tuple = insertTuple(m_table, prepareTempTuple(m_table, 72, 345, "4256.345", "something", "more tuple data, really not the same", 1812));
     endTxn(true);
@@ -910,7 +956,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexWhenAAEnabled) {
     flushAndApply(100);
 
     EXPECT_EQ(1, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(third_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(third_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -923,7 +969,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
     ASSERT_TRUE(indexPair2.first == NULL);
 
     beginTxn(99, 99, 98, 70);
-    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple first_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
     TableTuple temp_tuple = m_otherTableWithIndex->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(0));
@@ -956,7 +1002,7 @@ TEST_F(DRBinaryLogTest, DeleteWithUniqueIndexMultipleTables) {
 
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
     EXPECT_EQ(1, m_otherTableWithIndexReplica->activeTupleCount());
-    TableTuple tuple = m_otherTableWithIndexReplica->lookupTupleByValues(fifth_tuple);
+    TableTuple tuple = m_otherTableWithIndexReplica->lookupTupleForDR(fifth_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
     EXPECT_EQ(0, m_otherTableWithoutIndexReplica->activeTupleCount());
 }
@@ -1013,7 +1059,7 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
 
     beginTxn(99, 99, 98, 70);
 
-    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple second_tuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
 
     // Simulate a second batch within the same txn
     UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
@@ -1029,9 +1075,9 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
     flushAndApply(100);
 
     EXPECT_EQ(2, m_tableReplica->activeTupleCount());
-    TableTuple tuple = m_tableReplica->lookupTupleByValues(first_tuple);
+    TableTuple tuple = m_tableReplica->lookupTupleForDR(first_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
-    tuple = m_tableReplica->lookupTupleByValues(second_tuple);
+    tuple = m_tableReplica->lookupTupleForDR(second_tuple);
     ASSERT_FALSE(tuple.isNullTuple());
 }
 
@@ -1134,7 +1180,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteMissingTuple) {
 
     // insert rows on both side
     beginTxn(99, 99, 98, 70);
-    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of m_table will be rewritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
@@ -1201,7 +1247,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
 
     // insert one row on both side
     beginTxn(99, 99, 98, 70);
-    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of relica table will be rewritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
@@ -1261,7 +1307,7 @@ TEST_F(DRBinaryLogTest, DetectDeleteTimestampMismatch) {
  *
  * DB B reports: <DELETE no conflict>
  * existingRow: <null>
- * expectedRow: <null>
+ * expectedRow: <24, 2321, X>
  *               <INSERT constraint violation>
  * existingRow: <123, 33333, Z>
  * newRow:      <12, 33333, X>
@@ -1290,9 +1336,9 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
 
     // insert rows on replica side
     beginTxn(100, 100, 99, 71);
-    insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
 
-    TableTuple tempExistingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 123, 33333, "122308345.34583", "another thing", "a totally different thing altogether", 5433));
+    TableTuple tempExistingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 123, 33333, "122308345.34583", "another thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTuple (m_tableReplica->schema());
     boost::shared_array<char> existingData;
@@ -1314,7 +1360,8 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
     // 1. check delete conflict part
     EXPECT_EQ(m_topend.deleteConflictType, NO_CONFLICT);
     ASSERT_TRUE(m_topend.existingTupleRowsForDelete.get() == NULL);
-    ASSERT_TRUE(m_topend.expectedTupleRowsForDelete.get() == NULL);
+    EXPECT_EQ(1, m_topend.expectedTupleRowsForDelete->activeTupleCount());
+    verifyExpectedTableForDelete(expectedTuple);
 
     // 2. check insert conflict part
     EXPECT_EQ(m_topend.insertConflictType, CONFLICT_CONSTRAINT_VIOLATION);
@@ -1327,7 +1374,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateUniqueConstraintViolation) {
 
     // 3. check export
     MockExportTupleStream *exportStream = reinterpret_cast<MockExportTupleStream*>(m_engine->getExportTupleStream());
-    EXPECT_EQ(2, exportStream->receivedTuples.size());
+    EXPECT_EQ(3, exportStream->receivedTuples.size());
 }
 
 /*
@@ -1355,7 +1402,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTuple) {
 
     // insert rows on both side
     beginTxn(99, 99, 98, 70);
-    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
@@ -1432,7 +1479,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
 
     // insert rows on both side
     beginTxn(99, 99, 98, 70);
-    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
@@ -1446,7 +1493,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateMissingTupleAndNewRowConstraint) {
     // update one row on replica
     beginTxn(100, 100, 99, 71);
     deleteTuple(m_tableReplica, tempExpectedTuple);
-    TableTuple tempExistingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 36, 12345, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExistingTuple = insertTuple(m_tableReplica, prepareTempTuple(m_tableReplica, 36, 12345, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of relica table will be overwritten when applying binary log
     TableTuple existingTuple (m_tableReplica->schema());
     boost::shared_array<char> existingData;
@@ -1513,7 +1560,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatch) {
 
     // insert one row on both side
     beginTxn(99, 99, 98, 70);
-    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;
@@ -1597,7 +1644,7 @@ TEST_F(DRBinaryLogTest, DetectUpdateTimestampMismatchAndNewRowConstraint) {
 
     // insert one row on both side
     beginTxn(99, 99, 98, 70);
-    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "a totally different thing altogether", 5433));
+    TableTuple tempExpectedTuple = insertTuple(m_table, prepareTempTuple(m_table, 42, 55555, "349508345.34583", "a thing", "this is a rather long string of text that is used to cause nvalue to use outline storage for the underlying data. It should be longer than 64 bytes.", 5433));
     // do a deep copy because temp tuple of table will be overwritten later
     TableTuple expectedTuple (m_table->schema());
     boost::shared_array<char> expectedData;

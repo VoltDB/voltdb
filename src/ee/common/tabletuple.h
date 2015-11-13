@@ -188,26 +188,20 @@ public:
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
+        // fast-path for no inlined cols
+        if (m_schema->getUninlinedObjectColumnCount() == 0) {
+            return 0;
+        }
+        // TODO: simplify this loop using the non-inlined-only column iteration
+        // technique used in copyForPersistentInsert's for loop.
         size_t bytes = 0;
         int cols = sizeInValues();
-        // fast-path for no inlined cols
-        if (m_schema->getUninlinedObjectColumnCount() != 0)
-        {
-            for (int i = 0; i < cols; ++i)
-            {
-                // peekObjectLength is unhappy with non-varchar
-                const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
-                voltdb::ValueType columnType = columnInfo->getVoltType();
-                if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
-                    !columnInfo->inlined)
-                {
-                    const NValue val = getNValue(i);
-                    if (!val.isNull())
-                    {
-                        bytes += StringRef::computeStringMemoryUsed(
-                                (ValuePeeker::peekObjectLength_withoutNull(val)));
-                    }
-                }
+        for (int i = 0; i < cols; ++i) {
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+            voltdb::ValueType columnType = columnInfo->getVoltType();
+            if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
+                !columnInfo->inlined) {
+                bytes += getNValue(i).getAllocationSizeForObject();
             }
         }
         return bytes;
@@ -351,7 +345,7 @@ public:
     void setAllNulls() const;
 
     bool equals(const TableTuple &other) const;
-    bool equalsNoSchemaCheck(const TableTuple &other) const;
+    bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
 
     int compare(const TableTuple &other) const;
 
@@ -981,10 +975,20 @@ inline bool TableTuple::equals(const TableTuple &other) const {
     return equalsNoSchemaCheck(other);
 }
 
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
+inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns /*= false*/) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
+        if (lhs.op_notEquals(rhs).isTrue()) {
+            return false;
+        }
+    }
+    if (!includeHiddenColumns) {
+        return true;
+    }
+    for (int ii = 0; ii < m_schema->hiddenColumnCount(); ii++) {
+        const NValue lhs = getHiddenNValue(ii);
+        const NValue rhs = other.getHiddenNValue(ii);
         if (lhs.op_notEquals(rhs).isTrue()) {
             return false;
         }

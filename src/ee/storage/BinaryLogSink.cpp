@@ -265,7 +265,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE rowInput(rowData, rowLength);
             tempTuple.deserializeFromDR(rowInput, pool);
 
-            TableTuple deleteTuple = table->lookupTupleByValues(tempTuple);
+            TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
             if (deleteTuple.isNullTuple()) {
                 if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
@@ -323,7 +323,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
             tempTuple.deserializeFromDR(newRowInput, pool);
 
-            TableTuple oldTuple = table->lookupTupleByValues(expectedTuple);
+            TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
             if (oldTuple.isNullTuple()) {
                 if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, &expectedTuple, &tempTuple, uniqueId, remoteClusterId, DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
@@ -348,7 +348,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             }
 
             try {
-                table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+                table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
             } catch (ConstraintFailureException &e) {
                 if (engine->getIsActiveActiveDREnabled()) {
                     if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(), const_cast<TableTuple *>(e.getConflictTuple()), uniqueId, remoteClusterId, DR_RECORD_UPDATE, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
@@ -426,7 +426,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
             ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
             tempTuple.deserializeFromDR(newRowInput, pool);
 
-            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes());
+            table->updateTupleWithSpecificIndexes(oldTuple, tempTuple, table->allIndexes(), true, false);
             break;
         }
         case DR_RECORD_BEGIN_TXN: {
@@ -617,12 +617,12 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
                     drTable, pool, existingTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXISTING_ROW);
         }
 
+    }
+    if (expectedTuple) {
         expectedMetaTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXPECTED_TABLE, conflictExportTable, NULL));
         expectedTupleTableForDelete.reset(TableFactory::getCopiedTempTable(0, EXISTING_TABLE, drTable, NULL));
-        if (expectedTuple) {
-            createConflictExportTuple(expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
-                    drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
-        }
+        createConflictExportTuple(expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
+                drTable, pool, expectedTuple, NOT_CONFLICT_ON_PK, actionType, deleteConflict, EXPECTED_ROW);
     }
 
     // find any rows conflict with the new row
@@ -651,6 +651,7 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
             }
         }
     }
+
     if (newTuple) {
         newMetaTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, conflictExportTable, NULL));
         newTupleTableForInsert.reset(TableFactory::getCopiedTempTable(0, NEW_TABLE, drTable, NULL));
@@ -706,11 +707,15 @@ bool BinaryLogSink::handleConflict(VoltDBEngine *engine, PersistentTable *drTabl
             drTable->insertPersistentTuple(*newTuple, true);
         }
     }
-    exportDRConflict(conflictExportTable, applyRemoteChange, resolved,
-            existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
-            expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
-            existingMetaTableForInsert.get(), existingTupleTableForInsert.get(),
-            newMetaTableForInsert.get(), newTupleTableForInsert.get());
+
+    // For replicated table, pick partition 0 to export the conflicts.
+    if (!drTable->isReplicatedTable() || engine->getPartitionId() == 0) {
+        exportDRConflict(conflictExportTable, applyRemoteChange, resolved,
+                existingMetaTableForDelete.get(), existingTupleTableForDelete.get(),
+                expectedMetaTableForDelete.get(), expectedTupleTableForDelete.get(),
+                existingMetaTableForInsert.get(), existingTupleTableForInsert.get(),
+                newMetaTableForInsert.get(), newTupleTableForInsert.get());
+    }
 
     if (existingMetaTableForDelete.get()) {
         existingMetaTableForDelete.get()->deleteAllTuples(true);

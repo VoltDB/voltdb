@@ -40,7 +40,6 @@
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
 #include "common/StringRef.h"
-#include "common/ThreadLocalPool.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
@@ -593,9 +592,12 @@ class NValue {
             return std::string(reinterpret_cast<char*>(getObjectValue_withoutNull()),
                                getObjectLength_withoutNull());
         case VALUE_TYPE_VARBINARY: {
-            char buf[getObjectLength_withoutNull() * 2 + 1];
-            catalog::Catalog::hexEncodeString(reinterpret_cast<char*>(getObjectValue_withoutNull()), buf);
-            return std::string(buf, getObjectLength_withoutNull() * 2);
+            size_t objLen = getObjectLength_withoutNull();
+            char *buf = new char[objLen * 2 + 1];
+            catalog::Catalog::hexEncodeString(reinterpret_cast<char*>(getObjectValue_withoutNull()), buf, objLen);
+            std::string retval(buf, objLen * 2);
+            delete [] buf;
+            return retval;
         }
         case VALUE_TYPE_TIMESTAMP: {
             streamTimestamp(value);
@@ -714,6 +716,16 @@ class NValue {
             copy.allocateObjectFromInlinedValue(getTempStringPool());
         }
         return copy;
+    }
+
+    std::size_t getAllocationSizeForObject() const
+    {
+        if (isNull()) {
+            return 0;
+        }
+        assert( ! m_sourceInlined);
+        StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
+        return sref->getAllocatedSize();
     }
 
 private:
@@ -988,9 +1000,6 @@ private:
     }
 
     bool isBooleanNULL() const ;
-
-    std::size_t getAllocationSizeForObject() const;
-    static std::size_t getAllocationSizeForObject(int32_t length);
 
     static void throwCastSQLException(const ValueType origType,
                                       const ValueType newType)

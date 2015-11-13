@@ -196,7 +196,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
         /**
          * Check to see if the block needs to move to a new bucket
          */
-        if (retval.second != -1) {
+        if (retval.second != NO_NEW_BUCKET_INDEX) {
             //Check if if the block is currently pending snapshot
             if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
                 block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
@@ -230,7 +230,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     /**
      * Check to see if the block needs to move to a new bucket
      */
-    if (retval.second != -1) {
+    if (retval.second != NO_NEW_BUCKET_INDEX) {
         //Check if the block goes into the pending snapshot set of buckets
         if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
             //std::cout << "Swapping block to nonsnapshot bucket " << static_cast<void*>(block.get()) << " to bucket " << retval.second << std::endl;
@@ -560,7 +560,8 @@ void PersistentTable::insertTupleForUndo(char *tuple)
 bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      TableTuple &sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> const &indexesToUpdate,
-                                                     bool fallible)
+                                                     bool fallible,
+                                                     bool updateDRTimestamp)
 {
     UndoQuantum *uq = NULL;
     char* oldTupleData = NULL;
@@ -634,7 +635,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    if (hasDRTimestampColumn()) {
+    if (hasDRTimestampColumn() && updateDRTimestamp) {
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
@@ -930,7 +931,7 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     deleteTupleFinalize(target); // also frees object columns
 }
 
-TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
+TableTuple PersistentTable::lookupTuple(TableTuple tuple, LookupType lookupType) {
     TableTuple nullTuple(m_schema);
 
     TableIndex *pkeyIndex = primaryKeyIndex();
@@ -940,8 +941,16 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
          */
         TableTuple tableTuple(m_schema);
         TableIterator ti(this, m_data.begin());
-        if (forUndo || m_schema->getUninlinedObjectColumnCount() == 0) {
-            size_t tuple_length = m_schema->tupleLength();
+        if (lookupType == LOOKUP_FOR_UNDO || m_schema->getUninlinedObjectColumnCount() == 0) {
+            size_t tuple_length;
+            if (lookupType == LOOKUP_BY_VALUES && m_schema->hiddenColumnCount() > 0) {
+                // Looking up a tuple by values should not include any internal
+                // hidden column values, which are appended to the end of the
+                // tuple
+                tuple_length = m_schema->offsetOfHiddenColumns();
+            } else {
+                tuple_length = m_schema->tupleLength();
+            }
             // Do an inline tuple byte comparison
             // to avoid matching duplicate tuples with different pointers to Object storage
             // -- which would cause erroneous releases of the wrong Object storage copy.
@@ -954,9 +963,10 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple, bool forUndo) {
                 }
             }
         } else {
+            bool includeHiddenColumns = (lookupType == LOOKUP_FOR_DR);
             while (ti.hasNext()) {
                 ti.next(tableTuple);
-                if (tableTuple.equalsNoSchemaCheck(tuple)) {
+                if (tableTuple.equalsNoSchemaCheck(tuple, includeHiddenColumns)) {
                     return tableTuple;
                 }
             }
@@ -1336,14 +1346,15 @@ size_t PersistentTable::hashCode() {
 }
 
 void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
-    if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
-    } else {
+    if (m_blocksNotPendingSnapshot.find(block) == m_blocksNotPendingSnapshot.end()) {
+        // do not find block in not pending snapshot container
         assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_tableStreamer->notifyBlockWasCompactedAway(block);
+        return;
     }
-
+    // else check that block is in pending snapshot container
+    assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
 }
 
 // Call-back from TupleBlock::merge() for each tuple moved.
@@ -1386,7 +1397,7 @@ void PersistentTable::swapTuples(TableTuple &originalTuple,
     }
 }
 
-bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
+bool PersistentTable::doCompactionWithinSubset(TBBucketPtrVector *bucketVector) {
     /**
      * First find the two best candidate blocks
      */
@@ -1394,8 +1405,8 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
     TBBucketI fullestIterator;
     bool foundFullest = false;
     for (int ii = (TUPLE_BLOCK_NUM_BUCKETS - 1); ii >= 0; ii--) {
-        fullestIterator = (*bucketMap)[ii]->begin();
-        if (fullestIterator != (*bucketMap)[ii]->end()) {
+        fullestIterator = (*bucketVector)[ii]->begin();
+        if (fullestIterator != (*bucketVector)[ii]->end()) {
             foundFullest = true;
             fullest = fullestIterator.key();
             break;
@@ -1406,58 +1417,37 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         return false;
     }
 
-    int fullestBucketChange = -1;
+    int fullestBucketChange = NO_NEW_BUCKET_INDEX;
     while (fullest->hasFreeTuples()) {
         TBPtr lightest;
         TBBucketI lightestIterator;
         bool foundLightest = false;
 
         for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
-            lightestIterator = (*bucketMap)[ii]->begin();
-            if (lightestIterator != (*bucketMap)[ii]->end()) {
+            lightestIterator = (*bucketVector)[ii]->begin();
+            if (lightestIterator != (*bucketVector)[ii]->end()) {
                 lightest = lightestIterator.key();
                 if (lightest != fullest) {
                     foundLightest = true;
                     break;
-                } else {
-                    lightestIterator++;
-                    if (lightestIterator != (*bucketMap)[ii]->end()) {
-                        lightest = lightestIterator.key();
-                        foundLightest = true;
-                        break;
-                    }
+                }
+                assert(lightest == fullest);
+                lightestIterator++;
+                if (lightestIterator != (*bucketVector)[ii]->end()) {
+                    lightest = lightestIterator.key();
+                    foundLightest = true;
+                    break;
                 }
             }
         }
         if (!foundLightest) {
-//            TBMapI iter = m_data.begin();
-//            while (iter != m_data.end()) {
-//                std::cout << "Block " << static_cast<void*>(iter.data().get()) << " has " <<
-//                        iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
-//                        << " last compaction offset and is in bucket " <<
-//                        static_cast<void*>(iter.data()->currentBucket().get()) <<
-//                        std::endl;
-//                iter++;
-//            }
-//
-//            for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
-//                std::cout << "Bucket " << ii << "(" << static_cast<void*>((*bucketMap)[ii].get()) << ") has size " << (*bucketMap)[ii]->size() << std::endl;
-//                if (!(*bucketMap)[ii]->empty()) {
-//                    TBBucketI bucketIter = (*bucketMap)[ii]->begin();
-//                    while (bucketIter != (*bucketMap)[ii]->end()) {
-//                        std::cout << "\t" << static_cast<void*>(bucketIter->get()) << std::endl;
-//                        bucketIter++;
-//                    }
-//                }
-//            }
-//
-//            std::cout << "Could not find a lightest block for compaction" << std::endl;
+            //could not find a lightest block for compaction
             return false;
         }
 
         std::pair<int, int> bucketChanges = fullest->merge(this, lightest, this);
         int tempFullestBucketChange = bucketChanges.first;
-        if (tempFullestBucketChange != -1) {
+        if (tempFullestBucketChange != NO_NEW_BUCKET_INDEX) {
             fullestBucketChange = tempFullestBucketChange;
         }
 
@@ -1470,14 +1460,14 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
             lightest->swapToBucket(TBBucketPtr());
         } else {
             int lightestBucketChange = bucketChanges.second;
-            if (lightestBucketChange != -1) {
-                lightest->swapToBucket((*bucketMap)[lightestBucketChange]);
+            if (lightestBucketChange != NO_NEW_BUCKET_INDEX) {
+                lightest->swapToBucket((*bucketVector)[lightestBucketChange]);
             }
         }
     }
 
-    if (fullestBucketChange != -1) {
-        fullest->swapToBucket((*bucketMap)[fullestBucketChange]);
+    if (fullestBucketChange != NO_NEW_BUCKET_INDEX) {
+        fullest->swapToBucket((*bucketVector)[fullestBucketChange]);
     }
     if (!fullest->hasFreeTuples()) {
         m_blocksWithSpace.erase(fullest);
