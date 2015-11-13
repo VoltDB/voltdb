@@ -65,12 +65,12 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // Captures up to 6 order-by columns; beyond those will be ignored
     // (similar to tests/scripts/examples/sql_coverage/StandardNormalzer.py)
     private static final Pattern orderByQuery = Pattern.compile(
-            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+(\\s*\\))*(\\s+(ASC|DESC))?)"
-            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s*\\))*(\\s+(ASC|DESC))?))?"
-            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+(\\s*\\))*(\\s+(ASC|DESC))?))?",
+            "ORDER BY(?<column1>\\s+(\\w*\\s*\\(\\s*)*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?)"
+            + "((?<column2>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column3>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column4>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column5>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?"
+            + "((?<column6>\\s*,\\s*(\\w*\\s*\\()*\\s*(\\w+\\.)?\\w+((\\s+AS\\s+\\w+)?\\s*\\))*(\\s+(ASC|DESC))?))?",
             Pattern.CASE_INSENSITIVE);
     // Captures the use of EXTRACT(DAY_OF_WEEK FROM ...) or
     // EXTRACT(DAY_OF_YEAR FROM ...), which PostgreSQL does not support
@@ -80,15 +80,15 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     // Captures the use of AVG(columnName), which PostgreSQL handles
     // differently, when the columnName is of one of the integer types
     private static final Pattern avgQuery = Pattern.compile(
-            "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\))*\\s*\\)",
+            "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\)(\\s+AS\\s+\\w+)?)*\\s*\\)",
             Pattern.CASE_INSENSITIVE);
-    // TODO: Captures the use of x / y, which PostgreSQL handles differently,
-    // when both values are integer types
-    private static final Pattern divisionQuery = Pattern.compile(
-            "AVG\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\))*\\s*\\)",
+    // Captures the use of CEILING(columnName) or FLOOR(columnName), which PostgreSQL
+    // handles differently, when the columnName is of one of the integer types
+    private static final Pattern ceilingOrFloorQuery = Pattern.compile(
+            "(CEILING|FLOOR)\\s*\\((\\s*\\w*\\s*\\()*\\s*(\\w+\\.)?(?<column>\\w+)(\\s*\\)(\\s+AS\\s+\\w+)?)*\\s*\\)",
             Pattern.CASE_INSENSITIVE);
     // Captures up to 6 table names, for each FROM clause used in the query
-    // TODO: fix/finish this! (Use for AVG, / queries)
+    // TODO: fix/finish this! (Use for AVG, CEILING, FLOOR queries)
 //    private static final Pattern tableNames = Pattern.compile(
 //              "FROM\\s*\\(?<table1>\\w+)\\s*"
 //            + "(\\s*,s*\\(?<table2>\\w+)\\s*)?"
@@ -105,6 +105,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     private static final Pattern varbinaryDdl = Pattern.compile(
             "VARBINARY\\s*\\(\\s*(?<numBytes>\\d+)\\s*\\)",
             Pattern.CASE_INSENSITIVE);
+    private static final boolean DEBUG = false;
 
     static public PostgreSQLBackend initializePostgreSQLBackend(CatalogContext context)
     {
@@ -196,6 +197,27 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return isIntegerConstant(columnName) || isIntegerColumn(columnName, tableNames);
     }
 
+    /** TODO */
+    static private int numOccurencesOfCharIn(String str, char ch) {
+        int num = 0;
+        for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
+            num++;
+        }
+        return num;
+    }
+
+    /** TODO */
+    static private int indexOfNthOccurenceOfCharIn(String str, char ch, int n) {
+        int index = -1;
+        for (int i=0; i < n; i++) {
+            index = str.indexOf(ch, index+1);
+            if (index < 0) {
+                return -1;
+            }
+        }
+        return index;
+    }
+
     /** Modify queries containing an ORDER BY clause, in such a way that
      *  PostgreSQL results will match VoltDB results, generally by adding
      *  NULLS FIRST or NULLS LAST. */
@@ -224,11 +246,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             matcher.appendReplacement(modified_dml, replaceText.toString());
         }
         matcher.appendTail(modified_dml);
-//        // TODO: temp debug:
-//        if (!dml.equalsIgnoreCase(modified_dml.toString())) {
-//            System.out.println("In PostgreSQLBackend.transformOrderByQueries,\n  with dml    : " + dml);
-//            System.out.println("  modified_dml: " + modified_dml);
-//        }
+        if (DEBUG && !dml.equalsIgnoreCase(modified_dml.toString())) {
+            System.out.println("In PostgreSQLBackend.transformOrderByQueries,\n  with dml    : " + dml);
+            System.out.println("  modified_dml: " + modified_dml);
+        }
         return modified_dml.toString();
     }
 
@@ -240,7 +261,6 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  counts Sunday as 0 and Saturday as 6, etc., whereas VoltDB counts
      *  Sunday as 1 and Saturday as 7, etc.) */
     static private String transformDayOfWeekOrYearQueries(String dml) {
-        // TODO: temp debug:
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = dayOfWeekOrYearQuery.matcher(dml);
         while (matcher.find()) {
@@ -269,11 +289,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             matcher.appendReplacement(modified_dml, replaceText.toString());
         }
         matcher.appendTail(modified_dml);
-//        // TODO: temp debug:
-//        if (!dml.equalsIgnoreCase(modified_dml.toString())) {
-//            System.out.println("In PostgreSQLBackend.transformDayOfWeekOrYearQueries,\n  with dml    : " + dml);
-//            System.out.println("  modified_dml: " + modified_dml);
-//        }
+        if (DEBUG && !dml.equalsIgnoreCase(modified_dml.toString())) {
+            System.out.println("In PostgreSQLBackend.transformDayOfWeekOrYearQueries,\n  with dml    : " + dml);
+            System.out.println("  modified_dml: " + modified_dml);
+        }
         return modified_dml.toString();
     }
 
@@ -282,19 +301,14 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  (non-integer) value, unlike VoltDB, which returns an integer;
      *  so change it to: TRUNC ( AVG(columnName) ). */
     static private String transformAvgOfIntegerQueries(String dml) {
-        // TODO: temp debug:
-//        System.out.println("Entered PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml       : " + dml);
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = avgQuery.matcher(dml);
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer();
-            String column = null, avgFunc = null;
+            String column = null, function = null;
             try {
-                column  = matcher.group("column");
-                avgFunc = matcher.group(0);
-                // TODO: temp debug:
-//                System.out.println("  column : " + column);
-//                System.out.println("  avgFunc: " + avgFunc);
+                function = matcher.group();
+                column   = matcher.group("column");
             } catch (IllegalArgumentException e) {
                 // do nothing: column remains null
                 break;
@@ -303,18 +317,76 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 throw new ExpectedProcedureException("Programming error: column should not "
                         + "be null, but is (" + column + "), for SQL statement:\n" + dml);
             } else if (isIntegerColumn(column)) {
-                replaceText.append("TRUNC ( " + avgFunc + " )");
+                int numOpenParens  = numOccurencesOfCharIn(function, '(');
+                int numCloseParens = numOccurencesOfCharIn(function, ')');
+                if (numOpenParens == numCloseParens) {
+                    replaceText.append("TRUNC ( " + function + " )");
+                } else if (numOpenParens < numCloseParens) {
+                    int index = indexOfNthOccurenceOfCharIn(function, ')', numOpenParens);
+                    replaceText.append("TRUNC ( " + function.substring(0, index+1) + " )" + function.substring(index+1));
+                } else {
+                    // numOpenParens < numCloseParens: give up, leave dml unchanged
+                    replaceText.append(function);
+                }
             } else {
-                replaceText.append(avgFunc);
+                replaceText.append(function);
             }
             matcher.appendReplacement(modified_dml, replaceText.toString());
         }
         matcher.appendTail(modified_dml);
-        // TODO: temp debug:
-//        if (!dml.equalsIgnoreCase(modified_dml.toString())) {
-//            System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml    : " + dml);
-//            System.out.println("  modified_dml: " + modified_dml);
-//        }
+        if (DEBUG && !dml.equalsIgnoreCase(modified_dml.toString())) {
+            System.out.println("In PostgreSQLBackend.transformAvgOfIntegerQueries,\n  with dml    : " + dml);
+            System.out.println("  modified_dml: " + modified_dml);
+        }
+        return modified_dml.toString();
+    }
+
+    /** Modify queries containing an AVG(columnName) where <i>columnName</i>
+     *  is of an integer type, for which PostgreSQL returns a numeric
+     *  (non-integer) value, unlike VoltDB, which returns an integer;
+     *  so change it to: TRUNC ( AVG(columnName) ). */
+    static private String transformCeilingOrFloorOfIntegerQueries(String dml) {
+        StringBuffer modified_dml = new StringBuffer();
+        Matcher matcher = ceilingOrFloorQuery.matcher(dml);
+        while (matcher.find()) {
+            StringBuffer replaceText = new StringBuffer();
+            String function = null, column = null;
+            try {
+                function = matcher.group();
+                column   = matcher.group("column");
+                // TODO: temp debug:
+                System.out.println("Entered PostgreSQLBackend.transformCeilingOrFloorOfIntegerQueries,\n  with dml    : " + dml);
+                System.out.println("  function: " + function);
+                System.out.println("  column  : " + column);
+            } catch (IllegalArgumentException e) {
+                // do nothing: column remains null
+                break;
+            }
+            if (column == null) {
+                throw new ExpectedProcedureException("Programming error: column should not "
+                        + "be null, but is (" + column + "), for SQL statement:\n" + dml);
+            } else if (isIntegerColumn(column)) {
+                int numOpenParens  = numOccurencesOfCharIn(function, '(');
+                int numCloseParens = numOccurencesOfCharIn(function, ')');
+                if (numOpenParens == numCloseParens) {
+                    replaceText.append("CAST ( " + function + " as INTEGER )");
+                } else if (numOpenParens < numCloseParens) {
+                    int index = indexOfNthOccurenceOfCharIn(function, ')', numOpenParens);
+                    replaceText.append("CAST ( " + function.substring(0, index+1) + " as INTEGER )" + function.substring(index+1));
+                } else {
+                    // numOpenParens < numCloseParens: give up, leave dml unchanged
+                    replaceText.append(function);
+                }
+            } else {
+                replaceText.append(function);
+            }
+            matcher.appendReplacement(modified_dml, replaceText.toString());
+        }
+        matcher.appendTail(modified_dml);
+        if (DEBUG && !dml.equalsIgnoreCase(modified_dml.toString())) {
+//            System.out.println("In PostgreSQLBackend.transformCeilingOrFloorOfIntegerQueries,\n  with dml    : " + dml);
+            System.out.println("  modified_dml: " + modified_dml);
+        }
         return modified_dml.toString();
     }
 
@@ -336,16 +408,14 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 // do nothing: numBytes remains -1
                 break;
             }
-            // TODO: figure out why 14 is not big enough
-            replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 42) + ")");
+            replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 14) + ")");
             matcher.appendReplacement(modified_ddl, replaceText.toString());
         }
         matcher.appendTail(modified_ddl);
-//        // TODO: temp debug:
-//        if (!ddl.equalsIgnoreCase(modified_ddl.toString())) {
-//            System.out.println("In PostgreSQLBackend.transformVarcharOfBytes,\n  with dml    : " + ddl);
-//            System.out.println("  modified_dml: " + modified_ddl);
-//        }
+        if (DEBUG && !ddl.equalsIgnoreCase(modified_ddl.toString())) {
+            System.out.println("In PostgreSQLBackend.transformVarcharOfBytes,\n  with dml    : " + ddl);
+            System.out.println("  modified_dml: " + modified_ddl);
+        }
         return modified_ddl.toString();
     }
 
@@ -364,8 +434,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             matcher.appendReplacement(modified_ddl, "BYTEA");
         }
         matcher.appendTail(modified_ddl);
-        // TODO: temp debug:
-        if (!ddl.equalsIgnoreCase(modified_ddl.toString())) {
+        if (DEBUG && !ddl.equalsIgnoreCase(modified_ddl.toString())) {
             System.out.println("In PostgreSQLBackend.transformVarbinary,\n  with ddl    : " + ddl);
             System.out.println("  modified_dml: " + modified_ddl);
         }
@@ -384,9 +453,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  which behave differently in PostgreSQL than in VoltDB, with other,
      *  similar terms, so that the results will match. */
     static public String transformDML(String dml) {
-        return  transformOrderByQueries(
-                transformDayOfWeekOrYearQueries(
-                transformAvgOfIntegerQueries(dml) ));
+        return transformDayOfWeekOrYearQueries(
+                transformCeilingOrFloorOfIntegerQueries(
+                    transformAvgOfIntegerQueries(
+                        transformOrderByQueries(dml) )));
     }
 
     /** Modifies DDL statements in such a way that PostgreSQL results will
