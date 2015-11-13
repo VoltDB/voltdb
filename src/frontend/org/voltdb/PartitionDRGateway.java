@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -88,7 +89,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         // init the instance and return
         try {
             pdrg.init(partitionId, producerGateway, startAction);
-        } catch (IOException e) {
+        } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
 
@@ -119,7 +120,8 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     // empty methods for community edition
     protected void init(int partitionId,
                         ProducerDRGateway producerGateway,
-                        StartAction startAction) throws IOException {}
+                        StartAction startAction) throws IOException, ExecutionException, InterruptedException
+    {}
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
                                           ClientResponseImpl response) {}
