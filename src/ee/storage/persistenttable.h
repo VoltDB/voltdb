@@ -93,7 +93,7 @@ class PersistentTableSurgeon {
 
 public:
 
-    TBMap &getData();
+    TBMap &getData() const;
     PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
@@ -427,7 +427,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         m_tupleLimit = newLimit;
     }
 
-    bool isPersistentTableEmpty()
+    bool isPersistentTableEmpty() const
     {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
@@ -443,7 +443,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() {
+    PersistentTable * getPreTruncateTable() const {
         return m_preTruncateTable;
     }
 
@@ -680,7 +680,7 @@ inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
 inline PersistentTableSurgeon::~PersistentTableSurgeon()
 {}
 
-inline TBMap &PersistentTableSurgeon::getData() {
+inline TBMap &PersistentTableSurgeon::getData() const {
     return m_table.m_data;
 }
 
