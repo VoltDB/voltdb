@@ -90,6 +90,15 @@ class TupleBlock {
 public:
     TupleBlock(Table *table, TBBucketPtr bucket);
 
+    void* operator new(std::size_t sz)
+    {
+        assert(sz == sizeof(TupleBlock));
+        return ThreadLocalPool::allocateExactSizedObject(sizeof(TupleBlock));
+    }
+
+    void operator delete(void* object)
+    { return ThreadLocalPool::freeExactSizedObject(sizeof(TupleBlock), object); }
+
     double loadFactor() {
         return m_activeTuples / m_tuplesPerBlock;
     }
@@ -267,8 +276,7 @@ inline void intrusive_ptr_add_ref(voltdb::TupleBlock * p)
 inline void intrusive_ptr_release(voltdb::TupleBlock * p)
 {
     if (--(p->m_references) == 0) {
-        p->~TupleBlock();
-        voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
+        delete p;
     }
 }
 

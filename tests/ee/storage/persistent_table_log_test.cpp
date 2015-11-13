@@ -235,9 +235,16 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     tableutil::getRandomTuple(m_table, tuple);
     ASSERT_FALSE( m_table->lookupTupleForUndo(tuple).isNullTuple());
 
+    // After calling undoUndoToken(), variable "tuple" is deactivated and the uninlined
+    // data it contains maybe freed, the safe way is to copy the "tuple" before undo.
+    voltdb::TableTuple tupleBackup(m_tableSchema);
+    tupleBackup.move(new char[tupleBackup.tupleLength()]);
+    tupleBackup.copyForPersistentInsert(tuple);
+    StackCleaner cleaner(tupleBackup);
+
     m_engine->undoUndoToken(INT64_MIN + 3);
 
-    ASSERT_TRUE(m_table->lookupTupleForUndo(tuple).isNullTuple());
+    ASSERT_TRUE(m_table->lookupTupleForUndo(tupleBackup).isNullTuple());
     ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)0);
 }
 
@@ -357,9 +364,9 @@ TEST_F(PersistentTableLogTest, FindBlockTest) {
     TBBucketPtr bucket(new TBBucket());
 
     // these will be used as artificial tuple block addresses
-    TBPtr block1(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
-    TBPtr block2(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
-    TBPtr block3(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(m_table, bucket));
+    TBPtr block1(new TupleBlock(m_table, bucket));
+    TBPtr block2(new TupleBlock(m_table, bucket));
+    TBPtr block3(new TupleBlock(m_table, bucket));
 
     TBMap blocks;
     char *base = block1->address();

@@ -36,8 +36,8 @@ class ContiguousAllocator {
     };
 
     int64_t m_count;
-    int32_t m_allocSize;
-    int32_t m_chunkSize;
+    const int32_t m_allocSize;
+    const int32_t m_chunkSize;
     Buffer *m_tail;
     int32_t m_blockCount;
 
@@ -53,6 +53,8 @@ public:
     void *last() const;
     void trim();
     int64_t count() const { return m_count; }
+
+    int32_t allocationSize() const { return m_allocSize; }
 
     size_t bytesAllocated() const;
 };
