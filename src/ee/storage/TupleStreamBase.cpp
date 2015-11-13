@@ -109,8 +109,6 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         throwFatalException(
                 "Received a new transaction, but with the same spHandle (%jd): old uniqueId is %jd, new uniqueId is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
-    } else if (uniqueId < 0 && lastCommittedSpHandle != currentSpHandle) {
-
     }
 
     // more data for an ongoing transaction with no new committed data
