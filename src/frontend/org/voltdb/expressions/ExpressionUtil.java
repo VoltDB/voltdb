@@ -45,6 +45,24 @@ public abstract class ExpressionUtil {
     }
 
     /**
+    *
+    * @param colExps
+    */
+   @SafeVarargs
+   public static AbstractExpression combine(Collection<AbstractExpression>... colExps) {
+       Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+       for (Collection<AbstractExpression> exps : colExps) {
+           if (exps != null) {
+               stack.addAll(exps);
+           }
+       }
+       if (stack.isEmpty()) {
+           return null;
+       }
+       return combine(stack);
+   }
+
+    /**
      *
      * @param exps
      */
@@ -54,7 +72,10 @@ public abstract class ExpressionUtil {
         }
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
+        return combine(stack);
+    }
 
+    private static AbstractExpression combine(Stack<AbstractExpression> stack) {
         // TODO: This code probably doesn't need to go through all this trouble to create AND trees
         // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
         // There is an easier algorithm that does not require stacking intermediate results.

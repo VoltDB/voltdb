@@ -867,7 +867,7 @@ public class TestJoinsSuite extends RegressionSuite {
         clearSeqTables(client);
         subtestTwoReplicatedTableFullNLJoin(client);
         clearSeqTables(client);
-        subtestPartitionTableFullNLJoin(client);
+        subtestPartitionTableFullJoin(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -987,7 +987,7 @@ public class TestJoinsSuite extends RegressionSuite {
 
     }
 
-    private void subtestPartitionTableFullNLJoin(Client client)
+    private void subtestPartitionTableFullJoin(Client client)
             throws NoConnectionsException, IOException, ProcCallException
     {
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(1, 1);");
