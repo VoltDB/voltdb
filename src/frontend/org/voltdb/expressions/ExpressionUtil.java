@@ -44,28 +44,38 @@ public abstract class ExpressionUtil {
         exp.finalizeValueTypes();
     }
 
-    public static AbstractExpression cloneAndCombinePredicates(List<AbstractExpression> exps) {
-        if (exps.isEmpty()) {
-            return null;
-        }
+    @SafeVarargs
+    public static AbstractExpression cloneAndCombinePredicates(Collection<AbstractExpression>... colExps) {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        for (AbstractExpression expr : exps) {
-            stack.add((AbstractExpression)expr.clone());
+        for (Collection<AbstractExpression> exps : colExps) {
+            if (exps == null) {
+                continue;
+            }
+            for (AbstractExpression expr : exps) {
+                stack.add((AbstractExpression)expr.clone());
+            }
+        }
+        if (stack.isEmpty()) {
+            return null;
         }
         return combineStack(stack);
     }
 
     /**
      *
-     * @param exps
+     * @param colExps
      */
-    public static AbstractExpression combine(Collection<AbstractExpression> exps) {
-        if (exps.isEmpty()) {
+    @SafeVarargs
+    public static AbstractExpression combinePredicates(Collection<AbstractExpression>... colExps) {
+        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
+        for (Collection<AbstractExpression> exps : colExps) {
+            if (exps != null) {
+                stack.addAll(exps);
+            }
+        }
+        if (stack.isEmpty()) {
             return null;
         }
-        Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
-        stack.addAll(exps);
-
         return combineStack(stack);
     }
 

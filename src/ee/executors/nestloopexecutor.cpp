@@ -88,9 +88,9 @@ static void collectAllTableTuples(boost::unordered_set<uint64_t>& tupleAddressSe
     }
 }
 
-struct PredicateEvaluator
+struct PredicateLimitEvaluator
 {
-    PredicateEvaluator(const AbstractExpression * wherePredicate, int limit, int offset) :
+    PredicateLimitEvaluator(const AbstractExpression * wherePredicate, int limit, int offset) :
         m_wherePredicate(wherePredicate),
         m_limit(limit),
         m_offset(offset),
@@ -109,7 +109,7 @@ struct PredicateEvaluator
     }
 
     // Returns true if predicate evaluates to true and LIMIT/OFFSET conditions are satisfied.
-    bool evalPredicate(const TableTuple& outer_tuple, const TableTuple& inner_tuple) {
+    bool eval(const TableTuple& outer_tuple, const TableTuple& inner_tuple) {
         if (m_wherePredicate == NULL || m_wherePredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
             // Check if we have to skip this tuple because of offset
             if (m_tuple_skipped < m_offset) {
@@ -243,10 +243,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     const TableTuple& null_inner_tuple = m_null_inner_tuple.tuple();
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
-    int tuple_ctr = 0;
-    int tuple_skipped = 0;
     ProgressMonitorProxy pmp(m_engine, this);
     PredicateEvaluator whereEvaluator(wherePredicate, limit, offset);
+    PredicateLimitEvaluator whereEvaluator(wherePredicate, limit, offset);
 
     TableTuple join_tuple;
     if (m_aggExec != NULL) {
@@ -280,14 +279,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 // then pad unmatched outers, then filter them all
                 if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                     outerMatch = true;
-                    // The inner tuple passed the predicate
-                    // Remove it from the set of inner tuples
-                    size_t erase_count = innerNoMatchTuples.erase((uint64_t) inner_tuple.address());
-                    // the inner tuple could be already deleted during the iteration over previous outer tupe
-                    assert(erase_count <= 1);
-                    erase_count = 1;
+                    // The inner tuple passed the join predicate
+                    if (join_type == JOIN_TYPE_FULL) {
+                        // Remove it from the set of inner tuples
+                        innerNoMatchTuples.erase((uint64_t) inner_tuple.address());
+                    }
                     // Filter the joined tuple
-                    if (whereEvaluator.evalPredicate(outer_tuple, inner_tuple)) {
+                    if (whereEvaluator.eval(outer_tuple, inner_tuple)) {
                         // Matched! Complete the joined tuple with the inner column values.
                         join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                         if (outputTuple(join_tuple, pmp)) {
@@ -303,7 +301,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         //
         if (join_type != JOIN_TYPE_INNER && !outerMatch && whereEvaluator.isUnderLimit()) {
             // Still needs to pass the filter
-            if (whereEvaluator.evalPredicate(outer_tuple, null_inner_tuple)) {
+            if (whereEvaluator.eval(outer_tuple, null_inner_tuple)) {
                 // Matched! Complete the joined tuple with the inner column values.
                 join_tuple.setNValues(outer_cols, null_inner_tuple, 0, inner_cols);
                 if (outputTuple(join_tuple, pmp)) {
@@ -326,7 +324,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             // Restore the tuple value
             inner_tuple.move((char *)*itr);
             // Still needs to pass the filter
-            if (whereEvaluator.evalPredicate(null_outer_tuple, inner_tuple)) {
+            if (whereEvaluator.eval(null_outer_tuple, inner_tuple)) {
                 // Matched! Complete the joined tuple with the inner column values.
                 join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                 if (outputTuple(join_tuple, pmp)) {

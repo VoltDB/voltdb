@@ -58,10 +58,8 @@ namespace voltdb {
 class NestLoopIndexPlanNode;
 class IndexScanPlanNode;
 class AggregateExecutorBase;
-class PersistentTable;
-class Table;
-class TempTable;
-class TableIndex;
+class ProgressMonitorProxy;
+class TableTuple;
 
 /**
  * Nested loop for IndexScan.
@@ -87,12 +85,17 @@ protected:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
+    // Write tuple to the output table. If inline aggregate is set and reached the limit
+    // return TRUE indicating the end of iteration. Otherwise return FALSE
+    bool outputTuple(TableTuple& join_tuple, ProgressMonitorProxy& pmp);
+
     IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
     JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
-    StandAloneTupleStorage m_null_tuple;
+    StandAloneTupleStorage m_null_outer_tuple;
+    StandAloneTupleStorage m_null_inner_tuple;
     StandAloneTupleStorage m_indexValues;
     AggregateExecutorBase* m_aggExec;
 };
