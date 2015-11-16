@@ -39,7 +39,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ImportHandler;
 import org.voltdb.ImporterServerAdapterImpl;
-import org.voltdb.InternalConnectionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
 
@@ -69,7 +68,8 @@ public class ImportProcessor implements ImportDataProcessor {
     public class BundleWrapper {
         private final Bundle m_bundle;
         private ImportHandlerProxy m_handlerProxy;
-        private AbstractImporter m_importer;
+        private AbstractImporterFactory m_importerFactory;
+        private ImporterTypeManager m_importerTypeMgr;
         private ImportHandler m_handler;
         private ChannelDistributer m_channelDistributer;
 
@@ -78,8 +78,17 @@ public class ImportProcessor implements ImportDataProcessor {
             if (o instanceof ImportHandlerProxy) {
                 m_handlerProxy = (ImportHandlerProxy) o;;
             } else {
-                m_importer = (AbstractImporter) o;
-                m_importer.setImportServerAdapter(m_importServerAdapter);
+                m_importerFactory = (AbstractImporterFactory) o;
+                m_importerFactory.setImportServerAdapter(m_importServerAdapter);
+                m_importerTypeMgr = new ImporterTypeManager(m_importerFactory);
+            }
+        }
+
+        public String getImporterType() {
+            if (m_handlerProxy != null) {
+                return m_handlerProxy.getName();
+            } else {
+                return m_importerFactory.getTypeName();
             }
         }
 
@@ -87,7 +96,7 @@ public class ImportProcessor implements ImportDataProcessor {
             if (m_handlerProxy != null) {
                 m_handlerProxy.configure(props);
             } else {
-                m_importer.configure(props);
+                m_importerTypeMgr.configure(props);
             }
         }
 
@@ -111,8 +120,8 @@ public class ImportProcessor implements ImportDataProcessor {
                 if (m_handler != null) {
                     m_handler.stop();
                 }
-                if (m_importer != null) {
-                    m_importer.stopImporter(m_distributer);
+                if (m_importerFactory != null) {
+                    m_importerTypeMgr.stop(m_distributer);
                 }
                 if (m_bundle != null) {
                     m_bundle.stop();
@@ -134,7 +143,6 @@ public class ImportProcessor implements ImportDataProcessor {
 
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
-            InternalConnectionContext importer = null;
             if (wrapper == null) {
                 if (moduleType.equalsIgnoreCase("osgi")) {
 
@@ -149,7 +157,6 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
                     Object o = bundle.getBundleContext().getService(reference);
-                    importer = (InternalConnectionContext) o;
                     wrapper = new BundleWrapper(o, bundle);
                 } else {
                     //Class based importer.
@@ -159,10 +166,9 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
 
-                    importer = (ImportHandlerProxy) reference.newInstance();
-                     wrapper = new BundleWrapper(importer, null);
+                     wrapper = new BundleWrapper(reference.newInstance(), null);
                 }
-                String name = importer.getName();
+                String name = wrapper.getImporterType();
                 if (name == null || name.trim().length() == 0) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
@@ -204,7 +210,7 @@ public class ImportProcessor implements ImportDataProcessor {
                             importHandler.readyForData();
                             m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
                         } else {
-                            bw.m_importer.readyForData(m_distributer);
+                            bw.m_importerTypeMgr.readyForData(m_distributer);
                         }
                     } catch (Exception ex) {
                         //Should never fail. crash.

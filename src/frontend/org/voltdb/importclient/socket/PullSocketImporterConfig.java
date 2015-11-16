@@ -23,7 +23,6 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,17 +33,34 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  */
-public class PullSocketImporterConfig implements ImporterConfig {
-
+public class PullSocketImporterConfig implements ImporterConfig
+{
     private final static Splitter COMMA_SPLITTER = Splitter.on(',').omitEmptyStrings().trimResults();
     private final static Pattern HOST_RE = Pattern.compile(
                 "(?<host>[\\w._-]+):(?<port>\\d+)(?:-(?<tail>\\d+)){0,1}"
             );
 
-    private Map<URI,String> m_resources = ImmutableMap.of();
+
+    private final URI m_resourceID;
+    private final String m_procedure;
+
+    public PullSocketImporterConfig(URI resourceID, String procedure)
+    {
+        m_resourceID = resourceID;
+        m_procedure = procedure;
+    }
 
     @Override
-    public void addConfiguration(Properties props)
+    public URI getResourceID()
+    {
+        return m_resourceID;
+    }
+
+    String getProcedure() {
+        return m_procedure;
+    }
+
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props)
     {
         String hosts = props.getProperty("addresses", "").trim();
         if (hosts.isEmpty()) {
@@ -55,20 +71,19 @@ public class PullSocketImporterConfig implements ImporterConfig {
             throw new IllegalArgumentException("'procedure' is a required property and must be defined");
         }
 
-        ImmutableMap.Builder<URI,String> sbldr = ImmutableMap.builder();
-        sbldr.putAll(m_resources);
+        ImmutableMap.Builder<URI, ImporterConfig> sbldr = ImmutableMap.builder();
         for (String host: COMMA_SPLITTER.split(hosts)) {
-            sbldr.putAll(checkHost(host, procedure));
+            checkHostAndAddConfig(host, procedure, sbldr);
         }
         try {
-            m_resources = sbldr.build();
+            return sbldr.build();
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(
                     "One or more addresses are assigned to more than one store procedure", e);
         }
     }
 
-    private final Map<URI,String> checkHost(String hspec, String procedure) {
+    private static void checkHostAndAddConfig(String hspec, String procedure, ImmutableMap.Builder<URI, ImporterConfig> builder) {
         Matcher mtc = HOST_RE.matcher(hspec);
         if (!mtc.matches()) {
             throw new IllegalArgumentException(String.format("Address spec %s is malformed", hspec));
@@ -81,7 +96,7 @@ public class PullSocketImporterConfig implements ImporterConfig {
         if (port>tail) {
             throw new IllegalArgumentException(String.format("Invalid port range in address spec %s", hspec));
         }
-        ImmutableMap.Builder<URI,String> mbldr = ImmutableMap.builder();
+
         for (int p = port; p <= tail; ++p) {
             InetAddress a;
             try {
@@ -90,18 +105,9 @@ public class PullSocketImporterConfig implements ImporterConfig {
                 throw new IllegalArgumentException(String.format("Failed to resolve host %s", mtc.group("host")), e);
             }
             InetSocketAddress sa = new InetSocketAddress(a, p);
-            mbldr.put(URI.create("tcp://" + sa.getHostString() + ":" + sa.getPort() + "/"),procedure);
+            PullSocketImporterConfig config =
+                    new PullSocketImporterConfig(URI.create("tcp://" + sa.getHostString() + ":" + sa.getPort() + "/"), procedure);
+            builder.put(config.getResourceID(), config);
         }
-        return mbldr.build();
-    }
-
-    @Override
-    public Set<URI> getAvailableResources()
-    {
-        return m_resources.keySet();
-    }
-
-    String getProcedure(URI uri) {
-        return m_resources.get(uri);
     }
 }

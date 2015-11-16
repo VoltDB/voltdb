@@ -18,45 +18,41 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.HashSet;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
-import org.osgi.framework.BundleActivator;
-import org.osgi.framework.BundleContext;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.InternalConnectionContext;
 
 
 /**
- * Abstract class that must be extended to create importers in VoltDB server.
- * If the importer is made available using an OSGi bundle, this class has BundleActivator start method implementation
- * to register itself as a service. The sequence of calls when the importer is started up is:
- * - Find the importer in the OSGi bundle as a service
- * - Get ImporterConfig object using importer.createImporterConfig
- * - Add configuration entries using importerConfig.addConfiguration
- * - Start the importer by calling readyForData. This starts up required number of executors for the
- *   resources used by this importer and calls readyForData for each resource in its own thread.
+ * Abstract class that must be extended to create custom importers in VoltDB server.
+ * If the importer is made available using an OSGi bundle, will register itself as a service using
+ * BundleActivator.start implementation. The sequence of calls when the importer is started up is:
+ * <ul>
+ * <li> Find the importer in the OSGi bundle as a service </li>
+ * <li> Get ImporterConfig object using importer.createImporterConfig </li>
+ * <li> Add configuration entries using importerConfig.addConfiguration </li>
+ * <li> Start the importer by calling readyForData. This in turn creates the required number
+ *   threads for the resources available and calls <code>accept(reourceID)</code> implementation
+ *   on the importer for each resource. If the importer is <code>!isRunEveryWhere</code>,
+ *   <code>accept(resourceID)</code> is called when the resources are distributed to the importers. </li>
+ * </ul>
  *
- * <p>The importer is stopped by simply calling stop method, which will stop the executor service and
- * call stopImporter to stop required activities specific to the importer instance.
+ * <p>The framework stops the importer by calling <code>stopImporter</code>, which will stop the executor service and
+ * call <code>stop</code> on the importer instance to close resources used by the specific importer.
+ * <code>stop(resourceID)</code> will also be called on the importer instances when the resources are redistributed
+ * because of addition/deletion of nodes to the cluster.
  *
  * <p>Importer implementations should do their work in a <code>while (shouldRun())</code> loop, which will
- * make sure that that the importer stops its work when stop is called.
+ * make sure that that the importer will stop its work when the framework calls stop.
  * TODO: Should we call interrupt as well on the importer instance.
  */
 public abstract class AbstractImporter
-    implements InternalConnectionContext, ChannelChangeCallback, BundleActivator {
+    implements InternalConnectionContext {
 
-    private ExecutorService m_executorService;
-    private final ImporterConfig m_config;
+    private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
+
     private final VoltLogger m_logger;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
@@ -64,104 +60,48 @@ public abstract class AbstractImporter
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
-        m_config = createImporterConfig();
     }
 
-    @Override
-    public final void start(BundleContext context) throws Exception {
-        context.registerService(this.getClass().getName(), this, null);
-    }
-
-    @Override
-    public final void stop(BundleContext context) throws Exception {
-        // Nothing to do for now.
-    }
-
+    /**
+     * Passes in the server adapter that may be used by this importer to access the server,
+     * like calling a procedure.
+     *
+     * @param adapter the server adapter that may be used by this to access the server.
+     */
     public final void setImportServerAdapter(ImporterServerAdapter adapter) {
         m_importServerAdapter = adapter;
     }
 
-    public final void configure(Properties props) {
-        m_config.addConfiguration(props);
-    }
-
-    public final void readyForData(ChannelDistributer distributer) {
-        if (m_executorService != null) { // Should be caused by coding error. Hence generic RuntimeException is OK
-            throw new RuntimeException("Importer has already been started and is running");
-        }
-
-        Set<URI> resources = m_config.getAvailableResources();
-        m_executorService = Executors.newFixedThreadPool(resources.size(),
-                getThreadFactory(getName(), ImportHandlerProxy.MEDIUM_STACK_SIZE));
-
-        if (isRunEveryWhere()) {
-            for (final URI res : resources) {
-                m_executorService.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        accept(res);
-                    }
-                });
-            }
-        } else {
-            distributer.registerCallback(getName(), this);
-            distributer.registerChannels(getName(), resources);
-        }
-    }
-
-    @Override
-    public final void onChange(ImporterChannelAssignment assignment) {
-        if (m_stopping) return;
-
-        for (URI removed: assignment.getRemoved()) {
-            stop(removed);
-        }
-
-        for (final URI added: assignment.getAdded()) {
-            m_executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    accept(added);
-                }
-            });
-        }
-    }
-
-    @Override
-    public void onClusterStateChange(VersionedOperationMode mode) {
-        if (m_logger.isDebugEnabled()) {
-            m_logger.debug(getName() + ".onChange");
-        }
-    }
-
-    public final void stopImporter(ChannelDistributer distributer) {
-        m_stopping = true;
-
-        if (!isRunEveryWhere()) {
-            distributer.registerChannels(getName(), new HashSet<URI>());
-        }
-        stop();
-
-        if (m_executorService != null) {
-            m_executorService.shutdown();
-            try {
-                m_executorService.awaitTermination(365, TimeUnit.DAYS);
-            } catch (InterruptedException ex) {
-                //Should never come here.
-                m_logger.warn("Unexpected interrupted exception waiting for " + getName() + " to shutdown", ex);
-            }
-        }
-    }
-
-    protected final boolean shouldRun() {
+    /**
+     * This method indicates if the importer has been stopped or if it should continue running.
+     * This should be checked by importer implementations regularly to determine if the importer
+     * should continue its execution.
+     *
+     * @return returns true if the importer execution should continue; false otherwise
+     */
+    protected final boolean shouldRun()
+    {
         return !m_stopping;
     }
 
-    protected final VoltLogger getLogger() {
+    /**
+     * Returns the logger that should be used by this importer.
+     *
+     * @return logger that should be used by this importer.
+     */
+    protected final VoltLogger getLogger()
+    {
         return m_logger;
     }
 
-    protected final boolean callProcedure(Invocation invocation) {
+    /**
+     * This should be used importer implementations to execute a stored procedure.
+     *
+     * @param invocation Invocation object with procedure name and parameter information
+     * @return returns true if the procedure execution went through successfully; false otherwise
+     */
+    protected final boolean callProcedure(Invocation invocation)
+    {
         try {
             boolean result = m_importServerAdapter.callProcedure(this, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
@@ -214,34 +154,18 @@ public abstract class AbstractImporter
         m_importServerAdapter.reportFailure(getName(), procName, false);
     }
 
-    private ThreadFactory getThreadFactory(final String groupName, final int stackSize) {
-        final ThreadGroup group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
-
-        return new ThreadFactory() {
-            private final AtomicLong m_createdThreadCount = new AtomicLong(0);
-
-            @Override
-            public synchronized Thread newThread(final Runnable r) {
-                final String threadName = groupName + " - " + m_createdThreadCount.getAndIncrement();
-                Thread t = new Thread(group, r, threadName, stackSize);
-                t.setDaemon(true);
-                return t;
-            }
-        };
+    protected void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
+    {
+        m_logger.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, level, cause, format, args);
     }
 
-    protected void rateLimitedLog(Level level, Throwable cause, String format, Object... args) {
-        //TODO: define suppress interval somewhere
-        m_logger.rateLimitedLog(60, level, cause, format, args);
-    }
+    public abstract URI getResourceID();
 
-    protected abstract ImporterConfig createImporterConfig();
-
-    protected abstract void accept(URI resourceID);
+    /**
+     * This is
+     * @param resourceID
+     */
+    protected abstract void accept();
 
     protected abstract void stop();
-
-    protected abstract void stop(URI resourceID);
-
-    protected abstract boolean isRunEveryWhere();
 }

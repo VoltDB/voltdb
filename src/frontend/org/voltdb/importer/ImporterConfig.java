@@ -18,16 +18,12 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.Properties;
-import java.util.Set;
 
 
 /**
  * TODO:
  */
-public interface ImporterConfig {
-
-    public void addConfiguration(Properties props);
-
-    public Set<URI> getAvailableResources();
+public interface ImporterConfig
+{
+    public URI getResourceID();
 }

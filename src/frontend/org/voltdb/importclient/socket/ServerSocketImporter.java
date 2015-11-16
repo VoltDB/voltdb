@@ -28,20 +28,18 @@ import java.util.List;
 import org.voltcore.logging.Level;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.CSVInvocation;
-import org.voltdb.importer.ImporterConfig;
 
 /**
  */
 public class ServerSocketImporter extends AbstractImporter {
 
-    private ServerSocketImporterConfig m_config;
+    private final ServerSocketImporterConfig m_config;
     private List<ClientConnectionHandler> m_clients = new ArrayList<>();
 
-    @Override
-    protected ImporterConfig createImporterConfig()
+    public ServerSocketImporter(ServerSocketImporterConfig config)
     {
-        m_config = new ServerSocketImporterConfig();
-        return m_config;
+        super();
+        m_config = config;
     }
 
     @Override
@@ -51,22 +49,24 @@ public class ServerSocketImporter extends AbstractImporter {
     }
 
     @Override
-    protected void accept(URI resourceID)
+    public URI getResourceID()
     {
-        ServerSocketImporterConfig.InstanceConfiguration instanceConfig = m_config.getInstanceConfiguration(resourceID);
-        //TODO: Make sure we don't need null check here. Merge 2 lines, if we don't need null check.
-        startListening(instanceConfig);
+        return m_config.getResourceID();
+    }
+
+    @Override
+    protected void accept()
+    {
+        startListening();
     }
 
     @Override
     protected void stop()
     {
-        for (ServerSocketImporterConfig.InstanceConfiguration aconfig : m_config.getAllInstanceConfigurations()) {
-            try {
-                aconfig.m_serverSocket.close();
-            } catch(IOException e) {
-                getLogger().warn("Error closing socket importer server socket on port " + aconfig.m_port, e);
-            }
+        try {
+            m_config.getServerSocket().close();
+        } catch(IOException e) {
+            getLogger().warn("Error closing socket importer server socket on port " + m_config.getPort(), e);
         }
 
         for (ClientConnectionHandler client : m_clients) {
@@ -74,22 +74,17 @@ public class ServerSocketImporter extends AbstractImporter {
         }
     }
 
-    @Override
-    protected void stop(URI resourceID) {
-        throw new UnsupportedOperationException("Stopping for a specific URI is not supported for SocketServerImporter");
-    }
-
-    private void startListening(ServerSocketImporterConfig.InstanceConfiguration instanceConfig)
+    private void startListening()
     {
         try {
             while (shouldRun()) {
-                Socket clientSocket = instanceConfig.m_serverSocket.accept();
-                ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket, instanceConfig.m_procedure);
+                Socket clientSocket = m_config.getServerSocket().accept();
+                ClientConnectionHandler ch = new ClientConnectionHandler(clientSocket, m_config.getProcedure());
                 m_clients.add(ch);
                 ch.start();
             }
         } catch(IOException e) {
-           getLogger().error("Unexpected error accepting client connections for " + getName() + " on port " + instanceConfig.m_port, e);
+           getLogger().error("Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort(), e);
         }
     }
 
@@ -132,11 +127,5 @@ public class ServerSocketImporter extends AbstractImporter {
         {
             m_isStopping = true;
         }
-    }
-
-    @Override
-    protected boolean isRunEveryWhere()
-    {
-        return true;
     }
 }

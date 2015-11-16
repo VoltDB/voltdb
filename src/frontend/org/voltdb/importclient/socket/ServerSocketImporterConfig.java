@@ -21,87 +21,72 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import org.voltdb.importer.ImporterConfig;
 
 /**
  */
-public class ServerSocketImporterConfig implements ImporterConfig {
+public class ServerSocketImporterConfig implements ImporterConfig
+{
 
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
-    private Map<URI, InstanceConfiguration> m_instanceConfigs = new HashMap<>();
+    private final URI m_resourceID;
+    private final String m_procedure;
+    private final int m_port;
+    private final ServerSocket m_serverSocket;
 
-    @SuppressWarnings("resource")
-    @Override
-    public void addConfiguration(Properties props)
+    public ServerSocketImporterConfig(Properties props)
     {
         Properties propsCopy = (Properties) props.clone();
 
-        String procedure = (String) propsCopy.get("procedure");
-        if (procedure == null || procedure.trim().length() == 0) {
+        m_procedure = (String) propsCopy.get("procedure");
+        if (m_procedure == null || m_procedure.trim().length() == 0) {
             throw new IllegalArgumentException("Missing procedure.");
         }
 
         String portStr = (String) propsCopy.get("port");
-        if (m_instanceConfigs.containsKey(portStr)) {
-            throw new IllegalArgumentException("Multiple configuration sections for socket importer on port: " + portStr);
-        }
-
-        int port =-1;
         try {
-            port = Integer.parseInt(portStr);
-            if (port <= 0) {
+            m_port = Integer.parseInt(portStr);
+            if (m_port <= 0) {
                 throw new NumberFormatException();
             }
         } catch(NumberFormatException e) {
             throw new IllegalArgumentException("Invalid port specification: " + portStr);
         }
 
-        ServerSocket sSocket = null;
         try {
-            sSocket = new ServerSocket(port);
+            m_serverSocket = new ServerSocket(m_port);
         } catch(IOException e) {
-            throw new IllegalArgumentException("Error starting socket importer listener on port: " + port, e);
+            throw new IllegalArgumentException("Error starting socket importer listener on port: " + m_port, e);
         }
 
         try {
-            m_instanceConfigs.put(new URI(SOCKET_IMPORTER_URI_SCHEME, portStr, null),
-                    new InstanceConfiguration(port, procedure, sSocket));
+            m_resourceID = new URI(SOCKET_IMPORTER_URI_SCHEME, portStr, null);
         } catch(URISyntaxException e) { // Will not happen
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public Set<URI> getAvailableResources()
+    public URI getResourceID()
     {
-        return m_instanceConfigs.keySet();
+        return m_resourceID;
     }
 
-    InstanceConfiguration getInstanceConfiguration(URI resourceID) {
-        return m_instanceConfigs.get(resourceID);
-    }
-
-    Collection<InstanceConfiguration> getAllInstanceConfigurations() {
-        return m_instanceConfigs.values();
-    }
-
-    static class InstanceConfiguration
+    public String getProcedure()
     {
-        final int m_port;
-        final String m_procedure;
-        final ServerSocket m_serverSocket;
+        return m_procedure;
+    }
 
-        public InstanceConfiguration(int port, String procedure, ServerSocket serverSocket) {
-            m_port = port;
-            m_procedure = procedure;
-            m_serverSocket = serverSocket;
-        }
+    public int getPort()
+    {
+        return m_port;
+    }
+
+    public ServerSocket getServerSocket()
+    {
+        return m_serverSocket;
     }
 }

@@ -26,9 +26,9 @@
     <target name="socketstream">
         <antcall target="osgibundle">
             <param name="bundle.name" value="socketstream"/>
-            <param name="activator" value="org.voltdb.importclient.socket.SocketServerImporter"/>
+            <param name="activator" value="org.voltdb.importclient.socket.ServerSocketImporterFactory"/>
             <param name="bundle.displayname" value="SocketStreamImporter"/>
-            <param name="include.classpattern" value="socket/Socket*.class"/>
+            <param name="include.classpattern" value="socket/ServerSocket*.class"/>
         </antcall>
     </target>
 
@@ -36,15 +36,9 @@
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/pullsocketimporter.jar" basedir="${build.prod.dir}">
             <include name="org/voltdb/importclient/socket/PullSocketImporter*.class"/>
-<!--
-            <include name="org/voltdb/importclient/PullSocketImporter*.class"/>
--->
             <include name="org/voltdb/importclient/ImportBaseException.class"/>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.socket.PullSocketImporterVersion2" />
-<!--
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.PullSocketImporter" />
--->
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.socket.PullSocketImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="PullSocketImporter OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="PullSocketImporter" />
