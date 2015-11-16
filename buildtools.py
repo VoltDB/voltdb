@@ -5,7 +5,7 @@ class BuildContext:
     def __init__(self, args):
         self.CPPFLAGS = ""
         self.EXTRAFLAGS = ""
-        self.LDFLAGS = ""
+        self.LDFLAGS = "-L${INSTALL_DIR}/lib"
         self.JNIEXT = ""
         self.JNILIBFLAGS = ""
         self.JNIBINFLAGS = ""
@@ -18,7 +18,7 @@ class BuildContext:
         self.TEST_PREFIX = ""
         self.INPUT = {}
         self.SRC_INCLUDE_DIRS = []
-        self.OBJ_INCLUDE_DIRS = []
+        self.OBJ_INCLUDE_DIRS = ["3pty-install/include"]
         self.THIRD_PARTY_INPUT = {}
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
@@ -54,7 +54,19 @@ class BuildContext:
         buildLocal = os.path.join(os.path.dirname(__file__), "build.local")
         if os.path.exists(buildLocal):
             execfile(buildLocal, dict(BUILD = self))
-        
+
+    def getOpenSSLVersion(self):
+        return self.OPENSSL_VERSION
+    
+    def getOpenSSLToken(self):
+        if self.PLATFORM == 'Darwin':
+            return "darwin64-x86_64-cc"
+        if self.PLATFORM == 'Linux':
+            if self.compilerName() == 'gcc':
+                return "linux-x86_64:gcc -fpic"
+        print "ERROR: Don't know what platform to use to configure openssl."
+        sys.exit(-1)
+
     def compilerName(self):
         self.getCompilerVersion()
         if self.COMPILER_NAME:
@@ -170,15 +182,6 @@ def buildMakefile(CTX):
     for dir in CTX.OBJ_INCLUDE_DIRS:
         MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
     MAKECPPFLAGS += " -I${OBJDIR}"
-    # I don't think these are used anywhere.
-    LOCALCPPFLAGS = CPPFLAGS
-    for dir in CTX.SYSTEM_DIRS:
-        LOCALCPPFLAGS += " -isystem %s" % (dir)
-    for dir in CTX.SRC_INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I${ROOTDIR}/%s" % (dir)
-    for dir in CTX.OBJ_INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I${OBJDIR}/%s" % (dir)
-    LOCALCPPFLAGS += " -I${OBJDIR}"
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -189,9 +192,11 @@ def buildMakefile(CTX):
     JNIEXT = CTX.JNIEXT.strip()
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
+    THIRD_PARTY_INSTALL_DIR=(OUTPUT_PREFIX + "/" + "3pty-install")
 
     # create directories for output if they don't exist
     os.system("mkdir -p %s" % (OUTPUT_PREFIX))
+    os.system("mkdir -p %s" % THIRD_PARTY_INSTALL_DIR)
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
@@ -224,18 +229,33 @@ def buildMakefile(CTX):
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
-    makefile.write("#\n# Capture the (relative) name of the root directory.\n")
+    makefile.write("#\n")
+    makefile.write("# Capture the (relative) name of the root directory.\n")
     makefile.write("# Also, remember the obj directory,\n")
-    makefile.write("# which should be the directory we are currently in.\n#\n")
-    makefile.write('ROOTDIR=../..\n')
+    makefile.write("# which should be the directory we are currently in.\n")
+    makefile.write("#\n")
+    makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
     makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
-    makefile.write('#\n# This is the root of the cpp sources.\n#\n')
+    makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
+    makefile.write('#\n')
+    makefile.write('# This is the root of the cpp sources.\n')
+    makefile.write('#\n')
     makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
-    makefile.write('#\n# This is the root of the third party sources.\n#\n')
+    makefile.write('#\n')
+    makefile.write('# This is the root of the third party sources.\n')
+    makefile.write('#\n')
     makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
-    makefile.write("#\n# These are google S2 library's source and object directories.\n#\n")
-    makefile.write('GOOGLE_S2_SRC="${THIRD_PARTY_SRC}/google-s2-geometry"\n')
-    makefile.write('GOOGLE_S2_OBJ="${OBJDIR}/google-s2-geometry"\n')
+    makefile.write("#\n")
+    makefile.write("# These are google S2 library's source and object directories.\n")
+    makefile.write("#\n")
+    makefile.write('GOOGLE_S2_SRC=${THIRD_PARTY_SRC}/google-s2-geometry\n')
+    makefile.write('GOOGLE_S2_INSTALL=${INSTALL_DIR}\n')
+    makefile.write('\n')
+    makefile.write('#\n# These are the openssl library\'s source and install directories.\n')
+    makefile.write('# Note that we only use the BIGNUM functions from openssl.\n#\n')
+    makefile.write('OPENSSL_VERSION=%s\n' % CTX.OPENSSL_VERSION)
+    makefile.write('OPENSSL_SRC=${THIRD_PARTY_SRC}/openssl/openssl-${OPENSSL_VERSION}\n')
+    makefile.write('OPENSSL_INSTALL=${INSTALL_DIR}\n')
     makefile.write("\n")
 
     if CTX.TARGET == "CLEAN":
@@ -245,7 +265,8 @@ def buildMakefile(CTX):
         makefile.close()
         return
 
-    makefile.write(".PHONY: main\n\n")
+    makefile.write(".PHONY: main\n")
+    makefile.write('\n')
     if CTX.TARGET == "VOLTRUN":
         makefile.write("main: prod/voltrun\n")
     elif CTX.TARGET == "TEST":
@@ -301,7 +322,8 @@ def buildMakefile(CTX):
         makefile.write("prod/voltdbipc")
     if CTX.LEVEL == "MEMCHECK_NOFREELIST":
         makefile.write("prod/voltdbipc")
-    makefile.write("\n\n")
+    makefile.write("\n")
+    makefile.write('\n')
     makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
@@ -310,8 +332,6 @@ def buildMakefile(CTX):
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
-    
-    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
     
     makefile.write("########################################################################\n")
     makefile.write("#\n# %s\n#\n" % "Volt Files")
@@ -368,12 +388,15 @@ def buildMakefile(CTX):
     makefile.write("#\n# This target lets us print makefile variables, for debugging\n")
     makefile.write("#\n# the makefile.\n#\n")
     makefile.write("echo_makefile_config:\n")
-    makefile.write('\t@echo "ROOTDIR = $(ROOTDIR)"\n')
-    makefile.write('\t@echo "OBJDIR = $(OBJDIR)"\n')
-    makefile.write('\t@echo "SRCDIR = $(SRCDIR)"\n')
-    makefile.write('\t@echo "THIRD_PARTY_SRC = $(THIRD_PARTY_SRC)"\n')
-    makefile.write('\t@echo "GOOGLE_S2_SRC = $(GOOGLE_S2_SRC)"\n')
-    makefile.write('\t@echo "GOOGLE_S2_OBJ = $(GOOGLE_S2_OBJ)"\n')
+    makefile.write('\t@echo "ROOTDIR           = $(ROOTDIR)"\n')
+    makefile.write('\t@echo "OBJDIR            = $(OBJDIR)"\n')
+    makefile.write('\t@echo "SRCDIR            = $(SRCDIR)"\n')
+    makefile.write('\t@echo "THIRD_PARTY_SRC   = $(THIRD_PARTY_SRC)"\n')
+    makefile.write('\t@echo "GOOGLE_S2_SRC     = $(GOOGLE_S2_SRC)"\n')
+    makefile.write('\t@echo "GOOGLE_S2_INSTALL = $(GOOGLE_S2_INSTALL)"\n')
+    makefile.write('\t@echo "OPENSSL_SRC       = $(OPENSSL_SRC)"\n')
+    makefile.write('\t@echo "OPENSSL_INSTALL   = $(OPENSSL_INSTALL)"\n')
+    makefile.write('\t@echo "OPENSSL_VERSION   = $(OPENSSL_VERSION)"\n')
 
     makefile.write("#\n# Google S2 uses cmake, which has different names for the\n")
     makefile.write("# build types.  It's easier to translate them here than to\n")
@@ -393,11 +416,15 @@ def buildMakefile(CTX):
     makefile.write('\n')
     makefile.write('#\n# Force all third party libraries and tools to be\n')
     makefile.write('# configured and built and built here.\n#\n')
+    makefile.write('#   openssl - We use this only to get the Bignum from libcrypto.\n')
+    makefile.write('#             Note that this has to be before S2.\n');
+    makefile.write('#   s2      - We use this for geospatial computations.\n');
     makefile.write('.PHONY: build-third-party-tools\n')
-    makefile.write('build-third-party-tools: build-s2-geometry\n\n')
-    makefile.write('.PHONY: build-s2-geometry\n')
+    makefile.write('build-third-party-tools: build-openssl build-s2-geometry\n')
     makefile.write('\n')
-    makefile.write('build-s2-geometry: configure-s2-geometry\n')
+    makefile.write('.PHONY: build-openssl build-s2-geometry\n')
+    makefile.write('\n')
+    makefile.write('build-s2-geometry: configure-s2-geometry | build-openssl \n')
     makefile.write('\t@echo Building the S2 Library\n')
     makefile.write('\tcd google-s2-geometry; ${MAKE} all install\n')
     makefile.write('\n')
@@ -410,24 +437,47 @@ def buildMakefile(CTX):
     makefile.write("\t    rm -rf google-s2-geometry; \\\n")
     makefile.write('\t    mkdir google-s2-geometry; \\\n')
     makefile.write('\t    cd google-s2-geometry; \\\n')
-    makefile.write('\t\tcmake -DCXX_VERSION_FLAG=\"%s\" -DVOLTDB_THIRD_PARTY_CPP_DIR=\"../${THIRD_PARTY_SRC}\" -DCMAKE_INSTALL_PREFIX=. -DCMAKE_BUILD_TYPE=${S2_BUILD_TYPE} \"../${GOOGLE_S2_SRC}\"; \\\n' % CTX.CXX_VERSION_FLAG )
+    makefile.write('\t\tcmake -DCXX_VERSION_FLAG=\"%s\" -DVOLTDB_THIRD_PARTY_CPP_DIR=\"${THIRD_PARTY_SRC}\" -DCMAKE_INSTALL_PREFIX=\"${INSTALL_DIR}\" -DCMAKE_BUILD_TYPE=\"${S2_BUILD_TYPE}\" \"${GOOGLE_S2_SRC}\"; \\\n' % CTX.CXX_VERSION_FLAG )
     makefile.write("\tfi\n")
     makefile.write('\n')
     makefile.write('clean-s2-geometry:\n')
     makefile.write("\t@echo Deleting the S2 library\\\'s object files\n")
     makefile.write('\trm -rf google-s2-geometry\n')
     makefile.write('\n')
-    
+    makefile.write('# OpenSSL\n')
+    makefile.write('build-openssl: configure-openssl compile-openssl install-openssl\n')
+    makefile.write('configure-openssl:\n')
+    makefile.write('\t(cd "${OPENSSL_SRC}"; \\\n')
+    makefile.write('\t if [ ! -f Makefile ] ; then \\\n')
+    makefile.write('\t   ./Configure "%s"; \\\n' % CTX.getOpenSSLToken() )
+    makefile.write('\t fi )\n')
+    makefile.write('\n')
+    makefile.write('compile-openssl: | configure-openssl\n')
+    makefile.write('\t(cd "$(OPENSSL_SRC)"; $(MAKE))\n')
+    makefile.write('\n')
+    makefile.write('install-openssl: | compile-openssl\n')
+    makefile.write('\tif [ ! -f "$(OPENSSL_INSTALL)/lib/libcrypto.a" ] ; then \\\n')
+    makefile.write('\t  (cd "$(OPENSSL_SRC)"; $(MAKE) INSTALLTOP=\"$(OPENSSL_INSTALL)\" OPENSSLDIR=\"$(OPENSSL_INSTALL)\" install ) ; \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('\n')
+    makefile.write('clean-openssl:\n')
+    makefile.write('\t(cd "${OPENSSL_SRC}"; $(MAKE) clean; mv Makefile Makefile.last)\n')
+    makefile.write('.PHONY: build-openssl configure-openssl compile-openssl install-openssl clean-openssl\n')
+    makefile.write('\n')
 
     makefile.write("########################################################################\n")
-    makefile.write("#\n# %s\n#\n" % "Tests")
+    makefile.write("#\n")
+    makefile.write("# Tests\n")
+    makefile.write("#\n")
     makefile.write("########################################################################\n")
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
         makefile.write("########################################################################\n")
-        makefile.write("#\n# %s\n#\n" % sourcename)
+        makefile.write("#\n")
+        makefile.write("# %s\n" % sourcename)
+        makefile.write("#\n")
         makefile.write("########################################################################\n")
         makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
@@ -445,11 +495,18 @@ def buildMakefile(CTX):
             cleanobjs += [targetpath]
 
     makefile.write("########################################################################\n")
-    makefile.write("#\n# %s\n#\n" % "Cleaning")
+    makefile.write("#\n")
+    makefile.write("# Cleaning\n")
+    makefile.write("#\n")
     makefile.write("########################################################################\n")
     makefile.write("\n")
-    makefile.write("clean: clean-s2-geometry \n")
+    makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install\n")
     makefile.write("\t${RM} %s\n" % formatList(cleanobjs))
+    makefile.write("\n")
+    makefile.write("clean-3pty-install:\n")
+    makefile.write("\t${RM} -r \"${INSTALL_DIR}\"\n")
+    makefile.write(".PHONY: clean-3pty-install\n")
+    makefile.write("\n")
     makefile.close()
     return True
 

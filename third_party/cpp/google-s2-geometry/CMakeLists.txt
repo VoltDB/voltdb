@@ -5,10 +5,8 @@ include(CheckCXXCompilerFlag)
 include(FindPackageHandleStandardArgs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-if (APPLE)
-    set(ENV{OPENSSL_ROOT_DIR} "/usr/local/opt/openssl/include")
-endif(APPLE)
-find_package(OpenSSL REQUIRED)
+set(OPENSSL_INCLUDE_DIR ${CMAKE_INSTALL_PREFIX}/include)
+set(OPENSSL_LIBRARIES   "-L${CMAKE_INSTALL_PREFIX}/lib -lcrypto")
 
 message("OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
 message("OpenSSL libraries: ${OPENSSL_LIBRARIES}")
@@ -28,6 +26,7 @@ endif()
 
 ADD_DEFINITIONS (-Wno-deprecated-declarations -Wno-conversion -DNDEBUG ${CXX_VERSION_FLAG})
 
+message("OpenSSL DIR is ${OPENSSL_INCLUDE_DIR}")
 include_directories(${OPENSSL_INCLUDE_DIR})
 include_directories(geometry)
 include_directories(geometry/include)
