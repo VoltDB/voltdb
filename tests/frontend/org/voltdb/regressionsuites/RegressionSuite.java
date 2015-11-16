@@ -802,6 +802,17 @@ public class RegressionSuite extends TestCase {
                 long val = ((Integer)expectedObj).longValue();
                 assertEquals(msg, val, actualRow.getLong(i));
             }
+            else if (expectedObj instanceof Double) {
+                double expectedValue= (Double)expectedObj;
+                double actualValue = actualRow.getDouble(i);
+                // check if the row value was evaluated as null. Looking
+                // at return is not reliable way to do so;
+                // for null values, convert value into double min
+                if (actualRow.wasNull()) {
+                    actualValue = Double.MIN_VALUE;
+                }
+                assertEquals(msg, expectedValue, actualValue);
+            }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
                 assertEquals(msg, val, actualRow.getString(i));

@@ -247,6 +247,10 @@ static const int FUNC_VOLT_BIN                         = 20030;
 static const int FUNC_VOLT_POINTFROMTEXT               = 20031;
 static const int FUNC_VOLT_POLYGONFROMTEXT             = 20032;
 static const int FUNC_VOLT_CONTAINS                    = 20033;
+static const int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS  = 20034;
+static const int FUNC_VOLT_POLYGON_NUM_POINTS          = 20035;
+static const int FUNC_VOLT_POINT_LATITUDE              = 20036;
+static const int FUNC_VOLT_POINT_LONGITUDE             = 20037;
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

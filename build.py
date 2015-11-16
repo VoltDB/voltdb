@@ -25,14 +25,14 @@ from buildtools import *
 #  - Parse Target and Level from Command Line
 ###############################################################################
 
-CTX = BuildContext(sys.argv)
-
+###############################################################################
 # CTX is an instance of BuildContext, which is declared in buildtools.py
 # BuildContext contains vars that determine how the makefile will be built
 #  and how the build will go down. It also checks the platform and parses
 #  command line args to determine target and build level.
+###############################################################################
+CTX = BuildContext(sys.argv)
 
-# print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
 ###############################################################################
 # SET GLOBAL CONTEXT VARIABLES FOR BUILDING
 ###############################################################################
@@ -395,9 +395,13 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
 ###############################################################################
 # Some special handling for S2.
 ###############################################################################
-CTX.S2GEO_LIBS += " -Lgoogle-s2-geometry/lib -ls2geo -lcrypto "
-CTX.OBJ_INCLUDE_DIRS += ['google-s2-geometry/include']
+CTX.S2GEO_LIBS += "-ls2geo -lcrypto"
 CTX.LASTLDFLAGS += CTX.S2GEO_LIBS
+
+###############################################################################
+# Some special handling for OpenSSL
+###############################################################################
+CTX.OPENSSL_VERSION="1.0.2d"
 
 ###############################################################################
 # SPECIFY THE TESTS
@@ -497,6 +501,14 @@ if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
      PlanNodeFragmentTest
     """
+
+###############################################################################
+#
+# Print some configuration information.  This is useful for debugging.
+#
+###############################################################################
+print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
+print("OpenSSL: version %s, config %s\n" % (CTX.getOpenSSLVersion(), CTX.getOpenSSLToken()))
 
 ###############################################################################
 # BUILD THE MAKEFILE

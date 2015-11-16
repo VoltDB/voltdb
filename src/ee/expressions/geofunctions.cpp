@@ -246,4 +246,44 @@ template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& ar
     return ValueFactory::getBooleanValue(s2Poly->Contains(s2Point));
 }
 
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() const {
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_INTEGER);
+    }
+    const Geography polygon = getGeography();
+    NValue retVal(VALUE_TYPE_INTEGER);
+    // exclude exterior ring
+    retVal.getInteger() = polygon.numLoops() - 1;
+    return retVal;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_INTEGER);
+    }
+    const Geography polygon = getGeography();
+    NValue retVal(VALUE_TYPE_INTEGER);
+    retVal.getInteger() = polygon.numPoints();
+    return retVal;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
+    }
+    const Point point = getPoint();
+    NValue retVal(VALUE_TYPE_DOUBLE);
+    retVal.getDouble() = point.getLatitude();
+    return retVal;
+}
+template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
+    }
+    const Point point = getPoint();
+    NValue retVal(VALUE_TYPE_DOUBLE);
+    retVal.getDouble() = point.getLongitude();
+    return retVal;
+}
+
 } // end namespace voltdb

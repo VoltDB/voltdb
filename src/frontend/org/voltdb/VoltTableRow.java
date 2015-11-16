@@ -805,45 +805,57 @@ public abstract class VoltTableRow {
         switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case SMALLINT:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case INTEGER:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case BIGINT:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case TIMESTAMP:
             value = getTimestampAsLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case FLOAT:
             dvalue = getDouble(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(dvalue);
+            }
             break;
         case STRING:
             js.value(getString(columnIndex));
@@ -854,18 +866,30 @@ public abstract class VoltTableRow {
             break;
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(dec.toString());
+            }
             break;
         case POINT:
             PointType pt = getPoint(columnIndex);
-            js.value(pt.toString());
+            if (wasNull()) {
+                js.value(null);
+            }
+            else {
+                js.value(pt.toString());
+            }
             break;
         case GEOGRAPHY:
             GeographyValue gv = getGeographyValue(columnIndex);
-            js.value(gv.toString());
+            if (wasNull()) {
+                js.value(null);
+            }
+            else {
+                js.value(gv.toString());
+            }
             break;
         // VoltType includes a few values that aren't valid column value types
         case INVALID:
