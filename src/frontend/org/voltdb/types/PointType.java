@@ -32,8 +32,9 @@ public class PointType {
     //    5. Some optional space.
     //    6. A coordinate, consisting of
     //       6.1. An optional sign.
-    //       6.2. A digit string, starting with [1-9].
-    //       6.3. An optional dot followed by a floating point string.
+    //       6.2. An integer part, consisting of a non-empty sequence of digits.
+    //       6.3. An optional fractional part, consisting of a
+    //            dot followed by a non-empty sequence of digits.
     //    7. Some required space.
     //    8. A second coordinate, just like (6) above
     //    9. A right parenthesis.
@@ -41,7 +42,7 @@ public class PointType {
     //   11. The end of the string.
     //
     private static final Pattern wktPattern
-        = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?[1-9]\\d*)(?:[.](\\d*))?\\s+([-]?[1-9]\\d*)(?:[.](\\d*))?\\s*[)]\\s*\\z",
+ = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?\\d+)(?:[.](\\d*))?\\s+([-]?\\d+)(?:[.](\\d*))?\\s*[)]\\s*\\z",
                           Pattern.CASE_INSENSITIVE);
     private final double m_latitude;
     private final double m_longitude;
@@ -67,8 +68,8 @@ public class PointType {
         }
     }
 
-    private static float toFloat(String aInt, String aFrac) {
-        return Float.parseFloat(aInt + "." + (aFrac == null ? "0" : aFrac));
+    private static double toDouble(String aInt, String aFrac) {
+        return Double.parseDouble(aInt + "." + (aFrac == null ? "0" : aFrac));
     }
     /**
      * Create a PointType from a WellKnownText string.
@@ -80,8 +81,8 @@ public class PointType {
         }
         Matcher m = wktPattern.matcher(param);
         if (m.find()) {
-            float latitude  = toFloat(m.group(1), m.group(2));
-            float longitude = toFloat(m.group(3), m.group(4));
+            double latitude  = toDouble(m.group(1), m.group(2));
+            double longitude = toDouble(m.group(3), m.group(4));
             if (Math.abs(latitude) > 90.0) {
                 throw new IllegalArgumentException(String.format("Latitude \"%f\" out of bounds.", latitude));
             }

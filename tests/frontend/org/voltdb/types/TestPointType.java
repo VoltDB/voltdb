@@ -29,6 +29,8 @@ import java.util.regex.Pattern;
 import junit.framework.TestCase;
 
 public class TestPointType extends TestCase {
+    // Points should have this much precision.
+    private final double EPSILON = 1.0e-15;
 
     private void assertConstructorThrows(String expectedMessage, double lat, double lng) {
         try {
@@ -45,8 +47,8 @@ public class TestPointType extends TestCase {
         assertEquals(16, PointType.getLengthInBytes());
 
         PointType point = new PointType(10.333, 20.666);
-        assertEquals(10.333, point.getLatitude(), 0.001);
-        assertEquals(20.666, point.getLongitude(), 0.001);
+        assertEquals(10.333, point.getLatitude(), EPSILON);
+        assertEquals(20.666, point.getLongitude(), EPSILON);
 
         assertTrue(point.equals(point));
         assertFalse(point.equals(new PointType(0.0, 10.0)));
@@ -115,20 +117,39 @@ public class TestPointType extends TestCase {
     }
 
     public void testPointFactory() {
-        testOnePointFromFactory("point(10.333 20.666)",               10.333,  20.666, 0.001, null);
-        testOnePointFromFactory("  point  (10.333   20.666)    ",     10.333,  20.666, 0.001, null);
-        testOnePointFromFactory("point(-10.333 -20.666)",            -10.333, -20.666, 0.001, null);
-        testOnePointFromFactory("  point  (-10.333   -20.666)    ",  -10.333, -20.666, 0.001, null);
-        testOnePointFromFactory("point(10 10)",                       10.0,    10.0,   0.001, null);
+        testOnePointFromFactory("point(0 0)",                                    0.0,            0.0,          EPSILON, null);
+        testOnePointFromFactory("point(10.3330000000 20.6660000000)",           10.3330000000,  20.6660000000, EPSILON, null);
+        testOnePointFromFactory("  point  (10.3330000000   20.6660000000)    ", 10.333,         20.666,        EPSILON, null);
+        testOnePointFromFactory("point(10.333 20.666)",                         10.333,         20.666,        EPSILON, null);
+        testOnePointFromFactory("  point  (10.333   20.666)    ",               10.333,         20.666,        EPSILON, null);
+        testOnePointFromFactory("point(-10.333 -20.666)",                      -10.333,        -20.666,        EPSILON, null);
+        testOnePointFromFactory("  point  (-10.333   -20.666)    ",            -10.333,        -20.666,        EPSILON, null);
+        testOnePointFromFactory("point(10 10)",                                 10.0,           10.0,          EPSILON, null);
         // Test latitude/longitude ranges.
-        testOnePointFromFactory("point( 100.0   100.0)",             100.0,   100.0,   0.001, "Latitude \"100.0+\" out of bounds.");
-        testOnePointFromFactory("point(  45.0   360.0)",              45.0,   360.0,   0.001, "Longitude \"360.0+\" out of bounds.");
-        testOnePointFromFactory("point(  45.0   270.0)",              45.0,   360.0,   0.001, "Longitude \"270.0+\" out of bounds.");
-        testOnePointFromFactory("point(-100.0  -100.0)",            -100.0,  -100.0,   0.001, "Latitude \"-100.0+\" out of bounds.");
-        testOnePointFromFactory("point( -45.0  -360.0)",             -45.0,  -360.0,   0.001, "Longitude \"-360.0+\" out of bounds.");
-        testOnePointFromFactory("point( -45.0  -270.0)",             -45.0,  -360.0,   0.001, "Longitude \"-270.0+\" out of bounds.");
+        testOnePointFromFactory("point( 100.0   100.0)", 100.0, 100.0, EPSILON, "Latitude \"100.0+\" out of bounds.");
+        testOnePointFromFactory("point(  45.0   360.0)",  45.0, 360.0, EPSILON, "Longitude \"360.0+\" out of bounds.");
+        testOnePointFromFactory("point(  45.0   270.0)",  45.0, 360.0, EPSILON, "Longitude \"270.0+\" out of bounds.");
+        testOnePointFromFactory("point(-100.0  -100.0)",
+                                -100.0,
+                                -100.0,
+                                EPSILON,
+                                "Latitude \"-100.0+\" out of bounds.");
+        testOnePointFromFactory("point( -45.0  -360.0)",
+                                -45.0,
+                                -360.0,
+                                EPSILON,
+                                "Longitude \"-360.0+\" out of bounds.");
+        testOnePointFromFactory("point( -45.0  -270.0)",
+                                -45.0,
+                                -360.0,
+                                EPSILON,
+                                "Longitude \"-270.0+\" out of bounds.");
         // Syntax errors
         //   Comma separating the coordinates.
-        testOnePointFromFactory("point(0.0, 0.0)",                     0.0,     0.0,   0.001, "Cannot construct PointType value from \"point\\(0[.]0, 0[.]0\\)\"");
+        testOnePointFromFactory("point(0.0, 0.0)",
+                                0.0,
+                                0.0,
+                                EPSILON,
+                                "Cannot construct PointType value from \"point\\(0[.]0, 0[.]0\\)\"");
     }
 }
