@@ -225,7 +225,7 @@ public abstract class CatalogSizing {
         return bufferSize + 8 + 24;
     }
 
-    private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex) {
+    private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {
         // See http://voltdb.com/docs/PlanningGuide/ChapMemoryRecs.php
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
@@ -253,6 +253,11 @@ public abstract class CatalogSizing {
             }
             }
         }
+        //For DR active active enabled account for additional timestamp column for conflict detection.
+        if (bAdjustForDrAA) {
+            csize.widthMin += 8;
+            csize.widthMax += 8;
+        }
         return csize;
     }
 
@@ -265,7 +270,8 @@ public abstract class CatalogSizing {
         for (ColumnRef columnRef: columnRefsMap) {
             indexColumns.add(columnRef.getColumn());
         }
-        CatalogItemSizeBase isize = getColumnsSize(indexColumns, true);
+        //For index Size dont count the DR AA conflict column.
+        CatalogItemSizeBase isize = getColumnsSize(indexColumns, true, false);
         if (index.getType() == IndexType.HASH_TABLE.getValue()) {
             // Hash index overhead follows this documented formula:
             //   w=column width, r=row count
@@ -285,13 +291,15 @@ public abstract class CatalogSizing {
         return isize;
     }
 
-    private static TableSize getTableSize(Table table) {
+    private static TableSize getTableSize(Table table, boolean bActiveActiveEnabled) {
         // The cardinality is the estimated tuple count or an arbitrary number
         // if not estimated.
         long cardinality = table.getEstimatedtuplecount();
         if (cardinality <= 0) {
             cardinality = 1000;
         }
+        //Do we need to adjust for DR-AA?
+        boolean bAdjustForDrAA = (table.getIsdred() && bActiveActiveEnabled);
 
         // Add up the column widths.
         CatalogMap<Column> columnsMap = table.getColumns();
@@ -299,7 +307,7 @@ public abstract class CatalogSizing {
         for (Column column: columnsMap) {
             columns.add(column);
         }
-        CatalogItemSizeBase csize = getColumnsSize(columns, false);
+        CatalogItemSizeBase csize = getColumnsSize(columns, false, bAdjustForDrAA);
 
         boolean isView = table.getMaterializer() != null;
         TableSize tsize = new TableSize(table, isView, csize.widthMin, csize.widthMax, cardinality);
@@ -322,7 +330,7 @@ public abstract class CatalogSizing {
     public static DatabaseSizes getCatalogSizes(Database dbCatalog) {
         DatabaseSizes dbSizes = new DatabaseSizes();
         for (Table table: dbCatalog.getTables()) {
-            dbSizes.addTable(getTableSize(table));
+            dbSizes.addTable(getTableSize(table, dbCatalog.getIsactiveactivedred()));
         }
         return dbSizes;
     }
