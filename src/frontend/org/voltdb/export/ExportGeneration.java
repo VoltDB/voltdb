@@ -43,16 +43,20 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -60,10 +64,6 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import org.voltcore.utils.DBBPool;
-import org.voltdb.catalog.Column;
-import org.voltdb.iv2.TxnEgo;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -364,7 +364,7 @@ public class ExportGeneration {
         String leader = Collections.min(children);
         String part = m_partitionLeaderZKName.get(partition);
         if (part == null) {
-            exportLog.error("Unable to start exporting for partition: " + partition);
+            exportLog.warn("Unable to start exporting for partition (not master of): " + partition);
             return;
         }
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
