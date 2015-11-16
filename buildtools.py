@@ -262,6 +262,10 @@ def buildMakefile(CTX):
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
         makefile.write("\trm -rf *\n")
+        makefile.write("\t(cd ${OPENSSL_SRC}; \\\n")
+        makefile.write("\t if [ -f Makefile ] ; then \\\n")
+        makefile.write("\t   make clean; \\\n")
+        makefile.write("\t fi )\n")
         makefile.close()
         return
 
@@ -448,7 +452,8 @@ def buildMakefile(CTX):
     makefile.write('build-openssl: configure-openssl compile-openssl install-openssl\n')
     makefile.write('configure-openssl:\n')
     makefile.write('\t(cd "${OPENSSL_SRC}"; \\\n')
-    makefile.write('\t if [ ! -f Makefile ] ; then \\\n')
+    makefile.write('\t if [ ! -f Makefile ] || [ Makefile -ot Makefile.org ] ; then \\\n')
+    makefile.write('\t   rm Makefile; \\\n')
     makefile.write('\t   ./Configure "%s"; \\\n' % CTX.getOpenSSLToken() )
     makefile.write('\t fi )\n')
     makefile.write('\n')
