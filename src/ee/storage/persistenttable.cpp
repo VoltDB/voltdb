@@ -316,6 +316,40 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
 
 void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
+    if (isPersistentTableEmpty() == true) {
+        return;
+    }
+
+    // If the table has only one tuple-storage block, it may be better to truncate
+    // table by iteratively deleting table rows. Evalute if this is the case
+    // based on the block and tuple block load factor
+    if (m_data.size() == 1) {
+        // threshold cutoff in terms of block load factor at which truncate is
+        // better than tuple-by-tuple delete. Cut-off values are based on worst
+        // case scenarios with intent to improve performance and to avoid
+        // performance regression by not getting too greedy for performance -
+        // in here cut-off have been lowered to favor truncate instead of
+        // tuple-by-tuple delete. Cut-off numbers were obtained from benchmark
+        // tests performing inserts and truncate under different scenarios outline
+        // and comparing them for deleting all rows with a predicate that's always
+        // true. Following are scenarios based on which cut-off were obtained:
+        // - varying table schema - effect of tables having more columns
+        // - varying number of views on table
+        // - tables with more varchar columns with size below and above 16
+        // - tables with indexes
+
+        // cut-off for table with no views
+        const double tableLFCutoffForTrunc = 0.105666;
+        //cut-off for table with views
+        const double tableWithViewsLFCutoffForTrunc = 0.015416;
+
+        const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
+        if ((blockLoadFactor <= tableLFCutoffForTrunc) ||
+            (m_views.size() > 0 && blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) {
+            return deleteAllTuples(true);
+        }
+    }
+
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
 
