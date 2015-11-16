@@ -59,9 +59,9 @@ public class UtilQueries {
         long stats[] = {0, 0, 0, 0};
 
         while (importStats.advanceRow()) {
-        	int statnum = 0;
-        	stats[statnum++] = importStats.getLong("SUCCESSES");
-        	stats[statnum++] = importStats.getLong("FAILURES");
+            int statnum = 0;
+            stats[statnum++] = importStats.getLong("SUCCESSES");
+            stats[statnum++] = importStats.getLong("FAILURES");
             stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
             stats[statnum++] = importStats.getLong("RETRIES");
         }
