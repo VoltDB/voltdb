@@ -49,6 +49,8 @@ AS
  GROUP BY phone_number
 ;
 
+export table votes to stream anish2;
+
 -- rollup of votes by contestant and state for the heat map and results
 CREATE VIEW v_votes_by_contestant_number_state
 (
@@ -66,7 +68,6 @@ AS
 ;
 
 END_OF_BATCH
-export table votes to stream anish2;
 
 -- Update classes from jar so that the server will know about classes
 -- but not procedures yet.

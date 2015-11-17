@@ -91,9 +91,9 @@ StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalo
         if (currTarget == target) {
             // The view is already up to date.
             // but still need to update the index used for min/max
-            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
+//            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
                 currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-            }
+//            }
             return;
         }
 
