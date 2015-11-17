@@ -209,7 +209,7 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
         const uint8_t drVersion = taskInfo.readByte();
-        if (drVersion > 2) {
+        if (drVersion != DRTupleStream::DR_VERSION) {
             throwFatalException("Unsupported DR version %d", drVersion);
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
