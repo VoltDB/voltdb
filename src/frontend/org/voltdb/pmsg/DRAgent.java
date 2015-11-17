@@ -8371,17 +8371,29 @@ public final class DRAgent {
      */
     org.voltdb.pmsg.DRAgent.SubscribeOrBuilder getSubscribeOrBuilder();
 
-    // optional .pmsg.Connect connect = 9;
+    // optional .pmsg.Connect connect = 10;
     /**
-     * <code>optional .pmsg.Connect connect = 9;</code>
+     * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     boolean hasConnect();
     /**
-     * <code>optional .pmsg.Connect connect = 9;</code>
+     * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     org.voltdb.pmsg.DRAgent.Connect getConnect();
     /**
-     * <code>optional .pmsg.Connect connect = 9;</code>
+     * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     org.voltdb.pmsg.DRAgent.ConnectOrBuilder getConnectOrBuilder();
   }
@@ -8538,7 +8550,7 @@ public final class DRAgent {
               bitField0_ |= 0x00000080;
               break;
             }
-            case 74: {
+            case 82: {
               org.voltdb.pmsg.DRAgent.Connect.Builder subBuilder = null;
               if (((bitField0_ & 0x00000100) == 0x00000100)) {
                 subBuilder = connect_.toBuilder();
@@ -8915,23 +8927,35 @@ public final class DRAgent {
       return subscribe_;
     }
 
-    // optional .pmsg.Connect connect = 9;
-    public static final int CONNECT_FIELD_NUMBER = 9;
+    // optional .pmsg.Connect connect = 10;
+    public static final int CONNECT_FIELD_NUMBER = 10;
     private org.voltdb.pmsg.DRAgent.Connect connect_;
     /**
-     * <code>optional .pmsg.Connect connect = 9;</code>
+     * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     public boolean hasConnect() {
       return ((bitField0_ & 0x00000100) == 0x00000100);
     }
     /**
-     * <code>optional .pmsg.Connect connect = 9;</code>
+     * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     public org.voltdb.pmsg.DRAgent.Connect getConnect() {
       return connect_;
     }
     /**
-     * <code>optional .pmsg.Connect connect = 9;</code>
+     * <code>optional .pmsg.Connect connect = 10;</code>
+     *
+     * <pre>
+     * Intentionally skip field 9 -- deprecated message type
+     * </pre>
      */
     public org.voltdb.pmsg.DRAgent.ConnectOrBuilder getConnectOrBuilder() {
       return connect_;
@@ -9003,7 +9027,7 @@ public final class DRAgent {
         output.writeMessage(8, subscribe_);
       }
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
-        output.writeMessage(9, connect_);
+        output.writeMessage(10, connect_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -9048,7 +9072,7 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(9, connect_);
+          .computeMessageSize(10, connect_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -10263,18 +10287,26 @@ public final class DRAgent {
         return subscribeBuilder_;
       }
 
-      // optional .pmsg.Connect connect = 9;
+      // optional .pmsg.Connect connect = 10;
       private org.voltdb.pmsg.DRAgent.Connect connect_ = org.voltdb.pmsg.DRAgent.Connect.getDefaultInstance();
       private com.google.protobuf.SingleFieldBuilder<
           org.voltdb.pmsg.DRAgent.Connect, org.voltdb.pmsg.DRAgent.Connect.Builder, org.voltdb.pmsg.DRAgent.ConnectOrBuilder> connectBuilder_;
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public boolean hasConnect() {
         return ((bitField0_ & 0x00000100) == 0x00000100);
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public org.voltdb.pmsg.DRAgent.Connect getConnect() {
         if (connectBuilder_ == null) {
@@ -10284,7 +10316,11 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder setConnect(org.voltdb.pmsg.DRAgent.Connect value) {
         if (connectBuilder_ == null) {
@@ -10300,7 +10336,11 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder setConnect(
           org.voltdb.pmsg.DRAgent.Connect.Builder builderForValue) {
@@ -10314,7 +10354,11 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder mergeConnect(org.voltdb.pmsg.DRAgent.Connect value) {
         if (connectBuilder_ == null) {
@@ -10333,7 +10377,11 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public Builder clearConnect() {
         if (connectBuilder_ == null) {
@@ -10346,7 +10394,11 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public org.voltdb.pmsg.DRAgent.Connect.Builder getConnectBuilder() {
         bitField0_ |= 0x00000100;
@@ -10354,7 +10406,11 @@ public final class DRAgent {
         return getConnectFieldBuilder().getBuilder();
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       public org.voltdb.pmsg.DRAgent.ConnectOrBuilder getConnectOrBuilder() {
         if (connectBuilder_ != null) {
@@ -10364,7 +10420,11 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>optional .pmsg.Connect connect = 9;</code>
+       * <code>optional .pmsg.Connect connect = 10;</code>
+       *
+       * <pre>
+       * Intentionally skip field 9 -- deprecated message type
+       * </pre>
        */
       private com.google.protobuf.SingleFieldBuilder<
           org.voltdb.pmsg.DRAgent.Connect, org.voltdb.pmsg.DRAgent.Connect.Builder, org.voltdb.pmsg.DRAgent.ConnectOrBuilder> 
@@ -10493,7 +10553,7 @@ public final class DRAgent {
       "\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 " +
       "\001(\0132\016.pmsg.Response\022&\n\013snapshotReq\030\007 \001(\013" +
       "2\021.pmsg.SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017" +
-      ".pmsg.Subscribe\022\036\n\007connect\030\t \001(\0132\r.pmsg." +
+      ".pmsg.Subscribe\022\036\n\007connect\030\n \001(\0132\r.pmsg." +
       "Connect\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005",
       "PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAP" +
       "SHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SY" +

@@ -115,5 +115,6 @@ message CtrlEnvelope {
     optional Response response = 6;
     optional SnapshotReq snapshotReq = 7;
     optional Subscribe subscribe = 8;
-    optional Connect connect = 9;
+    // Intentionally skip field 9 -- deprecated message type
+    optional Connect connect = 10;
 }
