@@ -18,10 +18,13 @@
 package org.voltdb;
 
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.ImporterServerAdapter;
 import org.voltdb.importer.ImporterStatsCollector;
 
 /**
+ * Implementation that uses the server internal classes to execute procedures and
+ * to report information for statistics collection.
  */
 public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     private ImporterStatsCollector m_statsCollector;
@@ -29,6 +32,7 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     public ImporterServerAdapterImpl(ImporterStatsCollector statsCollector) {
         m_statsCollector = statsCollector;
     }
+
     /**
      * Returns true if a table with the given name exists in the server catalog.
      */
@@ -37,13 +41,13 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     }
 
     @Override
-    public boolean callProcedure(InternalConnectionContext ic, String proc, Object... fieldList) {
-        return callProcedure(ic, null, proc, fieldList);
+    public boolean callProcedure(AbstractImporter importer, String proc, Object... fieldList) {
+        return callProcedure(importer, null, proc, fieldList);
     }
 
-    public boolean callProcedure(InternalConnectionContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
-        return getInternalConnectionHandler() //TODO: backpressure timeout is not used by internal connection handler. Remove it!
-                .callProcedure(ic, m_statsCollector, 10, procCallback, proc, fieldList);
+    private boolean callProcedure(InternalConnectionContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
+        return getInternalConnectionHandler()
+                .callProcedure(ic, m_statsCollector, procCallback, proc, fieldList);
     }
 
     private InternalConnectionHandler getInternalConnectionHandler() {

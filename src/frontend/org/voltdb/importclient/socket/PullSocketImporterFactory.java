@@ -26,6 +26,7 @@ import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
 
 /**
+ * Importer factory implementation for pull socket importer.
  */
 public class PullSocketImporterFactory extends AbstractImporterFactory
 {

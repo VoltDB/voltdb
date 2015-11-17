@@ -32,6 +32,8 @@ import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
+ * ImporterConfig implementation for pull socket importer. There will be an ImporterConfig per
+ * resource ID.
  */
 public class PullSocketImporterConfig implements ImporterConfig
 {

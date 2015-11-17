@@ -18,10 +18,9 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -30,46 +29,55 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
+
 
 /**
- * TODO:
+ * This class is responsible for receiving notifications from the server and
+ * starting or stopping the importer instances accordingly. There will be a
+ * manager instance per importer type/bundle.
  */
 public class ImporterTypeManager implements ChannelChangeCallback
 {
-    private final VoltLogger m_logger;
+    private final static VoltLogger s_logger = new VoltLogger("ImporterTypeManager");
+
     private final AbstractImporterFactory m_factory;
     private ExecutorService m_executorService;
-    private Map<URI, ImporterConfig> m_configs = new HashMap<>();
-    private Map<URI, AbstractImporter> m_importers = new HashMap<>();
+    private ImmutableMap<URI, ImporterConfig> m_configs = ImmutableMap.of();
+    private ImmutableMap<URI, AbstractImporter> m_importers;
     private volatile boolean m_stopping;
 
     public ImporterTypeManager(AbstractImporterFactory factory)
     {
         m_factory = factory;
-        m_logger = new VoltLogger("ImporterTypeManager");
     }
 
 
     /**
-     * This will be called for every importer configuration section.
+     * This will be called for every importer configuration section for this importer type.
      *
      * @param props Properties defined in a configuration section for this importer
      */
     public final void configure(Properties props)
     {
-        m_configs.putAll(m_factory.createImporterConfigurations(props));
+        ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
+        builder.putAll(m_factory.createImporterConfigurations(props));
+        m_configs = builder.build();
     }
 
     /**
-     * This method is used by the framework to indicate to the importer that it may start its work.
+     * This method is used by the framework to indicate that the importers must be started now.
      * This implementation starts the required number of threads based on the number of resources
-     * configured for this importer.
-     * <p>For importers that must be run on every node, this will also call
-     * <code>accept(resourceID)</code> for all the available resources in its own thread.
-     * For importers that should not be run on every node, this will register itself with the
-     * resource distributer to be notified of the resources that this should use.
+     * configured for this importer type.
+     * <p>For importers that must be run on every site, this will also call
+     * <code>accept()</code>.
+     * For importers that must not be run on every site, this will register itself with the
+     * resource distributer.
      *
-     * @param distributer ChannelDistributer that is responsible for allocating resources to nodes
+     * @param distributer ChannelDistributer that is responsible for allocating resources to nodes.
+     * This will be used only if the importer must not be run on every site.
      */
     public final void readyForData(ChannelDistributer distributer)
     {
@@ -82,15 +90,18 @@ public class ImporterTypeManager implements ChannelChangeCallback
         m_executorService = Executors.newFixedThreadPool(m_configs.size(),
                 getThreadFactory(m_factory.getTypeName(), ImportHandlerProxy.MEDIUM_STACK_SIZE));
 
+        ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         if (m_factory.isImporterRunEveryWhere()) {
             for (final ImporterConfig config : m_configs.values()) {
                 AbstractImporter importer = m_factory.createImporter(config);
-                m_importers.put(importer.getResourceID(), importer);
+                builder.put(importer.getResourceID(), importer);
                 submitAccept(importer);
             }
+            m_importers = builder.build();
         } else {
             distributer.registerCallback(m_factory.getTypeName(), this);
             distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
+            m_importers = ImmutableMap.of();
         }
     }
 
@@ -104,12 +115,14 @@ public class ImporterTypeManager implements ChannelChangeCallback
     {
         if (m_stopping) return;
 
+        ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
+        builder.putAll(Maps.filterKeys(m_importers, notUriIn(assignment.getRemoved())));
         for (URI removed: assignment.getRemoved()) {
             try {
-                AbstractImporter importer = m_importers.remove(removed);
+                AbstractImporter importer = m_importers.get(removed);
                 importer.stop();
             } catch(Exception e) {
-                m_logger.warn(
+                s_logger.warn(
                         String.format("Error calling stop on %s in importer %s", removed.toString(), m_factory.getTypeName()),
                         e);
             }
@@ -117,9 +130,20 @@ public class ImporterTypeManager implements ChannelChangeCallback
 
         for (final URI added: assignment.getAdded()) {
             AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
-            m_importers.put(added, importer);
+            builder.put(added, importer);
             submitAccept(importer);
         }
+
+        m_importers = builder.build();
+    }
+
+    private final static Predicate<URI> notUriIn(final Set<URI> uris) {
+        return new Predicate<URI>() {
+            @Override
+            final public boolean apply(URI uri) {
+                return !uris.contains(uri);
+            }
+        };
     }
 
     private void submitAccept(final AbstractImporter importer)
@@ -130,7 +154,7 @@ public class ImporterTypeManager implements ChannelChangeCallback
                 try {
                     importer.accept();
                 } catch(Exception e) {
-                    m_logger.error(
+                    s_logger.error(
                         String.format("Error calling accept for importer %s", m_factory.getTypeName()),
                         e);
                 }
@@ -139,20 +163,22 @@ public class ImporterTypeManager implements ChannelChangeCallback
     }
 
     @Override
-    public void onClusterStateChange(VersionedOperationMode mode) {
-        if (m_logger.isDebugEnabled()) {
-            m_logger.debug(m_factory.getTypeName() + ".onChange");
+    public void onClusterStateChange(VersionedOperationMode mode)
+    {
+        if (s_logger.isDebugEnabled()) {
+            s_logger.debug(m_factory.getTypeName() + ".onChange");
         }
     }
 
     /**
-     * This is called by the importer framework to stop an importer. Once this is called
-     * <code>shouldRun()</code> will return false. All resources for this importer will be unregistered
+     * This is called by the importer framework to stop importers.
+     * All resources for this importer will be unregistered
      * from the resource distributer.
      *
      * @param distributer the resource distributer from which this importer's resources must be unregistered.
      */
-    public final void stop(ChannelDistributer distributer) {
+    public final void stop(ChannelDistributer distributer)
+    {
         m_stopping = true;
 
         if (!m_factory.isImporterRunEveryWhere()) {
@@ -166,7 +192,7 @@ public class ImporterTypeManager implements ChannelChangeCallback
                 m_executorService.awaitTermination(365, TimeUnit.DAYS);
             } catch (InterruptedException ex) {
                 //Should never come here.
-                m_logger.warn("Unexpected interrupted exception waiting for " + m_factory.getTypeName() + " to shutdown", ex);
+                s_logger.warn("Unexpected interrupted exception waiting for " + m_factory.getTypeName() + " to shutdown", ex);
             }
         }
     }
@@ -177,20 +203,10 @@ public class ImporterTypeManager implements ChannelChangeCallback
             try {
                 importer.stop();
             } catch(Exception e) {
-                m_logger.warn("Error trying to stop importer resource ID " + importer.getResourceID(), e);
+                s_logger.warn("Error trying to stop importer resource ID " + importer.getResourceID(), e);
             }
         }
-        m_importers.clear();
-    }
-
-    /**
-     * Returns the logger that should be used by this importer.
-     *
-     * @return logger that should be used by this importer.
-     */
-    protected final VoltLogger getLogger()
-    {
-        return m_logger;
+        m_importers = null;
     }
 
     private ThreadFactory getThreadFactory(final String groupName, final int stackSize) {

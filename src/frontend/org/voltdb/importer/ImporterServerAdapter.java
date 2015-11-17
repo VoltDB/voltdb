@@ -17,19 +17,44 @@
 
 package org.voltdb.importer;
 
-import org.voltdb.InternalConnectionContext;
 
 
 /**
+ * Adapter that is used by importers to access the server. For example, to execute procedures
+ * and report information for statistics collection.
+ * <p> This separates out server specific classes from importer specific bundle classes and thus allows
+ * importer bundles to run without depending on VoltDB internal classes.
  */
-
 public interface ImporterServerAdapter {
 
     /**
+     * This is used by importers to execute procedures in the server.
+     *
+     * @param importer the calling importer instance. This may be used by the importer framework
+     * to report back pressure.
+     * @param proc the name of the procedure that is to be executed
+     * @param fieldList the parameters to be passed in to the procedure
+     * @return returns true if the procedure execution was queued successfully; false otherwise.
      */
-    public boolean callProcedure(InternalConnectionContext ic, String proc, Object... fieldList);
+    public boolean callProcedure(AbstractImporter importer, String proc, Object... fieldList);
 
+    /**
+     * This should be used by importers to report failure while trying to execute a procedure.
+     *
+     * @param importerName the name of the importer
+     * @param procName the name of the procedure that the importer was trying to execute
+     * @param decrementPending indicates if this failed after the importer reported that the
+     * procedure execution was queued or not. True indicates that reporter already reported queuing
+     * and hence must decrement that count. False indicates that failure occurred before the importer
+     * reported queuing.
+     */
     public void reportFailure(String importerName, String procName, boolean decrementPending);
 
+    /**
+     * This should be used by importers to report that a procedure executed was queued successfully.
+     *
+     * @param importerName the name of the importer
+     * @param procName the name of the procedure that the importer was trying to execute
+     */
     public void reportQueued(String importerName, String procName);
 }

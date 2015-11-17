@@ -27,26 +27,22 @@ import org.voltdb.InternalConnectionContext;
 
 /**
  * Abstract class that must be extended to create custom importers in VoltDB server.
- * If the importer is made available using an OSGi bundle, will register itself as a service using
- * BundleActivator.start implementation. The sequence of calls when the importer is started up is:
+ * The sequence of calls when the importer is started up is:
  * <ul>
- * <li> Find the importer in the OSGi bundle as a service </li>
- * <li> Get ImporterConfig object using importer.createImporterConfig </li>
- * <li> Add configuration entries using importerConfig.addConfiguration </li>
- * <li> Start the importer by calling readyForData. This in turn creates the required number
- *   threads for the resources available and calls <code>accept(reourceID)</code> implementation
- *   on the importer for each resource. If the importer is <code>!isRunEveryWhere</code>,
- *   <code>accept(resourceID)</code> is called when the resources are distributed to the importers. </li>
+ * <li> Find the importer factory in the OSGi bundle as a service </li>
+ * <li> Validate and setup configuration using factory.createImporterConfigurations </li>
+ * <li> Create an importer instance using factory.createImporter for every resource that must be
+ *      run on this server </li>
+ * <li> Start the importers by calling accept. Each of this will be called in its own thread.
+ *      Importers should do their work in the implementation of accept.
+ *      Importer implementations should do their work in a <code>while (shouldRun())</code> loop,
+ *      which will make sure that that the importer will stop its work when the framework calls stop. </li>
  * </ul>
  *
  * <p>The framework stops the importer by calling <code>stopImporter</code>, which will stop the executor service and
  * call <code>stop</code> on the importer instance to close resources used by the specific importer.
  * <code>stop(resourceID)</code> will also be called on the importer instances when the resources are redistributed
  * because of addition/deletion of nodes to the cluster.
- *
- * <p>Importer implementations should do their work in a <code>while (shouldRun())</code> loop, which will
- * make sure that that the importer will stop its work when the framework calls stop.
- * TODO: Should we call interrupt as well on the importer instance.
  */
 public abstract class AbstractImporter
     implements InternalConnectionContext {
@@ -132,6 +128,10 @@ public abstract class AbstractImporter
         }
     }
 
+    /**
+     * Called by the internal framework code to indicate if back pressure must
+     * be applied on the importer because the server is busy.
+     */
     @Override
     public void setBackPressure(boolean hasBackPressure)
     {
@@ -154,18 +154,39 @@ public abstract class AbstractImporter
         m_importServerAdapter.reportFailure(getName(), procName, false);
     }
 
+    /**
+     * This rate limited log must be used by the importers to log messages that may
+     * happen frequently and must be rate limited.
+     *
+     * @param level the log level
+     * @param cause cause exception, if there is one
+     * @param format error message format
+     * @param args arguments to format the error message
+     */
     protected void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
     {
         m_logger.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, level, cause, format, args);
     }
 
+    /**
+     * Returns the resource id for which this importer was started. There will be unique
+     * resource id per importer for each importer type.
+     *
+     * @return the unique resource id that is used by this importer
+     */
     public abstract URI getResourceID();
 
     /**
-     * This is
-     * @param resourceID
+     * Implementation of this should contain the main importer work. This is typically
+     * called in its own thread so that each importer can do its work in parallel in its
+     * own thread. This implementation should check <code>shouldRun()</code> to check if
+     * importer work should be stopped or continued.
      */
     protected abstract void accept();
 
+    /**
+     * This is called by the importer framework to stop the importer. Any importer
+     * specific resources should be closed and released here.
+     */
     protected abstract void stop();
 }

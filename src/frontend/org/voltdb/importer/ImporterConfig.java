@@ -21,9 +21,18 @@ import java.net.URI;
 
 
 /**
- * TODO:
+ * Represents importer configurations created from properties specified in deployment file.
+ * Implementations will contain importer specific details. Importer framework will create
+ * ImporterConfig objects from importer properties in deployment file and use it to create
+ * importer instances when it is time to run importers for the different resources.`
  */
 public interface ImporterConfig
 {
+    /**
+     * Unique resource id for which the configuration is specified.
+     * This must be unique per importer type.
+     *
+     * @return the unique resource id
+     */
     public URI getResourceID();
 }

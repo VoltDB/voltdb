@@ -30,6 +30,8 @@ import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.CSVInvocation;
 
 /**
+ * Importer that listens on a server socket for data. Data is expected in CSV format currently,
+ * which will be parsed and sent to the procedure specified in the configuration.
  */
 public class ServerSocketImporter extends AbstractImporter {
 
@@ -93,7 +95,6 @@ public class ServerSocketImporter extends AbstractImporter {
     {
         private final Socket m_clientSocket;
         private final String m_procedure;
-        private volatile boolean m_isStopping;
 
         public ClientConnectionHandler(Socket clientSocket, String procedure)
         {
@@ -107,25 +108,30 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
-                while (!m_isStopping) {
+                while (shouldRun()) {
                     String line = in.readLine();
                     //You should convert your data to params here.
-                    if (line == null) break;
+                    if (line == null) continue;
                     CSVInvocation invocation = new CSVInvocation(m_procedure, line);
                     if (!callProcedure(invocation)) {
                         rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                     }
                 }
-                m_clientSocket.close();
-                getLogger().info("Client Closed.");
             } catch (IOException ioe) {
                 getLogger().error("IO exception reading from client socket connection in socket importer", ioe);
+            }
+
+            try {
+                m_clientSocket.close();
+                getLogger().info("Client Closed.");
+            } catch(IOException e) {
+                getLogger().warn("Error closing socket importer connection", e);
             }
         }
 
         public void stopClient()
         {
-            m_isStopping = true;
+            // nothing to do for now
         }
     }
 }

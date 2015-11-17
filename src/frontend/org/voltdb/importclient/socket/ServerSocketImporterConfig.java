@@ -26,6 +26,7 @@ import java.util.Properties;
 import org.voltdb.importer.ImporterConfig;
 
 /**
+ * ImporterConfig for server socket importer.
  */
 public class ServerSocketImporterConfig implements ImporterConfig
 {

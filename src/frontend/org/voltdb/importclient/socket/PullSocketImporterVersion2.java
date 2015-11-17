@@ -34,6 +34,10 @@ import org.voltdb.importer.CSVInvocation;
 
 import com.google_voltpatches.common.base.Optional;
 
+/**
+ * Importer implementation for pull socket importer. At runtime, there will
+ * one instance of this per host and socket combination.
+ */
 public class PullSocketImporterVersion2 extends AbstractImporter {
 
     private PullSocketImporterConfig m_config;

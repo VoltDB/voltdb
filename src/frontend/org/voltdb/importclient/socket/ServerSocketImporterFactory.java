@@ -28,6 +28,7 @@ import org.voltdb.importer.ImporterConfig;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
+ * Importer factory implementation for server socket importers.
  */
 public class ServerSocketImporterFactory extends AbstractImporterFactory
 {
