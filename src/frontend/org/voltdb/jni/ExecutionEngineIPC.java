@@ -883,15 +883,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
                 else if (result == ExecutionEngine.ERRORCODE_PROGRESS_UPDATE) {
                     int batchIndex = m_connection.readInt();
-                    short size = m_connection.readShort();
-                    String planNodeName = m_connection.readString(size);
-                    size = m_connection.readShort();
-                    String lastAccessedTable = m_connection.readString(size);
-                    long lastAccessedTableSize = m_connection.readLong();
+                    int planNodeTypeAsInt = m_connection.readInt();
                     long tuplesFound = m_connection.readLong();
                     long currMemoryInBytes = m_connection.readLong();
                     long peakMemoryInBytes = m_connection.readLong();
-                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound,
+                    long nextStep = fragmentProgressUpdate(batchIndex, planNodeTypeAsInt, tuplesFound,
                             currMemoryInBytes, peakMemoryInBytes);
                     m_data.clear();
                     m_data.putLong(nextStep);
@@ -1451,7 +1447,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken)
+                               int remoteClusterId, long undoToken)
     throws EEException
     {
         m_data.clear();
@@ -1460,6 +1456,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
+        m_data.putInt(remoteClusterId);
         m_data.putLong(undoToken);
         m_data.put(log.array());
 

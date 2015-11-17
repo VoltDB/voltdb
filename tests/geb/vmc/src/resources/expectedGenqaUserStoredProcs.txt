@@ -1,0 +1,11 @@
+# Expected User-defined Stored Procedures: (when running the Genqa test app)
+JiggleExportDoneTable
+JiggleExportMultiPartition
+JiggleExportSinglePartition
+JiggleMultiPartition
+JiggleMultiPartitionWithDeletionExport
+JiggleSinglePartition
+JiggleSinglePartitionWithDeletionExport
+JiggleSkinnyExportSinglePartition
+WaitMultiPartition
+WaitSinglePartition

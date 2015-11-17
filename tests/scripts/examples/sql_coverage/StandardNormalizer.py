@@ -32,6 +32,7 @@ import decimal
 import math
 import re
 import types
+import array
 
 from NotANormalizer import NotANormalizer
 from SortNulls import SortNulls
@@ -84,7 +85,9 @@ def normalize_values(tuples, columns):
     # I assume t is a voltdbclient.VoltTable.
     if hasattr(tuples, "__iter__"):
         for i in xrange(len(tuples)):
-            if hasattr(tuples[i], "__iter__"):
+            # varbinary is array.array type and has __iter__ defined, but should be considered
+            # as a single value to be compared.
+            if hasattr(tuples[i], "__iter__") and type(tuples[i]) is not array.array:
                 normalize_values(tuples[i], columns)
             else:
                 tuples[i] = normalize_value(tuples[i], columns[i].type)
@@ -136,6 +139,11 @@ def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
         rows.sort(cmp=StandardNormalizer.safecmp)
         return
 
+    #print "sort_nulls : " + str(sort_nulls)
+    #print "sorted_cols: " + str(sorted_cols)
+    #print "desc       : " + str(desc)
+    #print "rows 0:\n"     + str(rows)
+
     begin = 0
     prev = None
     unsorteds = lambda row: project_unsorted(row, sorted_cols)
@@ -151,6 +159,8 @@ def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
 
     # Sort the final "group" (of rows with matching ORDER BY column values)
     rows[begin:] = sorted(rows[begin:], cmp=StandardNormalizer.safecmp, key=unsorteds)
+
+    #print "rows 1:\n" + str(rows)
 
     # Sort SQL NULL (Python None) values, in ORDER BY columns
     # (i.e. sorted_cols), in the specified order (if any)
@@ -224,6 +234,8 @@ def sort(rows, sorted_cols, desc, sort_nulls=SortNulls.never):
                     prev = tmp
                     begin = j
 
+    #print "rows 2:\n" + str(rows)
+
 def parse_sql(x):
     """Finds if the SQL statement contains an ORDER BY command, and returns
        the names of the ORDER BY columns.
@@ -276,15 +288,22 @@ class StandardNormalizer(NotANormalizer):
         sort_cols = parse_sql(sql_upper[last_paren_index+1:])
         indices = []
         desc = []
+        #print "last_paren_index: " + str(last_paren_index)
+        #print "sort_cols: " + str(sort_cols)
         if sort_cols:
             # gets the ORDER BY column indices, in the order used in that clause
             for i in xrange(len(sort_cols)):
+                sort_col_i_upper = sort_cols[i].upper()
                 # Find the table column name or index that matches the ORDER BY column name
                 for j in xrange(len(table.columns)):
-                    if sort_cols[i] == table.columns[j].name or sort_cols[i] == str(j+1):
+                    #print "i, j+1; sort_cols[i], table.columns[j].name: " + str(i) + ", " + str(j+1) + ", " + str(sort_cols[i]) + ", " + str(table.columns[j].name)
+                    if sort_col_i_upper == table.columns[j].name.upper() or sort_cols[i] == str(j+1):
+                        #print "  appending j: " + str(j)
                         indices.append(j)
                         desc.append(parse_for_order_by_desc(sql_upper[last_paren_index+1:], sort_cols[i]))
                         break
+        #print "indices: " + str(indices)
+        #print "desc   : " + str(desc)
 
         # Make sure if there is an ORDER BY clause, the order by columns appear in
         # the result table. Otherwise all the columns will be sorted by the

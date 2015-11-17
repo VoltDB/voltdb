@@ -938,7 +938,7 @@ DISTRIBUTION
 </target>
 
 <target name="prep_libvoltdb">
-    <copy todir='voltdb'>
+    <copy todir='voltdb' overwrite="true">
         <fileset dir="${build.dir}/nativelibs">
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
@@ -2293,6 +2293,9 @@ TEST CASES
     <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
+    <condition property="config_postgresql" value="-P" else="">
+        <isset property="postgresql"/>
+    </condition>
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
@@ -2353,6 +2356,7 @@ TEST CASES
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
+        <arg line="${config_postgresql}" />
         <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />

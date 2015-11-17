@@ -23,12 +23,14 @@ class Directories extends Module {
         exportOverflowTitle 	{ $("#exportOverflow").previous() }
         commandLogsTitle 		{ $("#commandlogpath").previous() }
         commandLogSnapshotTitle { $("#commandlogsnapshotpath").previous() }
+        drOverflowTitle { $("#droverflowpath").previous() }
 
         rootValue 				{ $("#voltdbroot") }
         snapshotValue 			{ $("#snapshotpath") }
         exportOverflowValue 	{ $("#exportOverflow") }
         commandLogsValue 		{ $("#commandlogpath") }
         commandLogSnapshotValue { $("#commandlogsnapshotpath") }
+        drOverflowValue { $("#droverflowpath") }
     }
 
 }

@@ -37,10 +37,11 @@ public interface SiteProcedureConnection {
     public long getLatestUndoToken();
 
     /**
-     * Get the HSQL backend, if any.  Returns null if we're not configured
-     * to use it
+     * Get the non-VoltDB backend, if any, such as an HSQL or PostgreSQL
+     * backend used for comparison testing. Returns null if we're not
+     * configured to use it.
      */
-    public HsqlBackend getHsqlBackendIfExists();
+    public NonVoltDBBackend getNonVoltDBBackendIfExists();
 
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
@@ -196,5 +197,5 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, byte logData[]);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
 }

@@ -1,0 +1,6 @@
+# Expected User-defined Stored Procedures: (when running the Voter example app)
+ContestantWinningStates
+GetStateHeatmap
+Initialize
+Results
+Vote

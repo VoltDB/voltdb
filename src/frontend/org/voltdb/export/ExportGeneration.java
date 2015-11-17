@@ -70,6 +70,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
  *
  */
 public class ExportGeneration {
+
     /**
      * Processors also log using this facility.
      */
@@ -156,7 +157,6 @@ public class ExportGeneration {
 
     //This is maintained to detect if this is a continueing generation or not
     private final boolean m_isContinueingGeneration;
-
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
@@ -171,6 +171,7 @@ public class ExportGeneration {
             }
         }
         m_isContinueingGeneration = true;
+
         exportLog.info("Creating new export generation " + m_timestamp + " Rejoin: " + isRejoin);
     }
 
@@ -187,6 +188,7 @@ public class ExportGeneration {
         } catch (NumberFormatException ex) {
             throw new IOException("Invalid Generation directory, directory name must be a number.");
         }
+
         m_isContinueingGeneration = (catalogGen == m_timestamp);
     }
 
@@ -362,14 +364,16 @@ public class ExportGeneration {
         String leader = Collections.min(children);
         String part = m_partitionLeaderZKName.get(partition);
         if (part == null) {
-            exportLog.error("Unable to start exporting for partition: " + partition);
+            exportLog.warn("Unable to start exporting for partition (not master of): " + partition);
             return;
         }
         if (m_partitionLeaderZKName.get(partition).equals(leader)) {
             if (m_partitionsIKnowIAmTheLeader.add(partition)) {
                 for (ExportDataSource eds : m_dataSourcesByPartition.get(partition).values()) {
                     try {
-                        eds.acceptMastership();
+                        if (!eds.setMaster()) {
+                            eds.acceptMastership();
+                        }
                     } catch (Exception e) {
                         exportLog.error("Unable to start exporting", e);
                     }
@@ -413,7 +417,7 @@ public class ExportGeneration {
         findMissingDataSources(partitions, missingPartitions);
         if (missingPartitions.size() > 0) {
             exportLog.info("Found Missing partitions for continueing generation: " + missingPartitions);
-            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList<Integer>(missingPartitions));
+            initializeGenerationFromCatalog(connectors, hostId, messenger, new ArrayList(missingPartitions));
         }
     }
 
@@ -433,6 +437,7 @@ public class ExportGeneration {
                     buf.get(stringBytes);
                     String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
+                    final boolean runEveryWhere = (buf.getShort() == (short )1);
 
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
@@ -449,7 +454,7 @@ public class ExportGeneration {
                     }
 
                     try {
-                        eds.ack(ackUSO);
+                        eds.ack(ackUSO, runEveryWhere);
                     } catch (RejectedExecutionException ignoreIt) {
                         // ignore it: as it is already shutdown
                     }
@@ -505,7 +510,6 @@ public class ExportGeneration {
                         mailboxes.add(Long.valueOf(child));
                     }
                     ImmutableList<Long> mailboxHsids = mailboxes.build();
-
                     for( ExportDataSource eds:
                         m_dataSourcesByPartition.get( partition).values()) {
                         eds.updateAckMailboxes(Pair.of(m_mbox, mailboxHsids));
@@ -513,6 +517,7 @@ public class ExportGeneration {
                 }
             }
         });
+
         try {
             fut.get();
         } catch (Throwable t) {
@@ -648,8 +653,7 @@ public class ExportGeneration {
     }
 
     // silly helper to add datasources for a table catalog object
-    private void addDataSources(
-            Table table, int hostId, List<Integer> partitions)
+    private void addDataSources(Table table, int hostId, List<Integer> partitions)
     {
         for (Integer partition : partitions) {
 
@@ -832,10 +836,11 @@ public class ExportGeneration {
             return;
         }
 
-        exportLog.info("Export generation " + m_timestamp + " accepting mastership for partition " + partitionId);
         for( ExportDataSource eds: partitionDataSourceMap.values()) {
             try {
-                eds.acceptMastership();
+                if (!eds.setMaster()) {
+                    eds.acceptMastership();
+                }
             } catch (Exception e) {
                 exportLog.error("Unable to start exporting", e);
             }

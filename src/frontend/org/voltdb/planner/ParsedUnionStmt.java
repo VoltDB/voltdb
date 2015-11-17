@@ -411,4 +411,24 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             orderCol.expression = expr;
         }
     }
+
+    /**
+     * Here we search all the children, finding if each is content
+     * deterministic. If it is we return right away.
+     */
+    @Override
+    public String calculateContentDeterminismMessage() {
+        String ans = null;
+        for (AbstractParsedStmt child : m_children) {
+            ans = child.getContentDeterminismMessage();
+            if (ans != null) {
+                return ans;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isDML() { return false; }
+
 }

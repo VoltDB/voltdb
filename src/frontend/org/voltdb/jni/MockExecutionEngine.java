@@ -222,7 +222,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               long undoToken) throws EEException
+                               int remoteClusterId, long undoToken) throws EEException
     {
         throw new UnsupportedOperationException();
     }

@@ -93,7 +93,7 @@ class PersistentTableSurgeon {
 
 public:
 
-    TBMap &getData();
+    TBMap &getData() const;
     PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
@@ -134,7 +134,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark);
+    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -266,7 +266,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
                                                 std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true);
+                                                bool fallible=true,
+                                                bool updateDRTimestamp=true);
 
     virtual void addIndex(TableIndex *index) {
         Table::addIndex(index);
@@ -306,6 +307,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Does a primary key lookup or table scan if necessary.
      */
     voltdb::TableTuple lookupTupleForUndo(TableTuple tuple);
+
+    /*
+     * Functions the same as lookupTupleByValues(), but takes the DR hidden timestamp
+     * column into account.
+     */
+    voltdb::TableTuple lookupTupleForDR(TableTuple tuple);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -397,6 +404,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    inline bool isReplicatedTable() const {
+        return (m_partitionColumn == -1);
+    }
+
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
 
@@ -416,7 +427,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         m_tupleLimit = newLimit;
     }
 
-    bool isPersistentTableEmpty()
+    bool isPersistentTableEmpty() const
     {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
@@ -432,7 +443,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() {
+    PersistentTable * getPreTruncateTable() const {
         return m_preTruncateTable;
     }
 
@@ -488,12 +499,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_purgeExecutorVector;
     }
 
-    inline std::pair<const TableIndex*, uint32_t> getSmallestUniqueIndex() {
-        if (!m_smallestUniqueIndex && !m_noAvailableUniqueIndex) {
-            computeSmallestUniqueIndex();
-        }
-        return std::make_pair(m_smallestUniqueIndex, m_smallestUniqueIndexCrc);
-    }
+    std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
 
   private:
 
@@ -521,14 +527,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         if (finishedBlock != NULL && !finishedBlock->isEmpty()) {
             m_blocksNotPendingSnapshot.insert(finishedBlock);
             int bucketIndex = finishedBlock->calculateBucketIndex();
-            if (bucketIndex != -1) {
+            if (bucketIndex != NO_NEW_BUCKET_INDEX) {
                 finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
             }
         }
     }
 
     void nextFreeTuple(TableTuple *tuple);
-    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
+    bool doCompactionWithinSubset(TBBucketPtrVector *bucketVector);
     void doForcedCompaction();
 
     void insertIntoAllIndexes(TableTuple *tuple);
@@ -566,7 +572,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL), bool deleteLastEmptyBlock=false);
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
@@ -578,12 +584,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     size_t &tupleCountPosition,
                                     bool shouldDRStreamRows);
 
-    TableTuple lookupTuple(TableTuple tuple, bool forUndo);
+    enum LookupType {
+        LOOKUP_BY_VALUES,
+        LOOKUP_FOR_DR,
+        LOOKUP_FOR_UNDO
+    };
+    TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
     TBPtr allocateNextBlock();
 
     inline DRTupleStream *getDRTupleStream(ExecutorContext *ec) {
-        if (m_partitionColumn == -1) {
+        if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         } else {
             return ec->drStream();
@@ -617,8 +628,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // STORAGE TRACKING
 
     // Map from load to the blocks with level of load
-    TBBucketMap m_blocksNotPendingSnapshotLoad;
-    TBBucketMap m_blocksPendingSnapshotLoad;
+    TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
+    TBBucketPtrVector m_blocksPendingSnapshotLoad;
 
     // Map containing blocks that aren't pending snapshot
     boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
@@ -669,7 +680,7 @@ inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
 inline PersistentTableSurgeon::~PersistentTableSurgeon()
 {}
 
-inline TBMap &PersistentTableSurgeon::getData() {
+inline TBMap &PersistentTableSurgeon::getData() const {
     return m_table.m_data;
 }
 
@@ -836,14 +847,14 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
 }
 
 inline void
-PersistentTableSurgeon::DRRollback(size_t drMark) {
+PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
     if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
         if (m_table.m_partitionColumn == -1) {
             if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark);
+                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
             }
         } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
         }
     }
 }
@@ -855,7 +866,7 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
 }
 
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, bool deleteLastEmptyBlock)
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 {
     // May not delete an already deleted tuple.
     assert(tuple.isActive());
@@ -888,7 +899,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, 
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 
     int retval = block->freeTuple(tuple.address());
-    if (retval != -1) {
+    if (retval != NO_NEW_BUCKET_INDEX) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
@@ -902,13 +913,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block, 
         }
     }
 
-    // If the current block is empty and there are more than one storage blocks, release the
-    // existing empty block. If there is only 1 tuple block storage block remaining, which is empty,
-    // and if caller has not requested to release the last remaining storage block, don't release
-    // the last empty tuple storage block. Intend of not releasing the last remaining empty block
-    // is to improve first tuple insertion performance in the table next time by avoiding to fetch
-    // new storage tuple block for storing tuples from pool at time of first tuple insertion
-    if (block->isEmpty() && (m_data.size() > 1 || deleteLastEmptyBlock)) {
+    if (block->isEmpty()) {
         m_data.erase(block->address());
         m_blocksWithSpace.erase(block);
         m_blocksNotPendingSnapshot.erase(block);
@@ -942,19 +947,24 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
     return TBPtr(NULL);
 }
 
-inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
-    m_data.insert( block->address(), block);
+inline TBPtr PersistentTable::allocateNextBlock()
+{
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;
 }
 
 inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
-    return lookupTuple(tuple, false);
+    return lookupTuple(tuple, LOOKUP_BY_VALUES);
 }
 
 inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
-    return lookupTuple(tuple, true);
+    return lookupTuple(tuple, LOOKUP_FOR_UNDO);
+}
+
+inline TableTuple PersistentTable::lookupTupleForDR(TableTuple tuple) {
+    return lookupTuple(tuple, LOOKUP_FOR_DR);
 }
 
 }

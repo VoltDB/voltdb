@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.voltcore.utils.Pair;
+import org.voltdb.dtxn.UndoAction;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -39,9 +39,11 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
-    public abstract void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId);
+    public void restart() throws InterruptedException;
 
-    public abstract void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId);
+    public abstract void beginPromotePartition(int partitionId, DRLogSegmentId receivedSegment, long maxLocalUniqueId);
+
+    public abstract UndoAction notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId);
 
     /**
      * Should only be called before initialization. Populate all previously seen
@@ -49,11 +51,11 @@ public interface ConsumerDRGateway extends Promotable {
      * @param lastAppliedIds A map of clusterIds to maps of partitionIds to [drId, uniqueId] pairs.
      * The outer map is assumed to be of size 1
      */
-    public abstract void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, Pair<Long, Long>>> lastAppliedIds);
+    public abstract void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, DRLogSegmentId>> lastAppliedIds);
 
     public abstract void assertSequencing(int partitionId, long drId);
 
-    public abstract Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds();
+    public abstract Map<Integer, Map<Integer, DRLogSegmentId>> getLastReceivedBinaryLogIds();
 
     public static class DummyConsumerDRGateway implements ConsumerDRGateway {
         @Override
@@ -73,18 +75,21 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
-        public void notifyOfLastSeenSegmentId(int partitionId, long maxDRId, long maxUniqueId, long maxLocalUniqueId) {}
+        public void restart() throws InterruptedException {}
 
         @Override
-        public void notifyOfLastAppliedSegmentId(int partitionId, long endDRId, long endUniqueId, long localUniqueId) {}
+        public void beginPromotePartition(int partitionId, DRLogSegmentId receivedSegment, long maxLocalUniqueId) {}
+
+        @Override
+        public UndoAction notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId) { return null; }
 
         @Override
         public void assertSequencing(int partitionId, long drId) {}
 
         @Override
-        public Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds() { return ImmutableMap.of(); }
+        public Map<Integer, Map<Integer, DRLogSegmentId>> getLastReceivedBinaryLogIds() { return ImmutableMap.of(); }
 
         @Override
-        public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, Pair<Long, Long>>> lastAppliedIds) {}
+        public void populateLastAppliedSegmentIds(Map<Integer, Map<Integer, DRLogSegmentId>> lastAppliedIds) {}
     }
 }

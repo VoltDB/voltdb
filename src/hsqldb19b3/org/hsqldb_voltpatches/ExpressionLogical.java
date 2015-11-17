@@ -207,6 +207,7 @@ public class ExpressionLogical extends Expression {
         return new ExpressionLogical(OpTypes.AND, e1, e2);
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -364,6 +365,7 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -454,13 +456,13 @@ public class ExpressionLogical extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
 
-        if (nodes[LEFT] != null) {
+        if (nodes.length > LEFT && nodes[LEFT] != null) {
             sb.append(" arg1=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
 
-        if (nodes[RIGHT] != null) {
+        if (nodes.length > RIGHT && nodes[RIGHT] != null) {
             sb.append(" arg2=[");
             sb.append(nodes[RIGHT].describe(session, blanks + 1));
             sb.append(']');
@@ -469,6 +471,7 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -850,6 +853,7 @@ public class ExpressionLogical extends Expression {
         resolveTypesForAllAny(session);
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -859,8 +863,8 @@ public class ExpressionLogical extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -958,7 +962,7 @@ public class ExpressionLogical extends Expression {
                 if (exprSubType == OpTypes.ANY_QUANTIFIED
                         || exprSubType == OpTypes.ALL_QUANTIFIED) {
                     return testAllAnyCondition(
-                        session, (Object[]) nodes[LEFT].getRowValue(session));
+                        session, nodes[LEFT].getRowValue(session));
                 }
 
                 Object o1 = nodes[LEFT].getValue(session);
@@ -1035,8 +1039,8 @@ public class ExpressionLogical extends Expression {
             return null;
         }
 
-        Object[] leftList  = (Object[]) left;
-        Object[] rightList = (Object[]) right;
+        Object[] leftList  = left;
+        Object[] rightList = right;
 
         for (int i = 0; i < nodes[LEFT].nodes.length; i++) {
             if (leftList[i] == null) {
@@ -1497,6 +1501,7 @@ public class ExpressionLogical extends Expression {
         ((ExpressionLogical) nodes[RIGHT]).distributeOr();
     }
 
+    @Override
     Expression getIndexableExpression(RangeVariable rangeVar) {
 
         switch (opType) {

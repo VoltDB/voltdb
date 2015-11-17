@@ -35,9 +35,11 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.IndexRef;
@@ -745,19 +747,8 @@ public class TestDDLCompiler extends TestCase {
 
         try {
             assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
-            Table t = compiler.getCatalogDatabase().getTables().get(CatalogUtil.DR_CONFLICTS_TABLE_PREFIX + "T");
-            assertNotNull(t);
-            // verify table schema
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TABLE_NAME"));
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_CLUSTER_ID"));
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_TIMESTAMP"));
-            assertNotNull(t.getColumns().get("VOLTDB_AUTOGEN_OPERATION_TYPE"));
-            assertNotNull(t.getColumns().get("D1"));
-            assertNotNull(t.getColumns().get("D2"));
-            assertNotNull(t.getColumns().get("D3"));
-            assertNotNull(t.getColumns().get("VAL1"));
-            assertNotNull(t.getColumns().get("VAL2"));
-            assertNotNull(t.getColumns().get("VAL3"));
+            verifyDRConflictTableSchema(compiler, CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE, true);
+            verifyDRConflictTableSchema(compiler, CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE, false);
         } catch (Exception e) {
             e.printStackTrace();
             fail(e.getMessage());
@@ -765,5 +756,49 @@ public class TestDDLCompiler extends TestCase {
 
         // cleanup after the test
         jarOut.delete();
+    }
+
+    private static void verifyDRConflictTableSchema(VoltCompiler compiler, String name, boolean partitioned) {
+        Table t = compiler.getCatalogDatabase().getTables().get(name);
+        assertNotNull(t);
+
+        if (partitioned) {
+            assertNotNull(t.getPartitioncolumn());
+        } else {
+            assertNull(t.getPartitioncolumn());
+        }
+
+        // verify table schema
+        assertTrue(t.getColumns().size() == 10);
+        Column c1 = t.getColumns().get(DDLCompiler.DR_ROW_TYPE_COLUMN_NAME);
+        assertNotNull(c1);
+        assertTrue(c1.getType() == VoltType.STRING.getValue());
+        Column c2 = t.getColumns().get(DDLCompiler.DR_LOG_ACTION_COLUMN_NAME);
+        assertNotNull(c2);
+        assertTrue(c2.getType() == VoltType.STRING.getValue());
+        Column c3 = t.getColumns().get(DDLCompiler.DR_CONFLICT_COLUMN_NAME);
+        assertNotNull(c3);
+        assertTrue(c3.getType() == VoltType.STRING.getValue());
+        Column c4 = t.getColumns().get(DDLCompiler.DR_CONFLICTS_ON_PK_COLUMN_NAME);
+        assertNotNull(c4);
+        assertTrue(c4.getType() == VoltType.TINYINT.getValue());
+        Column c5 = t.getColumns().get(DDLCompiler.DR_DECISION_COLUMN_NAME);
+        assertNotNull(c5);
+        assertTrue(c5.getType() == VoltType.STRING.getValue());
+        Column c6 = t.getColumns().get(DDLCompiler.DR_CLUSTER_ID_COLUMN_NAME);
+        assertNotNull(c6);
+        assertTrue(c6.getType() == VoltType.TINYINT.getValue());
+        Column c7 = t.getColumns().get(DDLCompiler.DR_TIMESTAMP_COLUMN_NAME);
+        assertNotNull(c7);
+        assertTrue(c7.getType() == VoltType.BIGINT.getValue());
+        Column c8 = t.getColumns().get(DDLCompiler.DR_DIVERGENCE_COLUMN_NAME);
+        assertNotNull(8);
+        assertTrue(c8.getType() == VoltType.STRING.getValue());
+        Column c9 = t.getColumns().get(DDLCompiler.DR_TABLE_NAME_COLUMN_NAME);
+        assertNotNull(9);
+        assertTrue(c9.getType() == VoltType.STRING.getValue());
+        Column c10 = t.getColumns().get(DDLCompiler.DR_TUPLE_COLUMN_NAME);
+        assertNotNull(10);
+        assertTrue(c10.getType() == VoltType.STRING.getValue());
     }
 }

@@ -59,6 +59,7 @@
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
+#include "storage/ExportTupleStream.h"
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {

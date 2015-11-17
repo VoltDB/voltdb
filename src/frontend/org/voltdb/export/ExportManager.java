@@ -220,6 +220,8 @@ public class ExportManager
                     } else {
                         //Just set the next generation.
                         m_processor.get().setExportGeneration(nextGeneration);
+                        //make sure so that we can re acquire.
+                        m_processor.get().startPolling();
                     }
 
                     if (!nextGeneration.isContinueingGeneration()) {
@@ -442,6 +444,7 @@ public class ExportManager
                     currentGeneration.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 }
             }
+            //I know all generations.
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
             /*
              * For the newly constructed processor, provide it the oldest known generation
@@ -584,11 +587,11 @@ public class ExportManager
         }
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+        final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
         ExportGeneration newGeneration = null;
         try {
-            newGeneration = new ExportGeneration(
-                    catalogContext.m_uniqueId, exportOverflowDirectory, false);
+            newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
             m_generations.put(catalogContext.m_uniqueId, newGeneration);

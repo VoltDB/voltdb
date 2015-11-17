@@ -15,41 +15,22 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "CompactingPool.h"
+package org.voltdb;
 
-#include <cstring>
+import org.voltdb.client.ClientResponse;
 
-using namespace voltdb;
-using namespace std;
 
-CompactingPool::CompactingPool(int32_t elementSize, int32_t elementsPerBuffer) :
-    m_size(elementSize), m_allocator(elementSize, elementsPerBuffer)
+/**
+ * Methods to report success, failure, retries etc. of internal connection transactions.
+ */
+public interface InternalConnectionStatsCollector
 {
-}
-
-void*
-CompactingPool::malloc()
-{
-    return m_allocator.alloc();
-}
-
-bool
-CompactingPool::free(void* element)
-{
-    bool element_moved = false;
-    void* last = m_allocator.last();
-    if (last != element)
-    {
-        // copy the last element into the newly vacated spot
-        memcpy(element, last, m_size);
-        element_moved = true;
-    }
-    m_allocator.trim();
-    return element_moved;
-}
-
-size_t
-CompactingPool::getBytesAllocated() const
-{
-    return m_allocator.bytesAllocated();
+    /**
+     * Used to report that a request completion details.
+     *
+     * @param callerName a name identifying the request invoker
+     * @param procName name of the procedure that is used in the transaction request.
+     * @param response ClientResponse with response details
+     */
+    public void reportCompletion(String callerName, String procName, ClientResponse response);
 }

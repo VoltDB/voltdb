@@ -95,6 +95,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
+    private long m_lastAckUSO = 0;
+    //Set if connector "replicated" property is set to true
+    private boolean m_runEveryWhere = false;
+    private boolean m_isMaster = false;
+    private boolean m_replicaRunning = false;
+    //This is released when all mailboxes are set.
+    private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
+    private volatile boolean m_closed = false;
+    private volatile boolean m_mastershipAccepted = false;
 
     /**
      * Create a new data source.
@@ -116,7 +125,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             ) throws IOException
             {
         checkNotNull( onDrain, "onDrain runnable is null");
-
         m_format = ExportFormat.FOURDOTFOUR;
         m_generation = generation;
         m_onDrain = new Runnable() {
@@ -212,7 +220,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ExportDataSource(final Runnable onDrain, File adFile, boolean isContinueingGeneration) throws IOException {
-
         /*
          * Certainly no more data coming if this is coming off of disk
          */
@@ -291,7 +298,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_es = CoreUtils.getListeningExecutorService("ExportDataSource gen " + m_generation + " table " + m_tableName + " partition " + m_partitionId, 1);
     }
 
-    public void updateAckMailboxes( final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
+    public synchronized void updateAckMailboxes(final Pair<Mailbox, ImmutableList<Long>> ackMailboxes) {
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
@@ -334,7 +341,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_signature;
     }
 
-    public int getPartitionId() {
+    public final int getPartitionId() {
         return m_partitionId;
     }
 
@@ -620,6 +627,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public ListenableFuture<?> close() {
+        m_closed = true;
+        //If we are waiting at this allow to break out when close comes in.
+        m_allowAcceptingMastership.release();
         return m_es.submit((new Runnable() {
             @Override
             public void run() {
@@ -667,6 +677,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return fut;
     }
 
+    //If replica we poll from lowest of ack rcvd or last poll point.
+    private long getFirstUnpolledUso() {
+        if (m_isMaster) {
+            return m_firstUnpolledUso;
+        }
+        return Math.min(m_lastAckUSO, m_firstUnpolledUso);
+    }
+
     private void pollImpl(SettableFuture<BBContainer> fut) {
         if (fut == null) {
             return;
@@ -691,12 +709,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             //Copying and sending the data will take place outside the critical section
             try {
                 Iterator<StreamBlock> iter = m_committedBuffers.iterator();
+                long fuso = getFirstUnpolledUso();
                 while (iter.hasNext()) {
                     StreamBlock block = iter.next();
                     // find the first block that has unpolled data
-                    if (m_firstUnpolledUso < block.uso() + block.totalUso()) {
+                    if (fuso < block.uso() + block.totalUso()) {
                         first_unpolled_block = block;
-                        m_firstUnpolledUso = block.uso() + block.totalUso();
+                        m_firstUnpolledUso = (block.uso() + block.totalUso());
                         break;
                     } else {
                         blocksToDelete.add(block);
@@ -772,19 +791,24 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     private void forwardAckToOtherReplicas(long uso) {
+        if (m_runEveryWhere && m_replicaRunning) {
+           //we dont forward if we are running as replica in replicated export
+           return;
+        }
         Pair<Mailbox, ImmutableList<Long>> p = m_ackMailboxRefs.get();
         Mailbox mbx = p.getFirst();
-
-        if (mbx != null) {
+        if (mbx != null && p.getSecond().size() > 0) {
             // partition:int(4) + length:int(4) +
-            // signaturesBytes.length + ackUSO:long(8)
-            final int msgLen = 4 + 4 + m_signatureBytes.length + 8;
+            // signaturesBytes.length + ackUSO:long(8) + 2 bytes for runEverywhere or not.
+            final int msgLen = 4 + 4 + m_signatureBytes.length + 8 + 2;
 
             ByteBuffer buf = ByteBuffer.allocate(msgLen);
             buf.putInt(m_partitionId);
             buf.putInt(m_signatureBytes.length);
             buf.put(m_signatureBytes);
             buf.putLong(uso);
+            buf.putShort((m_runEveryWhere ? (short )1 : (short )0));
+
 
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], buf.array());
 
@@ -794,13 +818,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
     }
 
-    public void ack(final long uso) {
+    public void ack(final long uso, boolean runEveryWhere) {
+        // If I am not master and run everywhere connector and I get ack to start replicating....do so and become a exporting replica.
+        if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
+            //These are single threaded so no need to lock.
+            m_lastAckUSO = uso;
+            if (!m_replicaRunning) {
+                exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
+                m_replicaRunning = true;
+                m_isMaster = false;
+                acceptMastership();
+            }
+            return;
+        }
+
+        //In replicated only master will be doing this.
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
                     if (!m_es.isShutdown()) {
-                        ackImpl(uso);
+                       ackImpl(uso);
                     }
                 } catch (Exception e) {
                     exportLog.error("Error acking export buffer", e);
@@ -811,7 +849,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
-    private void ackImpl(long uso) {
+     private void ackImpl(long uso) {
 
         if (uso == Long.MIN_VALUE && m_onDrain != null) {
             m_onDrain.run();
@@ -830,16 +868,39 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     /**
+     * Returns if replica was running.
+     * @return
+     */
+    public boolean setMaster() {
+        exportLog.info("Setting master for partition: " + getPartitionId() + " Table " + getTableName() + " Replica running " + m_replicaRunning);
+        m_isMaster = true;
+        boolean rval = m_replicaRunning;
+        m_replicaRunning = false;
+        return rval;
+    }
+
+    //Is this a run everywhere source
+    public boolean isRunEveryWhere() {
+        return m_runEveryWhere;
+    }
+
+    /**
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public void acceptMastership() {
+    public synchronized void acceptMastership() {
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
+        if (m_mastershipAccepted) {
+            exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
+            return;
+        }
+        m_mastershipAccepted = true;
         m_es.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    if (!m_es.isShutdown()) {
+                    if (!m_es.isShutdown() || !m_closed) {
+                        exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
                         m_onMastership.run();
                     }
                 } catch (Exception e) {
@@ -860,6 +921,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     public ExportFormat getExportFormat() {
         return m_format;
+    }
+
+    //Set it from client.
+    public void setRunEveryWhere(boolean runEveryWhere) {
+        m_runEveryWhere = runEveryWhere;
     }
 
     public ListeningExecutorService getExecutorService() {

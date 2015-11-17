@@ -160,6 +160,16 @@ public abstract class SubPlanAssembler {
                         path = null;
                     }
                 }
+            } else if (!index.getPredicatejson().isEmpty()) {
+                // Partial index can be used solely to eliminate a post-filter
+                // even when the indexed columns are irrelevant
+                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                if (isPartialIndexPredicateIsCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
+                    path = getRelevantNaivePath(allJoinExprs, filterExprs);
+                    filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
+                    path.index = index;
+                    path.lookupType = IndexLookupType.GTE;
+                }
             }
             if (path != null) {
                 if (postExprs != null) {
@@ -1276,7 +1286,7 @@ public abstract class SubPlanAssembler {
             // MAY not pay that much attention to minimizing scale.
             // This was behind issue ENG-4606 -- failure to index on constant equality.
             // So, accept any pair of integer types.
-            if ( ! (keyType.isInteger() && otherType.isInteger()))  {
+            if ( ! (keyType.isBackendIntegerType() && otherType.isBackendIntegerType()))  {
                 return null;
             }
         }

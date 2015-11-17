@@ -58,7 +58,37 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
     protected boolean m_inBytes = false;
+    /*
+     * We set this to non-null iff the expression has a non-deterministic
+     * operation. The most common kind of non-deterministic operation is an
+     * aggregate function applied to a floating point expression.
+     */
+    private String m_contentDeterminismMessage = null;
 
+    /**
+     * Note that this expression is inherently non-deterministic. This may be
+     * called if the expression is already known to be non-deterministic, even
+     * if the value is false, because we are careful to never go from true to
+     * false here. Perhaps we should concatenate the messages. But since we only
+     * have one now it would result in unnecessary duplication.
+     *
+     * @param value
+     */
+    public void updateContentDeterminismMessage(String value) {
+        if (m_contentDeterminismMessage == null) {
+            m_contentDeterminismMessage = value;
+        }
+    }
+
+    /**
+     * Get the inherent non-determinism state of this expression. This is not
+     * valid before finalizeValueTypes is called.
+     *
+     * @return The state.
+     */
+    public String getContentDeterminismMessage() {
+        return m_contentDeterminismMessage;
+    }
     // Keep this flag turned off in production or when testing user-accessible EXPLAIN output or when
     // using EXPLAIN output to validate plans.
     protected static boolean m_verboseExplainForDebugging = false; // CODE REVIEWER! this SHOULD be false!
@@ -643,6 +673,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return result;
     }
 
+    public static void fromJSONArrayString(String jsontext, StmtTableScan tableScan, List<AbstractExpression> result) throws JSONException
+    {
+        result.addAll(fromJSONArrayString(jsontext, tableScan));
+    }
+
     public static AbstractExpression fromJSONString(String jsontext, StmtTableScan tableScan) throws JSONException
     {
         JSONObject jobject = new JSONObject(jsontext);
@@ -701,8 +736,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 tve.setOrigStmtId(((TupleValueExpression)this).getOrigStmtId());
             }
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
-            if (hasAnySubexpressionOfClass(AggregateExpression.class))
+            if (hasAnySubexpressionOfClass(AggregateExpression.class)) {
                 tve.setHasAggregate(true);
+            }
 
             return tve;
         }
@@ -1079,15 +1115,23 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public abstract void finalizeValueTypes();
 
-    /** Do the recursive part of finalizeValueTypes as requested. */
+    /**
+     * Do the recursive part of finalizeValueTypes as requested. Note that this
+     * updates the content non-determinism state.
+     */
     protected final void finalizeChildValueTypes() {
-        if (m_left != null)
+        if (m_left != null) {
             m_left.finalizeValueTypes();
-        if (m_right != null)
+            updateContentDeterminismMessage(m_left.getContentDeterminismMessage());
+        }
+        if (m_right != null) {
             m_right.finalizeValueTypes();
+            updateContentDeterminismMessage(m_right.getContentDeterminismMessage());
+        }
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
                 argument.finalizeValueTypes();
+                updateContentDeterminismMessage(argument.getContentDeterminismMessage());
             }
         }
     }

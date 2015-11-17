@@ -52,10 +52,13 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Framework m_framework;
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
+    private final ImporterStatsCollector m_importStatsCollector;
 
-    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework) throws BundleException {
+    public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework, ImporterStatsCollector statsCollector)
+            throws BundleException {
         m_framework = framework;
         m_distributer = distributer;
+        m_importStatsCollector = statsCollector;
     }
 
     //This abstracts OSGi based and class based importers.
@@ -165,7 +168,7 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy);
+                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, m_importStatsCollector);
                         //Set the internal handler
                         bw.setHandler(importHandler);
                         if (!bw.m_handlerProxy.isRunEveryWhere()) {

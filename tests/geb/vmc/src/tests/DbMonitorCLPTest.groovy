@@ -59,15 +59,13 @@ class DbMonitorCLPTest extends TestBase {
     def "Verify Show and Hide in Command Log Performance  table" (){
         when: "ensure CLP section is present or not"
         println("test" +page.isCmdLogSectionOpen())
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
             then:
             println("proceed")
-        if( page.isCmdLogSectionOpen())
-        {
+        if( page.isCmdLogSectionOpen()) {
             println("CLP section is present")
             when: "ensure the CLP section is open"
             waitFor(30) { page.openCLPArea() }
@@ -91,16 +89,14 @@ class DbMonitorCLPTest extends TestBase {
             then: 'CLP area is closed (again)'
             !page.isCLPAreaOpen()
         }
-
     }
 
-        def "Verify the Ascending and Descending in the Cmd Server column of Command Log Performance table"(){
+    def "Verify the Ascending and Descending in the Cmd Server column of Command Log Performance table"(){
         String before = ""
         String after  = ""
         when:"Check if Command log is Displayed"
 
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
@@ -136,8 +132,7 @@ class DbMonitorCLPTest extends TestBase {
         String after  = ""
         when:"Check if Command Log is Displayed"
 
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
@@ -171,8 +166,7 @@ class DbMonitorCLPTest extends TestBase {
         String after  = ""
         when:"Check if Command Log is Displayed"
 
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
@@ -206,8 +200,7 @@ class DbMonitorCLPTest extends TestBase {
         String after  = ""
         when:"Check if Command Log is Displayed"
 
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
@@ -241,8 +234,7 @@ class DbMonitorCLPTest extends TestBase {
         String after  = ""
         when:"Check if Command Log is Displayed"
 
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
@@ -276,8 +268,7 @@ class DbMonitorCLPTest extends TestBase {
         String after  = ""
         when:"Check if Command Log is Displayed"
 
-        if( page.isCmdLogSectionOpen()==false)
-        {
+        if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
@@ -309,8 +300,7 @@ class DbMonitorCLPTest extends TestBase {
 
     def "Verify the text in the Title in Command Log Performance "(){
         when: "Check Command Log Performance Title is displayed or not"
-        if(page.drCLPTitleDisplayed())
-        {
+        if(page.drCLPTitleDisplayed()) {
             assert true
         }
         then:
@@ -318,8 +308,7 @@ class DbMonitorCLPTest extends TestBase {
             println(waitFor(20) { page.drCLPTitle.text() })
             page.drCLPTitle.text().equals("Command Log")
         }
-        else
-        {
+        else {
             println("Command Log Section is not visible")
         }
     }
@@ -330,22 +319,24 @@ class DbMonitorCLPTest extends TestBase {
         boolean isCLPOpen = false
 
         when: "Check if CLP section is present"
-
-        if(!waitFor(20){page.isCmdLogSectionOpen()})
-        {
+        try {
+            waitFor(waitTime) { page.isCmdLogSectionOpen() }
+        } catch(geb.waiting.WaitTimeoutException e) {
+        }
+        
+        if(!page.isCmdLogSectionOpen()) {
             println("CLP section is not present")
             isCLPOpen = false
         }
         else {
             isCLPOpen = true
         }
-
         then:
         println("proceed")
         when: "Set the value of Master filter"
         println("isCLPOpen" + isCLPOpen)
         if(isCLPOpen==true) {
-            if (waitFor(20){page.clpServerRows.size()} > 1) {
+            if (waitFor(waitTime){page.clpServerRows.size()} > 1) {
                 searchText = page.clpServerRows[0].text().substring(0, 1)
                 page.filterServer.value(page.clpServerRows[0].text().substring(0, 1))
             } else {
@@ -364,9 +355,8 @@ class DbMonitorCLPTest extends TestBase {
 
             }
         }
-        else
-        {
-            isValid=true
+        else {
+            isValid = true
         }
         then:
         println("proceed")
@@ -375,9 +365,6 @@ class DbMonitorCLPTest extends TestBase {
         } else {
             assert false;
         }
-
-
-
     }
 
 }

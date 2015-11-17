@@ -46,9 +46,9 @@ class SqlQueriesTestBase extends TestBase {
     def ensureOnSqlQueryPage() {
         ensureOnVoltDBManagementCenterPage()
         try {
-            debugPrint 'Attempting to open SqlQueryPage, at: ' + sdf.format(new Date())
+            //debugPrint 'Attempting to open SqlQueryPage, at: ' + sdf.format(new Date())
             page.openSqlQueryPage()
-            debugPrint 'Succeeded:  opened SqlQueryPage, at: ' + sdf.format(new Date())
+            //debugPrint 'Succeeded:  opened SqlQueryPage, at: ' + sdf.format(new Date())
         } catch (WaitTimeoutException e) {
             // If a WaitTimeoutException is encountered, make a second attempt
             String message = '\nCaught a WaitTimeoutException attempting to open SqlQueryPage ' +
@@ -77,15 +77,18 @@ class SqlQueriesTestBase extends TestBase {
     def Map<String,List<String>> runQuery(SqlQueryPage sqp, String query,
             ColumnHeaderCase colHeaderFormat=ColumnHeaderCase.TO_LOWER_CASE) {
         sqp.runQuery(query)
-        def qResult = sqp.getQueryResult(colHeaderFormat)
+        def qResult  = sqp.getQueryResult(colHeaderFormat)
+        def error    = sqp.getQueryError()
+        def duration = sqp.getQueryDuration()
         def qResText = sqp.getQueryResultText()
 
-        if (qResText.contains("Connect to a datasource first")) {
+        // If no connection to database, give it a second chance
+        if (qResText.contains("Connect to a datasource first") || qResText.contains("No connections")) {
             debugPrint "\nQuery : " + query
-            debugPrint "Result Text: " + qResText
+            debugPrint "All result text:\n" + qResText
             debugPrint "Result: " + qResult
-            debugPrint "Duration: " + sqp.getQueryDuration()
-            debugPrint "Error : " + sqp.getQueryError()
+            debugPrint "Duration: " + duration
+            debugPrint "Error : " + error
             debugPrint "Reloading and trying again..."
             driver.navigate().refresh()
             if (!sqp.verifyAtSafely()) {
@@ -97,7 +100,10 @@ class SqlQueriesTestBase extends TestBase {
             }
             sqp.verifyAt()
             sqp.runQuery(query)
-            qResult = sqp.getQueryResult()
+            qResult  = sqp.getQueryResult()
+            error    = sqp.getQueryError()
+            duration = sqp.getQueryDuration()
+            qResText = sqp.getQueryResultText()
         }
 
         // If 'sleepSeconds' property is set and greater than zero, sleep
@@ -106,18 +112,21 @@ class SqlQueriesTestBase extends TestBase {
             try {
                 Thread.sleep(1000 * sleepSeconds)
             } catch (InterruptedException e) {
-                println "\nIn SqlQueriesTestBase.runQuery, caught:\n  " + e.toString() +
-                        "\nSee standard error for stack trace."
+                String message = "\nIn SqlQueriesTestBase.runQuery, caught:\n  " + e.toString()
+                println message + '.'
+                println 'See Standard error for stack trace.\n'
+                System.err.println message + ':'
                 e.printStackTrace()
             }
         }
 
         debugPrint "\nQuery : " + query
         debugPrint "Result: " + qResult
-        debugPrint "Duration: " + sqp.getQueryDuration()
-        def error = sqp.getQueryError()
+        debugPrint "Duration: " + duration
         if (error != null) {
             debugPrint "Error : " + error
+        } else if (duration != null && duration.contains('error')) {
+            debugPrint "All result text:\n" + qResText
         }
 
         return qResult

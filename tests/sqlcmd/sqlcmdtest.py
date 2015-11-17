@@ -150,7 +150,7 @@ def clean_output(parent, path):
     memory_check_matcher = re.compile(r"""
             ^(WARN:\s)?Strict\sjava\smemory\schecking.*$  # Match the start.
             """, re.VERBOSE)
-    # 2. Allow different latency numbers to be reported like
+    # 2. Allow different latency numbers to be reported, like
     # "(Returned 3 rows in 9.99s)" vs. "(Returned 3 rows in 10.01s)".
     # These both get "fuzzed" into the same generic string "(Returned 3 rows in #.##s)".
     # This produces identical 'baseline` results on platforms and builds that
@@ -160,6 +160,20 @@ def clean_output(parent, path):
                                  # survives as \g<1>
             [0-9]+\.[0-9]+s      # also required, replaced with #.##s
             """, re.VERBOSE)
+    # 3. Allow different query timeout periods to be reported, like
+    # "A SQL query was terminated after 1.000 seconds because it exceeded the query timeout period." vs.
+    # "A SQL query was terminated after 1.001 seconds because it exceeded the query timeout period.".
+    # These both get "fuzzed" into the same generic string:
+    # "A SQL query was terminated after 1.00# seconds because it exceeded the query timeout period."
+    # ignoring the final milliseconds digit.
+    # This produces identical 'baseline` results on platforms and builds that
+    # may terminate a query after a slightly different number of milliseconds.
+    query_timeout_matcher = re.compile(r"""
+            (terminated\safter\s[0-9]+\.[0-9][0-9])  # required to match a query timeout
+                                                     # line, survives as \g<1>
+            [0-9]                                    # final digit, replaced with #
+            (\sseconds)                              # survives as \g<2>
+            """, re.VERBOSE)
     for line in outbackin:
         # Note len(cleanedline) here counts 1 EOL character.
         # Preserve blank lines as is -- there's no need to try cleaning them.
@@ -168,6 +182,7 @@ def clean_output(parent, path):
             continue
         cleanedline = memory_check_matcher.sub("", line)
         cleanedline = latency_matcher.sub("\g<1>#.##s", cleanedline)
+        cleanedline = query_timeout_matcher.sub("\g<1>#\g<2>", cleanedline)
         # # enable for debug print "DEBUG line length %d" % (len(cleanedline))
         # # enable for debug #print cleanedline
         # Here, a blank line resulted from a total text replacement,

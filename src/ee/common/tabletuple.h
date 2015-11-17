@@ -57,6 +57,7 @@
 #include <ostream>
 #include <iostream>
 #include <vector>
+#include <jsoncpp/jsoncpp.h>
 
 class CopyOnWriteTest_TestTableTupleFlags;
 
@@ -73,6 +74,7 @@ class TableColumn;
 class TupleIterator;
 class ElasticScanner;
 class StandAloneTupleStorage;
+class SetAndRestorePendingDeleteFlag;
 
 class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
@@ -85,6 +87,7 @@ class TableTuple {
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
     friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
+    friend class SetAndRestorePendingDeleteFlag;
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
@@ -153,14 +156,22 @@ public:
     }
 
     size_t maxDRSerializationSize(const std::vector<int>* interestingColumns) const {
-        if (!interestingColumns) {
-            return maxExportSerializationSize();
-        }
         size_t bytes = 0;
-        std::vector<int> cols = *interestingColumns;
-        for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
-            bytes += maxExportSerializedColumnSize(*cit);
+
+        if (!interestingColumns) {
+            bytes = maxExportSerializationSize();
+        } else {
+            std::vector<int> cols = *interestingColumns;
+            for (std::vector<int>::const_iterator cit = cols.begin(); cit != cols.end(); ++cit) {
+                bytes += maxExportSerializedColumnSize(*cit);
+            }
         }
+
+        int hiddenCols = m_schema->hiddenColumnCount();
+        for (int i = 0; i < hiddenCols; ++i) {
+            bytes += maxExportSerializedHiddenColumnSize(i);
+        }
+
         return bytes;
     }
 
@@ -177,26 +188,20 @@ public:
     // Return the amount of memory allocated for non-inlined objects
     size_t getNonInlinedMemorySize() const
     {
+        // fast-path for no inlined cols
+        if (m_schema->getUninlinedObjectColumnCount() == 0) {
+            return 0;
+        }
+        // TODO: simplify this loop using the non-inlined-only column iteration
+        // technique used in copyForPersistentInsert's for loop.
         size_t bytes = 0;
         int cols = sizeInValues();
-        // fast-path for no inlined cols
-        if (m_schema->getUninlinedObjectColumnCount() != 0)
-        {
-            for (int i = 0; i < cols; ++i)
-            {
-                // peekObjectLength is unhappy with non-varchar
-                const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
-                voltdb::ValueType columnType = columnInfo->getVoltType();
-                if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
-                    !columnInfo->inlined)
-                {
-                    const NValue val = getNValue(i);
-                    if (!val.isNull())
-                    {
-                        bytes += StringRef::computeStringMemoryUsed(
-                                (ValuePeeker::peekObjectLength_withoutNull(val)));
-                    }
-                }
+        for (int i = 0; i < cols; ++i) {
+            const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
+            voltdb::ValueType columnType = columnInfo->getVoltType();
+            if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
+                !columnInfo->inlined) {
+                bytes += getNValue(i).getAllocationSizeForObject();
             }
         }
         return bytes;
@@ -314,6 +319,20 @@ public:
     std::string debug(const std::string& tableName) const;
     std::string debugNoHeader() const;
 
+    std::string toJsonArray() const {
+        int totalColumns = sizeInValues();
+        Json::Value array(Json::arrayValue);
+
+        array.resize(totalColumns);
+        for (int i = 0; i < totalColumns; i++) {
+            array[i] = getNValue(i).toString();
+        }
+
+        std::string retval = Json::FastWriter().write(array);
+        // The FastWritter always writes a newline at the end, ignore it
+        return std::string(retval, 0, retval.length() - 1);
+    }
+
     /** Copy values from one tuple into another (uses memcpy) */
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
     // The vector "output" arguments detail the non-inline object memory management
@@ -326,7 +345,7 @@ public:
     void setAllNulls() const;
 
     bool equals(const TableTuple &other) const;
-    bool equalsNoSchemaCheck(const TableTuple &other) const;
+    bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
 
     int compare(const TableTuple &other) const;
 
@@ -424,7 +443,20 @@ private:
     }
 
     inline size_t maxExportSerializedColumnSize(int colIndex) const {
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
+        return maxExportSerializedColumnSizeCommon(colIndex, false);
+    }
+
+    inline size_t maxExportSerializedHiddenColumnSize(int colIndex) const {
+        return maxExportSerializedColumnSizeCommon(colIndex, true);
+    }
+
+    inline size_t maxExportSerializedColumnSizeCommon(int colIndex, bool isHidden) const {
+        const TupleSchema::ColumnInfo *columnInfo;
+        if (isHidden) {
+            columnInfo = m_schema->getHiddenColumnInfo(colIndex);
+        } else {
+            columnInfo = m_schema->getColumnInfo(colIndex);
+        }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
           case VALUE_TYPE_TINYINT:
@@ -442,11 +474,19 @@ private:
               return 18;
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
+              bool isNullCol;
+              if (isHidden) {
+                  isNullCol = isHiddenNull(colIndex);
+              } else {
+                  isNullCol = isNull(colIndex);
+              }
+
               // 32 bit length preceding value and
               // actual character data without null string terminator.
-              if (!isNull(colIndex))
+              if (!isNullCol)
               {
-                  return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(getNValue(colIndex)));
+                  const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+                  return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(value));
               }
               return (size_t)0;
           default:
@@ -462,7 +502,7 @@ private:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
 
-        if (columnType == VALUE_TYPE_VARCHAR && columnType == VALUE_TYPE_VARBINARY) {
+        if (columnType == VALUE_TYPE_VARCHAR || columnType == VALUE_TYPE_VARBINARY) {
             // Null variable length value doesn't take any bytes in
             // export table, so here needs a special handle for VARCHAR
             // and VARBINARY
@@ -935,10 +975,20 @@ inline bool TableTuple::equals(const TableTuple &other) const {
     return equalsNoSchemaCheck(other);
 }
 
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
+inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns /*= false*/) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
+        if (lhs.op_notEquals(rhs).isTrue()) {
+            return false;
+        }
+    }
+    if (!includeHiddenColumns) {
+        return true;
+    }
+    for (int ii = 0; ii < m_schema->hiddenColumnCount(); ii++) {
+        const NValue lhs = getHiddenNValue(ii);
+        const NValue rhs = other.getHiddenNValue(ii);
         if (lhs.op_notEquals(rhs).isTrue()) {
             return false;
         }

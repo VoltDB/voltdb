@@ -36,12 +36,13 @@ public enum StatsSelector {
     PROCEDUREOUTPUT,
 
     /*
-     * DRPARTITION and DRNODE are internal names
-     * Externally the selector is just "DR"
+     * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
+     * Externally the selector is "DRPRODUCER", or just "DR"
      */
     DR,
-    DRPARTITION,
-    DRNODE,
+    DRPRODUCER,
+    DRPRODUCERPARTITION,
+    DRPRODUCERNODE,
 
     DRCONSUMER,
     DRCONSUMERNODE,
@@ -52,5 +53,6 @@ public enum StatsSelector {
     KSAFETY,        // return ksafety coverage information
     CPU,            // Return CPU Stats
 
-    COMMANDLOG      // return number of outstanding bytes and txns on this node
+    COMMANDLOG,     // return number of outstanding bytes and txns on this node
+    IMPORTER
 }

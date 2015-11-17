@@ -38,13 +38,16 @@ import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -73,7 +76,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.export.ExportManager;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
@@ -89,9 +91,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import com.google_voltpatches.common.base.Preconditions;
-
 import vanilla.java.affinity.impl.PosixJNAAffinity;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -137,9 +139,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     final InitiatorMailbox m_initiatorMailbox;
 
-    // Almighty execution engine and its HSQL sidekick
+    // Almighty execution engine and its (HSQL or PostgreSQL) backend sidekick
     ExecutionEngine m_ee;
-    HsqlBackend m_hsql;
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Stats
     final TableStats m_tableStats;
@@ -375,13 +377,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void forceAllBuffersToDiskForDRAndExport(final boolean nofsync)
+        public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
         {
             m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
             if (m_mpDrGateway != null) {
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
-            ExportManager.sync(nofsync);
         }
 
         @Override
@@ -458,16 +459,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void initialize()
     {
         if (m_backend == BackendTarget.NONE) {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
             m_ee = new MockExecutionEngine();
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
-                                                       m_context);
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
+            m_ee = new MockExecutionEngine();
+        }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
             m_ee = new MockExecutionEngine();
         }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
             m_ee = initializeEE();
         }
 
@@ -536,7 +540,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void run()
     {
-        Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
+        if (m_partitionId == MpInitiator.MP_INIT_PID) {
+            Thread.currentThread().setName("MP Site - " + CoreUtils.hsIdToString(m_siteId));
+        }
+        else {
+            Thread.currentThread().setName("SP " + m_partitionId + " Site - " + CoreUtils.hsIdToString(m_siteId));
+        }
         if (m_coreBindIds != null) {
             PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
         }
@@ -713,8 +722,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void shutdown()
     {
         try {
-            if (m_hsql != null) {
-                HsqlBackend.shutdownInstance();
+            if (m_non_voltdb_backend != null) {
+                m_non_voltdb_backend.shutdownInstance();
             }
             if (m_ee != null) {
                 m_ee.release();
@@ -747,8 +756,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, Pair<Long, Long>> drTupleStreamInfo,
-            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
+            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
                                         exportSequenceNumbers, drTupleStreamInfo,
                                         remoteDCLastIds);
@@ -914,9 +923,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override
@@ -930,16 +939,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, ByteBuffer.allocate(0)));
         long partitionSequenceNumber = resultBuffer.getLong();
-        long partitionUniqueId = resultBuffer.getLong();
+        long partitionSpUniqueId = resultBuffer.getLong();
+        long partitionMpUniqueId = resultBuffer.getLong();
+        DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
         TupleStreamStateInfo info = null;
         if (hasReplicatedStateInfo != 0) {
             long replicatedSequenceNumber = resultBuffer.getLong();
-            long replicatedUniqueId = resultBuffer.getLong();
-            info = new TupleStreamStateInfo(partitionSequenceNumber, partitionUniqueId,
-                    replicatedSequenceNumber, replicatedUniqueId);
+            long replicatedSpUniqueId = resultBuffer.getLong();
+            long replicatedMpUniqueId = resultBuffer.getLong();
+            DRLogSegmentId replicatedInfo = new DRLogSegmentId(replicatedSequenceNumber, replicatedSpUniqueId, replicatedMpUniqueId);
+
+            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo);
         } else {
-            info = new TupleStreamStateInfo(partitionSequenceNumber, partitionUniqueId);
+            info = new TupleStreamStateInfo(partitionInfo);
         }
         return info;
     }
@@ -1312,12 +1325,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public long applyBinaryLog(long txnId, long spHandle,
-                               long uniqueId, byte log[]) throws EEException {
+                               long uniqueId, int remoteClusterId,
+                               byte log[]) throws EEException {
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
         return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            getNextUndoToken(m_currentTxnId));
+                            remoteClusterId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override
