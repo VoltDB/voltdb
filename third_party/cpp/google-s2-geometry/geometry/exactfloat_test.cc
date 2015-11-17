@@ -15,7 +15,10 @@ typedef Vector3<ExactFloat> Vector3_xf;
 
 class ExactFloatTestBase : public testing::Test {
 protected:
-	ExactFloat ef_zero = 0.0;
+  ExactFloat ef_zero;
+  ExactFloatTestBase() :
+    ef_zero(0.0)
+  {}
 };
 
 

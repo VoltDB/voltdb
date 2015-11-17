@@ -4,6 +4,8 @@
  *  Created on: Nov 6, 2015
  *      Author: bill.white@voltdb.com
  */
+#include "s2geo/util/math/exactfloat/exactfloat.h"
+#if  defined(USE_GOOGLE_EXACTFLOAT) && defined(USE_GOOGLE_EXACTFLOAT_WITH_VOLTDB_OPENSSL)
 #include "s2geo/util/math/exactfloat/bignum.h"
 #include "s2geo/testing/base/public/gunit.h"
 
@@ -328,3 +330,4 @@ TEST_F(BignumTestBase, TestArith) {
 		bn_00 = bn_01;
 	}
 }
+#endif  // defined(USE_GOOGLE_EXACTFLOAT) && defined(USE_GOOGLE_EXACTFLOAT_WITH_VOLTDB_OPENSSL)

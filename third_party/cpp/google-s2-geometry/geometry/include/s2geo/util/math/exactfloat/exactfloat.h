@@ -109,6 +109,10 @@
 #undef  USE_GOOGLE_EXACTFLOAT_WITH_VOLTDB_OPENSSL
 #endif
 
+#if  !defined(USE_GOOGLE_EXACTFLOAT) && !defined(USE_VOLTDB_EXACTFLOAT)
+#error "One of USE_GOOGLE_EXACTFLOAT, or USE_VOLTDB_EXACTFLOAT must be defined."
+#endif
+
 #if  defined(USE_VOLTDB_EXACTFLOAT)
 /// The original S2 library used its own notion of ExactFloat, using either
 /// MPFloat or the OpenSSL libcrypto bignum library.  The former is licensed
