@@ -699,6 +699,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                         long spHandle,
                                         long lastCommittedSpHandle,
                                         long uniqueId,
+                                        int remoteClusterId,
                                         long undoToken) throws EEException;
 
     /**
@@ -965,6 +966,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                long spHandle,
                                                long lastCommittedSpHandle,
                                                long uniqueId,
+                                               int remoteClusterId,
                                                long undoToken);
 
     /**

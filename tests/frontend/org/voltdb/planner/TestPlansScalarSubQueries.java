@@ -287,7 +287,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * Uncomment these tests when ENG-8306 is finished
      */
     public void testHavingScalar() {
-        failToCompile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);",
+        failToCompile("select max(r2.c) from r2 group by r2.c having count(c) = (select a from r1);",
                 TestPlansInExistsSubQueries.HavingErrorMsg);
 
 //        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
@@ -302,7 +302,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
      * Uncomment these tests when ENG-8306 is finished
      */
     public void testHavingRow() {
-        failToCompile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);",
+        failToCompile("select max(r2.c) from r2 group by r2.c having (count(c), max(r2.c)) = (select a,c from r1);",
                 TestPlansInExistsSubQueries.HavingErrorMsg);
 
 //        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");

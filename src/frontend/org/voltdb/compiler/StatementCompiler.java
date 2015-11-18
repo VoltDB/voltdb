@@ -209,10 +209,12 @@ public abstract class StatementCompiler {
                 " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
         }
 
-        // Check order determinism before accessing the detail which it caches.
+        // Check order and content determinism before accessing the detail which
+        // it caches.
         boolean orderDeterministic = plan.isOrderDeterministic();
         catalogStmt.setIsorderdeterministic(orderDeterministic);
-        boolean contentDeterministic = orderDeterministic || ! plan.hasLimitOrOffset();
+        boolean contentDeterministic = plan.isContentDeterministic()
+                                       && (orderDeterministic || !plan.hasLimitOrOffset());
         catalogStmt.setIscontentdeterministic(contentDeterministic);
         String nondeterminismDetail = plan.nondeterminismDetail();
         catalogStmt.setNondeterminismdetail(nondeterminismDetail);

@@ -351,14 +351,15 @@ public class StatsAgent extends OpsAgent
         boolean interval = obj.getBoolean("interval");
         StatsSelector subselector = StatsSelector.valueOf(subselectorString);
         switch (subselector) {
-        case DR:
-            stats = collectDRStats();
+        case DRPRODUCER:
+        case DR: // synonym of DRPRODUCER
+            stats = collectDRProducerStats();
             break;
-        case DRNODE:
-            stats = collectStats(StatsSelector.DRNODE, false);
+        case DRPRODUCERNODE:
+            stats = collectStats(StatsSelector.DRPRODUCERNODE, false);
             break;
-        case DRPARTITION:
-            stats = collectStats(StatsSelector.DRPARTITION, false);
+        case DRPRODUCERPARTITION:
+            stats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
             break;
         case SNAPSHOTSTATUS:
             stats = collectStats(StatsSelector.SNAPSHOTSTATUS, false);
@@ -437,12 +438,12 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-    private VoltTable[] collectDRStats()
+    private VoltTable[] collectDRProducerStats()
     {
         VoltTable[] stats = null;
 
-        VoltTable[] partitionStats = collectStats(StatsSelector.DRPARTITION, false);
-        VoltTable[] nodeStats = collectStats(StatsSelector.DRNODE, false);
+        VoltTable[] partitionStats = collectStats(StatsSelector.DRPRODUCERPARTITION, false);
+        VoltTable[] nodeStats = collectStats(StatsSelector.DRPRODUCERNODE, false);
         if (partitionStats != null && nodeStats != null) {
             stats = new VoltTable[2];
             stats[0] = partitionStats[0];

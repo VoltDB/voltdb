@@ -350,7 +350,7 @@ int32_t hexCharToInt(char c) {
     return retval;
 }
 
-/** pass in a buffer at least half as long as the string */
+/** pass in a buffer at least (len(hexString)/2+1) */
 void Catalog::hexDecodeString(const string &hexString, char *buffer) {
     assert (buffer);
     int32_t i;
@@ -365,11 +365,11 @@ void Catalog::hexDecodeString(const string &hexString, char *buffer) {
     buffer[i] = '\0';
 }
 
-/** pass in a buffer at least twice as long as the string */
-void Catalog::hexEncodeString(const char *string, char *buffer) {
+/** pass in a buffer at least (2*len+1) */
+void Catalog::hexEncodeString(const char *string, char *buffer, size_t len) {
     assert (buffer);
     int32_t i = 0;
-    for (; i < strlen(string); i++) {
+    for (; i < len; i++) {
         char ch[2];
         snprintf(ch, 2, "%x", (string[i] >> 4) & 0xF);
         buffer[i * 2] = ch[0];

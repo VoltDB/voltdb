@@ -464,4 +464,8 @@ public class StmtSubqueryScan extends StmtTableScan {
     public List<SchemaColumn> getOutputSchema() {
         return m_outputColumnList;
     }
+
+    public String calculateContentDeterminismMessage() {
+        return m_subqueryStmt.calculateContentDeterminismMessage();
+    }
 }

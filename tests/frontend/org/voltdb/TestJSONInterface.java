@@ -333,12 +333,19 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme) throws Exception {
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
+    }
+
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme, int procCallTimeout) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
         HashMap<String, String> params = new HashMap<String, String>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
+        if (procCallTimeout > 0) {
+            params.put(HTTPClientInterface.QUERY_TIMEOUT_PARAM, String.valueOf(procCallTimeout));
+        }
         if (username != null) {
             params.put("User", username);
         }
@@ -1251,6 +1258,80 @@ public class TestJSONInterface extends TestCase {
             }
             server = null;
         }
+    }
+
+    public void testProcTimeout() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(InsertProc.class);
+            builder.addProcedures(LongReadProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            ParameterSet pset = null;
+
+            int batchSize = 10000;
+            for (int i=0; i<10; i++) {
+                pset = ParameterSet.fromArrayNoCopy(i*batchSize, batchSize);
+                String response = callProcOverJSON("TestJSONInterface$InsertProc", pset, null, null, false, false, 200, ClientAuthHashScheme.HASH_SHA256);
+                Response r = responseFromJSON(response);
+                assertEquals(ClientResponse.SUCCESS, r.status);
+            }
+
+            pset = ParameterSet.fromArrayNoCopy(100000);
+            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthHashScheme.HASH_SHA256, 1);
+            Response r = responseFromJSON(response);
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
+            assertTrue(r.statusString.contains("Transaction Interrupted"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public static class InsertProc extends VoltProcedure {
+
+        public final SQLStmt stmt = new SQLStmt("INSERT INTO foo values (?);");
+
+        public long run(int startValue, long numRows) {
+            for (int i=0; i<numRows; i++) {
+                voltQueueSQL(stmt, i+startValue);
+            }
+            voltExecuteSQL();
+            return 1;
+        }
+
+    }
+
+    public static class LongReadProc extends VoltProcedure {
+
+        public final SQLStmt stmt = new SQLStmt("SELECT * FROM foo");
+
+        public long run(long numLoops) {
+            voltQueueSQL(stmt);
+            voltExecuteSQL();
+            return 1;
+        }
+
     }
 
     public void testLongQuerySTring() throws Exception {

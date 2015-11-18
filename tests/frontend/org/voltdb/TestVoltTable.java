@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
@@ -1136,6 +1137,114 @@ public class TestVoltTable extends TestCase {
 
             // this should bomb if the data is invalid because it scans every value
             t2.toJSONString();
+        }
+    }
+
+    public void testFetchRowPerformance() {
+        final int ROW_COUNT = 100000;
+
+        TableHelper th = new TableHelper();
+        RandomTable rt = th.getTotallyRandomTable("FOO");
+        th.randomFill(rt.table, ROW_COUNT, 128);
+        assertTrue(rt.table.getRowCount() == ROW_COUNT);
+        VoltTable t = rt.table;
+
+        System.out.println("Iterating with fetchRow()...");
+        long t0 = System.nanoTime();
+
+        t.resetRowPosition();
+        for (int i=0; i < ROW_COUNT; i++) {
+            t.fetchRow(i);
+        }
+
+        System.out.println("Iterating with advanceRow()...");
+
+        long t1 = System.nanoTime();
+
+        t.resetRowPosition();
+        while (t.advanceRow()) {
+            t.advanceRow();
+        }
+
+        long t2 = System.nanoTime();
+
+        long fetchRowTime = t1-t0;
+        System.out.println("Took "+ fetchRowTime + " nanos to call fetchRow() for " + ROW_COUNT + " rows");
+
+        long advanceRowTime = t2-t1;
+        System.out.println("Took "+ advanceRowTime + " nanos to call advanceRow() for " + ROW_COUNT + " rows");
+
+        // this is a super loose bound just to check that the time isn't n^2
+        assertTrue(fetchRowTime < (advanceRowTime * 20));
+    }
+
+    public void testFetchRowAccuracy() {
+        final int ROW_COUNT = 10000;
+
+        TableHelper th = new TableHelper();
+        RandomTable rt = th.getTotallyRandomTable("FOO");
+        th.randomFill(rt.table, ROW_COUNT, 128);
+        assertTrue(rt.table.getRowCount() == ROW_COUNT);
+        VoltTable t = rt.table;
+
+        Object[] results = new Object[ROW_COUNT];
+
+        // cache all the answers and check that incrementing fetchrow and advancerow agree
+        t.resetRowPosition();
+        int i = 0;
+        while (t.advanceRow()) {
+            VoltTableRow r = t.fetchRow(i);
+
+            Object lhs = r.get(0, r.getColumnType(0));
+            Object rhs = t.get(0, t.getColumnType(0));
+            if (lhs == null) {
+                assert(rhs == null);
+            }
+            else {
+                assertTrue(lhs.equals(rhs));
+            }
+
+            results[i++] = lhs;
+        }
+
+        // match cached answers to random fetchrow requests
+        Random rand = new Random();
+        for (i = 0; i < 1000; i++) {
+            int randIndex = rand.nextInt(ROW_COUNT);
+            VoltTableRow r = t.fetchRow(randIndex);
+
+            Object lhs = r.get(0, r.getColumnType(0));
+            Object rhs = results[randIndex];
+            if (lhs == null) {
+                assert(rhs == null);
+            }
+            else {
+                assertTrue(lhs.equals(rhs));
+            }
+        }
+
+        // verify nothing gets hosed if you work out of bounds
+        for (i = 0; i < 1000; i++) {
+            // add some range on either end so we fetch rows out of bounds
+            int randIndex = rand.nextInt(ROW_COUNT * 3 / 2) - (ROW_COUNT / 4);
+
+            try {
+                VoltTableRow r = t.fetchRow(randIndex);
+                assertTrue(randIndex >= 0);
+                assertTrue(randIndex < ROW_COUNT);
+
+                Object lhs = r.get(0, r.getColumnType(0));
+                Object rhs = results[randIndex];
+                if (lhs == null) {
+                    assert(rhs == null);
+                }
+                else {
+                    assertTrue(lhs.equals(rhs));
+                }
+            }
+            catch (Exception e) {
+                assertTrue((randIndex < 0) || (randIndex >= ROW_COUNT));
+            }
         }
     }
 }

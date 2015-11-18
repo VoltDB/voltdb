@@ -51,9 +51,11 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block);
 
-    bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
-            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert);
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
