@@ -254,7 +254,7 @@ public class UniqueDevicesClient {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Unique Device ID counting results
-        System.out.println("\n" + HORIZONTAL_RULE + " Unique Device ID Couting Results\n" + HORIZONTAL_RULE);
+        System.out.println("\n" + HORIZONTAL_RULE + " Unique Device ID Counting Results\n" + HORIZONTAL_RULE);
         System.out.printf("A total of %,9d device ids were processed and %d failed (%.2f percent).\n\n",
                 totalVotes.get(),
                 failedVotes.get(),
