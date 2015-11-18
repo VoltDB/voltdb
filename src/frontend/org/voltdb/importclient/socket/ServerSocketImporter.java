@@ -40,7 +40,6 @@ public class ServerSocketImporter extends AbstractImporter {
 
     public ServerSocketImporter(ServerSocketImporterConfig config)
     {
-        super();
         m_config = config;
     }
 
@@ -68,7 +67,7 @@ public class ServerSocketImporter extends AbstractImporter {
         try {
             m_config.getServerSocket().close();
         } catch(IOException e) {
-            getLogger().warn("Error closing socket importer server socket on port " + m_config.getPort(), e);
+            warn("Error closing socket importer server socket on port " + m_config.getPort(), e);
         }
 
         for (ClientConnectionHandler client : m_clients) {
@@ -86,7 +85,7 @@ public class ServerSocketImporter extends AbstractImporter {
                 ch.start();
             }
         } catch(IOException e) {
-           getLogger().error("Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort(), e);
+           error("Unexpected error accepting client connections for " + getName() + " on port " + m_config.getPort(), e);
         }
     }
 
@@ -118,14 +117,14 @@ public class ServerSocketImporter extends AbstractImporter {
                     }
                 }
             } catch (IOException ioe) {
-                getLogger().error("IO exception reading from client socket connection in socket importer", ioe);
+                error("IO exception reading from client socket connection in socket importer", ioe);
             }
 
             try {
                 m_clientSocket.close();
-                getLogger().info("Client Closed.");
+                info("Client Closed.", null);
             } catch(IOException e) {
-                getLogger().warn("Error closing socket importer connection", e);
+                warn("Error closing socket importer connection", e);
             }
         }
 

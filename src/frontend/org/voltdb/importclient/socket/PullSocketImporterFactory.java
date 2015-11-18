@@ -46,7 +46,7 @@ public class PullSocketImporterFactory extends AbstractImporterFactory
     @Override
     public AbstractImporter create(ImporterConfig config)
     {
-        return new PullSocketImporterVersion2((PullSocketImporterConfig) config);
+        return new PullSocketImporter((PullSocketImporterConfig) config);
     }
 
     @Override

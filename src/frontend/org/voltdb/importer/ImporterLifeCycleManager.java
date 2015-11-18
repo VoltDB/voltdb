@@ -18,12 +18,12 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -32,6 +32,8 @@ import org.voltcore.logging.VoltLogger;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 
 /**
@@ -39,17 +41,17 @@ import com.google_voltpatches.common.collect.Maps;
  * starting or stopping the importer instances accordingly. There will be a
  * manager instance per importer type/bundle.
  */
-public class ImporterTypeManager implements ChannelChangeCallback
+public class ImporterLifeCycleManager implements ChannelChangeCallback
 {
     private final static VoltLogger s_logger = new VoltLogger("ImporterTypeManager");
 
     private final AbstractImporterFactory m_factory;
-    private ExecutorService m_executorService;
+    private ListeningExecutorService m_executorService;
     private ImmutableMap<URI, ImporterConfig> m_configs = ImmutableMap.of();
     private ImmutableMap<URI, AbstractImporter> m_importers;
     private volatile boolean m_stopping;
 
-    public ImporterTypeManager(AbstractImporterFactory factory)
+    public ImporterLifeCycleManager(AbstractImporterFactory factory)
     {
         m_factory = factory;
     }
@@ -87,21 +89,37 @@ public class ImporterTypeManager implements ChannelChangeCallback
             throw new RuntimeException("Importer has already been started and is running");
         }
 
-        m_executorService = Executors.newFixedThreadPool(m_configs.size(),
-                getThreadFactory(m_factory.getTypeName(), ImportHandlerProxy.MEDIUM_STACK_SIZE));
+        ThreadPoolExecutor tpe = new ThreadPoolExecutor(
+                m_configs.size(),
+                m_configs.size(),
+                5_000,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(),
+                getThreadFactory(m_factory.getTypeName(), ImportHandlerProxy.MEDIUM_STACK_SIZE)
+                );
+        tpe.allowCoreThreadTimeOut(true);
+
+        m_executorService = MoreExecutors.listeningDecorator(tpe);
 
         ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         if (m_factory.isImporterRunEveryWhere()) {
             for (final ImporterConfig config : m_configs.values()) {
                 AbstractImporter importer = m_factory.createImporter(config);
                 builder.put(importer.getResourceID(), importer);
-                submitAccept(importer);
             }
             m_importers = builder.build();
+            startImporters();
         } else {
             distributer.registerCallback(m_factory.getTypeName(), this);
             distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
             m_importers = ImmutableMap.of();
+        }
+    }
+
+    private void startImporters()
+    {
+        for (AbstractImporter importer : m_importers.values()) {
+            submitAccept(importer);
         }
     }
 
@@ -131,10 +149,10 @@ public class ImporterTypeManager implements ChannelChangeCallback
         for (final URI added: assignment.getAdded()) {
             AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
             builder.put(added, importer);
-            submitAccept(importer);
         }
 
         m_importers = builder.build();
+        startImporters();
     }
 
     private final static Predicate<URI> notUriIn(final Set<URI> uris) {
@@ -182,7 +200,7 @@ public class ImporterTypeManager implements ChannelChangeCallback
         m_stopping = true;
 
         if (!m_factory.isImporterRunEveryWhere()) {
-            distributer.registerChannels(m_factory.getTypeName(), new HashSet<URI>());
+            distributer.registerChannels(m_factory.getTypeName(), Collections.<URI> emptySet());
         }
         stopImporters();
 

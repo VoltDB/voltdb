@@ -38,13 +38,13 @@ import com.google_voltpatches.common.base.Optional;
  * Importer implementation for pull socket importer. At runtime, there will
  * one instance of this per host and socket combination.
  */
-public class PullSocketImporterVersion2 extends AbstractImporter {
+public class PullSocketImporter extends AbstractImporter {
 
     private PullSocketImporterConfig m_config;
     private final AtomicBoolean m_eos = new AtomicBoolean(false);
     private volatile Optional<Thread> m_thread = Optional.absent();
 
-    PullSocketImporterVersion2(PullSocketImporterConfig config)
+    PullSocketImporter(PullSocketImporterConfig config)
     {
         m_config = config;
     }
@@ -67,13 +67,13 @@ public class PullSocketImporterVersion2 extends AbstractImporter {
 
     @Override
     public String getName() {
-        return "PullSocketImporterVer2";
+        return "PullSocketImporter";
     }
 
     private void susceptibleRun() {
         if (m_eos.get()) return;
 
-        getLogger().info("Starting socket puller for " + m_config.getResourceID());
+        info("Starting socket puller for " + m_config.getResourceID(), null);
 
         m_thread = Optional.of(Thread.currentThread());
         Optional<BufferedReader> reader = null;
@@ -90,13 +90,13 @@ public class PullSocketImporterVersion2 extends AbstractImporter {
                 while ((csv=br.readLine()) != null) {
                     CSVInvocation invocation = new CSVInvocation(m_config.getProcedure(), csv);
                     if (!callProcedure(invocation)) {
-                        if (getLogger().isDebugEnabled()) {
-                            getLogger().debug("Failed to process Invocation possibly bad data: " + csv);
+                        if (isDebugEnabled()) {
+                            debug("Failed to process Invocation possibly bad data: " + csv, null);
                         }
                     }
                 }
                 if (csv == null) {
-                    getLogger().warn(m_config.getResourceID() + " peer terminated stream");
+                    warn(m_config.getResourceID() + " peer terminated stream", null);
                 }
             } catch (EOFException e) {
                 rateLimitedLog(Level.WARN, e, m_config.getResourceID() + " peer terminated stream");
@@ -111,7 +111,7 @@ public class PullSocketImporterVersion2 extends AbstractImporter {
             }
         }
 
-        getLogger().info("Stopping socket puller for " + m_config.getResourceID());
+        info("Stopping socket puller for " + m_config.getResourceID(), null);
     }
 
     private Optional<BufferedReader> attemptBufferedReader() {
@@ -129,9 +129,13 @@ public class PullSocketImporterVersion2 extends AbstractImporter {
             attempt = Optional.of(new BufferedReader(isr, 8192));
         } catch (InterruptedIOException e) {
             if (m_eos.get()) return attempt;
-            rateLimitedLog(Level.WARN, e, "Unable to connect to " + m_config.getResourceID());
+            if (isDebugEnabled()) {
+                rateLimitedLog(Level.DEBUG, e, "Unable to connect to " + m_config.getResourceID());
+            }
         } catch (IOException e) {
-            rateLimitedLog(Level.WARN, e, "Unable to connect to " + m_config.getResourceID());
+            if (isDebugEnabled()) {
+                rateLimitedLog(Level.DEBUG, e, "Unable to connect to " + m_config.getResourceID());
+            }
         }
         return attempt;
     }

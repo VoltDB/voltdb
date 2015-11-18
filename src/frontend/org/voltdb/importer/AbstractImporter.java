@@ -81,16 +81,6 @@ public abstract class AbstractImporter
     }
 
     /**
-     * Returns the logger that should be used by this importer.
-     *
-     * @return logger that should be used by this importer.
-     */
-    protected final VoltLogger getLogger()
-    {
-        return m_logger;
-    }
-
-    /**
      * This should be used importer implementations to execute a stored procedure.
      *
      * @param invocation Invocation object with procedure name and parameter information
@@ -166,6 +156,76 @@ public abstract class AbstractImporter
     protected void rateLimitedLog(Level level, Throwable cause, String format, Object... args)
     {
         m_logger.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, level, cause, format, args);
+    }
+
+    protected boolean isDebugEnabled()
+    {
+        return m_logger.isDebugEnabled();
+    }
+
+    protected boolean isInfoEnabled()
+    {
+        return m_logger.isInfoEnabled();
+    }
+
+    protected boolean isTraceEnabled()
+    {
+        return m_logger.isTraceEnabled();
+    }
+
+    /**
+     * Log a DEBUG level log message.
+     *
+     * @param message
+     * @param t
+     */
+    protected void debug(String message, Throwable t)
+    {
+        m_logger.debug(message, t);
+    }
+
+    /**
+     * Log a ERROR level log message.
+     *
+     * @param message
+     * @param t
+     */
+    protected void error(String message, Throwable t)
+    {
+        m_logger.error(message, t);
+    }
+
+    /**
+     * Log a INFO level log message.
+     *
+     * @param message
+     * @param t
+     */
+    protected void info(String message, Throwable t)
+    {
+        m_logger.info(message, t);
+    }
+
+    /**
+     * Log a TRACE level log message.
+     *
+     * @param message
+     * @param t
+     */
+    protected void trace(String message, Throwable t)
+    {
+        m_logger.trace(message, t);
+    }
+
+    /**
+     * Log a WARN level log message.
+     *
+     * @param message
+     * @param t
+     */
+    protected void warn(String message, Throwable t)
+    {
+        m_logger.warn(message, t);
     }
 
     /**

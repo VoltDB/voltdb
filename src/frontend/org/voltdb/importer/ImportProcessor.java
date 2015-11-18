@@ -69,7 +69,7 @@ public class ImportProcessor implements ImportDataProcessor {
         private final Bundle m_bundle;
         private ImportHandlerProxy m_handlerProxy;
         private AbstractImporterFactory m_importerFactory;
-        private ImporterTypeManager m_importerTypeMgr;
+        private ImporterLifeCycleManager m_importerTypeMgr;
         private ImportHandler m_handler;
         private ChannelDistributer m_channelDistributer;
 
@@ -80,7 +80,7 @@ public class ImportProcessor implements ImportDataProcessor {
             } else {
                 m_importerFactory = (AbstractImporterFactory) o;
                 m_importerFactory.setImportServerAdapter(m_importServerAdapter);
-                m_importerTypeMgr = new ImporterTypeManager(m_importerFactory);
+                m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory);
             }
         }
 
