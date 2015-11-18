@@ -29,8 +29,6 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
-import junit.framework.TestCase;
-
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
@@ -50,6 +48,8 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+
+import junit.framework.TestCase;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -476,7 +476,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 fail();
             }
         } catch (Exception ex) {
-            String msg = String.format("A SQL query was terminated after %.2f seconds "
+            String msg = String.format("A SQL query was terminated after %.03f seconds "
                     + "because it exceeded the query timeout period.",
                     timeout/1000.0);
             assertEquals(msg, ex.getMessage());

@@ -37,14 +37,6 @@ public:
     static const int POOLED_MAX_VALUE_LENGTH;
 
     /**
-     * Return the nearest power-of-two-plus-or-minus buffer size that
-     * will be allocated for an object of the given length
-     * TODO: internalize this function and CompactingStringStorage into
-     * ThreadLocalPool.cpp.
-     */
-    static std::size_t getAllocationSizeForObject(std::size_t length);
-
-    /**
      * Allocate space from a page of objects of the requested size.
      * Each new size of object splinters the allocated memory into a new pool
      * which is a collection of pages of objects of that exact size.
@@ -95,14 +87,19 @@ public:
      * a function that allowed the persistent pointer to be safely relocated
      * and re-registered.
      */
-    static char* allocateRelocatable(std::size_t sz);
+    static char* allocateRelocatable(char** referrer, int32_t sz);
+
+    /**
+     * Return the rounded-up buffer size that was allocated for the string.
+     */
+    static int32_t getAllocationSizeForRelocatable(char* string);
 
     /**
      * Deallocate the object returned by allocateRelocatable.
      * This implements continuous compaction which can have the side effect of
      * relocating some other allocation.
      */
-    static void freeRelocatable(std::size_t sz, char* string);
+    static void freeRelocatable(char* string);
 };
 }
 

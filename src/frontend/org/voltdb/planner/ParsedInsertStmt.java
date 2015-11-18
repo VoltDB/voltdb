@@ -101,6 +101,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                         "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }
         }
+        calculateContentDeterminismMessage();
     }
 
     @Override
@@ -241,6 +242,31 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         }
 
         return exprs;
+    }
+
+    /**
+     * Return the content determinism string of the subquery if there is one.
+     */
+    @Override
+    public String calculateContentDeterminismMessage() {
+        String ans = getContentDeterminismMessage();
+        if (ans != null) {
+            return ans;
+        }
+        if (m_subquery != null) {
+            updateContentDeterminismMessage(m_subquery.calculateContentDeterminismMessage());
+            return getContentDeterminismMessage();
+        }
+        if (m_columns != null) {
+            for (AbstractExpression expr : m_columns.values()) {
+                String emsg = expr.getContentDeterminismMessage();
+                if (emsg != null) {
+                    updateContentDeterminismMessage(emsg);
+                    return emsg;
+                }
+            }
+        }
+        return null;
     }
 
     @Override

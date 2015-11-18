@@ -93,11 +93,15 @@ public class PlanAssembler {
     private static class ParsedResultAccumulator {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
+        public final String m_isContentDeterministic;
 
-        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset)
+        public ParsedResultAccumulator(boolean orderIsDeterministic,
+                                       boolean hasLimitOrOffset,
+                                       String isContentDeterministic)
         {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
+            m_isContentDeterministic = isContentDeterministic;
         }
     }
 
@@ -374,14 +378,20 @@ public class PlanAssembler {
             return;
         }
 
-        if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
+        boolean contentDeterministic = plan.isContentDeterministic();
+        if (parsedStmt instanceof ParsedInsertStmt && !(plan.isOrderDeterministic() && contentDeterministic)) {
             ParsedInsertStmt parsedInsert = (ParsedInsertStmt)parsedStmt;
             boolean targetHasLimitRowsTrigger = parsedInsert.targetTableHasLimitRowsTrigger();
+            String contentDeterministicMsg = "";
+            if (!contentDeterministic) {
+                contentDeterministicMsg = "  " + plan.nondeterminismDetail();
+            }
 
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(
                         "UPSERT statement manipulates data in a non-deterministic way.  "
-                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue."
+                        + contentDeterministicMsg);
             }
             else if (targetHasLimitRowsTrigger) {
                 throw new PlanningErrorException(
@@ -389,12 +399,18 @@ public class PlanAssembler {
                         + "non-deterministic.  Since the table being inserted into has a row limit "
                         + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
                         + "to address this issue."
+                        + contentDeterministicMsg
                         );
             }
             else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(
                         "INSERT statement manipulates data in a content non-deterministic way.  "
-                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue.");
+                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue."
+                        + contentDeterministicMsg);
+            }
+            else if (!contentDeterministic) {
+                throw new PlanningErrorException("INSERT statement manipulates data in a non-deterministic way."
+                                                 + contentDeterministicMsg);
             }
         }
 
@@ -489,6 +505,7 @@ public class PlanAssembler {
         if (fromSubqueryResult != null) {
             // Calculate the combined state of determinism for the parent and child statements
             boolean orderIsDeterministic = retval.isOrderDeterministic();
+            String contentDeterminismDetail = fromSubqueryResult.m_isContentDeterministic;
             if (orderIsDeterministic && ! fromSubqueryResult.m_orderIsDeterministic) {
                 //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
                 // is subject to false negatives for determinism. It misses the subtlety of parent
@@ -506,13 +523,21 @@ public class PlanAssembler {
             }
             boolean hasLimitOrOffset =
                     fromSubqueryResult.m_hasLimitOrOffset || retval.hasLimitOrOffset();
-            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismDetail);
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
+        /*
+         * Find out if the query is inherently content deterministic and
+         * remember it.
+         */
+        String contentDeterminismMessage = parsedStmt.getContentDeterminismMessage();
+        if (contentDeterminismMessage != null) {
+            retval.setNondeterminismDetail(contentDeterminismMessage);
+        }
         failIfNonDeterministicDml(parsedStmt, retval);
 
         if (m_partitioning != null) {
@@ -539,6 +564,7 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
+        String isContentDeterministic = null;
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
@@ -546,6 +572,9 @@ public class PlanAssembler {
                 throw new PlanningErrorException(m_recentErrorMsg);
             }
             orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
+            if (isContentDeterministic != null && !subqueryBestPlan.isContentDeterministic()) {
+                isContentDeterministic = subqueryBestPlan.nondeterminismDetail();
+            }
             // Offsets or limits in subqueries are only significant (only effect content determinism)
             // when they apply to un-ordered subquery contents.
             hasSignificantOffsetOrLimit |=
@@ -555,7 +584,9 @@ public class PlanAssembler {
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 
-        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit);
+        return new ParsedResultAccumulator(orderIsDeterministic,
+                                           hasSignificantOffsetOrLimit,
+                                           isContentDeterministic);
     }
 
 
@@ -646,6 +677,7 @@ public class PlanAssembler {
      * @return A union plan or null.
      */
     private CompiledPlan getNextUnionPlan() {
+        String isContentDeterministic = null;
         // Since only the one "best" plan is considered,
         // this method should be called only once.
         if (m_bestAndOnlyPlanWasGenerated) {
@@ -679,6 +711,11 @@ public class PlanAssembler {
                 return null;
             }
             childrenPlans.add(bestChildPlan);
+            // Remember the content non-determinism message for the
+            // first non-deterministic children we find.
+            if (isContentDeterministic != null) {
+                isContentDeterministic = bestChildPlan.nondeterminismDetail();
+            }
 
             // Make sure that next child's plans won't override current ones.
             planId = processor.m_planId;
@@ -756,7 +793,7 @@ public class PlanAssembler {
         retval.sql = m_planSelector.m_sql;
         boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedUnion.hasLimitOrOffset();
-        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
 
         // compute the cost - total of all children
         retval.cost = 0.0;
@@ -958,7 +995,8 @@ public class PlanAssembler {
         plan.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
-        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
         // Apply the micro-optimization:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
@@ -1132,7 +1170,10 @@ public class PlanAssembler {
         boolean orderIsDeterministic = true;
 
         boolean hasLimitOrOffset = m_parsedDelete.hasLimitOrOffset();
-        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+
+        // The delete statement cannot be inherently content non-deterministic.
+        // So, the last parameter is always null.
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, null);
 
         return plan;
     }
@@ -1234,7 +1275,9 @@ public class PlanAssembler {
         // w/ possibly non-deterministic subqueries.
         // Is there some way to integrate a "subquery determinism" check here?
         // because we didn't support updates with limits, either.
-        retval.statementGuaranteesDeterminism(false, true);
+        // Since the update cannot be inherently non-deterministic, there is
+        // no message, and the last parameter is null.
+        retval.statementGuaranteesDeterminism(false, true, null);
 
         return retval;
     }
@@ -1282,10 +1325,10 @@ public class PlanAssembler {
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
         StmtSubqueryScan subquery = m_parsedInsert.getSubqueryScan();
-
         CompiledPlan retval = null;
+        String isContentDeterministic = null;
         if (subquery != null) {
-
+            isContentDeterministic = subquery.calculateContentDeterminismMessage();
             if (subquery.getBestCostPlan() == null) {
                 // Seems like this should really be caught earlier
                 // in getBestCostPlan, above.
@@ -1389,7 +1432,7 @@ public class PlanAssembler {
             // connect the insert and the materialize nodes together
             insertNode.addAndLinkChild(matNode);
 
-            retval.statementGuaranteesDeterminism(false, true);
+            retval.statementGuaranteesDeterminism(false, true, isContentDeterministic);
         } else {
             insertNode.addAndLinkChild(retval.rootPlanGraph);
         }

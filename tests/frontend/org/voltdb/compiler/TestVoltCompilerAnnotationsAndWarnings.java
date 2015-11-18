@@ -26,10 +26,11 @@ package org.voltdb.compiler;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.procedures.FloatParamToGetNiceComplaint;
+import org.voltdb.compiler.procedures.InsertAggregatesOfFloat;
+import org.voltdb.compiler.procedures.InsertAggregatesOfFloatInHaving;
+import org.voltdb.compiler.procedures.InsertAggregatesOfFloatWithSetops;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc1;
@@ -50,30 +51,286 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate5;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate6;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate7;
 
+import junit.framework.TestCase;
+
 public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
 
+    /**
+     * Test whether a DDL stored procedure does not compile properly. The test
+     * testSimple cannot test compilation failure. It's sometimes useful to have
+     * a single test to test compilation success.
+     *
+     * @param simpleSchema
+     *            A string containing the test schema.
+     * @param procObject
+     *            This tells what procedure to test. If this is an object of
+     *            type Class<?> we we add its procedures to the builder. If it's
+     *            an array of two strings we add a statement procedure whose
+     *            name is the first string and whose DDL definition is the
+     *            second string. Note that the "create procedure as" part is
+     *            added for you, so all you need is the SQL text for the
+     *            procedure.
+     * @param errorMessages
+     *            The error messages we expect to see, as Java regular
+     *            expressions. This may be true of no errors are expected.
+     * @param expectSuccess
+     *            If this is true, the compilation should succeed.
+     * @throws Exception
+     */
+    public void testCompilationFailure(String     testName,
+                                       String     simpleSchema,
+                                       Object     procObject,
+                                       String[]   errorMessages,
+                                       boolean    expectSuccess) throws Exception {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
+        PrintStream capturing = new PrintStream(capturer);
+        builder.setCompilerDebugPrintStream(capturing);
+        builder.addLiteralSchema(simpleSchema);
+        if (procObject instanceof String[]) {
+            String[] stmtProcDescrip = (String[]) procObject;
+            assertTrue(stmtProcDescrip.length == 2);
+            builder.addStmtProcedure(stmtProcDescrip[0], stmtProcDescrip[1]);
+        } else if (procObject instanceof Class<?>) {
+            Class<?> procKlazz = (Class<?>) procObject;
+            builder.addProcedures(procKlazz);
+        } else {
+            assertTrue("Bad type of object for parameter \"procObject\"", false);
+        }
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
+        assertEquals(String.format("Expected compilation %s",
+                                   (expectSuccess ? "success" : "failure")),
+                     expectSuccess, success);
+        if (errorMessages != null) {
+            String captured = capturer.toString("UTF-8");
+            String[] lines = captured.split("\n");
+            System.out.printf("\n" + ":----------------------------------------------------------------------:\n" + ":  %s: Start of captured output\n" + ":----------------------------------------------------------------------:\n",
+                              testName);
+            System.out.println(captured);
+            System.out.printf("\n" + ":----------------------------------------------------------------------:\n" + ":  %s: End of captured output\n" + ":----------------------------------------------------------------------:\n",
+                              testName);
+            // Output should include a line suggesting replacement of float with
+            // double.
+            for (String oneMessagePattern : errorMessages) {
+                assertTrue(foundLineMatching(lines, oneMessagePattern));
+            }
+        }
+    }
+
+    /**
+     * Test that a stored procedure with a parameter type of float will not
+     * compile. The Java type float is not legal for stored procedures.
+     *
+     * @throws Exception
+     */
     public void testFloatParamComplaint() throws Exception {
         String simpleSchema =
             "create table floatie (" +
             "ival bigint default 0 not null, " +
             "fval float not null," +
             "PRIMARY KEY(ival)" +
-            ");";
+            ");" +
+            "partition table floatie on column ival;";
+        String[][] partitionInfo = new String[][] { { "floatie", "ival" } };
+        testCompilationFailure("testFloatParamComplaint",
+                               simpleSchema,
+                               FloatParamToGetNiceComplaint.class,
+                               new String[] { ".*FloatParamToGetNiceComplaint.* float.* double.*" },
+                               false);
+    }
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
-        PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("floatie", "ival");
-        builder.addProcedures(FloatParamToGetNiceComplaint.class);
+    /**
+     * Test that a stored procedure with an aggregate whose parameter is FLOAT
+     * causes a compilation error.
+     *
+     * @throws Exception
+     */
+    public void testInsertAggregatesOfFloat() throws Exception {
+        String simpleSchema =
+                "create table floatingaggs_input ( alpha float );" +
+                "create table floatingaggs_output ( beta float );" +
+                "";
+        testCompilationFailure("testInsertAggregatesOfFloat",
+                               simpleSchema,
+                               InsertAggregatesOfFloat.class,
+                               new String[] { ".*InsertAggregatesOfFloat.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
-        assertFalse(success);
-        String captured = capturer.toString("UTF-8");
-        String[] lines = captured.split("\n");
-        // Output should include a line suggesting replacement of float with double.
-        assertTrue(foundLineMatching(lines, ".*FloatParamToGetNiceComplaint.* float.* double.*"));
+    /**
+     * Test that a stored procedure with an aggregate of floating point type in
+     * a having clause causes a compilation error.
+     *
+     * @throws Exception
+     */
+    public void testInsertAggregatesOfFloatInHaving() throws Exception {
+        String simpleSchema =
+                "create table floatingaggs_input ( alpha float );" +
+                "create table floatingaggs_output ( beta float );" +
+                "create table intaggs ( gamma integer );" +
+                "";
+        testCompilationFailure("testInsertAggregatesOfFloatInHaving",
+                               simpleSchema,
+                               InsertAggregatesOfFloatInHaving.class,
+                               new String[] { ".*InsertAggregatesOfFloatInHaving.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an aggregate of floating point type
+     * causes a compilation error.
+     *
+     * @throws Exception
+     */
+    public void testAggregatesOfFloatDDL() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure("testAggregatesOfFloatDDL",
+                               simpleSchema,
+                               new String[] { "InsertAggregatesOfFloatDDL", "insert into floatingaggs_output select sum(alpha) from floatingaggs_input;",
+                               },
+                               new String[] { ".*InsertAggregatesOfFloatDDL.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an aggregate of floating point type
+     * in a subquery in a from clause causes an error.
+     *
+     * @throws Exception
+     */
+    public void testAggregatesOfFloatInSubquery() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInSubquery",
+                               simpleSchema,
+                               new String[] { "AggregatesOfFloatInSubquery", "insert into floatingaggs_output select sq.ss from ( select sum(alpha) as ss from floatingaggs_input where alpha > 0.0 order by ss ) as sq;" },
+                               new String[] { ".*AggregatesOfFloatInSubquery.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an expression which has a
+     * subexpression which is an aggregate of floating point type in a subquery
+     * in a from clause causes an error.
+     *
+     * @throws Exception
+     */
+    public void testAggregatesOfFloatInComplexSubquery() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInComplexSubquery",
+                               simpleSchema,
+                               new String[] { "AggregatesOfFloatInComplexSubquery", "insert into floatingaggs_output select sq.ss + 100 from ( select sum(alpha) as ss from floatingaggs_input where alpha > 0.0 order by ss ) as sq;" },
+                               new String[] { ".*AggregatesOfFloatInComplexSubquery.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an expression which has a
+     * subexpression which is an aggregate whose type is float and whose
+     * expression is more than a column reference and which is also part of a
+     * larger expression causes a compilation error.
+     *
+     * @throws Exception
+     */
+    public void testAggregatesOfFloatInComplexSubquery2() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInComplexSubquery2",
+                               simpleSchema,
+                               new String[] { "AggregatesOfFloatInComplexSubquery2", "insert into floatingaggs_output select sq.ss + 100 from ( select sum(alpha + 42) as ss from floatingaggs_input where alpha > 0.0 order by ss ) as sq;" },
+                               new String[] { ".*AggregatesOfFloatInComplexSubquery2.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an expression which has a
+     * subexpression which is an aggregate whose type is float and is in a
+     * subquery causes a compilation error.
+     *
+     * @throws Exception
+     */
+    public void testAggregatesOfFloatInLeftOfJoin() throws Exception {
+        String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInLeftOfJoin",
+                               simpleSchema,
+                               new String[] { "AggregatesOfFloatInLeftOfJoin",
+                                              "insert into alpha select lf.ss+rf.ss from (select sum(af) as ss from alpha ) as lf inner join ( select bf as ss from beta ) as rf on true;" },
+                               new String[] { ".*AggregatesOfFloatInLeftOfJoin.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an expression which has a
+     * subexpression which is an aggregate whose type is float and is in a
+     * subquery causes a compilation error.
+     *
+     * @throws Exception
+     */
+    public void testAggregatesOfFloatInRightOfJoins() throws Exception {
+        String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInRightOfJoin",
+                               simpleSchema,
+                               new String[] { "AggregatesOfFloatInRightOfJoin",
+                                              "insert into alpha select lf.ss+rf.ss from (select af as ss from alpha ) as lf inner join ( select sum(bf) as ss from beta ) as rf on true;" },
+                               new String[] { ".*AggregatesOfFloatInRightOfJoin.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               false);
+    }
+
+    /**
+     * Test that a statement procedure with an aggregate expression of floating
+     * point type in a subquery which is found in a union expression causes a
+     * compilation error. This can't be a single statement procedure. It has to
+     * be a Java Stored Procedure. This will only be a warning, so the
+     * compilation will pass.
+     */
+    public void testAggregatesOfFloatInSetops() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInSetops",
+                               simpleSchema,
+                               InsertAggregatesOfFloatWithSetops.class,
+                               new String[] { ".*InsertAggregatesOfFloatWithSetops.*Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.*" },
+                               true);
+    }
+
+    /**
+     * Test that Min does not trigger non-determinism errors.
+     *
+     * @throws Exception
+     */
+    public void testMinOfFloatIsOk() throws Exception {
+        String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
+        testCompilationFailure("testMinOfFloat",
+                               simpleSchema,
+                               new String[] { "MinOfFloat", "insert into alpha select lf.ss+rf.ss from (select af as ss from alpha ) as lf inner join ( select min(bf) as ss from beta ) as rf on true;" },
+                               null,
+                               true);
+    }
+
+    /**
+     * Test that Max does not trigger non-determinism errors.
+     *
+     * @throws Exception
+     */
+    public void testMaxOfFloatIsOk() throws Exception {
+        String simpleSchema = "create table alpha ( af float );" + "create table beta ( bf float );" + "";
+        testCompilationFailure("testMaxOfFloat",
+                               simpleSchema,
+                               new String[] { "MaxOfFloat", "insert into alpha select lf.ss+rf.ss from (select af as ss from alpha ) as lf inner join ( select max(bf) as ss from beta ) as rf on true;" },
+                               null,
+                               true);
+    }
+
+    /**
+     * Test that we haven't broken the obvious good case.
+     *
+     * @throws Exception
+     */
+    public void testGoodInsert() throws Exception {
+        String simpleSchema = "create table floatingaggs_input ( alpha float );" + "create table floatingaggs_output ( beta float );" + "";
+        testCompilationFailure("testAggregatesOfFloatInComplexSubquery2",
+                               simpleSchema,
+                               new String[] { "AggregatesOfFloatInComplexSubquery2", "insert into floatingaggs_output select alpha from floatingaggs_input;" },
+                               null,
+                               true);
     }
 
     public void testSimple() throws Exception {
@@ -91,6 +348,12 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
             "ival bigint default 0 not null, " +
             "sval varchar(255) not null, " +
             "PRIMARY KEY(ival)" +
+            ");" +
+            "create table floatingaggs_input (" +
+            "alpha float" +
+            ");" +
+            "create table floatingaggs_output (" +
+            "beta float" +
             ");" +
             "";
 
@@ -141,12 +404,18 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
         builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_replicated_blah where ival = ?", null);
         builder.addStmtProcedure("FullIndexScan", "select ival, sval from indexed_replicated_blah", null);
-
-
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
         assert(success);
         String captured = capturer.toString("UTF-8");
+        System.out.print("\n"
+                         + ":----------------------------------------------------------------------:\n"
+                         + ":  Start of captured output\n"
+                         + ":----------------------------------------------------------------------:\n");
         System.out.println(captured);
+        System.out.print("\n"
+                        + ":----------------------------------------------------------------------:\n"
+                        + ":  End of captured output\n"
+                        + ":----------------------------------------------------------------------:\n");
         String[] lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines, ".*\\[READ].*NondeterministicROProc.*"));
@@ -157,7 +426,6 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRWProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[TABLE SCAN].*select ival, sval from indexed_replicated_blah.*"));
-
         assertEquals(1, countLinesMatching(lines, ".*\\[NDC].*NDC=true.*"));
 
         assertFalse(foundLineMatching(lines, ".*\\[NDC].*NDC=false.*"));
@@ -212,7 +480,6 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertFalse(foundLineMatching(lines, "^ .*values.*\\s\\s.*")); // includes 2 successive embedded or trailing whitespace of any kind
         assertTrue(foundLineMatching(lines, "^[^ ].*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
         assertFalse(foundLineMatching(lines, "^ .*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
-
     }
 
     private boolean foundLineMatching(String[] lines, String pattern) {

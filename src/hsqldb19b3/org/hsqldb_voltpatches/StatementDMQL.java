@@ -185,6 +185,7 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
+    @Override
     public Result execute(Session session) {
 
         Result result = getAccessRightsResult(session);
@@ -233,6 +234,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * For the creation of the statement
      */
+    @Override
     public void setGeneratedColumnInfo(int generate, ResultMetaData meta) {
 
         // can support INSERT_SELECT also
@@ -309,6 +311,7 @@ public abstract class StatementDMQL extends Statement {
         return values;
     }
 
+    @Override
     public boolean hasGeneratedColumns() {
         return generatedIndexes != null;
     }
@@ -364,6 +367,7 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
+    @Override
     public void clearVariables() {
 
         isValid            = false;
@@ -513,6 +517,7 @@ public abstract class StatementDMQL extends Statement {
      * Returns the metadata, which is empty if the CompiledStatement does not
      * generate a Result.
      */
+    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -534,6 +539,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Returns the metadata for the placeholder parameters.
      */
+    @Override
     public ResultMetaData getParametersMetaData() {
         return parameterMetaData;
     }
@@ -602,6 +608,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Retrieves a String representation of this object.
      */
+    @Override
     public String describe(Session session) {
 
         try {
@@ -659,10 +666,9 @@ public abstract class StatementDMQL extends Statement {
                 appendColumns(sb, updateColumnMap).append('\n');
                 appendTable(sb).append('\n');
                 appendCondition(session, sb);
-                sb.append(targetRangeVariables[0].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[1].describe(session)).append(
-                    '\n');
+                for (RangeVariable trv : targetRangeVariables) {
+                    sb.append(trv.describe(session)).append('\n');
+                }
                 appendParms(sb).append('\n');
                 appendSubqueries(session, sb).append(']');
 
@@ -673,10 +679,9 @@ public abstract class StatementDMQL extends Statement {
                 sb.append('[').append('\n');
                 appendTable(sb).append('\n');
                 appendCondition(session, sb);
-                sb.append(targetRangeVariables[0].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[1].describe(session)).append(
-                    '\n');
+                for (RangeVariable trv : targetRangeVariables) {
+                    sb.append(trv.describe(session)).append('\n');
+                }
                 appendParms(sb).append('\n');
                 appendSubqueries(session, sb).append(']');
 
@@ -695,12 +700,9 @@ public abstract class StatementDMQL extends Statement {
                 appendColumns(sb, updateColumnMap).append('\n');
                 appendTable(sb).append('\n');
                 appendCondition(session, sb);
-                sb.append(targetRangeVariables[0].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[1].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[2].describe(session)).append(
-                    '\n');
+                for (RangeVariable trv : targetRangeVariables) {
+                    sb.append(trv.describe(session)).append('\n');
+                }
                 appendParms(sb).append('\n');
                 appendSubqueries(session, sb).append(']');
 
@@ -810,8 +812,10 @@ public abstract class StatementDMQL extends Statement {
                                      "]\n");
     }
 
+    @Override
     public void resolve() {}
 
+    @Override
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }
