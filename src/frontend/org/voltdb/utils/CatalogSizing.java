@@ -211,8 +211,8 @@ public abstract class CatalogSizing {
         }
         // Larger capacities use pooled buffers sized in powers of 2 or values halfway
         // between powers of 2.
-        // The 12 byte overhead includes a 4 byte length and an 8 byte reverse pointer.
-        int content = 4 + 8 + dataSize;
+        // The rounded buffer size includes an object length, typically 4 bytes.
+        int content = 4 + dataSize;
         int bufferSize = 64;
         while (bufferSize < content) {
             int increment = bufferSize / 2;
@@ -222,10 +222,13 @@ public abstract class CatalogSizing {
             }
             bufferSize += increment;
         }
-        return bufferSize + 8 + 24;
+        // The rounded buffer size has an additional 4-byte allocation size and
+        // 8-byte back pointer overhead. There is also has an 8-byte pointer
+        // in the tuple and an 8-byte StringRef indirection pointer.
+        return bufferSize + 4 + 8 + 8 + 8;
     }
 
-    private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex) {
+    private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {
         // See http://voltdb.com/docs/PlanningGuide/ChapMemoryRecs.php
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
@@ -257,6 +260,11 @@ public abstract class CatalogSizing {
             }
             }
         }
+        //For DR active active enabled account for additional timestamp column for conflict detection.
+        if (bAdjustForDrAA) {
+            csize.widthMin += 8;
+            csize.widthMax += 8;
+        }
         return csize;
     }
 
@@ -269,7 +277,8 @@ public abstract class CatalogSizing {
         for (ColumnRef columnRef: columnRefsMap) {
             indexColumns.add(columnRef.getColumn());
         }
-        CatalogItemSizeBase isize = getColumnsSize(indexColumns, true);
+        //For index Size dont count the DR AA conflict column.
+        CatalogItemSizeBase isize = getColumnsSize(indexColumns, true, false);
         if (index.getType() == IndexType.HASH_TABLE.getValue()) {
             // Hash index overhead follows this documented formula:
             //   w=column width, r=row count
@@ -289,13 +298,15 @@ public abstract class CatalogSizing {
         return isize;
     }
 
-    private static TableSize getTableSize(Table table) {
+    private static TableSize getTableSize(Table table, boolean bActiveActiveEnabled) {
         // The cardinality is the estimated tuple count or an arbitrary number
         // if not estimated.
         long cardinality = table.getEstimatedtuplecount();
         if (cardinality <= 0) {
             cardinality = 1000;
         }
+        //Do we need to adjust for DR-AA?
+        boolean bAdjustForDrAA = (table.getIsdred() && bActiveActiveEnabled);
 
         // Add up the column widths.
         CatalogMap<Column> columnsMap = table.getColumns();
@@ -303,7 +314,7 @@ public abstract class CatalogSizing {
         for (Column column: columnsMap) {
             columns.add(column);
         }
-        CatalogItemSizeBase csize = getColumnsSize(columns, false);
+        CatalogItemSizeBase csize = getColumnsSize(columns, false, bAdjustForDrAA);
 
         boolean isView = table.getMaterializer() != null;
         TableSize tsize = new TableSize(table, isView, csize.widthMin, csize.widthMax, cardinality);
@@ -326,7 +337,7 @@ public abstract class CatalogSizing {
     public static DatabaseSizes getCatalogSizes(Database dbCatalog) {
         DatabaseSizes dbSizes = new DatabaseSizes();
         for (Table table: dbCatalog.getTables()) {
-            dbSizes.addTable(getTableSize(table));
+            dbSizes.addTable(getTableSize(table, dbCatalog.getIsactiveactivedred()));
         }
         return dbSizes;
     }

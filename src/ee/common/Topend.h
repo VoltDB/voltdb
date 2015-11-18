@@ -68,9 +68,11 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
-    virtual bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
-            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert) = 0;
+    virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
 
@@ -106,9 +108,11 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
-    bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingTableForDelete, Table *expectedTableForDelete,
-            DRConflictType insertConflict, Table *existingTableForInsert, Table *newTableForInsert);
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+            Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
+            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            Table *newMetaTableForInsert, Table *newTupleTableForInsert);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
@@ -124,10 +128,14 @@ public:
     DRRecordType actionType;
     DRConflictType deleteConflictType;
     DRConflictType insertConflictType;
-    boost::shared_ptr<Table> existingRowsForDelete;
-    boost::shared_ptr<Table> expectedRowsForDelete;
-    boost::shared_ptr<Table> existingRowsForInsert;
-    boost::shared_ptr<Table> newRowsForInsert;
+    boost::shared_ptr<Table> existingMetaRowsForDelete;
+    boost::shared_ptr<Table> existingTupleRowsForDelete;
+    boost::shared_ptr<Table> expectedMetaRowsForDelete;
+    boost::shared_ptr<Table> expectedTupleRowsForDelete;
+    boost::shared_ptr<Table> existingMetaRowsForInsert;
+    boost::shared_ptr<Table> existingTupleRowsForInsert;
+    boost::shared_ptr<Table> newMetaRowsForInsert;
+    boost::shared_ptr<Table> newTupleRowsForInsert;
 };
 
 }

@@ -18,6 +18,8 @@
 #ifndef STRINGFUNCTIONS_H
 #define STRINGFUNCTIONS_H
 
+#include "common/ThreadLocalPool.h" // for POOLED_MAX_VALUE_LENGTH
+
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 #include <boost/scoped_array.hpp>

@@ -34,7 +34,7 @@ class TableTuple;
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, bool isActiveActiveDREnabled = false);
+    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
 private:
     void validateChecksum(uint32_t expected, const char *start, const char *end);
 
@@ -42,15 +42,18 @@ private:
      * Handle insert constraint violation
      */
     bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* existingTuple, const TableTuple* expectedTuple, TableTuple* newTuple, int64_t uniqueId,
-            DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
+            int32_t remoteClusterId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
 
     /**
      * Export the conflict log to downstream
      */
-    void exportDRConflict(Table *exportTable, bool diverge, TempTable *existingTable, TempTable *expectedTable, TempTable *newTable, TempTable *outputTable);
+    void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool diverge,
+            TempTable *existingMetaTableForDelete, TempTable *existingTupleTableForDelete,
+            TempTable *expectedMetaTableForDelete, TempTable *expectedTupleTableForDelete,
+            TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
+            TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert);
 };
 
 
 }
 #endif
-

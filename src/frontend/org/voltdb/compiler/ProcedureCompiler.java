@@ -17,8 +17,6 @@
 
 package org.voltdb.compiler;
 
-import groovy.lang.Closure;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -60,6 +58,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import groovy.lang.Closure;
 
 /**
  * Compiles stored procedures into a given catalog,
@@ -504,31 +504,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
         procedure.setHasseqscans(procHasSeqScans);
 
-        for (Statement catalogStmt : procedure.getStatements()) {
-            if (catalogStmt.getIscontentdeterministic() == false) {
-                String potentialErrMsg =
-                    "Procedure " + shortName + " has a statement with a non-deterministic result - statement: \"" +
-                    catalogStmt.getSqltext() + "\" , reason: " + catalogStmt.getNondeterminismdetail();
-                // throw compiler.new VoltCompilerException(potentialErrMsg);
-                compiler.addWarn(potentialErrMsg);
-            }
-            else if (catalogStmt.getIsorderdeterministic() == false) {
-                String warnMsg;
-                if (procHasWriteStmts) {
-                    String rwPotentialErrMsg = "Procedure " + shortName +
-                            " is RW and has a statement whose result has a non-deterministic ordering - statement: \"" +
-                            catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
-                    // throw compiler.new VoltCompilerException(rwPotentialErrMsg);
-                    warnMsg = rwPotentialErrMsg;
-                }
-                else {
-                    warnMsg = "Procedure " + shortName +
-                        " has a statement with a non-deterministic result - statement: \"" +
-                        catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
-                }
-                compiler.addWarn(warnMsg);
-            }
-        }
+        checkForDeterminismWarnings(compiler, shortName, procedure, procHasWriteStmts);
 
         // set procedure parameter types
         CatalogMap<ProcParameter> params = procedure.getParameters();
@@ -635,6 +611,33 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             ancestor = ancestor.getEnclosingClass();
         }
         compiler.addClassToJar(jarOutput, ancestor);
+    }
+
+    private static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
+                                         boolean procHasWriteStmts) {
+        for (Statement catalogStmt : procedure.getStatements()) {
+            if (catalogStmt.getIscontentdeterministic() == false) {
+                String potentialErrMsg =
+                    "Procedure " + shortName + " has a statement with a non-deterministic result - statement: \"" +
+                    catalogStmt.getSqltext() + "\" , reason: " + catalogStmt.getNondeterminismdetail();
+                compiler.addWarn(potentialErrMsg);
+            }
+            else if (catalogStmt.getIsorderdeterministic() == false) {
+                String warnMsg;
+                if (procHasWriteStmts) {
+                    String rwPotentialErrMsg = "Procedure " + shortName +
+                            " is RW and has a statement whose result has a non-deterministic ordering - statement: \"" +
+                            catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                    warnMsg = rwPotentialErrMsg;
+                }
+                else {
+                    warnMsg = "Procedure " + shortName +
+                        " has a statement with a non-deterministic result - statement: \"" +
+                        catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                }
+                compiler.addWarn(warnMsg);
+            }
+        }
     }
 
     static void compileSingleStmtProcedure(VoltCompiler compiler,

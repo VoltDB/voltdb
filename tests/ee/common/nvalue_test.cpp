@@ -985,6 +985,38 @@ TEST_F(NValueTest, TestCastToDecimal) {
     EXPECT_TRUE(caught);
 }
 
+TEST_F(NValueTest, TestToString) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    getExecutorContextForTest(testPool);
+
+    NValue tinyInt = ValueFactory::getTinyIntValue(120);
+    NValue smallInt = ValueFactory::getSmallIntValue(120);
+    NValue integer = ValueFactory::getIntegerValue(120);
+    NValue bigInt = ValueFactory::getBigIntValue(-64);
+    NValue doubleValue = ValueFactory::getDoubleValue(-32);
+    NValue stringValue = ValueFactory::getStringValue("数据库");
+    NValue binaryValue = ValueFactory::getBinaryValue("aa");
+    NValue decimalValue = ValueFactory::getDecimalValueFromString("10.22");
+    NValue timestamp = ValueFactory::getTimestampValue(99999999);
+    NValue nullValue = ValueFactory::getNullValue();
+
+    EXPECT_EQ(strcmp(bigInt.toString().c_str(), "-64"), 0);
+    EXPECT_EQ(strcmp(integer.toString().c_str(), "120"), 0);
+    EXPECT_EQ(strcmp(smallInt.toString().c_str(), "120"), 0);
+    EXPECT_EQ(strcmp(tinyInt.toString().c_str(), "120"), 0);
+    EXPECT_EQ(strcmp(doubleValue.toString().c_str(), "-3.2E1"), 0);
+    EXPECT_EQ(strcmp(decimalValue.toString().c_str(), "10.220000000000"), 0);
+    EXPECT_EQ(strcmp(stringValue.toString().c_str(), "数据库"), 0);
+    EXPECT_EQ(strcmp(binaryValue.toString().c_str(), "aa"), 0);
+    EXPECT_EQ(strcmp(timestamp.toString().c_str(), "1970-01-01 00:01:39.999999"), 0);
+    EXPECT_EQ(strcmp(nullValue.toString().c_str(), "null"), 0);
+
+    // Make valgrind happy
+    stringValue.free();
+    binaryValue.free();
+}
+
 //
 // Adding can only overflow BigInt since they are all cast to BigInt before addition takes place.
 //

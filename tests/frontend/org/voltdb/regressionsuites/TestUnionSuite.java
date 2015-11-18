@@ -201,7 +201,7 @@ public class TestUnionSuite extends RegressionSuite {
         client.callProcedure("InsertA", 1, 1); //In the final result set
         client.callProcedure("InsertB", 1, 1); //Eliminated (duplicate)
         client.callProcedure("InsertB", 2, 1); //In the final result set
-        vt = client.callProcedure("@AdHoc", "SELECT * FROM A UNION SELECT * FROM B;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "( SELECT * FROM A UNION SELECT * FROM B ) ORDER BY PKEY ;").getResults()[0];
         assertEquals(3, vt.getRowCount());
         validateTableOfLongs(vt, new long[][]{{0,1},{1,1},{2,1}});
     }

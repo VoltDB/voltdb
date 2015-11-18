@@ -185,4 +185,7 @@ public class SysProcFragmentId
 
     public static final long PF_loadVoltTable = 270;
     public static final long PF_loadVoltTableAggregate = 271;
+
+    public static final long PF_resetDR = 280;
+    public static final long PF_resetDRAggregate = 281;
 }

@@ -71,7 +71,10 @@ public class KafkaImportBenchmark {
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------";
-
+    static final int SUCCESSES = 0;
+    static final int FAILURES = 1;
+    static final int OUTSTANDING_REQUESTS = 2;
+    static final int RETRIES = 3;
     // Statistics manager objects from the client
     static ClientStatsContext periodicStatsContext;
 
@@ -214,6 +217,7 @@ public class KafkaImportBenchmark {
             long rows = MatchChecks.getExportRowCount(client);
             if (rows == VoltType.NULL_BIGINT)
                 rows = 0;
+            log.info("Importer stats: " + MatchChecks.getImportStats(client));
             log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
                     thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
@@ -250,6 +254,7 @@ public class KafkaImportBenchmark {
                 if (sz > 1) {
                     log.info("Import Throughput " + (count - importProgress.get(sz - 2)) / period + "/s, Total Rows: " + count);
                 }
+                log.info("Import stats: " + MatchChecks.getImportStats(client));
             }
         },
         config.displayinterval * 1000,
@@ -327,6 +332,7 @@ public class KafkaImportBenchmark {
      * @throws Exception if anything goes wrong.
      */
     public static void main(String[] args) throws Exception {
+
         VoltLogger log = new VoltLogger("Benchmark.main");
         // create a configuration from the arguments
         Config config = new Config();
@@ -354,18 +360,20 @@ public class KafkaImportBenchmark {
         // not all the rows got to Kafka or not all the rows got imported back.
         do {
             Thread.sleep(END_WAIT * 1000);
-            // importProgress is an array of sampled counts of the importedcounts table, showing importProgressress of import
+            // importProgress is an array of sampled counts of the importedcounts table, showing import progress
             // samples are recorded by the checkTimer thread
         } while (importProgress.size() < 4 || importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-2) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-3) ||
                     importProgress.get(importProgress.size()-1) > importProgress.get(importProgress.size()-4) );
 
+        long[] importStatValues = MatchChecks.getImportValues(client);
         long mirrorRows = MatchChecks.getMirrorTableRowCount(config.alltypes, client);
         long importRows = MatchChecks.getImportTableRowCount(config.alltypes, client);
         long importRowCount = MatchChecks.getImportRowCount(client);
         boolean testResult = true;
 
-        // so counts that might help debugging....
+        // some counts that might help debugging....
+        log.info("importer outstanding requests: " + importStatValues[OUTSTANDING_REQUESTS]);
         log.info("mirrorRows: " + mirrorRows);
         log.info("importRows: " + importRows);
         log.info("importRowCount: " + importRowCount);
@@ -384,8 +392,11 @@ public class KafkaImportBenchmark {
             }
         }
 
-        if (importRows < exportRowCount && config.useexport) {
-            log.error("Export count '" + exportRowCount + "' does not match import row count '" + importRows + "' test fails.");
+        if ((exportRowCount != (importStatValues[SUCCESSES] + importStatValues[FAILURES])) && config.useexport) {
+            log.error("Export count '" + exportRowCount +
+                "' does not match import stats count '" +
+                (importStatValues[SUCCESSES] + importStatValues[FAILURES]) +
+                "' test fails.");
             testResult = false;
         }
 

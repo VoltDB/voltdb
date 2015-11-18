@@ -105,7 +105,8 @@ static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 // table name prefix of DR conflict table
-const std::string DR_CONFLICT_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
+const std::string DR_REPLICATED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
+const std::string DR_PARTITIONED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
 
 namespace voltdb {
 
@@ -152,6 +153,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_templateSingleLongTable(NULL),
       m_topend(topend),
       m_executorContext(NULL),
+      m_drPartitionedConflictExportTable(NULL),
+      m_drReplicatedConflictExportTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
       m_tuplesModifiedStack()
@@ -285,21 +288,6 @@ Table* VoltDBEngine::getTable(std::string name) const
 {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_tablesByName);
-}
-
-Table* VoltDBEngine::getDRConflictTable(PersistentTable* drTable)
-{
-    Table* exportTable;
-    boost::unordered_map<PersistentTable*, Table*>::iterator it = m_cachedDRConflictLookupTable.find(drTable);
-    if (it == m_cachedDRConflictLookupTable.end()) {
-        exportTable = getTable(DR_CONFLICT_TABLE_PREFIX + drTable->name());  // cache table miss, back to full search
-        if (exportTable) {
-            m_cachedDRConflictLookupTable[drTable] = exportTable;
-        }
-    } else {
-        exportTable = it->second;
-    }
-    return exportTable;
 }
 
 TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
@@ -579,8 +567,10 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     // Set DR flag based on current catalog state
     m_drStream->m_enabled = catalogCluster->drProducerEnabled();
+    m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
     if (m_drReplicatedStream) {
         m_drReplicatedStream->m_enabled = m_drStream->m_enabled;
+        m_drReplicatedStream->m_flushInterval = m_drStream->m_flushInterval;
     }
 
     // load up all the tables, adding all tables
@@ -992,9 +982,12 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
     m_catalog->execute(catalogPayload);
 
     // Set DR flag based on current catalog state
-    m_drStream->m_enabled = m_catalog->clusters().get("cluster")->drProducerEnabled();
+    catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
+    m_drStream->m_enabled = catalogCluster->drProducerEnabled();
+    m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
     if (m_drReplicatedStream) {
         m_drReplicatedStream->m_enabled = m_drStream->m_enabled;
+        m_drReplicatedStream->m_flushInterval = m_drStream->m_flushInterval;
     }
 
     if (updateCatalogDatabaseReference() == false) {
@@ -1071,7 +1064,6 @@ void VoltDBEngine::rebuildTableCollections()
     m_tables.clear();
     m_tablesByName.clear();
     m_tablesBySignatureHash.clear();
-    m_cachedDRConflictLookupTable.clear();
 
     // need to re-map all the table ids / indexes
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
@@ -1100,6 +1092,15 @@ void VoltDBEngine::rebuildTableCollections()
                                                       index->getIndexStats());
             }
         }
+    }
+
+    if (getIsActiveActiveDREnabled()) {
+        m_drPartitionedConflictExportTable = getTable(DR_PARTITIONED_CONFLICT_TABLE_NAME);
+        m_drReplicatedConflictExportTable = getTable(DR_REPLICATED_CONFLICT_TABLE_NAME);
+    }
+    else {
+        m_drPartitionedConflictExportTable = NULL;
+        m_drReplicatedConflictExportTable = NULL;
     }
 }
 
@@ -1709,6 +1710,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int64_t spHandle,
                                   int64_t lastCommittedSpHandle,
                                   int64_t uniqueId,
+                                  int32_t remoteClusterId,
                                   int64_t undoToken,
                                   const char *log) {
     DRTupleStreamDisableGuard guard(m_drStream, m_drReplicatedStream, !m_database->isActiveActiveDRed());
@@ -1719,7 +1721,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this);
+    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
@@ -1789,7 +1791,7 @@ void VoltDBEngine::reportProgressToTopend() {
         VOLT_DEBUG("Interrupt query.");
         char buff[100];
         snprintf(buff, 100,
-                "A SQL query was terminated after %.2f seconds because it exceeded the query timeout period.",
+                "A SQL query was terminated after %.03f seconds because it exceeded the query timeout period.",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
 
         throw InterruptException(std::string(buff));

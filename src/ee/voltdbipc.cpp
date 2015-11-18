@@ -132,9 +132,12 @@ public:
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int64_t exportGeneration, int32_t partitionId, std::string signature, voltdb::StreamBlock *block, bool sync, bool endOfStream);
-    bool reportDRConflict(int32_t partitionId, int64_t timestamp, std::string tableName, voltdb::DRRecordType action,
-                        voltdb::DRConflictType deleteConflict, voltdb::Table *existingTableForDelete, voltdb::Table *expectedTableForDelete,
-                        voltdb::DRConflictType insertConflict, voltdb::Table *existingTableForInsert, voltdb::Table *newTableForInsert);
+
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
+            voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
+            voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
+            voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
+            voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert);
 private:
     voltdb::VoltDBEngine *m_engine;
     long int m_counter;
@@ -342,6 +345,7 @@ typedef struct {
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
+    int32_t remoteClusterId;
     int64_t undoToken;
     char log[0];
 }__attribute__((packed)) apply_binary_log;
@@ -1528,6 +1532,7 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
                                         ntohll(params->spHandle),
                                         ntohll(params->lastCommittedSpHandle),
                                         ntohll(params->uniqueId),
+                                        ntohl(params->remoteClusterId),
                                         ntohll(params->undoToken),
                                         params->log);
         char response[9];
@@ -1546,11 +1551,11 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block)
     return -1;
 }
 
-bool VoltDBIPC::reportDRConflict(int32_t partitionId, int64_t timestamp,
-                        std::string tableName, voltdb::DRRecordType action,
-                        voltdb::DRConflictType deleteConflict, voltdb::Table *existingTableForDelete,
-                        voltdb::Table *expectedTableForDelete, voltdb::DRConflictType insertConflict,
-                        voltdb::Table *existingTableForInsert, voltdb::Table *newTableForInsert) {
+int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
+            voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
+            voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
+            voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
+            voltdb::Table *newMetaTableForInsert, voltdb::Table *newTupleTableForInsert) {
     return 0;
 }
 

@@ -115,3 +115,9 @@ create table ppk (
 );
 
 partition table ppk on column a;
+
+create table floataggs (
+    alpha float,
+    beta  float,
+    gamma float
+);
