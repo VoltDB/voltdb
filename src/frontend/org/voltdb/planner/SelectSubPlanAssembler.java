@@ -690,6 +690,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             canHaveNLIJ = false;
         }
 
+        // Prohibit FULL join plans with distributed outer and replicated inner branches -
+        // The join must happen on either a coordinator node or both tables must be joined on
+        // partition columns
+        if (joinNode.getJoinType() == JoinType.FULL &&
+                m_partitioning.requiresTwoFragments() &&
+                !outerPlan.hasReplicatedResult() &&
+                innerPlan.hasReplicatedResult()) {
+            canHaveNLIJ = false;
+            canHaveNLJ = false;
+        }
+
         AbstractJoinPlanNode ajNode = null;
         if (canHaveNLJ) {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();

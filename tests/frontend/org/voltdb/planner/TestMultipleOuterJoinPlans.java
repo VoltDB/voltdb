@@ -356,10 +356,12 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // FULL join is itself an outer node
         pn = compile("select * FROM  " +
                 "R1 FULL JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C WHERE R1.C is NULL");
-        n = pn.getChild(0).getChild(0).getChild(0);
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.LEFT, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN);
+        n = n.getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, ExpressionType.OPERATOR_IS_NULL, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN);
 
-        // OUTER JOIN expression (R1.A > 0) is pre-predicate, inner and inner - outer expressionsR3.C = R2.C AND R3.C < 0 are predicate
+        // OUTER JOIN expression (R1.A > 0) is pre-predicate, inner and inner - outer expressions R3.C = R2.C AND R3.C < 0 are predicate
         pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.C FULL JOIN R3 ON R3.C = R2.C  AND R1.A > 0 AND R3.C < 0");
         n = pn.getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN, null, "R3");
@@ -399,7 +401,7 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = pn.getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, ExpressionType.OPERATOR_IS_NULL, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN);
 
-        // FULL NLJ. R3.A is an index column but R3.A > 0 expression is used as a POST PREDICATE only
+        // FULL NLJ. R3.A is an index column but R3.A > 0 expression is used as a PREDICATE only
         pn = compile("select * FROM  " +
                 "R1 FULL JOIN R3 ON R3.C = R1.A AND R3.A > 0");
         n = pn.getChild(0).getChild(0);
@@ -411,8 +413,14 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
         verifyIndexScanNode(n.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, ExpressionType.COMPARE_GREATERTHAN);
 
+        // FULL NLIJ, inner join L.A > 0 is added as a pre-predicate to the NLIJ
+        pn = compile("select * FROM R3 L FULL JOIN R3 R ON L.A = R.A AND L.A > 55");
+        n = pn.getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "L", "R");
+        verifyIndexScanNode(n.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, null);
+
         // FULL NLIJ, inner-outer join R3.c = R1.c is a post-predicate for the inline Index scan
-        pn = compile("select * FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.c = R1.c");
+        pn = compile("select * FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.C = R1.C");
         n = pn.getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "R1", "R3");
         verifyIndexScanNode(n.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, ExpressionType.COMPARE_EQUAL);
@@ -452,13 +460,6 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0).getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
-        // FULL join of two partition tables on partition column
-        lpn = compileToFragments("select * FROM  " +
-                "P1 FULL JOIN P4 ON P1.A = P4.A ");
-        assertEquals(2, lpn.size());
-        n = lpn.get(1).getChild(0);
-        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "P1", "P4");
-
         // NLJ FULL join (R2, P2) on partition column  R2.A > 0 is a pre-predicate, P2.A = R2.A AND P2.E < 0 are join predicate
         // It can't be a NLIJ because P2 is partitioned - P2.A index is not used
         lpn = compileToFragments("select * FROM  " +
@@ -475,21 +476,26 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         n = lpn.get(0).getChild(0).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R2", null);
 
-        // NLIJ (P2,R3) on partition column P2.A using index R3.A
+        // NLJ (R3, P2) on partition column P2.A. R3.A > 0 is a PRE_PREDICTAE
+        // NLIJ (P2,R3) on partition column P2.A using index R3.A is an invalid plan for a FULL join
         lpn = compileToFragments("select * FROM  " +
                 "P2 FULL JOIN R3 ON P2.A = R3.A AND R3.A > 0 AND P2.E < 0");
         assertEquals(2, lpn.size());
-        n = lpn.get(1).getChild(0);
-        verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, ExpressionType.COMPARE_LESSTHAN, null, null, PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN, "P2", "R3");
-        verifyIndexScanNode(n.getChild(0), IndexLookupType.GTE, null);
+        n = lpn.get(0).getChild(0).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, ExpressionType.COMPARE_GREATERTHAN, ExpressionType.CONJUNCTION_AND, null, PlanNodeType.SEQSCAN, PlanNodeType.RECEIVE, "R3", null);
 
-        // NLIJ (P1,P2) on partition column P2.A using index P2.A
-              lpn = compileToFragments("select * FROM  " +
-                "P2 FULL JOIN P1 ON P1.A = P2.A");
+        // FULL NLJ join of two partition tables on partition column
+        lpn = compileToFragments("select * FROM  P1 FULL JOIN P4 ON P1.A = P4.A ");
+        assertEquals(2, lpn.size());
+        n = lpn.get(1).getChild(0);
+        verifyJoinNode(n, PlanNodeType.NESTLOOP, JoinType.FULL, null, ExpressionType.COMPARE_EQUAL, null, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, "P1", "P4");
+
+        // FULL NLIJ (P1,P2) on partition column P2.A
+        lpn = compileToFragments("select * FROM P2 FULL JOIN P1 ON P1.A = P2.A AND P2.A > 0");
         assertEquals(2, lpn.size());
         n = lpn.get(1).getChild(0);
         verifyJoinNode(n, PlanNodeType.NESTLOOPINDEX, JoinType.FULL, null, null, null, PlanNodeType.SEQSCAN, PlanNodeType.INDEXSCAN, "P1", "P2");
-        verifyIndexScanNode(n.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, null);
+        verifyIndexScanNode(n.getInlinePlanNode(PlanNodeType.INDEXSCAN), IndexLookupType.EQ, ExpressionType.COMPARE_GREATERTHAN);
 
         // FULL join of two partition tables on non-partition column
         failToCompile("select * FROM  P1 FULL JOIN P4 ON P1.C = P4.A ",
