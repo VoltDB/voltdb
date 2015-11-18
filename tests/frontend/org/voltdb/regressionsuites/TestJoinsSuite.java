@@ -876,11 +876,41 @@ public class TestJoinsSuite extends RegressionSuite {
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
             throws NoConnectionsException, IOException, ProcCallException
     {
+        String sql;
+        long MINVAL = Long.MIN_VALUE;
+
+        // case: two empty tables
+        sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A AND R1.D = R2.C ORDER BY R1.A, R1.D, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{});
+
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, NULL);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 2, 2);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 1, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(3, 3, 3);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(4, 4, 4);");
+
+        // case: Right table is empty
+        sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
+                "R1.A = R2.A AND R1.D = R2.C ORDER BY R1.A, R1.D, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {1, MINVAL, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, MINVAL, MINVAL},
+                {3, 3, MINVAL, MINVAL},
+                {4, 4, MINVAL, MINVAL},
+        });
+
+        // case: Left table is empty
+        sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R2 FULL JOIN R1 ON " +
+                "R1.A = R2.A AND R1.D = R2.C ORDER BY R1.A, R1.D, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {1, MINVAL, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, MINVAL, MINVAL},
+                {3, 3, MINVAL, MINVAL},
+                {4, 4, MINVAL, MINVAL},
+        });
 
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(1, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 1);");
@@ -888,9 +918,6 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 3);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 5);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, NULL);");
-
-        String sql;
-        long MINVAL = Long.MIN_VALUE;
 
         // case 1: equality join on two columns
         sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
@@ -1120,21 +1147,32 @@ public class TestJoinsSuite extends RegressionSuite {
     private void subtestTwoReplicatedTableFullNLIJoin(Client client)
             throws NoConnectionsException, IOException, ProcCallException
     {
+        String sql;
+        VoltTable vt;
+        long MINVAL = Long.MIN_VALUE;
+
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, NULL);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 2, 2);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 1, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(3, 3, 3);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(4, 4, 4);");
 
+        // case 0: Empty FULL NLIJ, inner join R3.A > 0 is added as a post-predicate to the inline Index scan
+        sql = "select R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.A > 2 " +
+                "ORDER BY R1.A, R1.D, R3.A, R3.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {1, 1, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, MINVAL, MINVAL},
+                {3, 3, MINVAL, MINVAL},
+                {4, 4, MINVAL, MINVAL},
+        });
+
         client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(3, 2);");
         client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(4, 3);");
         client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(5, 5);");
-
-        String sql;
-        VoltTable vt;
-        long MINVAL = Long.MIN_VALUE;
 
         // case 1: FULL NLIJ, inner join R3.A > 0 is added as a post-predicate to the inline Index scan
         sql = "select R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.A > 2 " +
