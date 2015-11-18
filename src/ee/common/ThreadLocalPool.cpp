@@ -209,6 +209,12 @@ static int32_t getAllocationSizeForObject(int length)
                         length);
 }
 
+int TestOnlyAllocationSizeForObject(int length)
+{
+    return getAllocationSizeForObject(length);
+}
+
+
 #ifdef MEMCHECK
 /// Persistent string pools with their compaction are completely bypassed for
 /// the memcheck build. It just does standard C++ heap allocations and
