@@ -162,10 +162,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
                         + "from places order by places.pk";
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
-                {{"Denver",         39.70399856567383,  -104.95899963378906},
-                 {"Albuquerque",    35.112998962402344, -106.5989990234375},
-                 {"Cheyenne",       41.13399887084961,  -104.81300354003906},
-                 {"Fort Collins",   40.584999084472656, -105.0770034790039},
+                {{"Denver",         39.704,  -104.959},
+                 {"Albuquerque",    35.113, -106.599},
+                 {"Cheyenne",       41.134,  -104.813},
+                 {"Fort Collins",   40.585, -105.077},
                  {"Neverwhere",     Double.MIN_VALUE,   Double.MIN_VALUE},
                 }, vt);
 
@@ -176,9 +176,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "order by places.name";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
-                {{"Cheyenne",       41.13399887084961,  -104.81300354003906},
-                 {"Denver",         39.70399856567383,  -104.95899963378906},
-                 {"Fort Collins",   40.584999084472656, -105.0770034790039}
+                {{"Cheyenne",       41.134,  -104.813},
+                 {"Denver",         39.704,  -104.959},
+                 {"Fort Collins",   40.585, -105.077}
                 }, vt);
     }
 
