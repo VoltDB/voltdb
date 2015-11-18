@@ -33,10 +33,13 @@ import java.util.UUID;
 import junit.framework.TestCase;
 
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.utils.CatalogSizing;
 
 import com.google_voltpatches.common.base.Charsets;
 
 public class TestReportMaker extends TestCase {
+
+    private static final int MAX_OVERHEAD = 4;
 
     private static String compileAndGenerateCatalogReport(String ddl) throws IOException {
         // Let's try not to "drool" files into the current directory.
@@ -75,6 +78,94 @@ public class TestReportMaker extends TestCase {
         }
 
         return report;
+    }
+
+    private void validateDeltas(int input, int testcase,
+                                int byte_increment, int percent_increment)
+    {
+        assertTrue(byte_increment >= 0);
+        if (byte_increment >= ((1<<19) + MAX_OVERHEAD)) {
+            System.out.println("Failing case " + testcase + " input " + input +
+                    " byte_increment " + byte_increment);
+        }
+        assertTrue(byte_increment < ((1<<19) + MAX_OVERHEAD));
+        if (percent_increment >= 66) {
+            System.out.println("Failing case " + testcase + " input " + input +
+                    " percent_increment " + percent_increment);
+        }
+        assertTrue(percent_increment < 66);
+    }
+
+    private int validateAllocation(int input)
+    {
+        int result = CatalogSizing.testOnlyAllocationSizeForObject(input);
+        int byte_overhead = result - input;
+        int percent_overhead = byte_overhead * 100 / input;
+        validateDeltas(input, 0, byte_overhead, percent_overhead);
+        return result;
+    }
+
+    private void validateTrend(int input, int suite, int low, int medium, int high)
+    {
+        int byte_increment_ml = medium - low;
+        int percent_increment_ml = byte_increment_ml * 100 / medium;
+        int byte_increment_hm = high - medium;
+        int percent_increment_hm = byte_increment_hm * 100 / medium;
+        int byte_increment_hl = high - low;
+        int percent_increment_hl = byte_increment_hl * 100 / medium;
+        validateDeltas(input, suite+1, byte_increment_ml, percent_increment_ml);
+        validateDeltas(input, suite+2, byte_increment_hm, percent_increment_hm);
+        validateDeltas(input, suite+3, byte_increment_hl, percent_increment_hl);
+    }
+
+    private void validateAllocationSpan(int input)
+    {
+        int result = validateAllocation(input);
+        int result_down = validateAllocation(input-1);
+        int result_up = validateAllocation(input+1);
+        int result_in = validateAllocation(input*7/8);
+        int result_out = validateAllocation(input*8/7);
+        assertTrue(result_up <= (1L<<20) + MAX_OVERHEAD);
+        assertTrue(result_out <= (1L<<20) + MAX_OVERHEAD);
+        validateTrend(input, 0, result_down, result, result_up);
+        validateTrend(input, 4, result_in, result, result_out);
+    }
+
+    // This purposely duplicates test logic in the common/ThreadLocalPoolTest cpp unit test.
+    // That test applies to the actual string allocation sizing logic.
+    // This test applies to the java recap of that logic used for estimation purposes.
+    // Ideally, they use compatible algorithms and so pass or fail the same sanity tests.
+    // This does not guarantee that their algorithms are in synch, but that level of testing
+    // would take more test-only JNI plumbing than seems warranted.
+    public void testCatalogSizingStringAllocationReasonableness()
+    {
+        // CHEATING SLIGHTLY -- The tests are a little too stringent when applied
+        // to the actual MIN_REQUEST value of 1.
+        final int MIN_REQUEST = 2;
+
+        // Extreme Inputs
+        validateAllocation(MIN_REQUEST);
+        validateAllocation(MIN_REQUEST+1);
+        validateAllocation(1<<20);
+        validateAllocation((1<<20) + MAX_OVERHEAD);
+
+        // A Range of Fixed Inputs
+        int fixedTrial[] = { 4, 7, 10, 13, 16,
+                             1<<5, 1<<6, 1<<7, 1<<8, 1<<9, 1<<10, 1<<12, 1<<14, 1<<18,
+                             3<<5, 3<<6, 3<<7, 3<<8, 3<<9, 3<<10, 3<<12, 3<<14, 3<<18,
+                             5<<5, 5<<6, 5<<7, 5<<8, 5<<9, 5<<10, 5<<12, 5<<14 };
+        for (int trial : fixedTrial) {
+            validateAllocationSpan(trial);
+        }
+
+        // A Range of Random Inputs Skewed towards smaller human-scale string data allocations.
+        int trialCount = 10000;
+        for (int randTrial = 0; randTrial < trialCount; ++randTrial) {
+            // Sum a small constant to avoid small extremes, a small linear component to get a wider range of
+            // unique values, and a component with an inverse distribution to favor numbers nearer the low end.
+            int skewedInt = (int) (MAX_OVERHEAD/2 + (Math.random() % (1<<10)) + (1<<19) / (1 + (Math.random() % (1<<19))));
+            validateAllocationSpan(skewedInt);
+        }
     }
 
     public void testEscapesRenderedText() throws IOException {
