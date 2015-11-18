@@ -1,6 +1,7 @@
 import os, sys, threading, shutil, re
 from subprocess import Popen, PIPE, STDOUT
 
+
 class BuildContext:
     def __init__(self, args):
         self.CPPFLAGS = ""
