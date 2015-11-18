@@ -866,8 +866,11 @@ public class TestJoinsSuite extends RegressionSuite {
         Client client = getClient();
         clearSeqTables(client);
         subtestTwoReplicatedTableFullNLJoin(client);
+        clearIndexTables(client);
+        subtestTwoReplicatedTableFullNLIJoin(client);
         clearSeqTables(client);
-        subtestPartitionTableFullJoin(client);
+        clearIndexTables(client);
+        subtestDistributedTableFullJoin(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -987,7 +990,7 @@ public class TestJoinsSuite extends RegressionSuite {
 
     }
 
-    private void subtestPartitionTableFullJoin(Client client)
+    private void subtestDistributedTableFullJoin(Client client)
             throws NoConnectionsException, IOException, ProcCallException
     {
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(1, 1);");
@@ -995,6 +998,11 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(2, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(3, 3);");
         client.callProcedure("@AdHoc", "INSERT INTO P1 VALUES(4, 4);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO P3 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO P3 VALUES(2, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO P3 VALUES(3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO P3 VALUES(4, 4);");
 
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(1, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 1);");
@@ -1004,12 +1012,12 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, NULL);");
 
         String sql;
+        VoltTable vt;
         long MINVAL = Long.MIN_VALUE;
 
-        // case 1: equality join on the coordinator node (R2, P1)
+        // case 1: equality join of (P1, R2) on a partition column P1.A
         sql = "select P1.A, P1.C, R2.A, R2.C FROM P1 FULL JOIN R2 ON P1.A = R2.A " +
                 " ORDER BY P1.A, P1.C, R2.A, R2.C";
-;
         validateTableOfLongs(client, sql, new long[][]{
                 {MINVAL, MINVAL, 5, MINVAL},
                 {MINVAL, MINVAL, 5, 5},
@@ -1021,8 +1029,144 @@ public class TestJoinsSuite extends RegressionSuite {
                 {4, 4, MINVAL, MINVAL}
                 });
 
-     // case 1: equality join of two partitioned tables (P1, P2) on a partition column
-        // @TODO
+        // case 2: equality join of (P1, R2) on a non-partition column
+        sql = "select P1.A, P1.C, R2.A, R2.C FROM P1 FULL JOIN R2 ON P1.C = R2.A " +
+                "WHERE (P1.A > 1 OR P1.A IS NULL) AND (R2.A = 3 OR R2.A IS NULL)" +
+                " ORDER BY P1.A, P1.C, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {3, 3, 3, 3},
+                {4, 4, MINVAL, MINVAL}
+                });
+
+        // case 3: NLJ FULL join (R2, P1) on partition column  P1.E = R2.A AND P1.A > 2 are join predicate
+        sql = "select P1.A, P1.C, R2.A, R2.C FROM  " +
+                "P1 FULL JOIN R2 ON P1.C = R2.A AND P1.A > 2" +
+                " ORDER BY P1.A, P1.C, R2.A, R2.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, 1, 1},
+                {MINVAL, MINVAL, 2, 1},
+                {MINVAL, MINVAL, 2, 2},
+                {MINVAL, MINVAL, 5, MINVAL},
+                {MINVAL, MINVAL, 5, 5},
+                {1, 1, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, MINVAL, MINVAL},
+                {3, 3, 3, 3},
+                {4, 4, MINVAL, MINVAL}
+                });
+
+      // case 4: NLJ FULL join (R2, P1) on partition column  P1.E = R2.A AND R2.A > 1 are join predicate
+      sql = "select P1.A, P1.C, R2.A, R2.C FROM  " +
+              "P1 FULL JOIN R2 ON P1.C = R2.A AND R2.A > 1" +
+              " ORDER BY P1.A, P1.C, R2.A, R2.C";
+      validateTableOfLongs(client, sql, new long[][]{
+              {MINVAL, MINVAL, 1, 1},
+              {MINVAL, MINVAL, 5, MINVAL},
+              {MINVAL, MINVAL, 5, 5},
+              {1, 1, MINVAL, MINVAL},
+              {1, 2, 2, 1},
+              {1, 2, 2, 2},
+              {2, 1, MINVAL, MINVAL},
+              {3, 3, 3, 3},
+              {4, 4, MINVAL, MINVAL}
+              });
+
+      // case 5: equality join of (P3, R2) on a partition/index column P1.A, Still NLJ
+      sql = "select P3.A, P3.F, R2.A, R2.C FROM P3 FULL JOIN R2 ON P3.A = R2.A " +
+              " ORDER BY P3.A, P3.F, R2.A, R2.C";
+      validateTableOfLongs(client, sql, new long[][]{
+              {MINVAL, MINVAL, 5, MINVAL},
+              {MINVAL, MINVAL, 5, 5},
+              {1, 1, 1, 1},
+              {2, 1, 2, 1},
+              {2, 1, 2, 2},
+              {3, 3, 3, 3},
+              {4, 4, MINVAL, MINVAL}
+              });
+
+      // case 6: NLJ join of (P1, P1) on a partition column P1.A
+      sql = "select L.A, L.C, R.A, R.C FROM P1 L FULL JOIN P1 R ON L.A = R.A AND L.A = 1 AND R.C = 1" +
+              " ORDER BY L.A, L.C, R.A, R.C";
+      validateTableOfLongs(client, sql, new long[][]{
+              {MINVAL, MINVAL, 1, 2},
+              {MINVAL, MINVAL, 2, 1},
+              {MINVAL, MINVAL, 3, 3},
+              {MINVAL, MINVAL, 4, 4},
+              {1, 1, 1, 1},
+              {1, 2, 1, 1},
+              {2, 1, MINVAL, MINVAL},
+              {3, 3, MINVAL, MINVAL},
+              {4, 4, MINVAL, MINVAL}
+              });
+
+      // case 7: NLIJ join of (P1, P3) on a partition columns
+      sql = "select P1.A, P1.C, P3.A, P3.F FROM P1 FULL JOIN P3 ON P1.A = P3.A AND P1.A = 1 AND P3.F = 1" +
+              " ORDER BY P1.A, P1.C, P3.A, P3.F";
+      validateTableOfLongs(client, sql, new long[][]{
+              {MINVAL, MINVAL, 2, 1},
+              {MINVAL, MINVAL, 3, 3},
+              {MINVAL, MINVAL, 4, 4},
+              {1, 1, 1, 1},
+              {1, 2, 1, 1},
+              {2, 1, MINVAL, MINVAL},
+              {3, 3, MINVAL, MINVAL},
+              {4, 4, MINVAL, MINVAL}
+              });
+      vt = client.callProcedure("@Explain", sql).getResults()[0];
+      assertTrue(vt.toString().contains("NESTLOOP INDEX FULL JOIN"));
+
+    }
+
+    private void subtestTwoReplicatedTableFullNLIJoin(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 2, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(3, 3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(4, 4, 4);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(2, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(3, 2);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(4, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R3 VALUES(5, 5);");
+
+        String sql;
+        VoltTable vt;
+        long MINVAL = Long.MIN_VALUE;
+
+        // case 1: FULL NLIJ, inner join R3.A > 0 is added as a post-predicate to the inline Index scan
+        sql = "select R1.A, R1.C, R3.A, R3.C FROM R1 FULL JOIN R3 ON R3.A = R1.A AND R3.A > 2 " +
+                "ORDER BY R1.A, R1.D, R3.A, R3.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, 1, 1},
+                {MINVAL, MINVAL, 2, 1},
+                {MINVAL, MINVAL, 5, 5},
+                {1, 1, MINVAL, MINVAL},
+                {1, 2, MINVAL, MINVAL},
+                {2, 1, MINVAL, MINVAL},
+                {3, 3, 3, 2},
+                {4, 4, 4, 3}
+                });
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("NESTLOOP INDEX FULL JOIN"));
+
+        // case 2: FULL NLIJ, inner join L.A > 0 is added as a pre-predicate to the NLIJ
+        sql = "select L.A, L.C, R.A, R.C FROM R3 L FULL JOIN R3 R ON L.A = R.A AND L.A > 3 " +
+                "ORDER BY L.A, L.C, R.A, R.C";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, MINVAL, 1, 1},
+                {MINVAL, MINVAL, 2, 1},
+                {MINVAL, MINVAL, 3, 2},
+                {1, 1, MINVAL, MINVAL},
+                {2, 1, MINVAL, MINVAL},
+                {3, 2, MINVAL, MINVAL},
+                {4, 3, 4, 3},
+                {5, 5, 5, 5}
+                });
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        assertTrue(vt.toString().contains("NESTLOOP INDEX FULL JOIN"));
     }
 
     static public junit.framework.Test suite()
