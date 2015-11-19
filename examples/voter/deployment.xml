@@ -6,10 +6,6 @@
     </httpd>
     <commandlog enabled="false" />
     <export>
-        <configuration enabled="true" stream="anish2" type="file">
-            <property name="outdir">/tmp</property>
-            <property name="nonce">anish2</property>
-            <property name="type">csv</property>
-        </configuration>
+        <configuration enabled="true" stream="noop" type="custom" exportconnectorclass="org.voltdb.exportclient.NoOpExporter" />
     </export>
 </deployment>

@@ -36,6 +36,8 @@ CREATE TABLE area_code_state
   )
 );
 
+export table votes to stream noop;
+
 -- rollup of votes by phone number, used to reject excessive voting
 CREATE VIEW v_votes_by_phone_number
 (
@@ -49,7 +51,6 @@ AS
  GROUP BY phone_number
 ;
 
-export table votes to stream anish2;
 
 -- rollup of votes by contestant and state for the heat map and results
 CREATE VIEW v_votes_by_contestant_number_state
@@ -65,6 +66,19 @@ AS
      FROM votes
  GROUP BY contestant_number
         , state
+;
+
+-- rollup of votes by contestant and state for the heat map and results
+CREATE VIEW v_votes_winner
+(
+  contestant_number
+, num_votes
+)
+AS
+   SELECT contestant_number
+        , COUNT(*)
+     FROM votes
+ GROUP BY contestant_number
 ;
 
 END_OF_BATCH
