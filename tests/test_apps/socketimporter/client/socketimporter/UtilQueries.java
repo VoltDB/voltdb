@@ -54,7 +54,7 @@ public class UtilQueries {
         return statsString;
     }
 
-    protected static long[] getImportOutstandingRequests(Client client) {
+    protected static long getImportOutstandingRequests(Client client) {
         VoltTable importStats = statsCall(client);
         long stats[] = {0, 0, 0, 0};
 
@@ -65,7 +65,7 @@ public class UtilQueries {
             stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
             stats[statnum++] = importStats.getLong("RETRIES");
         }
-        return stats;
+        return stats[2];
     }
 
     protected static VoltTable statsCall(Client client) {
