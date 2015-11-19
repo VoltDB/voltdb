@@ -64,6 +64,7 @@ message Response {
     optional fixed64 catalogCRC = 11;
     optional string catalogSignature = 12;
     optional string failureCause = 13;
+    optional bool isEndOfStream = 14;
 }
 
 message NodeInfo {

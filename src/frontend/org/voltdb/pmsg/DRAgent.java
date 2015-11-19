@@ -3834,6 +3834,16 @@ public final class DRAgent {
      */
     com.google.protobuf.ByteString
         getFailureCauseBytes();
+
+    // optional bool isEndOfStream = 14;
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    boolean hasIsEndOfStream();
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    boolean getIsEndOfStream();
   }
   /**
    * Protobuf type {@code pmsg.Response}
@@ -3975,6 +3985,11 @@ public final class DRAgent {
             case 106: {
               bitField0_ |= 0x00000400;
               failureCause_ = input.readBytes();
+              break;
+            }
+            case 112: {
+              bitField0_ |= 0x00000800;
+              isEndOfStream_ = input.readBool();
               break;
             }
           }
@@ -4520,6 +4535,22 @@ public final class DRAgent {
       }
     }
 
+    // optional bool isEndOfStream = 14;
+    public static final int ISENDOFSTREAM_FIELD_NUMBER = 14;
+    private boolean isEndOfStream_;
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    public boolean hasIsEndOfStream() {
+      return ((bitField0_ & 0x00000800) == 0x00000800);
+    }
+    /**
+     * <code>optional bool isEndOfStream = 14;</code>
+     */
+    public boolean getIsEndOfStream() {
+      return isEndOfStream_;
+    }
+
     private void initFields() {
       id_ = org.voltdb.pmsg.DRAgent.UUID.getDefaultInstance();
       mode_ = org.voltdb.pmsg.DRAgent.Response.ReplicationMode.IDLE;
@@ -4534,6 +4565,7 @@ public final class DRAgent {
       catalogCRC_ = 0L;
       catalogSignature_ = "";
       failureCause_ = "";
+      isEndOfStream_ = false;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -4593,6 +4625,9 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000400) == 0x00000400)) {
         output.writeBytes(13, getFailureCauseBytes());
+      }
+      if (((bitField0_ & 0x00000800) == 0x00000800)) {
+        output.writeBool(14, isEndOfStream_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -4654,6 +4689,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000400) == 0x00000400)) {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(13, getFailureCauseBytes());
+      }
+      if (((bitField0_ & 0x00000800) == 0x00000800)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(14, isEndOfStream_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -4812,6 +4851,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000800);
         failureCause_ = "";
         bitField0_ = (bitField0_ & ~0x00001000);
+        isEndOfStream_ = false;
+        bitField0_ = (bitField0_ & ~0x00002000);
         return this;
       }
 
@@ -4906,6 +4947,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000400;
         }
         result.failureCause_ = failureCause_;
+        if (((from_bitField0_ & 0x00002000) == 0x00002000)) {
+          to_bitField0_ |= 0x00000800;
+        }
+        result.isEndOfStream_ = isEndOfStream_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -5012,6 +5057,9 @@ public final class DRAgent {
           bitField0_ |= 0x00001000;
           failureCause_ = other.failureCause_;
           onChanged();
+        }
+        if (other.hasIsEndOfStream()) {
+          setIsEndOfStream(other.getIsEndOfStream());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -6278,6 +6326,39 @@ public final class DRAgent {
   }
   bitField0_ |= 0x00001000;
         failureCause_ = value;
+        onChanged();
+        return this;
+      }
+
+      // optional bool isEndOfStream = 14;
+      private boolean isEndOfStream_ ;
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public boolean hasIsEndOfStream() {
+        return ((bitField0_ & 0x00002000) == 0x00002000);
+      }
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public boolean getIsEndOfStream() {
+        return isEndOfStream_;
+      }
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public Builder setIsEndOfStream(boolean value) {
+        bitField0_ |= 0x00002000;
+        isEndOfStream_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional bool isEndOfStream = 14;</code>
+       */
+      public Builder clearIsEndOfStream() {
+        bitField0_ = (bitField0_ & ~0x00002000);
+        isEndOfStream_ = false;
         onChanged();
         return this;
       }
@@ -10525,7 +10606,7 @@ public final class DRAgent {
       "\022\031\n\021persistInstanceId\030\002 \001(\006\"t\n\tSubscribe" +
       "\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006" +
       "\022\022\n\nisCovering\030\003 \001(\010\022\030\n\020rewindToUniqueId",
-      "\030\004 \001(\006\022\021\n\tisSyncing\030\005 \001(\010\"\351\003\n\010Response\022\026" +
+      "\030\004 \001(\006\022\021\n\tisSyncing\030\005 \001(\010\"\200\004\n\010Response\022\026" +
       "\n\002id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030\002 \001(\0162\036.p" +
       "msg.Response.ReplicationMode\022\031\n\021snapshot" +
       "Timestamp\030\003 \001(\006\022\026\n\016instanceIdHash\030\004 \001(\006\022" +
@@ -10535,30 +10616,31 @@ public final class DRAgent {
       "Info\022\021\n\006status\030\t \001(\005:\0010\022%\n\004type\030\n \001(\0162\027." +
       "pmsg.CtrlEnvelope.Type\022\022\n\ncatalogCRC\030\013 \001" +
       "(\006\022\030\n\020catalogSignature\030\014 \001(\t\022\024\n\014failureC",
-      "ause\030\r \001(\t\"i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022" +
-      "\026\n\022SYNCING_REPLICATED\020\002\022\027\n\023SYNCING_PARTI" +
-      "TIONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n" +
-      "\010NodeInfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 " +
-      "\001(\005\022\022\n\ncatalogCRC\030\003 \001(\006\"\227\002\n\rPartitionInf" +
-      "o\022\023\n\013partitionId\030\001 \001(\005\022\031\n\021lastSentTimest" +
-      "amp\030\002 \001(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022l" +
-      "astSentTupleIndex\030\004 \001(\003\022\027\n\017totalTupleCou" +
-      "nt\030\005 \001(\003\022\036\n\026outstandingBufferCount\030\006 \001(\003" +
-      "\022\034\n\024outstandingByteCount\030\007 \001(\003\022\020\n\010isPaus",
-      "ed\030\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\022\024\n\014nextUnique" +
-      "Id\030\n \001(\003\022\017\n\007isEnded\030\013 \001(\010\"\274\003\n\014CtrlEnvelo" +
-      "pe\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Typ" +
-      "e\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t" +
-      ".pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n" +
-      "\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 " +
-      "\001(\0132\016.pmsg.Response\022&\n\013snapshotReq\030\007 \001(\013" +
-      "2\021.pmsg.SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017" +
-      ".pmsg.Subscribe\022\036\n\007connect\030\n \001(\0132\r.pmsg." +
-      "Connect\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005",
-      "PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAP" +
-      "SHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SY" +
-      "NC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org." +
-      "voltdb.pmsgB\007DRAgent"
+      "ause\030\r \001(\t\022\025\n\risEndOfStream\030\016 \001(\010\"i\n\017Rep" +
+      "licationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLIC" +
+      "ATED\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIV" +
+      "E\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeInfo\022\020\n\010host" +
+      "name\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncatalogCRC" +
+      "\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013partitionId\030" +
+      "\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001(\006\022\030\n\020lowe" +
+      "stTupleIndex\030\003 \001(\003\022\032\n\022lastSentTupleIndex" +
+      "\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(\003\022\036\n\026outst" +
+      "andingBufferCount\030\006 \001(\003\022\034\n\024outstandingBy",
+      "teCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSyn" +
+      "ced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(\003\022\017\n\007isEnd" +
+      "ed\030\013 \001(\010\"\274\003\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162" +
+      "\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n.p" +
+      "msg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005rese" +
+      "t\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pm" +
+      "sg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg.Respon" +
+      "se\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.SnapshotR" +
+      "eq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subscribe\022\036" +
+      "\n\007connect\030\n \001(\0132\r.pmsg.Connect\"\216\001\n\004Type\022",
+      "\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020" +
+      "\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNA" +
+      "PSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t" +
+      "\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb.pmsgB\007DRAg" +
+      "ent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -10612,7 +10694,7 @@ public final class DRAgent {
           internal_static_pmsg_Response_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Response_descriptor,
-              new java.lang.String[] { "Id", "Mode", "SnapshotTimestamp", "InstanceIdHash", "Version", "NodeInfo", "GlobalPartitionCount", "PartitionInfo", "Status", "Type", "CatalogCRC", "CatalogSignature", "FailureCause", });
+              new java.lang.String[] { "Id", "Mode", "SnapshotTimestamp", "InstanceIdHash", "Version", "NodeInfo", "GlobalPartitionCount", "PartitionInfo", "Status", "Type", "CatalogCRC", "CatalogSignature", "FailureCause", "IsEndOfStream", });
           internal_static_pmsg_NodeInfo_descriptor =
             getDescriptor().getMessageTypes().get(8);
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
