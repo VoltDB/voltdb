@@ -103,7 +103,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
         final Table[] tableArray;
-        if (config.tables.length == 0 && !jsData.has("tables")) {
+        if (config.tables.length == 0 && (jsData == null || !jsData.has("tables"))) {
             tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
         } else {
             tableArray = config.tables;
