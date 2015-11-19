@@ -25,9 +25,9 @@
 #include "boost/foreach.hpp"
 #include "boost/functional/hash.hpp"
 
-#include "common/value_defs.h"
 #include "common/Point.hpp"
 #include "common/serializeio.h"
+#include "common/value_defs.h"
 
 #include "s2geo/s2loop.h"
 #include "s2geo/s2polygon.h"
@@ -207,6 +207,13 @@ public:
         m_cursor += length;
     }
 
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << "SimpleOutputSerializer with buffer size " << m_size
+            << ", current offset = " << (m_cursor - m_buffer);
+        return oss.str();
+    }
+
 private:
 
     template<typename T>
@@ -361,8 +368,7 @@ const std::size_t BOUND_SERIALIZED_SIZE =
 template<class Deserializer>
 static inline void initBoundFromBuffer(S2LatLngRect *bound, Deserializer& input)
 {
-    int8_t version = input.readByte(); // encoding version
-    assert (version == COMPLETE_ENCODING);
+    input.readByte(); // encoding version
 
     double latLo = input.readDouble();
     double latHi = input.readDouble();
@@ -451,8 +457,7 @@ inline void Loop::pointArrayFromBuffer(Deserializer& input, std::vector<S2Point>
 template<class Deserializer>
 inline void Loop::initFromBuffer(Deserializer& input)
 {
-    int8_t version = input.readByte();
-    assert (version == COMPLETE_ENCODING);
+    input.readByte();
 
     set_num_vertices(input.readInt());
 
@@ -567,8 +572,7 @@ inline void Polygon::initFromGeography(const Geography& geog)
 template<class Deserializer>
 inline void Polygon::initFromBuffer(Deserializer& input)
 {
-    int8_t version = input.readByte(); // encoding version
-    assert (version == COMPLETE_ENCODING);
+    input.readByte(); // encoding version
 
     if (owns_loops()) {
         DeleteLoopsInVector(&(loops()));
