@@ -30,7 +30,6 @@
 namespace voltdb {
 
 extern const int64_t VOLT_EPOCH;
-const int64_t HIDDEN_VALUE_TIMESTAMP_MASK = (1LL << 49) - 1LL;
 
 class AbstractExecutor;
 class DRTupleStream;
@@ -125,7 +124,8 @@ class ExecutorContext {
         // Convert this into a microsecond-resolution timestamp; treat the time
         // portion as the time in milliseconds, and the sequence number as if
         // it is a time in microseconds
-        return (hiddenValue >> 23) * 1000 + VOLT_EPOCH + (hiddenValue & 0x1ff);
+        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
+        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
     }
 
     static int8_t getClusterIdFromHiddenNValue(NValue &value) {
