@@ -871,6 +871,8 @@ public class TestJoinsSuite extends RegressionSuite {
         clearSeqTables(client);
         clearIndexTables(client);
         subtestDistributedTableFullJoin(client);
+        clearSeqTables(client);
+        subtestNonEqualityFullJoin(client);
     }
 
     private void subtestTwoReplicatedTableFullNLJoin(Client client)
@@ -1206,6 +1208,50 @@ public class TestJoinsSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", sql).getResults()[0];
         assertTrue(vt.toString().contains("NESTLOOP INDEX FULL JOIN"));
     }
+
+    private void subtestNonEqualityFullJoin(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        String sql;
+        long MINVAL = Long.MIN_VALUE;
+
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(10, 10, 2);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(8, 8);");
+
+        client.callProcedure("@AdHoc", "INSERT INTO P2 VALUES(5, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO P2 VALUES(8, 8);");
+
+        // case 1: two replicated tables joined on non-equality condition
+        sql = "SELECT R1.A, R2.A FROM R1 FULL JOIN R2 ON " +
+                "R1.A > 15 ORDER BY R1.A, R2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, 5},
+                {MINVAL, 8},
+                {1,MINVAL},
+                {10, MINVAL}
+        });
+
+        // case 2: two replicated tables joined on non-equality inner and outer conditions
+        sql = "SELECT R1.A, R2.A FROM R1 FULL JOIN R2 ON " +
+                "R1.A > 5 AND R2.A < 7 ORDER BY R1.A, R2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, 8},
+                {1,MINVAL},
+                {10, 5}
+        });
+
+        // case 3: distributed table joined on non-equality inner and outer conditions
+        sql = "SELECT R1.A, P2.A FROM R1 FULL JOIN P2 ON " +
+                "R1.A > 5 AND P2.A < 7 ORDER BY R1.A, P2.A";
+        validateTableOfLongs(client, sql, new long[][]{
+                {MINVAL, 8},
+                {1,MINVAL},
+                {10, 5}
+        });
+}
 
     static public junit.framework.Test suite()
     {
