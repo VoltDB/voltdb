@@ -106,7 +106,7 @@ public class PointType {
     public String formatLatLng() {
         // Display a maximum of 9 decimal digits after the point.
         // This gives us precision of around 1 mm.
-        DecimalFormat df = new DecimalFormat("###.#########");
+        DecimalFormat df = new DecimalFormat("##0.0########");
         return df.format(m_latitude) + " " + df.format(m_longitude);
     }
 
