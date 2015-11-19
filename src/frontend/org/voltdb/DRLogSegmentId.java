@@ -70,7 +70,7 @@ public class DRLogSegmentId implements Serializable {
     }
 
     public static boolean isEmptyDRId (long drId) {
-        return (drId >>> 63) == (long)1;
+        return (drId >>> 63) == 1L;
     }
 
     public static int getClusterIdFromDRId(long drId) {
@@ -91,6 +91,12 @@ public class DRLogSegmentId implements Serializable {
         public long mpUniqueId;
 
         public MutableBinaryLogInfo() {
+            drId = Long.MIN_VALUE;
+            spUniqueId = Long.MIN_VALUE;
+            mpUniqueId = Long.MIN_VALUE;
+        }
+
+        public void reset() {
             drId = Long.MIN_VALUE;
             spUniqueId = Long.MIN_VALUE;
             mpUniqueId = Long.MIN_VALUE;
