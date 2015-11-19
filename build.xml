@@ -1382,7 +1382,6 @@ TEST CASES
         >
             <classpath refid='project.classpath' />
             <jvmarg value="-server" />
-            <jvmarg value="-Xcheck:jni" />
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <jvmarg value="-XX:-UseSplitVerifier"/>
