@@ -424,6 +424,11 @@ class ServerBundle(JavaBundle):
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
+	verb.add_options(
+            cli.StringListOption(None, '--skip-check', 'skip_requirements',
+                             '''requirements to skip when start voltdb:
+			     thp - ignore transparent huge page check at your peril, you could run out of memory''',
+                             default = None))
         verb.add_options(
             cli.StringOption('-d', '--deployment', 'deployment',
                              'specify the location of the deployment file',
@@ -462,8 +467,19 @@ class ServerBundle(JavaBundle):
     def go(self, verb, runner):
         if self.check_environment_config:
             incompatible_options = checkconfig.test_hard_requirements()
-            if incompatible_options is not None:
-                utility.abort(incompatible_options)
+            for k,v in  incompatible_options.items():
+                state = v[0]
+                if state == 'PASS' :
+                    pass
+                if state == "WARN":
+                    utility.warning(v[1])
+                if state == 'FAIL' :
+                    if k in checkconfig.skippableRequirements.keys() and runner.opts.skip_requirements and checkconfig.skippableRequirements[k] in runner.opts.skip_requirements:
+                        utility.warning(v[1])
+                    else:
+                        utility.abort(v[1])
+                else:
+                    utility.error(v[1])
         final_args = None
         if self.subcommand in ('create', 'recover'):
             if runner.opts.replica:
