@@ -112,7 +112,7 @@ NValue getRandomValue(ValueType type, uint32_t maxLength) {
             int length = (rand() % maxLength);
             unsigned char bytes[maxLength];
             for (int ii = 0; ii < length; ii++) {
-                bytes[ii] = (unsigned char)rand() % 256; //printable characters
+                bytes[ii] = static_cast<unsigned char> (rand() % 256); //printable characters
             }
             bytes[length] = '\0';
             //printf("Characters are \"%s\"\n", characters);
