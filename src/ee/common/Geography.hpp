@@ -415,8 +415,16 @@ public:
         return oss.str();
     }
 
+    double getDistance(const Point &point) {
+        std::unique_ptr<S2Polygon> s2Polygon = toS2Polygon();
+        const S2Point s2Point = point.toS2Point();
+        S1Angle distanceRadians = S1Angle(s2Polygon->Project(s2Point), s2Point);
+        return distanceRadians.radians();
+    }
+
 private:
     const char* const m_data;
+
 };
 
 } // end namespace

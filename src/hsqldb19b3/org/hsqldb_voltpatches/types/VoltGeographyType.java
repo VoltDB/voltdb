@@ -47,6 +47,11 @@ public class VoltGeographyType extends Type {
     }
 
     @Override
+    public boolean isGeographyType() {
+        return true;
+    }
+
+    @Override
     public int compare(Object a, Object b) {
         // Incompatible type in operation
         throw Error.error(ErrorCode.X_42565);
