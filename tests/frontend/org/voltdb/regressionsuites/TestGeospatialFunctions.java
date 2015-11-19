@@ -27,6 +27,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.PointType;
@@ -180,6 +181,71 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Denver",         39.70399856567383,  -104.95899963378906},
                  {"Fort Collins",   40.584999084472656, -105.0770034790039}
                 }, vt);
+    }
+
+    public void testPolygonCentroidAndArea() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        String sql = "select borders.name, Area(borders.region), LATITUDE(centroid(borders.region)), LONGITUDE(centroid(borders.region)) "
+                        + "from borders order by borders.pk";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.out.println(vt.toString());
+    }
+
+    public void testPolygonDistance() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        client.callProcedure("places.Insert", 5, "Point almost on Colorado border",
+                PointType.pointFromText("POINT(41.002 -105.04)"));
+
+        client.callProcedure("places.Insert", 6, "Point Not On Colorado Border",
+                PointType.pointFromText("POINT(41.005 -109.025)"));
+
+        VoltTable vt;
+
+        // distance between polygon and point
+        String sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
+                        + "from borders, places "
+                        + "order by borders.pk";
+        /*
+         * String sql = "select places.name, distance(borders.region, places.loc)"
+                        + "from borders, places where borders.pk = places.pk "
+                        + "order by borders.pk";
+         */
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.out.println(vt.toString());
+
+        // distance between point and polygon
+        sql = "select places.name, distance(places.loc, borders.region)"
+                + "from borders, places where borders.pk = places.pk "
+                + "order by borders.pk";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.out.println(vt.toString());
+
+        // distance between point and point
+        sql = "select A.name, B.name, distance(A.loc, B.loc)"
+                + "from places as A, places as B "
+                + "order by A.pk";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.out.println(vt.toString());
+
+        // distance between polygon and polygon
+        ProcCallException exception = null;
+        try {
+            sql = "select places.name, distance(borders.region, borders.region)"
+                    + "from borders, places where borders.pk = places.pk "
+                    + "order by borders.pk";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.out.println(vt.toString());
+        }
+        catch (ProcCallException excp) {
+            exception = excp;
+            assertTrue(exception.getMessage().contains("incompatible data type in operation"));
+        } finally {
+            assertNotNull(exception);
+        }
     }
 
     static public junit.framework.Test suite() {

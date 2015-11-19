@@ -24,11 +24,17 @@
 namespace voltdb {
 template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const;
-template<> NValue NValue::callUnary<FUNC_VOLT_CONTAINS>() const;
+template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& arguments);
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const;
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE>(const std::vector<NValue>& arguments);
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POLYGON>(const std::vector<NValue>& arguments);
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector<NValue>& arguments);
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vector<NValue>& arguments);
 }
 
 #endif

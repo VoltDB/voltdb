@@ -5,9 +5,6 @@
 extern "C" {
 #endif
 /* OpenSSL was configured with the following options: */
-#ifndef OPENSSL_SYSNAME_MACOSX
-# define OPENSSL_SYSNAME_MACOSX
-#endif
 #ifndef OPENSSL_DOING_MAKEDEPEND
 
 
@@ -100,8 +97,6 @@ extern "C" {
 # endif
 #endif
 
-#define OPENSSL_CPUID_OBJ
-
 /* crypto/opensslconf.h.in */
 
 /* Generate 80386 code? */
@@ -148,7 +143,7 @@ extern "C" {
  * This enables code handling data aligned at natural CPU word
  * boundary. See crypto/rc4/rc4_enc.c for further details.
  */
-#define RC4_CHUNK unsigned long
+#undef RC4_CHUNK
 #endif
 #endif
 
@@ -156,7 +151,7 @@ extern "C" {
 /* If this is set to 'unsigned int' on a DEC Alpha, this gives about a
  * %20 speed up (longs are 8 bytes, int's are 4). */
 #ifndef DES_LONG
-#define DES_LONG unsigned int
+#define DES_LONG unsigned long
 #endif
 #endif
 
@@ -167,9 +162,9 @@ extern "C" {
 /* Should we define BN_DIV2W here? */
 
 /* Only one for the following should be defined */
-#define SIXTY_FOUR_BIT_LONG
+#undef SIXTY_FOUR_BIT_LONG
 #undef SIXTY_FOUR_BIT
-#undef THIRTY_TWO_BIT
+#define THIRTY_TWO_BIT
 #endif
 
 #if defined(HEADER_RC4_LOCL_H) && !defined(CONFIG_HEADER_RC4_LOCL_H)
@@ -211,7 +206,7 @@ extern "C" {
 /* Unroll the inner loop, this sometimes helps, sometimes hinders.
  * Very mucy CPU dependant */
 #ifndef DES_UNROLL
-#define DES_UNROLL
+#undef DES_UNROLL
 #endif
 
 /* These default values were supplied by

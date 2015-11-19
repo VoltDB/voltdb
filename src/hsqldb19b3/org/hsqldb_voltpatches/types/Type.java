@@ -349,6 +349,14 @@ public abstract class Type implements SchemaObject, Cloneable {
         return false;
     }
 
+    public boolean isPointType() {
+        return false;
+    }
+
+    public boolean isGeographyType() {
+        return false;
+    }
+
     public boolean acceptsPrecision() {
         return false;
     }

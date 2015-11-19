@@ -136,6 +136,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 20035;
         static final int FUNC_VOLT_POINT_LATITUDE               = 20036;
         static final int FUNC_VOLT_POINT_LONGITUDE              = 20037;
+        static final int FUNC_VOLT_POLYGON_CENTROID             = 20038;
+        static final int FUNC_VOLT_POLYGON_AREA                 = 20039;
+        static final int FUNC_VOLT_DISTANCE                     = 20040;    // wrapper id for distance between all geo types
+        static final int FUNC_VOLT_DISTANCE_POINT_POLYGON       = 20041;    // distance between point and polygon
+        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20042;    // distance between point and point
+        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20043;    // distance between polygon and point
+
 
         private static final FunctionId[] instances = {
 
@@ -265,6 +272,18 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.VOLT_POINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+            new FunctionId("centroid", Type.VOLT_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("area", Type.SQL_DOUBLE, FUNC_VOLT_POLYGON_AREA, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("distance", Type.SQL_DOUBLE, FUNC_VOLT_DISTANCE, -1,
+                    new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                                   Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -466,6 +485,24 @@ public class FunctionForVoltDB extends FunctionSQL {
         case FunctionId.FUNC_VOLT_BIN:
             voltResolveToBigintType(0);
             dataType = Type.SQL_VARCHAR;
+            break;
+
+        case FunctionId.FUNC_VOLT_DISTANCE:
+            // validate the types of argument is valid
+            if ((nodes[0].dataType == null && nodes[0].isParam) ||
+                (nodes[1].dataType == null && nodes[1].isParam)) {
+                // todo: throw exception indicating the type is ambigous
+                throw Error.error(ErrorCode.X_42561);
+            }
+            else if (nodes[0].dataType == null || nodes[1].dataType == null) {
+                // todo: throw exception indicating the type invalid type
+                throw Error.error(ErrorCode.X_42561);
+            }
+            else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isPointType()) ||
+                     (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isPointType())) {
+                // one of the child node is neither geography nor point type
+                throw Error.error(ErrorCode.X_42565); // incompatible data type
+            }
             break;
 
         default:
