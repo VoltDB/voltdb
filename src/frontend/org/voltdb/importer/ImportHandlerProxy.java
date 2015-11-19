@@ -22,7 +22,6 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.Set;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.client.ProcedureCallback;
@@ -254,11 +253,6 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         } catch (Exception ex) {
         }
         return false;
-    }
-
-    @Override
-    public long getBackpressureTimeout() {
-        return TimeUnit.MINUTES.toNanos(2);
     }
 
     @Override

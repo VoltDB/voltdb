@@ -64,18 +64,18 @@ public class InternalConnectionHandler {
         }
     }
 
-    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector, long backPressureTimeout, String proc, Object... fieldList) {
-        return callProcedure(caller, statsCollector, backPressureTimeout, new NullCallback(), proc, fieldList);
+    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector, String proc, Object... fieldList) {
+        return callProcedure(caller, statsCollector, new NullCallback(), proc, fieldList);
     }
 
-    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector, long backPressureTimeout,
+    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector,
             ProcedureCallback procCallback, AuthSystem.AuthUser user, String proc, Object... fieldList) {
         m_user = user;
-        return callProcedure(caller, statsCollector, backPressureTimeout, procCallback, proc, fieldList);
+        return callProcedure(caller, statsCollector, procCallback, proc, fieldList);
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
-    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector, long backPressureTimeout,
+    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector,
             ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = VoltDB.instance().getClientInterface().getProcedureFromName(proc, VoltDB.instance().getCatalogContext());
         if (catProc == null) {

@@ -189,7 +189,7 @@ public class TestImportSuite extends RegressionSuite {
 
     private static Map<String, String> expectedStatRows = new HashMap<>();
     static {
-        expectedStatRows.put("SocketImporter", "importTable.insert");
+        expectedStatRows.put("SocketServerImporter", "importTable.insert");
         expectedStatRows.put("Log4jSocketHandlerImporter", "log_events.insert");
     };
     private static final String CONN_HOST_COL = "CONNECTION_HOSTNAME";
@@ -350,7 +350,6 @@ public class TestImportSuite extends RegressionSuite {
 
     static public junit.framework.Test suite() throws Exception
     {
-
         LocalCluster config;
         Map<String, String> additionalEnv = new HashMap<String, String>();
         //Specify bundle location

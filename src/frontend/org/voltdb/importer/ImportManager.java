@@ -106,6 +106,7 @@ public class ImportManager implements ChannelChangeCallback {
 
         List<String> packages = ImmutableList.<String>builder()
                 .add("org.voltcore.network")
+                .add("org.voltcore.logging")
                 .add("org.voltdb.importer")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")

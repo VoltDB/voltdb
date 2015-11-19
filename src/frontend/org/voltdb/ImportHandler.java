@@ -112,7 +112,7 @@ public class ImportHandler {
 
     public boolean callProcedure(ImportContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
         return getInternalConnectionHandler()
-                .callProcedure(ic, m_statsCollector, ic.getBackpressureTimeout(), procCallback, proc, fieldList);
+                .callProcedure(ic, m_statsCollector, procCallback, proc, fieldList);
     }
 
     private InternalConnectionHandler getInternalConnectionHandler() {
