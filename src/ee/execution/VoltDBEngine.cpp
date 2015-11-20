@@ -1503,7 +1503,6 @@ bool VoltDBEngine::activateTableStream(
         assert(table != NULL);
         return false;
     }
-
     setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
@@ -1520,6 +1519,8 @@ bool VoltDBEngine::activateTableStream(
         }
 
         table->incrementRefcount();
+    std::cout << "Activating stream for table: " << table-> << "\n";
+    std::cout.flush();
         m_snapshottingTables[tableId] = table;
     }
 
