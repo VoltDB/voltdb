@@ -45,16 +45,17 @@ public class TestGeographyValue extends RegressionSuite {
             + "18.476 -66.371, "
             + "32.305 -64.751))";
 
-    // The Bermuda Triangle with a hole inside
+    // The Bermuda Triangle with a square hole inside
     private final String BERMUDA_TRIANGLE_HOLE_WKT = "POLYGON("
             + "(32.305 -64.751, "
             + "25.244 -80.437, "
             + "18.476 -66.371, "
             + "32.305 -64.751), "
-            + "(28.066 -68.874, "
-            + "25.361 -68.855, "
-            + "28.376 -73.381,"
-            + " 28.066 -68.874))";
+            + "(27.026 -67.448, "
+            + "27.026 -68.992, "
+            + "25.968 -68.992, "
+            + "25.968 -67.448, "
+            + "27.026 -67.448))";
 
     // (Useful for testing comparisons since it has the same number of vertices as
     // the Bermuda Triangle)
@@ -532,10 +533,12 @@ public class TestGeographyValue extends RegressionSuite {
 
         // Parsing with more than one loop should work the same.
         expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                      + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
+                + "(27.026 -67.448, 27.026 -68.992, 25.968 -68.992, 25.968 -67.448, 27.026 -67.448))";
+
+        expected = BERMUDA_TRIANGLE_HOLE_WKT;
         assertEquals(expected, wktRoundTrip(client,
                 "PoLyGoN\t(  (\n32.305\n-64.751   ,    25.244\t-80.437\n,18.476 -66.371,32.305\t\t\t-64.751   ),\t "
-                        + "(\n28.066\t-68.874,\t25.361    -68.855\n,28.376      -73.381,28.066\n\n-68.874\t)\n)\t"));
+                        + "(\n27.026\t-67.448,\t27.026    -68.992\n,25.968      -68.992,25.968\n\n-67.448   ,   27.026\n-67.448\t)\n)\t"));
     }
 
     private void assertWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
@@ -555,7 +558,9 @@ public class TestGeographyValue extends RegressionSuite {
         assertWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
         assertWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
         assertWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
+        assertWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
+        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
+        assertWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
 
         // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates
         // that are separated only by a minus sign indicating that the second coordinate is negative.

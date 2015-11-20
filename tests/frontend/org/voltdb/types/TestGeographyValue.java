@@ -23,6 +23,7 @@
 
 package org.voltdb.types;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
@@ -58,10 +59,24 @@ public class TestGeographyValue extends TestCase {
                 + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
                 geog.toString());
 
-        // 4 (loop count prefix) +
-        // 4 (vertex count prefix) + 4 * sizeof(PointType) +
-        // 4 (vertex count prefix) + 4 * sizeof(PointType) +
-        assertEquals(140, geog.getLengthInBytes());
+        ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
+        geog.flattenToBuffer(buf);
+        assertEquals(270, buf.position());
+
+        buf.position(0);
+        GeographyValue newGeog = GeographyValue.unflattenFromBuffer(buf);
+        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
+                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+                newGeog.toString());
+        assertEquals(270, buf.position());
+
+        // Try the absolute version of unflattening
+        buf.position(77);
+        newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
+        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
+                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+                newGeog.toString());
+        assertEquals(77, buf.position());
     }
 
     private static String canonicalizeWkt(String wkt) {

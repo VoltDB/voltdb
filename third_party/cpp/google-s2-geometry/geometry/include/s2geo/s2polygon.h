@@ -265,6 +265,44 @@ class S2Polygon : public S2Region {
   virtual bool Decode(Decoder* const decoder);
   virtual bool DecodeWithinScope(Decoder* const decoder);
 
+  /* VoltDB specific code: The following protected methods have been
+   * added by VoltDB to support subclasses */
+ protected:
+
+  char owns_loops() const {
+      return owns_loops_;
+  }
+
+  void set_owns_loops(char owns_loops) {
+      owns_loops_ = owns_loops;
+  }
+
+  char has_holes() const {
+      return has_holes_;
+  }
+
+  void set_has_holes(char has_holes) {
+      has_holes_ = has_holes;
+  }
+
+  void set_num_vertices(int num_vertices) {
+      num_vertices_ = num_vertices;
+  }
+
+  vector<S2Loop*>& loops() {
+      return loops_;
+  }
+
+  vector<S2Loop*> const & loops() const {
+      return loops_;
+  }
+
+  void set_rect_bound(const S2LatLngRect& bound) {
+      bound_ = bound;
+  }
+
+  /* End of VoltDB specific code */
+
  private:
   /// Internal constructor that does *not* take ownership of its argument.
   explicit S2Polygon(S2Loop* loop);
