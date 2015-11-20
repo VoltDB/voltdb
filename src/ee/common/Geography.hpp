@@ -95,8 +95,10 @@ public:
  * A class for representing instances of geo-spatial geographies.
  * (Currently only polygons can be represented here.)
  *
- * Note that variable length data in the EE is typically prefixed with a length.
- * The pointer here should be to the start of the data just after the length.
+ * Note that variable length data in the EE is typically prefixed with
+ * a 4-byte integer that is the length of the data in bytes.  The
+ * pointer accepted by the constructor here should be to the start of
+ * the data just after the length.
  */
 class Geography {
 public:
@@ -236,8 +238,9 @@ inline int Geography::compareWith(const Geography& rhs) const {
      * deterministic order.
      *
      *   1. First compare number of loops (polygons with fewer loops sort as smaller).
-     *   2. If the number of loops are the same, compare on the number of vertices
-     *        in the loops.  The polygon with fewer vertices will sort as smaller.
+     *   2. If the number of loops are the same, compare the number
+     *        of vertices in each loop.  The polygon with first loop
+     *        containing fewer vertices will sort as smaller.
      *   3. Finally, if all loops have the same number of vertices, sort on the
      *        points themselves (which will involve doing floating-point comparison)
      */
