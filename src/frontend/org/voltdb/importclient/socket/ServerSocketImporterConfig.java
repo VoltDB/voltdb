@@ -25,17 +25,22 @@ import java.util.Properties;
 
 import org.voltdb.importer.ImporterConfig;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
+
 /**
  * ImporterConfig for server socket importer.
  */
 public class ServerSocketImporterConfig implements ImporterConfig
 {
+    private static final String CSV_TRANSFORMER_NAME = "csv";
+    private static final String TSV_TRANSFORMER_NAME = "tsv";
 
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
     private final URI m_resourceID;
     private final String m_procedure;
     private final int m_port;
+    private final char m_separator;
     private final ServerSocket m_serverSocket;
 
     public ServerSocketImporterConfig(Properties props)
@@ -68,6 +73,12 @@ public class ServerSocketImporterConfig implements ImporterConfig
         } catch(URISyntaxException e) { // Will not happen
             throw new RuntimeException(e);
         }
+
+        String transformer = props.getProperty("transformer", CSV_TRANSFORMER_NAME).trim().toLowerCase();
+        if (!CSV_TRANSFORMER_NAME.equals(transformer) && !TSV_TRANSFORMER_NAME.equals(transformer)) {
+            throw new RuntimeException("Invalid transformer: " + transformer);
+        }
+        m_separator = CSV_TRANSFORMER_NAME.equals(transformer) ? CSVParser.DEFAULT_SEPARATOR : '\t';
     }
 
     @Override
@@ -84,6 +95,11 @@ public class ServerSocketImporterConfig implements ImporterConfig
     public int getPort()
     {
         return m_port;
+    }
+
+    public char getSeparator()
+    {
+        return m_separator;
     }
 
     public ServerSocket getServerSocket()
