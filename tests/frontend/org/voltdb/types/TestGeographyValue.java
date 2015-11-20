@@ -116,6 +116,64 @@ public class TestGeographyValue extends TestCase {
                     iae.getMessage().contains(error));
         }
     }
+    /**
+     * This tests that the maximum error when we transform a latitude/longitude pair to an
+     * S2, 3-dimensinal point and then back again is less than 1.0e-13.
+     *
+     * We sample the sphere, looking at NUM_PTS X NUM_PTS pairs.  At each pair, <m, n>,
+     * we calculate a latitude and longitude, convert the PointType with this latitude and
+     * longitude to an XYZPoint, and then back.  We then take the maximum error over the
+     * entire sphere.
+     *
+     * Setting NUM_PTS to 2000000 is a very bad idea.
+     *
+     * The error bound is 1.0e-13, which is the value of EPSILON below.  We tested 1.0e-14,
+     * but that fails.
+     *
+     * Note that no conversions from text to floating point happen anywhere here, so that
+     * is not a source of precision loss.  Only calculation cause these precision losses.
+     *
+     * @throws Exception
+     */
+    public void testXYZPoint() throws Exception {
+        final double EPSILON = 1.0e-13;
+        // We transform from latitude, longitude to XYZ this many
+        // times for each point.  This could be set higher.  At about 85, there
+        // is more than 1.0e-13 error.  I leave this at 1, because the test
+        // time burden is somewhat severe at higher numbers.
+        final int    NUMBER_TRANSFORMS = 1;
+        // This has been tested at 10000, but it takes too long.
+        final int NUM_PTS = 2000;
+        final int MIN_PTS = -(NUM_PTS/2);
+        final int MAX_PTS = (NUM_PTS/2);
+        double max_latitude_error = 0;
+        double max_longitude_error = 0;
+        for (int ycoord = MIN_PTS; ycoord <= MAX_PTS; ycoord += 1) {
+            double latitude = ycoord*(90.0/NUM_PTS);
+            for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
+                double longitude = xcoord*(180.0/NUM_PTS);
+                PointType PT_point = new PointType(latitude, longitude);
+                for (int idx = 0; idx < NUMBER_TRANSFORMS; idx += 1) {
+                    GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromPointType(PT_point);
+                    PT_point = xyz_point.toPointType();
+                    double laterr = Math.abs(latitude-PT_point.getLatitude());
+                    double lngerr = Math.abs(longitude-PT_point.getLongitude());
+                    if (laterr > max_latitude_error) {
+                        max_latitude_error = laterr;
+                        assertTrue(String.format("Maximum Latitude Error out of range: error=%e >= epsilon = %e, latitude = %f, num_transforms = %d\n",
+                                                 max_latitude_error, EPSILON, latitude, idx),
+                                max_latitude_error < EPSILON);
+                    }
+                    if (lngerr > max_longitude_error) {
+                        max_longitude_error = lngerr;
+                        assertTrue(String.format("Maximum LongitudeError out of range: error=%e >= epsilon = %e, longitude = %f, num_transforms = %d\n",
+                                                 max_longitude_error, EPSILON, longitude, idx),
+                                   max_longitude_error < EPSILON);
+                    }
+                }
+            }
+        }
+    }
 
     public void testWktParsingNegative() {
         assertWktParseError("expected WKT to start with POLYGON", "NOT_A_POLYGON(...)");
