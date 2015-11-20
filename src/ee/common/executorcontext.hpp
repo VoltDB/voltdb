@@ -29,12 +29,11 @@
 
 namespace voltdb {
 
-const int64_t HIDDEN_VALUE_TIMESTAMP_MASK = (1LL << 49) - 1LL;
+extern const int64_t VOLT_EPOCH;
 
 class AbstractExecutor;
 class DRTupleStream;
 class VoltDBEngine;
-
 
 /*
  * EE site global data required by executors at runtime.
@@ -72,11 +71,6 @@ class ExecutorContext {
         m_partitionId = partitionId;
     }
 
-    // not always known at initial construction
-    void setEpoch(int64_t epoch) {
-        m_epoch = epoch;
-    }
-
     // helper to configure the context for a new jni call
     void setupForPlanFragments(UndoQuantum *undoQuantum,
                                int64_t txnId,
@@ -88,7 +82,7 @@ class ExecutorContext {
         m_spHandle = spHandle;
         m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
-        m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
+        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH;
         m_uniqueId = uniqueId;
         m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
@@ -127,7 +121,11 @@ class ExecutorContext {
 
     static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
         int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
-        return hiddenValue & HIDDEN_VALUE_TIMESTAMP_MASK;
+        // Convert this into a microsecond-resolution timestamp; treat the time
+        // portion as the time in milliseconds, and the sequence number as if
+        // it is a time in microseconds
+        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
+        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
     }
 
     static int8_t getClusterIdFromHiddenNValue(NValue &value) {
@@ -276,9 +274,6 @@ class ExecutorContext {
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
-
-    /** local epoch for voltdb, somtime around 2008, pulled from catalog */
-    int64_t m_epoch;
 };
 
 }
