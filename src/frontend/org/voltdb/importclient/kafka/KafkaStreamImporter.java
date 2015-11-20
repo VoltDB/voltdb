@@ -170,7 +170,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             throw new RuntimeException("Missing procedure.");
         }
 
-        Map<String, String> topicProc = topicProc = m_brokerProcedure.get(key);
+        Map<String, String> topicProc = m_brokerProcedure.get(key);
         if (topicProc == null) {
             topicProc = new HashMap<String, String>();
             m_brokerProcedure.put(key, topicProc);
