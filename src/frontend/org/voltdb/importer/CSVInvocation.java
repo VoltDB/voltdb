@@ -17,9 +17,11 @@
 
 package org.voltdb.importer;
 
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.io.IOException;
+
 import org.voltdb.common.Constants;
+
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
  *
@@ -29,11 +31,16 @@ public class CSVInvocation implements Invocation {
 
     private final String m_line;
     private final String m_proc;
-    private final CSVParser m_parser = new CSVParser();
+    private final CSVParser m_parser;
 
     public CSVInvocation(String proc, String line) {
+        this(proc, line, CSVParser.DEFAULT_SEPARATOR);
+    }
+
+    public CSVInvocation(String proc, String line, char separator) {
         m_line = line;
         m_proc = proc;
+        m_parser = new CSVParser(separator);
     }
 
     @Override
