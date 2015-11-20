@@ -284,7 +284,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         // get distance of points contained in a polygon to polygon's centroid
         sql = "select borders.name as State, places.name as Location, "
-        		+ "distance(centroid(borders.region), places.loc) as distance "
+                + "distance(centroid(borders.region), places.loc) as distance "
                 + "from borders, places where contains(borders.region, places.loc) "
                 + "order by distance";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -372,6 +372,4 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         return builder;
     }
-
-
 }
