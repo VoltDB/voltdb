@@ -25,7 +25,6 @@ package org.voltdb.regressionsuites;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyValue;
@@ -37,6 +36,66 @@ public class TestGeospatialFunctions extends RegressionSuite {
         super(name);
     }
 
+    /*
+     * We want to store the borders table once and for all, and insert and test
+     * without repeating ourselves. This class holds geometry values for us for
+     * inserting and for testing later on.
+     */
+    private static class Borders {
+        Borders(long pk, String name, GeographyValue region) {
+            m_pk = pk;
+            m_name = name;
+            m_region = region;
+        }
+
+        public final long getPk() {
+            return m_pk;
+        }
+
+        public final String getName() {
+            return m_name;
+        }
+
+        public final GeographyValue getRegion() {
+            return m_region;
+        }
+
+        private final long m_pk;
+        private final String m_name;
+        private final GeographyValue m_region;
+    }
+
+    /*
+     * This is the array of borders we know about. We will insert these
+     * borders and then extract them.
+     */
+    private static Borders borders[] = {
+        new Borders(0, "Colorado", new GeographyValue("POLYGON(("
+                                                  + "41.002 -102.052, "
+                                                  + "41.002 -109.045,"
+                                                  + "36.999 -109.045,"
+                                                  + "36.999 -102.052,"
+                                                  + "41.002 -102.052))")),
+        new Borders(1, "Wyoming", new GeographyValue("POLYGON(("
+                                                + "44.978 -104.061, "
+                                                + "44.978 -111.046, "
+                                                + "40.998 -111.046, "
+                                                + "40.998 -104.061, "
+                                                + "44.978 -104.061))")),
+       new Borders(2, "Colorado with a hole around Denver",
+               new GeographyValue("POLYGON("
+                                  + "(41.002 -102.052, "
+                                  + "41.002 -109.045,"
+                                  + "36.999 -109.045,"
+                                  + "36.999 -102.052,"
+                                  + "41.002 -102.052), "
+                                  + "(40.240 -104.035, "
+                                  + "40.240 -105.714, "
+                                  + "39.188 -105.714, "
+                                  + "39.188 -104.035,"
+                                  + "40.240 -104.035))")),
+       new Borders(3, "Wonderland", null)
+    };
     private static void populateTables(Client client) throws Exception {
         client.callProcedure("places.Insert", 0, "Denver",
                 PointType.pointFromText("POINT(39.704 -104.959)"));
@@ -50,37 +109,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // A null-valued point
         client.callProcedure("places.Insert", 4, "Neverwhere", null);
 
-        client.callProcedure("borders.Insert", 0, "Colorado",
-                new GeographyValue("POLYGON(("
-                        + "41.002 -102.052, "
-                        + "41.002 -109.045,"
-                        + "36.999 -109.045,"
-                        + "36.999 -102.052,"
-                        + "41.002 -102.052))"));
-        client.callProcedure("borders.Insert", 1, "Wyoming",
-                new GeographyValue("POLYGON(("
-                        + "44.978 -104.061, "
-                        + "44.978 -111.046, "
-                        + "40.998 -111.046, "
-                        + "40.998 -104.061, "
-                        + "44.978 -104.061))"));
-
-        // This polygon should not contain Denver, due to the hole.
-        client.callProcedure("borders.Insert", 2, "Colorado with a hole around Denver",
-                new GeographyValue("POLYGON("
-                        + "(41.002 -102.052, "
-                        + "41.002 -109.045,"
-                        + "36.999 -109.045,"
-                        + "36.999 -102.052,"
-                        + "41.002 -102.052), "
-                        + "(40.240 -104.035, "
-                        + "40.240 -105.714, "
-                        + "39.188 -105.714, "
-                        + "39.188 -104.035,"
-                        + "40.240 -104.035))"));
-
-        // a null-valued-polygon
-        client.callProcedure("borders.Insert", 3, "Wonderland", null);
+        for (int idx = 0; idx < borders.length; idx += 1) {
+            Borders b = borders[idx];
+            client.callProcedure("borders.Insert",
+                                 b.getPk(),
+                                 b.getName(),
+                                 b.getRegion());
+        }
     }
 
     public void testContains() throws Exception {
@@ -163,9 +198,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertContentOfTable(new Object[][]
                 {{"Denver",         39.704,  -104.959},
-                 {"Albuquerque",    35.113, -106.599},
+                 {"Albuquerque",    35.113,  -106.599},
                  {"Cheyenne",       41.134,  -104.813},
-                 {"Fort Collins",   40.585, -105.077},
+                 {"Fort Collins",   40.585,  -105.077},
                  {"Neverwhere",     Double.MIN_VALUE,   Double.MIN_VALUE},
                 }, vt);
 
@@ -178,8 +213,85 @@ public class TestGeospatialFunctions extends RegressionSuite {
         assertContentOfTable(new Object[][]
                 {{"Cheyenne",       41.134,  -104.813},
                  {"Denver",         39.704,  -104.959},
-                 {"Fort Collins",   40.585, -105.077}
+                 {"Fort Collins",   40.585,  -105.077}
                 }, vt);
+    }
+
+    public void testPolygonFloatingPrecision() throws Exception {
+        final double EPSILON = -1.0;
+        Client client = getClient();
+        populateTables(client);
+
+        String sql = "select name, region "
+                        + "from borders order by borders.pk";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertApproximateContentOfTable(new Object[][]
+                                        {{borders[0].getName(), borders[0].getRegion()},
+                                         {borders[1].getName(), borders[1].getRegion()},
+                                         {borders[2].getName(), borders[2].getRegion()},
+                                         {borders[3].getName(), borders[3].getRegion()}},
+                                        vt,
+                                        EPSILON);
+    }
+
+    /**
+     * This tests that the maximum error when we transform a latitude/longitude pair to an
+     * S2, 3-dimensinal point and then back again is less than 1.0e-13.
+     *
+     * We sample the sphere, looking at NUM_PTS X NUM_PTS pairs.  At each pair, <m, n>,
+     * we calculate a latitude and longitude, convert the PointType with this latitude and
+     * longitude to an XYZPoint, and then back.  We then take the maximum error over the
+     * entire sphere.
+     *
+     * Setting NUM_PTS to 2000000 is a very bad idea.
+     *
+     * The error bound is 1.0e-13, which is the value of EPSILON below.  We tested 1.0e-14,
+     * but that fails.
+     *
+     * Note that no conversions from text to floating point happen anywhere here, so that
+     * is not a source of precision loss.  Only calculation cause these precision losses.
+     *
+     * @throws Exception
+     */
+    public void testXYZPoint() throws Exception {
+        final double EPSILON = 1.0e-13;
+        // This has been tested at 10000, but it takes too long.
+        final int NUM_PTS = 4000;
+        final int MIN_PTS = -(NUM_PTS/2);
+        final int MAX_PTS = (NUM_PTS/2);
+        double max_latitude_error = 0;
+        double max_longitude_error = 0;
+        PointType longitude_error_point = null;
+        PointType latitude_error_point = null;
+        for (int ycoord = MIN_PTS; ycoord <= MAX_PTS; ycoord += 1) {
+            double latitude = ycoord*(90.0/NUM_PTS);
+            for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
+                double longitude = xcoord*(180.0/NUM_PTS);
+                PointType PT_point = new PointType(latitude, longitude);
+                GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromPointType(PT_point);
+                PointType roundTrip = xyz_point.toPointType();
+                double laterr = Math.abs(latitude-roundTrip.getLatitude());
+                double lngerr = Math.abs(longitude-roundTrip.getLongitude());
+                if (laterr > max_latitude_error) {
+                    max_latitude_error = laterr;
+                    latitude_error_point = new PointType(latitude, longitude);
+                }
+                if (lngerr > max_longitude_error) {
+                    max_longitude_error = lngerr;
+                    longitude_error_point = new PointType(latitude, longitude);
+                }
+            }
+        }
+        if (latitude_error_point != null) {
+            assertTrue(String.format("Maximum Latitude Error out of range: error=%e >= epsilon = %e, latitude = %s\n",
+                                     max_latitude_error, EPSILON, latitude_error_point.toString()),
+                       max_latitude_error < EPSILON);
+        }
+        if (longitude_error_point != null) {
+            assertTrue(String.format("Maximum LongitudeError out of range: error=%e >= epsilon = %e, longitude = %s\n",
+                                     max_longitude_error, EPSILON, longitude_error_point.toString()),
+                       max_longitude_error < EPSILON);
+        }
     }
 
     static public junit.framework.Test suite() {
@@ -218,6 +330,4 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         return builder;
     }
-
-
 }

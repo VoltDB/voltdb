@@ -43,7 +43,7 @@ public class PointType {
     //   11. The end of the string.
     //
     private static final Pattern wktPattern
- = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?\\d+)(?:[.](\\d*))?\\s+([-]?\\d+)(?:[.](\\d*))?\\s*[)]\\s*\\z",
+        = Pattern.compile("^\\s*point\\s*[(]\\s*([-]?\\d+)(?:[.](\\d*))?\\s+([-]?\\d+)(?:[.](\\d*))?\\s*[)]\\s*\\z",
                           Pattern.CASE_INSENSITIVE);
     private final double m_latitude;
     private final double m_longitude;

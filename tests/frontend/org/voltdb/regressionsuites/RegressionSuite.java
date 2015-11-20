@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -56,6 +54,8 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
+
+import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -780,6 +780,13 @@ public class RegressionSuite extends TestCase {
     }
 
     private static void assertContentOfRow(int row, Object[] expectedRow, VoltTable actualRow) {
+        assertApproximateContentOfRow(row, expectedRow, actualRow, 0.0d);
+    }
+
+    private static void assertApproximateContentOfRow(int row,
+                                                      Object[] expectedRow,
+                                                      VoltTable actualRow,
+                                                      double epsilon) {
         for (int i = 0; i < expectedRow.length; ++i) {
             String msg = "Row " + row + ", col " + i + ": ";
             Object expectedObj = expectedRow[i];
@@ -811,7 +818,11 @@ public class RegressionSuite extends TestCase {
                 if (actualRow.wasNull()) {
                     actualValue = Double.MIN_VALUE;
                 }
-                assertEquals(msg, expectedValue, actualValue);
+                if (epsilon <= 0) {
+                    assertEquals(msg, expectedValue, actualValue);
+                } else {
+                    assertTrue(msg, Math.abs(expectedValue - actualValue) < epsilon);
+                }
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
@@ -828,12 +839,28 @@ public class RegressionSuite extends TestCase {
      * Currently only handles some data types.  Feel free to add more as needed.
      */
     public static void assertContentOfTable(Object[][] expectedTable, VoltTable actualTable) {
+        assertApproximateContentOfTable(expectedTable, actualTable, 0.0d);
+    }
+
+    /**
+     * Assert that the expected and actual valus are approximately equal. By
+     * approximately equal we mean that non-floating point values are identical,
+     * and floating point values differ by at most epsilon. If epsilon is zero or negative,
+     * we require equality.
+     *
+     * @param expectedTable
+     * @param actualTable
+     * @param epsilon
+     */
+    public static void assertApproximateContentOfTable(Object[][] expectedTable,
+                                                       VoltTable actualTable,
+                                                       double epsilon) {
         for (int i = 0; i < expectedTable.length; ++i) {
             assertTrue("Fewer rows than expected: "
                     + "expected: " + expectedTable.length + ", "
                     + "actual: " + i,
                     actualTable.advanceRow());
-            assertContentOfRow(i, expectedTable[i], actualTable);
+            assertApproximateContentOfRow(i, expectedTable[i], actualTable, epsilon);
         }
         assertFalse("More rows than expected: "
                 + "expected " + expectedTable.length + ", "
