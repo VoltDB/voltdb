@@ -282,15 +282,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         VoltTable vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(vt1, vt);
 
-        // distance between point and point
-        /*
-        sql = "select A.name, B.name, distance(A.loc, B.loc) as Distance "
-                + "from places as A, places as B where Mod(A.pk, 2) = 1 and Mod(B.pk, 2) = 0 "
-                + "order by distance";
-        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        System.out.println(vt.toString());
-        */
-
         // get distance of points contained in a polygon to polygon's centroid
         sql = "select borders.name as State, places.name as Location, "
         		+ "distance(centroid(borders.region), places.loc) as distance "
@@ -323,10 +314,26 @@ public class TestGeospatialFunctions extends RegressionSuite {
         catch (ProcCallException excp) {
             exception = excp;
             assertTrue(exception.getMessage().contains("incompatible data type in operation"));
+            assertTrue(exception.getMessage().contains("Distance between two polygon not supported"));
         } finally {
             assertNotNull(exception);
         }
 
+        // distance between types others than point and poygon not supported
+        exception = null;
+        try {
+            sql = "select places.name, distance(borders.region, borders.pk) "
+                    + "from borders, places where borders.pk = places.pk "
+                    + "order by borders.pk";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        }
+        catch (ProcCallException excp) {
+            exception = excp;
+            assertTrue(exception.getMessage().contains("Error compiling query"));
+            assertTrue(exception.getMessage().contains("incompatible data type in operation"));
+        } finally {
+            assertNotNull(exception);
+        }
     }
 
     static public junit.framework.Test suite() {

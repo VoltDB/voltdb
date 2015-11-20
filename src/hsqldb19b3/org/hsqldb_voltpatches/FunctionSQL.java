@@ -2420,8 +2420,6 @@ public class FunctionSQL extends Expression {
             Type rightChildType = nodes[1].dataType;
             int distanceFunctionId = -1;
 
-            //todo: verify if error reporting is appropriate and if want to report
-            // which data type is incompatible would be good
             if (leftChildType.isGeographyType()) {
                 if (rightChildType.isGeographyType()) {
                     // distance between two polygons is not support, flag as an error
@@ -2452,6 +2450,8 @@ public class FunctionSQL extends Expression {
                 }
             }
             else {
+                //we should not come this far with incompatible data types
+                assert(false);
                 //right child is neither polygon nor point
                 throw Error.error(ErrorCode.X_42565);
             }
