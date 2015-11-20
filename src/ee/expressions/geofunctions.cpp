@@ -33,6 +33,9 @@ namespace voltdb {
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;
 static const int POLY = FUNC_VOLT_POLYGONFROMTEXT;
 
+static const int EARTH_AREA_SQ_KM = 510072000;
+static const int EARTH_RADIUS_METERS = 6371000;
+
 typedef boost::tokenizer<boost::char_separator<char> > Tokenizer;
 
 static void throwInvalidWktPoint(const std::string& input)
@@ -286,6 +289,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
     retVal.getDouble() = point.getLatitude();
     return retVal;
 }
+
 template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
@@ -293,6 +297,88 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
     const Point point = getPoint();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLongitude();
+    return retVal;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const {
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_POINT);
+    }
+
+    Polygon polygon;
+    polygon.initFromGeography(getGeography());
+    const Point point(polygon.GetCentroid());
+    NValue retVal(VALUE_TYPE_POINT);
+    retVal.getPoint() = point;
+    return retVal;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
+    }
+
+    Polygon polygon;
+    polygon.initFromGeography(getGeography());
+
+    NValue retVal(VALUE_TYPE_DOUBLE);
+    // S2 returns area in steradians. Convert this area to square meters
+    // convert steradians into square meter
+    retVal.getDouble() = polygon.GetArea() * EARTH_AREA_SQ_KM * 1000000 / (4 * M_PI);
+    return retVal;
+}
+
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POLYGON>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
+    assert(arguments[1].getValueType() == VALUE_TYPE_GEOGRAPHY);
+
+    if (arguments[0].isNull() || arguments[1].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
+    }
+
+    Polygon polygon;
+    polygon.initFromGeography(arguments[1].getGeography());
+    Point point = arguments[0].getPoint();
+    NValue retVal(VALUE_TYPE_DOUBLE);
+    retVal.getDouble() = polygon.getDistance(point) * EARTH_RADIUS_METERS;
+    return retVal;
+}
+
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_GEOGRAPHY);
+    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+
+    if (arguments[0].isNull() || arguments[1].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
+    }
+
+    Polygon polygon;
+    polygon.initFromGeography(arguments[0].getGeography());
+    Point point = arguments[1].getPoint();
+    NValue retVal(VALUE_TYPE_DOUBLE);
+    retVal.getDouble() = polygon.getDistance(point) * EARTH_RADIUS_METERS;
+    return retVal;
+}
+
+template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector<NValue>& arguments) {
+    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
+    assert(arguments[1].getValueType() == VALUE_TYPE_POINT);
+
+    if (arguments[0].isNull() || arguments[1].isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
+    }
+
+    // great circle using Haversine formula which.
+    // alternate to this is just get obtain 2 s2points and get S1Angle between them
+    // and use that as distance but the be different on meters 10E-3. Using one below
+    // assuming this is yields better answer using it though it requires more computation
+    // S2 test uses S2LatLng for computing distances
+    const S2LatLng latLng1 = S2LatLng(arguments[0].getPoint().toS2Point()).Normalized();
+    const S2LatLng latLng2 = S2LatLng(arguments[1].getPoint().toS2Point()).Normalized();
+    S1Angle distance = latLng1.GetDistance(latLng2);
+
+    NValue retVal(VALUE_TYPE_DOUBLE);
+    retVal.getDouble() = distance.radians() * EARTH_RADIUS_METERS;
     return retVal;
 }
 

@@ -251,6 +251,12 @@ static const int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS  = 20034;
 static const int FUNC_VOLT_POLYGON_NUM_POINTS          = 20035;
 static const int FUNC_VOLT_POINT_LATITUDE              = 20036;
 static const int FUNC_VOLT_POINT_LONGITUDE             = 20037;
+static const int FUNC_VOLT_POLYGON_CENTROID            = 20038;
+static const int FUNC_VOLT_POLYGON_AREA                = 20039;
+static const int FUNC_VOLT_DISTANCE                    = 20040;     // wrapper id for distance between all geo types
+static const int FUNC_VOLT_DISTANCE_POINT_POLYGON      = 20041;     // distance between point and polygon
+static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 20042;     // distance between point and point
+static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 20043;     // distance between polygon and point
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

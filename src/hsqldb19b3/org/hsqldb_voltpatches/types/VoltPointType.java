@@ -51,6 +51,11 @@ public class VoltPointType extends Type {
     }
 
     @Override
+    public boolean isPointType() {
+        return true;
+    }
+
+    @Override
     public int compare(Object a, Object b) {
         // Incompatible type in operation
         throw Error.error(ErrorCode.X_42565);

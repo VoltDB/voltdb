@@ -52,6 +52,18 @@ public:
         assert (m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
+    Point(const S2Point &s2Point)
+        : m_latitude(nullCoord())
+        , m_longitude(nullCoord())
+    {
+        assert(!s2Point.IsNaN());
+        S2LatLng latLong(s2Point);
+        m_latitude = latLong.lat().degrees();
+        m_longitude = latLong.lng().degrees();
+        assert (m_latitude >= -90.0 && m_latitude <= 90.0);
+        assert (m_longitude >= -180.0 && m_longitude <= 180.0);
+    }
+
     // Use the number 360.0 for the null coordinate.
     static Coord nullCoord() {
         // A static const member could be used for this, but clang

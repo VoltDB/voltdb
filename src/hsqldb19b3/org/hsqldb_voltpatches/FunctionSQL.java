@@ -2415,6 +2415,48 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE :
+            Type leftChildType = nodes[0].dataType;
+            Type rightChildType = nodes[1].dataType;
+            int distanceFunctionId = -1;
+
+            //todo: verify if error reporting is appropriate and if want to report
+            // which data type is incompatible would be good
+            if (leftChildType.isGeographyType()) {
+                if (rightChildType.isGeographyType()) {
+                    // distance between two polygons is not support, flag as an error
+                    throw Error.error(ErrorCode.X_42565, "Distance between two polygon not supported");
+                }
+                else if (rightChildType.isPointType()) {
+                    distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;
+                }
+                else {
+                    // we should not come this far with incompatible data types
+                    assert(false);
+                    // right child is neither polygon nor point
+                    throw Error.error(ErrorCode.X_42565, "2nd argument to distance() of invalid type");
+                }
+            }
+            else if (leftChildType.isPointType()) {
+                if (rightChildType.isGeographyType()) {
+                    distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POLYGON;
+                }
+                else if (rightChildType.isPointType()) {
+                    distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT;
+                }
+                else {
+                    //we should not come this far with incompatible data types
+                    assert(false);
+                    //right child is neither polygon nor point
+                    throw Error.error(ErrorCode.X_42565, "2nd argument to distance() of invalid type");
+                }
+            }
+            else {
+                //right child is neither polygon nor point
+                throw Error.error(ErrorCode.X_42565);
+            }
+            exp.attributes.put("function_id", String.valueOf(distanceFunctionId));
+            return exp;
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
