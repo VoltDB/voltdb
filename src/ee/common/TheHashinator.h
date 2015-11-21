@@ -63,8 +63,9 @@ class TheHashinator {
         case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_VARCHAR:
         {
-            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(value)),
-                    ValuePeeker::peekObjectLength_withoutNull(value));
+            int32_t length;
+            const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);
+            return hashinate(buf, length);
         }
         default:
             throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",

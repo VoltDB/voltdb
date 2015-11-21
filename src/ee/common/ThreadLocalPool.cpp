@@ -106,104 +106,39 @@ ThreadLocalPool::~ThreadLocalPool() {
 
 static int32_t getAllocationSizeForObject(int length)
 {
-    // This is an unfortunate abstraction leak.
-    // This allocator helper function happens to know not only the max length
-    // of a persistent string value but also the max number of prefix length
-    // bytes that NValue tacks on to that allocation.
-    // Not even the intervening StringRef class has that level of detail.
-    // The allocator uses this knowledge so it can back-stop NValue's
-    // guards against over-large allocations.
-    // The back-stop strategy for when NValue is unexpectedly not doing
-    // its job is to throw a fatal exception.
-    // An alternative to this arcane knowledge would be for the allocator
-    // to simply define its own reasonable limits -- greater than or equal to
-    // NValue's limits -- rather than exactly matching the NValue logic.
-    // The actual allocation sizes are slightly larger than the lengths
-    // being validated and rounded up here because two levels of allocator
-    // logic add their overhead to the length values returned here.
-    // That currently adds 12 bytes of overhead, so actual allocations range
-    // from 14 bytes up to (1 MB + 16 bytes).
     static const int32_t NVALUE_LONG_OBJECT_LENGTHLENGTH = 4;
-    if (length <= 2) {
-        return 2;
-    } else if (length <= 4) {
-        return 4;
-    } else if (length <= 4 + 2) {
-        return 4 + 2;
-    } else if (length <= 8) {
-        return 8;
-    } else if (length <= 8 + 4) {
-        return 8 + 4;
-    } else if (length <= 16) {
-        return 16;
-    } else if (length <= 16 + 8) {
-        return 16 + 8;
-    } else if (length <= 32) {
-        return 32;
-    } else if (length <= 32 + 16) {
-        return 32 + 16;
-    } else if (length <= 64) {
-        return 64;
-    } else if (length <= 64 + 32) {
-        return 64 + 32;
-    } else if (length <= 128) {
-        return 128;
-    } else if (length < 128 + 64) {
-        return 128 + 64;
-    } else if (length <= 256) {
-        return 256;
-    } else if (length <= 256 + 128) {
-        return 256 + 128;
-    } else if (length <= 512) {
-        return 512;
-    } else if (length <= 512 + 256) {
-        return 512 + 256;
-    } else if (length <= 1024) {
-        return 1024;
-    } else if (length <= 1024 + 512) {
-        return 1024 + 512;
-    } else if (length <= 2048) {
-        return 2048;
-    } else if (length <= 2048 + 1024) {
-        return 2048 + 1024;
-    } else if (length <= 4096) {
-        return 4096;
-    } else if (length <= 4096 + 2048) {
-        return 4096 + 2048;
-    } else if (length <= 8192) {
-        return 8192;
-    } else if (length <= 8192 + 4096) {
-        return 8192 + 4096;
-    } else if (length <= 16384) {
-        return 16384;
-    } else if (length <= 16384 + 8192) {
-        return 16384 + 8192;
-    } else if (length <= 32768) {
-        return 32768;
-    } else if (length <= 32768 + 16384) {
-        return 32768 + 16384;
-    } else if (length <= 65536) {
-        return 65536;
-    } else if (length <= 65536 + 32768) {
-        return 65536 + 32768;
-    } else if (length <= 131072) {
-        return 131072;
-    } else if (length <= 131072 + 65536) {
-        return 131072 + 65536;
-    } else if (length <= 262144) {
-        return 262144;
-    } else if (length <= 262144 + 131072) {
-        return 262144 + 131072;
-    } else if (length <= 524288) {
-        return 524288;
-    } else if (length <= 524288 + 262144) {
-        return 524288 + 262144;
-        // Need to allow space for a maximum-length string
-        // WITH its 4-byte length prefix provided by NValue.
-    } else if (length <= ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
-               NVALUE_LONG_OBJECT_LENGTHLENGTH) {
-        return ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
-                NVALUE_LONG_OBJECT_LENGTHLENGTH;
+    static const int32_t MAX_ALLOCATION = ThreadLocalPool::POOLED_MAX_VALUE_LENGTH +
+        NVALUE_LONG_OBJECT_LENGTHLENGTH +
+        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+
+    int length_to_fit = length +
+        NVALUE_LONG_OBJECT_LENGTHLENGTH +
+        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+
+    // The -1 and repeated shifting and + 1 are part of the rounding algorithm
+    // that produces the nearest power of 2 greater than or equal to the value.
+    int target = length_to_fit - 1;
+    target |= target >> 1;
+    target |= target >> 2;
+    target |= target >> 4;
+    target |= target >> 8;
+    target |= target >> 16;
+    target++;
+    // Try to shrink the target to "midway" down to the previous power of 2,
+    // if the length fits.
+    // Strictly speaking, a geometric mean (dividing the even power by sqrt(2))
+    // would give a more consistently proportional over-allocation for values
+    // at slightly different scales, but the arithmetic mean (3/4 of the power)
+    // is fast to calculate and close enough for our purposes.
+    int threeQuartersTarget = target - (target>>2);
+    if (length_to_fit < threeQuartersTarget) {
+        target = threeQuartersTarget;
+    }
+    if (target <= MAX_ALLOCATION) {
+        return target;
+    }
+    if (length_to_fit <= MAX_ALLOCATION) {
+        return MAX_ALLOCATION;
     }
     throwFatalException("Attempted to allocate an object larger than the 1 MB limit. Requested size was %d",
                         length);
@@ -219,33 +154,18 @@ int TestOnlyAllocationSizeForObject(int length)
 /// Persistent string pools with their compaction are completely bypassed for
 /// the memcheck build. It just does standard C++ heap allocations and
 /// deallocations.
-char* ThreadLocalPool::allocateRelocatable(char** referrer_ignored, int32_t sz)
+ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer_ignored, int32_t sz)
 {
-    char* data = new char[sz];
-    return data;
+    return new (new char[sizeof(Sized) + sz]) Sized(sz);
 }
 
-// We COULD go through the trouble of allocating a Sized block and returning
-// its "data" part in the MEMCHECK version of allocateRelocatable, just like
-// in non-MEMCHECK mode. Then we could use its m_size here to give the exact
-// same value as non-MEMCHECK mode, but for now, we are just letting the C++
-// heap track the allocation size internally. That means we can only return
-// an arbitrary guess here, hopefully good enough for MEMCHECK mode?
-// Another alternative would be to rely on the "object length" that NValue
-// encodes into the first 1-3 bytes of the data, but that breaks all kinds
-// of abstraction and pollutes this code with higher-level NValue details.
-// So, for now, use an arbitrary size that corresponds roughly for no really
-// good reason to the minimum possible non-MEMCHECK string allocation.
-int32_t ThreadLocalPool::getAllocationSizeForRelocatable(char* data_ignored)
+int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* data)
 {
-    static const int32_t MEMCHECK_NOMINAL_ALLOCATION_SIZE =
-        getAllocationSizeForObject(1) + static_cast<int32_t>(sizeof(int32_t)) +
-        CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
-    return MEMCHECK_NOMINAL_ALLOCATION_SIZE;
+    return data->m_size + sizeof(Sized);
 }
 
-void ThreadLocalPool::freeRelocatable(char* data)
-{ delete [] data; }
+void ThreadLocalPool::freeRelocatable(Sized* data)
+{ delete [] reinterpret_cast<char*>(data); }
 
 #else // not MEMCHECK
 
@@ -254,43 +174,7 @@ static CompactingStringStorage& getStringPoolMap()
     return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
 }
 
-/// The layout of an allocation segregated by size,
-/// including overhead to help identify the size-specific
-/// pool from which the allocation must be freed.
-/// The layout contains the size associated with its specific pool.
-/// This size is stored in a header that is completely invisible
-/// to the caller.
-/// The caller is exposed only to the remaining "data" part of the
-/// allocation, of at least their requested size.
-/// So, the address of this data part is the proper return value for
-/// allocate... and the proper argument to free....
-/// Methods are provided to "convert" back and forth between the
-/// pointer to the raw internal allocation and the data pointer
-/// exposed to the caller.
-struct Sized {
-    int32_t m_size;
-    char m_data[0];
-
-    static Sized* fromAllocation(void* allocation, int32_t alloc_size)
-    {
-        Sized* result = reinterpret_cast<Sized*>(allocation);
-        // Store the size so that it can be used
-        // to find the right pool for deallocation.
-        result->m_size = alloc_size;
-        return result;
-    }
-
-    static Sized* backtrackFromCallerData(char* data)
-    {
-        Sized* result = reinterpret_cast<Sized*>(data - sizeof(Sized));
-        // The data addresses should line up perfectly.
-        assert(data == result->m_data);
-        return result;
-    }
-
-};
-
-char* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
+ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
 {
     // The size provided to this function determines the
     // approximate-size-specific pool selection. It gets
@@ -305,8 +189,7 @@ char* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
     // getAllocationSizeForRelocatable and freeRelocatable.
     // For now, to keep the allocator simple and abstract,
     // NValue and the allocator each keep their own accounting.
-    int32_t alloc_size = getAllocationSizeForObject(sz) +
-            static_cast<int32_t>(sizeof(Sized));
+    int32_t alloc_size = getAllocationSizeForObject(sz);
     CompactingStringStorage& poolMap = getStringPoolMap();
     CompactingStringStorage::iterator iter = poolMap.find(alloc_size);
     void* allocation;
@@ -314,8 +197,7 @@ char* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
         // There is no pool yet for objects of this size, so create one.
         // Compute num_elements to be the largest multiple of alloc_size
         // to fit in a 2MB buffer.
-        int32_t num_elements = ((2 * 1024 * 1024 - 1) /
-                (alloc_size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY())) + 1;
+        int32_t num_elements = ((2 * 1024 * 1024 - 1) / alloc_size) + 1;
         boost::shared_ptr<CompactingPool> pool(new CompactingPool(alloc_size, num_elements));
         poolMap.insert(std::pair<int32_t, boost::shared_ptr<CompactingPool> >(alloc_size, pool));
         allocation = pool->malloc(referrer);
@@ -324,27 +206,22 @@ char* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
         allocation = iter->second->malloc(referrer);
     }
 
-    // Convert from the raw allocation to the initialized size header and the
-    // exposed caller data area.
-    Sized* sized = Sized::fromAllocation(allocation, alloc_size);
-    return sized->m_data;
+    // Convert from the raw allocation to the initialized size header.
+    Sized* sized = new (allocation) Sized(sz);
+    return sized;
 }
 
-int32_t ThreadLocalPool::getAllocationSizeForRelocatable(char* data)
+int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* sized)
 {
     // Convert from the caller data to the size-prefixed allocation to
     // extract its size field.
-    Sized* sized = Sized::backtrackFromCallerData(data);
-    return sized->m_size + CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
+    return getAllocationSizeForObject(sized->m_size);
 }
 
-void ThreadLocalPool::freeRelocatable(char* data)
+void ThreadLocalPool::freeRelocatable(Sized* sized)
 {
-    // Convert from the caller data to the size-prefixed allocation
-    // to return the correct raw allocation address to the correct pool.
-    Sized* sized = Sized::backtrackFromCallerData(data);
     // use the cached size to find the right pool.
-    int32_t alloc_size = sized->m_size;
+    int32_t alloc_size = getAllocationSizeForObject(sized->m_size);
     CompactingStringStorage& poolMap = getStringPoolMap();
     CompactingStringStorage::iterator iter = poolMap.find(alloc_size);
     if (iter == poolMap.end()) {

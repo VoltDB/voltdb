@@ -34,27 +34,27 @@ namespace voltdb {
  */
 class ValuePeeker {
 public:
-    static inline double peekDouble(const NValue value) {
+    static double peekDouble(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_DOUBLE);
         return value.getDouble();
     }
 
-    static inline int8_t peekTinyInt(const NValue value) {
+    static int8_t peekTinyInt(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_TINYINT);
         return value.getTinyInt();
     }
 
-    static inline int16_t peekSmallInt(const NValue value) {
+    static int16_t peekSmallInt(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_SMALLINT);
         return value.getSmallInt();
     }
 
-    static inline int32_t peekInteger(const NValue value) {
+    static int32_t peekInteger(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_INTEGER);
         return value.getInteger();
     }
 
-    static inline bool peekBoolean(const NValue value) {
+    static bool peekBoolean(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_BOOLEAN);
         return value.getBoolean();
     }
@@ -62,73 +62,59 @@ public:
     // cast as int and peek at value. this is used by index code that need a
     // real number from a tuple and the limit node code used to get the limit
     // from an expression.
-    static inline int32_t peekAsInteger(const NValue value) {
+    static int32_t peekAsInteger(const NValue& value) {
         return value.castAsInteger().getInteger();
     }
 
-    static inline int64_t peekBigInt(const NValue value) {
+    static int64_t peekBigInt(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_BIGINT);
         return value.getBigInt();
     }
 
-    static inline int64_t peekTimestamp(const NValue value) {
+    static int64_t peekTimestamp(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_TIMESTAMP);
         return value.getTimestamp();
     }
 
-    static inline void* peekObjectValue(const NValue value) {
+    static const char* peekObjectValue(const NValue& value) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
                (value.getValueType() == VALUE_TYPE_VARBINARY));
-        return value.getObjectValue();
-    }
-
-    static inline void* peekObjectValue_withoutNull(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        if (value.isNull()) {
+            return NULL;
+        }
         return value.getObjectValue_withoutNull();
     }
 
-    static inline int32_t peekObjectLength_withoutNull(const NValue value) {
+    static const char* peekObject_withoutNull(const NValue& value, int32_t* lengthOut) {
         assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
                (value.getValueType() == VALUE_TYPE_VARBINARY));
-        return value.getObjectLength_withoutNull();
+        // NEEDS WORK
+        return value.getObject_withoutNull(lengthOut);
     }
 
-    /**
-     * This function is only used in 'nvalue_test.cpp', why test a function that
-     * is not used in source code? Get rid of it? -xin
-     */
-    static std::string peekStringCopy_withoutNull(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
-        std::string result(reinterpret_cast<const char*>(value.getObjectValue_withoutNull()),
-                                                         value.getObjectLength_withoutNull());
-        return result;
-    }
-
-    static inline ValueType peekValueType(const NValue value) {
+    static ValueType peekValueType(const NValue& value) {
         return value.getValueType();
     }
 
-    static inline TTInt peekDecimal(const NValue value) {
+    static TTInt peekDecimal(const NValue& value) {
         return value.getDecimal();
     }
 
     // exists for test.
-    static inline std::string peekDecimalString(const NValue value) {
+    static std::string peekDecimalString(const NValue& value) {
         return value.createStringFromDecimal();
     }
 
     // cast as big int and peek at value. this is used by
     // index code that need a real number from a tuple.
-    static inline int64_t peekAsBigInt(const NValue value) {
+    static int64_t peekAsBigInt(const NValue& value) {
         if (value.isNull()) {
             return INT64_NULL;
         }
         return value.castAsBigIntAndGetValue();
     }
 
-    static inline int64_t peekAsRawInt64(const NValue value) {
+    static int64_t peekAsRawInt64(const NValue& value) {
         return value.castAsBigIntAndGetValue();
     }
 
@@ -136,7 +122,7 @@ public:
     /// The length of the data bytes via output parameter.
     ///
     /// Assumes that value is not null!!
-    static inline const char* peekPointerToDataBytes(const NValue &value, int32_t *length) {
+    static const char* peekPointerToDataBytes(const NValue &value, int32_t *length) {
         ValueType vt = value.getValueType();
         switch (vt) {
         case VALUE_TYPE_TINYINT:

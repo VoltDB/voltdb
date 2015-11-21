@@ -154,19 +154,25 @@ std::string NValue::debug() const {
         buffer << getDouble();
         break;
     case VALUE_TYPE_VARCHAR:
-        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    {
+        int32_t length;
+        ptr = getObject_withoutNull(&length);
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength_withoutNull());
-        buffer << "[" << getObjectLength_withoutNull() << "]";
+        out_val = std::string(ptr, length);
+        buffer << "[" << length << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
+    }
     case VALUE_TYPE_VARBINARY:
-        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+    {
+        int32_t length;
+        ptr = getObject_withoutNull(&length);
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength_withoutNull());
-        buffer << "[" << getObjectLength_withoutNull() << "]";
+        out_val = std::string(ptr, length);
+        buffer << "[" << length << "]";
         buffer << "-bin[@" << addr << "]";
         break;
+    }
     case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
@@ -416,7 +422,7 @@ void NValue::allocateANewNValueList(size_t length, ValueType elementType)
 void NValue::setArrayElements(std::vector<NValue> &args) const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
-    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    NValueList* listOfNValues = (NValueList*)getObjectValue_withoutNull();
     // Assign each of the elements.
     int ii = (int)args.size();
     assert(ii == listOfNValues->m_length);
@@ -430,14 +436,14 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
 int NValue::arrayLength() const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
-    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    NValueList* listOfNValues = (NValueList*)getObjectValue_withoutNull();
     return static_cast<int>(listOfNValues->m_length);
 }
 
 NValue NValue::itemAtIndex(int index) const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
-    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    NValueList* listOfNValues = (NValueList*)getObjectValue_withoutNull();
     assert(index >= 0);
     assert(index < listOfNValues->m_length);
     return listOfNValues->m_values[index];

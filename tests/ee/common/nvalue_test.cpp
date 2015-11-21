@@ -93,6 +93,13 @@ public:
         return m_executorContext.get();
     }
 
+    static std::string peekStringCopy_withoutNull(const NValue& value) {
+        int32_t length;
+        const char* buf = ValuePeeker::peekObject_withoutNull(value, &length);
+        std::string result(buf, length);
+        return result;
+    }
+
 };
 // An empty JSON object to get simple (non-quantified) behavior from comparators
 PlannerDomRoot NValueTest::m_emptyRoot("{}");
@@ -888,31 +895,31 @@ TEST_F(NValueTest, TestCastToString) {
 
 
     NValue bigIntCastToString = ValueFactory::castAsString(bigInt);
-    std::string bigIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(bigIntCastToString);
+    std::string bigIntPeekedString = peekStringCopy_withoutNull(bigIntCastToString);
     EXPECT_EQ(strcmp(bigIntPeekedString.c_str(), "-64"), 0);
 
     NValue integerCastToString = ValueFactory::castAsString(integer);
-    std::string integerPeekedString = ValuePeeker::peekStringCopy_withoutNull(integerCastToString);
+    std::string integerPeekedString = peekStringCopy_withoutNull(integerCastToString);
     EXPECT_EQ(strcmp(integerPeekedString.c_str(), "120"), 0);
 
     NValue smallIntCastToString = ValueFactory::castAsString(smallInt);
-    std::string smallIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(smallIntCastToString);
+    std::string smallIntPeekedString = peekStringCopy_withoutNull(smallIntCastToString);
     EXPECT_EQ(strcmp(smallIntPeekedString.c_str(), "120"), 0);
 
     NValue tinyIntCastToString = ValueFactory::castAsString(tinyInt);
-    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(tinyIntCastToString);
+    std::string tinyIntPeekedString = peekStringCopy_withoutNull(tinyIntCastToString);
     EXPECT_EQ(strcmp(tinyIntPeekedString.c_str(), "120"), 0);
 
     NValue doubleCastToString = ValueFactory::castAsString(doubleValue);
-    std::string doublePeekedString = ValuePeeker::peekStringCopy_withoutNull(doubleCastToString);
+    std::string doublePeekedString = peekStringCopy_withoutNull(doubleCastToString);
     EXPECT_EQ(strcmp(doublePeekedString.c_str(), "-3.2E1"), 0);
 
     NValue decimalCastToString = ValueFactory::castAsString(decimalValue);
-    std::string decimalPeekedString = ValuePeeker::peekStringCopy_withoutNull(decimalCastToString);
+    std::string decimalPeekedString = peekStringCopy_withoutNull(decimalCastToString);
     EXPECT_EQ(strcmp(decimalPeekedString.c_str(), "10.220000000000"), 0);
 
     NValue stringCastToString = ValueFactory::castAsString(stringValue);
-    std::string stringPeekedString = ValuePeeker::peekStringCopy_withoutNull(stringCastToString);
+    std::string stringPeekedString = peekStringCopy_withoutNull(stringCastToString);
     EXPECT_EQ(strcmp(stringPeekedString.c_str(), "dude"), 0);
 
     // Make valgrind happy
@@ -2245,10 +2252,18 @@ TEST_F(NValueTest, TestSubstring)
                 EXPECT_TRUE(rightExactStringValue.compare(rightDefaultStringValue) == 0);
                 EXPECT_TRUE(rightSureStringValue.compare(rightDefaultStringValue) == 0);
 
-                std::string leftString = ValuePeeker::peekStringCopy_withoutNull(leftStringValue);
-                std::string midString = ValuePeeker::peekStringCopy_withoutNull(midStringValue);
-                std::string rightString = ValuePeeker::peekStringCopy_withoutNull(rightExactStringValue);
+                std::string leftString = peekStringCopy_withoutNull(leftStringValue);
+                std::string midString = peekStringCopy_withoutNull(midStringValue);
+                std::string rightString = peekStringCopy_withoutNull(rightExactStringValue);
                 std::string recombined = leftString + midString + rightString;
+                if ( ! (testDatum.compare(recombined) == 0)) {
+                    std::cout << "DEBUG: mismatched recombine: "
+                              << "[(" << leftString.size() << ")" << leftString << "]"
+                              << " + [(" << midString.size() << ")" << midString << "]"
+                              << " + [(" << rightString.size() << ")" << rightString << "]"
+                              << " == [(" << recombined.size() << ")" << recombined << "]"
+                              << " != [(" << testDatum.size() << ")" << testDatum << "]" << std::endl;
+                }
                 EXPECT_TRUE(testDatum.compare(recombined) == 0);
 
                 if (midString.length() > 0) {
@@ -2984,7 +2999,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     try {
         NValue ts = ValueFactory::getTimestampValue(base);
         NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-        peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+        peekString = peekStringCopy_withoutNull(str);
         long roundtrip = NValue::parseTimestampString(peekString.c_str());
         EXPECT_EQ(base, roundtrip);
         if (base != roundtrip) {
@@ -3115,7 +3130,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
         try {
             NValue ts = ValueFactory::getTimestampValue(jj);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             long roundtrip = NValue::parseTimestampString(peekString.c_str());
             EXPECT_EQ(jj, roundtrip);
             if (jj != roundtrip) {
@@ -3151,7 +3166,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3207,7 +3222,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3228,7 +3243,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3250,7 +3265,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3271,7 +3286,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3293,7 +3308,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
@@ -3314,7 +3329,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
             int64_t value = NValue::parseTimestampString(dateStr);
             NValue ts = ValueFactory::getTimestampValue(value);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            peekString = peekStringCopy_withoutNull(str);
             EXPECT_EQ(peekString, dateStr2);
             if (peekString.compare(dateStr2) != 0) {
                 cout << "Failing for compare ts string " << peekString << " vs ts string " <<
