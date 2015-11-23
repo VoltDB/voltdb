@@ -71,6 +71,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.CSVInvocation;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.importer.ImporterChannelAssignment;
 import org.voltdb.importer.Invocation;
@@ -86,8 +87,8 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
 
-    private static final String CSV_TRANSFORMER_NAME = "csv";
-    private static final String TSV_TRANSFORMER_NAME = "tsv";
+    private static final String CSV_FORMATTER_NAME = "csv";
+    private static final String TSV_FORMATTER_NAME = "tsv";
 
     private final static PartitionOffsetRequestInfo LATEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
@@ -105,7 +106,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private final Map<String, Integer> m_brokerFetchSize = new HashMap<String, Integer>();
     private final Map<String, Integer> m_brokerSOTimeout = new HashMap<String, Integer>();
     private final Map<String, Map<String, String>> m_brokerProcedure = new HashMap<String, Map<String, String>>();
-    private final Map<String, String> m_brokerTransformer = new HashMap<String, String>();
+    private final Map<String, String> m_brokerFormatter = new HashMap<String, String>();
 
     private static final String GROUP_ID = "voltdb";
     private static final String CLIENT_ID = "voltdb-importer";
@@ -182,11 +183,11 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_brokerProcedure.put(key, topicProc);
         }
 
-        String transformer = p.getProperty("transformer", CSV_TRANSFORMER_NAME).trim().toLowerCase();
-        if (!CSV_TRANSFORMER_NAME.equals(transformer) && !TSV_TRANSFORMER_NAME.equals(transformer)) {
-            throw new RuntimeException("Invalid transformer: " + transformer);
+        String formatter = p.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
+        if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
+            throw new RuntimeException("Invalid formatter: " + formatter);
         }
-        m_brokerTransformer.put(key, transformer);
+        m_brokerFormatter.put(key, formatter);
 
         //comma separated list of topics.
         String topics = p.getProperty("topics", "").trim();
@@ -464,7 +465,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final char m_separator;
 
         public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String groupid, String topic, int partition,
-                String procedure, HostAndPort leader, int fetchSize, int consumerSocketTimeout, String transformer) {
+                String procedure, HostAndPort leader, int fetchSize, int consumerSocketTimeout, String formatter) {
             m_url = uri;
             m_groupId = groupid;
             m_brokers = brokers;
@@ -474,7 +475,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_fetchSize = fetchSize;
             m_consumerSocketTimeout = consumerSocketTimeout;
             m_topicAndPartition = new TopicAndPartition(topic, partition);
-            m_separator = CSV_TRANSFORMER_NAME.equals(transformer) ? CSVParser.DEFAULT_SEPARATOR : '\t';
+            m_separator = CSV_FORMATTER_NAME.equals(formatter) ? CSVParser.DEFAULT_SEPARATOR : '\t';
         }
 
         @SuppressWarnings("unused")
@@ -1037,7 +1038,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                             TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList.get(key), assignedKey, groupid,
                                     topic, partition, proc,
-                                    hap, fetchsize, consumerSocketTimeout, m_brokerTransformer.get(key));
+                                    hap, fetchsize, consumerSocketTimeout, m_brokerFormatter.get(key));
                             try {
                                 m_es.submit(fetcher);
                                 m_fetchers.put(assignedKey.toString(), fetcher);

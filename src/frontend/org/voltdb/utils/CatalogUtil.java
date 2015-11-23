@@ -1396,9 +1396,9 @@ public abstract class CatalogUtil {
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
-            String transformer = importConfiguration.getFormat();
-            if (transformer != null && !transformer.isEmpty()) {
-                processorProperties.put(ImportDataProcessor.IMPORT_TRANSFORMER, transformer);
+            String formatter = importConfiguration.getFormat();
+            if (formatter != null && !formatter.isEmpty()) {
+                processorProperties.put(ImportDataProcessor.IMPORT_FORMATTER, formatter);
             }
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
