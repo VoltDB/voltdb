@@ -57,6 +57,7 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ImportTransformerType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
@@ -600,6 +601,9 @@ public class VoltProjectBuilder {
         importConnector.put("ilModule", importBundle);
 
         importConnector.put("ilConfig", config);
+        if (importFormat != null) {
+            importConnector.put("ilTransformer", importFormat);
+        }
 
         if ((importType != null) && !importType.trim().isEmpty()) {
             importConnector.put("ilImportType", importType);
@@ -907,7 +911,7 @@ public class VoltProjectBuilder {
      */
     private String writeDeploymentFile(
             String voltRoot, DeploymentInfo dinfo) throws IOException, JAXBException
-            {
+    {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
 
@@ -1094,6 +1098,12 @@ public class VoltProjectBuilder {
             ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
             importConfig.setType(importType);
             importConfig.setModule((String )importConnector.get("ilModule"));
+            String transformer = (String) importConnector.get("ilTransformer");
+            if (transformer != null) {
+                ImportTransformerType transformerType = factory.createImportTransformerType();
+                transformerType.setName(transformer);
+                importConfig.setTransformer(transformerType);
+            }
 
             Properties config = (Properties)importConnector.get("ilConfig");
             if((config != null) && (config.size() > 0)) {
@@ -1135,7 +1145,7 @@ public class VoltProjectBuilder {
         marshaller.marshal(doc, file);
         final String deploymentPath = file.getPath();
         return deploymentPath;
-            }
+    }
 
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)
