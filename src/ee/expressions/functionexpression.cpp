@@ -452,9 +452,6 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_CONTAINS:
             ret = new GeneralFunctionExpression<FUNC_VOLT_CONTAINS>(*arguments);
             break;
-        case FUNC_VOLT_DISTANCE_POINT_POLYGON:
-            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POINT_POLYGON>(*arguments);
-            break;
         case FUNC_VOLT_DISTANCE_POINT_POINT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POINT_POINT>(*arguments);
             break;

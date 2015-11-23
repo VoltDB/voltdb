@@ -2422,25 +2422,30 @@ public class FunctionSQL extends Expression {
 
             if (leftChildType.isGeographyType()) {
                 if (rightChildType.isGeographyType()) {
-                    // distance between two polygons is not support, flag as an error
-                    throw Error.error(ErrorCode.X_42565, "Distance between two polygon not supported");
+                    // we are bit far in processing - distance between polygon-to-polygon should
+                    // have generated error whle resolving types. Assert in debug environment
+                    assert(false);
+                    throw Error.error(ErrorCode.X_42565, "Distance between two polygons not supported");
                 }
                 else if (rightChildType.isPointType()) {
                     distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;
                 }
                 else {
-                    // we should not come this far with incompatible data types
+                    // same here, this should have been taken care while resolving types and flagged as
+                    // incompatible data types
                     assert(false);
                     // right child is neither polygon nor point
                     throw Error.error(ErrorCode.X_42565, "2nd argument to distance() of invalid type");
                 }
             }
             else if (leftChildType.isPointType()) {
-                if (rightChildType.isGeographyType()) {
-                    distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POLYGON;
-                }
-                else if (rightChildType.isPointType()) {
+                if (rightChildType.isPointType()) {
                     distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT;
+                }
+                else if (rightChildType.isGeographyType()) {
+                    //distance between point-to-polygon should have been converted to polygon-to-point by now
+                    assert(false);
+                    throw Error.runtimeError(ErrorCode.X_42565, "distance between point and polygon");
                 }
                 else {
                     //we should not come this far with incompatible data types

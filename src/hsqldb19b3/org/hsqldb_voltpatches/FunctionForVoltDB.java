@@ -139,9 +139,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_POLYGON_CENTROID             = 20038;
         static final int FUNC_VOLT_POLYGON_AREA                 = 20039;
         static final int FUNC_VOLT_DISTANCE                     = 20040;    // wrapper id for distance between all geo types
-        static final int FUNC_VOLT_DISTANCE_POINT_POLYGON       = 20041;    // distance between point and polygon
-        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20042;    // distance between point and point
-        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20043;    // distance between polygon and point
+        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20041;    // distance between point and point
+        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20042;    // distance between polygon and point
 
 
         private static final FunctionId[] instances = {
@@ -500,8 +499,20 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isPointType()) ||
                      (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isPointType())) {
-                // one of the child node is neither geography nor point type
-                throw Error.error(ErrorCode.X_42565); // incompatible data type
+                // either of the nodes is not a valid type
+                throw Error.error(ErrorCode.X_42565,
+                        "Distance supported between Point-to-Point, Polygon-to-Point or Point-to-Polygon");
+            } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
+                // distance between two polygons is not supported, flag as an error
+                throw Error.error(ErrorCode.X_42565, "Distance between two polygons not supported");
+            } else if (nodes[0].dataType.isPointType() && nodes[1].dataType.isGeographyType()) {
+                // distance between polygon-to-point and point-to-polygon is symmetric.
+                // So, update the the expression for distance between point and polygon to
+                // distance between polygon and point. This simplifies the logic and have to
+                // handle only one case: polygon-to-point instead of two
+                Expression tempNode = nodes[0];
+                nodes[0] = nodes[1];
+                nodes[1] = tempNode;
             }
             break;
 

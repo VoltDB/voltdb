@@ -33,8 +33,8 @@ namespace voltdb {
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;
 static const int POLY = FUNC_VOLT_POLYGONFROMTEXT;
 
-static const int EARTH_AREA_SQ_KM = 510072000;
-static const int EARTH_RADIUS_METERS = 6371000;
+static const double EARTH_AREA_SQ_M = 510.072E12;
+static const double EARTH_RADIUS_METERS = 6371000;
 
 typedef boost::tokenizer<boost::char_separator<char> > Tokenizer;
 
@@ -322,25 +322,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
     polygon.initFromGeography(getGeography());
 
     NValue retVal(VALUE_TYPE_DOUBLE);
-    // area is in steradians. Convert this area to square meters
-    retVal.getDouble() = polygon.GetArea() * EARTH_AREA_SQ_KM * 1000000 / (4 * M_PI);
-    return retVal;
-}
-
-template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POLYGON>(const std::vector<NValue>& arguments) {
-    assert(arguments[0].getValueType() == VALUE_TYPE_POINT);
-    assert(arguments[1].getValueType() == VALUE_TYPE_GEOGRAPHY);
-
-    if (arguments[0].isNull() || arguments[1].isNull()) {
-        return NValue::getNullValue(VALUE_TYPE_DOUBLE);
-    }
-
-    Polygon polygon;
-    polygon.initFromGeography(arguments[1].getGeography());
-    Point point = arguments[0].getPoint();
-    NValue retVal(VALUE_TYPE_DOUBLE);
-    // distance is in radians, so convert it to meters
-    retVal.getDouble() = polygon.getDistance(point) * EARTH_RADIUS_METERS;
+    // area is in steradians which is a solid angle. Earth in the calculation is treated as sphere
+    // and a complete sphere subtends 4π steradians (https://en.wikipedia.org/wiki/Steradian).
+    // Taking area of earth as 510.072*10^12 sq meters,area for the given steradians can be calculated as:
+    retVal.getDouble() = polygon.GetArea() * EARTH_AREA_SQ_M / (4 * M_PI);
     return retVal;
 }
 

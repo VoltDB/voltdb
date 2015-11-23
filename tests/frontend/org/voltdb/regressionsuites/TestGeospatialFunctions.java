@@ -231,16 +231,20 @@ public class TestGeospatialFunctions extends RegressionSuite {
         String sql = "select borders.name, Area(borders.region), LATITUDE(centroid(borders.region)), LONGITUDE(centroid(borders.region)) "
                         + "from borders order by borders.pk";
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        // in the calculation below, areas of states are close to actual area of the state (vertices
+        // used for polygon are close approximations, not exact, values of the state vertices).
+        // Area for Colorado - 269601 sq km and Wyoming 253350 sq km
+        // For centroid, the value in table is based on the answer provide by S2 for the given polygons
         assertContentOfTable(new Object[][]
                 {{ "Colorado",      2.6886542912139893E11,  39.03372408765194,      -105.5485 },
-                 { "Wyoming",       2.5126863189309897E11,  43.01953179182205,      -107.55349999999999 },
+                 { "Wyoming",       2.5126863189309894E11,  43.01953179182205,      -107.55349999999999 },
                  { "Colorado with a hole around Denver",
                                     2.5206603914764166E11,  38.98811213712535,      -105.5929789796371 },
                  { "Wonderland",    Double.MIN_VALUE,       Double.MIN_VALUE,       Double.MIN_VALUE},
                 }, vt);
     }
 
-    public void testPolygonDistance() throws Exception {
+    public void testPolygonPointDistance() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -271,11 +275,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 }, vt);
 
         // Validate result set obtained using distance between point and polygon is same as
-        // polygon and point
+        // distance between polygon and point
         sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
                         + "from borders, places "
                         + "order by borders.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        // distance between point and polygon
         sql = "select borders.name, places.name, distance(places.loc, borders.region) as distance "
                 + "from borders, places "
                 + "order by borders.pk";
@@ -314,7 +319,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         catch (ProcCallException excp) {
             exception = excp;
             assertTrue(exception.getMessage().contains("incompatible data type in operation"));
-            assertTrue(exception.getMessage().contains("Distance between two polygon not supported"));
+            assertTrue(exception.getMessage().contains("Distance between two polygons not supported"));
         } finally {
             assertNotNull(exception);
         }
