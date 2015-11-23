@@ -76,6 +76,8 @@ import org.voltdb.importer.ImporterChannelAssignment;
 import org.voltdb.importer.Invocation;
 import org.voltdb.importer.VersionedOperationMode;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
+
 /**
  * Based on SimpleConsumer Implement a BundleActivator interface and extend ImportHandlerProxy.
  * For each partition for a topic a thread is launched to pull data and submit transactions.
@@ -83,6 +85,9 @@ import org.voltdb.importer.VersionedOperationMode;
  * @author akhanzode
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
+
+    private static final String CSV_TRANSFORMER_NAME = "csv";
+    private static final String TSV_TRANSFORMER_NAME = "tsv";
 
     private final static PartitionOffsetRequestInfo LATEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
@@ -100,6 +105,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private final Map<String, Integer> m_brokerFetchSize = new HashMap<String, Integer>();
     private final Map<String, Integer> m_brokerSOTimeout = new HashMap<String, Integer>();
     private final Map<String, Map<String, String>> m_brokerProcedure = new HashMap<String, Map<String, String>>();
+    private final Map<String, String> m_brokerTransformer = new HashMap<String, String>();
 
     private static final String GROUP_ID = "voltdb";
     private static final String CLIENT_ID = "voltdb-importer";
@@ -170,13 +176,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             throw new RuntimeException("Missing procedure.");
         }
 
-        Map<String, String> topicProc = topicProc = m_brokerProcedure.get(key);
+        Map<String, String> topicProc = m_brokerProcedure.get(key);
         if (topicProc == null) {
             topicProc = new HashMap<String, String>();
             m_brokerProcedure.put(key, topicProc);
         }
 
-        //comma seperated list of topics.
+        String transformer = p.getProperty("transformer", CSV_TRANSFORMER_NAME).trim().toLowerCase();
+        if (!CSV_TRANSFORMER_NAME.equals(transformer) && !TSV_TRANSFORMER_NAME.equals(transformer)) {
+            throw new RuntimeException("Invalid transformer: " + transformer);
+        }
+        m_brokerTransformer.put(key, transformer);
+
+        //comma separated list of topics.
         String topics = p.getProperty("topics", "").trim();
         if (topics.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
@@ -449,8 +461,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
         private final String m_groupId;
         private final String m_procedure;
+        private final char m_separator;
 
-        public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String groupid, String topic, int partition, String procedure, HostAndPort leader, int fetchSize, int consumerSocketTimeout) {
+        public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String groupid, String topic, int partition,
+                String procedure, HostAndPort leader, int fetchSize, int consumerSocketTimeout, String transformer) {
             m_url = uri;
             m_groupId = groupid;
             m_brokers = brokers;
@@ -460,6 +474,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_fetchSize = fetchSize;
             m_consumerSocketTimeout = consumerSocketTimeout;
             m_topicAndPartition = new TopicAndPartition(topic, partition);
+            m_separator = CSV_TRANSFORMER_NAME.equals(transformer) ? CSVParser.DEFAULT_SEPARATOR : '\t';
         }
 
         @SuppressWarnings("unused")
@@ -795,7 +810,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         ByteBuffer payload = messageAndOffset.message().payload();
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                        CSVInvocation invocation = new CSVInvocation(m_procedure, line, m_separator);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                                 invocation);
@@ -1022,7 +1037,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                             TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList.get(key), assignedKey, groupid,
                                     topic, partition, proc,
-                                    hap, fetchsize, consumerSocketTimeout);
+                                    hap, fetchsize, consumerSocketTimeout, m_brokerTransformer.get(key));
                             try {
                                 m_es.submit(fetcher);
                                 m_fetchers.put(assignedKey.toString(), fetcher);

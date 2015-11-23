@@ -335,11 +335,16 @@
 
   <xs:complexType name="ImportConfigurationType">
     <xs:sequence>
+      <xs:element name="transformer" type="ImportTransformerType" minOccurs="0"/>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="module" type="xs:string" />
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <xs:complexType name="ImportTransformerType">
+    <xs:attribute name="name" type="xs:string" use="required"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
@@ -421,9 +426,9 @@
     <xs:attribute name="source" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:string">
-          <!-- Only the most basic validation that this could possibly be a hostname -->
+          <!-- Validate that this is either empty or a comma-separated list of hostnames -->
           <xs:minLength value="0"/>
-          <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
+          <xs:pattern value="[*]{0}|([a-zA-Z0-9\-\.]+(:[0-9]*)?(,\s*[a-zA-Z0-9\-\.]+(:[0-9]*)?)*)"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
