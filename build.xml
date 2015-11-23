@@ -20,6 +20,8 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
+            fork="yes"
+            executable="${java7home}/bin/javac"
             target="1.7"
             source="1.7"
             srcdir="@{srcdir}"
@@ -40,6 +42,9 @@
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
+
+<!-- find the location of java7 -->
+<exec executable="tools/findjava7.sh" outputproperty="java7home" />
 
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
