@@ -291,10 +291,11 @@ public class StmtSubqueryScan extends StmtTableScan {
      */
     public boolean canRunInOneFragment() {
         assert(m_subqueriesPartitioning != null);
-        if (! m_subqueriesPartitioning.requiresTwoFragments()) {
-            return false;
-        }
         assert(m_subqueryStmt != null);
+
+        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0) {
+            return true;
+        }
 
         // recursive check for its nested subqueries for should have receive node.
         if (failsSingleFragmentTest()) {

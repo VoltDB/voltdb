@@ -1306,9 +1306,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
     }
 
     /*
-     * LIMIT/OFFSET/DISTINCT/GROUP BY are not always the bad guys.
-     * When they apply on the replicated table only, the subquery contains this case should
-     * be able to drop the receive node if it has partition table in other places.
+     * LIMIT/OFFSET/DISTINCT/GROUP BY are not always bad guys.
+     * When they apply on the replicated table only, the subquery that
+     * contains them should be able to drop the receive node at the top
+     * of subqueries' partitioned tables.
      */
     public void testFineGrainedCases() {
         // LIMIT comes from replicated table which has no receive node
