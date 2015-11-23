@@ -89,6 +89,12 @@ public:
     static void copyViaSerializers(Serializer& output, Deserializer& input);
 
     static std::size_t serializedLengthNoLoops();
+
+    double getDistance(const Point &point) {
+        const S2Point s2Point = point.toS2Point();
+        S1Angle distanceRadians = S1Angle(Project(s2Point), s2Point);
+        return distanceRadians.radians();
+    }
 };
 
 /**

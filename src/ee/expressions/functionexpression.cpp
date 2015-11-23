@@ -355,6 +355,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_POINT_LONGITUDE:
             ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LONGITUDE>((*arguments)[0]);
             break;
+        case FUNC_VOLT_POLYGON_CENTROID:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_CENTROID>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_AREA:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_AREA>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
@@ -445,6 +451,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_CONTAINS:
             ret = new GeneralFunctionExpression<FUNC_VOLT_CONTAINS>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POINT_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POINT_POINT>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POLYGON_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POLYGON_POINT>(*arguments);
             break;
         default:
             return NULL;
