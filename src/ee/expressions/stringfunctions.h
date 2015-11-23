@@ -23,7 +23,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 #include <boost/scoped_array.hpp>
-#include <boost/regex.hpp>
+//TEMP workaround. #include <boost/regex.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -665,9 +665,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     char* patChars = reinterpret_cast<char*>(pat.getObjectValue_withoutNull());
     std::string patStr(patChars, lenPat);
 
+    /* // TEMP boost disable for dry run build and wrong answer.
     boost::regex_constants::syntax_option_type matchOpts = boost::regex_constants::normal;
     boost::match_flag_type matchFlags = boost::match_default;
-
+    */ // TEMP boost disable for dry run build and wrong answer.
     if (arguments.size() == 3) {
         const NValue& flags = arguments[2];
         if (!flags.isNull()) {
@@ -684,7 +685,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
                     case 'c':
                         break;
                     case 'i':
+                        /* // TEMP boost disable for dry run build and wrong answer.
                         matchOpts |= boost::regex_constants::icase;
+                        */ // TEMP boost disable for dry run build and wrong answer.
                         break;
                     default:
                         throw SQLException(SQLException::data_exception_invalid_parameter, "illegal match flags");
@@ -694,6 +697,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     }
 
     size_t position;
+    position = 0; /* // TEMP boost disable for dry run build and wrong answer.
     try {
         boost::regex patExpr(patStr, matchOpts);
         boost::sregex_iterator rit(sourceStr.begin(), sourceStr.end(), patExpr, matchFlags);
@@ -708,7 +712,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
         // TODO Return more specific error messages?
         throw SQLException(SQLException::data_exception_invalid_parameter, "illegal pattern string");
     }
-
+                  */ // TEMP boost disable for dry run build and wrong answer.
     return getIntegerValue(static_cast<int32_t>(position));
 }
 

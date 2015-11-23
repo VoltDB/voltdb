@@ -74,7 +74,8 @@ if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS += """ -g3 -lboost_regex"""
+# TEMP backout until exact boost prereqs can be established CTX.LDFLAGS += """ -g3 -lboost_regex"""
+CTX.LDFLAGS += """ -g3"""
 CTX.LASTLDFLAGS = """ """
 CTX.LASTIPCLDFLAGS = """ -ldl """
 
