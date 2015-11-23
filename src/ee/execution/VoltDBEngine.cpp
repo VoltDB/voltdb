@@ -560,12 +560,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         return false;
     }
 
-    // deal with the epoch
-    catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
-    int64_t epoch = catalogCluster->localepoch() * (int64_t)1000;
-    m_executorContext->setEpoch(epoch);
-
     // Set DR flag based on current catalog state
+    catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
     m_drStream->m_enabled = catalogCluster->drProducerEnabled();
     m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
     if (m_drReplicatedStream) {
