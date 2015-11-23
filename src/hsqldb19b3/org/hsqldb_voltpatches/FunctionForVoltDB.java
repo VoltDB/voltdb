@@ -501,7 +501,8 @@ public class FunctionForVoltDB extends FunctionSQL {
                      (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isPointType())) {
                 // either of the nodes is not a valid type
                 throw Error.error(ErrorCode.X_42565,
-                        "Distance supported between Point-to-Point, Polygon-to-Point or Point-to-Polygon");
+                        "The distance function is only able to compute point-to-point, point-to-polygon " +
+                        "and polygon-to-point distances.");
             } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
                 // distance between two polygons is not supported, flag as an error
                 throw Error.error(ErrorCode.X_42565, "Distance between two polygons not supported");

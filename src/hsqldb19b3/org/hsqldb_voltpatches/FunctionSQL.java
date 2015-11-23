@@ -2420,48 +2420,21 @@ public class FunctionSQL extends Expression {
             Type rightChildType = nodes[1].dataType;
             int distanceFunctionId = -1;
 
+            // in here the only cases needed to be handled are distance between polygon-to-point
+            // and point-to-point.
+            assert(leftChildType.isGeographyType() || leftChildType.isPointType());
+            assert(rightChildType.isPointType());
+
             if (leftChildType.isGeographyType()) {
-                if (rightChildType.isGeographyType()) {
-                    // we are bit far in processing - distance between polygon-to-polygon should
-                    // have generated error whle resolving types. Assert in debug environment
-                    assert(false);
-                    throw Error.error(ErrorCode.X_42565, "Distance between two polygons not supported");
-                }
-                else if (rightChildType.isPointType()) {
-                    distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;
-                }
-                else {
-                    // same here, this should have been taken care while resolving types and flagged as
-                    // incompatible data types
-                    assert(false);
-                    // right child is neither polygon nor point
-                    throw Error.error(ErrorCode.X_42565, "2nd argument to distance() of invalid type");
-                }
-            }
-            else if (leftChildType.isPointType()) {
-                if (rightChildType.isPointType()) {
-                    distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT;
-                }
-                else if (rightChildType.isGeographyType()) {
-                    //distance between point-to-polygon should have been converted to polygon-to-point by now
-                    assert(false);
-                    throw Error.runtimeError(ErrorCode.X_42565, "distance between point and polygon");
-                }
-                else {
-                    //we should not come this far with incompatible data types
-                    assert(false);
-                    //right child is neither polygon nor point
-                    throw Error.error(ErrorCode.X_42565, "2nd argument to distance() of invalid type");
-                }
+                distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;
             }
             else {
-                //we should not come this far with incompatible data types
-                assert(false);
-                //right child is neither polygon nor point
-                throw Error.error(ErrorCode.X_42565);
+                distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT;
             }
+
             exp.attributes.put("function_id", String.valueOf(distanceFunctionId));
             return exp;
+
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
