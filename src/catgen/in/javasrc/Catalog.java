@@ -99,9 +99,7 @@ public class Catalog extends CatalogType {
                 catch (Exception ex) {
                     String msg = "Invalid catalog command on line " + ctr + "\n" +
                         "Contents: '" + line + "'\n";
-                    ex.printStackTrace();
                     throw new RuntimeException(msg, ex);
-
                 }
                 ctr++;
             }
