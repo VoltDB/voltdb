@@ -55,6 +55,10 @@ import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansSubQueries extends PlannerTestCase {
+    @Override
+    protected void setUp() throws Exception {
+        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
+    }
 
     public void testSelectOnlyGuard() {
         // Can only have expression subqueries in SELECT statements
@@ -1144,6 +1148,33 @@ public class TestPlansSubQueries extends PlannerTestCase {
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
+        // Add distinct option to aggregate inside of subquery
+        planNodes = compileToFragments(
+                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A ");
+        assertEquals(2, planNodes.size());
+        pn = planNodes.get(0);
+        assertTrue(pn instanceof SendPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ReceivePlanNode);
+
+        pn = planNodes.get(1);
+        assertTrue(pn instanceof SendPlanNode);
+        nlpn = pn.getChild(0);
+        assertTrue(nlpn instanceof NestLoopIndexPlanNode);
+        assertEquals(JoinType.INNER, ((NestLoopIndexPlanNode) nlpn).getJoinType());
+        pn = nlpn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        checkPrimaryKeyIndexScan(pn, "P2");
+
+        pn = nlpn.getChild(0);
+        checkSeqScan(pn, "T1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        pn = pn.getChild(0);
+        checkPrimaryKeyIndexScan(pn, "P1");
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
 
         // single partition filter inside subquery
         planNodes = compileToFragments(
@@ -1575,11 +1606,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "                    (SELECT A, C FROM R2) T2, P3 " +
                 "where T1.A = T2.A AND P3.A = T2.A", joinErrorMsg);
 
-        // Invalid aggregate distinct
-        failToCompile(
-                "SELECT * FROM (SELECT A, C, SUM(distinct D) FROM P2 GROUP BY A, C) T1, P1 " +
-                "where T1.A = P1.A ", joinErrorMsg);
-
         // Error in one of the sub-queries and return exception directly for the whole statement
         String sql = "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, " +
                 "                    (SELECT P1.A, P1.C FROM P1, P3) T2, P3 " +
@@ -1606,9 +1632,16 @@ public class TestPlansSubQueries extends PlannerTestCase {
         pn = planNodes.get(0).getChild(0);
 
         assertFalse(pn.toExplainPlanString().contains("DISTINCT"));
-        assertTrue(pn.toExplainPlanString().contains("LOOP INNER JOIN")); // this join can be pushed down also in future
 
         pn = planNodes.get(1).getChild(0);
+        // this join can be pushed down.
+        //* enable to debug */ System.out.println(pn.toExplainPlanString());
+        assertTrue(pn.toExplainPlanString().contains("LOOP INNER JOIN"));
+        pn = pn.getChild(0);
+        // This is a trivial subquery result scan.
+        assertTrue(pn instanceof SeqScanPlanNode);
+        pn = pn.getChild(0);
+        // This is the subquery plan.
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertTrue(pn.toExplainPlanString().contains("SUM DISTINCT(P2.D"));
@@ -2283,10 +2316,4 @@ public class TestPlansSubQueries extends PlannerTestCase {
             }
         }
     }
-
-    @Override
-    protected void setUp() throws Exception {
-        setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
-    }
-
 }

@@ -297,7 +297,8 @@ public class StmtSubqueryScan extends StmtTableScan {
             return true;
         }
 
-        // recursive check for its nested subqueries for should have receive node.
+        // recursive check for its nested subqueries that require coordination
+        // of their results.
         if (failsSingleFragmentTest()) {
             return false;
         }
@@ -343,16 +344,6 @@ public class StmtSubqueryScan extends StmtTableScan {
             // violate the partitioned table join criteria.
             // Detect case (1) to mark receive node.
             if (! selectStmt.hasPartitionColumnInGroupby()) {
-                return false;
-            }
-
-            //
-            // (2) Contains a partition column:
-            //     This is the interesting case that we are going to support.
-            //     At this point, subquery does not contain LIMIT/OFFSET.
-            //     But if the statement has a distinct aggregate, retain the
-            //     send/receive and compute the distinct result on the coordinator.
-            if ( selectStmt.hasAggregateDistinct() ) {
                 return false;
             }
         }
