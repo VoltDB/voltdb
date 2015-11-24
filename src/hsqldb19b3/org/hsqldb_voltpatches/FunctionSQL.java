@@ -2415,6 +2415,26 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE :
+            Type leftChildType = nodes[0].dataType;
+            Type rightChildType = nodes[1].dataType;
+            int distanceFunctionId = -1;
+
+            // in here the only cases needed to be handled are distance between polygon-to-point
+            // and point-to-point.
+            assert(leftChildType.isGeographyType() || leftChildType.isPointType());
+            assert(rightChildType.isPointType());
+
+            if (leftChildType.isGeographyType()) {
+                distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;
+            }
+            else {
+                distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT;
+            }
+
+            exp.attributes.put("function_id", String.valueOf(distanceFunctionId));
+            return exp;
+
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
