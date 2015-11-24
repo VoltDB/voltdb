@@ -35,7 +35,7 @@ class ElasticHashinatorTest : public Test {
 
 TEST_F(ElasticHashinatorTest, TestMinMaxToken)
 {
-    boost::scoped_ptr<char> config(new char[4 + (12 * 3)]);
+    boost::scoped_array<char> config(new char[4 + (12 * 3)]);
     ReferenceSerializeOutput output(config.get(), 4 + (12 * 3));
 
     output.writeInt(3);
