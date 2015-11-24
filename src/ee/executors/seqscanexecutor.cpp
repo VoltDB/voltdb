@@ -113,7 +113,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     // Short-circuit an empty scan
     if (node->isEmptyScan()) {
-        VOLT_DEBUG ("Empty Seq Scan :\n %s", m_outputTable->debug().c_str());
+        VOLT_DEBUG ("Empty Seq Scan :\n %s", output_table->debug().c_str());
         return true;
     }
 
