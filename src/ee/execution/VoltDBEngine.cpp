@@ -1519,7 +1519,7 @@ bool VoltDBEngine::activateTableStream(
         }
 
         table->incrementRefcount();
-    std::cout << "Activating stream for table: " << table-> << "\n";
+    std::cout << "Activating stream for table: " << "\n";
     std::cout.flush();
         m_snapshottingTables[tableId] = table;
     }

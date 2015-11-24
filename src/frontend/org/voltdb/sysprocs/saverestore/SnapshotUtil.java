@@ -1245,6 +1245,13 @@ public class SnapshotUtil {
         ArrayList<Table> my_tables = new ArrayList<Table>();
         for (Table table : all_tables)
         {
+            //If table has view and table is export table snapshot view table.
+            if ((table.getMaterializer() != null) &&
+                    (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
+            {
+                my_tables.add(table);
+                continue;
+            }
             // Make a list of all non-materialized, non-export only tables
             if ((table.getMaterializer() != null) ||
                     (CatalogUtil.isTableExportOnly(database, table)))
