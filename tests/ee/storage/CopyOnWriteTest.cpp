@@ -1144,7 +1144,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
-    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks);
+    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon());
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
 

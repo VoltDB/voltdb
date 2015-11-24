@@ -82,7 +82,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType)
 
     m_surgeon.activateSnapshot();
 
-    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_surgeon.getData()));
+    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon));
 
     return ACTIVATION_SUCCEEDED;
 }
@@ -217,12 +217,10 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                 // at least returned it's currentBlock to the lists.
                 if (allPendingCnt > 0) {
                     // We have orphaned or corrupted some tables. Let's make them pristine.
-                    TBMap allBlocks(m_surgeon.getData());
-                    TBMapI iter = allBlocks.begin();
-                    while (iter != allBlocks.end()) {
+                    TBMapI iter = m_surgeon.getData().begin();
+                    while (iter != m_surgeon.getData().end()) {
                         m_surgeon.snapshotFinishedScanningBlock(iter.value(), TBPtr());
-                        allBlocks.erase(iter);
-                        TBMapI iter = allBlocks.begin();
+                        iter++;
                     }
                 }
                 if (!m_surgeon.blockCountConsistent()) {

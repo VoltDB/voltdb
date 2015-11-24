@@ -32,8 +32,7 @@ public:
 
     CopyOnWriteIterator(
         PersistentTable *table,
-        PersistentTableSurgeon *surgeon,
-        TBMap blocks);
+        PersistentTableSurgeon *surgeon);
 
     bool needToDirtyTuple(char *tupleAddress);
 

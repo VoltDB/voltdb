@@ -21,9 +21,8 @@
 namespace voltdb {
 CopyOnWriteIterator::CopyOnWriteIterator(
         PersistentTable *table,
-        PersistentTableSurgeon *surgeon,
-        TBMap blocks) :
-        m_table(table), m_surgeon(surgeon), m_blocks(blocks),
+        PersistentTableSurgeon *surgeon) :
+        m_table(table), m_surgeon(surgeon), m_blocks(m_surgeon->getData()),
         m_blockIterator(m_blocks.begin()), m_end(m_blocks.end()),
         m_tupleLength(table->getTupleLength()),
         m_location(NULL),
