@@ -2,3 +2,6 @@
 *.o
 *.so
 *.dylib
+Makefile.last
+Makefile.bak
+Makefile

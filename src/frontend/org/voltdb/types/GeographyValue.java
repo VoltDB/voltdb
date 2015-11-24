@@ -249,7 +249,7 @@ public class GeographyValue {
      * But the interface we expose to users is (lat, lng).  This class is the
      * internal representation for vertices.
      */
-    private static class XYZPoint {
+    static class XYZPoint {
         private final double m_x;
         private final double m_y;
         private final double m_z;
