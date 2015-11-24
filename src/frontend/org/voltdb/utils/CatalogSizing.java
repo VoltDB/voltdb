@@ -198,6 +198,19 @@ public abstract class CatalogSizing {
         }
     }
 
+    private static int roundedAllocationSize(int min, int contentSize) {
+        int bufferSize = min;
+        while (bufferSize < contentSize) {
+            int increment = bufferSize / 2;
+            bufferSize += increment;
+            if (bufferSize >= contentSize) {
+                break;
+            }
+            bufferSize += increment;
+        }
+        return bufferSize;
+    }
+
     private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex) {
         assert(capacity >= 0);
         assert(dataSize >= 0);
@@ -213,19 +226,25 @@ public abstract class CatalogSizing {
         // between powers of 2.
         // The rounded buffer size includes an object length, typically 4 bytes.
         int content = 4 + dataSize;
-        int bufferSize = 64;
-        while (bufferSize < content) {
-            int increment = bufferSize / 2;
-            bufferSize += increment;
-            if (bufferSize >= content) {
-                break;
-            }
-            bufferSize += increment;
-        }
+        int bufferSize = roundedAllocationSize(64, content);
         // The rounded buffer size has an additional 4-byte allocation size and
         // 8-byte back pointer overhead. There is also has an 8-byte pointer
         // in the tuple and an 8-byte StringRef indirection pointer.
         return bufferSize + 4 + 8 + 8 + 8;
+    }
+
+    public static int testOnlyAllocationSizeForObject(int requestSize) {
+        if (requestSize <= 48) {
+            // Short-cut calculations for sizes that are not used in the catalog sizing.
+            if (requestSize <= 2) {
+                return 2;
+            }
+            return roundedAllocationSize(4, requestSize);
+        }
+        // Otherwise exercise as much of the common catalog sizing code path as possible
+        // but strip out any adjustments that are not directly a result of allocation rounding.
+        // See the comments in getVariableColumnSize for the significance of these adjustments.
+        return getVariableColumnSize(64, requestSize - 4, false) - 4 - 8 - 8 - 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {
