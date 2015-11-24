@@ -24,3 +24,5 @@
 /openssl.pc
 /tools/c_rehash.bak
 /Makefile.bak
+/crypto/opensslconf.h
+/include/openssl/opensslconf.h
