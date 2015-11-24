@@ -88,7 +88,7 @@ public:
         m_tempTableDeleteAsGo = flag;
     }
 
-private:
+protected:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
@@ -296,6 +296,44 @@ inline bool TableIterator::tempNext(TableTuple &out) {
 
 inline int TableIterator::getLocation() const {
     return m_location;
+}
+
+class JumpingTableIterator : public TableIterator {
+public:
+    // Get an iterator via table->iterator()
+    JumpingTableIterator(PersistentTable* table, TBMapI start, TBMapI end);
+    int getTuplesInNextBlock();
+    bool hasNextBlock();
+    void nextBlock();
+
+private:
+    TBMapI m_end;
+};
+
+
+inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start, TBMapI end)
+    : TableIterator((Table*)parent, start), m_end(end)
+    {
+    }
+
+
+inline int JumpingTableIterator::getTuplesInNextBlock() {
+    assert(m_blockIterator != m_end);
+    return m_blockIterator.data()->activeTuples();
+}
+
+inline bool JumpingTableIterator::hasNextBlock() {
+    assert(m_blockOffset == 0);
+    return m_blockIterator != m_end;
+}
+
+inline void JumpingTableIterator::nextBlock() {
+    assert(m_blockOffset == 0);
+    assert(m_blockIterator != m_end);
+    TBPtr currentBlock = m_blockIterator.data();
+    m_blockIterator++;
+    m_foundTuples += currentBlock->activeTuples();
+    m_location += m_table->getTuplesPerBlock();
 }
 
 }
