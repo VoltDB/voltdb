@@ -425,9 +425,9 @@ class ServerBundle(JavaBundle):
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
 	verb.add_options(
-            cli.StringListOption(None, '--skip-check', 'skip_requirements',
+            cli.StringListOption(None, '--ignore', 'skip_requirements',
                              '''requirements to skip when start voltdb:
-			     thp - ignore transparent huge page check at your peril, you could run out of memory''',
+			     thp - Checking for Transparent Huge Pages (THP) has been disabled.  Use of THP can cause VoltDB to run out of memory. Do not disable this check on production systems.''',
                              default = None))
         verb.add_options(
             cli.StringOption('-d', '--deployment', 'deployment',
@@ -471,9 +471,9 @@ class ServerBundle(JavaBundle):
                 state = v[0]
                 if state == 'PASS' :
                     pass
-                if state == "WARN":
+                elif state == "WARN":
                     utility.warning(v[1])
-                if state == 'FAIL' :
+                elif state == 'FAIL' :
                     if k in checkconfig.skippableRequirements.keys() and runner.opts.skip_requirements and checkconfig.skippableRequirements[k] in runner.opts.skip_requirements:
                         utility.warning(v[1])
                     else:
