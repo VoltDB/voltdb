@@ -510,7 +510,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
         {
             // The subquery SEND/MERGERECEIVE is preserved during the subquery post-processing
             // resulting in the multi-partitioned join that gets rejected.
-            // In this case, the subquery MERGERECEIVE node is technically redundant but at the moment,
+            // In this case, the subquery MERGERECEIVE node is techically redundant but at the moment,
             // the subquery post-processing still keeps it.
             failToCompile(
                     "select PT_D1 from (select P_D1 as PT_D1, P_D0 as PT_D0 from P order by P_D1) P_T, P where P.P_D0 = P_T.PT_D0;",

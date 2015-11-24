@@ -221,10 +221,9 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
          * where bindings will be added.
          */
         Index indexToUse = ispn.getCatalogIndex();
-        String tableAlias = ispn.getTargetTableAlias();
         List<AbstractExpression> indexedExprs = null;
         if ( ! indexToUse.getExpressionsjson().isEmpty() ) {
-            StmtTableScan tableScan = m_parsedStmt.getStmtTableScanByAlias(tableAlias);
+            StmtTableScan tableScan = m_parsedStmt.m_tableAliasMap.get(ispn.getTargetTableAlias());
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(indexToUse.getExpressionsjson(), tableScan);
             } catch (JSONException e) {
@@ -298,7 +297,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // do not aggressively evaluate all indexes, just examine the index currently in use;
         // because for all qualified indexes, one access plan must have been generated already,
         // and we can take advantage of that
-        if (!checkIndex(ispn.getCatalogIndex(), aggExpr, exprs, ispn.getBindings(), tableAlias)) {
+        if (!checkIndex(ispn.getCatalogIndex(), aggExpr, exprs, ispn.getBindings(), ispn.getTargetTableAlias())) {
             return plan;
         } else {
             // we know which end we want to fetch, set the sort direction
@@ -391,7 +390,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
-            StmtTableScan tableScan = m_parsedStmt.getStmtTableScanByAlias(fromTableAlias);
+            StmtTableScan tableScan = m_parsedStmt.m_tableAliasMap.get(fromTableAlias);
+
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
             } catch (JSONException e) {

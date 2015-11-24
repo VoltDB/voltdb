@@ -34,7 +34,11 @@ import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.SendPlanNode;
 
 /**
  * StmtTableScan caches data related to a given instance of a sub-query within the statement scope
@@ -49,7 +53,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     private StatementPartitioning m_subqueriesPartitioning = null;
 
-    private boolean m_failedSingleFragmentTest = false;
+    private boolean m_hasReceiveNode = false;
 
     private boolean m_tableAggregateSubquery = false;
 
@@ -81,6 +85,10 @@ public class StmtSubqueryScan extends StmtTableScan {
         this(subqueryStmt, tableAlias, 0);
     }
 
+    public StatementPartitioning getPartitioningForStatement() {
+        return m_subqueriesPartitioning;
+    }
+
     public void setSubqueriesPartitioning(StatementPartitioning subqueriesPartitioning) {
         assert(subqueriesPartitioning != null);
         m_subqueriesPartitioning = subqueriesPartitioning;
@@ -97,14 +105,15 @@ public class StmtSubqueryScan extends StmtTableScan {
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets)
     {
-        assert(m_subqueriesPartitioning != null);
-        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0 ||
-                m_subqueriesPartitioning.requiresTwoFragments()) {
+        StatementPartitioning stmtPartitioning = getPartitioningForStatement();
+
+        if (stmtPartitioning.getCountOfPartitionedTables() == 0 ||
+            stmtPartitioning.requiresTwoFragments()) {
             return;
         }
-        // This subquery is a single partitioned query on partitioned tables
-        // promoting the single partition expression up to its parent level.
-        AbstractExpression spExpr = m_subqueriesPartitioning.singlePartitioningExpression();
+        // this sub-query is single partitioned query on partitioned tables
+        // promoting the single partition express up the its parent level
+        AbstractExpression spExpr = stmtPartitioning.singlePartitioningExpression();
 
         for (SchemaColumn col: m_partitioningColumns) {
             AbstractExpression tveKey = col.getExpression();
@@ -161,8 +170,10 @@ public class StmtSubqueryScan extends StmtTableScan {
         assert(m_subqueriesPartitioning != null);
 
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
-            for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
-                List<SchemaColumn> scols = tableScan.getPartitioningColumns();
+            for (StmtTableScan tableScan : m_subqueryStmt.m_tableAliasMap.values()) {
+
+                List<SchemaColumn> scols;
+                scols = tableScan.getPartitioningColumns();
                 addPartitioningColumns(scols);
             }
         }
@@ -218,8 +229,10 @@ public class StmtSubqueryScan extends StmtTableScan {
      */
     @Override
     public boolean getIsReplicated() {
-        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
-            if ( ! tableScan.getIsReplicated()) {
+        boolean isReplicated = true;
+        for (StmtTableScan tableScan : m_subqueryStmt.m_tableAliasMap.values()) {
+            isReplicated = isReplicated && tableScan.getIsReplicated();
+            if ( ! isReplicated) {
                 return false;
             }
         }
@@ -228,7 +241,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     public List<StmtTargetTableScan> getAllTargetTables() {
         List <StmtTargetTableScan> stmtTables = new ArrayList<StmtTargetTableScan>();
-        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
+        for (StmtTableScan tableScan : m_subqueryStmt.m_tableAliasMap.values()) {
             if (tableScan instanceof StmtTargetTableScan) {
                 stmtTables.add((StmtTargetTableScan)tableScan);
             } else {
@@ -278,104 +291,122 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     }
 
+
     /**
-     * Some subquery results can only be joined with a partitioned table after
-     * it finishes some work on the coordinator. With the 2 fragment plan limit,
-     * those queries can not be supported.
-     * Other than that case, the planner will typically have added a
-     * send/receive pair to the subquery plan that is actually only suitable to
-     * a stand-alone plan. This function distinguishes subqueries that should NOT
-     * have a send/receive pair.
+     * Some subquery results can only be joined with a partitioned table after it finishes work
+     * on the coordinator. With 2 fragment plan limit, those queries should not be supported.
+     * Other than that, planner can get rid of the send/receive pair and push down the join.
      * @param root
-     * @return true if there is no aspect to the plan that requires execution on the coordinator.
+     * @return
      */
-    public boolean canRunInOneFragment() {
+    public AbstractPlanNode processReceiveNode(AbstractPlanNode root) {
         assert(m_subqueriesPartitioning != null);
         if (! m_subqueriesPartitioning.requiresTwoFragments()) {
-            return false;
+            return root;
         }
+        assert(root.findAllNodesOfClass(AbstractReceivePlanNode.class).size() == 1);
         assert(m_subqueryStmt != null);
 
         // recursive check for its nested subqueries for should have receive node.
-        if (failsSingleFragmentTest()) {
-            return false;
+        if (hasReceiveNode()) {
+            m_hasReceiveNode = true;
+            return root;
         }
 
-        // Tentative assignment in case of early return.
-        // This gets immediately reset if it passes all the tests.
-        m_failedSingleFragmentTest = true;
+        m_hasReceiveNode = true;
+
+        if (root.hasAnyNodeOfClass(MergeReceivePlanNode.class)) {
+            // The MergeReceivePlanNode always has an inline ORDER BY node and may have
+            // LIMIT/OFFSET and aggregation node(s). Removing the MergeReceivePlanNode will
+            // also remove its inline node(s) which may produce an invalid access plan. For example
+            // SELECT TC1 FROM (SELECT C1 AS TC1 FROM P ORDER BY C1) PT LIMIT 4;
+            // where P is partitioned and C1 is a non-partitioned index column.
+            // Removing the subquery MergeReceivePlnaNode and its ORDER BY node results
+            // in the invalid access plan - the subquery result order is significant in this case
+            // The concern with generally keeping the (Merge)Receive node in the subquery is
+            // that it would needlessly generate more-than-2-fragment plans in cases
+            // where 2 fragments could have done the job.
+            return root;
+        }
 
         if (m_subqueryStmt instanceof ParsedUnionStmt) {
             // Union are just returned
-            return false;
+            assert(m_subqueryStmt instanceof ParsedUnionStmt);
+            return root;
         }
 
-        if ( ! (m_subqueryStmt instanceof ParsedSelectStmt)) {
+        if (m_subqueryStmt instanceof ParsedSelectStmt == false) {
             throw new PlanningErrorException("Unsupported subquery found in FROM clause:" + m_subqueryStmt.toString());
         }
 
         ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
+        assert(selectStmt != null);
 
         // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
-        // we should get rid of the receive node. I (--paul) don't know what this means.
+        // we should get rid of the receive node.
         if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinctWithGroupBy()) {
-            return false;
+            return root;
         }
 
-        // If the query uses the partitioned materialized view table with the
-        // need to Re-aggregate, then we can not get rid of the receive node.
-        // This is also caught in StatementPartitioning when analyzing the join criteria,
-        // because it contains a partitioned view that does not have a partition column.
+        // If the query contains the partition materialized table with the need to Re-aggregate,
+        // then we can not get rid of the receive node.
+        // This is also caught in StatementPartitioning when analysing the join criteria,
+        // because it contains a partitioned view that does not have partition column.
         if (selectStmt.m_mvFixInfo.needed()) {
-            return false;
+            return root;
         }
 
         // Table aggregate cases should not get rid of the receive node
         if (selectStmt.hasAggregateOrGroupby()) {
             if (!selectStmt.isGrouped()) {
                 m_tableAggregateSubquery = true;
-                return false;
+                return root;
             }
             // For group by queries, there are two cases on group by columns.
-            // (1) Does not contain a partition column:
-            // If joined with a partitioned table in the parent query, it will
-            // violate the partitioned table join criteria.
+            // (1) Does not Contain the partition columns: If join with partition table on outer
+            //     level, it will violates the join criteria.
             // Detect case (1) to mark receive node.
             if (! selectStmt.hasPartitionColumnInGroupby()) {
-                return false;
+                return root;
             }
 
             //
-            // (2) Contains a partition column:
+            // (2) Group by columns contain the partition columns:
             //     This is the interesting case that we are going to support.
             //     At this point, subquery does not contain LIMIT/OFFSET.
-            //     But if the statement has a distinct aggregate, retain the
-            //     send/receive and compute the distinct result on the coordinator.
+            //     But if the aggregate has distinct, we have to compute on coordinator.
             if ( selectStmt.hasAggregateDistinct() ) {
-                return false;
+                return root;
             }
+
+            //     Now. If this sub-query joins with partition table on outer level,
+            //     we are able to push the join down by removing the send/receive plan node pair.
         }
-        // Now. If this sub-query joins with a partitioned table in the parent statement,
-        // push the join down by removing the send/receive plan node pair.
-        m_failedSingleFragmentTest = false;
-        return true;
+
+        //
+        // Remove the send/receive pair on distributed node
+        //
+        root = removeCoordinatorSendReceivePair(root);
+
+        m_hasReceiveNode = false;
+        return root;
     }
 
-    public boolean failsSingleFragmentTest() {
-        if (m_failedSingleFragmentTest) {
+    public boolean hasReceiveNode() {
+        if (m_hasReceiveNode) {
             return true;
         }
-        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
+
+        for (StmtTableScan tableScan : m_subqueryStmt.m_tableAliasMap.values()) {
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
-                if (subScan.failsSingleFragmentTest()) {
-                    // Cache known test failures on parent subqueries.
-                    m_failedSingleFragmentTest = true;
+                if (subScan.hasReceiveNode()) {
                     return true;
                 }
             }
         }
-        return false;
+
+        return m_hasReceiveNode;
     }
 
     public boolean isTableAggregate() {
@@ -388,6 +419,46 @@ public class StmtSubqueryScan extends StmtTableScan {
         TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
                 schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);
         return tve;
+    }
+
+    /**
+     * Remove the coordinator send/receive pair if any from the graph.
+     *
+     * @param root the complete plan node.
+     * @return the plan without the send/receive pair.
+     */
+    static public AbstractPlanNode removeCoordinatorSendReceivePair(AbstractPlanNode root) {
+        assert(root != null);
+        return removeCoordinatorSendReceivePairRecursive(root, root);
+    }
+
+    static public AbstractPlanNode removeCoordinatorSendReceivePairRecursive(AbstractPlanNode root,
+            AbstractPlanNode current) {
+        if (current instanceof AbstractReceivePlanNode) {
+            assert(current.getChildCount() == 1);
+
+            AbstractPlanNode child = current.getChild(0);
+            assert(child instanceof SendPlanNode);
+
+            assert(child.getChildCount() == 1);
+            child = child.getChild(0);
+            child.clearParents();
+            if (current.getParentCount() == 0) {
+                return child;
+            } else {
+                assert(current.getParentCount() == 1);
+                AbstractPlanNode parent = current.getParent(0);
+                parent.unlinkChild(current);
+                parent.addAndLinkChild(child);
+                return root;
+            }
+        } else if (current.getChildCount() == 1) {
+            // This is still a coordinator node
+            return removeCoordinatorSendReceivePairRecursive(root, current.getChild(0));
+        } else {
+            // We are about to branch and leave the coordinator
+            return root;
+        }
     }
 
     public List<SchemaColumn> getOutputSchema() {

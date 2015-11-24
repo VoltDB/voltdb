@@ -35,8 +35,8 @@ import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -213,8 +213,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // should propagate an error message identifying partitioning as the problem.
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
-                Collection<StmtTableScan> scans = m_parsedStmt.allScans();
-                m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
+                m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
+                                                                      valueEquivalence);
                 if ( ! m_partitioning.isJoinValid() ) {
                     // The case of more than one independent partitioned table
                     // would result in an illegal plan with more than two fragments.

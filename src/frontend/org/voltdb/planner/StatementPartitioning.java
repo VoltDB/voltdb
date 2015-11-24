@@ -31,7 +31,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -411,10 +410,8 @@ public class StatementPartitioning implements Cloneable{
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
                 subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
-                CompiledPlan subqueryPlan = subScan.getBestCostPlan();
-                if (( ! subScan.canRunInOneFragment()) ||
-                        ((subqueryPlan != null) &&
-                         subqueryPlan.rootPlanGraph.hasAnyNodeOfClass(AbstractReceivePlanNode.class))) {
+
+                if (subScan.hasReceiveNode()) {
                     if (subqueryHasReceiveNode) {
                         // Has found another subquery with receive node on the same level
                         // Not going to support this kind of subquery join with 2 fragment plan.
