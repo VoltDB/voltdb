@@ -292,6 +292,21 @@ public class GeographyValue {
             double lngDegrees = lngRadians * (180 / Math.PI);
             return new PointType(latDegrees, lngDegrees);
         }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof XYZPoint)) {
+                return false;
+            }
+
+            XYZPoint compareTo = (XYZPoint) other;
+
+            if(m_x == compareTo.x() && m_y == compareTo.y() && m_z == compareTo.z()) {
+                return true;
+            }
+
+            return false;
+        }
     }
 
 
@@ -386,7 +401,6 @@ public class GeographyValue {
         return depth;
     }
 
-
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
@@ -447,10 +461,21 @@ public class GeographyValue {
                     break;
                 case ')':
                     if (currentLoop == null) {
-                        throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
+                        throw new IllegalArgumentException(msgPrefix + "polygon should contain atleast one loop, " +
+                                "with each loop containing minimum of 4 vertices - start and end vertices being equal");
                     }
 
-                    // We really should check that the last vertex is the same as the first here.
+                    // 4 vertices = 3 unique vertices for polygon + 1 end point which is same as start point
+                    if(currentLoop.size() < 4) {
+                        throw new IllegalArgumentException(msgPrefix + "each loop in polygon should have 4 vertices, " +
+                                  "with start and end vertices equal");
+                    }
+
+                    // check if the end points of the loop are equal
+                    if (currentLoop.get(0).equals(currentLoop.get(currentLoop.size() - 1)) == false) {
+                        throw new IllegalArgumentException(msgPrefix + "start and end vertices of loop are not equal");
+                    }
+
                     currentLoop.remove(currentLoop.size() - 1);
 
                     loops.add(currentLoop);

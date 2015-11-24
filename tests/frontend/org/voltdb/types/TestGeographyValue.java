@@ -184,6 +184,14 @@ public class TestGeographyValue extends TestCase {
         assertWktParseError("premature end of input", "POLYGON ((80 80, 60 60, 70 70,");
         assertWktParseError("missing closing parenthesis", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
         assertWktParseError("unrecognized token", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertWktParseError("unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
+        assertWktParseError("unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90, 80 80))blahblah");
+        assertWktParseError("polygon should contain atleast one loop, with each loop containing minimum of 4 vertices - " +
+                "start and end vertices being equal", "POLYGON ()");
+        assertWktParseError("each loop in polygon should have 4 vertices, with start and end vertices equal",
+                            "POLYGON (())");
+        assertWktParseError("each loop in polygon should have 4 vertices, with start and end vertices equal",
+                            "POLYGON ((10 10, 20 20, 30 30))");
+        assertWktParseError("start and end vertices of loop are not equal", "POLYGON ((10 10, 20 20, 30 30, 40 40))");
+
     }
 }
