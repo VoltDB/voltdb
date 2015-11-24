@@ -1,11 +1,30 @@
 We're currently using Boost 1.53.
 
-It's header-only and we specifically disable any references to boost::thread.
+It's mostly header-only and we specifically disable any references to boost::thread.
 
-No included Boost files have been modified.
+1.) Header only libraries.
+    No included Boost files have been modified.
 
-Many files have been removed. If you use some new part of boost and it fails because a
-header is missing, you can get the full Boost tarball of the appropriate version and
-restore missing headers as needed.
+    Many files have been removed. If you use some new part of boost and it fails because a
+    header is missing, you can get the full Boost tarball of the appropriate version and
+    restore missing headers as needed.
 
-Feel free to remove headers that aren't used.
+    Feel free to remove headers that aren't used.
+2.) Built libraries.
+    We build the boost static libraries and check them in to git.  We build on a
+    platform which is old enough that all other platforms are compatible with it.
+
+    The build procedure is pretty simple, but it's appallingly manual.
+    a.) Download the boost tarball.
+    b.) Copy the needed header-only include files to the repository.
+    c.) Configure, build and install the wanted built libraries.  These
+        are installed in some temporary location.  We only use the static
+        libraries, to simplify packaging.
+    d.) Copy the static libraries into the repository.  The static libraries
+        are stored in voltdb/third_party/cpp/boost/lib/$ARCH/libxxx.a.
+        where $ARCH is the name of the architecture, and xxx is the name
+        of the library.  For now, the architecture on the mac is "Darwin",
+        and the architecture for linux is "Linux".
+    All of these steps are manual, and must be done each time the boost library
+    is updated.  If we made a change to any of the boost sources these changes
+    would have to be made as well.
