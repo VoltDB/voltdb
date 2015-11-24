@@ -335,16 +335,12 @@
 
   <xs:complexType name="ImportConfigurationType">
     <xs:sequence>
-      <xs:element name="transformer" type="ImportTransformerType" minOccurs="0"/>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="module" type="xs:string" />
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-  </xs:complexType>
-
-  <xs:complexType name="ImportTransformerType">
-    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="format" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
