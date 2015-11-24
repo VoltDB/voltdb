@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -98,7 +99,7 @@ public abstract class AbstractParsedStmt {
     // User specified join order, null if none is specified
     public String m_joinOrder = null;
 
-    public HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
+    protected final HashMap<String, StmtTableScan> m_tableAliasMap = new HashMap<String, StmtTableScan>();
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
@@ -457,7 +458,7 @@ public abstract class AbstractParsedStmt {
         // Resolve the tve and add it to the scan's cache of referenced columns
         // Get tableScan where this TVE is originated from. In case of the
         // correlated queries it may not be THIS statement but its parent
-        StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
+        StmtTableScan tableScan = resolveStmtTableScanByAlias(tableAlias);
         if (tableScan == null) {
             // This never used to happen.  HSQL should make sure all the
             // identifiers are defined.  But something has gone wrong.
@@ -509,38 +510,46 @@ public abstract class AbstractParsedStmt {
    }
 
    /**
-   *
-   * @param exprNode
-   * @return
-   */
-  private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
-      // Parse individual columnref expressions from the IN output schema
-      List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-      for (VoltXMLElement exprNode : exprNodes) {
-          AbstractExpression expr = parseExpressionNode(exprNode);
-          exprs.add(expr);
-      }
-      return new RowSubqueryExpression(exprs);
-  }
+    *
+    * @param exprNode
+    * @return
+    */
+   private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
+       // Parse individual columnref expressions from the IN output schema
+       List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+       for (VoltXMLElement exprNode : exprNodes) {
+           AbstractExpression expr = parseExpressionNode(exprNode);
+           exprs.add(expr);
+       }
+       return new RowSubqueryExpression(exprs);
+   }
 
-    /**
-     * Return StmtTableScan by table alias. In case of correlated queries, would need
-     * to walk the statement tree up.
-     *
-     * @param stmt
-     * @param tableAlias
-     */
-    private StmtTableScan getStmtTableScanByAlias(String tableAlias) {
-        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
-        if (tableScan != null) {
-            return tableScan;
-        }
-        if (m_parentStmt != null) {
-            // This may be a correlated subquery
-            return m_parentStmt.getStmtTableScanByAlias(tableAlias);
-        }
-        return null;
-    }
+   public Collection<StmtTableScan> allScans()
+   { return m_tableAliasMap.values(); }
+
+   /**
+    * Return locally defined StmtTableScan by table alias.
+    * @param tableAlias
+    */
+   public StmtTableScan getStmtTableScanByAlias(String tableAlias)
+   { return m_tableAliasMap.get(tableAlias); }
+
+   /**
+    * Return StmtTableScan by table alias. In case of correlated queries,
+    * may need to walk up the statement tree.
+    * @param tableAlias
+    */
+   private StmtTableScan resolveStmtTableScanByAlias(String tableAlias) {
+       StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
+       if (tableScan != null) {
+           return tableScan;
+       }
+       if (m_parentStmt != null) {
+           // This may be a correlated subquery
+           return m_parentStmt.resolveStmtTableScanByAlias(tableAlias);
+       }
+       return null;
+   }
 
     /**
      * Add a table to the statement cache.
@@ -571,8 +580,7 @@ public abstract class AbstractParsedStmt {
         if (tableAlias == null) {
             tableAlias = "VOLT_TEMP_TABLE_" + subquery.m_stmtId;
         }
-        StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
-        assert(tableScan == null);
+        assert(m_tableAliasMap.get(tableAlias) == null);
         StmtSubqueryScan subqueryScan = new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
         m_tableAliasMap.put(tableAlias, subqueryScan);
         return subqueryScan;
@@ -1139,7 +1147,7 @@ public abstract class AbstractParsedStmt {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_joinTree != null) {
-          m_joinTree.extractSubQueries(subqueries);
+            m_joinTree.extractSubQueries(subqueries);
         }
 
         return subqueries;
@@ -1515,7 +1523,7 @@ public abstract class AbstractParsedStmt {
         boolean allScansAreDeterministic = true;
         for (Entry<String, List<AbstractExpression>> orderedAlias : baseTableAliases.entrySet()) {
             List<AbstractExpression> orderedAliasExprs = orderedAlias.getValue();
-            StmtTableScan tableScan = m_tableAliasMap.get(orderedAlias.getKey());
+            StmtTableScan tableScan = getStmtTableScanByAlias(orderedAlias.getKey());
             if (tableScan == null) {
                 assert(false);
                 return false;

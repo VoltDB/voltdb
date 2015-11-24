@@ -111,7 +111,7 @@ public class ServerSocketImporter extends AbstractImporter {
                     String line = in.readLine();
                     //You should convert your data to params here.
                     if (line == null) continue;
-                    CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                    CSVInvocation invocation = new CSVInvocation(m_procedure, line, m_config.getSeparator());
                     if (!callProcedure(invocation)) {
                         rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                     }
