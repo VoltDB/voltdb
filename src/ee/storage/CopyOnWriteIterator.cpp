@@ -42,6 +42,42 @@ CopyOnWriteIterator::CopyOnWriteIterator(
 }
 
 /**
+ * When a tuple is "dirty" it is still active, but will never be a "found" tuple
+ * since it is skipped. The tuple may be dirty because it was deleted (this is why it is always skipped). In that
+ * case the CopyOnWriteContext calls this to ensure that the iteration finds the correct number of tuples
+ * in the used portion of the table blocks and doesn't overrun to the uninitialized block memory because
+ * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
+ */
+bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
+    /**
+     * Find out which block the address is contained in. Lower bound returns the first entry
+     * in the index >= the address. Unless the address happens to be equal then the block
+     * we are looking for is probably the previous entry. Then check if the address fits
+     * in the previous entry. If it doesn't then the block is something new.
+     */
+    TBPtr block = PersistentTable::findBlock(tupleAddress, m_blocks, m_table->getTableAllocationSize());
+    if (block.get() == NULL) {
+        // tuple not in snapshot region, don't care about this tuple
+        return false;
+    }
+
+    /**
+     * Now check where this is relative to the COWIterator.
+     */
+    const char *blockAddress = block->address();
+    if (blockAddress > m_currentBlock->address()) {
+        return true;
+    }
+
+    assert(blockAddress == m_currentBlock->address());
+    if (tupleAddress >= m_location) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
  * Iterate through the table blocks until all the active tuples have been found. Skip dirty tuples
  * and mark them as clean so that they can be copied during the next snapshot.
  */

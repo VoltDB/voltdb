@@ -187,7 +187,7 @@ public class SnapshotSiteProcessor {
     private long m_lastSnapshotTxnId;
     private final int m_snapshotPriority;
 
-    private boolean m_lastSnapshotSucceded = true;
+    private boolean m_perSiteLastSnapshotSucceded = true;
 
     /**
      * List of threads to join to block on snapshot completion
@@ -403,7 +403,7 @@ public class SnapshotSiteProcessor {
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
-        m_lastSnapshotSucceded = true;
+        m_perSiteLastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
@@ -549,10 +549,10 @@ public class SnapshotSiteProcessor {
                             try {
                                 tableTask.m_target.close();
                             } catch (IOException e) {
-                                m_lastSnapshotSucceded = false;
+                                m_perSiteLastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             } catch (InterruptedException e) {
-                                m_lastSnapshotSucceded = false;
+                                m_perSiteLastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
 
@@ -606,6 +606,7 @@ public class SnapshotSiteProcessor {
                 break;
             }
 
+
             // Stream more and add a listener to handle any failures
             Pair<ListenableFuture, Boolean> streamResult =
                     m_streamers.get(tableId).streamMore(context, outputBuffers, null);
@@ -618,14 +619,13 @@ public class SnapshotSiteProcessor {
                         try {
                             writeFutures.get();
                         } catch (Throwable t) {
-                            if (m_lastSnapshotSucceded) {
+                            if (m_perSiteLastSnapshotSucceded) {
                                 if (t instanceof StreamSnapshotTimeoutException ||
                                         t.getCause() instanceof StreamSnapshotTimeoutException) {
                                     //This error is already logged by the watchdog when it generates the exception
                                 } else {
                                     SNAP_LOG.error("Error while attempting to write snapshot data", t);
                                 }
-                                m_lastSnapshotSucceded = false;
                             }
                         }
                     }
@@ -691,6 +691,7 @@ public class SnapshotSiteProcessor {
                     new Thread("Snapshot terminator") {
                     @Override
                     public void run() {
+                        boolean snapshotSucceeded = true;
                         try {
                             /*
                              * Be absolutely sure the snapshot is finished
@@ -710,10 +711,10 @@ public class SnapshotSiteProcessor {
                                 try {
                                     t.close();
                                 } catch (IOException e) {
-                                    m_lastSnapshotSucceded = false;
+                                    snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 } catch (InterruptedException e) {
-                                    m_lastSnapshotSucceded = false;
+                                    snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 }
                             }
@@ -731,7 +732,6 @@ public class SnapshotSiteProcessor {
                             // ExecutionSitesCurrentlySnapshotting set, so
                             // logSnapshotCompletionToZK() will not see incorrect values
                             // from the next snapshot
-                            final boolean snapshotSucceeded = m_lastSnapshotSucceded;
 
                             try {
                                 VoltDB.instance().getHostMessenger().getZK().delete(

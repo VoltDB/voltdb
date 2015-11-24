@@ -48,7 +48,6 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.PosixAdvise;
-import org.voltdb.VoltTable.ColumnInfo;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -83,6 +82,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      */
     private volatile boolean m_writeFailed = false;
     private volatile IOException m_writeException = null;
+    private volatile IOException m_reportedSerializationFailure = null;
 
     private volatile long m_bytesWritten = 0;
 
@@ -337,6 +337,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public void reportSerializationFailure(IOException ex) {
+        m_reportedSerializationFailure = ex;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         return m_needsFinalClose;
@@ -382,6 +387,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_channel.close();
         if (m_onCloseHandler != null) {
             m_onCloseHandler.run();
+        }
+        if (m_reportedSerializationFailure != null) {
+            // There was an error reported by the EE during serialization
+            throw m_reportedSerializationFailure;
         }
     }
 
