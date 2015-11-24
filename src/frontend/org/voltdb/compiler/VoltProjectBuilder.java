@@ -57,7 +57,6 @@ import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ImportTransformerType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
@@ -602,7 +601,7 @@ public class VoltProjectBuilder {
 
         importConnector.put("ilConfig", config);
         if (importFormat != null) {
-            importConnector.put("ilTransformer", importFormat);
+            importConnector.put("ilFormatter", importFormat);
         }
 
         if ((importType != null) && !importType.trim().isEmpty()) {
@@ -1098,11 +1097,9 @@ public class VoltProjectBuilder {
             ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
             importConfig.setType(importType);
             importConfig.setModule((String )importConnector.get("ilModule"));
-            String transformer = (String) importConnector.get("ilTransformer");
-            if (transformer != null) {
-                ImportTransformerType transformerType = factory.createImportTransformerType();
-                transformerType.setName(transformer);
-                importConfig.setTransformer(transformerType);
+            String formatter = (String) importConnector.get("ilFormatter");
+            if (formatter != null) {
+                importConfig.setFormat(formatter);
             }
 
             Properties config = (Properties)importConnector.get("ilConfig");
