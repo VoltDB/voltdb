@@ -43,8 +43,9 @@ public interface CommandLogReinitiator {
      * Generate the local replay plan. Call this before starting replay.
      * @param newPartitionCount
      * @param true if this node contains the MPI
+     * @param true if dr is enabled (must perform a scan of the log tail to find the best replay partition)
      */
-    public void generateReplayPlan(int newPartitionCount, boolean isMPINode);
+    public void generateReplayPlan(int newPartitionCount, boolean isMPINode, boolean drEnabled);
 
     /**
      * Start replaying the log. Two threads will be started, one for reading the
