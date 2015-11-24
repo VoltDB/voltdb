@@ -83,6 +83,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      */
     private volatile boolean m_writeFailed = false;
     private volatile IOException m_writeException = null;
+    private volatile IOException m_reportedSerializationFailure = null;
 
     private volatile long m_bytesWritten = 0;
 
@@ -337,6 +338,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
+    public void reportSerializationFailure(IOException ex) {
+        m_reportedSerializationFailure = ex;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         return m_needsFinalClose;
@@ -372,7 +378,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
         m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
-        if (m_writeFailed) {
+        if (m_writeFailed || m_reportedSerializationFailure != null) {
             completed.put((byte)0).flip();
         } else {
             completed.put((byte)1).flip();
@@ -382,6 +388,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         m_channel.close();
         if (m_onCloseHandler != null) {
             m_onCloseHandler.run();
+        }
+        if (m_reportedSerializationFailure != null) {
+            // There was an error reported by the EE during serialization
+            throw m_reportedSerializationFailure;
         }
     }
 
