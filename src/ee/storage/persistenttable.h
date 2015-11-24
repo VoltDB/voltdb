@@ -104,6 +104,9 @@ public:
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
+    size_t getSnapshotPendingBlockCount() const;
+    size_t getSnapshotPendingLoadBlockCount() const;
+    bool blockCountConsistent() const;
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
@@ -225,6 +228,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     TableIterator* makeIterator() {
         return new TableIterator(this, m_data.begin());
+    }
+
+    JumpingTableIterator* makeJumpingIterator() {
+        return new JumpingTableIterator(this, m_data.begin());
     }
 
     TableIterator& iteratorDeletingAsWeGo() {
@@ -518,6 +525,22 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<std::string> &predicateStrings,
                                     bool skipInternalActivation);
 
+    size_t getSnapshotPendingBlockCount() const {
+        return m_blocksPendingSnapshot.size();
+    }
+
+    size_t getSnapshotPendingLoadBlockCount() const {
+        size_t blockCnt = 0;
+        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+            blockCnt += m_blocksPendingSnapshotLoad[ii]->size();
+        }
+        return blockCnt;
+    }
+
+    bool blockCountConsistent() const {
+        return m_blocksNotPendingSnapshot.size() == m_data.size();
+    }
+
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
             assert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
@@ -535,7 +558,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void nextFreeTuple(TableTuple *tuple);
     bool doCompactionWithinSubset(TBBucketPtrVector *bucketVector);
-    void doForcedCompaction();
+    bool doForcedCompaction();  // Returns true if a compaction was performed
 
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
@@ -712,6 +735,18 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
 
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     m_table.deleteTupleStorage(tuple, block);
+}
+
+inline size_t PersistentTableSurgeon::getSnapshotPendingBlockCount() const {
+    return m_table.getSnapshotPendingBlockCount();
+}
+
+inline size_t PersistentTableSurgeon::getSnapshotPendingLoadBlockCount() const {
+    return m_table.getSnapshotPendingLoadBlockCount();
+}
+
+inline bool PersistentTableSurgeon::blockCountConsistent() const {
+    return m_table.blockCountConsistent();
 }
 
 inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {

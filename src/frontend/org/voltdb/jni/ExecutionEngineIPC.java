@@ -634,20 +634,22 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
     @Override
-    protected void throwExceptionForError(final int errorCode) {
+    protected Void throwExceptionForError(final int errorCode) {
         try {
             m_connection.throwException(errorCode);
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
+        return null;
     }
 
     @Override
-    public void release() throws EEException, InterruptedException {
+    public Void release() throws EEException, InterruptedException {
         System.out.println("Shutdown IPC connection in progress.");
         m_connection.close();
         System.out.println("Shutdown IPC connection in done.");
         m_dataNetworkOrigin.discard();
+        return null;
     }
 
     private static final Object printLockObject = new Object();
@@ -696,7 +698,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** write the catalog as a UTF-8 byte string via connection */
     @Override
-    protected void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
+    protected Void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -717,11 +719,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         checkErrorCode(result);
+        return null;
     }
 
     /** write the diffs as a UTF-8 byte string via connection */
     @Override
-    public void updateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
+    public Void updateCatalog(final long timestamp, final String catalogDiffs) throws EEException {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
 
@@ -748,10 +751,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(e);
         }
         checkErrorCode(result);
+        return null;
     }
 
     @Override
-    public void tick(final long time, final long lastCommittedSpHandle) {
+    public Void tick(final long time, final long lastCommittedSpHandle) {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Tick.m_id);
@@ -767,10 +771,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
         checkErrorCode(result);
         // no return code for tick.
+        return null;
     }
 
     @Override
-    public void quiesce(long lastCommittedSpHandle) {
+    public Void quiesce(long lastCommittedSpHandle) {
         int result = ExecutionEngine.ERRORCODE_ERROR;
         m_data.clear();
         m_data.putInt(Commands.Quiesce.m_id);
@@ -784,6 +789,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException();
         }
         checkErrorCode(result);
+        return null;
     }
 
     private void sendPlanFragmentsInvocation(final Commands cmd,
@@ -927,8 +933,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      * Unsupported implementation of toggleProfiler
      */
     @Override
-    public void toggleProfiler(final int toggle) {
-        return;
+    public Void toggleProfiler(final int toggle) {
+        return null;
     }
 
 
@@ -1287,7 +1293,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
+    public Void exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
         try {
             m_data.clear();
@@ -1317,7 +1323,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
-
+        return null;
     }
 
     @Override
@@ -1352,7 +1358,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long pointer) {
+    public Void processRecoveryMessage( ByteBuffer buffer, long pointer) {
         try {
             m_data.clear();
             m_data.putInt(Commands.RecoveryMessage.m_id);
@@ -1367,6 +1373,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
+        return null;
     }
 
     @Override
@@ -1429,7 +1436,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config)
+    public Void updateHashinator(HashinatorConfig config)
     {
         m_data.clear();
         m_data.putInt(Commands.updateHashinator.m_id);
@@ -1443,6 +1450,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
+        return null;
     }
 
     @Override

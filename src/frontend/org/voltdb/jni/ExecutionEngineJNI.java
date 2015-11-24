@@ -183,7 +183,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
-    final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
+    final protected Void throwExceptionForError(final int errorCode) throws RuntimeException {
         exceptionBuffer.clear();
         final int exceptionLength = exceptionBuffer.getInt();
 
@@ -203,7 +203,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * using the object.
      */
     @Override
-    public void release() throws EEException {
+    public Void release() throws EEException {
         LOG.trace("Releasing Execution Engine... " + pointer);
         if (pointer != 0L) {
             final int errorCode = nativeDestroy(pointer);
@@ -217,6 +217,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         psetBufferC.discard();
         psetBuffer = null;
         LOG.trace("Released Execution Engine.");
+        return null;
     }
 
     /**
@@ -224,12 +225,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
+    protected Void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
+        return null;
     }
 
     /**
@@ -237,11 +239,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
+    public Void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
         checkErrorCode(errorCode);
+        return null;
     }
 
     /**
@@ -417,13 +420,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * System.currentTimeMillis();
      */
     @Override
-    public void tick(final long time, final long lastCommittedTxnId) {
+    public Void tick(final long time, final long lastCommittedTxnId) {
         nativeTick(pointer, time, lastCommittedTxnId);
+        return null;
     }
 
     @Override
-    public void quiesce(long lastCommittedTxnId) {
+    public Void quiesce(long lastCommittedTxnId) {
         nativeQuiesce(pointer, lastCommittedTxnId);
+        return null;
     }
 
     /**
@@ -467,9 +472,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void toggleProfiler(final int toggle) {
+    public Void toggleProfiler(final int toggle) {
         nativeToggleProfiler(pointer, toggle);
-        return;
+        return null;
     }
 
     @Override
@@ -539,7 +544,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction,
+    public Void exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
@@ -551,6 +556,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + tableSignature);
         }
+        return null;
     }
 
     @Override
@@ -559,8 +565,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
+    public Void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
         nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
+        return null;
     }
 
     @Override
@@ -587,7 +594,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config)
+    public Void updateHashinator(HashinatorConfig config)
     {
         if (config.configPtr == 0) {
             ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
@@ -602,6 +609,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
+        return null;
     }
 
     @Override
