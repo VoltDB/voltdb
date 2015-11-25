@@ -2918,7 +2918,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         long megabytes = 1024 * 1024;
         long maxMemory = Runtime.getRuntime().maxMemory() / megabytes;
         // DRv2 now is off heap
-        // long drRqt = isPro ? 128 * sitesPerHost : 0;
         long crazyThresh = computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
 
         if (maxMemory < crazyThresh) {
@@ -2938,11 +2937,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         long baseRqt = 384;
         long tableRqt = 10 * tableCount;
-        // K-safety Heap consumption drop to theoretically 8 MB (per node)
+        // K-safety Heap consumption drop to 8 MB (per node)
         // Snapshot cost 32 MB (per node)
-        // Theoretically, 32 snapshot and 8 for k-safety should (per node) be enough
+        // Theoretically, 40 MB (per node) should be enough
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
-        // long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
     }
 
