@@ -81,6 +81,9 @@ static void collectAllTableTuples(boost::unordered_set<uint64_t>& tupleAddressSe
 
     typedef std::pair<boost::unordered_set<uint64_t>::iterator, bool> Result;
 
+    int64_t count = table->activeTupleCount();
+    tupleAddressSet.reserve(count);
+
     TableTuple tuple(table->schema());
     IndexCursor indexCursor(index->getTupleSchema());
     index->moveToEnd(true, indexCursor);
