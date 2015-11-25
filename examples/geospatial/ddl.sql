@@ -57,22 +57,22 @@ CREATE TABLE impressions
 partition table impressions on column device_id;
 
 -- This materiazlied view aggregates the number of ads served from
--- each advertiser per minute, and the amount their account will be
+-- each advertiser per second, and the amount their account will be
 -- charged.
-CREATE VIEW impressions_by_minute_by_advertiser
+CREATE VIEW impressions_by_second_by_advertiser
 (
-  ts_minute
+  ts_second
 , advertiser_id
 , impression_count
 , sum_of_impression_revenue
 )
 AS
   select
-    truncate(minute, ts) as ts_minute
+    truncate(second, ts) as ts_second
   , advertiser_id
   , count(*)
   , sum(bid_amount)
   from impressions
-  group by ts_minute, advertiser_id;
+  group by ts_second, advertiser_id;
 
 END_OF_BATCH
