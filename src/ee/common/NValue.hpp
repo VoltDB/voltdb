@@ -404,7 +404,7 @@ class NValue {
      * If this NValue is an array value, get a value.
      * Undefined behavior if not an array or if oob (cassert fail in debug).
      */
-    NValue itemAtIndex(int index) const;
+    const NValue& itemAtIndex(int index) const;
 
     /**
      * Used for SQL-IN-LIST to cast all array values to a specific type,
