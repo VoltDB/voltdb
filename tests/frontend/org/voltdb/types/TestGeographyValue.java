@@ -24,6 +24,7 @@
 package org.voltdb.types;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,7 +32,7 @@ import junit.framework.TestCase;
 
 public class TestGeographyValue extends TestCase {
 
-    public void testBasic() {
+    public void testGeographyValuePositive() {
         GeographyValue geog;
         // The Bermuda Triangle
         List<PointType> outerLoop = Arrays.asList(
@@ -77,6 +78,61 @@ public class TestGeographyValue extends TestCase {
                 + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
                 newGeog.toString());
         assertEquals(77, buf.position());
+    }
+
+    public void testGeographyValueNegativeCases() {
+        List<PointType> outerLoop = new ArrayList<PointType>();
+        outerLoop.add(new PointType(32.305, -64.751));
+        outerLoop.add(new PointType(25.244, -80.437));
+        outerLoop.add(new PointType(18.476, -66.371));
+        outerLoop.add(new PointType(20.305, -76.751));
+        outerLoop.add(new PointType(32.305, -64.751));
+        GeographyValue geoValue;
+        // start with valid loop
+        geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 20.305 -76.751, 32.305 -64.751))",
+                geoValue.toString());
+
+        Exception exception = null;
+        // first and last vertex are not equal in the loop
+        outerLoop.remove(outerLoop.size() - 1);
+        try {
+            geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        }
+        catch (IllegalArgumentException illegalArgs) {
+            exception = illegalArgs;
+            assertTrue(exception.getMessage().contains("start and end vertices of loop are not equal"));
+        }
+        finally {
+            assertNotNull(exception);
+        }
+
+        // loop has less than 4 vertex
+        exception = null;
+        outerLoop.remove(outerLoop.size() - 1);
+        try {
+            geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        }
+        catch (IllegalArgumentException illegalArgs) {
+            exception = illegalArgs;
+            assertTrue(exception.getMessage().contains("each loop in polygon should have 4 vertices, with start and end vertices equal"));
+        }
+        finally {
+            assertNotNull(exception);
+        }
+
+        // loop is empty
+        outerLoop.clear();
+        try {
+            geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        }
+        catch (IllegalArgumentException illegalArgs) {
+            exception = illegalArgs;
+            assertTrue(exception.getMessage().contains("each loop in polygon should have 4 vertices, with start and end vertices equal"));
+        }
+        finally {
+            assertNotNull(exception);
+        }
     }
 
     private static String canonicalizeWkt(String wkt) {

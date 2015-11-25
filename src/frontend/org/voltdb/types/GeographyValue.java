@@ -52,9 +52,11 @@ public class GeographyValue {
         m_loops = new ArrayList<List<XYZPoint>>();
         for (List<PointType> loop : loops) {
             List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
-            for (int i = 0; i < (loop.size() - 1); ++i) {
+            for (int i = 0; i < loop.size(); ++i) {
                 oneLoop.add(XYZPoint.fromPointType(loop.get(i)));
             }
+            diagnoseLoop(oneLoop, "Invalid loop for GeographyValue: ");
+            oneLoop.remove(oneLoop.size() - 1);
             m_loops.add(oneLoop);
         }
     }
@@ -401,6 +403,30 @@ public class GeographyValue {
         return depth;
     }
 
+
+
+    /**
+     * A helper function to validate the loop structure
+     * If loop is invalid, it generates IllegalArgumentException exception
+     */
+
+    private static void diagnoseLoop(List<XYZPoint> loop, String excpMsgPrf) throws IllegalArgumentException {
+        if (loop == null) {
+            throw new IllegalArgumentException(excpMsgPrf + "polygon should contain atleast one loop, " +
+                    "with each loop containing minimum of 4 vertices - start and end vertices being equal");
+        }
+
+        // 4 vertices = 3 unique vertices for polygon + 1 end point which is same as start point
+        if (loop.size() < 4) {
+            throw new IllegalArgumentException(excpMsgPrf + "each loop in polygon should have 4 vertices, with start and end vertices equal");
+        }
+
+        // check if the end points of the loop are equal
+        if (loop.get(0).equals(loop.get(loop.size() - 1)) == false) {
+            throw new IllegalArgumentException(excpMsgPrf + "start and end vertices of loop are not equal");
+        }
+    }
+
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
@@ -460,22 +486,8 @@ public class GeographyValue {
                     }
                     break;
                 case ')':
-                    if (currentLoop == null) {
-                        throw new IllegalArgumentException(msgPrefix + "polygon should contain atleast one loop, " +
-                                "with each loop containing minimum of 4 vertices - start and end vertices being equal");
-                    }
-
-                    // 4 vertices = 3 unique vertices for polygon + 1 end point which is same as start point
-                    if(currentLoop.size() < 4) {
-                        throw new IllegalArgumentException(msgPrefix + "each loop in polygon should have 4 vertices, " +
-                                  "with start and end vertices equal");
-                    }
-
-                    // check if the end points of the loop are equal
-                    if (currentLoop.get(0).equals(currentLoop.get(currentLoop.size() - 1)) == false) {
-                        throw new IllegalArgumentException(msgPrefix + "start and end vertices of loop are not equal");
-                    }
-
+                    // perform basic validation of loop
+                    diagnoseLoop(currentLoop, msgPrefix);
                     currentLoop.remove(currentLoop.size() - 1);
 
                     loops.add(currentLoop);
