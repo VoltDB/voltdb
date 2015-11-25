@@ -92,14 +92,14 @@ public class DRLogSegmentId implements Serializable {
 
         public MutableBinaryLogInfo() {
             drId = Long.MIN_VALUE;
-            spUniqueId = Long.MIN_VALUE;
-            mpUniqueId = Long.MIN_VALUE;
+            spUniqueId = 0;
+            mpUniqueId = 0;
         }
 
         public void reset() {
             drId = Long.MIN_VALUE;
-            spUniqueId = Long.MIN_VALUE;
-            mpUniqueId = Long.MIN_VALUE;
+            spUniqueId = 0;
+            mpUniqueId = 0;
         }
 
         public DRLogSegmentId toImmutable() {
