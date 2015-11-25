@@ -340,7 +340,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Handle joined query case case.
         // MV partitioned table without partition column can only join with replicated tables.
         // For all tables in this query, the # of tables that need to be fixed should not exceed one.
-        for (StmtTableScan mvTableScan: m_tableAliasMap.values()) {
+        for (StmtTableScan mvTableScan: allScans()) {
             Set<SchemaColumn> mvNewScanColumns = new HashSet<SchemaColumn>();
 
             Collection<SchemaColumn> columns = mvTableScan.getScanColumns();
@@ -1316,7 +1316,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             String alias = element.trim().toUpperCase();
             tableAliases.add(alias);
             if (!dupCheck.add(alias)) {
-                if (m_hasLargeNumberOfTableJoins) return false;
+                if (m_hasLargeNumberOfTableJoins) {
+                    return false;
+                }
 
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"").append(joinOrder);
@@ -1329,7 +1331,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // here and in isValidJoinOrder should be combined in one AbstractParsedStmt function
         // that generates a JoinNode tree or throws an exception.
         if (m_tableAliasMap.size() != tableAliases.size()) {
-            if (m_hasLargeNumberOfTableJoins) return false;
+            if (m_hasLargeNumberOfTableJoins) {
+                return false;
+            }
 
             StringBuilder sb = new StringBuilder();
             sb.append("The specified join order \"");
@@ -1343,7 +1347,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         Set<String> specifiedNames = new HashSet<String>(tableAliases);
         specifiedNames.removeAll(aliasSet);
         if (specifiedNames.isEmpty() == false) {
-            if (m_hasLargeNumberOfTableJoins) return false;
+            if (m_hasLargeNumberOfTableJoins) {
+                return false;
+            }
 
             StringBuilder sb = new StringBuilder();
             sb.append("The specified join order \"");
@@ -1815,7 +1821,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean hasTopLevelScans() {
-        for (StmtTableScan scan : m_tableAliasMap.values()) {
+        for (StmtTableScan scan : allScans()) {
             if (scan instanceof StmtTargetTableScan) {
                 return true;
             }
