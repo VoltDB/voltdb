@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -57,6 +55,8 @@ import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
+import junit.framework.TestCase;
+
 /**
  * Base class for a set of JUnit tests that perform regression tests
  * on a running VoltDB server. It is assumed that all tests will access
@@ -67,6 +67,7 @@ import com.google_voltpatches.common.net.HostAndPort;
  *
  */
 public class RegressionSuite extends TestCase {
+    protected final static double GEOGRAPHY_EPSILON = 1.0e-13;
 
     protected static int m_verboseDiagnosticRowCap = 40;
     protected VoltServerConfig m_config;
@@ -727,15 +728,55 @@ public class RegressionSuite extends TestCase {
     }
 
     public static void assertEquals(String msg, PointType expected, PointType actual) {
-        assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), 0.001);
-        assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), 0.001);
+            assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
+    }
+    /**
+     * Assert that two points are approximately equal.  By this we mean the latitude and
+     * longitude differ by at most epsilon.  If epsilon is zero or negative this means
+     * equality.
+     *
+     * @param msg
+     * @param expected
+     * @param actual
+     */
+    public static void assertApproximatelyEquals(String msg, PointType expected, PointType actual, double epsilon) {
+        if (epsilon > 0) {
+            assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), epsilon);
+            assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), epsilon);
+        } else {
+            assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude());
+            assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude());
+        }
     }
 
     public static void assertEquals(PointType expected, PointType actual) {
         assertEquals("Points not equal: ", expected, actual);
     }
 
+    /**
+     * Assert that two geography values are equal.  This delegates to
+     * assertApproximatelyEquals with epsilon equal to zero.
+     *
+     * @param msg
+     * @param expected
+     * @param actual
+     */
     public static void assertEquals(String msg, GeographyValue expected, GeographyValue actual) {
+        assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
+    }
+
+    /**
+     * Assert that two geography values are approximately equal.  By approximately
+     * equal we mean that the vertices of the expected and actual values differ
+     * by at most epsilon.  If epsilon is not positive this means the values must
+     * be exactly equal.
+     *
+     * @param msg
+     * @param expected
+     * @param actual
+     * @param epsilon
+     */
+    public static void assertApproximatelyEquals(String msg, GeographyValue expected, GeographyValue actual, double epsilon) {
         if (expected == actual) {
             return;
         }
@@ -767,7 +808,7 @@ public class RegressionSuite extends TestCase {
             for (PointType actualPt : actualLoop) {
                 PointType expectedPt = expectedVertexIt.next();
                 String prefix = msg + "at loop " + loopCtr + ", vertex " + vertexCtr;
-                assertEquals(prefix, expectedPt, actualPt);
+                assertApproximatelyEquals(prefix, expectedPt, actualPt, epsilon);
                 ++vertexCtr;
             }
 
@@ -779,7 +820,10 @@ public class RegressionSuite extends TestCase {
         assertEquals("Geographies not equal: ", expected, actual);
     }
 
-    private static void assertContentOfRow(int row, Object[] expectedRow, VoltTable actualRow) {
+    private static void assertApproximateContentOfRow(int row,
+                                                      Object[] expectedRow,
+                                                      VoltTable actualRow,
+                                                      double epsilon) {
         for (int i = 0; i < expectedRow.length; ++i) {
             String msg = "Row " + row + ", col " + i + ": ";
             Object expectedObj = expectedRow[i];
@@ -789,10 +833,10 @@ public class RegressionSuite extends TestCase {
                 assertTrue(msg, actualRow.wasNull());
             }
             else if (expectedObj instanceof PointType) {
-                assertEquals(msg, (PointType)expectedObj, actualRow.getPoint(i));
+                assertEquals(msg, expectedObj, actualRow.getPoint(i));
             }
             else if (expectedObj instanceof GeographyValue) {
-                assertEquals(msg, (GeographyValue)expectedObj, actualRow.getGeographyValue(i));
+                assertApproximatelyEquals(msg, (GeographyValue)expectedObj, actualRow.getGeographyValue(i), epsilon);
             }
             else if (expectedObj instanceof Long) {
                 long val = ((Long)expectedObj).longValue();
@@ -811,7 +855,11 @@ public class RegressionSuite extends TestCase {
                 if (actualRow.wasNull()) {
                     actualValue = Double.MIN_VALUE;
                 }
-                assertEquals(msg, expectedValue, actualValue);
+                if (epsilon <= 0) {
+                    assertEquals(msg, expectedValue, actualValue);
+                } else {
+                    assertTrue(msg, Math.abs(expectedValue - actualValue) < epsilon);
+                }
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
@@ -828,12 +876,28 @@ public class RegressionSuite extends TestCase {
      * Currently only handles some data types.  Feel free to add more as needed.
      */
     public static void assertContentOfTable(Object[][] expectedTable, VoltTable actualTable) {
+        assertApproximateContentOfTable(expectedTable, actualTable, 0.0d);
+    }
+
+    /**
+     * Assert that the expected and actual valus are approximately equal. By
+     * approximately equal we mean that non-floating point values are identical,
+     * and floating point values differ by at most epsilon. If epsilon is zero or negative,
+     * we require equality.
+     *
+     * @param expectedTable
+     * @param actualTable
+     * @param epsilon
+     */
+    public static void assertApproximateContentOfTable(Object[][] expectedTable,
+                                                       VoltTable actualTable,
+                                                       double epsilon) {
         for (int i = 0; i < expectedTable.length; ++i) {
             assertTrue("Fewer rows than expected: "
                     + "expected: " + expectedTable.length + ", "
                     + "actual: " + i,
                     actualTable.advanceRow());
-            assertContentOfRow(i, expectedTable[i], actualTable);
+            assertApproximateContentOfRow(i, expectedTable[i], actualTable, epsilon);
         }
         assertFalse("More rows than expected: "
                 + "expected " + expectedTable.length + ", "

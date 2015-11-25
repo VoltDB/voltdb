@@ -33,9 +33,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyValue;
 
-public class TestGeographyValue extends RegressionSuite {
-
-    public TestGeographyValue(String name) {
+public class TestGeographyValueQueries extends RegressionSuite {
+    public TestGeographyValueQueries(String name) {
         super(name);
     }
 
@@ -432,13 +431,14 @@ public class TestGeographyValue extends RegressionSuite {
             vt = client.callProcedure("@AdHoc",
                     "select * from " + tbl + " order by pk asc")
                     .getResults()[0];
-            assertContentOfTable(new Object[][] {
+            assertApproximateContentOfTable(new Object[][] {
                     {0, "Santa Cruz Triangle", new GeographyValue(santaCruzWkt)},
                     {1, "Bermuda Triangle with a hole", BERMUDA_TRIANGLE_HOLE_POLY},
                     {2, "South Valley Triangle", new GeographyValue(southValleyWkt)},
                     {3, "Lowell Square", LOWELL_SQUARE_POLY},
                     {4, "null poly", null}},
-                    vt);
+                    vt,
+                    GEOGRAPHY_EPSILON);
         }
     }
 
@@ -573,7 +573,7 @@ public class TestGeographyValue extends RegressionSuite {
 
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGeographyValue.class);
+            new MultiConfigSuiteBuilder(TestGeographyValueQueries.class);
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();

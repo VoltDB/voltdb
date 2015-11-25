@@ -37,6 +37,66 @@ public class TestGeospatialFunctions extends RegressionSuite {
         super(name);
     }
 
+    /*
+     * We want to store the borders table once and for all, and insert and test
+     * without repeating ourselves. This class holds geometry values for us for
+     * inserting and for testing later on.
+     */
+    private static class Borders {
+        Borders(long pk, String name, GeographyValue region) {
+            m_pk = pk;
+            m_name = name;
+            m_region = region;
+        }
+
+        public final long getPk() {
+            return m_pk;
+        }
+
+        public final String getName() {
+            return m_name;
+        }
+
+        public final GeographyValue getRegion() {
+            return m_region;
+        }
+
+        private final long m_pk;
+        private final String m_name;
+        private final GeographyValue m_region;
+    }
+
+    /*
+     * This is the array of borders we know about. We will insert these
+     * borders and then extract them.
+     */
+    private static Borders borders[] = {
+        new Borders(0, "Colorado", new GeographyValue("POLYGON(("
+                                                  + "41.002 -102.052, "
+                                                  + "41.002 -109.045,"
+                                                  + "36.999 -109.045,"
+                                                  + "36.999 -102.052,"
+                                                  + "41.002 -102.052))")),
+        new Borders(1, "Wyoming", new GeographyValue("POLYGON(("
+                                                + "44.978 -104.061, "
+                                                + "44.978 -111.046, "
+                                                + "40.998 -111.046, "
+                                                + "40.998 -104.061, "
+                                                + "44.978 -104.061))")),
+       new Borders(2, "Colorado with a hole around Denver",
+               new GeographyValue("POLYGON("
+                                  + "(41.002 -102.052, "
+                                  + "41.002 -109.045,"
+                                  + "36.999 -109.045,"
+                                  + "36.999 -102.052,"
+                                  + "41.002 -102.052), "
+                                  + "(40.240 -104.035, "
+                                  + "40.240 -105.714, "
+                                  + "39.188 -105.714, "
+                                  + "39.188 -104.035,"
+                                  + "40.240 -104.035))")),
+       new Borders(3, "Wonderland", null)
+    };
     private static void populateTables(Client client) throws Exception {
         client.callProcedure("places.Insert", 0, "Denver",
                 PointType.pointFromText("POINT(39.704 -104.959)"));
@@ -70,37 +130,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // A null-valued point
         client.callProcedure("places.Insert", 99, "Neverwhere", null);
 
-        client.callProcedure("borders.Insert", 0, "Colorado",
-                new GeographyValue("POLYGON(("
-                        + "41.002 -102.052, "
-                        + "41.002 -109.045,"
-                        + "36.999 -109.045,"
-                        + "36.999 -102.052,"
-                        + "41.002 -102.052))"));
-        client.callProcedure("borders.Insert", 1, "Wyoming",
-                new GeographyValue("POLYGON(("
-                        + "44.978 -104.061, "
-                        + "44.978 -111.046, "
-                        + "40.998 -111.046, "
-                        + "40.998 -104.061, "
-                        + "44.978 -104.061))"));
-
-        // This polygon should not contain Denver, due to the hole.
-        client.callProcedure("borders.Insert", 2, "Colorado with a hole around Denver",
-                new GeographyValue("POLYGON("
-                        + "(41.002 -102.052, "
-                        + "41.002 -109.045,"
-                        + "36.999 -109.045,"
-                        + "36.999 -102.052,"
-                        + "41.002 -102.052), "
-                        + "(40.240 -104.035, "
-                        + "40.240 -105.714, "
-                        + "39.188 -105.714, "
-                        + "39.188 -104.035,"
-                        + "40.240 -104.035))"));
-
-        // a null-valued-polygon
-        client.callProcedure("borders.Insert", 3, "Wonderland", null);
+        for (int idx = 0; idx < borders.length; idx += 1) {
+            Borders b = borders[idx];
+            client.callProcedure("borders.Insert",
+                                 b.getPk(),
+                                 b.getName(),
+                                 b.getRegion());
+        }
     }
 
     public void testContains() throws Exception {
@@ -222,6 +258,23 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Point on E Wyoming Border",      42.988, -104.078},
                  {"Point on N Wyoming Border",      44.978, -105.058},
                 }, vt);
+    }
+
+    public void testPolygonFloatingPrecision() throws Exception {
+        final double EPSILON = -1.0;
+        Client client = getClient();
+        populateTables(client);
+
+        String sql = "select name, region "
+                        + "from borders order by borders.pk";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertApproximateContentOfTable(new Object[][]
+                                        {{borders[0].getName(), borders[0].getRegion()},
+                                         {borders[1].getName(), borders[1].getRegion()},
+                                         {borders[2].getName(), borders[2].getRegion()},
+                                         {borders[3].getName(), borders[3].getRegion()}},
+                                        vt,
+                                        EPSILON);
     }
 
     public void testPolygonCentroidAndArea() throws Exception {
