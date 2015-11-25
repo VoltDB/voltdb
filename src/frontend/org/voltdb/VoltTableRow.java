@@ -20,12 +20,11 @@ package org.voltdb;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -297,7 +296,7 @@ public abstract class VoltTableRow {
         case DECIMAL:
             ret = getDecimalAsBigDecimal(columnIndex);
             break;
-        case POINT:
+        case GEOGRAPHY_POINT:
             ret = getPoint(columnIndex);
             break;
         case GEOGRAPHY:
@@ -621,14 +620,14 @@ public abstract class VoltTableRow {
         return getVarbinary(colIndex);
     }
 
-    public final PointType getPoint(int columnIndex) {
-        validateColumnType(columnIndex, VoltType.POINT);
-        PointType pt = PointType.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
+    public final GeographyPointValue getPoint(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.GEOGRAPHY_POINT);
+        GeographyPointValue pt = GeographyPointValue.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
         m_wasNull = (pt == null);
         return pt;
     }
 
-    public final PointType getPoint(String columnName) {
+    public final GeographyPointValue getPoint(String columnName) {
         final int colIndex = getColumnIndex(columnName);
         return getPoint(colIndex);
     }
@@ -790,6 +789,7 @@ public abstract class VoltTableRow {
 
     static final String GEOJSON_TYPE_KEY           = "type";
     static final String GEOJSON_COORDS_KEY         = "coordinates";
+    // This is not "GeographyPoint".  This is used in geojson syntax.
     static final String GEOJSON_POINT_TYPE_SIGIL   = "Point";
     static final String GEOJSON_POLYGON_TYPE_SIGIL = "Polygon";
     /**
@@ -873,8 +873,8 @@ public abstract class VoltTableRow {
                 js.value(dec.toString());
             }
             break;
-        case POINT:
-            PointType pt = getPoint(columnIndex);
+        case GEOGRAPHY_POINT:
+            GeographyPointValue pt = getPoint(columnIndex);
             if (wasNull()) {
                 js.value(null);
             }

@@ -36,8 +36,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -64,6 +62,8 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -2754,7 +2754,7 @@ public class TestVoltCompiler extends TestCase {
         String ddl =
                 "create table points ("
                 + "  id integer,"
-                + "  pt point"
+                + "  pt geography_point"
                 + ");";
         Database db = goodDDLAgainstSimpleSchema(ddl);
         assertNotNull(db);
@@ -2763,7 +2763,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(pointTable);
 
         Column pointCol = pointTable.getColumns().getIgnoreCase("pt");
-        assertEquals(VoltType.POINT.getValue(), pointCol.getType());
+        assertEquals(VoltType.GEOGRAPHY_POINT.getValue(), pointCol.getType());
     }
 
     public void testPointTypeNegative() throws Exception {
@@ -2771,7 +2771,7 @@ public class TestVoltCompiler extends TestCase {
         // POINT cannot be a partition column
         badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
                 "create table pts ("
-                + "  pt point not null"
+                + "  pt geography_point not null"
                 + ");"
                 + "partition table pts on column pt;"
                 );
@@ -2779,7 +2779,7 @@ public class TestVoltCompiler extends TestCase {
         // POINT columns cannot yet be indexed
         badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
                 "create table pts ("
-                + "  pt point not null"
+                + "  pt geography_point not null"
                 + ");  "
                 + "create index ptidx on pts(pt);"
                 );
@@ -2788,40 +2788,40 @@ public class TestVoltCompiler extends TestCase {
         // are implemented as indexes.
         badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
                 "create table pts ("
-                + "  pt point primary key"
+                + "  pt geography_point primary key"
                 + ");  "
                 );
 
         badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
                 "create table pts ("
-                + "  pt point, "
+                + "  pt geography_point, "
                 + "  primary key (pt)"
                 + ");  "
                 );
 
         badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
                 "create table pts ("
-                + "  pt point, "
+                + "  pt geography_point, "
                 + "  constraint uniq_pt unique (pt)"
                 + ");  "
                 );
 
         badDDLAgainstSimpleSchema(".*POINT values are not currently supported as index keys.*",
                 "create table pts ("
-                + "  pt point unique, "
+                + "  pt geography_point unique, "
                 + ");  "
                 );
 
         // Default values are not yet supported
         badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*",
                 "create table pts ("
-                + "  pt point default 'point(3.0 9.0)', "
+                + "  pt geography_point default 'point(3.0 9.0)', "
                 + ");  "
                 );
 
         badDDLAgainstSimpleSchema(".*unexpected token.*",
                 "create table pts ("
-                + "  pt point default pointfromtext('point(3.0 9.0)'), "
+                + "  pt geography_point default pointfromtext('point(3.0 9.0)'), "
                 + ");  "
                 );
     }

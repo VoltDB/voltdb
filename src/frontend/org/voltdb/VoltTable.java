@@ -32,7 +32,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -786,8 +786,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             case VARBINARY:
                 m_buffer.putInt(NULL_STRING_INDICATOR);
                 break;
-            case POINT:
-                PointType.serializeNull(m_buffer);
+            case GEOGRAPHY_POINT:
+                GeographyPointValue.serializeNull(m_buffer);
                 break;
             case DECIMAL:
                 VoltDecimalHelper.serializeNull(m_buffer);
@@ -930,8 +930,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     break;
                 }
 
-                case POINT: {
-                    PointType pt = (PointType)value;
+                case GEOGRAPHY_POINT: {
+                    GeographyPointValue pt = (GeographyPointValue)value;
                     pt.flattenToBuffer(m_buffer);
                     break;
                 }
@@ -1320,8 +1320,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         buffer.append(bd.toString());
                     }
                     break;
-                case POINT:
-                    PointType pt = r.getPoint(i);
+                case GEOGRAPHY_POINT:
+                    GeographyPointValue pt = r.getPoint(i);
                     if (r.wasNull()) {
                         buffer.append("NULL");
                     }
@@ -1406,7 +1406,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     + ((this.getColumnType(i) == VoltType.STRING
                             || this.getColumnType(i) == VoltType.TIMESTAMP
                             || this.getColumnType(i) == VoltType.VARBINARY
-                            || this.getColumnType(i) == VoltType.POINT) ? "-" : "")
+                            || this.getColumnType(i) == VoltType.GEOGRAPHY_POINT) ? "-" : "")
                     + padding[i] + "s";
         }
 
