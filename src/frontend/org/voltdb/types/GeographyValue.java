@@ -412,18 +412,19 @@ public class GeographyValue {
 
     private static void diagnoseLoop(List<XYZPoint> loop, String excpMsgPrf) throws IllegalArgumentException {
         if (loop == null) {
-            throw new IllegalArgumentException(excpMsgPrf + "polygon should contain atleast one loop, " +
-                    "with each loop containing minimum of 4 vertices - start and end vertices being equal");
+            throw new IllegalArgumentException(excpMsgPrf + "a polygon must contain at least one ring " +
+                    "(with each ring at least 4 points, including repeated closing vertex)");
         }
 
         // 4 vertices = 3 unique vertices for polygon + 1 end point which is same as start point
         if (loop.size() < 4) {
-            throw new IllegalArgumentException(excpMsgPrf + "each loop in polygon should have 4 vertices, with start and end vertices equal");
+            throw new IllegalArgumentException(excpMsgPrf + "a polygon ring must contain at least 4 points " +
+                    "(including repeated closing vertex)");
         }
 
         // check if the end points of the loop are equal
         if (loop.get(0).equals(loop.get(loop.size() - 1)) == false) {
-            throw new IllegalArgumentException(excpMsgPrf + "start and end vertices of loop are not equal");
+            throw new IllegalArgumentException(excpMsgPrf + "closing points of ring are not equal");
         }
     }
 
