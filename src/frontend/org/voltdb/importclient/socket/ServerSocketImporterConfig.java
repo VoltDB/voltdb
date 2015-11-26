@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
 
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
@@ -32,8 +33,8 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
  */
 public class ServerSocketImporterConfig implements ImporterConfig
 {
-    private static final String CSV_TRANSFORMER_NAME = "csv";
-    private static final String TSV_TRANSFORMER_NAME = "tsv";
+    private static final String CSV_FORMATTER_NAME = "csv";
+    private static final String TSV_FORMATTER_NAME = "tsv";
 
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
@@ -74,11 +75,11 @@ public class ServerSocketImporterConfig implements ImporterConfig
             throw new RuntimeException(e);
         }
 
-        String transformer = props.getProperty("transformer", CSV_TRANSFORMER_NAME).trim().toLowerCase();
-        if (!CSV_TRANSFORMER_NAME.equals(transformer) && !TSV_TRANSFORMER_NAME.equals(transformer)) {
-            throw new RuntimeException("Invalid transformer: " + transformer);
+        String formatter = props.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
+        if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
+            throw new RuntimeException("Invalid formatter: " + formatter);
         }
-        m_separator = CSV_TRANSFORMER_NAME.equals(transformer) ? CSVParser.DEFAULT_SEPARATOR : '\t';
+        m_separator = CSV_FORMATTER_NAME.equals(formatter) ? CSVParser.DEFAULT_SEPARATOR : '\t';
     }
 
     @Override
