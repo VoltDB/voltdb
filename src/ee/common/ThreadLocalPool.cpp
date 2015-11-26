@@ -161,7 +161,7 @@ ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer_ign
 
 int32_t ThreadLocalPool::getAllocationSizeForRelocatable(Sized* data)
 {
-    return data->m_size + sizeof(Sized);
+    return static_cast<int32_t>(data->m_size + sizeof(Sized));
 }
 
 void ThreadLocalPool::freeRelocatable(Sized* data)
