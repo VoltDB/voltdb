@@ -23,6 +23,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 #include <boost/scoped_array.hpp>
+#include <boost/regex.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -634,6 +635,81 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     // we still need to test and make sure no memory leakage in this piece of code.
     std::string rv = out.str();
     return getTempStringValue(rv.c_str(), rv.length());
+}
+
+/** Implement the VoltDB SQL function regexp_position for re-based pattern matching */
+template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2 || arguments.size() == 3);
+
+    const NValue& source = arguments[0];
+    if (source.isNull()) {
+        return getNullValue();
+    }
+    if (source.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(source.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& pat = arguments[1];
+    if (pat.isNull()) {
+        return getNullValue();
+    }
+    if (pat.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException(pat.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    int32_t lenSource = source.getObjectLength_withoutNull();
+    char* sourceChars = reinterpret_cast<char*>(source.getObjectValue_withoutNull());
+    std::string sourceStr(sourceChars, lenSource);
+
+    int32_t lenPat = pat.getObjectLength_withoutNull();
+    char* patChars = reinterpret_cast<char*>(pat.getObjectValue_withoutNull());
+    std::string patStr(patChars, lenPat);
+
+    boost::regex_constants::syntax_option_type matchOpts = boost::regex_constants::normal;
+    boost::match_flag_type matchFlags = boost::match_default;
+
+    if (arguments.size() == 3) {
+        const NValue& flags = arguments[2];
+        if (!flags.isNull()) {
+            if (flags.getValueType() != VALUE_TYPE_VARCHAR) {
+                 throwCastSQLException(flags.getValueType(), VALUE_TYPE_VARCHAR);
+            }
+
+            int32_t lenFlags = flags.getObjectLength_withoutNull();
+            char* flagChars = reinterpret_cast<char*>(flags.getObjectValue_withoutNull());
+            std::string flagStr(flagChars, lenFlags);
+
+            for(std::string::iterator it = flagStr.begin(); it != flagStr.end(); ++it) {
+                switch (*it) {
+                    case 'c':
+                        break;
+                    case 'i':
+                        matchOpts |= boost::regex_constants::icase;
+                        break;
+                    default:
+                        throw SQLException(SQLException::data_exception_invalid_parameter, "illegal match flags");
+                }
+            }
+        }
+    }
+
+    size_t position;
+    try {
+        boost::regex patExpr(patStr, matchOpts);
+        boost::sregex_iterator rit(sourceStr.begin(), sourceStr.end(), patExpr, matchFlags);
+        boost::sregex_iterator rend;
+
+        if (rit != rend) {
+            position = NValue::getCharLength(sourceStr.c_str(), rit->position()) + 1;
+        } else {
+            position = 0;
+        }
+    } catch (boost::regex_error& e) {
+        // TODO Return more specific error messages?
+        throw SQLException(SQLException::data_exception_invalid_parameter, "illegal pattern string");
+    }
+
+    return getIntegerValue(static_cast<int32_t>(position));
 }
 
 }

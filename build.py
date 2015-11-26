@@ -106,7 +106,7 @@ CTX.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp/"
 # where to find the tests
 CTX.TEST_PREFIX = "tests/ee/"
 
-CTX.LDFLAGS += """ -L../../%s/boost/lib/%s -lboost_regex""" % (CTX.THIRD_PARTY_INPUT_PREFIX, CTX.PLATFORM)
+CTX.LASTLDFLAGS += """ -L../../%s/boost/lib/%s -lboost_regex""" % (CTX.THIRD_PARTY_INPUT_PREFIX, CTX.PLATFORM)
 
 ###############################################################################
 # SET RELEASE LEVEL CONTEXT
