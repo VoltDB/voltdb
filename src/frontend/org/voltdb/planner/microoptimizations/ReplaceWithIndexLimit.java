@@ -298,9 +298,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // do not aggressively evaluate all indexes, just examine the index currently in use;
         // because for all qualified indexes, one access plan must have been generated already,
         // and we can take advantage of that
-        if (!checkIndex(ispn.getCatalogIndex(), aggExpr, exprs, ispn.getBindings(), tableAlias)) {
-            return plan;
-        } else {
+        if (checkIndex(ispn.getCatalogIndex(), aggExpr, exprs, ispn.getBindings(), tableAlias)) {
             // we know which end we want to fetch, set the sort direction
             ispn.setSortDirection(sortDirection);
 
@@ -347,9 +345,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 ispn.clearSearchKeyExpression();
                 aggplan.setPrePredicate(newPredicate);
             }
-
-            return plan;
         }
+        return plan;
     }
 
     private Index findQualifiedIndex(SeqScanPlanNode seqScan, AbstractExpression aggExpr, List<AbstractExpression> bindingExprs) {
