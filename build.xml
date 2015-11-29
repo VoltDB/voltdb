@@ -2,6 +2,7 @@
 <project default="default" name="VoltDB">
 
 <!-- GENERAL HELPER MACROS -->
+
 <macrodef name="envdefault">
     <attribute name="prop" />
     <attribute name="var" />
