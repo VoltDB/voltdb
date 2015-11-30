@@ -99,7 +99,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, true, snapshotPath, ppdPrefix);
+                                     null, 0, true, snapshotPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -118,7 +118,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         }
         m_adminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup);
+                                     adminPort, adminOnStartup, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
