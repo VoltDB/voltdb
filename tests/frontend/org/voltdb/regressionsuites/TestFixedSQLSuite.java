@@ -692,6 +692,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG8120();
         subTestENG9032();
         subTestENG9389();
+        subTestENG9533();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
