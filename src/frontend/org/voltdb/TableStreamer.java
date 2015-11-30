@@ -28,7 +28,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotFailedException;
+import org.voltdb.rejoin.StreamSnapshotDataTarget.SnapshotSerializationException;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -96,7 +96,7 @@ public class TableStreamer {
      * @return A future for all writes to data targets, and a boolean indicating if there's more left in the table.
      * The future could be null if nothing is serialized. If row count is specified it sets the number of rows that
      * is to stream
-     * @throws StreamSnapshotFailedException
+     * @throws SnapshotSerializationException
      */
     @SuppressWarnings("rawtypes")
     public Pair<ListenableFuture, Boolean> streamMore(SystemProcedureExecutionContext context,
@@ -113,8 +113,10 @@ public class TableStreamer {
             for (DBBPool.BBContainer container : outputBuffers) {
                 container.discard();
             }
-            StreamSnapshotFailedException ex = new StreamSnapshotFailedException("Snapshot of table " + m_tableId + " failed to complete.");
-            m_tableTasks.get(m_tableId).m_target.reportSerializationFailure(ex);
+            SnapshotSerializationException ex = new SnapshotSerializationException("Snapshot of table " + m_tableId + " failed to complete.");
+            for (SnapshotTableTask task : m_tableTasks) {
+                task.m_target.reportSerializationFailure(ex);
+            }
             return Pair.of(null, false);
         }
 

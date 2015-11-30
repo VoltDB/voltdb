@@ -225,8 +225,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
     }
 
-    public static class StreamSnapshotFailedException extends IOException {
-        public StreamSnapshotFailedException(String message) {
+    public static class SnapshotSerializationException extends IOException {
+        public SnapshotSerializationException(String message) {
             super(message);
         }
     }

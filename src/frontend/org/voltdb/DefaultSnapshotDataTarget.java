@@ -377,7 +377,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
         m_channel.position(8);
         ByteBuffer completed = ByteBuffer.allocate(1);
-        if (m_writeFailed) {
+        if (m_writeFailed || m_reportedSerializationFailure != null) {
             completed.put((byte)0).flip();
         } else {
             completed.put((byte)1).flip();

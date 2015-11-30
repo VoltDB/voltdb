@@ -626,6 +626,7 @@ public class SnapshotSiteProcessor {
                                 } else {
                                     SNAP_LOG.error("Error while attempting to write snapshot data", t);
                                 }
+                                m_perSiteLastSnapshotSucceded = false;
                             }
                         }
                     }
