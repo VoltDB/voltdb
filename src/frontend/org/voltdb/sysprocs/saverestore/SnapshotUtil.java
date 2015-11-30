@@ -149,7 +149,8 @@ public class SnapshotUtil {
         InstanceId instanceId,
         long timestamp,
         long clusterCreateTime,
-        int newPartitionCount)
+        int newPartitionCount,
+        int clusterId)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -166,6 +167,7 @@ public class SnapshotUtil {
             try {
                 stringer.object();
                 stringer.key("version").value(1);
+                stringer.key("clusterid").value(clusterId);
                 stringer.key("txnId").value(txnId);
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));

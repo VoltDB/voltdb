@@ -989,6 +989,7 @@ public abstract class CatalogUtil {
         int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
+        int clusterId = cluster.getId();
 
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
 
@@ -1001,6 +1002,7 @@ public abstract class CatalogUtil {
             catDeploy.setHostcount(hostCount);
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
+            catDeploy.setClusterid(clusterId);
             // copy partition detection configuration from xml to catalog
             String defaultPPDPrefix = "partition_detection";
             if (deployment.getPartitionDetection().isEnabled()) {
@@ -1776,8 +1778,16 @@ public abstract class CatalogUtil {
             Cluster cluster = catalog.getClusters().get("cluster");
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
-            cluster.setDrclusterid(dr.getId());
             cluster.setDrproducerport(dr.getPort());
+            // Backward compatibility to support cluster id in DR tag
+            Deployment deployment = catalog.getClusters().get("cluster").getDeployment().get("deployment");
+            if (deployment.getClusterid() != 0 && dr.getId() != 0) {
+                throw new RuntimeException("Detected two cluster ids in deployement file, setting cluster id in DR tag is "
+                        + "deprecated, please remove");
+            }
+            if (deployment.getClusterid() == 0) {
+                deployment.setClusterid(dr.getId());
+            }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
                 String drSource = drConnection.getSource();

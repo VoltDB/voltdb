@@ -571,6 +571,13 @@ public class ProcedureRunner {
         }
     }
 
+    /*
+     * Cluster id is immutable and be persisted during the snapshot
+     */
+    public int getClusterId() {
+        return m_site.getCorrespondingClusterId();
+    }
+
     private void updateCRC(QueuedSQL queuedSQL) {
         if (!queuedSQL.stmt.isReadOnly) {
             m_inputCRC.update(queuedSQL.stmt.sqlCRC);

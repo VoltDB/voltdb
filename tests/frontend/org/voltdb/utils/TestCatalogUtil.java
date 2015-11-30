@@ -31,8 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -60,6 +58,8 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
+
+import junit.framework.TestCase;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -1431,8 +1431,8 @@ public class TestCatalogUtil extends TestCase {
         final String multipleConnections =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+                + "    <dr>"
                 + "        <connection source='master'/>"
                 + "        <connection source='imposter'/>"
                 + "    </dr>"
@@ -1440,63 +1440,71 @@ public class TestCatalogUtil extends TestCase {
         final String oneConnection =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+                + "    <dr>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
         final String oneEnabledConnection =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+                + "    <dr>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
         final String drDisabled =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1' listen='false'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+                + "    <dr listen='false'>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
         final String clusterIdTooSmall =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='-1'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='-1'/>"
+                + "    <dr>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
         final String clusterIdTooLarge =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='128'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='128'/>"
+                + "    <dr>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String twoClusterIds =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='5'/>"
+                + "    <dr id='5'>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
         final String drEnabledNoConnection =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='0' listen='true'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='0'/>"
+                + "    <dr listen='true'>"
                 + "    </dr>"
                 + "</deployment>";
         final String drEnabledWithEnabledConnection =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1' listen='true'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+                + "    <dr listen='true'>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
         final String drEnabledWithPort =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1' listen='true' port='100'>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+                + "    <dr listen='true' port='100'>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
@@ -1512,7 +1520,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
         assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
+        assertTrue(catalog.getClusters().get("cluster").getDeployment().isEmpty());
 
         final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(oneConnection);
         DeploymentType valid_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
@@ -1523,7 +1531,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
 
         final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
         DeploymentType valid_deployment_enabled = CatalogUtil.getDeployment(new FileInputStream(tmpEnabled));
@@ -1535,7 +1543,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
 
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(drDisabled);
         DeploymentType valid_deployment_disabled = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
@@ -1547,7 +1555,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertFalse(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
         assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
 
         final File tmpEnabledNoConn = VoltProjectBuilder.writeStringToTempFile(drEnabledNoConnection);
         DeploymentType valid_deployment_enabledNoConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledNoConn));
@@ -1559,7 +1567,15 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
+        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 0);
+
+        final File tmpTwoClusterIds = VoltProjectBuilder.writeStringToTempFile(twoClusterIds);
+        DeploymentType invalid_deployment_twoClusterIds = CatalogUtil.getDeployment(new FileInputStream(tmpTwoClusterIds));
+        assertNotNull(invalid_deployment_twoClusterIds);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, invalid_deployment_twoClusterIds, false);
+        assertTrue("Deployment file failed to parse", msg != null);
 
         final File tmpEnabledWithConn = VoltProjectBuilder.writeStringToTempFile(drEnabledWithEnabledConnection);
         DeploymentType valid_deployment_enabledWithConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithConn));
@@ -1571,7 +1587,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
 
         final File tmpEnabledWithPort = VoltProjectBuilder.writeStringToTempFile(drEnabledWithPort);
         DeploymentType valid_deployment_port = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithPort));
