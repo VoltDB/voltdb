@@ -24,6 +24,7 @@
 package org.voltdb.types;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,7 +32,7 @@ import junit.framework.TestCase;
 
 public class TestGeographyValue extends TestCase {
 
-    public void testBasic() {
+    public void testGeographyValuePositive() {
         GeographyValue geog;
         // The Bermuda Triangle
         List<PointType> outerLoop = Arrays.asList(
@@ -77,6 +78,63 @@ public class TestGeographyValue extends TestCase {
                 + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
                 newGeog.toString());
         assertEquals(77, buf.position());
+    }
+
+    public void testGeographyValueNegativeCases() {
+        List<PointType> outerLoop = new ArrayList<PointType>();
+        outerLoop.add(new PointType(32.305, -64.751));
+        outerLoop.add(new PointType(25.244, -80.437));
+        outerLoop.add(new PointType(18.476, -66.371));
+        outerLoop.add(new PointType(20.305, -76.751));
+        outerLoop.add(new PointType(32.305, -64.751));
+        GeographyValue geoValue;
+        // start with valid loop
+        geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 20.305 -76.751, 32.305 -64.751))",
+                geoValue.toString());
+
+        Exception exception = null;
+        // first and last vertex are not equal in the loop
+        outerLoop.remove(outerLoop.size() - 1);
+        try {
+            geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        }
+        catch (IllegalArgumentException illegalArgs) {
+            exception = illegalArgs;
+            assertTrue(exception.getMessage().contains("closing points of ring are not equal"));
+        }
+        finally {
+            assertNotNull(exception);
+        }
+
+        // loop has less than 4 vertex
+        exception = null;
+        outerLoop.remove(outerLoop.size() - 1);
+        try {
+            geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        }
+        catch (IllegalArgumentException illegalArgs) {
+            exception = illegalArgs;
+            assertTrue(exception.getMessage().contains("a polygon ring must contain at least 4 points " +
+                        "(including repeated closing vertex"));
+        }
+        finally {
+            assertNotNull(exception);
+        }
+
+        // loop is empty
+        outerLoop.clear();
+        try {
+            geoValue = new GeographyValue(Arrays.asList(outerLoop));
+        }
+        catch (IllegalArgumentException illegalArgs) {
+            exception = illegalArgs;
+            assertTrue(exception.getMessage().contains("a polygon ring must contain at least 4 points " +
+                        "(including repeated closing vertex"));
+        }
+        finally {
+            assertNotNull(exception);
+        }
     }
 
     private static String canonicalizeWkt(String wkt) {
@@ -184,6 +242,17 @@ public class TestGeographyValue extends TestCase {
         assertWktParseError("premature end of input", "POLYGON ((80 80, 60 60, 70 70,");
         assertWktParseError("missing closing parenthesis", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
         assertWktParseError("unrecognized token", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertWktParseError("unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90))blahblah");
+        assertWktParseError("unrecognized input after WKT", "POLYGON ((80 80, 60 60, 70 70, 90 90, 80 80))blahblah");
+        assertWktParseError("a polygon must contain at least one ring " +
+                            "(with each ring at least 4 points, including repeated closing vertex)",
+                            "POLYGON ()");
+        assertWktParseError("a polygon ring must contain at least 4 points " +
+                            "(including repeated closing vertex)",
+                            "POLYGON (())");
+        assertWktParseError("a polygon ring must contain at least 4 points " +
+                            "(including repeated closing vertex)",
+                            "POLYGON ((10 10, 20 20, 30 30))");
+        assertWktParseError("closing points of ring are not equal", "POLYGON ((10 10, 20 20, 30 30, 40 40))");
+
     }
 }

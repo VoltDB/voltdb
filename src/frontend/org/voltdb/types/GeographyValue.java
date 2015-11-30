@@ -52,9 +52,11 @@ public class GeographyValue {
         m_loops = new ArrayList<List<XYZPoint>>();
         for (List<PointType> loop : loops) {
             List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
-            for (int i = 0; i < (loop.size() - 1); ++i) {
+            for (int i = 0; i < loop.size(); ++i) {
                 oneLoop.add(XYZPoint.fromPointType(loop.get(i)));
             }
+            diagnoseLoop(oneLoop, "Invalid loop for GeographyValue: ");
+            oneLoop.remove(oneLoop.size() - 1);
             m_loops.add(oneLoop);
         }
     }
@@ -292,6 +294,21 @@ public class GeographyValue {
             double lngDegrees = lngRadians * (180 / Math.PI);
             return new PointType(latDegrees, lngDegrees);
         }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof XYZPoint)) {
+                return false;
+            }
+
+            XYZPoint compareTo = (XYZPoint) other;
+
+            if(m_x == compareTo.x() && m_y == compareTo.y() && m_z == compareTo.z()) {
+                return true;
+            }
+
+            return false;
+        }
     }
 
 
@@ -387,6 +404,30 @@ public class GeographyValue {
     }
 
 
+
+    /**
+     * A helper function to validate the loop structure
+     * If loop is invalid, it generates IllegalArgumentException exception
+     */
+
+    private static void diagnoseLoop(List<XYZPoint> loop, String excpMsgPrf) throws IllegalArgumentException {
+        if (loop == null) {
+            throw new IllegalArgumentException(excpMsgPrf + "a polygon must contain at least one ring " +
+                    "(with each ring at least 4 points, including repeated closing vertex)");
+        }
+
+        // 4 vertices = 3 unique vertices for polygon + 1 end point which is same as start point
+        if (loop.size() < 4) {
+            throw new IllegalArgumentException(excpMsgPrf + "a polygon ring must contain at least 4 points " +
+                    "(including repeated closing vertex)");
+        }
+
+        // check if the end points of the loop are equal
+        if (loop.get(0).equals(loop.get(loop.size() - 1)) == false) {
+            throw new IllegalArgumentException(excpMsgPrf + "closing points of ring are not equal");
+        }
+    }
+
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
@@ -446,11 +487,8 @@ public class GeographyValue {
                     }
                     break;
                 case ')':
-                    if (currentLoop == null) {
-                        throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
-                    }
-
-                    // We really should check that the last vertex is the same as the first here.
+                    // perform basic validation of loop
+                    diagnoseLoop(currentLoop, msgPrefix);
                     currentLoop.remove(currentLoop.size() - 1);
 
                     loops.add(currentLoop);
