@@ -13,7 +13,7 @@ class BuildContext:
         self.SOEXT = ""
         self.IGNORE_SYS_PREFIXES = ()
         self.INPUT_PREFIX = ""
-        self.THIRD_PARTY_INPUT_PREFIX = ""
+        self.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp"
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
         self.INPUT = {}
