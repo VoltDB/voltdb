@@ -55,16 +55,19 @@ AS
 -- rollup of votes by contestant and state for the heat map and results
 CREATE VIEW v_votes_by_contestant_number_state
 (
-  contestant_number
+  phone_number
+, contestant_number
 , state
 , num_votes
 )
 AS
-   SELECT contestant_number
+   SELECT phone_number
+        , contestant_number
         , state
         , COUNT(*)
      FROM votes
- GROUP BY contestant_number
+ GROUP BY phone_number
+        , contestant_number
         , state
 ;
 
