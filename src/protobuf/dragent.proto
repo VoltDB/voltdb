@@ -29,6 +29,7 @@ message Pause {
 message Connect {
     optional int32 clusterId = 1;
     optional fixed64 persistInstanceId = 2;
+    optional int32 protocolVersion = 3;
 }
 
 message Subscribe {
@@ -65,6 +66,7 @@ message Response {
     optional string catalogSignature = 12;
     optional string failureCause = 13;
     optional bool isEndOfStream = 14;
+    optional int32 protocolVersion = 15;
 }
 
 message NodeInfo {
