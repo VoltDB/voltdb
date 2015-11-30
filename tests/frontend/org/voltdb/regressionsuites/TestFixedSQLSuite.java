@@ -2531,10 +2531,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
         System.out.println("test subTestENG9533 outerjoin with OR pred...");
         Client client = getClient();
         String insStmts[] = {
-                "insert into test1_eng_9533 values(1);",
-                "insert into test1_eng_9533 values(2);",
-                "insert into test2_eng_9533 values(1,'athing',null,5);",
-                "insert into test2_eng_9533 values(2,'otherthing',null,10);"
+                "insert into test1_eng_9533 values (1);",
+                "insert into test1_eng_9533 values (2);",
+                "insert into test2_eng_9533 values (1, 'athing', 'one', 5);",
+                "insert into test2_eng_9533 values (2, 'otherthing', 'two', 10);"
         };
 
         for (String stmt : insStmts) {
