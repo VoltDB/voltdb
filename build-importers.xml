@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, builtintransformer"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -91,6 +91,22 @@
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
                 <attribute name="Import-Package" value="${default.imports}" />
+            </manifest>
+        </jar>
+    </target>
+
+    <target name="builtintransformer">
+        <mkdir dir="${bundles.dir}" />
+        <jar destfile="${bundles.dir}/builtintransformer.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importer/transformer/SimpleTransformer.class"/>
+            <include name="org/voltdb/importer/transformer/AbstractTransformer.class"/>
+            <manifest>
+                <attribute name="Bundle-Activator" value="org.voltdb.importer.transformer.SimpleTransformer" />
+                <attribute name="Bundle-ManifestVersion" value="2" />
+                <attribute name="Bundle-Name" value="Builtin Transformer OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="BuiltinTransformer" />
+                <attribute name="Bundle-Version" value="1.0.0" />
+                <attribute name="DynamicImport-Package" value="*" />
             </manifest>
         </jar>
     </target>
