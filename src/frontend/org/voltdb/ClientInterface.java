@@ -273,7 +273,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
     private ScheduledFuture<?> m_maxConnectionUpdater;
 
-    private final boolean m_isConfiguredForHSQL;
+    private final boolean m_isConfiguredForNonVoltDBBackend;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -1213,7 +1213,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
-        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
+        BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
+        m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
         bindAdapter(internalAdapter, null, true);
@@ -1895,9 +1897,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             }
-            else if (task.procName.equals("@ResetDR")) {
-                return dispatchResetDR(task);
-            }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
 
@@ -1962,7 +1961,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         SyncCallback cb = new SyncCallback();
                         getInternalConnectionHandler().callProcedure(
-                                new ClientInterfaceConnectionContext(), null, 0, cb, user, "@UpdateApplicationCatalog", catalog, dep);
+                                new ClientInterfaceConnectionContext(), null, cb, user, "@UpdateApplicationCatalog", catalog, dep);
                         cb.waitForResponse();
 
                         m_catalogContext.set(VoltDB.instance().getCatalogContext());
@@ -2233,15 +2232,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
-    private ClientResponseImpl dispatchResetDR(StoredProcedureInvocation task) {
-        if (VoltDB.instance().getNodeDRGateway() != null) {
-            VoltDB.instance().getNodeDRGateway().resetDRProducer();
-        }
-        VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
-        t.addRow(VoltSystemProcedure.STATUS_OK);
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[] {t}, "SUCCESS", task.clientHandle);
-    }
-
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
             throws VoltTypeException
     {
@@ -2262,8 +2252,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
         // pick the sysproc based on the presence of partition info
-        // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
+        // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
+        // -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
         int partition = -1;
 
         if (isSinglePartition) {

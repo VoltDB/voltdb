@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.voltdb.dtxn.UndoAction;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -38,9 +39,11 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
+    public void restart() throws InterruptedException;
+
     public abstract void beginPromotePartition(int partitionId, DRLogSegmentId receivedSegment, long maxLocalUniqueId);
 
-    public abstract void notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId);
+    public abstract UndoAction notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId);
 
     /**
      * Should only be called before initialization. Populate all previously seen
@@ -72,10 +75,13 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
+        public void restart() throws InterruptedException {}
+
+        @Override
         public void beginPromotePartition(int partitionId, DRLogSegmentId receivedSegment, long maxLocalUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId) {}
+        public UndoAction notifyOfLastAppliedSegmentId(int partitionId, DRLogSegmentId appliedSegment, long localUniqueId) { return null; }
 
         @Override
         public void assertSequencing(int partitionId, long drId) {}

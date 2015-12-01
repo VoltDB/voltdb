@@ -85,7 +85,7 @@ a.alertIcon,
 input.icon-search,
 a.save-search,
 a.icon-search,
-ul.clusterStat, li.activeServerName, 
+ul.clusterStat, li.activeServerName,.timeOutCross,
 a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
@@ -1578,6 +1578,18 @@ input.count-input {
         background-position: 3px -834px;
     }
 
+.timeOutCross {color: #888;
+    cursor: pointer;
+    padding: 5px;
+    background-position: 0 -795px;
+    height: 15px;
+    width: 15px;
+   }
+
+.timeOutCross:hover {
+    background-position:0 -833px;
+}
+
 .popup_back {
     cursor: pointer;
     background-color: #222;
@@ -2163,6 +2175,7 @@ ul.helpSchemaList {
 
 /**admin**/
 .adminIcons,
+.sqlSetting,
 .pause,
 .resume,
 .save,
@@ -2394,6 +2407,11 @@ ul.adminClusterList li a.shutdown {
 }
 
 .adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/
+    background-position: -225px -14px;
+    height: 28px;
+    width: 30px;
+}
+.sqlSetting {
     background-position: -225px -14px;
     height: 28px;
     width: 30px;
@@ -3642,6 +3660,43 @@ table.diskLimitTbl tr td { border: none;}
 svg.nvd3-svg { width:95% !important; }
 .nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
 .nvtooltip table tr td { border: none !important;}
+
+
+#queryTimeoutConfigControls { width:345px;}
+.queryTimeout { border:1px solid #ccc; margin:20px;}
+.queryTimeout p { padding:10px 5px;border-top:1px solid #ccc;}
+.QueryTbl {}
+.QueryTbl tr td {
+    border:none;
+    padding: 8px 5px 10px 5px;
+    text-align: left;
+}
+
+.queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px;}
+.queryTimeOutLabel {
+    background: none repeat scroll 0 0 #d0d2d2;
+    cursor: pointer;
+    float: left;
+    font-weight: bold;
+    height: 28px;
+    line-height: 28px;
+    padding: 0 0 0 8px;
+}
+.setqueryTimeOut {
+    float: right;
+}
+
+label.errorTimeOut {
+    color: #c70000;
+    width: auto;
+    display: block;
+    line-height: 12px;
+    font-size: 11px;
+    /* padding: 10px 5px 0 7px; */
+    padding: 10px 5px 0 0;
+    margin: 0 0 10px 0;
+    height: 10px;
+}
 
 /*********************************************media Qu********************/
 

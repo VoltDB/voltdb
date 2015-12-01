@@ -52,7 +52,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 2;
+    static const uint8_t DR_VERSION = 3;
 
     DRTupleStream();
 
@@ -70,7 +70,10 @@ public:
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
 
-    /** write a tuple to the stream */
+    /**
+     * write an insert or delete record to the stream
+     * for active-active conflict detection purpose, write full row image for delete records.
+     * */
     virtual size_t appendTuple(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int64_t txnId,
@@ -80,6 +83,10 @@ public:
                        DRRecordType type,
                        const std::pair<const TableIndex*, uint32_t>& indexPair);
 
+    /**
+     * write an update record to the stream
+     * for active-active conflict detection purpose, write full before image for update records.
+     * */
     virtual size_t appendUpdateRecord(int64_t lastCommittedSpHandle,
                        char *tableHandle,
                        int64_t txnId,

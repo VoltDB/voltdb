@@ -20,6 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 /*
  * This program exercises the socket import capability by writing
  * <key, value> pairs to one or more VoltDB socket importers.
@@ -44,6 +45,7 @@
 package socketimporter.client.socketimporter;
 
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -57,15 +59,14 @@ import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
-import java.io.IOException;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStatsContext;
-import org.voltcore.logging.VoltLogger;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -160,8 +161,6 @@ public class AsyncBenchmark {
         //AsyncBenchmark.config = config;
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
-
-
     }
 
     /**
@@ -264,14 +263,17 @@ public class AsyncBenchmark {
             long max_insert_time = checkDB.maxInsertTime();
             thrup = (long) (runCount.get() / ((max_insert_time-benchmarkStartTS)/1000.0));
 
-            log.info(String.format("Import Throughput %d/s, Total Rows %d",
+            if (thrup > 0) { // first time through, calc can be whacky
+                log.info(String.format("Import Throughput %d/s, Total Rows %d",
                     thrup, runCount.get()+warmupCount.get()));
+            }
         } catch (Exception e) {
             log.info("Exception in printStatistics" + e);
             StringWriter writer = new StringWriter();
             e.printStackTrace( new PrintWriter(writer,true ));
             System. out.println("exeption stack is :\n"+writer.toString());
         }
+        System.out.println("Import stats: " +UtilQueries.getImportStats(client));
     }
 
     /**
@@ -475,7 +477,12 @@ public class AsyncBenchmark {
             while (queueEndTime > System.currentTimeMillis()) {
                 checkDB.processQueue();
             }
+            long outstandingRequests = UtilQueries.getImportOutstandingRequests(client);
+            if (outstandingRequests != 0) {
+                log.error("Importer outstanding requests is " + outstandingRequests + " after extended wait. Zero expected.");
+            }
         }
+
         client.drain();
         client.close();
 

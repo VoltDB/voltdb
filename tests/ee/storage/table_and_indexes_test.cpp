@@ -42,6 +42,7 @@
 #include "storage/tableiterator.h"
 #include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
+#include "catalog/database.h"
 
 using namespace voltdb;
 using namespace std;
@@ -50,12 +51,23 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 44;
 }
 
+class MockVoltDBEngine : public VoltDBEngine {
+public:
+    MockVoltDBEngine(bool isActiveActiveEnabled) {
+        m_isActiveActiveEnabled = isActiveActiveEnabled;
+    }
+    bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
+
+private:
+    bool m_isActiveActiveEnabled;
+};
+
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
             NValueArray* noParams = NULL;
-            VoltDBEngine* noEngine = NULL;
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, noEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            mockEngine = new MockVoltDBEngine(false);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -266,6 +278,7 @@ class TableAndIndexTest : public Test {
 
         ~TableAndIndexTest() {
             delete engine;
+            delete mockEngine;
             delete districtTable;
             delete districtTableReplica;
             delete districtTempTable;
@@ -302,6 +315,7 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         ExecutorContext *engine;
+        MockVoltDBEngine *mockEngine;
         DRTupleStream drStream;
         DRTupleStream drReplicatedStream;
         DummyTopend topend;
@@ -403,7 +417,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -422,7 +436,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     /*
      * Test that update propagates
      */
-    TableTuple toUpdate = districtTable->lookupTupleByValues(temp_tuple);
+    TableTuple toUpdate = districtTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toUpdate.isNullTuple());
 
     //Use a different string value for one column
@@ -446,7 +460,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -454,11 +468,11 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
 
     //Validate the update took place
-    TableTuple updated = districtTableReplica->lookupTupleByValues(temp_tuple);
+    TableTuple updated = districtTableReplica->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(updated.isNullTuple());
     EXPECT_EQ(0, updated.getNValue(3).compare(cachedStringValues.back()));
 
-    TableTuple toDelete = districtTable->lookupTupleByValues(temp_tuple);
+    TableTuple toDelete = districtTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toDelete.isNullTuple());
 
     //Prep another transaction to test propagating a delete
@@ -482,7 +496,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -546,7 +560,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -565,7 +579,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     /*
      * Test that delete propagates
      */
-    TableTuple toDelete = districtTable->lookupTupleByValues(temp_tuple);
+    TableTuple toDelete = districtTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toDelete.isNullTuple());
     districtTable->deleteTuple(toDelete, true);
 
@@ -585,7 +599,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -664,7 +678,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     customerTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     customerTable->setDR(true);
 
@@ -683,7 +697,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     /*
      * Test that delete propagates
      */
-    TableTuple toDelete = customerTable->lookupTupleByValues(temp_tuple);
+    TableTuple toDelete = customerTable->lookupTupleForDR(temp_tuple);
     ASSERT_FALSE(toDelete.isNullTuple());
     customerTable->deleteTuple(toDelete, true);
 
@@ -703,7 +717,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     customerTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, NULL);
+    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     customerTable->setDR(true);
 

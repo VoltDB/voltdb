@@ -31,6 +31,7 @@ public:
     const static int64_t VOLT_EPOCH = 1199145600000L;
     const static int64_t TIMESTAMP_MAX_VALUE = (1L << TIMESTAMP_BITS) - 1L;
     const static int64_t COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
+    const static int64_t TIMESTAMP_PLUS_COUNTER_MAX_VALUE = (1LL << (TIMESTAMP_BITS + COUNTER_BITS)) - 1LL;
     const static int64_t PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
     const static int64_t PARTITION_ID_MASK = (1 << 14) - 1;
     const static int64_t MP_INIT_PID = PARTITION_ID_MASK;
@@ -59,6 +60,10 @@ public:
 
     static bool isMpUniqueId(UniqueId uid) {
         return pid(uid) == MP_INIT_PID;
+    }
+
+    static int64_t timestampAndCounter(UniqueId uid) {
+        return (uid >> PARTITIONID_BITS) & TIMESTAMP_PLUS_COUNTER_MAX_VALUE;
     }
 
     const int64_t uid;

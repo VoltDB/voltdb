@@ -66,7 +66,7 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
-if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3):
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 
@@ -194,13 +194,10 @@ CTX.INPUT['catalog'] = """
 """
 
 CTX.INPUT['structures'] = """
- CompactingPool.cpp
  ContiguousAllocator.cpp
 """
 
 CTX.INPUT['common'] = """
- CompactingStringPool.cpp
- CompactingStringStorage.cpp
  FatalException.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
@@ -246,6 +243,7 @@ CTX.INPUT['executors'] = """
  limitexecutor.cpp
  materializedscanexecutor.cpp
  materializeexecutor.cpp
+ mergereceiveexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -275,6 +273,7 @@ CTX.INPUT['plannodes'] = """
  abstractjoinnode.cpp
  abstractoperationnode.cpp
  abstractplannode.cpp
+ abstractreceivenode.cpp
  abstractscannode.cpp
  aggregatenode.cpp
  deletenode.cpp
@@ -285,6 +284,7 @@ CTX.INPUT['plannodes'] = """
  limitnode.cpp
  materializenode.cpp
  materializedscanplannode.cpp
+ mergereceivenode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
@@ -413,6 +413,7 @@ if whichtests in ("${eetestsuite}", "execution"):
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
+    MergeReceiveExecutorTest
     """
 
 

@@ -340,6 +340,7 @@
     <xs:attribute name="module" type="xs:string" />
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="format" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
@@ -408,15 +409,22 @@
     <xs:attribute name="id" type="clusterIdType" use="required"/>
     <xs:attribute name="listen" type="xs:boolean" default="true" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
+    <xs:attribute name="flushInterval" default="1000">
+        <xs:simpleType>
+            <xs:restriction base="xs:int">
+                <xs:minInclusive value="20"/>
+            </xs:restriction>
+        </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
 
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:string">
-          <!-- Only the most basic validation that this could possibly be a hostname -->
+          <!-- Validate that this is either empty or a comma-separated list of hostnames -->
           <xs:minLength value="0"/>
-          <xs:pattern value="[a-zA-Z0-9\-\.]*(:[0-9]*)?"/>
+          <xs:pattern value="[*]{0}|([a-zA-Z0-9\-\.]+(:[0-9]*)?(,\s*[a-zA-Z0-9\-\.]+(:[0-9]*)?)*)"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>

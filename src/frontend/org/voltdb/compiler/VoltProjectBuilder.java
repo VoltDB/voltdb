@@ -600,6 +600,9 @@ public class VoltProjectBuilder {
         importConnector.put("ilModule", importBundle);
 
         importConnector.put("ilConfig", config);
+        if (importFormat != null) {
+            importConnector.put("ilFormatter", importFormat);
+        }
 
         if ((importType != null) && !importType.trim().isEmpty()) {
             importConnector.put("ilImportType", importType);
@@ -907,7 +910,7 @@ public class VoltProjectBuilder {
      */
     private String writeDeploymentFile(
             String voltRoot, DeploymentInfo dinfo) throws IOException, JAXBException
-            {
+    {
         org.voltdb.compiler.deploymentfile.ObjectFactory factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
 
@@ -1094,6 +1097,10 @@ public class VoltProjectBuilder {
             ServerImportEnum importType = ServerImportEnum.fromValue(((String)importConnector.get("ilImportType")).toLowerCase());
             importConfig.setType(importType);
             importConfig.setModule((String )importConnector.get("ilModule"));
+            String formatter = (String) importConnector.get("ilFormatter");
+            if (formatter != null) {
+                importConfig.setFormat(formatter);
+            }
 
             Properties config = (Properties)importConnector.get("ilConfig");
             if((config != null) && (config.size() > 0)) {
@@ -1135,7 +1142,7 @@ public class VoltProjectBuilder {
         marshaller.marshal(doc, file);
         final String deploymentPath = file.getPath();
         return deploymentPath;
-            }
+    }
 
 
     private SystemSettingsType createSystemSettingsType(org.voltdb.compiler.deploymentfile.ObjectFactory factory)

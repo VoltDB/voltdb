@@ -39,7 +39,8 @@ using namespace voltdb;
 const int MAX_BUFFER_AGE = 4000;
 
 TupleStreamBase::TupleStreamBase(size_t extraHeaderSpace /*= 0*/)
-    : m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
+    : m_flushInterval(MAX_BUFFER_AGE),
+      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
       // snapshot restores will call load table which in turn
       // calls appendTupple with LONG_MIN transaction ids
@@ -104,6 +105,10 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
                 "Active transactions moving backwards: openSpHandle is %jd, while the current spHandle is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle
                 );
+    } else if (currentSpHandle == m_openSpHandle && uniqueId >= 0 && uniqueId != m_openUniqueId) {
+        throwFatalException(
+                "Received a new transaction, but with the same spHandle (%jd): old uniqueId is %jd, new uniqueId is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)m_openUniqueId, (intmax_t)uniqueId);
     }
 
     // more data for an ongoing transaction with no new committed data
@@ -135,6 +140,11 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     // by ending the current open transaction and not starting a new one
     if (m_openSpHandle < currentSpHandle && currentSpHandle != lastCommittedSpHandle)
     {
+        if (uniqueId < 0) {
+            throwFatalException(
+                    "Received invalid uniqueId (%jd) with open spHandle %jd, currentSpHandle %jd, lastCommittedSpHandle %jd.",
+                    (intmax_t)uniqueId, (intmax_t)m_openSpHandle, (intmax_t)currentSpHandle, (intmax_t)lastCommittedSpHandle);
+        }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
         //<< currentSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
@@ -210,9 +220,11 @@ void TupleStreamBase::pushPendingBlocks() {
 void TupleStreamBase::rollbackTo(size_t mark, size_t)
 {
     if (mark > m_uso) {
-        throwFatalException("Truncating the future.");
+        throwFatalException("Truncating the future: mark %jd, current USO %jd.",
+                            (intmax_t)mark, (intmax_t)m_uso);
     } else if (mark < m_committedUso) {
-        throwFatalException("Truncating committed tuple data");
+        throwFatalException("Truncating committed tuple data: mark %jd, committed USO %jd, current USO %jd, open spHandle %jd, committed spHandle %jd.",
+                            (intmax_t)mark, (intmax_t)m_committedUso, (intmax_t)m_uso, (intmax_t)m_openSpHandle, (intmax_t)m_committedSpHandle);
     }
 
     // back up the universal stream counter
@@ -333,7 +345,7 @@ TupleStreamBase::periodicFlush(int64_t timeInMillis,
                                   int64_t lastCommittedSpHandle)
 {
     // negative timeInMillis instructs a mandatory flush
-    if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
+    if (timeInMillis < 0 || (m_flushInterval > 0 && timeInMillis - m_lastFlush > m_flushInterval)) {
         int64_t maxSpHandle = std::max(m_openSpHandle, lastCommittedSpHandle);
         if (timeInMillis > 0) {
             m_lastFlush = timeInMillis;

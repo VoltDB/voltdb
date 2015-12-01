@@ -51,6 +51,7 @@ public class AuthenticatedConnectionCache {
     final int m_port;
     final int m_adminPort;
     final int m_targetSize; // goal size of the client cache
+    private boolean m_isClosing;
 
     /**
      * Metadata about a connection.
@@ -268,8 +269,8 @@ public class AuthenticatedConnectionCache {
         }
         String ckey = userNameBuilder.toString() + scheme;
         Connection conn = m_connections.get(ckey);
-        if (conn == null) {
-            throw new RuntimeException("Released client not in pool.");
+        if (conn == null) { // already closed and cleaned up by closeAll. Nothing more to do.
+            return;
         }
         if (force) {
             //Dont bother with target size of pool and remove dead connection.
@@ -297,9 +298,14 @@ public class AuthenticatedConnectionCache {
         }
     }
 
+    public boolean isClosing() {
+        return m_isClosing;
+    }
+
     //Close all and just clear stuff.
     public synchronized void closeAll()
     {
+        m_isClosing = true;
         if (m_unauthClient != null)
         {
             closeClient(m_unauthClient);

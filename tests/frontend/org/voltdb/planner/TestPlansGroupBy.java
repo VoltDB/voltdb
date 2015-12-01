@@ -29,6 +29,7 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
@@ -41,6 +42,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
     @Override
@@ -1049,6 +1051,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 false, false);
     }
 
+    private void checkMVNoFix_NoAgg_NormalQueries_MergeReceive(
+            String sql, SortDirectionType sortDirection) {
+        pns = compileToFragments(sql);
+        checkMVReaggregateFeatureMergeReceive(false,
+                -1, -1,
+                false, false, sortDirection);
+    }
+
     private void checkMVNoFix_NoAgg(
             String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             boolean aggPushdown, boolean aggInline) {
@@ -1064,7 +1074,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Normal select queries
         checkMVNoFix_NoAgg_NormalQueries("SELECT * FROM V_P1_NO_FIX_NEEDED");
-        checkMVNoFix_NoAgg_NormalQueries("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED ORDER BY V_A1");
+        checkMVNoFix_NoAgg_NormalQueries_MergeReceive("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED ORDER BY V_A1",
+                SortDirectionType.ASC);
         checkMVNoFix_NoAgg_NormalQueries("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED LIMIT 1");
 
         // Distributed distinct select query
@@ -1156,11 +1167,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String[] tbs = {"V_P1", "V_P1_ABS"};
         for (String tb: tbs) {
             checkMVFix_reAgg("SELECT * FROM " + tb, 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1", 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1, V_B1", 2, 3);
+            checkMVFix_reAgg_MergeReceive("SELECT * FROM " + tb + " order by V_A1 DESC", 2, 3, SortDirectionType.DESC);
+            checkMVFix_reAgg_MergeReceive("SELECT * FROM " + tb + " order by V_A1, V_B1", 2, 3, SortDirectionType.ASC);
             checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_SUM_D1", 2, 3);
             checkMVFix_reAgg("SELECT * FROM " + tb + " limit 1", 2, 3);
-            checkMVFix_reAgg("SELECT * FROM " + tb + " order by V_A1, V_B1 limit 1", 2, 3);
+            checkMVFix_reAgg_MergeReceive("SELECT * FROM " + tb + " order by V_A1, V_B1 limit 1", 2, 3, SortDirectionType.ASC);
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb, 2, 1);
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1", 2, 1);
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_d1", 2, 2);
@@ -1244,7 +1255,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     private void checkMVFixWithWhere(Object aggFilters, Object scanFilters) {
         AbstractPlanNode p = pns.get(0);
 
-        List<AbstractPlanNode> nodes = p.findAllNodesOfType(PlanNodeType.RECEIVE);
+        List<AbstractPlanNode> nodes = p.findAllNodesOfClass(AbstractReceivePlanNode.class);
         assertEquals(1, nodes.size());
         p = nodes.get(0);
 
@@ -1541,10 +1552,19 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
     }
 
+    private void checkMVFix_reAgg_MergeReceive(
+            String sql,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+            SortDirectionType sortDirection) {
+        pns = compileToFragments(sql);
+        checkMVReaggregateFeatureMergeReceive(true,
+                numGroupbyOfReaggNode, numAggsOfReaggNode,
+                false, false, sortDirection);
+}
+
     private void checkMVFix_reAgg(
             String sql,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
-
         checkMVReaggreateFeature(sql, true,
                 -1, -1,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
@@ -1576,6 +1596,40 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     // topNode, reAggNode
+    private void checkMVReaggregateFeatureMergeReceive(
+            boolean needFix,
+            int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+            boolean aggPushdown, boolean aggInline, SortDirectionType sortDirection) {
+
+        assertTrue(pns.size() == 2);
+        AbstractPlanNode p = pns.get(0);
+        assertTrue(p instanceof SendPlanNode);
+        p = p.getChild(0);
+
+        AbstractPlanNode receiveNode = (p instanceof ProjectionPlanNode) ? p.getChild(0) : p;
+        assertNotNull(receiveNode);
+
+        AggregatePlanNode reAggNode = AggregatePlanNode.getInlineAggregationNode(receiveNode);
+
+        if (needFix) {
+            assertNotNull(reAggNode);
+
+            assertEquals(numGroupbyOfReaggNode, reAggNode.getGroupByExpressionsSize());
+            assertEquals(numAggsOfReaggNode, reAggNode.getAggregateTypesSize());
+        } else {
+            assertNull(reAggNode);
+        }
+
+        p = pns.get(1);
+        assertTrue(p instanceof SendPlanNode);
+        p = p.getChild(0);
+
+        assertTrue(p instanceof IndexScanPlanNode);
+        assertEquals(sortDirection, ((IndexScanPlanNode)p).getSortDirection());
+
+    }
+
+    // topNode, reAggNode
     private void checkMVReaggregateFeature(
             boolean needFix,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
@@ -1601,7 +1655,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         }
         HashAggregatePlanNode reAggNode = null;
 
-        List<AbstractPlanNode> nodes = p.findAllNodesOfType(PlanNodeType.RECEIVE);
+        List<AbstractPlanNode> nodes = p.findAllNodesOfClass(AbstractReceivePlanNode.class);
         assertEquals(1, nodes.size());
         AbstractPlanNode receiveNode = nodes.get(0);
 

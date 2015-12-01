@@ -691,6 +691,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG7480();
         subTestENG8120();
         subTestENG9032();
+        subTestENG9389();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -1639,7 +1640,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             if (isHSQL()) {
-                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+                assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
@@ -1662,7 +1663,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             if (isHSQL()) {
-                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+                assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
@@ -2499,6 +2500,31 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, "T1");
     }
 
+    private void subTestENG9389() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9389 outerjoin is null...");
+        Client client = getClient();
+        String sql;
+
+        sql = "INSERT INTO t1 VALUES (1, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t2 VALUES (2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+
+        // NULL padded row in T3 will trigger the bug ENG-9389
+
+        sql = "select t1.A from t1 left join t3 on t3.A = t1.A where t3.D is null and t1.B = 2;";
+        validateTableOfScalarLongs(client, sql, new long[]{1});
+
+        sql = " select t1.A from T1 left join t3 on t3.A = t1.A where t3.D is null and t1.B = 2 "
+                + "and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) ; ";
+        validateTableOfScalarLongs(client, sql, new long[]{1});
+
+        sql = "select t1.A from t1 inner join t2 on t2.B = t1.B left join t3 on t3.A = t1.A "
+                + "where t2.D is null and t3.D is null and t2.B = 2;";
+        validateTableOfScalarLongs(client, sql, new long[]{1});
+
+        truncateTables(client, new String[]{"T1", "T2"});
+    }
 
     //
     // JUnit / RegressionSuite boilerplate

@@ -1789,6 +1789,12 @@ public class TestCatalogUtil extends TestCase {
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
         assertTrue(db.getIsactiveactivedred());
         assertTrue(db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP) != null);
+        // check default setting of DR conflict exporter
+        assertEquals("LOG", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("nonce").getValue());
+        assertEquals(cat.getClusters().get("cluster").getVoltroot() + "/" + CatalogUtil.DEFAULT_DR_CONFLICTS_DIR,
+                db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("outdir").getValue());
+        assertEquals("true", db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("replicated").getValue());
+        assertEquals(CatalogUtil.DEFAULT_DR_CONFLICTS_EXPORT_TYPE, db.getConnectors().get(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).getConfig().get("type").getValue());
     }
 
     public void testMemoryLimitNegative() throws Exception {

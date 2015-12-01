@@ -66,22 +66,15 @@
 
 package org.hsqldb_voltpatches;
 
-// A VoltDB extension to transfer Expression structures to the VoltDB planner
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
 
-/// We DO NOT reorganize imports in hsql code. And we try to keep these structured comment in place.
-import java.math.BigDecimal;
-import org.hsqldb_voltpatches.types.BinaryData;
-import org.hsqldb_voltpatches.types.TimestampData;
-import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-// End of VoltDB extension
-
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -91,8 +84,11 @@ import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.persist.PersistentStore;
+import org.hsqldb_voltpatches.types.BinaryData;
 import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.NullType;
+import org.hsqldb_voltpatches.types.NumberType;
+import org.hsqldb_voltpatches.types.TimestampData;
 import org.hsqldb_voltpatches.types.Type;
 
 /**
@@ -370,49 +366,46 @@ public class Expression {
 
         switch (opType) {
 
-            case OpTypes.VALUE :
-                sb.append("VALUE = ").append(valueData);
-                sb.append(", TYPE = ").append(dataType.getNameString());
+        case OpTypes.VALUE :
+            sb.append("VALUE = ").append(valueData);
+            sb.append(", TYPE = ").append(dataType.getNameString());
+            break;
 
-                return sb.toString();
+        case OpTypes.ROW_SUBQUERY :
+        case OpTypes.TABLE_SUBQUERY :
+            sb.append("QUERY ");
+            sb.append(subQuery.queryExpression.describe(session));
+            break;
 
-            case OpTypes.ROW_SUBQUERY :
-            case OpTypes.TABLE_SUBQUERY :
-                sb.append("QUERY ");
-                sb.append(subQuery.queryExpression.describe(session));
+        case OpTypes.ROW :
+            sb.append("ROW = (");
+            for (Expression node : nodes) {
+                sb.append(node.describe(session, blanks + 1));
+            }
+            sb.append("), TYPE = ")
+            .append(dataType == null ? "null" : dataType.getNameString());
+            break;
 
-                return sb.toString();
+        case OpTypes.TABLE :
+            sb.append("VALUELIST ");
+            for (Expression node : nodes) {
+                sb.append(node.describe(session, blanks + 1));
+                sb.append(' ');
+            }
+            break;
 
-            case OpTypes.ROW :
-                sb.append("ROW = ");
+        default:
+            if (nodes.length > LEFT && nodes[LEFT] != null) {
+                sb.append(" arg1=[");
+                sb.append(nodes[LEFT].describe(session, blanks + 1));
+                sb.append(']');
+            }
 
-                for (int i = 0; i < nodes.length; i++) {
-                    sb.append(nodes[i].describe(session, blanks + 1));
-                }
-
-                sb.append("), TYPE = ").append(dataType.getNameString());
-                break;
-
-            case OpTypes.TABLE :
-                sb.append("VALUELIST ");
-
-                for (int i = 0; i < nodes.length; i++) {
-                    sb.append(nodes[i].describe(session, blanks + 1));
-                    sb.append(' ');
-                }
-                break;
-        }
-
-        if (nodes[LEFT] != null) {
-            sb.append(" arg1=[");
-            sb.append(nodes[LEFT].describe(session, blanks + 1));
-            sb.append(']');
-        }
-
-        if (nodes[RIGHT] != null) {
-            sb.append(" arg2=[");
-            sb.append(nodes[RIGHT].describe(session, blanks + 1));
-            sb.append(']');
+            if (nodes.length > RIGHT && nodes[RIGHT] != null) {
+                sb.append(" arg2=[");
+                sb.append(nodes[RIGHT].describe(session, blanks + 1));
+                sb.append(']');
+            }
         }
 
         return sb.toString();
@@ -459,6 +452,7 @@ public class Expression {
         }
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -472,6 +466,7 @@ public class Expression {
         return false;
     }
 
+    @Override
     public int hashCode() {
 
         int val = opType + exprSubType;

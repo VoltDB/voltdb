@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -51,7 +52,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     protected AbstractPlanNode m_subqueryNode = null;
     // List of correlated parameter indexes that originate at the immediate parent's level
     // and need to be set by this SubqueryExpression on the EE side prior to the evaluation
-    protected List<Integer> m_parameterIdxList = new ArrayList<Integer>();
+    private List<Integer> m_parameterIdxList = new ArrayList<Integer>();
 
     protected AbstractSubqueryExpression() {
         m_valueType = VoltType.BIGINT;
@@ -85,6 +86,20 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         return m_parameterIdxList;
     }
 
+    // Create a matching PVE for this expression to be used on the EE side
+    // to get the original expression value
+    protected void addCorrelationParameterValueExpression(AbstractExpression expr, List<AbstractExpression> pves) {
+        int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
+        m_parameterIdxList.add(paramIdx);
+        ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
+        pves.add(pve);
+    }
+
+    protected void addArgumentParameter(Integer paramIdx, AbstractExpression expr) {
+        m_args.add(expr);
+        m_parameterIdxList.add(paramIdx);
+    }
+
     public  int overrideSubqueryNodeIds(int newId) {
         assert(m_subqueryNode != null);
         newId =  m_subqueryNode.overrideId(newId);
@@ -104,7 +119,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         if (!m_parameterIdxList.isEmpty()) {
             clone.m_parameterIdxList = new ArrayList<Integer>();
             for (Integer paramIdx : m_parameterIdxList) {
-                clone.m_parameterIdxList.add(new Integer(paramIdx.intValue()));
+                clone.m_parameterIdxList.add(paramIdx);
             }
         }
         return clone;
@@ -165,7 +180,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         if (obj.has(Members.PARAM_IDX.name())) {
             JSONArray paramIdxArray = obj.getJSONArray(Members.PARAM_IDX.name());
             int paramSize = paramIdxArray.length();
-            assert(m_args != null && paramSize == m_args.size());
+            assert(m_args != null);
             for (int i = 0; i < paramSize; ++i) {
                 m_parameterIdxList.add(paramIdxArray.getInt(i));
             }
@@ -187,5 +202,10 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         if (m_subqueryNode != null) {
             m_subqueryNode.generateOutputSchema(db);
         }
+    }
+
+    @Override
+    public String getContentDeterminismMessage() {
+        return null;
     }
 }

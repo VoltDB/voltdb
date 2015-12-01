@@ -15,41 +15,24 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "CompactingPool.h"
+package org.voltdb.importer;
 
-#include <cstring>
+import java.net.URI;
 
-using namespace voltdb;
-using namespace std;
 
-CompactingPool::CompactingPool(int32_t elementSize, int32_t elementsPerBuffer) :
-    m_size(elementSize), m_allocator(elementSize, elementsPerBuffer)
+/**
+ * Represents importer configurations created from properties specified in deployment file.
+ * Implementations will contain importer specific details. Importer framework will create
+ * ImporterConfig objects from importer properties in deployment file and use it to create
+ * importer instances when it is time to run importers for the different resources.`
+ */
+public interface ImporterConfig
 {
-}
-
-void*
-CompactingPool::malloc()
-{
-    return m_allocator.alloc();
-}
-
-bool
-CompactingPool::free(void* element)
-{
-    bool element_moved = false;
-    void* last = m_allocator.last();
-    if (last != element)
-    {
-        // copy the last element into the newly vacated spot
-        memcpy(element, last, m_size);
-        element_moved = true;
-    }
-    m_allocator.trim();
-    return element_moved;
-}
-
-size_t
-CompactingPool::getBytesAllocated() const
-{
-    return m_allocator.bytesAllocated();
+    /**
+     * Unique resource id for which the configuration is specified.
+     * This must be unique per importer type.
+     *
+     * @return the unique resource id
+     */
+    public URI getResourceID();
 }

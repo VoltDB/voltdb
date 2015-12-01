@@ -450,11 +450,11 @@ public:
         return m_table->m_blocksNotPendingSnapshot;
     }
 
-    TBBucketMap &getBlocksPendingSnapshotLoad() {
+    TBBucketPtrVector &getBlocksPendingSnapshotLoad() {
         return m_table->m_blocksPendingSnapshotLoad;
     }
 
-    TBBucketMap &getBlocksNotPendingSnapshotLoad() {
+    TBBucketPtrVector &getBlocksNotPendingSnapshotLoad() {
         return m_table->m_blocksNotPendingSnapshotLoad;
     }
 

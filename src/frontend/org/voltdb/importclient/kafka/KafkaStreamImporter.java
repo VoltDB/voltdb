@@ -71,10 +71,13 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.CSVInvocation;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImportHandlerProxy;
 import org.voltdb.importer.ImporterChannelAssignment;
 import org.voltdb.importer.Invocation;
 import org.voltdb.importer.VersionedOperationMode;
+
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
  * Based on SimpleConsumer Implement a BundleActivator interface and extend ImportHandlerProxy.
@@ -83,6 +86,9 @@ import org.voltdb.importer.VersionedOperationMode;
  * @author akhanzode
  */
 public class KafkaStreamImporter extends ImportHandlerProxy implements BundleActivator {
+
+    private static final String CSV_FORMATTER_NAME = "csv";
+    private static final String TSV_FORMATTER_NAME = "tsv";
 
     private final static PartitionOffsetRequestInfo LATEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
@@ -100,6 +106,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     private final Map<String, Integer> m_brokerFetchSize = new HashMap<String, Integer>();
     private final Map<String, Integer> m_brokerSOTimeout = new HashMap<String, Integer>();
     private final Map<String, Map<String, String>> m_brokerProcedure = new HashMap<String, Map<String, String>>();
+    private final Map<String, String> m_brokerFormatter = new HashMap<String, String>();
 
     private static final String GROUP_ID = "voltdb";
     private static final String CLIENT_ID = "voltdb-importer";
@@ -170,13 +177,19 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             throw new RuntimeException("Missing procedure.");
         }
 
-        Map<String, String> topicProc = topicProc = m_brokerProcedure.get(key);
+        Map<String, String> topicProc = m_brokerProcedure.get(key);
         if (topicProc == null) {
             topicProc = new HashMap<String, String>();
             m_brokerProcedure.put(key, topicProc);
         }
 
-        //comma seperated list of topics.
+        String formatter = p.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
+        if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
+            throw new RuntimeException("Invalid formatter: " + formatter);
+        }
+        m_brokerFormatter.put(key, formatter);
+
+        //comma separated list of topics.
         String topics = p.getProperty("topics", "").trim();
         if (topics.isEmpty()) {
             throw new RuntimeException("Missing topic(s).");
@@ -392,14 +405,14 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
 
         private final long m_offset;
         private final AtomicLong m_cbcnt;
-        private final Gap m_tracker;
+        private final TopicPartitionFetcher.Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
         private final Invocation m_invocation;
 
         public TopicPartitionInvocationCallback(
                 final long offset,
                 final AtomicLong cbcnt,
-                final Gap tracker,
+                final TopicPartitionFetcher.Gap tracker,
                 final AtomicBoolean dontCommit,
                 final Invocation invocation) {
             m_offset = offset;
@@ -419,6 +432,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             }
         }
 
+        @SuppressWarnings("unused")
         public Invocation getInvocation() {
             return m_invocation;
         }
@@ -445,11 +459,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
         private SimpleConsumer m_consumer = null;
         private final TopicAndPartition m_topicAndPartition;
-        private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 8192));
+        private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
         private final String m_groupId;
         private final String m_procedure;
+        private final char m_separator;
 
-        public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String groupid, String topic, int partition, String procedure, HostAndPort leader, int fetchSize, int consumerSocketTimeout) {
+        public TopicPartitionFetcher(List<HostAndPort> brokers, URI uri, String groupid, String topic, int partition,
+                String procedure, HostAndPort leader, int fetchSize, int consumerSocketTimeout, String formatter) {
             m_url = uri;
             m_groupId = groupid;
             m_brokers = brokers;
@@ -459,8 +475,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             m_fetchSize = fetchSize;
             m_consumerSocketTimeout = consumerSocketTimeout;
             m_topicAndPartition = new TopicAndPartition(topic, partition);
+            m_separator = CSV_FORMATTER_NAME.equals(formatter) ? CSVParser.DEFAULT_SEPARATOR : '\t';
         }
 
+        @SuppressWarnings("unused")
         public final URI getUrl() {
             return m_url;
         }
@@ -793,7 +811,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         ByteBuffer payload = messageAndOffset.message().payload();
 
                         String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                        CSVInvocation invocation = new CSVInvocation(m_procedure, line);
+                        CSVInvocation invocation = new CSVInvocation(m_procedure, line, m_separator);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                                 invocation);
@@ -889,6 +907,57 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             return true;
         }
 
+        final class Gap {
+            long c = 0;
+            long s = -1L;
+            final long [] lag;
+
+            Gap(int leeway) {
+                if (leeway <= 0) {
+                    throw new IllegalArgumentException("leeways is zero or negative");
+                }
+                lag = new long[leeway];
+            }
+
+            synchronized void submit(long offset) {
+                if (s == -1L && offset >= 0) {
+                    lag[idx(offset)] = c = s = offset;
+                }
+                if (offset > s) {
+                    s = offset;
+                }
+            }
+
+            private final int idx(long offset) {
+                return (int)offset % lag.length;
+            }
+
+            synchronized void resetTo(long offset) {
+                if (offset < 0) {
+                    throw new IllegalArgumentException("offset is negative");
+                }
+                lag[idx(offset)] = s = c = offset;
+            }
+
+            synchronized long commit(long offset) {
+                if (offset <= s && offset > c) {
+                    int ggap = (int)Math.min(lag.length, offset-c);
+                    if (ggap == lag.length) {
+                        warn(
+                              null, "Gap tracker moving topic commit point from %d to %d for "
+                              + m_topicAndPartition, c, (offset - lag.length + 1)
+                            );
+                        c = offset - lag.length + 1;
+                        lag[idx(c)] = c;
+                    }
+                    lag[idx(offset)] = offset;
+                    while (ggap > 0 && lag[idx(c)]+1 == lag[idx(c+1)]) {
+                        ++c;
+                    }
+                }
+                return c;
+            }
+        }
     }
 
     public void closeConsumer(SimpleConsumer consumer) {
@@ -969,7 +1038,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             HostAndPort hap = m_topicPartitionLeader.get(leaderKey);
                             TopicPartitionFetcher fetcher = new TopicPartitionFetcher(m_brokerList.get(key), assignedKey, groupid,
                                     topic, partition, proc,
-                                    hap, fetchsize, consumerSocketTimeout);
+                                    hap, fetchsize, consumerSocketTimeout, m_brokerFormatter.get(key));
                             try {
                                 m_es.submit(fetcher);
                                 m_fetchers.put(assignedKey.toString(), fetcher);
@@ -1004,8 +1073,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         }
     }
 
-    public class KafkaStreamImporterException extends ImportBaseException
-    {
+    public class KafkaStreamImporterException extends ImportBaseException {
         private static final long serialVersionUID = 7668280657393399984L;
 
         public KafkaStreamImporterException() {
@@ -1023,7 +1091,5 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 Object... args) {
             super(format, cause, args);
         }
-
     }
-
 }

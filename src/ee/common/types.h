@@ -203,6 +203,7 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_SEND             = 40,
     PLAN_NODE_TYPE_RECEIVE          = 41,
+    PLAN_NODE_TYPE_MERGERECEIVE     = 42,
 
     //
     // Misc Nodes
@@ -528,9 +529,31 @@ enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 // Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)
 // ------------------------------------------------------------------
 enum DRConflictType {
-    DR_CONFLICT_UNIQUE_CONSTRIANT_VIOLATION,
-    DR_CONFLICT_MISSING_TUPLE,
-    DR_CONFLICT_TIMESTAMP_MISMATCH
+    NO_CONFLICT,
+    CONFLICT_CONSTRAINT_VIOLATION,
+    CONFLICT_EXPECTED_ROW_MISSING,
+    CONFLICT_EXPECTED_ROW_MISMATCH,
+};
+
+enum DRConflictRowType {
+    EXISTING_ROW,
+    EXPECTED_ROW,
+    NEW_ROW,
+};
+
+enum DRRowDecision {
+   ACCEPT,
+   REJECT,
+};
+
+enum DRDivergence {
+    NOT_DIVERGE,
+    DIVERGE,
+};
+
+enum DRConflictOnPK {
+    NOT_CONFLICT_ON_PK,
+    CONFLICT_ON_PK,
 };
 
 // ------------------------------------------------------------------

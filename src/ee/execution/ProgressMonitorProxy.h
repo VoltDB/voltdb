@@ -24,9 +24,10 @@ namespace voltdb {
 
 class ProgressMonitorProxy {
 public:
-    ProgressMonitorProxy(VoltDBEngine* engine, AbstractExecutor* exec, Table* target_table = NULL)
+    ProgressMonitorProxy(VoltDBEngine* engine, AbstractExecutor* exec)
         : m_engine(engine)
-        , m_tuplesRemainingUntilReport(engine->pullTuplesRemainingUntilProgressReport(exec, target_table))
+        , m_tuplesRemainingUntilReport(
+              engine->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
         , m_countDown(m_tuplesRemainingUntilReport)
     { }
 

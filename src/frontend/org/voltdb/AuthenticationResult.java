@@ -17,6 +17,7 @@
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthHashScheme;
 
@@ -30,11 +31,13 @@ public class AuthenticationResult {
     final public String[] m_perms;
     final public AuthUser m_authUser;
     final public ClientAuthHashScheme m_scheme;
+    final public AuthenticatedConnectionCache m_connectionCache;
 
     //Is user authenticated or not depends on client connection there or not.
-    public AuthenticationResult(Client client, ClientAuthHashScheme scheme, boolean adminMode, String user, String message) {
+    public AuthenticationResult(Client client, AuthenticatedConnectionCache connectionCache, ClientAuthHashScheme scheme, boolean adminMode, String user, String message) {
         m_adminMode = adminMode;
         m_client = client;
+        m_connectionCache = connectionCache;
         m_scheme = scheme;
         final AuthSystem authSystem = VoltDB.instance().getCatalogContext().authSystem;
         //null user when security is disabled.

@@ -38,11 +38,13 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PopulateTruncateTable;
 
 public class TestSQLFeaturesNewSuite extends RegressionSuite {
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
-        TruncateTable.class
+        TruncateTable.class,
+        PopulateTruncateTable.class
     };
 
     /**
@@ -71,12 +73,20 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         String[] procs = {"RTABLE.insert", "PTABLE.insert"};
         String[] tbs = {"RTABLE", "PTABLE"};
-        // Insert data
-        loadTableForTruncateTest(client, procs);
+
+        // Populate table with large # of rows (using SP) to exercise swap path for truncate also.
+        // Perform row insertion in chunks as there is upper limit on # on calls that be queued
+        // and executed in single SP call.
+        int rowsToInsert = 50000;
+        final int rowsInsertionEachChunk = 10000;
+        for (int rowsInserted = 0; rowsInserted < rowsToInsert; rowsInserted += rowsInsertionEachChunk) {
+            // Insert data
+            client.callProcedure("PopulateTruncateTable", rowsInserted + 1, rowsInsertionEachChunk);
+        }
 
         for (String tb: tbs) {
             vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
+            validateTableOfScalarLongs(vt, new long[] {rowsToInsert});
         }
 
         if (isHSQL()) {
@@ -95,12 +105,14 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         }
         for (String tb: tbs) {
             vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
+            validateTableOfScalarLongs(vt, new long[] {rowsToInsert});
 
-            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
+            int nextId = rowsToInsert + 1;
+            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (" +
+                                            nextId + ", 30,  1.1, 'Jedi','Winchester');");
 
             vt = client.callProcedure("@AdHoc", "select count(ID) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {7});
+            validateTableOfScalarLongs(vt, new long[] {nextId});
 
 
             vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];

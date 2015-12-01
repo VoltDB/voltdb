@@ -29,6 +29,10 @@ import platform
 import subprocess
 import sys
 import os.path
+# Define HardRequirements (full name)
+# and possible SkippableleRequirements(fullname:init)
+hardRequirements = ['TransparentHugePage']
+skippableRequirements = {'TransparentHugePage':'thp'}
 
 # Helper functions
 
@@ -141,13 +145,11 @@ def test_ntp(output):
             output['NTP'] = ["WARN", "More then one NTP service is running"]
 
 def test_java_version(output):
-    javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java '", stdout=subprocess.PIPE, shell=True).stdout.read()
+    javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java \|openjdk '", stdout=subprocess.PIPE, shell=True).stdout.read()
     javacVersion = subprocess.Popen("javac -version 2>&1", stdout=subprocess.PIPE, shell=True).stdout.read()
     if '1.7.' in javaVersion or '1.8.' in javaVersion:
-        if '1.7.' in javacVersion:
+        if '1.7.' in javacVersion or '1.8.' in javacVersion:
             output['Java'] = ["PASS", javaVersion.strip() + ' ' + javacVersion.strip()]
-        elif '1.8.' in javacVersion:
-            output['Java'] = ["FAIL", "VoltDB can not be compiled with Java8, " + javacVersion]
         else:
             output['Java'] = ["FAIL", "Unsupported Javac version detected, " + javacVersion]
     else:
@@ -231,6 +233,9 @@ def test_full_config(output):
 def test_hard_requirements():
     """ Returns any errors resulting from hard config requirement violations
     """
-    return _check_thp_config()
+    output = {}
+    test_full_config(output)
+    return dict([(k,v) for k,v in output.items() if k in hardRequirements])
+    # return _check_thp_config()
 
 
