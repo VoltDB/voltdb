@@ -167,6 +167,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * table with the tuples that were backed up.
              */
             m_finishedTableScan = true;
+            // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
             m_iterator.reset(m_backedUpTuples.get()->makeIterator());
         } else {
             /*
@@ -176,8 +177,12 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
             size_t allPendingCnt = m_surgeon.getSnapshotPendingBlockCount();
             size_t pendingLoadCnt = m_surgeon.getSnapshotPendingLoadBlockCount();
             if (m_tuplesRemaining > 0 || allPendingCnt > 0 || pendingLoadCnt > 0) {
-                int32_t skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
-                int32_t skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
+                int32_t skippedDirtyRows = 0;
+                int32_t skippedInactiveRows = 0;
+                if (!m_finishedTableScan) {
+                    skippedDirtyRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedDirtyRows;
+                    skippedInactiveRows = reinterpret_cast<CopyOnWriteIterator*>(m_iterator.get())->m_skippedInactiveRows;
+                }
 
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
