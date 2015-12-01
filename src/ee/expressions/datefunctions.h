@@ -97,7 +97,7 @@ static inline int64_t addMonths(int64_t epoch_micros, int64_t months) {
     micros_to_ptime(epoch_micros, ts);
 
     try {
-        ts += boost::gregorian::months((int) months);
+        ts += boost::gregorian::months(static_cast<int>(months));
     } catch (std::out_of_range &e) {
         throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
@@ -447,7 +447,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<
     micros_to_ptime(date.getTimestamp(), ts);
 
     try {
-        ts += boost::gregorian::years((int) interval);
+        ts += boost::gregorian::years(static_cast<int>(interval));
         boost::posix_time::time_duration td = ts - EPOCH;
         return getTimestampValue(td.total_microseconds());
     } catch (std::out_of_range &e) {

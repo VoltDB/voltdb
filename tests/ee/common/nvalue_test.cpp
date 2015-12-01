@@ -3328,6 +3328,55 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
     }
 }
 
+TEST_F(NValueTest, TestDateadd) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    getExecutorContextForTest(testPool);
+
+    NValue result;
+    NValue interval = ValueFactory::getBigIntValue(1);
+    NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
+
+    std::vector<NValue> args;
+    args.push_back(interval);
+    args.push_back(midSeptember);
+
+    int EXPECTED_YEAR = 2002;
+    result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
+    result = result.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    int EXPECTED_QUARTER = 12;
+    result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
+    result = result.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_QUARTER)));
+
+    int EXPECTED_MONTH = 10;
+    result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
+    result = result.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_MONTH)));
+
+    int EXPECTED_DAY = 10;
+    result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
+    result = result.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_DAY)));
+
+    int EXPECTED_HOUR = 2;
+    result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
+    result = result.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_HOUR)));
+
+    int EXPECTED_MINUTE = 47;
+    result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
+    result = result.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_MINUTE)));
+
+    int EXPECTED_SECOND = 41;
+    result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
+    result = result.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_SECOND)));
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

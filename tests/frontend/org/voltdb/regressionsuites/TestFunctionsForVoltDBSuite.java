@@ -1798,6 +1798,303 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testDateadd() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test DATEADD function tests");
+
+        /*
+         *      "CREATE TABLE P2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P2 ON COLUMN ID;\n" +
+         */
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (10000, '2000-01-01 01:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2001-01-01 01:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-04-01 01:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-01 01:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(vt.getTimestampAsSqlTimestamp(0), Timestamp.valueOf("2000-01-02 01:00:00.000000"));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 02:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:01:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:01.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:00.001000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millis, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:00.001000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 1, TM) FROM P2 WHERE ID = 10000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-01-01 01:00:00.000001"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20000, '2007-01-01 13:10:10.111111');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 1, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.112111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 2, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.113111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 1, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.111112"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 2, TM) FROM P2 WHERE ID = 20000").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 13:10:10.111113"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20001, '2007-01-01 01:01:01.111111');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, 4, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2008-01-01 01:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 13, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2008-02-01 01:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 365, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2008-01-01 01:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, 23, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-02 00:01:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, 59, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 02:00:01.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, 59, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 01:02:00.111111"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 59, TM) FROM P2 WHERE ID = 20001").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2007-01-01 01:01:01.170111"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20002, '2000-01-01 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-01-01 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-10-01 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-01 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:59.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:59.999000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, -1, TM) FROM P2 WHERE ID = 20002").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("1999-12-31 23:59:59.999999"), vt.getTimestampAsSqlTimestamp(0));
+
+        //leap year test case
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20003, '2000-02-29 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, 1, TM) FROM P2 WHERE ID = 20003").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2001-02-28 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20004, '2000-01-31 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 1, TM) FROM P2 WHERE ID = 20004").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 31, TM) FROM P2 WHERE ID = 20004").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-03-02 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20005, '1999-12-31 00:00:00.000000');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(year, 1, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-12-31 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(quarter, 2, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-06-30 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(month, 2, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(day, 60, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(hour, 1440, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(minute, 86400, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(second, 5184000, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(millisecond, 5184000000, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(microsecond, 5184000000000, TM) FROM P2 WHERE ID = 20005").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
+
+        // Test null timestamp
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, NULL, TM) FROM P2 WHERE ID = 20005;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(null, vt.getTimestampAsTimestamp(0));
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20006, null)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, 1, TM) FROM P2 WHERE ID = 20006;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(null, vt.getTimestampAsTimestamp(0));
+    }
+
+    public void testRegexpPosition() throws Exception {
+        System.out.println("STARTING testRegexpPosition");
+
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable vt = null;
+        /*
+            "CREATE TABLE P1 ( " +
+            "ID INTEGER DEFAULT 0 NOT NULL, " +
+            "DESC VARCHAR(300), " +
+            "NUM INTEGER, " +
+            "RATIO FLOAT, " +
+            "PAST TIMESTAMP DEFAULT NULL, " +
+            "PRIMARY KEY (ID) ); " +
+         */
+
+       cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (200, 'TEST reGexp_poSiTion123456Test')");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE REGEXP_POSITION(DESC, 'TEST') > 0;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(1, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]') > 0").getResults()[0];
+        assertFalse(vt.advanceRow());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'i') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        try {
+            client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("illegal pattern string"));
+        }
+
+        try {
+            client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("illegal match flags"));
+        }
+
+        // test null strings
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, NULL) FROM P1 WHERE ID = 200").getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0);
+        assertTrue(vt.wasNull());
+
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (201, NULL);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE ID = 201").getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getLong(0);
+        assertTrue(vt.wasNull());
+
+        // test utf-8 strings
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (202, 'vVoltDBBB贾贾贾');");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[A-Z]贾') FROM P1 WHERE ID = 202;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(9, vt.getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z]贾', 'i') FROM P1 WHERE ID = 202;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(9, vt.getLong(0));
+
+
+        // clear test data
+        cr = client.callProcedure("@AdHoc", "DELETE FROM P1 WHERE ID IN (200, 201, 202);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
