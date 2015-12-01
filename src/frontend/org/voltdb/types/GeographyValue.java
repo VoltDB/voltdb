@@ -44,13 +44,13 @@ public class GeographyValue {
      *
      * @param loops
      */
-    public GeographyValue(List<List<PointType>> loops) {
+    public GeographyValue(List<List<GeographyPointValue>> loops) {
         if (loops == null || loops.size() < 1) {
             throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
         }
 
         m_loops = new ArrayList<List<XYZPoint>>();
-        for (List<PointType> loop : loops) {
+        for (List<GeographyPointValue> loop : loops) {
             List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
             for (int i = 0; i < loop.size(); ++i) {
                 oneLoop.add(XYZPoint.fromPointType(loop.get(i)));
@@ -88,11 +88,11 @@ public class GeographyValue {
      * Gets the loops that make up the polygon, with the outer loop first.
      * @return  The loops in the polygon as a list of a list of points
      */
-    public List<List<PointType>> getLoops() {
-        List<List<PointType>> llLoops = new ArrayList<List<PointType>>();
+    public List<List<GeographyPointValue>> getLoops() {
+        List<List<GeographyPointValue>> llLoops = new ArrayList<List<GeographyPointValue>>();
 
         for (List<XYZPoint> xyzLoop : m_loops) {
-            List<PointType> llLoop = new ArrayList<PointType>();
+            List<GeographyPointValue> llLoop = new ArrayList<GeographyPointValue>();
             for (XYZPoint xyz : xyzLoop) {
                 llLoop.add(xyz.toPointType());
             }
@@ -256,7 +256,7 @@ public class GeographyValue {
         private final double m_y;
         private final double m_z;
 
-        public static XYZPoint fromPointType(PointType pt) {
+        public static XYZPoint fromPointType(GeographyPointValue pt) {
             double latRadians = pt.getLatitude() * (Math.PI / 180);  // AKA phi
             double lngRadians = pt.getLongitude() * (Math.PI / 180); // AKA theta
 
@@ -286,13 +286,13 @@ public class GeographyValue {
             return m_z;
         }
 
-        public PointType toPointType() {
+        public GeographyPointValue toPointType() {
             double latRadians = Math.atan2(m_z, Math.sqrt(m_x * m_x + m_y * m_y));
             double lngRadians = Math.atan2(m_y, m_x);
 
             double latDegrees = latRadians * (180 / Math.PI);
             double lngDegrees = lngRadians * (180 / Math.PI);
-            return new PointType(latDegrees, lngDegrees);
+            return new GeographyPointValue(latDegrees, lngDegrees);
         }
 
         @Override
@@ -345,10 +345,10 @@ public class GeographyValue {
 
     private static void flattenEmptyBoundToBuffer(ByteBuffer buf) {
         buf.put(INCOMPLETE_ENCODING_FROM_JAVA); // for encoding version
-        buf.putDouble(PointType.NULL_COORD);
-        buf.putDouble(PointType.NULL_COORD);
-        buf.putDouble(PointType.NULL_COORD);
-        buf.putDouble(PointType.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
     }
 
     private static void flattenLoopToBuffer(List<XYZPoint> loop, ByteBuffer buf) {
@@ -476,7 +476,7 @@ public class GeographyValue {
                         throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
                     }
                     double lng = tokenizer.nval;
-                    currentLoop.add(XYZPoint.fromPointType(new PointType(lat, lng)));
+                    currentLoop.add(XYZPoint.fromPointType(new GeographyPointValue(lat, lng)));
 
                     token = tokenizer.nextToken();
                     if (token != ',') {

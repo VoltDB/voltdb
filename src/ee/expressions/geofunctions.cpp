@@ -57,13 +57,13 @@ static void throwInvalidWktPoly(const std::string& reason)
                        oss.str().c_str());
 }
 
-static Point::Coord stringToCoord(int pointOrPoly,
+static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
                                   const std::string& input,
                            const std::string& val)
 {
-    Point::Coord coord = 0.0;
+    GeographyPointValue::Coord coord = 0.0;
     try {
-        coord = boost::lexical_cast<Point::Coord>(val);
+        coord = boost::lexical_cast<GeographyPointValue::Coord>(val);
     }
     catch (const boost::bad_lexical_cast&) {
         if (pointOrPoly == POLY) {
@@ -102,10 +102,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     ++it;
 
 
-    Point::Coord lat = stringToCoord(POINT, wkt, *it);
+    GeographyPointValue::Coord lat = stringToCoord(POINT, wkt, *it);
     ++it;
 
-    Point::Coord lng = stringToCoord(POINT, wkt, *it);
+    GeographyPointValue::Coord lng = stringToCoord(POINT, wkt, *it);
     ++it;
 
     if (! boost::iequals(*it, ")")) {
@@ -118,7 +118,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     }
 
     NValue returnValue(VALUE_TYPE_POINT);
-    returnValue.getPoint() = Point(lat, lng);
+    returnValue.getPoint() = GeographyPointValue(lat, lng);
 
     return returnValue;
 }
@@ -135,10 +135,10 @@ static void readLoop(const std::string &wkt,
 
     std::vector<S2Point> points;
     while (it != end && *it != ")") {
-        Point::Coord lat = stringToCoord(POLY, wkt, *it);
+        GeographyPointValue::Coord lat = stringToCoord(POLY, wkt, *it);
         ++it;
 
-        Point::Coord lng = stringToCoord(POLY, wkt, *it);
+        GeographyPointValue::Coord lng = stringToCoord(POLY, wkt, *it);
         ++it;
 
         points.push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
@@ -284,7 +284,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
-    const Point point = getPoint();
+    const GeographyPointValue point = getPoint();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLatitude();
     return retVal;
@@ -294,7 +294,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
-    const Point point = getPoint();
+    const GeographyPointValue point = getPoint();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLongitude();
     return retVal;
@@ -307,7 +307,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const {
 
     Polygon polygon;
     polygon.initFromGeography(getGeography());
-    const Point point(polygon.GetCentroid());
+    const GeographyPointValue point(polygon.GetCentroid());
     NValue retVal(VALUE_TYPE_POINT);
     retVal.getPoint() = point;
     return retVal;
@@ -339,7 +339,7 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vect
 
     Polygon polygon;
     polygon.initFromGeography(arguments[0].getGeography());
-    Point point = arguments[1].getPoint();
+    GeographyPointValue point = arguments[1].getPoint();
     NValue retVal(VALUE_TYPE_DOUBLE);
     // distance is in radians, so convert it to meters
     retVal.getDouble() = polygon.getDistance(point) * EARTH_RADIUS_METERS;

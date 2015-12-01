@@ -30,17 +30,17 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.types.PointType;
+import org.voltdb.types.GeographyPointValue;
 
-public class TestPointType extends RegressionSuite {
+public class TestGeograpyPointValue extends RegressionSuite {
 
-    public TestPointType(String name) {
+    public TestGeograpyPointValue(String name) {
         super(name);
     }
 
-    private static final PointType BEDFORD_PT = new PointType(42.4906, -71.2767);
-    private static final PointType SANTA_CLARA_PT = new PointType(37.3544, -121.9692);
-    private static final PointType LOWELL_PT = new PointType(42.6200, -71.3273);
+    private static final GeographyPointValue BEDFORD_PT = new GeographyPointValue(42.4906, -71.2767);
+    private static final GeographyPointValue SANTA_CLARA_PT = new GeographyPointValue(37.3544, -121.9692);
+    private static final GeographyPointValue LOWELL_PT = new GeographyPointValue(42.6200, -71.3273);
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
@@ -80,11 +80,11 @@ public class TestPointType extends RegressionSuite {
         assertTrue(vt.advanceRow());
         long id = vt.getLong(0);
         assertEquals(1, id);
-        PointType ptByIndex = vt.getPoint(1);
+        GeographyPointValue ptByIndex = vt.getPoint(1);
         assertTrue(vt.wasNull());
         assertNull(ptByIndex);
 
-        PointType ptByColumnName = vt.getPoint("pt");
+        GeographyPointValue ptByColumnName = vt.getPoint("pt");
         assertTrue(vt.wasNull());
         assertNull(ptByColumnName);
 
@@ -106,7 +106,7 @@ public class TestPointType extends RegressionSuite {
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select pointfromtext('point (42.4906 -71.2767)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
-        PointType pt = vt.getPoint(0);
+        GeographyPointValue pt = vt.getPoint(0);
         assertFalse(vt.wasNull());
         assertEquals(42.4906, pt.getLatitude(), 0.001);
         assertEquals(-71.2767, pt.getLongitude(), 0.001);
@@ -241,8 +241,8 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        final PointType CAMBRIDGE_PT = new PointType(42.3736, -71.1106);
-        final PointType SAN_JOSE_PT = new PointType(37.3362, -121.8906);
+        final GeographyPointValue CAMBRIDGE_PT = new GeographyPointValue(42.3736, -71.1106);
+        final GeographyPointValue SAN_JOSE_PT = new GeographyPointValue(37.3362, -121.8906);
 
         validateTableOfScalarLongs(client,
                 "update t set "
@@ -303,7 +303,7 @@ public class TestPointType extends RegressionSuite {
                 .getResults()[0];
 
         assertContentOfTable (new Object[][] {
-                {0, "Singapore", new PointType(1.2905, 103.8521)}},
+                {0, "Singapore", new GeographyPointValue(1.2905, 103.8521)}},
                 vt);
     }
 
@@ -312,7 +312,7 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        Object listParam = new PointType[] {SANTA_CLARA_PT, null, LOWELL_PT};
+        Object listParam = new GeographyPointValue[] {SANTA_CLARA_PT, null, LOWELL_PT};
         VoltTable vt = client.callProcedure("sel_in", listParam)
                 .getResults()[0];
 
@@ -329,7 +329,7 @@ public class TestPointType extends RegressionSuite {
         catch (RuntimeException rte) {
             // When ENG-9311 is fixed, then we shouldn't get this error and
             // the procedure call should succeed.
-            assertTrue(rte.getMessage().contains("PointType or GeographyValue instances "
+            assertTrue(rte.getMessage().contains("GeographyPointValue or GeographyValue instances "
                     + "are not yet supported in Object arrays passed as parameters"));
         }
     }
@@ -338,7 +338,7 @@ public class TestPointType extends RegressionSuite {
 
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestPointType.class);
+            new MultiConfigSuiteBuilder(TestGeograpyPointValue.class);
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -347,12 +347,12 @@ public class TestPointType extends RegressionSuite {
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
-                + "  PT POINT\n"
+                + "  PT GEOGRAPHY_POINT\n"
                 + ");\n"
                 + "CREATE TABLE T_NOT_NULL (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
-                + "  PT POINT NOT NULL\n"
+                + "  PT GEOGRAPHY_POINT NOT NULL\n"
                 + ");\n"
                 + "\n"
                 + "CREATE PROCEDURE sel_in AS"

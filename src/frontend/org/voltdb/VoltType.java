@@ -22,8 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -235,11 +235,11 @@ public enum VoltType {
     /**
      * Point type, for a geographical point (lat, long)
      */
-    POINT ((byte)26,
-            PointType.getLengthInBytes(),
-            "POINT",
-            new Class[] {PointType.class},
-            PointType[].class,
+    GEOGRAPHY_POINT ((byte)26,
+            GeographyPointValue.getLengthInBytes(),
+            "GEOGRAPHY_POINT",
+            new Class[] {GeographyPointValue.class},
+            GeographyPointValue[].class,
             'P'), // 'p' was taken by timestamp
 
     /**
@@ -732,7 +732,7 @@ public enum VoltType {
             return NULL_DECIMAL;
         case VARBINARY:
             return NULL_STRING_OR_VARBINARY;
-        case POINT:
+        case GEOGRAPHY_POINT:
             return NULL_POINT;
         case GEOGRAPHY:
             return NULL_GEOGRAPHY;
@@ -769,7 +769,7 @@ public enum VoltType {
         case STRING:
         case VARBINARY:
         case DECIMAL:
-        case POINT:
+        case GEOGRAPHY_POINT:
         case GEOGRAPHY:
             // already checked these above
             return false;
@@ -781,7 +781,7 @@ public enum VoltType {
 
     public boolean isIndexable() {
         switch(this) {
-        case POINT:
+        case GEOGRAPHY_POINT:
         case GEOGRAPHY:
             return false;
         default:

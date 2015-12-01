@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EE_COMMON_POINT_HPP
-#define EE_COMMON_POINT_HPP
+#ifndef EE_COMMON_GEOGRAPHY_POINT_VALUE_HPP
+#define EE_COMMON_GEOGRAPHY_POINT_VALUE_HPP
 
 #include <limits>
 #include <sstream>
@@ -31,20 +31,20 @@ namespace voltdb {
 /**
  * A class for representing instances of geo-spatial points.
  */
-class Point {
+class GeographyPointValue {
 public:
 
     typedef double Coord;
 
     /** Constructor for a null point,
      * with both lat and lng init'd to the null coordinate */
-    Point()
+    GeographyPointValue()
         : m_latitude(nullCoord())
         , m_longitude(nullCoord())
     {
     }
 
-    Point(Coord latitude, Coord longitude)
+    GeographyPointValue(Coord latitude, Coord longitude)
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
@@ -52,7 +52,7 @@ public:
         assert (m_longitude >= -180.0 && m_longitude <= 180.0);
     }
 
-    Point(const S2Point &s2Point)
+    GeographyPointValue(const S2Point &s2Point)
         : m_latitude(nullCoord())
         , m_longitude(nullCoord())
     {
@@ -92,7 +92,7 @@ public:
         return S2LatLng::FromDegrees(getLatitude(), getLongitude()).ToPoint();
     }
 
-    int compareWith(const Point& rhs) const {
+    int compareWith(const GeographyPointValue& rhs) const {
 
         // Caller guarantees that neither side is null
         assert(! isNull());
@@ -123,14 +123,14 @@ public:
     }
 
     template<class Deserializer>
-    static Point deserializeFrom(Deserializer& input) {
+    static GeographyPointValue deserializeFrom(Deserializer& input) {
         Coord lat = input.readDouble();
         Coord lng = input.readDouble();
         if (lat == nullCoord() && lng == nullCoord()) {
-            return Point();
+            return GeographyPointValue();
         }
 
-        return Point(lat, lng);
+        return GeographyPointValue(lat, lng);
     }
 
     template<class Serializer>
@@ -157,4 +157,4 @@ private:
 
 } // end namespace
 
-#endif // EE_COMMON_POINT_HPP
+#endif // EE_COMMON_GEOGRAPHY_POINT_VALUE_HPP

@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.voltdb.types.PointType;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -1377,7 +1377,7 @@ public class SQLParser extends SQLPatternFactory
         }
     }
 
-    public static PointType parsePoint(String param) {
+    public static GeographyPointValue parseGeographyPoint(String param) {
         int spos = param.indexOf("'");
         int epos = param.lastIndexOf("'");
         if (spos < 0) {
@@ -1386,7 +1386,7 @@ public class SQLParser extends SQLPatternFactory
         if (epos < 0) {
             epos = param.length();
         }
-        return PointType.pointFromText(param.substring(spos+1, epos));
+        return GeographyPointValue.geographyPointFromText(param.substring(spos+1, epos));
     }
     /**
      * Given a parameter string, if it's of the form x'0123456789ABCDEF',
@@ -1521,8 +1521,8 @@ public class SQLParser extends SQLPatternFactory
                         }
                         else if (paramType.equals("timestamp")) {
                             objParam = parseDate(param);
-                        } else if (paramType.equals("point")) {
-                            objParam = parsePoint(param);
+                        } else if (paramType.equals("geography_point")) {
+                            objParam = parseGeographyPoint(param);
                         }
                         else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
                             // A VARBINARY literal may or may not be

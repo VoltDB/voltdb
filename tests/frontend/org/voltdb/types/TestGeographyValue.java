@@ -35,18 +35,18 @@ public class TestGeographyValue extends TestCase {
     public void testGeographyValuePositive() {
         GeographyValue geog;
         // The Bermuda Triangle
-        List<PointType> outerLoop = Arrays.asList(
-                new PointType(32.305, -64.751),
-                new PointType(25.244, -80.437),
-                new PointType(18.476, -66.371),
-                new PointType(32.305, -64.751));
+        List<GeographyPointValue> outerLoop = Arrays.asList(
+                new GeographyPointValue(32.305, -64.751),
+                new GeographyPointValue(25.244, -80.437),
+                new GeographyPointValue(18.476, -66.371),
+                new GeographyPointValue(32.305, -64.751));
 
         // A triangular hole
-        List<PointType> innerLoop = Arrays.asList(
-                new PointType(28.066, -68.874),
-                new PointType(25.361, -68.855),
-                new PointType(28.376, -73.381),
-                new PointType(28.066, -68.874));
+        List<GeographyPointValue> innerLoop = Arrays.asList(
+                new GeographyPointValue(28.066, -68.874),
+                new GeographyPointValue(25.361, -68.855),
+                new GeographyPointValue(28.376, -73.381),
+                new GeographyPointValue(28.066, -68.874));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
         assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
@@ -210,7 +210,7 @@ public class TestGeographyValue extends TestCase {
             double latitude = ycoord*(90.0/NUM_PTS);
             for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
                 double longitude = xcoord*(180.0/NUM_PTS);
-                PointType PT_point = new PointType(latitude, longitude);
+                GeographyPointValue PT_point = new GeographyPointValue(latitude, longitude);
                 for (int idx = 0; idx < NUMBER_TRANSFORMS; idx += 1) {
                     GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromPointType(PT_point);
                     PT_point = xyz_point.toPointType();
