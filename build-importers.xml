@@ -67,7 +67,7 @@
         <zipgroupfileset dir="${base.dir}/lib/" includes="scala-library-2.10.4.jar" />
         <zipgroupfileset dir="${base.dir}/lib" includes="kafka_2.10-0.8.2.1.jar" />
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka.KafkaStreamImporter" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka.KafkaStreamImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="KafkaStream OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="KafkaStreamImporter" />
