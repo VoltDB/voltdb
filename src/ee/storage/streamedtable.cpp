@@ -118,8 +118,6 @@ StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalo
  */
 void StreamedTable::addMaterializedView(ExportMaterializedViewMetadata *view)
 {
-    std::cout << "Adding mat view \n";
-    std::cout.flush();
     m_views.push_back(view);
 }
 
@@ -172,8 +170,6 @@ void StreamedTable::dropMaterializedView(ExportMaterializedViewMetadata *targetV
     }
     // The last element is now excess.
     m_views.pop_back();
-    std::cout << "Deleting mat view  \n";
-    std::cout.flush();
     delete targetView;
 }
 

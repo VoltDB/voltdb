@@ -2053,6 +2053,23 @@ public abstract class CatalogUtil {
      * @param tableId  table id
      * @return table name associated with the given table id (null if no association is found)
      */
+    public static Table getTableObjectNameFromId(Database catalog, int tableId) {
+        for (Table table: catalog.getTables()) {
+            if (table.getRelativeIndex() == tableId) {
+                return table;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Iterate through all the tables in the catalog, find a table with an id that matches the
+     * given table id, and return its name.
+     *
+     * @param catalog  Catalog database
+     * @param tableId  table id
+     * @return table name associated with the given table id (null if no association is found)
+     */
     public static String getTableNameFromId(Database catalog, int tableId) {
         String tableName = null;
         for (Table table: catalog.getTables()) {

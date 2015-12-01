@@ -343,9 +343,9 @@ public abstract class VoltProcedure {
      */
     @Deprecated
     public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
+                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean isExportTableViewTarget)
     throws VoltAbortException
     {
-        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream);
+        return m_runner.voltLoadTable(clusterName, databaseName, tableName, data, returnUniqueViolations, shouldDRStream, isExportTableViewTarget);
     }
 }

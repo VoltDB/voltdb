@@ -1092,7 +1092,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
                         bool returnUniqueViolations,
-                        bool shouldDRStream)
+                        bool shouldDRStream, bool isExportTableViewTarget)
 {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
@@ -1120,7 +1120,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream, isExportTableViewTarget);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -1515,8 +1515,6 @@ bool VoltDBEngine::activateTableStream(
         }
 
         table->incrementRefcount();
-    std::cout << "Activating stream for table: " << "\n";
-    std::cout.flush();
         m_snapshottingTables[tableId] = table;
     }
 

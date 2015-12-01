@@ -35,6 +35,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -79,13 +80,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             // add the partition id
             long currentPartition = context.getPartitionId();
             result.addRow(currentPartition);
-
+            Table table = context.getDatabase().getTables().get(tableName);
+            boolean exportViewTable =  ((table.getMaterializer() != null) &&
+                    (CatalogUtil.isTableExportOnly(context.getDatabase(), table.getMaterializer())));
             try {
                 // voltLoadTable is void. Assume success or exception.
                 voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
                                     tableName,
-                                    toInsert, false, false);
+                                    toInsert, false, exportViewTable, false);
                 // return the number of rows inserted
                 result.addRow(toInsert.getRowCount());
             }

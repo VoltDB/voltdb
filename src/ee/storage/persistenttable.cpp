@@ -482,7 +482,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream, bool isExportViewTarget)
 {
     if (fallible) {
         // not null checks at first
@@ -511,10 +511,12 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         target.setDirtyFalse();
     }
 
-    TableTuple conflict(m_schema);
-    tryInsertOnAllIndexes(&target, &conflict);
-    if (!conflict.isNullTuple()) {
-        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
+    if (!isExportViewTarget) {
+        TableTuple conflict(m_schema);
+        tryInsertOnAllIndexes(&target, &conflict);
+        if (!conflict.isNullTuple()) {
+            throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
+        }
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -1233,9 +1235,9 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          ReferenceSerializeOutput *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
-                                         bool shouldDRStreamRows) {
+                                         bool shouldDRStreamRows, bool isExportTableViewTarget) {
     try {
-        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, isExportTableViewTarget);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {
