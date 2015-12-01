@@ -2425,6 +2425,16 @@ public final class DRAgent {
      * <code>optional fixed64 persistInstanceId = 2;</code>
      */
     long getPersistInstanceId();
+
+    // optional int32 protocolVersion = 3;
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    boolean hasProtocolVersion();
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    int getProtocolVersion();
   }
   /**
    * Protobuf type {@code pmsg.Connect}
@@ -2485,6 +2495,11 @@ public final class DRAgent {
             case 17: {
               bitField0_ |= 0x00000002;
               persistInstanceId_ = input.readFixed64();
+              break;
+            }
+            case 24: {
+              bitField0_ |= 0x00000004;
+              protocolVersion_ = input.readInt32();
               break;
             }
           }
@@ -2559,9 +2574,26 @@ public final class DRAgent {
       return persistInstanceId_;
     }
 
+    // optional int32 protocolVersion = 3;
+    public static final int PROTOCOLVERSION_FIELD_NUMBER = 3;
+    private int protocolVersion_;
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    public boolean hasProtocolVersion() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    /**
+     * <code>optional int32 protocolVersion = 3;</code>
+     */
+    public int getProtocolVersion() {
+      return protocolVersion_;
+    }
+
     private void initFields() {
       clusterId_ = 0;
       persistInstanceId_ = 0L;
+      protocolVersion_ = 0;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2581,6 +2613,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         output.writeFixed64(2, persistInstanceId_);
       }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeInt32(3, protocolVersion_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -2597,6 +2632,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
           .computeFixed64Size(2, persistInstanceId_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(3, protocolVersion_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -2718,6 +2757,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000001);
         persistInstanceId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
+        protocolVersion_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
 
@@ -2754,6 +2795,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000002;
         }
         result.persistInstanceId_ = persistInstanceId_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.protocolVersion_ = protocolVersion_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -2775,6 +2820,9 @@ public final class DRAgent {
         }
         if (other.hasPersistInstanceId()) {
           setPersistInstanceId(other.getPersistInstanceId());
+        }
+        if (other.hasProtocolVersion()) {
+          setProtocolVersion(other.getProtocolVersion());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -2865,6 +2913,39 @@ public final class DRAgent {
       public Builder clearPersistInstanceId() {
         bitField0_ = (bitField0_ & ~0x00000002);
         persistInstanceId_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      // optional int32 protocolVersion = 3;
+      private int protocolVersion_ ;
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public boolean hasProtocolVersion() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public int getProtocolVersion() {
+        return protocolVersion_;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public Builder setProtocolVersion(int value) {
+        bitField0_ |= 0x00000004;
+        protocolVersion_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 3;</code>
+       */
+      public Builder clearProtocolVersion() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        protocolVersion_ = 0;
         onChanged();
         return this;
       }
@@ -3844,6 +3925,16 @@ public final class DRAgent {
      * <code>optional bool isEndOfStream = 14;</code>
      */
     boolean getIsEndOfStream();
+
+    // optional int32 protocolVersion = 15;
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    boolean hasProtocolVersion();
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    int getProtocolVersion();
   }
   /**
    * Protobuf type {@code pmsg.Response}
@@ -3990,6 +4081,11 @@ public final class DRAgent {
             case 112: {
               bitField0_ |= 0x00000800;
               isEndOfStream_ = input.readBool();
+              break;
+            }
+            case 120: {
+              bitField0_ |= 0x00001000;
+              protocolVersion_ = input.readInt32();
               break;
             }
           }
@@ -4551,6 +4647,22 @@ public final class DRAgent {
       return isEndOfStream_;
     }
 
+    // optional int32 protocolVersion = 15;
+    public static final int PROTOCOLVERSION_FIELD_NUMBER = 15;
+    private int protocolVersion_;
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    public boolean hasProtocolVersion() {
+      return ((bitField0_ & 0x00001000) == 0x00001000);
+    }
+    /**
+     * <code>optional int32 protocolVersion = 15;</code>
+     */
+    public int getProtocolVersion() {
+      return protocolVersion_;
+    }
+
     private void initFields() {
       id_ = org.voltdb.pmsg.DRAgent.UUID.getDefaultInstance();
       mode_ = org.voltdb.pmsg.DRAgent.Response.ReplicationMode.IDLE;
@@ -4566,6 +4678,7 @@ public final class DRAgent {
       catalogSignature_ = "";
       failureCause_ = "";
       isEndOfStream_ = false;
+      protocolVersion_ = 0;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -4628,6 +4741,9 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000800) == 0x00000800)) {
         output.writeBool(14, isEndOfStream_);
+      }
+      if (((bitField0_ & 0x00001000) == 0x00001000)) {
+        output.writeInt32(15, protocolVersion_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -4693,6 +4809,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000800) == 0x00000800)) {
         size += com.google.protobuf.CodedOutputStream
           .computeBoolSize(14, isEndOfStream_);
+      }
+      if (((bitField0_ & 0x00001000) == 0x00001000)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(15, protocolVersion_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -4853,6 +4973,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00001000);
         isEndOfStream_ = false;
         bitField0_ = (bitField0_ & ~0x00002000);
+        protocolVersion_ = 0;
+        bitField0_ = (bitField0_ & ~0x00004000);
         return this;
       }
 
@@ -4951,6 +5073,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000800;
         }
         result.isEndOfStream_ = isEndOfStream_;
+        if (((from_bitField0_ & 0x00004000) == 0x00004000)) {
+          to_bitField0_ |= 0x00001000;
+        }
+        result.protocolVersion_ = protocolVersion_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -5060,6 +5186,9 @@ public final class DRAgent {
         }
         if (other.hasIsEndOfStream()) {
           setIsEndOfStream(other.getIsEndOfStream());
+        }
+        if (other.hasProtocolVersion()) {
+          setProtocolVersion(other.getProtocolVersion());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -6359,6 +6488,39 @@ public final class DRAgent {
       public Builder clearIsEndOfStream() {
         bitField0_ = (bitField0_ & ~0x00002000);
         isEndOfStream_ = false;
+        onChanged();
+        return this;
+      }
+
+      // optional int32 protocolVersion = 15;
+      private int protocolVersion_ ;
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public boolean hasProtocolVersion() {
+        return ((bitField0_ & 0x00004000) == 0x00004000);
+      }
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public int getProtocolVersion() {
+        return protocolVersion_;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public Builder setProtocolVersion(int value) {
+        bitField0_ |= 0x00004000;
+        protocolVersion_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 15;</code>
+       */
+      public Builder clearProtocolVersion() {
+        bitField0_ = (bitField0_ & ~0x00004000);
+        protocolVersion_ = 0;
         onChanged();
         return this;
       }
@@ -10602,45 +10764,46 @@ public final class DRAgent {
       "RowLatencyNanos\030\003 \001(\006\"\034\n\013SnapshotReq\022\r\n\005" +
       "nonce\030\001 \001(\t\"/\n\005Reset\022\023\n\013partitionId\030\001 \001(" +
       "\005\022\021\n\ttimestamp\030\002 \001(\006\"\034\n\005Pause\022\023\n\013partiti" +
-      "onId\030\001 \001(\005\"7\n\007Connect\022\021\n\tclusterId\030\001 \001(\005" +
-      "\022\031\n\021persistInstanceId\030\002 \001(\006\"t\n\tSubscribe" +
-      "\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006" +
-      "\022\022\n\nisCovering\030\003 \001(\010\022\030\n\020rewindToUniqueId",
-      "\030\004 \001(\006\022\021\n\tisSyncing\030\005 \001(\010\"\200\004\n\010Response\022\026" +
-      "\n\002id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030\002 \001(\0162\036.p" +
-      "msg.Response.ReplicationMode\022\031\n\021snapshot" +
-      "Timestamp\030\003 \001(\006\022\026\n\016instanceIdHash\030\004 \001(\006\022" +
-      "\017\n\007version\030\005 \001(\t\022 \n\010nodeInfo\030\006 \003(\0132\016.pms" +
-      "g.NodeInfo\022\034\n\024globalPartitionCount\030\007 \001(\005" +
-      "\022*\n\rpartitionInfo\030\010 \003(\0132\023.pmsg.Partition" +
-      "Info\022\021\n\006status\030\t \001(\005:\0010\022%\n\004type\030\n \001(\0162\027." +
-      "pmsg.CtrlEnvelope.Type\022\022\n\ncatalogCRC\030\013 \001" +
-      "(\006\022\030\n\020catalogSignature\030\014 \001(\t\022\024\n\014failureC",
-      "ause\030\r \001(\t\022\025\n\risEndOfStream\030\016 \001(\010\"i\n\017Rep" +
-      "licationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLIC" +
-      "ATED\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIV" +
-      "E\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeInfo\022\020\n\010host" +
-      "name\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncatalogCRC" +
-      "\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013partitionId\030" +
-      "\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001(\006\022\030\n\020lowe" +
-      "stTupleIndex\030\003 \001(\003\022\032\n\022lastSentTupleIndex" +
-      "\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(\003\022\036\n\026outst" +
-      "andingBufferCount\030\006 \001(\003\022\034\n\024outstandingBy",
-      "teCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSyn" +
-      "ced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(\003\022\017\n\007isEnd" +
-      "ed\030\013 \001(\010\"\274\003\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162" +
-      "\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n.p" +
-      "msg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005rese" +
-      "t\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pm" +
-      "sg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg.Respon" +
-      "se\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.SnapshotR" +
-      "eq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subscribe\022\036" +
-      "\n\007connect\030\n \001(\0132\r.pmsg.Connect\"\216\001\n\004Type\022",
-      "\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020" +
-      "\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNA" +
-      "PSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t" +
-      "\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb.pmsgB\007DRAg" +
-      "ent"
+      "onId\030\001 \001(\005\"P\n\007Connect\022\021\n\tclusterId\030\001 \001(\005" +
+      "\022\031\n\021persistInstanceId\030\002 \001(\006\022\027\n\017protocolV" +
+      "ersion\030\003 \001(\005\"t\n\tSubscribe\022\023\n\013partitionId" +
+      "\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n\nisCovering\030",
+      "\003 \001(\010\022\030\n\020rewindToUniqueId\030\004 \001(\006\022\021\n\tisSyn" +
+      "cing\030\005 \001(\010\"\231\004\n\010Response\022\026\n\002id\030\001 \002(\0132\n.pm" +
+      "sg.UUID\022,\n\004mode\030\002 \001(\0162\036.pmsg.Response.Re" +
+      "plicationMode\022\031\n\021snapshotTimestamp\030\003 \001(\006" +
+      "\022\026\n\016instanceIdHash\030\004 \001(\006\022\017\n\007version\030\005 \001(" +
+      "\t\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022\034\n\024g" +
+      "lobalPartitionCount\030\007 \001(\005\022*\n\rpartitionIn" +
+      "fo\030\010 \003(\0132\023.pmsg.PartitionInfo\022\021\n\006status\030" +
+      "\t \001(\005:\0010\022%\n\004type\030\n \001(\0162\027.pmsg.CtrlEnvelo" +
+      "pe.Type\022\022\n\ncatalogCRC\030\013 \001(\006\022\030\n\020catalogSi",
+      "gnature\030\014 \001(\t\022\024\n\014failureCause\030\r \001(\t\022\025\n\ri" +
+      "sEndOfStream\030\016 \001(\010\022\027\n\017protocolVersion\030\017 " +
+      "\001(\005\"i\n\017ReplicationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNC" +
+      "ING_REPLICATED\020\002\022\027\n\023SYNCING_PARTITIONED\020" +
+      "\003\022\n\n\006ACTIVE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeIn" +
+      "fo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\n" +
+      "catalogCRC\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013pa" +
+      "rtitionId\030\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001" +
+      "(\006\022\030\n\020lowestTupleIndex\030\003 \001(\003\022\032\n\022lastSent" +
+      "TupleIndex\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(",
+      "\003\022\036\n\026outstandingBufferCount\030\006 \001(\003\022\034\n\024out" +
+      "standingByteCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(" +
+      "\010\022\020\n\010isSynced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(" +
+      "\003\022\017\n\007isEnded\030\013 \001(\010\"\274\003\n\014CtrlEnvelope\022%\n\004t" +
+      "ype\030\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id" +
+      "\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.A" +
+      "ck\022\032\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030" +
+      "\005 \001(\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.p" +
+      "msg.Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg" +
+      ".SnapshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.S",
+      "ubscribe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect" +
+      "\"\216\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003" +
+      "\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_RE" +
+      "Q\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n" +
+      "\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\nB\032\n\017org.voltdb." +
+      "pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -10682,7 +10845,7 @@ public final class DRAgent {
           internal_static_pmsg_Connect_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Connect_descriptor,
-              new java.lang.String[] { "ClusterId", "PersistInstanceId", });
+              new java.lang.String[] { "ClusterId", "PersistInstanceId", "ProtocolVersion", });
           internal_static_pmsg_Subscribe_descriptor =
             getDescriptor().getMessageTypes().get(6);
           internal_static_pmsg_Subscribe_fieldAccessorTable = new
@@ -10694,7 +10857,7 @@ public final class DRAgent {
           internal_static_pmsg_Response_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Response_descriptor,
-              new java.lang.String[] { "Id", "Mode", "SnapshotTimestamp", "InstanceIdHash", "Version", "NodeInfo", "GlobalPartitionCount", "PartitionInfo", "Status", "Type", "CatalogCRC", "CatalogSignature", "FailureCause", "IsEndOfStream", });
+              new java.lang.String[] { "Id", "Mode", "SnapshotTimestamp", "InstanceIdHash", "Version", "NodeInfo", "GlobalPartitionCount", "PartitionInfo", "Status", "Type", "CatalogCRC", "CatalogSignature", "FailureCause", "IsEndOfStream", "ProtocolVersion", });
           internal_static_pmsg_NodeInfo_descriptor =
             getDescriptor().getMessageTypes().get(8);
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
