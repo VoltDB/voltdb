@@ -3671,6 +3671,7 @@ svg.nvd3-svg { width:95% !important; }
     padding: 8px 5px 10px 5px;
     text-align: left;
 }
+.QueryTbl tr td input[type="text"] { width:175px;}
 
 .queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px;}
 .queryTimeOutLabel {
@@ -3820,6 +3821,9 @@ label.errorTimeOut {
         position: relative;
         right: 10px;
     }
+	#queryTimeoutConfigControls { width:305px;}
+	.QueryTbl tr td input[type="text"] { width:126px;}
+	label.errorTimeOut { padding-bottom:20px;}
 }
 
 @media (min-width: 639px) and (max-width:640px) {
