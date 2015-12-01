@@ -1010,6 +1010,13 @@
                     <div class="queryInput" id="inputQuery">
                         <ul class="btnList" id="queryBtnList">
                             <li>
+                              <div class="queryTimeOutLabel" id="divQueryTimeOut"><span id="queryTimeoutTxt" class="qtmText"></span><span id="timeoutCross" class="setqueryTimeOut timeOutCross"></span></div>
+
+                            </li>
+                            <li>
+                                <a href="#queryTimeoutConfigPopup" id="bntTimeoutSetting" class="setServer sqlSetting"></a>
+                            </li>
+                            <li>
                                 <button class="btnStudio" id="runBTn">Run</button>
                             </li>
                             <li>
@@ -1889,6 +1896,41 @@
         <div class="overlay-btns"><a id="btnSaveDrReplica" class="btn">Ok</a> <a id="btnPopupDrReplicaCancel" class="btn btn-gray">Cancel</a></div>
     </div>
     <!-- POPUP DRReplicaPop -->
+    <!--Configure Query Timeout Popup-->
+    <div id="queryTimeoutConfigPopup" style="display: none;">
+      <div id="queryTimeoutConfigInnerPopup">
+        <div class="overlay-title icon-alert">
+          <div id="queryTimeoutConfigHeader" class="addConfigHeader">Query Timeout</div>
+          <div class="clear"></div>
+        </div>
+        <div id="queryTimeoutConfigControls">
+          <div class="queryTimeout">
+            <form id="formQueryTimeoutConfiguration" method="get" action="">
+              <table id="tblAddNewProperty" width="100%" class="QueryTbl">
+                <tbody><tr>
+                  <td>Name</td>
+                  <td align="center">
+                    <input size="20" id="txtQueryTimeoutConfig" name="txtQueryTimeoutConfig"  type="text">
+                    <label id="errorQueryTimeoutConfig" for="txtQueryTimeoutConfig" class="error errorTimeOut" style="display: none;"></label>
+                  </td>
+                  <td align="left">milliseconds</td>
+                  </tr>
+                </tbody>
+              </table>
+            </form>
+            <p> You can set time limit for read-only queries. Read-only queries that take longer than the specified time will
+              be cancelled.</p>
+          </div>
+
+          <div class="overlay-btns">
+            <a id="btnQueryTimeoutConfigSave" class="btn">Save</a>
+            <a id="btnQueryTimeoutConfigClear" class="btn btn-gray">Clear</a>
+            <a id="btnQueryTimeoutConfigCancel" class="btn btn-gray" style="margin-left:0.02%;">Cancel</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>
     <script src="js/jquery.tablesorter.js"></script>
