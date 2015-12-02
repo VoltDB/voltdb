@@ -58,15 +58,16 @@ import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.Invocation;
 
 /**
+ * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
  */
-public class KafkaStreamImporterVersion2 extends AbstractImporter
+public class KafkaTopicPartitionImporter extends AbstractImporter
 {
     private final static PartitionOffsetRequestInfo LATEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.LatestTime(), 1);
     private final static PartitionOffsetRequestInfo EARLIEST_OFFSET =
             new PartitionOffsetRequestInfo(kafka.api.OffsetRequest.EarliestTime(), 1);
 
-    private int m_waitSleepMs = 1;
+    private final int m_waitSleepMs = 1;
     private final AtomicBoolean m_dead = new AtomicBoolean(false);
     //Start with invalid so consumer will fetch it.
     private final AtomicLong m_currentOffset = new AtomicLong(-1);
@@ -78,7 +79,7 @@ public class KafkaStreamImporterVersion2 extends AbstractImporter
     private final KafkaStreamImporterConfig m_config;
     private KafkaStreamImporterConfig.HostAndPort m_coordinator;
 
-    public KafkaStreamImporterVersion2(KafkaStreamImporterConfig config)
+    public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
         m_config = config;
         m_coordinator = m_config.getPartitionLeader();

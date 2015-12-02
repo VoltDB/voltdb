@@ -41,7 +41,7 @@ import org.voltdb.importer.ImporterConfig;
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
- * TODO:
+ * Holds configuration information required to connect to a single partition for a topic.
  */
 public class KafkaStreamImporterConfig implements ImporterConfig
 {
@@ -223,7 +223,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig
             consumer = new SimpleConsumer(brokerList.get(0).getHost(), brokerList.get(0).getPort(), soTimeout, fetchSize, CLIENT_ID);
 
             TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
-            //TODO: Catch exception in caller and log
             kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
 
             List<TopicMetadata> metaData = resp.topicsMetadata();
@@ -303,7 +302,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
 
         @Override
         public String toString() {
-            return m_host + ":" + m_port;
+            return m_connectionString;
         }
 
         @Override

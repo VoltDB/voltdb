@@ -110,9 +110,9 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             m_importers = builder.build();
             startImporters();
         } else {
+            m_importers = ImmutableMap.of();
             distributer.registerCallback(m_factory.getTypeName(), this);
             distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
-            m_importers = ImmutableMap.of();
         }
     }
 

@@ -34,7 +34,7 @@ public class KafkaStreamImporterFactory extends AbstractImporterFactory
     @Override
     public String getTypeName()
     {
-        return "KafkaStreamIimporter";
+        return "KafkaStreamImporter";
     }
 
     @Override
@@ -46,7 +46,7 @@ public class KafkaStreamImporterFactory extends AbstractImporterFactory
     @Override
     public AbstractImporter create(ImporterConfig config)
     {
-        return new KafkaStreamImporterVersion2((KafkaStreamImporterConfig) config);
+        return new KafkaTopicPartitionImporter((KafkaStreamImporterConfig) config);
     }
 
     @Override
