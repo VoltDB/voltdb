@@ -1,0 +1,21 @@
+file scripts/geospatial/geography.sql;
+
+exec make_polygon 1 'polygon ((10.1 ';
+exec make_polygon 2 '  polygon  (10.333   20.666)    ';
+exec make_polygon 3 'polygon(-10.333 -20.666)';
+exec make_polygon 4 '  polygon  (-10.333   -20.666)    ';
+exec make_polygon 5 'polygon(10 10)';
+-- Test latitude/longitude ranges.
+exec make_polygon 106 'polygon( 100.0   100.0)';
+exec make_polygon 107 'polygon(  45.0   360.0)';
+exec make_polygon 108 'polygon(  45.0   270.0)';
+exec make_polygon 109 'polygon(-100.0  -100.0)';
+exec make_polygon 110 'polygon( -45.0  -360.0)';
+exec make_polygon 111 'polygon( -45.0  -270.0)';
+-- Syntax errors
+-- Comma separating the coordinates.
+exec make_polygon 112 'polygon(0.0, 0.0)';
+
+exec make_polygon 200 null;
+
+select * from points;
