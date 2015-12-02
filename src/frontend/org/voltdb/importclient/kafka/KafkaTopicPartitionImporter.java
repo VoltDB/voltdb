@@ -307,6 +307,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     private void resetLeader() {
+        //TODO: remove
+        info(null, "*****resetLeader*****");
         KafkaStreamImporterConfig.HostAndPort leaderBroker = m_config.getPartitionLeader();
 
         KafkaStreamImporterConfig.closeConsumer(m_consumer);
@@ -322,6 +324,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 m_config.setPartitionLeader(leaderBroker);
             }
         }
+        //TODO: remove
+        info(null, "*****setting consumer*****");
         m_consumer = new SimpleConsumer(
                 leaderBroker.getHost(), leaderBroker.getPort(),
                 m_config.getSocketTimeout(), m_config.getFetchSize(), KafkaStreamImporterConfig.CLIENT_ID
@@ -335,6 +339,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         AtomicLong cbcnt = new AtomicLong(0);
         try {
             //Start with the starting leader.
+        //TODO: remove
+        info(null, "*****Calling resetLeader*****");
             resetLeader();
 
             int sleepCounter = 1;
@@ -367,6 +373,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                                 .build();
                 FetchResponse fetchResponse = null;
                 try {
+        //TODO: remove
+        info(null, "*****m_consumer=" + m_consumer +" *****");
                     fetchResponse = m_consumer.fetch(req);
                     if (fetchResponse == null) {
                         sleepCounter = backoffSleep(sleepCounter);
