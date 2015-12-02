@@ -686,16 +686,21 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     }
 
     const char* sourceChars = reinterpret_cast<const char*>(source.getObjectValue_withoutNull());
+    int32_t lenSource = source.getObjectLength_withoutNull();
+    // temporary workaround to make sure the string we are operating on is null terminated
+    std::string sourceStr(sourceChars, lenSource);
 
     int32_t lenPat = pat.getObjectLength_withoutNull();
     const char* patChars = reinterpret_cast<const char*>(pat.getObjectValue_withoutNull());
+    // temporary workaround to make sure the string we are operating on is null terminated
+    std::string patStr(patChars, lenPat);
 
     try {
-        boost::regex patExpr(patChars, lenPat, syntaxOpts);
+        boost::regex patExpr(patStr, syntaxOpts);
         boost::cmatch what;
 
-        if (regex_search(sourceChars, what, patExpr, matchFlags)) {
-            return getBigIntValue(getCharLength(sourceChars, what.position()) + 1);
+        if (regex_search(sourceStr.c_str(), what, patExpr, matchFlags)) {
+            return getBigIntValue(getCharLength(sourceStr.c_str(), what.position()) + 1);
         } else {
             return getBigIntValue(0);
         }
