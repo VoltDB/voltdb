@@ -308,7 +308,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
         else {
-            // just fill m_outputSchema with the table's columns
+            // We come here if this node is an inline scan node, or if m_tableScanSchema is empty.
+            //
+            // If this scan node is inlined into another node, then there is no output temp
+            // table for this node, so the output schema will be the same as the
+            //
+            // When would m_tableScanSchema be empty?  I'm not sure (--cwolff, 12/02/15)
+            //
+            // Just fill m_outputSchema with the table's columns.
             m_outputSchema = m_tableSchema.clone();
             m_hasSignificantOutputSchema = true;
         }
