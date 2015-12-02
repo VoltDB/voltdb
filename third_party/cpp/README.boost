@@ -18,7 +18,7 @@ It's mostly header-only and we specifically disable any references to boost::thr
     a.) Download the boost tarball.
     b.) Copy the needed header-only include files to the repository.
     c.) Configure, build and install the wanted built libraries statically using
-        --fpic (for eg: ./b2 link=static --with-regex --cxxflags=--fpic). These
+        --fpic (for eg: ./b2 link=static --with-regex cxxflags=-fPIC). These
         are installed in some temporary location.  We only use the static
         libraries, to simplify packaging.
     d.) Copy the static libraries into the repository.  The static libraries
