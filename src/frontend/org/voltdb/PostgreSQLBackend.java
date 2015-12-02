@@ -261,12 +261,45 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         }
     }
 
-    /** TODO: Modify queries containing an ORDER BY clause, in such a way that
-     *  PostgreSQL results will match VoltDB results, generally by adding
-     *  NULLS FIRST or NULLS LAST. */
+    /**
+     * Modify a query (<i>dml</i>) containing the specified <i>queryPattern</i>,
+     * in such a way that PostgreSQL results will match VoltDB results, generally
+     * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
+     * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
+     * as a whole.
+     * @param dml - the query text (DML or DQL) to be transformed.
+     * @param queryPattern - the Pattern to be detected and modified, within
+     * the query.
+     * @param initText - an initial string with which to begin the replacement
+     * text (e.g. "ORDER BY"); may be an empty string, but not <b>null</b>.
+     * @param prefix - a string to appear before each group, or before the
+     * whole <i>queryPattern</i> (e.g. "TRUNC ( "); may be an empty string,
+     * but not <b>null</b>.
+     * @param suffix - a string to appear after each group, or after the
+     * whole <i>queryPattern</i> (e.g. " NULLS FIRST"); may be an empty string,
+     * but not <b>null</b>.
+     * @param altEnding - when a matching group ends with this text (e.g. "DESC"),
+     * the <i>altText</i> will be used, instead of <i>suffix</i>; may be <b>null</b>.
+     * @param altText - when <i>altEnding</i> is not null, the alternate suffix,
+     * to be used when the group ends with <i>altEnding</i> (e.g. " NULLS LAST");
+     * when <i>altEnding</i> is null, the text to be used to replace each group,
+     * within the whole match (e.g. "||"); may be <b>null</b>, in which case the
+     * group is not replaced.
+     * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
+     * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
+     * they will be applied to each group.
+     * @param intOnly - when <b>true</b>, the query (<i>dml</i>) will only be
+     * modified if the group is an integer-valued column.
+     * @param groups - zero or more groups found within the <i>queryPattern</i>
+     * (e.g. "column").
+     * @return the query (<i>dml</i>), transformed in the specified ways
+     * (possibly unchanged).
+     * @throws NullPointerException if <i>dml</i>, <i>queryPattern</i>,
+     * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
+     */
     @SuppressWarnings("unused")
     static private String transformQuery(String dml, Pattern queryPattern, String initText,
-            String prefix, String suffix, String altEnding, String altSuffix,
+            String prefix, String suffix, String altEnding, String altText,
             boolean useWhole, boolean intOnly, String ... groups) {
         StringBuffer modified_dml = new StringBuffer();
         Matcher matcher = queryPattern.matcher(dml);
@@ -275,7 +308,6 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             String wholeMatch = null, group = null;
             wholeMatch = matcher.group();
             for (String groupName : groups) {
-//                System.out.println("  groupName : " + groupName);
                 group = null;
                 try {
                     group = matcher.group(groupName);
@@ -285,12 +317,10 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 if (DEBUG) {
                     System.out.println("In PostgreSQLBackend.transformQuery,\n  with dml    : " + dml);
                     System.out.println("  queryPattern: " + queryPattern);
-                    System.out.println("  initText, intOnly, prefix, suffix:\n    '"
-                            + initText + "', '" + intOnly + "', '" + prefix + "', '" + suffix
-                            + "'\n  preGroup, postGroup, altEnding, altSuffix; groups:\n    '"
-//                            + preGroup + "', '" + postGroup + "', '" + altEnding + "', '" + altPostGroup + "';\n    "
-                            + prefix + "', '" + suffix + "', '" + altEnding + "', '" + altSuffix + "';\n    "
-                            + groups);
+                    System.out.println("  initText, prefix, suffix, altEnding, altText:\n    '"
+                            + initText + "', '" + prefix + "', '" + suffix + "', '" + altEnding + "', '" + altText
+                            + "'\n  useWhole, intOnly; groups:\n    '"
+                            + useWhole + ", " + intOnly + "; " + groups);
                     System.out.println("  wholeMatch: " + wholeMatch);
                     System.out.println("  group     : " + group);
                 }
@@ -298,29 +328,22 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     break;
                 } else if (!useWhole) {
                     // Check for the ending that indicates to use the alternate suffix
-                    if (altEnding != null && group.toUpperCase().endsWith(altEnding)) {
-                        suffix = altSuffix;
+                    if (altText != null && group.toUpperCase().endsWith(altEnding)) {
+                        suffix = altText;
                     }
                     // Make sure not to swallow up extra ')', in this group
                     replaceText.append(handleParens(group, prefix, suffix));
                 }
             }
             if (useWhole) {
-                if (DEBUG) {
-                    System.out.println("In PostgreSQLBackend.transformQuery,\n  with dml    : " + dml);
-                    System.out.println("  queryPattern: " + queryPattern);
-                    System.out.println("  initText, intOnly, prefix, suffix:\n    '"
-                            + initText + "', '" + intOnly + "', '" + prefix + "', '" + suffix
-                            + "'\n  preGroup, postGroup, altEnding, altSuffix; groups:\n    '"
-                            + prefix + "', '" + suffix + "', '" + altEnding + "', '" + altSuffix + "';\n    "
-                            + groups);
-                    System.out.println("  wholeMatch: " + wholeMatch);
-                    System.out.println("  group     : " + group);
-                }
                 if (intOnly && !isIntegerColumn(group)) {
                     // Make no changes to query
                     replaceText.append(wholeMatch);
                 } else {
+                    // Check for the case where the group is to be replaced with altText
+                    if (altText != null && altEnding == null) {
+                        wholeMatch = wholeMatch.replace(group, altText);
+                    }
                     // Make sure not to swallow up extra ')', in whole match
                     replaceText.append(handleParens(wholeMatch, prefix, suffix));
                 }
@@ -335,40 +358,36 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return modified_dml.toString();
     }
 
-    /** Modify queries containing an ORDER BY clause, in such a way that
+    /** Modify a query containing an ORDER BY clause, in such a way that
      *  PostgreSQL results will match VoltDB results, generally by adding
-     *  NULLS FIRST or NULLS LAST. */
+     *  NULLS FIRST or (after "DESC") NULLS LAST. */
     static private String transformOrderByQuery(String dml) {
         return transformQuery(dml, orderByQuery, "ORDER BY",
                 "", " NULLS FIRST", "DESC", " NULLS LAST", false, false,
                 "column1", "column2", "column3", "column4", "column5", "column6");
     }
 
-    /** Modify queries containing an EXTRACT(DAY_OF_WEEK FROM ...) or
-     *  EXTRACT(DAY_OF_YEAR FROM ...) function, which PostgreSQL does not
-     *  support, and replace it with EXTRACT(DOW FROM ...)+1 or
-     *  DATE_PART('DOY', ...), respectively, which is an equivalent that
-     *  PostgreSQL does support. (The '+1' for DOW is because PostgreSQL
-     *  counts Sunday as 0 and Saturday as 6, etc., whereas VoltDB counts
-     *  Sunday as 1 and Saturday as 7, etc.) */
+    /** Modify a query containing an EXTRACT(DAY_OF_WEEK FROM ...) function,
+     *  which PostgreSQL does not support, and replace it with
+     *  EXTRACT(DOW FROM ...)+1, which is an equivalent that PostgreSQL
+     *  does support. (The '+1' is because PostgreSQL counts Sunday as 0 and
+     *  Saturday as 6, etc., whereas VoltDB counts Sunday as 1 and Saturday
+     *  as 7, etc.) */
     static private String transformDayOfWeekQuery(String dml) {
         return transformQuery(dml, dayOfWeekQuery, "EXTRACT ( ",
-                "DOW FROM", ")+1", null, null, true, false, "column");
+                "DOW FROM", ")+1", null, null, false, false, "column");
     }
 
-    /** Modify queries containing an EXTRACT(DAY_OF_WEEK FROM ...) or
-     *  EXTRACT(DAY_OF_YEAR FROM ...) function, which PostgreSQL does not
-     *  support, and replace it with EXTRACT(DOW FROM ...)+1 or
-     *  DATE_PART('DOY', ...), respectively, which is an equivalent that
-     *  PostgreSQL does support. (The '+1' for DOW is because PostgreSQL
-     *  counts Sunday as 0 and Saturday as 6, etc., whereas VoltDB counts
-     *  Sunday as 1 and Saturday as 7, etc.) */
+    /** Modify a query containing an EXTRACT(DAY_OF_YEAR FROM ...) function,
+     *  which PostgreSQL does not support, and replace it with
+     *  EXTRACT(DOY FROM ...), which is an equivalent that PostgreSQL
+     *  does support. */
     static private String transformDayOfYearQuery(String dml) {
         return transformQuery(dml, dayOfYearQuery, "EXTRACT ( ",
-                "DOY FROM", ")", null, null, true, false, "column");
+                "DOY FROM", ")", null, null, false, false, "column");
     }
 
-    /** Modify queries containing an AVG(columnName), where <i>columnName</i>
+    /** Modify a query containing an AVG(columnName), where <i>columnName</i>
      *  is of an integer type, for which PostgreSQL returns a numeric
      *  (non-integer) value, unlike VoltDB, which returns an integer;
      *  so change it to: TRUNC ( AVG(columnName) ). */
@@ -377,22 +396,22 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 "TRUNC ( ", " )", null, null, true, true, "column");
     }
 
-    /** Modify queries containing a CEILING(columnName) or FLOOR() where
-     *  <i>columnName</i> is of an integer type, for which PostgreSQL returns
-     *  a numeric (non-integer) value, unlike VoltDB, which returns an integer;
-     *  so change it to: CAST ( CEILING(columnName) as INTEGER ). */
+    /** Modify a query containing a CEILING(columnName) or FLOOR(columnName),
+     *  where <i>columnName</i> is of an integer type, for which PostgreSQL
+     *  returns a numeric (non-integer) value, unlike VoltDB, which returns
+     *  an integer; so change it to: CAST ( CEILING(columnName) as INTEGER ),
+     *  or CAST ( FLOOR(columnName) as INTEGER ), respectively. */
     static private String transformCeilingOrFloorOfIntegerQuery(String dml) {
         return transformQuery(dml, ceilingOrFloorQuery, "",
                 "CAST ( ", " as INTEGER )", null, null, true, true, "column");
     }
 
-    /** TODO: Modify queries containing an AVG(columnName) where <i>columnName</i>
-     *  is of an integer type, for which PostgreSQL returns a numeric
-     *  (non-integer) value, unlike VoltDB, which returns an integer;
-     *  so change it to: TRUNC ( AVG(columnName) ). */
+    /** Modify a query containing 'FOO' + ..., which PostgreSQL does not
+     *  support, and replace it with 'FOO' || ..., which is an equivalent
+     *  that PostgreSQL does support. */
     static private String transformStringConcatQuery(String dml) {
         return transformQuery(dml, stringConcatQuery, "",
-                "||", "", null, null, true, false, "plus");
+                "", "", null, "||", true, false, "plus");
     }
 
     /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
@@ -401,6 +420,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  length). */
     @SuppressWarnings("unused")
     static private String transformVarcharOfBytes(String ddl) {
+        // TODO: modify this to call transformQuery?
         StringBuffer modified_ddl = new StringBuffer();
         Matcher matcher = varcharBytesDdl.matcher(ddl);
         while (matcher.find()) {
@@ -429,6 +449,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  support, and replace it with BYTEA (which it does). */
     @SuppressWarnings("unused")
     static private String transformVarbinary(String ddl) {
+        // TODO: modify this to call transformQuery?
         StringBuffer modified_ddl = new StringBuffer();
         Matcher matcher = varbinaryDdl.matcher(ddl);
         while (matcher.find()) {
