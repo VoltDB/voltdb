@@ -1,11 +1,13 @@
 import os, sys, threading, shutil, re
 from subprocess import Popen, PIPE, STDOUT
 
+
 class BuildContext:
     def __init__(self, args):
         self.CPPFLAGS = ""
         self.EXTRAFLAGS = ""
-        self.LDFLAGS = ""
+        self.LDFLAGS = "-L${INSTALL_DIR}/lib"
+        self.LASTLDFLAGS = ""
         self.JNIEXT = ""
         self.JNILIBFLAGS = ""
         self.JNIBINFLAGS = ""
@@ -13,12 +15,12 @@ class BuildContext:
         self.SOEXT = ""
         self.IGNORE_SYS_PREFIXES = ()
         self.INPUT_PREFIX = ""
-        self.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp"
+        self.THIRD_PARTY_INPUT_PREFIX = ""
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
         self.INPUT = {}
         self.SRC_INCLUDE_DIRS = []
-        self.OBJ_INCLUDE_DIRS = []
+        self.OBJ_INCLUDE_DIRS = ["3pty-install/include"]
         self.THIRD_PARTY_INPUT = {}
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
@@ -130,24 +132,24 @@ except:
 # new extension.  If the filename does not
 # have an extension, the new extension is just
 # appended.
-def replaceExtension(filename, newExtension):
-    pos = filename.rfind(".")
+def replaceSuffix(name, suffix):
+    pos = name.rindex(".")
     if pos < 0:
-        return filename + newExtension
+        return name + suffix;
     else:
-        return filename[:pos] + newExtension
+        return name[:pos] + suffix;
     
 def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
-    jni_objname = replaceExtension("objects/" + relativepath, ".o")
-    static_objname = replaceExtension("static_objects/" + relativepath, ".o")
+    jni_objname = "objects/" + replaceSuffix(relativepath, ".o")
+    static_objname = "static_objects/" + replaceSuffix(relativepath, ".o")
     return os.path.normpath(jni_objname), os.path.normpath(static_objname)
 
 def namesForTestCode(filename):
     relativepath = "/".join(filename.split("/")[2:])
     binname = "cpptests/" + relativepath
     sourcename = filename + ".cpp"
-    objectname = replaceExtension("static_objects/" + relativepath, ".o")
+    objectname = "static_objects/" + filename.split("/")[-1] + ".o"
     return os.path.normpath(binname), os.path.normpath(objectname), os.path.normpath(sourcename)
 
 def formatList(list):
@@ -173,7 +175,6 @@ def buildMakefile(CTX):
     for dir in CTX.OBJ_INCLUDE_DIRS:
         MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
     MAKECPPFLAGS += " -I${OBJDIR}"
-
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -184,9 +185,11 @@ def buildMakefile(CTX):
     JNIEXT = CTX.JNIEXT.strip()
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
+    THIRD_PARTY_INSTALL_DIR=(OUTPUT_PREFIX + "/" + "3pty-install")
 
     # create directories for output if they don't exist
     os.system("mkdir -p %s" % (OUTPUT_PREFIX))
+    os.system("mkdir -p %s" % THIRD_PARTY_INSTALL_DIR)
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
@@ -219,21 +222,43 @@ def buildMakefile(CTX):
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
-    makefile.write("#\n# Capture the (relative) name of the root directory.\n")
+    makefile.write('RM = /bin/rm -rf\n')
+    makefile.write("#\n")
+    makefile.write("# Capture the (relative) name of the root directory.\n")
     makefile.write("# Also, remember the obj directory,\n")
-    makefile.write("# which should be the directory we are currently in.\n#\n")
-    makefile.write('ROOTDIR=../..\n')
+    makefile.write("# which should be the directory we are currently in.\n")
+    makefile.write("#\n")
+    makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
     makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
-    makefile.write('#\n# This is the root of the cpp sources.\n#\n')
+    makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
+    makefile.write('#\n')
+    makefile.write('# This is the root of the cpp sources.\n')
+    makefile.write('#\n')
     makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
-    makefile.write('#\n# This is the root of the third party sources.\n#\n')
+    makefile.write('#\n')
+    makefile.write('# This is the root of the third party sources.\n')
+    makefile.write('#\n')
     makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
     makefile.write("\n")
+    makefile.write('#\n')
+    makefile.write('# We keep tarballs of third party sources here.\n')
+    makefile.write('#\n')
+    makefile.write('TARBALLS_DIR=${THIRD_PARTY_SRC}/tarballs\n')
+    makefile.write('\n')
+    makefile.write('# These are the PCRE2 library\'s source, build and install directories,\n')
+    makefile.write('# and the location of the source tarball\n')
+    makefile.write('PCRE2_VERSION=10.10\n')
+    makefile.write('PCRE2_NAME=pcre2-${PCRE2_VERSION}\n')
+    makefile.write('PCRE2_SRC=${THIRD_PARTY_SRC}/${PCRE2_NAME}\n')
+    makefile.write('PCRE2_OBJ=${OBJDIR}/${PCRE2_NAME}\n')
+    makefile.write('PCRE2_INSTALL=${INSTALL_DIR}\n')
+    makefile.write('PCRE2_TARBALL=${TARBALLS_DIR}/${PCRE2_NAME}.tar.bz2\n')
 
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
-        makefile.write("\trm -rf *\n")
+	makefile.write('\t${RM} "${PCRE2_SRC}"\n')
+        makefile.write('\trm -rf "${OBJDIR}"\n')
         makefile.close()
         return
 
@@ -314,16 +339,16 @@ def buildMakefile(CTX):
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % filename)
         makefile.write("########################################################################\n")
-        makefile.write("%s: %s \n" % (jni_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (jni_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write("%s: %s \n" % (static_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (static_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
-        makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(static_objname, ".d"))
         cleanobjs += [jni_objname,
                       static_objname,
-                      replaceExtension(jni_objname, ".d"),
-                      replaceExtension(jni_objname, ".d")]
+                      replaceSuffix(jni_objname, ".d"),
+                      replaceSuffix(jni_objname, ".d")]
         makefile.write("\n")
     makefile.write("\n")
 
@@ -340,16 +365,16 @@ def buildMakefile(CTX):
         makefile.write("########################################################################\n")
         makefile.write("#\n# %s\n#\n" % filename)
         makefile.write("########################################################################\n")
-        makefile.write("%s: %s \n" % (jni_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (jni_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write("%s: %s \n" % (static_objname, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (static_objname, filename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write("-include %s\n" % replaceExtension(jni_objname, ".d"))
-        makefile.write("-include %s\n" % replaceExtension(static_objname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(static_objname, ".d"))
         cleanobjs += [jni_objname,
                       static_objname,
-                      replaceExtension(jni_objname, ".d"),
-                      replaceExtension(jni_objname, ".d")]
+                      replaceSuffix(jni_objname, ".d"),
+                      replaceSuffix(jni_objname, ".d")]
         makefile.write("\n")
     makefile.write("\n")
 
@@ -363,37 +388,92 @@ def buildMakefile(CTX):
     makefile.write('\t@echo "THIRD_PARTY_SRC = $(THIRD_PARTY_SRC)"\n\n')
 
     makefile.write("########################################################################\n")
-    makefile.write("#\n# %s\n#\n" % "Tests")
+    makefile.write("#\n")
+    makefile.write("# Third Party Tools.\n")
+    makefile.write("#\n")
     makefile.write("########################################################################\n")
+    makefile.write('.PHONY: build-third-party-tools\n')
+    makefile.write('build-third-party-tools: build-pcre2\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('# Testing of third party tools.  We do not run this usually, but\n')
+    makefile.write('# it is convenient to put it in the makefile.\n')
+    makefile.write('# Note that these will not be run by Jenkins.\n')
+    makefile.write('########################################################################\n')
+    makefile.write('test-third-party-tools: test-pcre2\n')
+    makefile.write('.PHONY: test-third-party-tools')
+    makefile.write('\n')
+    makefile.write('test-pcre2: build-pcre2\n')
+    makefile.write('\t@echo Testing PCRE2 in ${PCRE2_OBJ}\n')
+    makefile.write('\t(cd "${PCRE2_OBJ}"; ${MAKE} check)\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('# pcre2 - regular expressions.\n')
+    makefile.write('########################################################################\n')
+    makefile.write('build-pcre2: configure-pcre2\n')
+    makefile.write('\tif [ ! -f "${PCRE2_INSTALL}/lib/libpcre2-8.a" ] ; then \\\n')
+    makefile.write('\t  @echo Building PCRE2 ; \\\n')
+    makefile.write('\t  (cd "$(PCRE2_OBJ)"; ${MAKE} install); \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('.PHONY: build-pcre2\n')
+    makefile.write('\n')
+    makefile.write('configure-pcre2: unpack-pcre2\n')
+    makefile.write('\tif [ ! -d "${PCRE2_OBJ}" ] ; then \\\n')
+    makefile.write('\t  @echo Configuring PCRE2; \\\n')
+    makefile.write('\t  /bin/rm -rf "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  mkdir -p "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  cd "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  "${PCRE2_SRC}/configure" --disable-shared --prefix="${PCRE2_INSTALL}" ; \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('.PHONY: configure-pcre2\n')
+    makefile.write('\n')
+    makefile.write('unpack-pcre2:\n')
+    makefile.write('\tif [ ! -d "$PCRE2_SRC" ] ; then \\\n')
+    makefile.write('\t  tar -x -j -f "${PCRE2_TARBALL}" -C "${THIRD_PARTY_SRC}" ; \\\n')
+    makefile.write('fi\n')
+    makefile.write('.PHONY: unpack-pcre2\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('#\n')
+    makefile.write('# Tests\n')
+    makefile.write('#\n')
+    makefile.write('########################################################################\n')
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
         makefile.write("########################################################################\n")
-        makefile.write("#\n# %s\n#\n" % sourcename)
+        makefile.write("#\n")
+        makefile.write("# %s\n" % sourcename)
+        makefile.write("#\n")
         makefile.write("########################################################################\n")
-        makefile.write("%s: $(ROOTDIR)/%s \n" % (objectname, sourcename))
+        makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
-        makefile.write("-include %s\n" % replaceExtension(objectname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
-        makefile.write("%s: %s objects/volt.a \n" % (binname, objectname))
+        makefile.write("%s: %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
         makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
         pysourcename = sourcename[:-3] + "py"
-        cleanobjs += [objectname, replaceExtension(objectname, ".d"), binname]
+        cleanobjs += [objectname, replaceSuffix(objectname, ".d"), binname]
         if os.path.exists(pysourcename):
             shutil.copy(pysourcename, targetpath)
             cleanobjs += [targetpath]
 
     makefile.write("########################################################################\n")
-    makefile.write("#\n# %s\n#\n" % "Cleaning")
+    makefile.write("#\n")
+    makefile.write("# Cleaning\n")
+    makefile.write("#\n")
     makefile.write("########################################################################\n")
     makefile.write("\n")
     makefile.write("clean: \n")
     makefile.write("\t@echo Deleting all derived files.\n")
-    makefile.write("\t@${RM} %s\n" % formatList(cleanobjs))
+    makefile.write('\t@${RM} %s\n' % formatList(cleanobjs))
+    makefile.write('\t@${RM} "${PCRE2_OBJ}"\n')
+    makefile.write('\t@${RM} "${INSTALL_DIR}/*"\n')
+    makefile.write('\t@${RM} "${PCRE2_SRC}"\n')
     makefile.close()
     return True
 

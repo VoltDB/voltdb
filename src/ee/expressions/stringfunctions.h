@@ -23,7 +23,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 #include <boost/scoped_array.hpp>
-#include <boost/regex.hpp>
+
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <string.h>
+#include <boost/shared_ptr.hpp>
+#include "pcre2.h"
 
 #include <iostream>
 #include <sstream>
@@ -637,6 +641,14 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     return getTempStringValue(rv.c_str(), rv.length());
 }
 
+static std::string pcre2_error_code_message(int error_code, std::string prefix)
+{
+    unsigned char buffer[1024];
+    /* This function really wants an unsigned char buffer, but std::string wants signed characters. */
+    pcre2_get_error_message(error_code, buffer, sizeof(buffer));
+    return std::string("Regular Expression Compilation Error: ") + reinterpret_cast<char *>(buffer);
+}
+
 /** Implement the VoltDB SQL function regexp_position for re-based pattern matching */
 template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2 || arguments.size() == 3);
@@ -657,8 +669,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
         throwCastSQLException(pat.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    boost::regex_constants::syntax_option_type syntaxOpts = boost::regex_constants::normal;
-    boost::match_flag_type matchFlags = boost::match_default;
+    uint32_t syntaxOpts = PCRE2_UTF;
 
     if (arguments.size() == 3) {
         const NValue& flags = arguments[2];
@@ -675,10 +686,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
                     case 'c':
                         break;
                     case 'i':
-                        syntaxOpts |= boost::regex_constants::icase;
+                        syntaxOpts |= PCRE2_CASELESS;
                         break;
                     default:
-                        throw SQLException(SQLException::data_exception_invalid_parameter, "illegal match flags");
+                        throw SQLException(SQLException::data_exception_invalid_parameter, "Regular Expression Compilation Error: Illegal Match Flags");
                 }
                 flagChars++;
             }
@@ -686,26 +697,47 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     }
 
     const char* sourceChars = reinterpret_cast<const char*>(source.getObjectValue_withoutNull());
+    unsigned long int lenSource = source.getObjectLength_withoutNull();
+    const unsigned char* patChars = reinterpret_cast<const unsigned char*>(pat.getObjectValue_withoutNull());
+    unsigned long int lenPat = pat.getObjectLength_withoutNull();
+    // Compile the pattern.
 
-    int32_t lenPat = pat.getObjectLength_withoutNull();
-    const char* patChars = reinterpret_cast<const char*>(pat.getObjectValue_withoutNull());
-
-    try {
-        boost::regex patExpr(patChars, lenPat, syntaxOpts);
-        boost::cmatch what;
-
-        if (regex_search(sourceChars, what, patExpr, matchFlags)) {
-            return getBigIntValue(getCharLength(sourceChars, what.position()) + 1);
-        } else {
+    int error_code = 0;
+    PCRE2_SIZE error_offset = 0;
+    boost::shared_ptr<pcre2_code> pattern ( pcre2_compile(patChars,
+                                                          lenPat,
+                                                          syntaxOpts,
+                                                          &error_code,
+                                                          &error_offset,
+                                                          NULL), pcre2_code_free );
+    if (pattern.get() == NULL) {
+        std::string emsg = pcre2_error_code_message(error_code, "Regular Expression Compilation Error: ");
+        throw SQLException(SQLException::data_exception_invalid_parameter, emsg.c_str());
+    }
+    boost::shared_ptr<pcre2_match_data> match_data(pcre2_match_data_create_from_pattern(pattern.get(), NULL),
+                                                   pcre2_match_data_free);
+    if (match_data.get() == NULL) {
+        throw SQLException(SQLException::data_exception_invalid_parameter, "Internal error: Cannot create PCRE2 match data.");
+    }
+    unsigned long int matchFlags = 0;
+    error_code = pcre2_match(pattern.get(),
+                      reinterpret_cast<const unsigned char *>(sourceChars),
+                      lenSource,
+                      0ul,
+                      matchFlags,
+                      match_data.get(),
+                      NULL);
+    if (error_code < 0) {
+        if (error_code == PCRE2_ERROR_NOMATCH) {
             return getBigIntValue(0);
         }
-    } catch (boost::regex_error& e) {
-        throw SQLException(SQLException::data_exception_invalid_parameter, "illegal pattern string");
-    } catch (std::runtime_error& e) {
-        throw SQLException(SQLException::dynamic_sql_error, "regular pattern is too complicate.");
+        std::string emsg = pcre2_error_code_message(error_code, "Regular Expression Matching Error: ");
+        throw SQLException(SQLException::data_exception_invalid_parameter, emsg.c_str());
     }
+    PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data.get());
+    unsigned long position = ovector[0];
+    return getBigIntValue(getCharLength(sourceChars, position) + 1);
 }
-
 }
 
 #endif /* STRINGFUNCTIONS_H */
