@@ -58,7 +58,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         m_PostgreSQLTypeNames.put("int8", "BIGINT");
         m_PostgreSQLTypeNames.put("float8", "FLOAT");
         m_PostgreSQLTypeNames.put("numeric", "DECIMAL");
-        m_PostgreSQLTypeNames.put("bytea", "VARBINARY");
+        m_PostgreSQLTypeNames.put("varbit", "VARBINARY");
         m_PostgreSQLTypeNames.put("char", "CHARACTER");
         m_PostgreSQLTypeNames.put("text", "VARCHAR");
     }
@@ -214,7 +214,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return isIntegerConstant(columnName) || isIntegerColumn(columnName, tableNames);
     }
 
-    /** TODO */
+    /** Returns the number of occurrence of the specified character in the specified String. */
     static private int numOccurencesOfCharIn(String str, char ch) {
         int num = 0;
         for (int i = str.indexOf(ch); i >= 0 ; i = str.indexOf(ch, i+1)) {
@@ -223,8 +223,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return num;
     }
 
-    /** TODO */
-    static private int indexOfNthOccurenceOfCharIn(String str, char ch, int n) {
+    /** Returns the Nth occurrence of the specified character in the specified String. */
+    static private int indexOfNthOccurrenceOfCharIn(String str, char ch, int n) {
         int index = -1;
         for (int i=0; i < n; i++) {
             index = str.indexOf(ch, index+1);
@@ -235,39 +235,34 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return index;
     }
 
-    /** TODO */
-    static private String handleParens(String group, String preGroup, String postGroup) {
+    /** Simply returns a String consisting of the <i>prefix</i>, <i>group</i>,
+     *  and <i>suffix</i> concatenated (in that order), but being careful not
+     *  to include more close-parentheses than open-parentheses; if the group
+     *  does contain more close-parens than open-parens, the <i>suffix</i> is
+     *  inserted before the extra close-parens, instead of at the very end. */
+    static private String handleParens(String group, String prefix, String suffix) {
         int numOpenParens  = numOccurencesOfCharIn(group, '(');
         int numCloseParens = numOccurencesOfCharIn(group, ')');
-//        System.out.println("  numOpenParens, numCloseParens: " + numOpenParens + ", " + numCloseParens);
-        if (numOpenParens == numCloseParens) {
-//            System.out.println("  returning (preGroup + group + postGroup):\n    " + preGroup + group + postGroup);
-            return (preGroup + group + postGroup);
-        } else if (numOpenParens < numCloseParens) {
+        if (numOpenParens >= numCloseParens) {
+            return (prefix + group + suffix);
+        } else {  // numOpenParens < numCloseParens
             int index;
             if (numOpenParens == 0) {
-                index = indexOfNthOccurenceOfCharIn(group, ')', 1) - 1;
+                index = indexOfNthOccurrenceOfCharIn(group, ')', 1) - 1;
             } else {
-                index = indexOfNthOccurenceOfCharIn(group, ')', numOpenParens);
+                index = indexOfNthOccurrenceOfCharIn(group, ')', numOpenParens);
             }
-//            System.out.println("  index, substr: " + index + ", '" + group.substring(0, index+1) + "'");
-//            System.out.println("  returning (preGroup + substr + postGroup + group.substring(index+1)):\n    "
-//                    + preGroup + group.substring(0, index+1) + postGroup + group.substring(index+1));
-            return (preGroup + group.substring(0, index+1) + postGroup + group.substring(index+1));
-        } else {
-            // numOpenParens >= numCloseParens: give up, leave group unchanged
-//            System.out.println("  gave up; returning (group):\n    " + group);
-            return group;
+            return (prefix + group.substring(0, index+1) + suffix + group.substring(index+1));
         }
     }
 
     /**
-     * Modify a query (<i>dml</i>) containing the specified <i>queryPattern</i>,
-     * in such a way that PostgreSQL results will match VoltDB results, generally
+     * Modify a <i>query</i> containing the specified <i>queryPattern</i>, in
+     * such a way that PostgreSQL results will match VoltDB results, generally
      * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
      * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
      * as a whole.
-     * @param dml - the query text (DML or DQL) to be transformed.
+     * @param query - the query text (DDL, DML or DQL) to be transformed.
      * @param queryPattern - the Pattern to be detected and modified, within
      * the query.
      * @param initText - an initial string with which to begin the replacement
@@ -288,21 +283,28 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
      * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
      * they will be applied to each group.
-     * @param intOnly - when <b>true</b>, the query (<i>dml</i>) will only be
+     * @param intOnly - when <b>true</b>, the <i>query</i> will only be
      * modified if the group is an integer-valued column.
+     * @param multiplier - a value to be multiplied by the (int-valued) group,
+     * in the transformed query (e.g. 8.0, to convert from bytes to bits); may
+     * be <b>null</b>, in which case it is ignored.
+     * @param minimum - a minimum value for the result of multiplying the
+     * (int-valued) group by the <i>multiplier</i>; may be <b>null</b>, in
+     * which case it is ignored.
      * @param groups - zero or more groups found within the <i>queryPattern</i>
      * (e.g. "column").
-     * @return the query (<i>dml</i>), transformed in the specified ways
-     * (possibly unchanged).
-     * @throws NullPointerException if <i>dml</i>, <i>queryPattern</i>,
+     * @return the <i>query</i>, transformed in the specified ways (possibly
+     * unchanged).
+     * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
     @SuppressWarnings("unused")
-    static private String transformQuery(String dml, Pattern queryPattern, String initText,
+    static private String transformQuery(String query, Pattern queryPattern, String initText,
             String prefix, String suffix, String altEnding, String altText,
-            boolean useWhole, boolean intOnly, String ... groups) {
-        StringBuffer modified_dml = new StringBuffer();
-        Matcher matcher = queryPattern.matcher(dml);
+            boolean useWhole, boolean intOnly, Double multiplier, Integer minimum,
+            String ... groups) {
+        StringBuffer modified_query = new StringBuffer();
+        Matcher matcher = queryPattern.matcher(query);
         while (matcher.find()) {
             StringBuffer replaceText = new StringBuffer(initText);
             String wholeMatch = null, group = null;
@@ -315,24 +317,29 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     // do nothing: group remains null
                 }
                 if (DEBUG) {
-                    System.out.println("In PostgreSQLBackend.transformQuery,\n  with dml    : " + dml);
+                    System.out.println("In PostgreSQLBackend.transformQuery,\n  with query    : " + query);
                     System.out.println("  queryPattern: " + queryPattern);
                     System.out.println("  initText, prefix, suffix, altEnding, altText:\n    '"
                             + initText + "', '" + prefix + "', '" + suffix + "', '" + altEnding + "', '" + altText
-                            + "'\n  useWhole, intOnly; groups:\n    '"
-                            + useWhole + ", " + intOnly + "; " + groups);
+                            + "'\n  useWhole, intOnly, multiplier, minimum; groups:\n    '"
+                            + useWhole + ", " + intOnly + ", " + multiplier + ", " + minimum + "\n" + groups);
                     System.out.println("  wholeMatch: " + wholeMatch);
                     System.out.println("  group     : " + group);
                 }
                 if (group == null) {
                     break;
                 } else if (!useWhole) {
+                    String groupValue = group, suffixValue = suffix;
+                    // Check for the case where a multiplier & minimum are used
+                    if (multiplier != null && minimum != null) {
+                        groupValue = Long.toString(Math.round(Math.max(Integer.parseInt(group) * multiplier, minimum)));
+                    }
                     // Check for the ending that indicates to use the alternate suffix
                     if (altText != null && group.toUpperCase().endsWith(altEnding)) {
-                        suffix = altText;
+                        suffixValue = altText;
                     }
                     // Make sure not to swallow up extra ')', in this group
-                    replaceText.append(handleParens(group, prefix, suffix));
+                    replaceText.append(handleParens(groupValue, prefix, suffixValue));
                 }
             }
             if (useWhole) {
@@ -348,14 +355,98 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                     replaceText.append(handleParens(wholeMatch, prefix, suffix));
                 }
             }
-            matcher.appendReplacement(modified_dml, replaceText.toString());
+            matcher.appendReplacement(modified_query, replaceText.toString());
         }
-        matcher.appendTail(modified_dml);
-        if (DEBUG && !dml.equalsIgnoreCase(modified_dml.toString())) {
-            System.out.println("In PostgreSQLBackend.transformQuery,\n  with dml    : " + dml);
-            System.out.println("  modified_dml: " + modified_dml);
+        matcher.appendTail(modified_query);
+        if (DEBUG && !query.equalsIgnoreCase(modified_query.toString())) {
+            System.out.println("In PostgreSQLBackend.transformQuery,\n  with query    : " + query);
+            System.out.println("  modified_query: " + modified_query);
         }
-        return modified_dml.toString();
+        return modified_query.toString();
+    }
+
+    /**
+     * Modify a <i>query</i> containing the specified <i>queryPattern</i>, in
+     * such a way that PostgreSQL results will match VoltDB results, generally
+     * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
+     * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
+     * as a whole.
+     * @param query - the query text (DDL, DML or DQL) to be transformed.
+     * @param queryPattern - the Pattern to be detected and modified, within
+     * the query.
+     * @param initText - an initial string with which to begin the replacement
+     * text (e.g. "ORDER BY"); may be an empty string, but not <b>null</b>.
+     * @param prefix - a string to appear before each group, or before the
+     * whole <i>queryPattern</i> (e.g. "TRUNC ( "); may be an empty string,
+     * but not <b>null</b>.
+     * @param suffix - a string to appear after each group, or after the
+     * whole <i>queryPattern</i> (e.g. " NULLS FIRST"); may be an empty string,
+     * but not <b>null</b>.
+     * @param altText - the text to be used to replace each group, within the
+     * whole match (e.g. "||"); may be <b>null</b>, in which case the group is
+     * not replaced.
+     * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
+     * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
+     * they will be applied to each group.
+     * @param intOnly - when <b>true</b>, the <i>query</i> will only be
+     * modified if the group is an integer-valued column.
+     * @param groups - zero or more groups found within the <i>queryPattern</i>
+     * (e.g. "column").
+     * @return the <i>query</i>, transformed in the specified ways (possibly
+     * unchanged).
+     * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
+     * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
+     */
+    static private String transformQuery(String query, Pattern queryPattern,
+            String initText, String prefix, String suffix, String altText,
+            boolean useWhole, boolean intOnly, String ... groups) {
+        return transformQuery(query, queryPattern, initText,
+                prefix, suffix, null, altText,
+                useWhole, intOnly, null, null,
+                groups);
+    }
+
+    /**
+     * Modify a <i>query</i> containing the specified <i>queryPattern</i>, in
+     * such a way that PostgreSQL results will match VoltDB results, generally
+     * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
+     * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
+     * as a whole.
+     * @param query - the query text (DDL, DML or DQL) to be transformed.
+     * @param queryPattern - the Pattern to be detected and modified, within
+     * the query.
+     * @param initText - an initial string with which to begin the replacement
+     * text (e.g. "ORDER BY"); may be an empty string, but not <b>null</b>.
+     * @param prefix - a string to appear before each group, or before the
+     * whole <i>queryPattern</i> (e.g. "TRUNC ( "); may be an empty string,
+     * but not <b>null</b>.
+     * @param suffix - a string to appear after each group, or after the
+     * whole <i>queryPattern</i> (e.g. " NULLS FIRST"); may be an empty string,
+     * but not <b>null</b>.
+     * @param useWhole - when <b>true</b>, the <i>prefix</i> and <i>suffix</i>
+     * will be applied to the whole <i>queryPattern</i>; when <b>false</b>,
+     * they will be applied to each group.
+     * @param multiplier - a value to be multiplied by the (int-valued) group,
+     * in the transformed query (e.g. 8.0, to convert from bytes to bits); may
+     * be <b>null</b>, in which case it is ignored.
+     * @param minimum - a minimum value for the result of multiplying the
+     * (int-valued) group by the <i>multiplier</i>; may be <b>null</b>, in
+     * which case it is ignored.
+     * @param groups - zero or more groups found within the <i>queryPattern</i>
+     * (e.g. "column").
+     * @return the <i>query</i>, transformed in the specified ways (possibly
+     * unchanged).
+     * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
+     * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
+     */
+    static private String transformQuery(String query, Pattern queryPattern,
+            String initText, String prefix, String suffix,
+            boolean useWhole, Double multiplier, Integer minimum,
+            String ... groups) {
+        return transformQuery(query, queryPattern,
+                initText, prefix, suffix, null, null,
+                useWhole, false, multiplier, minimum,
+                groups);
     }
 
     /** Modify a query containing an ORDER BY clause, in such a way that
@@ -363,7 +454,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  NULLS FIRST or (after "DESC") NULLS LAST. */
     static private String transformOrderByQuery(String dml) {
         return transformQuery(dml, orderByQuery, "ORDER BY",
-                "", " NULLS FIRST", "DESC", " NULLS LAST", false, false,
+                "", " NULLS FIRST", "DESC", " NULLS LAST", false, false, null, null,
                 "column1", "column2", "column3", "column4", "column5", "column6");
     }
 
@@ -375,7 +466,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  as 7, etc.) */
     static private String transformDayOfWeekQuery(String dml) {
         return transformQuery(dml, dayOfWeekQuery, "EXTRACT ( ",
-                "DOW FROM", ")+1", null, null, false, false, "column");
+                "DOW FROM", ")+1", null, false, false, "column");
     }
 
     /** Modify a query containing an EXTRACT(DAY_OF_YEAR FROM ...) function,
@@ -384,7 +475,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  does support. */
     static private String transformDayOfYearQuery(String dml) {
         return transformQuery(dml, dayOfYearQuery, "EXTRACT ( ",
-                "DOY FROM", ")", null, null, false, false, "column");
+                "DOY FROM", ")", null, false, false, "column");
     }
 
     /** Modify a query containing an AVG(columnName), where <i>columnName</i>
@@ -393,7 +484,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  so change it to: TRUNC ( AVG(columnName) ). */
     static private String transformAvgOfIntegerQuery(String dml) {
         return transformQuery(dml, avgQuery, "",
-                "TRUNC ( ", " )", null, null, true, true, "column");
+                "TRUNC ( ", " )", null, true, true, "column");
     }
 
     /** Modify a query containing a CEILING(columnName) or FLOOR(columnName),
@@ -403,7 +494,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  or CAST ( FLOOR(columnName) as INTEGER ), respectively. */
     static private String transformCeilingOrFloorOfIntegerQuery(String dml) {
         return transformQuery(dml, ceilingOrFloorQuery, "",
-                "CAST ( ", " as INTEGER )", null, null, true, true, "column");
+                "CAST ( ", " as INTEGER )", null, true, true, "column");
     }
 
     /** Modify a query containing 'FOO' + ..., which PostgreSQL does not
@@ -411,62 +502,24 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      *  that PostgreSQL does support. */
     static private String transformStringConcatQuery(String dml) {
         return transformQuery(dml, stringConcatQuery, "",
-                "", "", null, "||", true, false, "plus");
+                "", "", "||", true, false, "plus");
     }
 
     /** Modify DDL containing VARCHAR(n BYTES), which PostgreSQL does not
      *  support, and replace it with VARCHAR(m), where m = n / 4 (but m is
      *  always at least 14, since many SQLCoverage tests use strings of that
-     *  length). */
-    @SuppressWarnings("unused")
+     *  length), which it does support. */
     static private String transformVarcharOfBytes(String ddl) {
-        // TODO: modify this to call transformQuery?
-        StringBuffer modified_ddl = new StringBuffer();
-        Matcher matcher = varcharBytesDdl.matcher(ddl);
-        while (matcher.find()) {
-            StringBuffer replaceText = new StringBuffer();
-            String numBytesStr = null;
-            int numBytes = -1;
-            try {
-                numBytesStr = matcher.group("numBytes");
-                numBytes = Integer.parseInt(numBytesStr);
-            } catch (IllegalArgumentException e) {
-                // do nothing: numBytes remains -1
-                break;
-            }
-            replaceText.append("VARCHAR(" + Math.max(numBytes / 4, 14) + ")");
-            matcher.appendReplacement(modified_ddl, replaceText.toString());
-        }
-        matcher.appendTail(modified_ddl);
-        if (DEBUG && !ddl.equalsIgnoreCase(modified_ddl.toString())) {
-            System.out.println("In PostgreSQLBackend.transformVarcharOfBytes,\n  with dml    : " + ddl);
-            System.out.println("  modified_dml: " + modified_ddl);
-        }
-        return modified_ddl.toString();
+        return transformQuery(ddl, varcharBytesDdl, "",
+                "VARCHAR(", ")", false, 0.25, 14, "numBytes");
     }
 
-    /** Modify DDL containing VARBINARY(n), which PostgreSQL does not
-     *  support, and replace it with BYTEA (which it does). */
-    @SuppressWarnings("unused")
+    /** Modify DDL containing VARBINARY(n), which PostgreSQL does not support,
+     *  and replace it with BIT VARYING(m), where m = n * 8 (i.e., converting
+     *  from bytes to bits), which it does support. */
     static private String transformVarbinary(String ddl) {
-        // TODO: modify this to call transformQuery?
-        StringBuffer modified_ddl = new StringBuffer();
-        Matcher matcher = varbinaryDdl.matcher(ddl);
-        while (matcher.find()) {
-            String varbinary = null;
-            try {
-                varbinary = matcher.group();
-            } catch (IllegalArgumentException e) {
-                // do nothing: varbinary remains null
-            }
-            matcher.appendReplacement(modified_ddl, "BYTEA");
-        }
-        matcher.appendTail(modified_ddl);
-        if (DEBUG && !ddl.equalsIgnoreCase(modified_ddl.toString())) {
-            System.out.println("In PostgreSQLBackend.transformVarbinary,\n  with ddl    : " + ddl);
-            System.out.println("  modified_dml: " + modified_ddl);
-        }
-        return modified_ddl.toString();
+        return transformQuery(ddl, varbinaryDdl, "",
+                "BIT VARYING(", ")", false, 8.0, 8, "numBytes");
     }
 
     /** For a SQL DDL statement, replace keywords not supported by PostgreSQL
