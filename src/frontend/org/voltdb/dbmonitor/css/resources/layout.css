@@ -3696,10 +3696,10 @@ svg.nvd3-svg { width:95% !important; }
 }
 .QueryTbl tr td input[type="text"] { width:175px;}
 
-.queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px;}
+.queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px; }
 .queryTimeOutLabel {
     background: none repeat scroll 0 0 #d0d2d2;
-    cursor: pointer;
+    cursor: default;
     float: left;
     font-weight: bold;
     height: 28px;
@@ -3849,10 +3849,10 @@ label.errorTimeOut {
 	label.errorTimeOut { padding-bottom:20px;}
 	.btnList { float:none; margin-left:10px}
 	.btnList li { float:none;}
-	.btnStudio { width:100%;margin-bottom:2px;}
+	.btnStudio { width:100%;margin-top:2px;}
 	.queryHeadName { float:none;}
-	.queryTimeoutName { width:97.5%; margin-bottom:2px;}
-	
+	.queryTimeOutLabel { width:86%; margin-right:2px;}
+
 }
 
 @media (min-width: 639px) and (max-width:640px) {
