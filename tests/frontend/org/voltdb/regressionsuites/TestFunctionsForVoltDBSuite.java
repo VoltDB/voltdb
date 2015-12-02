@@ -2002,17 +2002,246 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals(Timestamp.valueOf("2000-02-29 00:00:00.000000"), vt.getTimestampAsSqlTimestamp(0));
 
-        // Test null timestamp
-        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, NULL, TM) FROM P2 WHERE ID = 20005;").getResults()[0];
+        // Test null interval
+        vt = client.callProcedure(
+                "@AdHoc",
+                "SELECT DATEADD(YEAR, NULL, TM), DATEADD(QUARTER, NULL,TM), DATEADD(MONTH, NULL,TM), "
+                        + "DATEADD(DAY, NULL,TM), DATEADD(HOUR, NULL,TM), DATEADD(MINUTE, NULL,TM), "
+                        + "DATEADD(SECOND, NULL,TM), DATEADD(MILLISECOND, NULL,TM), "
+                        + "DATEADD(MICROSECOND, NULL,TM) FROM P2 WHERE ID = 20005;").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(null, vt.getTimestampAsTimestamp(0));
+        assertEquals(null, vt.getTimestampAsTimestamp(1));
+        assertEquals(null, vt.getTimestampAsTimestamp(2));
+        assertEquals(null, vt.getTimestampAsTimestamp(3));
+        assertEquals(null, vt.getTimestampAsTimestamp(4));
+        assertEquals(null, vt.getTimestampAsTimestamp(5));
+        assertEquals(null, vt.getTimestampAsTimestamp(6));
+        assertEquals(null, vt.getTimestampAsTimestamp(7));
+        assertEquals(null, vt.getTimestampAsTimestamp(8));
 
+        // Test null timestamp
         cr = client.callProcedure("@AdHoc", "INSERT INTO P2 (ID, TM) VALUES (20006, null)");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        vt = client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, 1, TM) FROM P2 WHERE ID = 20006;").getResults()[0];
+        vt = client.callProcedure(
+                "@AdHoc",
+                "SELECT DATEADD(YEAR, 1, TM), DATEADD(QUARTER, 1, TM), DATEADD(MONTH, 1, TM), "
+                        + "DATEADD(DAY, 1, TM), DATEADD(HOUR, 1, TM), DATEADD(MINUTE, 1, TM), "
+                        + "DATEADD(SECOND, 1, TM), DATEADD(MILLISECOND, 1, TM), "
+                        + "DATEADD(MICROSECOND, 1, TM) FROM P2 WHERE ID = 20006;").getResults()[0];
         assertTrue(vt.advanceRow());
         assertEquals(null, vt.getTimestampAsTimestamp(0));
+        assertEquals(null, vt.getTimestampAsTimestamp(1));
+        assertEquals(null, vt.getTimestampAsTimestamp(2));
+        assertEquals(null, vt.getTimestampAsTimestamp(3));
+        assertEquals(null, vt.getTimestampAsTimestamp(4));
+        assertEquals(null, vt.getTimestampAsTimestamp(5));
+        assertEquals(null, vt.getTimestampAsTimestamp(6));
+        assertEquals(null, vt.getTimestampAsTimestamp(7));
+        assertEquals(null, vt.getTimestampAsTimestamp(8));
+
+        // Test null or illegal datepart
+        boolean throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(WEEK, 1, TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        // Test large intervals caused exceptions
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+       assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(QUARTER, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(QUARTER, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MONTH, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MONTH, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(DAY, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(DAY, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(HOUR, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(HOUR, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MINUTE, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MINUTE, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(SECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(SECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MILLISECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MILLISECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MICROSECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
+
+        throwed = false;
+        try {
+            client.callProcedure("@AdHoc", "SELECT DATEADD(MICROSECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
+        } catch (ProcCallException e) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
+            throwed = true;
+        }
+        assertTrue(throwed);
     }
 
     public void testRegexpPosition() throws Exception {
@@ -2049,19 +2278,29 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'ci') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
+        boolean expectedExceptionThrowed = false;
         try {
             client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
             assertTrue(e.getClientResponse().getStatusString().contains("illegal pattern string"));
+            expectedExceptionThrowed = true;
         }
+        assertTrue(expectedExceptionThrowed);
 
+        expectedExceptionThrowed = false;
         try {
             client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0");
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
             assertTrue(e.getClientResponse().getStatusString().contains("illegal match flags"));
+            expectedExceptionThrowed = true;
         }
+        assertTrue(expectedExceptionThrowed);
 
         // test null strings
         vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, NULL) FROM P1 WHERE ID = 200").getResults()[0];

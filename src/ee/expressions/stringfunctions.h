@@ -702,7 +702,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     } catch (boost::regex_error& e) {
         throw SQLException(SQLException::data_exception_invalid_parameter, "illegal pattern string");
     } catch (std::runtime_error& e) {
-        throw SQLException(SQLException::dynamic_sql_error, "regular pattern is too complicate.");
+        throw SQLException(SQLException::dynamic_sql_error, "Pattern input to REGEXP_POSITION is malformed to cause runtime performance issues.");
     }
 }
 

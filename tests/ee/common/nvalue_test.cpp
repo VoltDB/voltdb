@@ -3335,6 +3335,7 @@ TEST_F(NValueTest, TestDateadd) {
 
     NValue result;
     NValue interval = ValueFactory::getBigIntValue(1);
+    // 2001-09-09 01:46.40.000000
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
 
     std::vector<NValue> args;
