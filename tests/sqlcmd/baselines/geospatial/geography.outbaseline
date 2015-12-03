@@ -1,5 +1,5 @@
 
-FILE scripts/geospatial/points.sql
+FILE scripts/geospatial/geography.sql
 
 create table polygons (
   id         integer primary key not null,
@@ -12,16 +12,16 @@ create procedure make_polygon as
 Command succeeded.
 
 exec make_polygon 1 'polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))';
-(Returned 1 rows in 0.01s)
+(Returned 1 rows in #.##s)
 
 exec make_polygon 2 'PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))';
-(Returned 1 rows in 0.00s)
+(Returned 1 rows in #.##s)
 
 exec make_polygon 3 '  POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305   -64.751  )  ) ';
-(Returned 1 rows in 0.00s)
+(Returned 1 rows in #.##s)
 
 exec make_polygon 4 '  POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), (28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))';
-(Returned 1 rows in 0.00s)
+(Returned 1 rows in #.##s)
 
 exec make_polygon 100 'NOT_A_POLYGON(...)';
 
@@ -50,6 +50,8 @@ ID   LOCATION
    3 POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))
    4 POLYGON((28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874), (32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))
  200                            NULL
+
+(Returned 5 rows in #.##s)
 
 drop procedure make_polygon if exists;
 Command succeeded.
