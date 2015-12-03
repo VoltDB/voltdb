@@ -473,7 +473,20 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
     if (uniqueViolationOutput != NULL) {
         lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
+    if (isExportTableViewTarget) {
+        StandAloneTupleStorage t;
+        t.init(m_schema);
+        for (int i = 0; i < tupleCount; ++i) {
+            t.setActiveTrue();
+            t.setDirtyFalse();
+            t.setPendingDeleteFalse();
+            t.setPendingDeleteOnUndoReleaseFalse();
 
+            t.deserializeFrom(serialize_io, stringPool);
+
+            processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow, isExportTableViewTarget);
+        }
+    }
     for (int i = 0; i < tupleCount; ++i) {
         nextFreeTuple(&target);
         target.setActiveTrue();

@@ -52,6 +52,8 @@ public:
      */
     void processTupleInsert(const TableTuple &newTuple, bool fallible);
 
+    void processPostTupleInsert(const TableTuple &newTuple, bool fallible);
+
     /**
      * Called when the source table is deleting a tuple. This will update the materialized view
      * destination table to reflect this change.

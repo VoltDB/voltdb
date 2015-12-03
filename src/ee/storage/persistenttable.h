@@ -71,10 +71,12 @@
 #include "structures/CompactingSet.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
+#include "storage/ExportMaterializedViewMetadata.h"
 
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
 class CopyOnWriteTest;
+class ExportMaterializedViewMetadata;
 
 namespace catalog {
 class MaterializedViewInfo;
@@ -329,6 +331,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     std::vector<MaterializedViewMetadata *> views() const {
         return m_views;
+    }
+
+    ExportMaterializedViewMetadata * srcview() const {
+        return m_src_view;
+    }
+
+    void setSourceView(ExportMaterializedViewMetadata *view) {
+        m_src_view = view;
     }
 
     /** inlined here because it can't be inlined in base Table, as it
@@ -620,6 +630,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;
+    ExportMaterializedViewMetadata *m_src_view;
 
     // STATS
     voltdb::PersistentTableStats stats_;

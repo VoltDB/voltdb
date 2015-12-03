@@ -65,6 +65,7 @@ ExportMaterializedViewMetadata::ExportMaterializedViewMetadata(StreamedTable *sr
 
     m_mvInfo = mvInfo;
 
+    m_target->setSourceView(this);
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
 
@@ -126,6 +127,7 @@ void ExportMaterializedViewMetadata::setTargetTable(PersistentTable * target)
     PersistentTable * oldTarget = m_target;
 
     m_target = target;
+    m_target->setSourceView(this);
     target->incrementRefcount();
 
     // Re-initialize dependencies on the target table, allowing for widened columns
