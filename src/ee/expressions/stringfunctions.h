@@ -698,9 +698,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     }
 
     const char* sourceChars = reinterpret_cast<const char*>(source.getObjectValue_withoutNull());
-    unsigned long int lenSource = source.getObjectLength_withoutNull();
+    unsigned int lenSource = source.getObjectLength_withoutNull();
     const unsigned char* patChars = reinterpret_cast<const unsigned char*>(pat.getObjectValue_withoutNull());
-    unsigned long int lenPat = pat.getObjectLength_withoutNull();
+    unsigned int lenPat = pat.getObjectLength_withoutNull();
     // Compile the pattern.
 
     int error_code = 0;
@@ -720,7 +720,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
     if (match_data.get() == NULL) {
         throw SQLException(SQLException::data_exception_invalid_parameter, "Internal error: Cannot create PCRE2 match data.");
     }
-    unsigned long int matchFlags = 0;
+    unsigned int matchFlags = 0;
     error_code = pcre2_match(pattern.get(),
                       reinterpret_cast<const unsigned char *>(sourceChars),
                       lenSource,
