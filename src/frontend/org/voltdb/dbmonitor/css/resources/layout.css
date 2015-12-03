@@ -3694,7 +3694,7 @@ svg.nvd3-svg { width:95% !important; }
     padding: 8px 5px 10px 5px;
     text-align: left;
 }
-.QueryTbl tr td input[type="text"] { width:175px;}
+.QueryTbl tr td input[type="text"] { width:125px;}
 
 .queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px; }
 .queryTimeOutLabel {
@@ -3712,13 +3712,13 @@ svg.nvd3-svg { width:95% !important; }
 
 label.errorTimeOut {
     color: #c70000;
-    width: auto;
+    width: 115px;
     display: block;
     line-height: 12px;
     font-size: 11px;
     /* padding: 10px 5px 0 7px; */
     padding: 10px 5px 0 0;
-    margin: 0 0 10px 0;
+    margin: 0 0 22px 0;
     height: 10px;
 }
 
@@ -3845,7 +3845,7 @@ label.errorTimeOut {
         right: 10px;
     }
 	#queryTimeoutConfigControls { width:305px;}
-	.QueryTbl tr td input[type="text"] { width:126px;}
+	.QueryTbl tr td input[type="text"] { width:125px;}
 	label.errorTimeOut { padding-bottom:20px;}
 	.btnList { float:none; margin-left:10px}
 	.btnList li { float:none;}
