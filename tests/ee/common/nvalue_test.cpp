@@ -3335,6 +3335,7 @@ TEST_F(NValueTest, TestDateadd) {
 
     NValue result;
     NValue interval = ValueFactory::getBigIntValue(1);
+    // 2001-09-09 01:46.40.000000
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
 
     std::vector<NValue> args;
@@ -3375,6 +3376,190 @@ TEST_F(NValueTest, TestDateadd) {
     result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
     result = result.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_SECOND)));
+
+    // Test illegal arguments
+    const std::string expectedMsg = std::string("interval is too large for DATEADD function");
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_YEAR_INTERVAL+1);
+    bool caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_QUARTER_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MONTH_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_DAY_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_HOUR_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MINUTE_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_SECOND_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MILLISECOND_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MAX_MICROSECOND_INTERVAL+1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_YEAR_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_QUARTER_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MONTH_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_DAY_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_HOUR_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MINUTE_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_SECOND_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MILLISECOND_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
+    args[0] = ValueFactory::getBigIntValue(PTIME_MIN_MICROSECOND_INTERVAL-1);
+    caught = false;
+    try {
+        result = NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(args);
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+
 }
 
 int main() {

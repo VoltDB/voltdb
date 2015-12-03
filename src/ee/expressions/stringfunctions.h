@@ -669,9 +669,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
 
             int32_t lenFlags = flags.getObjectLength_withoutNull();
             const char* flagChars = reinterpret_cast<const char*>(flags.getObjectValue_withoutNull());
+            // temporary workaround to make sure the string we are operating on is null terminated
+            std::string flagStr(flagChars, lenFlags);
 
-            for(int i = 0; i < lenFlags; i++) {
-                switch (*flagChars) {
+            for(std::string::iterator it = flagStr.begin(); it != flagStr.end(); ++it) {
+                switch (*it) {
                     case 'c':
                         break;
                     case 'i':
@@ -680,29 +682,32 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
                     default:
                         throw SQLException(SQLException::data_exception_invalid_parameter, "illegal match flags");
                 }
-                flagChars++;
             }
         }
     }
 
-    const char* sourceChars = reinterpret_cast<const char*>(source.getObjectValue_withoutNull());
+    char* sourceChars = reinterpret_cast<char*>(source.getObjectValue_withoutNull());
+    int32_t lenSource = source.getObjectLength_withoutNull();
+    std::string sourceStr(sourceChars, lenSource);
 
+    char* patChars = reinterpret_cast<char*>(pat.getObjectValue_withoutNull());
     int32_t lenPat = pat.getObjectLength_withoutNull();
-    const char* patChars = reinterpret_cast<const char*>(pat.getObjectValue_withoutNull());
+    std::string patStr(patChars, lenPat);
 
     try {
-        boost::regex patExpr(patChars, lenPat, syntaxOpts);
-        boost::cmatch what;
+        boost::regex patExpr(patStr, syntaxOpts);
+        boost::sregex_iterator rit(sourceStr.begin(), sourceStr.end(), patExpr, matchFlags);
+        boost::sregex_iterator rend;
 
-        if (regex_search(sourceChars, what, patExpr, matchFlags)) {
-            return getBigIntValue(getCharLength(sourceChars, what.position()) + 1);
+        if (rit != rend) {
+            return getBigIntValue(getCharLength(sourceStr.c_str(), rit->position()) + 1);
         } else {
             return getBigIntValue(0);
         }
     } catch (boost::regex_error& e) {
         throw SQLException(SQLException::data_exception_invalid_parameter, "illegal pattern string");
     } catch (std::runtime_error& e) {
-        throw SQLException(SQLException::dynamic_sql_error, "regular pattern is too complicate.");
+        throw SQLException(SQLException::dynamic_sql_error, "Pattern input to REGEXP_POSITION is malformed to cause runtime performance issues.");
     }
 }
 

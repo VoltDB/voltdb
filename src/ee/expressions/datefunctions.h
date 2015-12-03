@@ -32,12 +32,26 @@ static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:
 static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
         /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
 
-static const int64_t PTIME_MAX_YEARS = std::numeric_limits<int>::max();
-static const int64_t PTIME_MIN_YEARS = std::numeric_limits<int>::min();
-static const int64_t PTIME_MAX_MONTHS = std::numeric_limits<int>::max();
-static const int64_t PTIME_MIN_MONTHS = std::numeric_limits<int>::min();
-static const int64_t PTIME_MAX_QUARTERS = PTIME_MAX_MONTHS / 3;
-static const int64_t PTIME_MIN_QUARTERS = PTIME_MIN_MONTHS / 3;
+static const int64_t PTIME_MAX_YEARS = 10000;
+static const int64_t PTIME_MIN_YEARS = boost::gregorian::date(boost::gregorian::min_date_time).year();
+static const int64_t PTIME_MAX_YEAR_INTERVAL = PTIME_MAX_YEARS - PTIME_MIN_YEARS;
+static const int64_t PTIME_MIN_YEAR_INTERVAL = -PTIME_MAX_YEAR_INTERVAL;
+static const int64_t PTIME_MAX_QUARTER_INTERVAL = PTIME_MAX_YEAR_INTERVAL * 4;
+static const int64_t PTIME_MIN_QUARTER_INTERVAL = -PTIME_MAX_QUARTER_INTERVAL;
+static const int64_t PTIME_MAX_MONTH_INTERVAL = PTIME_MAX_YEAR_INTERVAL * 12;
+static const int64_t PTIME_MIN_MONTH_INTERVAL = -PTIME_MAX_MONTH_INTERVAL;
+static const int64_t PTIME_MAX_DAY_INTERVAL =  PTIME_MAX_YEAR_INTERVAL * 365 + (PTIME_MAX_YEARS / 4);
+static const int64_t PTIME_MIN_DAY_INTERVAL = -PTIME_MAX_DAY_INTERVAL;
+static const int64_t PTIME_MAX_HOUR_INTERVAL = PTIME_MAX_DAY_INTERVAL * 24;
+static const int64_t PTIME_MIN_HOUR_INTERVAL = -PTIME_MAX_HOUR_INTERVAL;
+static const int64_t PTIME_MAX_MINUTE_INTERVAL = PTIME_MAX_HOUR_INTERVAL * 60;
+static const int64_t PTIME_MIN_MINUTE_INTERVAL = -PTIME_MAX_MINUTE_INTERVAL;
+static const int64_t PTIME_MAX_SECOND_INTERVAL = PTIME_MAX_MINUTE_INTERVAL * 60;
+static const int64_t PTIME_MIN_SECOND_INTERVAL =  -PTIME_MAX_SECOND_INTERVAL;
+static const int64_t PTIME_MAX_MILLISECOND_INTERVAL = PTIME_MAX_SECOND_INTERVAL * 1000;
+static const int64_t PTIME_MIN_MILLISECOND_INTERVAL = -PTIME_MAX_MILLISECOND_INTERVAL;
+static const int64_t PTIME_MAX_MICROSECOND_INTERVAL = PTIME_MAX_MILLISECOND_INTERVAL * 1000;
+static const int64_t PTIME_MIN_MICROSECOND_INTERVAL = -PTIME_MAX_MICROSECOND_INTERVAL;
 
 /** Convert from epoch_micros to date **/
 static inline void micros_to_date(int64_t epoch_micros_in, boost::gregorian::date& date_out) {
@@ -439,7 +453,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
-    if (interval > PTIME_MAX_YEARS || interval < PTIME_MIN_YEARS) {
+    if (interval > PTIME_MAX_YEAR_INTERVAL || interval < PTIME_MIN_YEAR_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
@@ -469,7 +483,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_QUARTER>(const std::vect
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
-    if (interval > PTIME_MAX_QUARTERS || interval < PTIME_MIN_QUARTERS) {
+    if (interval > PTIME_MAX_QUARTER_INTERVAL || interval < PTIME_MIN_QUARTER_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
@@ -490,7 +504,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
-    if (interval > PTIME_MAX_MONTHS || interval < PTIME_MIN_MONTHS) {
+    if (interval > PTIME_MAX_MONTH_INTERVAL || interval < PTIME_MIN_MONTH_INTERVAL) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
 
@@ -511,6 +525,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<N
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval > PTIME_MAX_DAY_INTERVAL || interval < PTIME_MIN_DAY_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
 
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
@@ -538,6 +555,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_HOUR>(const std::vector<
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval > PTIME_MAX_HOUR_INTERVAL || interval < PTIME_MIN_HOUR_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
 
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
@@ -565,6 +585,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MINUTE>(const std::vecto
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval > PTIME_MAX_MINUTE_INTERVAL || interval < PTIME_MIN_MINUTE_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
 
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
@@ -592,6 +615,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_SECOND>(const std::vecto
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval > PTIME_MAX_SECOND_INTERVAL || interval < PTIME_MIN_SECOND_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
 
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
@@ -619,6 +645,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(const std::
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval > PTIME_MAX_MILLISECOND_INTERVAL || interval < PTIME_MIN_MILLISECOND_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
 
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
@@ -646,6 +675,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
     }
 
     int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval > PTIME_MAX_MICROSECOND_INTERVAL || interval < PTIME_MIN_MICROSECOND_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
+    }
 
     boost::posix_time::ptime ts;
     micros_to_ptime(date.getTimestamp(), ts);
