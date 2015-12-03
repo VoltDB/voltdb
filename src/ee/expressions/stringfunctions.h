@@ -680,9 +680,11 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
 
             int32_t lenFlags = flags.getObjectLength_withoutNull();
             const char* flagChars = reinterpret_cast<const char*>(flags.getObjectValue_withoutNull());
+            // temporary workaround to make sure the string we are operating on is null terminated
+            std::string flagStr(flagChars, lenFlags);
 
-            for(int i = 0; i < lenFlags; i++) {
-                switch (*flagChars) {
+            for(std::string::iterator it = flagStr.begin(); it != flagStr.end(); ++it) {
+                switch (*it) {
                     case 'c':
                         break;
                     case 'i':
@@ -691,7 +693,6 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
                     default:
                         throw SQLException(SQLException::data_exception_invalid_parameter, "Regular Expression Compilation Error: Illegal Match Flags");
                 }
-                flagChars++;
             }
         }
     }

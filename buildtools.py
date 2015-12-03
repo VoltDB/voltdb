@@ -423,7 +423,7 @@ def buildMakefile(CTX):
     makefile.write('\t  /bin/rm -rf "${PCRE2_OBJ}"; \\\n')
     makefile.write('\t  mkdir -p "${PCRE2_OBJ}"; \\\n')
     makefile.write('\t  cd "${PCRE2_OBJ}"; \\\n')
-    makefile.write('\t  "${PCRE2_SRC}/configure" --disable-shared --prefix="${PCRE2_INSTALL}" ; \\\n')
+    makefile.write('\t  "${PCRE2_SRC}/configure" --disable-shared --with-pic --prefix="${PCRE2_INSTALL}" ; \\\n')
     makefile.write('\tfi\n')
     makefile.write('.PHONY: configure-pcre2\n')
     makefile.write('\n')
