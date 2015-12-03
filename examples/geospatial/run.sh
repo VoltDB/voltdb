@@ -43,6 +43,35 @@ LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
+# remove binaries, logs, runtime artifacts, etc... but keep the jars
+function clean() {
+    rm -rf debugoutput voltdbroot log catalog-report.html \
+         statement-plans procedures/geospatial/*.class \
+         client/geospatial/*.class \
+         geospatial-client.jar
+}
+
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    # compile java source
+    # javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
+    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/geospatial/*.java
+    # build procedure and client jars
+    # jar cf voter-procs.jar -C procedures voter
+    jar cf geospatial-client.jar -C client geospatial
+    # remove compiled .class files
+    #rm -rf procedures/voter/*.class client/voter/*.class
+    rm -rf client/voter/*.class
+}
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    #if [ ! -e geospatial-procs.jar ] || [ ! -e voter-client.jar ]; then
+    if [ ! -e geospatial-client.jar ]; then
+        jars;
+    fi
+}
+
 # run the voltdb server locally
 function server() {
     echo "Starting the VoltDB server."
@@ -53,9 +82,11 @@ function server() {
     voltdb create -l $LICENSE -H $HOST
 }
 
-# load schema and procedures
+# load schema, procedures, and static data
 function init() {
+    jars-ifneeded
     sqlcmd < ddl.sql
+    csvloader -f advertisers.csv advertisers
 }
 
 # wait for backgrounded server to start up
@@ -79,9 +110,30 @@ function background_server_andload() {
     init
 }
 
+# run the client that drives the example
+function client() {
+    adbroker-benchmark
+}
+
+# latencyreport: default is OFF
+# ratelimit: must be a reasonable value if lantencyreport is ON
+# Disable the comments to get latency report
+function adbroker-benchmark() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        geospatial.AdBrokerBenchmark \
+        --displayinterval=5 \
+        --warmup=1 \
+        --duration=10 \
+        --servers=localhost:21212 \
+        --ratelimit=2000000
+#        --latencyreport=true \
+}
+
 function demo() {
     echo "starting server in background..."
     background_server_andload
+    client
 
     echo
     echo When you are done with the demo database, \
