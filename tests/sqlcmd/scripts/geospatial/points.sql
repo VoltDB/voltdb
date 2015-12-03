@@ -1,3 +1,4 @@
+drop procedure make_point if exists;
 drop table points if exists;
 
 create table points (
