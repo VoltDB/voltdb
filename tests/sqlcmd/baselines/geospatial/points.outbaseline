@@ -1,6 +1,9 @@
 
 FILE scripts/geospatial/points.sql
 
+drop procedure make_point if exists;
+Command succeeded.
+
 drop table points if exists;
 Command succeeded.
 
@@ -57,3 +60,9 @@ ID   LOCATION
  200 NULL                    
 
 (Returned 6 rows in #.##s)
+
+drop procedure make_point;
+Command succeeded.
+
+drop table points;
+Command succeeded.

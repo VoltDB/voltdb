@@ -20,3 +20,5 @@ exec make_point 200 null;
 
 select * from points;
 
+drop procedure make_point;
+drop table points;
