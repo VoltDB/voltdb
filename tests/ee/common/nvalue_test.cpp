@@ -3378,11 +3378,14 @@ TEST_F(NValueTest, TestDateadd) {
     EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_SECOND)));
 
     // Test illegal arguments
+    const std::string expectedMsg = std::string("interval is too large for DATEADD function");
+
     args[0] = ValueFactory::getBigIntValue(PTIME_MAX_YEAR_INTERVAL+1);
     bool caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3391,7 +3394,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3400,7 +3404,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3409,7 +3414,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3418,7 +3424,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3427,7 +3434,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3436,7 +3444,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3445,7 +3454,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3454,7 +3464,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3463,7 +3474,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_YEAR>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3472,7 +3484,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_QUARTER>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3481,7 +3494,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MONTH>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3490,7 +3504,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_DAY>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3499,7 +3514,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_HOUR>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3508,7 +3524,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MINUTE>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3517,7 +3534,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_SECOND>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3526,7 +3544,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
@@ -3535,7 +3554,8 @@ TEST_F(NValueTest, TestDateadd) {
     caught = false;
     try {
         result = NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(args);
-    } catch (SQLException& e) {
+    } catch (SQLException& exception) {
+        EXPECT_TRUE(exception.message().find(expectedMsg) != string::npos);
         caught = true;
     }
     EXPECT_TRUE(caught);
