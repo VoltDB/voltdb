@@ -136,7 +136,6 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     }
 
     m_preTruncateTable = NULL;
-    m_src_view = NULL;
 
     ::memcpy(&m_signature, signature, 20);
 }
@@ -514,12 +513,10 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         target.setDirtyFalse();
     }
 
-    if (!isExportViewTarget) {
-        TableTuple conflict(m_schema);
-        tryInsertOnAllIndexes(&target, &conflict);
-        if (!conflict.isNullTuple()) {
-            throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
-        }
+    TableTuple conflict(m_schema);
+    tryInsertOnAllIndexes(&target, &conflict);
+    if (!conflict.isNullTuple()) {
+        throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -558,12 +555,6 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(target, fallible);
-    }
-    //for export view table build view pointing to it.
-    if (isExportViewTarget) {
-        if (m_src_view != NULL) {
-            this->m_src_view->processTupleInsert(target, fallible);
-        }
     }
 }
 

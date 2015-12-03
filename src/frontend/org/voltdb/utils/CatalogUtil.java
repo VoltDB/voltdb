@@ -502,6 +502,23 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Return true if a table is the source table for a materialized view.
+     */
+    public static List<Table> getMaterializeViews(org.voltdb.catalog.Database database,
+                                                       org.voltdb.catalog.Table table)
+    {
+        ArrayList<Table> tlist = new ArrayList<Table>();
+        CatalogMap<Table> tables = database.getTables();
+        for (Table t : tables) {
+            Table matsrc = t.getMaterializer();
+            if ((matsrc != null) && (matsrc.getRelativeIndex() == table.getRelativeIndex())) {
+                tlist.add(t);
+            }
+        }
+        return tlist;
+    }
+
+    /**
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *

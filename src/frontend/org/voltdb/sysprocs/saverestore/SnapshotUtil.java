@@ -86,6 +86,7 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.catalog.Column;
 
 public class SnapshotUtil {
 
@@ -1249,7 +1250,14 @@ public class SnapshotUtil {
             if ((table.getMaterializer() != null) &&
                     (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
             {
-                my_tables.add(table);
+                //This is just a guard compiler should not let this view compile.
+                String bPartName = table.getMaterializer().getPartitioncolumn().getName();
+                Column pc = table.getColumns().get(bPartName);
+                if (pc != null) {
+                    my_tables.add(table);
+                } else {
+                    System.out.println("Can not snapshot " + table.toString());
+                }
                 continue;
             }
             // Make a list of all non-materialized, non-export only tables

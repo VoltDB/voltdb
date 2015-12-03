@@ -65,7 +65,6 @@ ExportMaterializedViewMetadata::ExportMaterializedViewMetadata(StreamedTable *sr
 
     m_mvInfo = mvInfo;
 
-    m_target->setSourceView(this);
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
 
@@ -90,14 +89,6 @@ ExportMaterializedViewMetadata::ExportMaterializedViewMetadata(StreamedTable *sr
 
     allocateBackedTuples();
 
-    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-//    if (m_target->isPersistentTableEmpty()) {
-//        TableTuple scannedTuple(srcTable->schema());
-//        TableIterator &iterator = srcTable->iterator();
-//        while (iterator.next(scannedTuple)) {
-//            processTupleInsert(scannedTuple, false);
-//        }
-//    }
     /* If there is no group by column and the target table is still empty
      * even after catching up with pre-existing source tuples, we should initialize the
      * target table with a row of default values.
@@ -127,7 +118,6 @@ void ExportMaterializedViewMetadata::setTargetTable(PersistentTable * target)
     PersistentTable * oldTarget = m_target;
 
     m_target = target;
-    m_target->setSourceView(this);
     target->incrementRefcount();
 
     // Re-initialize dependencies on the target table, allowing for widened columns

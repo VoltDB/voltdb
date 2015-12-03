@@ -1690,6 +1690,23 @@ public class VoltCompiler {
             throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
             "the catalog.");
         }
+        Column pc = tableref.getPartitioncolumn();
+        //Get views
+        List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
+        if (pc == null && tlist.size() != 0) {
+            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
+                    "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+            throw new VoltCompilerException("Export table configured with materialized view without partitioned column.");
+        }
+        if (pc != null && pc.getName() != null && tlist.size() != 0) {
+            for (Table t : tlist) {
+                if (t.getColumns().get(pc.getName()) == null) {
+                    compilerLog.error("While configuring export, table " + t + " is a source table " +
+                            "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+                    throw new VoltCompilerException("Export table configured with materialized view without partitioned column in the view.");
+                }
+            }
+        }
         if (tableref.getMaterializer() != null)
         {
             compilerLog.error("While configuring export, table " + tableName + " is a " +

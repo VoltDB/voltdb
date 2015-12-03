@@ -57,15 +57,17 @@ CREATE VIEW v_votes_by_contestant_number_state
 (
   contestant_number
 , state
+, phone_number
 , num_votes
 )
 AS
    SELECT contestant_number
         , state
+        , phone_number
         , COUNT(*)
      FROM votes
  GROUP BY contestant_number
-        , state
+        , state , phone_number
 ;
 
 -- rollup of votes by contestant and state for the heat map and results
@@ -73,12 +75,14 @@ CREATE VIEW v_votes_winner
 (
   contestant_number
 , num_votes
+, phone_number
 )
 AS
    SELECT contestant_number
+        , phone_number
         , COUNT(*)
      FROM votes
- GROUP BY contestant_number
+ GROUP BY contestant_number , phone_number
 ;
 
 END_OF_BATCH
