@@ -53,8 +53,8 @@ ID   LOCATION
 
 (Returned 5 rows in #.##s)
 
-drop procedure make_polygon if exists;
+drop procedure make_polygon;
 Command succeeded.
 
-drop table polygons if exists;
+drop table polygons;
 Command succeeded.
