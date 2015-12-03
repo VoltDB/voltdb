@@ -98,10 +98,10 @@
     <target name="builtintransformer">
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/builtintransformer.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importer/transformer/SimpleTransformer.class"/>
-            <include name="org/voltdb/importer/transformer/AbstractTransformer.class"/>
+            <include name="org/voltdb/importer/transformer/builtin/SimpleTransformer.class"/>
+            <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importer.transformer.SimpleTransformer" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importer.transformer.builtin.SimpleTransformer" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="Builtin Transformer OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="BuiltinTransformer" />

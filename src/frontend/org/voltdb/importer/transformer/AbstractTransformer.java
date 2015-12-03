@@ -25,7 +25,7 @@ public abstract class AbstractTransformer {
 
     };
 
-    public Object[] transform(ByteBuffer b) {
+    public Object[] transform(ByteBuffer b) throws Exception {
         return null;
     };
 }

@@ -64,15 +64,11 @@ public class TestBuiltinTransformer extends TestCase {
 
     @Before
     public void setUp() throws Exception {
-
-    }
-
-    @Test
-    public void testHostFailure() throws Exception {
         List<String> packages = ImmutableList.<String>builder()
                 .add("org.voltcore.network")
                 .add("org.voltcore.logging")
                 .add("org.voltdb.importer")
+                .add("org.voltdb.importer.transformer")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")
                 .add("org.slf4j")
@@ -98,19 +94,34 @@ public class TestBuiltinTransformer extends TestCase {
         m_framework.start();
         m_bundle = m_framework.getBundleContext().installBundle("file:/home/dweiss/dev/voltdb/bundles/builtintransformer.jar");
         m_bundle.start();
-        System.out.println(AbstractTransformer.class.getClassLoader().toString());
+    }
+
+    @Test
+    public void testCSVBundle() throws Exception {
         ServiceReference refs[] = m_bundle.getRegisteredServices();
         ServiceReference<AbstractTransformer> reference = refs[0];
         AbstractTransformer o = m_bundle.getBundleContext().getService(reference);
-        System.out.println(o.getClass().getClassLoader().toString());
         Properties prop = new Properties();
-        prop.setProperty("service", "csv");
+        prop.setProperty("format", "csv");
         o.configure(prop);
-        ByteBuffer input = ByteBuffer.wrap("\"test\",12,10.05,test".getBytes());
+        ByteBuffer input = ByteBuffer.wrap("12,10.05,test".getBytes());
         Object[] results = o.transform(input);
-        for (Object result : results) {
-            System.out.println(result);
-        }
+        assertEquals(results.length, 3);
+
+    }
+
+    @Test
+    public void testTSVBundle() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractTransformer> reference = refs[0];
+        AbstractTransformer o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("format", "tsv");
+        o.configure(prop);
+        ByteBuffer input = ByteBuffer.wrap("12\t10.05\ttest".getBytes());
+        Object[] results = o.transform(input);
+        assertEquals(results.length, 3);
+
     }
 
     @After
