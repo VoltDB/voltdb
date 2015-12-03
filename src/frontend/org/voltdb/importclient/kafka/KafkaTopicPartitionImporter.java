@@ -128,7 +128,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     //Find leader for this topic partition.
     private KafkaStreamImporterConfig.HostAndPort findNewLeader() {
+        //TODO: remove
+        info(null, this + "*****findNewLeader*****");
         for (int i = 0; i < 3; i++) {
+            //TODO: remove
+            info(null, this + "*****Attempt # " + i + " *****");
             boolean shouldSleep = false;
             PartitionMetadata metadata = findLeader();
             if (metadata == null) {
@@ -140,6 +144,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 // second time, assume the broker did recover before failover, or it was a non-Broker issue
                 shouldSleep = true;
             } else {
+                //TODO: remove
+                info(null, this + "*****findNewLeader returning new HostAndPort*****");
                 return new KafkaStreamImporterConfig.HostAndPort(metadata.leader().host(), metadata.leader().port());
             }
             if (shouldSleep) {
@@ -307,13 +313,14 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     private void resetLeader() {
+        try {
         //TODO: remove
         info(null, "*****resetLeader*****");
-        KafkaStreamImporterConfig.HostAndPort leaderBroker = m_config.getPartitionLeader();
-
         KafkaStreamImporterConfig.closeConsumer(m_consumer);
         m_consumer = null;
-        leaderBroker = findNewLeader();
+        KafkaStreamImporterConfig.HostAndPort leaderBroker = findNewLeader();
+        //TODO: remove
+        info(null, "*****findNewLeader found " + leaderBroker + " *****");
         if (leaderBroker == null) {
             //point to original leader which will fail and we fall back again here.
             error(null, "Fetch Failed to find leader continue with old leader: %s", m_config.getPartitionLeader());
@@ -330,6 +337,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 leaderBroker.getHost(), leaderBroker.getPort(),
                 m_config.getSocketTimeout(), m_config.getFetchSize(), KafkaStreamImporterConfig.CLIENT_ID
                 );
+        } catch(Throwable t) {// TODO: remove
+            info(t, "*****Error in resetLeader*****");
+        }
     }
 
     @Override
@@ -339,8 +349,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         AtomicLong cbcnt = new AtomicLong(0);
         try {
             //Start with the starting leader.
-        //TODO: remove
-        info(null, "*****Calling resetLeader*****");
             resetLeader();
 
             int sleepCounter = 1;
