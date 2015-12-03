@@ -3,7 +3,7 @@ file scripts/geospatial/geography.sql;
 -- parsing is case-insensitive
 exec make_polygon 1 'polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))';
 exec make_polygon 2 'PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))';
--- parsing is whitespace-insensitive 
+-- parsing is whitespace-insensitive
 exec make_polygon 3 '  POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305   -64.751  )  ) ';
 -- insert polygon with a hole
 exec make_polygon 4 '  POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), (28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))';
