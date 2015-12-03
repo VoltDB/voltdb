@@ -720,7 +720,7 @@ if __name__ == "__main__":
         if options.postgresql and config_name == "index-varbinary":
             if result["mis"] > 1510:
                 success = False
-        elif result["mis"] > 0:
+        elif result["mis"] != 0:
             success = False
 
     # Write the summary
