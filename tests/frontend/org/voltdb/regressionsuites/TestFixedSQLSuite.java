@@ -692,6 +692,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG8120();
         subTestENG9032();
         subTestENG9389();
+        subTestENG9533();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -2524,6 +2525,40 @@ public class TestFixedSQLSuite extends RegressionSuite {
         validateTableOfScalarLongs(client, sql, new long[]{1});
 
         truncateTables(client, new String[]{"T1", "T2"});
+    }
+
+    private void subTestENG9533() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9533 outerjoin with OR pred...");
+        Client client = getClient();
+        String insStmts[] = {
+                "insert into test1_eng_9533 values (0);",
+                "insert into test1_eng_9533 values (1);",
+                "insert into test1_eng_9533 values (2);",
+                "insert into test1_eng_9533 values (3);",
+                "insert into test2_eng_9533 values (1, 'athing', 'one', 5);",
+                "insert into test2_eng_9533 values (2, 'otherthing', 'two', 10);",
+                "insert into test2_eng_9533 values (3, 'yetotherthing', 'three', 3);"
+        };
+
+        for (String stmt : insStmts) {
+            validateTableOfScalarLongs(client, stmt, new long[] {1});
+        }
+
+        String sqlStmt =
+                "select "
+                + "  id, t_int "
+                + "from test1_eng_9533 "
+                + "  left join test2_eng_9533 "
+                + "  on t_id = id "
+                + "where "
+                + "  id <= 1 or t_int > 4 "
+                + "order by id * 2"; // this order by is so that we don't force an index scan on the outer table.
+
+        validateTableOfLongs(client, sqlStmt, new long[][] {
+                {0, Long.MIN_VALUE},
+                {1, 5},
+                {2, 10}
+        });
     }
 
     //
