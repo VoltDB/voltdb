@@ -42,6 +42,7 @@ import org.voltdb.exceptions.EEException;
  * guidelines to add/modify JNI methods.
  */
 public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
+    // This map allows Mockito to evaluate the functions (for When clauses) without making EE calls.
     private final Map<Long, Boolean> m_callingThreadsToBlock = new ConcurrentHashMap<Long, Boolean>();
 
     /**

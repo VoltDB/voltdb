@@ -517,8 +517,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     @Override
     public void close() throws IOException, InterruptedException {
-        boolean hadFailureBeforeClose = m_writeFailed.get() != null;
-
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -557,7 +555,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
         // If there was an error during close(), throw it so that the snapshot
         // can be marked as failed.
-        if (!hadFailureBeforeClose && m_writeFailed.get() != null) {
+        if (m_writeFailed.get() != null) {
             throw m_writeFailed.get();
         }
     }
