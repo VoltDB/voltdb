@@ -106,7 +106,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, false, WRITE_TOKEN);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -157,7 +157,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, Long.MAX_VALUE);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -263,7 +263,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, false, WRITE_TOKEN);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -422,7 +422,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
         }
 
-        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, 0, false, false, false, WRITE_TOKEN);
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(numRowsToInsert, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
         System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
 

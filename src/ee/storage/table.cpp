@@ -459,7 +459,7 @@ bool Table::equals(voltdb::Table *other) {
 void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
                                    Pool *stringPool,
                                    ReferenceSerializeOutput *uniqueViolationOutput,
-                                   bool shouldDRStreamRow, bool isExportTableViewTarget) {
+                                   bool shouldDRStreamRow) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
@@ -482,7 +482,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
 
         target.deserializeFrom(serialize_io, stringPool);
 
-        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow, isExportTableViewTarget);
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
@@ -501,7 +501,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
 void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                            Pool *stringPool,
                            ReferenceSerializeOutput *uniqueViolationOutput,
-                           bool shouldDRStreamRow, bool isExportTableViewTarget) {
+                           bool shouldDRStreamRow) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -559,7 +559,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow, isExportTableViewTarget);
+    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
 
 bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {

@@ -260,7 +260,7 @@ class Table {
     void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
                                 Pool *stringPool = NULL,
                                 ReferenceSerializeOutput *uniqueViolationOutput = NULL,
-                                bool shouldDRStreamRows = false, bool isExportTableViewTarget = false);
+                                bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
@@ -269,7 +269,7 @@ class Table {
     void loadTuplesFrom(SerializeInputBE &serialize_in,
                         Pool *stringPool = NULL,
                         ReferenceSerializeOutput *uniqueViolationOutput = NULL,
-                        bool shouldDRStreamRows = false, bool isExportTableViewTarget = false);
+                        bool shouldDRStreamRows = false);
 
 
     // ------------------------------------------------------------------
@@ -354,7 +354,7 @@ protected:
                                     ReferenceSerializeOutput *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
                                     size_t &tupleCountPosition,
-                                    bool shouldDRStreamRow, bool isExportTableViewTarget) {
+                                    bool shouldDRStreamRow) {
     };
 
     virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {

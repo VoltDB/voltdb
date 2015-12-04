@@ -935,7 +935,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
             final long spHandle, final long lastCommittedSpHandle, final long uniqueId,
-            boolean returnUniqueViolations, boolean shouldDRStream, boolean isExportTableViewTarget, long undoToken)
+            boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {

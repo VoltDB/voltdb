@@ -197,7 +197,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        int64_t spHandle, int64_t lastCommittedSpHandle,
                        int64_t uniqueId,
                        bool returnUniqueViolations,
-                       bool shouldDRStream, bool isExportTableViewTarget);
+                       bool shouldDRStream);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }

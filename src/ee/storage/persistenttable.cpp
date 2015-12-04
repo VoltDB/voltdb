@@ -484,7 +484,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream, bool isExportViewTarget)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream)
 {
     if (fallible) {
         // not null checks at first
@@ -1235,9 +1235,9 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          ReferenceSerializeOutput *uniqueViolationOutput,
                                          int32_t &serializedTupleCount,
                                          size_t &tupleCountPosition,
-                                         bool shouldDRStreamRows, bool isExportTableViewTarget) {
+                                         bool shouldDRStreamRows) {
     try {
-        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, isExportTableViewTarget);
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {

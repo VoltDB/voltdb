@@ -76,7 +76,6 @@ public interface SiteProcedureConnection {
             VoltTable data,
             boolean returnUniqueViolations,
             boolean shouldDRStream,
-            boolean isExportTableViewTarget,
             boolean undo)
     throws VoltAbortException;
 
@@ -91,7 +90,6 @@ public interface SiteProcedureConnection {
             VoltTable data,
             boolean returnUniqueViolations,
             boolean shouldDRStream,
-            boolean isExportTableViewTarget,
             boolean undo);
 
     /**

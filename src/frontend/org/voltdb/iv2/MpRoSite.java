@@ -349,16 +349,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
-            String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean isExportTableViewTarget,
-            boolean undo) throws VoltAbortException
+            String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean undo) throws VoltAbortException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
-            boolean shouldDRStream, boolean isExportTableViewTarget,
-            boolean undo)
+            boolean shouldDRStream, boolean undo)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

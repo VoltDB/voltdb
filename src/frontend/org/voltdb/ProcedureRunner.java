@@ -803,7 +803,7 @@ public class ProcedureRunner {
     }
 
     public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream, boolean isExportTableViewTarget)
+                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
@@ -812,7 +812,7 @@ public class ProcedureRunner {
         try {
             return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle, m_txnState.uniqueId,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations, shouldDRStream, isExportTableViewTarget, false);
+                             tableName, data, returnUniqueViolations, shouldDRStream, false);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);

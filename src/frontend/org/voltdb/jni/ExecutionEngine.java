@@ -589,7 +589,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long txnId, long spHandle,
-        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream, boolean isExportTableViewTarget,
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -810,7 +810,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream, boolean isExportTableViewTarget,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
             long undoToken);
 
     /**

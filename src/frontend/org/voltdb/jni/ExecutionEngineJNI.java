@@ -377,7 +377,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         final long lastCommittedSpHandle,
         final long uniqueId,
         boolean returnUniqueViolations,
-        boolean shouldDRStream, boolean isExportTableViewTarget,
+        boolean shouldDRStream,
         long undoToken) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
@@ -392,7 +392,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, isExportTableViewTarget, undoToken);
+                                              returnUniqueViolations, shouldDRStream, undoToken);
         checkErrorCode(errorCode);
 
         try {
