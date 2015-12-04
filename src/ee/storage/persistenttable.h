@@ -230,6 +230,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return new TableIterator(this, m_data.begin());
     }
 
+    JumpingTableIterator* makeJumpingIterator() {
+        return new JumpingTableIterator(this, m_data.begin());
+    }
+
     TableIterator& iteratorDeletingAsWeGo() {
         m_iter.reset(m_data.begin());
         m_iter.setTempTableDeleteAsGo(false);
@@ -554,7 +558,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void nextFreeTuple(TableTuple *tuple);
     bool doCompactionWithinSubset(TBBucketPtrVector *bucketVector);
-    void doForcedCompaction();
+    bool doForcedCompaction();  // Returns true if a compaction was performed
 
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);

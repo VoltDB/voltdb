@@ -1518,11 +1518,11 @@ void PersistentTable::doIdleCompaction() {
     }
 }
 
-void PersistentTable::doForcedCompaction() {
+bool PersistentTable::doForcedCompaction() {
     if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
-        return;
+        return false;
     }
     bool hadWork1 = true;
     bool hadWork2 = true;
@@ -1591,6 +1591,7 @@ void PersistentTable::doForcedCompaction() {
     snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd",
             ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+    return (notPendingCompactions + pendingCompactions) > 0;
 }
 
 void PersistentTable::printBucketInfo() {

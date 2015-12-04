@@ -311,6 +311,27 @@ public:
         }
     }
 
+    TableTuple findLastTuple(PersistentTable *table) {
+        TableTuple tuple = table->tempTuple();
+        tableutil::getLastTuple(table, tuple);
+        return tuple;
+    }
+
+    void updateSpecificTuple(PersistentTable *table, voltdb::TableTuple tuple, T_ValueSet *setFrom = NULL, T_ValueSet *setTo = NULL) {
+        TableTuple tempTuple = table->tempTuple();
+        tempTuple.copy(tuple);
+        int value = ::rand();
+        tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
+        if (setFrom != NULL) {
+            setFrom->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+        }
+        if (setTo != NULL) {
+            setTo->insert(*reinterpret_cast<const int64_t*>(tempTuple.address() + 1));
+        }
+        table->updateTuple(tuple, tempTuple);
+        m_tuplesUpdated++;
+    }
+
     void doRandomInsert(PersistentTable *table, T_ValueSet *set = NULL) {
         addRandomUniqueTuples(table, 1, set);
         m_tuplesInserted++;
@@ -318,20 +339,9 @@ public:
     }
 
     void doRandomUpdate(PersistentTable *table, T_ValueSet *setFrom = NULL, T_ValueSet *setTo = NULL) {
-        voltdb::TableTuple tuple(table->schema());
-        voltdb::TableTuple tempTuple = table->tempTuple();
+        TableTuple tuple(table->schema());
         if (tableutil::getRandomTuple(table, tuple)) {
-            tempTuple.copy(tuple);
-            int value = ::rand();
-            tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
-            if (setFrom != NULL) {
-                setFrom->insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
-            }
-            if (setTo != NULL) {
-                setTo->insert(*reinterpret_cast<const int64_t*>(tempTuple.address() + 1));
-            }
-            table->updateTuple(tuple, tempTuple);
-            m_tuplesUpdated++;
+            updateSpecificTuple(table, tuple, setFrom, setTo);
         }
     }
 
@@ -370,8 +380,8 @@ public:
         }
     }
 
-    void doForcedCompaction(PersistentTable *table) {
-        table->doForcedCompaction();
+    bool doForcedCompaction(PersistentTable *table) {
+        return table->doForcedCompaction();
     }
 
     void checkTuples(size_t tupleCount, const T_ValueSet& expected, const T_ValueSet& received) {
@@ -1183,6 +1193,99 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     tuple.setDirtyFalse();
     ASSERT_TRUE(tuple.isActive());
     ASSERT_FALSE(tuple.isDirty());
+}
+
+/**
+ * Test serializes one buffer (960 tuples) updates 10% + the bookmark tuple then serializes the rest.
+ * When the bookmark tuple has been serialized and the dirty bit is reset, we should be serializing
+ * the temp table. Now delete 10% of the tuples and force compaction. Then continue serializing the
+ * temp table.
+ */
+TEST_F(CopyOnWriteTest, CompactionDuringTempTableSerialization) {
+    initTable(1, 0);
+    int tupleCount = TUPLE_COUNT;
+    int updateCount = tupleCount/5;  // Update 20% of the entries
+    int deleteCount = TUPLE_COUNT * 4 / 5;  // Delete at least 3 blocks worth about 80% (3 blocks = 96789)
+    m_engine->setUndoToken(m_undoToken);
+    addRandomUniqueTuples( m_table, tupleCount);
+    TableTuple bookmark = findLastTuple(m_table);
+    assert(!bookmark.isNullTuple());
+    m_engine->releaseUndoToken(m_undoToken);
+    ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
+                                                                 0, 0, 0, 0);
+    m_undoToken++;
+    T_ValueSet originalTuples;
+    getTableValueSet(originalTuples);
+
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInputBE input(config, 4);
+
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+
+    T_ValueSet COWTuples;
+    char serializationBuffer[1000];
+    int totalInserted = 0;
+    bool updatedTable = false;
+    bool forcedCompaction = false;
+    while (true) {
+        TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+        TupleOutputStream &outputStream = outputStreams.at(0);
+        std::vector<int> retPositions;
+        int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+        if (remaining >= 0) {
+            ASSERT_EQ(outputStreams.size(), retPositions.size());
+        }
+        const size_t serialized = outputStream.position();
+        if (serialized == 0) {
+            break;
+        }
+        for (size_t ii = sizeof(int32_t)*3; // skip partition id, row count, and first tuple length
+             ii + sizeof(int64_t) <= serialized;
+             ii += m_tupleWidth + sizeof(int32_t)) {
+            int32_t values[2];
+            values[0] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii]));
+            values[1] = ntohl(*reinterpret_cast<const int32_t*>(&serializationBuffer[ii + 4]));
+            // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+            void *valuesVoid = reinterpret_cast<void*>(values);
+            const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
+            const bool inserted = COWTuples.insert(*values64);
+            if (!inserted) {
+                printf("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
+            }
+            ASSERT_TRUE(inserted);
+            totalInserted++;
+        }
+        if (!updatedTable) {
+            // Serialized 1 buffer (~960 rows) fill up the temp table with ~30000 tuples
+            for (int jj = 0; jj < updateCount; jj++) {
+                doRandomUpdate(m_table);
+            }
+            // Mark last row in table dirty so we notice when the COW has moved past it
+            updateSpecificTuple(m_table, bookmark);
+            m_engine->releaseUndoToken(m_undoToken);
+            ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
+                                                                         0, 0, 0, 0);
+            m_undoToken++;
+            assert(bookmark.isDirty());
+            updatedTable = true;
+        }
+        if (!bookmark.isDirty() && !forcedCompaction) {
+            // Started streaming the tempTable; delete most of the table to force compaction
+            for (size_t kk = 0; kk < deleteCount; kk++) {
+                doRandomDelete(m_table);
+            }
+            m_engine->releaseUndoToken(m_undoToken);
+            ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(),
+                                                                         0, 0, 0, 0);
+            m_undoToken++;
+            bool compactionPerformed = doForcedCompaction(m_table);
+            assert(compactionPerformed);
+            forcedCompaction = true;
+        }
+    }
+    assert(forcedCompaction);
+    checkTuples(tupleCount + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
 }
 
 TEST_F(CopyOnWriteTest, BigTest) {
