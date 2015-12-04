@@ -50,6 +50,7 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 
+import org.voltcore.logging.Level;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
@@ -115,13 +116,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                     }
                 } catch (Exception e) {
-                    error(e, "Error in finding leader for %s", m_topicAndPartition);
+                    rateLimitedLog(Level.ERROR, e, "Error in finding leader for " + m_topicAndPartition);
                 } finally {
                     KafkaStreamImporterConfig.closeConsumer(consumer);
                 }
             }
         if (returnMetaData == null) {
-            error(null, "Failed to find Leader for %s", m_topicAndPartition);
+            rateLimitedLog(Level.ERROR, null, "Failed to find Leader for " + m_topicAndPartition);
         }
         return returnMetaData;
     }
@@ -147,7 +148,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             }
         }
         //Unable to find return null for recheck.
-        error(null, "Failed to find new leader for %s", m_topicAndPartition);
+        rateLimitedLog(Level.ERROR, null, "Failed to find new leader for " + m_topicAndPartition);
         return null;
     }
 
@@ -227,7 +228,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             fault = e;
         }
         if (fault != null) {
-            error(fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
             response = null;
         }
         return response;
@@ -263,7 +264,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             fault = e;
         }
         if (fault != null) {
-            error(fault, "unable to fetch earliest offset for " + m_topicAndPartition);
+            rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
                     rsp = null;
         }
         return rsp;
@@ -312,7 +313,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         KafkaStreamImporterConfig.HostAndPort leaderBroker = findNewLeader();
         if (leaderBroker == null) {
             //point to original leader which will fail and we fall back again here.
-            error(null, "Fetch Failed to find leader continue with old leader: %s", m_config.getPartitionLeader().toString());
+            rateLimitedLog(Level.ERROR, null, "Fetch Failed to find leader continue with old leader: " + m_config.getPartitionLeader());
             leaderBroker = m_config.getPartitionLeader();
         } else {
             if (!leaderBroker.equals(m_config.getPartitionLeader())) {
@@ -371,7 +372,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         continue;
                     }
                 } catch (Exception ex) {
-                    error(ex, "Failed to fetch from %s", m_topicAndPartition);
+                    rateLimitedLog(Level.ERROR, ex, "Failed to fetch from " +  m_topicAndPartition);
                     //See if its network error and find new leader for this partition.
                     if (ex instanceof IOException) {
                         resetLeader();
@@ -486,17 +487,17 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                     }
                 } else {
-                    error(null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                    rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                     return false;
                 }
             } catch (Exception e) {
-                error(e, "Failed to commit Offset for " + m_topicAndPartition);
+                rateLimitedLog(Level.ERROR, e, "Failed to commit Offset for " + m_topicAndPartition);
                 return false;
             }
             final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
             if (code != ErrorMapping.NoError()) {
                 final String msg = "Commit Offset Failed to commit for " + m_topicAndPartition;
-                error(ErrorMapping.exceptionFor(code), msg);
+                rateLimitedLog(Level.ERROR, ErrorMapping.exceptionFor(code), msg);
                 return false;
             }
             m_lastCommittedOffset = safe;

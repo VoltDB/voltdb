@@ -45,7 +45,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
  */
 public class KafkaStreamImporterConfig implements ImporterConfig
 {
-    private static final Logger m_logger = Logger.getLogger("ImporterConfig");
+    private static final Logger m_logger = Logger.getLogger("IMPORT");
 
     public static final String CLIENT_ID = "voltdb-importer";
     private static final String GROUP_ID = "voltdb";
@@ -53,7 +53,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private static final String CSV_FORMATTER_NAME = "csv";
     private static final String TSV_FORMATTER_NAME = "tsv";
 
-    private static final Pattern legalTopicNamesPattern = Pattern.compile("[a-zA-Z0-9\\._\\-]+");
+    // We don't allow period in topic names because we construct URIs using it
+    private static final Pattern legalTopicNamesPattern = Pattern.compile("[a-zA-Z0-9\\_-]+");
     private static final int topicMaxNameLength = 255;
 
     private final URI m_uri;
@@ -151,12 +152,12 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     {
        String brokers = props.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
-            throw new RuntimeException("Missing kafka broker");
+            throw new IllegalArgumentException("Missing kafka broker");
         }
         String key = getBrokerKey(brokers);
         List<String> brokerList = Arrays.asList(brokers.split("\\s*,\\s*"));
         if (brokerList == null || brokerList.isEmpty()) {
-            throw new RuntimeException("Missing kafka broker");
+            throw new IllegalArgumentException("Missing kafka broker");
         }
         List<HostAndPort> hapList = new ArrayList<HostAndPort>();
         for (String broker : brokerList) {
@@ -164,23 +165,23 @@ public class KafkaStreamImporterConfig implements ImporterConfig
             hapList.add(hap);
         }
         if (hapList.isEmpty()) {
-            throw new RuntimeException("Missing or misconfigured kafka broker list. See brokers property");
+            throw new IllegalArgumentException("Missing or misconfigured kafka broker list. See brokers property");
         }
 
         String procedure = props.getProperty("procedure", "").trim();
         if (procedure.isEmpty()) {
-            throw new RuntimeException("Missing procedure.");
+            throw new IllegalArgumentException("Missing procedure.");
         }
 
         String formatter = props.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
         if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
-            throw new RuntimeException("Invalid formatter: " + formatter);
+            throw new IllegalArgumentException("Invalid formatter: " + formatter);
         }
 
         //comma separated list of topics.
         String topics = props.getProperty("topics", "").trim();
         if (topics.isEmpty()) {
-            throw new RuntimeException("Missing topic(s).");
+            throw new IllegalArgumentException("Missing topic(s).");
         }
 
         String groupId = props.getProperty("groupid", GROUP_ID).trim();
@@ -190,20 +191,17 @@ public class KafkaStreamImporterConfig implements ImporterConfig
 
         List<String> ttopicList = Arrays.asList(topics.split("\\s*,\\s*"));
         if (ttopicList == null || ttopicList.isEmpty()) {
-            throw new RuntimeException("Missing topic(s).");
+            throw new IllegalArgumentException("Missing topic(s).");
         }
 
         Map<URI, ImporterConfig> configs = new HashMap<>();
         for (String topic : ttopicList) {
-            if (topic.contains("..") || topic.contains(".")) {
-                throw new RuntimeException("topic name cannot be \".\" or \"..\"");
-            }
             if (topic.length() > topicMaxNameLength) {
-                throw new RuntimeException("topic name is illegal, can't be longer than "
+                throw new IllegalArgumentException("topic name is illegal, can't be longer than "
                         + topicMaxNameLength + " characters");
             }
             if (!legalTopicNamesPattern.matcher(topic).matches()) {
-                throw new RuntimeException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '.', '_' and '-'");
+                throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
                 configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, formatter, soTimeout, fetchSize));
