@@ -15,17 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importer.transformer;
+package org.voltdb.importer.formatter;
 
-import java.nio.ByteBuffer;
 import java.util.Properties;
 
-public abstract class AbstractTransformer {
-    public void configure(Properties p) {
+public interface AbstractFormatter {
+    public void configure(Properties p);
 
-    };
-
-    public Object[] transform(ByteBuffer b) throws Exception {
-        return null;
-    };
+    public Object[] transform(Object b) throws FormatException;
 }

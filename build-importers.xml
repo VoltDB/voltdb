@@ -5,7 +5,7 @@
 <property name='build.dir'        location='obj/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
-    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, builtintransformer"/>
+    <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, volt-formatter"/>
 
     <resources id="default.imports.resource">
         <string>org.osgi.framework;version=&quot;[1.6,2)&quot;</string>
@@ -95,16 +95,17 @@
         </jar>
     </target>
 
-    <target name="builtintransformer">
+    <target name="volt-formatter">
         <mkdir dir="${bundles.dir}" />
-        <jar destfile="${bundles.dir}/builtintransformer.jar" basedir="${build.prod.dir}">
-            <include name="org/voltdb/importer/transformer/builtin/SimpleTransformer.class"/>
+        <jar destfile="${bundles.dir}/volt-formatter.jar" basedir="${build.prod.dir}">
+            <include name="org/voltdb/importer/formatter/builtin/VoltFormatter.class"/>
+            <include name="org/voltdb/importer/formatter/builtin/FormatterFactory.class"/>
             <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importer.transformer.builtin.SimpleTransformer" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.FormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
-                <attribute name="Bundle-Name" value="Builtin Transformer OSGi Bundle" />
-                <attribute name="Bundle-SymbolicName" value="BuiltinTransformer" />
+                <attribute name="Bundle-Name" value="Builtin Formatter OSGi Bundle" />
+                <attribute name="Bundle-SymbolicName" value="VoltFormatter" />
                 <attribute name="Bundle-Version" value="1.0.0" />
                 <attribute name="DynamicImport-Package" value="*" />
             </manifest>

@@ -15,34 +15,19 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importer.transformer.builtin;
+package org.voltdb.importer.formatter.builtin;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
-import org.osgi.framework.BundleActivator;
-import org.osgi.framework.BundleContext;
 import org.voltdb.common.Constants;
-import org.voltdb.importer.transformer.AbstractTransformer;
+import org.voltdb.importer.formatter.AbstractFormatter;
+import org.voltdb.importer.formatter.FormatException;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
-public class SimpleTransformer extends AbstractTransformer implements BundleActivator {
+public class VoltFormatter implements AbstractFormatter {
     String m_format;
-    Boolean m_strictQuote;
-
-    @Override
-    public void start(BundleContext context) throws Exception {
-        context.registerService(this.getClass().getName(), this, null);
-    }
-
-    @Override
-    public void stop(BundleContext context) throws Exception {
-        //Do any bundle related cleanup.
-    }
-
 
     @Override
     public void configure(Properties p) {
@@ -53,18 +38,24 @@ public class SimpleTransformer extends AbstractTransformer implements BundleActi
     };
 
     @Override
-    public Object[] transform(ByteBuffer b) throws IOException {
-        String line = new String(b.array(),b.arrayOffset(),b.limit(),StandardCharsets.UTF_8);
-        Object list[] = new CSVParser("csv".equalsIgnoreCase(m_format) ? ',' : '\t').parseLine(line);
-        if (list != null) {
-            for (int i = 0; i < list.length; i++) {
-                if ("NULL".equals(list[i])
-                        || Constants.CSV_NULL.equals(list[i])
-                        || Constants.QUOTED_CSV_NULL.equals(list[i])) {
-                    list[i] = null;
+    public Object[] transform(Object b) throws FormatException {
+        if (b == null || !b.getClass().equals(String.class))
+            throw new FormatException("Transform takes an argument of type String.");
+        String line = (String) b;
+        try {
+            Object list[] = new CSVParser("csv".equalsIgnoreCase(m_format) ? ',' : '\t').parseLine(line);
+            if (list != null) {
+                for (int i = 0; i < list.length; i++) {
+                    if ("NULL".equals(list[i])
+                            || Constants.CSV_NULL.equals(list[i])
+                            || Constants.QUOTED_CSV_NULL.equals(list[i])) {
+                        list[i] = null;
+                    }
                 }
             }
+            return list;
+        } catch (IOException e) {
+            throw new FormatException(e);
         }
-        return list;
     }
 }

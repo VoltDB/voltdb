@@ -26,7 +26,6 @@ package org.voltdb.importer;
 import static org.voltcore.common.Constants.VOLT_TMP_DIR;
 
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -42,7 +41,9 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
-import org.voltdb.importer.transformer.AbstractTransformer;
+import org.voltdb.importer.formatter.AbstractFormatter;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.FormatException;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
@@ -50,7 +51,7 @@ import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
-public class TestBuiltinTransformer extends TestCase {
+public class TestVoltFormatter extends TestCase {
     private Bundle m_bundle;
     private Framework m_framework;
     private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
@@ -68,7 +69,7 @@ public class TestBuiltinTransformer extends TestCase {
                 .add("org.voltcore.network")
                 .add("org.voltcore.logging")
                 .add("org.voltdb.importer")
-                .add("org.voltdb.importer.transformer")
+                .add("org.voltdb.importer.formatter")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")
                 .add("org.slf4j")
@@ -92,36 +93,76 @@ public class TestBuiltinTransformer extends TestCase {
         FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
         m_framework = frameworkFactory.newFramework(m_frameworkProps);
         m_framework.start();
-        m_bundle = m_framework.getBundleContext().installBundle("file:/home/dweiss/dev/voltdb/bundles/builtintransformer.jar");
+        m_bundle = m_framework.getBundleContext().installBundle("file:" + System.getProperty("user.dir") + "/bundles/volt-formatter.jar");
         m_bundle.start();
     }
 
     @Test
     public void testCSVBundle() throws Exception {
         ServiceReference refs[] = m_bundle.getRegisteredServices();
-        ServiceReference<AbstractTransformer> reference = refs[0];
-        AbstractTransformer o = m_bundle.getBundleContext().getService(reference);
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("format", "csv");
-        o.configure(prop);
-        ByteBuffer input = ByteBuffer.wrap("12,10.05,test".getBytes());
-        Object[] results = o.transform(input);
+        AbstractFormatter formatter = o.create(prop);
+        Object[] results = formatter.transform("12,10.05,test");
         assertEquals(results.length, 3);
-
     }
 
     @Test
     public void testTSVBundle() throws Exception {
         ServiceReference refs[] = m_bundle.getRegisteredServices();
-        ServiceReference<AbstractTransformer> reference = refs[0];
-        AbstractTransformer o = m_bundle.getBundleContext().getService(reference);
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         prop.setProperty("format", "tsv");
-        o.configure(prop);
-        ByteBuffer input = ByteBuffer.wrap("12\t10.05\ttest".getBytes());
-        Object[] results = o.transform(input);
+        AbstractFormatter formatter = o.create(prop);
+        Object[] results = formatter.transform("12\t10.05\ttest");
         assertEquals(results.length, 3);
+    }
 
+    @Test
+    public void testBadFormat() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("format", "badformat");
+        try {
+            o.create(prop);
+            fail();
+        } catch (RuntimeException e) {
+        }
+    }
+
+    @Test
+    public void testNullTransform() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("format", "csv");
+        AbstractFormatter formatter = o.create(prop);
+        try {
+            formatter.transform(null);
+            fail();
+        } catch (FormatException e) {
+        }
+    }
+
+    @Test
+    public void testNonStringTransform() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("format", "csv");
+        AbstractFormatter formatter = o.create(prop);
+        try {
+            formatter.transform(12345);
+            fail();
+        } catch (FormatException e) {
+        }
     }
 
     @After
