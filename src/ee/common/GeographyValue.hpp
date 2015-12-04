@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef EE_COMMON_GEOGRAPHY_HPP
-#define EE_COMMON_GEOGRAPHY_HPP
+#ifndef EE_COMMON_GEOGRAPHY_VALUE_HPP
+#define EE_COMMON_GEOGRAPHY_VALUE_HPP
 
 #include <memory>
 #include <sstream>
@@ -25,16 +25,15 @@
 #include "boost/foreach.hpp"
 #include "boost/functional/hash.hpp"
 
-#include "common/Point.hpp"
 #include "common/serializeio.h"
 #include "common/value_defs.h"
-
+#include "GeographyPointValue.hpp"
 #include "s2geo/s2loop.h"
 #include "s2geo/s2polygon.h"
 
 namespace voltdb {
 
-class Geography;
+class GeographyValue;
 
 /**
  * A subclass of S2Loop that allows instances to be initialized from
@@ -77,7 +76,7 @@ public:
 
     void init(std::vector<std::unique_ptr<S2Loop> > *loops);
 
-    void initFromGeography(const Geography& geog);
+    void initFromGeography(const GeographyValue& geog);
 
     template<class Deserializer>
     void initFromBuffer(Deserializer& input);
@@ -90,7 +89,7 @@ public:
 
     static std::size_t serializedLengthNoLoops();
 
-    double getDistance(const Point &point) {
+    double getDistance(const GeographyPointValue &point) {
         const S2Point s2Point = point.toS2Point();
         S1Angle distanceRadians = S1Angle(Project(s2Point), s2Point);
         return distanceRadians.radians();
@@ -106,17 +105,17 @@ public:
  * pointer accepted by the constructor here should be to the start of
  * the data just after the length.
  */
-class Geography {
+class GeographyValue {
 public:
 
     /** Constructor for a null geography */
-    Geography()
+    GeographyValue()
         : m_data(NULL)
         , m_length(0)
     {
     }
 
-    Geography(void* data, int32_t length)
+    GeographyValue(void* data, int32_t length)
         : m_data(static_cast<char*>(data))
         , m_length(length)
     {
@@ -140,7 +139,7 @@ public:
     /**
      * Do a comparison with another geography (polygon).
      */
-    int compareWith(const Geography& rhs) const;
+    int compareWith(const GeographyValue& rhs) const;
 
     /**
      * Serialize this geography
@@ -237,7 +236,7 @@ private:
     char* m_cursor;
 };
 
-inline int Geography::compareWith(const Geography& rhs) const {
+inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
     /* Do floating-point comparisons only as a last resort to help
      * avoid issues with floating-point math.  It doesn't really
      * matter how we do our comparison as long as we produce a
@@ -304,7 +303,7 @@ inline int Geography::compareWith(const Geography& rhs) const {
 }
 
 
-inline void Geography::hashCombine(std::size_t& seed) const {
+inline void GeographyValue::hashCombine(std::size_t& seed) const {
 
     if (isNull()) {
         // Treat a null as a polygon with zero loops
@@ -328,7 +327,7 @@ inline void Geography::hashCombine(std::size_t& seed) const {
     }
 }
 
-inline std::string Geography::toString() const {
+inline std::string GeographyValue::toString() const {
     std::ostringstream oss;
 
     if (isNull()) {
@@ -350,7 +349,7 @@ inline std::string Geography::toString() const {
 }
 
 template<class Deserializer>
-inline void Geography::deserializeFrom(Deserializer& input,
+inline void GeographyValue::deserializeFrom(Deserializer& input,
                                        char* storage,
                                        int32_t length)
 {
@@ -359,7 +358,7 @@ inline void Geography::deserializeFrom(Deserializer& input,
 }
 
 template<class Serializer>
-inline void Geography::serializeTo(Serializer& output) const
+inline void GeographyValue::serializeTo(Serializer& output) const
 {
     ReferenceSerializeInputLE input(m_data, m_length);
     Polygon::copyViaSerializers(output, input);
@@ -572,7 +571,7 @@ static inline void DeleteLoopsInVector(vector<S2Loop*>* loops) {
   loops->clear();
 }
 
-inline void Polygon::initFromGeography(const Geography& geog)
+inline void Polygon::initFromGeography(const GeographyValue& geog)
 {
     ReferenceSerializeInputLE input(geog.data(), geog.length());
     initFromBuffer(input);
@@ -624,4 +623,4 @@ void Polygon::saveToBuffer(Serializer& output) const {
 
 } // end namespace voltdb
 
-#endif // EE_COMMON_GEOGRAPHY_HPP
+#endif // EE_COMMON_GEOGRAPHY_VALUE_HPP

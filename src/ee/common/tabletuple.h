@@ -490,7 +490,7 @@ private:
               }
               return (size_t)0;
           case VALUE_TYPE_POINT:
-              return sizeof (Point);
+              return sizeof (GeographyPointValue);
           default:
             // let caller handle this error
             throwDynamicSQLException(

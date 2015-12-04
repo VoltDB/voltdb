@@ -238,16 +238,15 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("pointfromtext", Type.VOLT_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
+            new FunctionId("pointfromtext", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
-
             new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
-                    new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_POINT },
+                    new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_GEOGRAPHY_POINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                     Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
@@ -265,14 +264,14 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("latitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LATITUDE, -1,
-                    new Type[] { Type.VOLT_POINT },
+                    new Type[] { Type.VOLT_GEOGRAPHY_POINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("longitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LONGITUDE, -1,
-                    new Type[] { Type.VOLT_POINT },
+                    new Type[] { Type.VOLT_GEOGRAPHY_POINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("centroid", Type.VOLT_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
+            new FunctionId("centroid", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
@@ -498,8 +497,8 @@ public class FunctionForVoltDB extends FunctionSQL {
                 // todo: throw exception indicating the type invalid type
                 throw Error.error(ErrorCode.X_42561);
             }
-            else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isPointType()) ||
-                     (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isPointType())) {
+            else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isGeographyPointType()) ||
+                     (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isGeographyPointType())) {
                 // either of the nodes is not a valid type
                 throw Error.error(ErrorCode.X_42565,
                         "The distance function is only able to compute point-to-point, point-to-polygon " +
@@ -507,7 +506,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
                 // distance between two polygons is not supported, flag as an error
                 throw Error.error(ErrorCode.X_42565, "Distance between two polygons not supported");
-            } else if (nodes[0].dataType.isPointType() && nodes[1].dataType.isGeographyType()) {
+            } else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
                 // distance between polygon-to-point and point-to-polygon is symmetric.
                 // So, update the the expression for distance between point and polygon to
                 // distance between polygon and point. This simplifies the logic and have to

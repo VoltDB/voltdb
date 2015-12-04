@@ -48,8 +48,8 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
@@ -727,7 +727,7 @@ public class RegressionSuite extends TestCase {
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
     }
 
-    public static void assertEquals(String msg, PointType expected, PointType actual) {
+    public static void assertEquals(String msg, GeographyPointValue expected, GeographyPointValue actual) {
             assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
     }
     /**
@@ -739,7 +739,7 @@ public class RegressionSuite extends TestCase {
      * @param expected
      * @param actual
      */
-    public static void assertApproximatelyEquals(String msg, PointType expected, PointType actual, double epsilon) {
+    public static void assertApproximatelyEquals(String msg, GeographyPointValue expected, GeographyPointValue actual, double epsilon) {
         if (epsilon > 0) {
             assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), epsilon);
             assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), epsilon);
@@ -749,7 +749,7 @@ public class RegressionSuite extends TestCase {
         }
     }
 
-    public static void assertEquals(PointType expected, PointType actual) {
+    public static void assertEquals(GeographyPointValue expected, GeographyPointValue actual) {
         assertEquals("Points not equal: ", expected, actual);
     }
 
@@ -788,25 +788,25 @@ public class RegressionSuite extends TestCase {
             fail(msg + " found null value when non-null expected");
         }
 
-        List<List<PointType>> expectedLoops = expected.getLoops();
-        List<List<PointType>> actualLoops = actual.getLoops();
+        List<List<GeographyPointValue>> expectedLoops = expected.getLoops();
+        List<List<GeographyPointValue>> actualLoops = actual.getLoops();
 
         assertEquals(msg + "wrong number of loops, expected " + expectedLoops.size() + ", "
                 + "got " + actualLoops.size(),
                 expectedLoops.size(), actualLoops.size());
 
         int loopCtr = 0;
-        Iterator<List<PointType>> expectedLoopIt = expectedLoops.iterator();
-        for (List<PointType> actualLoop : actualLoops) {
-            List<PointType> expectedLoop = expectedLoopIt.next();
+        Iterator<List<GeographyPointValue>> expectedLoopIt = expectedLoops.iterator();
+        for (List<GeographyPointValue> actualLoop : actualLoops) {
+            List<GeographyPointValue> expectedLoop = expectedLoopIt.next();
             assertEquals(msg + loopCtr + "th loop should have " + expectedLoop.size()
                     + " vertices, but has " + actualLoop.size(),
                     expectedLoop.size(), actualLoop.size());
 
             int vertexCtr = 0;
-            Iterator<PointType> expectedVertexIt = expectedLoop.iterator();
-            for (PointType actualPt : actualLoop) {
-                PointType expectedPt = expectedVertexIt.next();
+            Iterator<GeographyPointValue> expectedVertexIt = expectedLoop.iterator();
+            for (GeographyPointValue actualPt : actualLoop) {
+                GeographyPointValue expectedPt = expectedVertexIt.next();
                 String prefix = msg + "at loop " + loopCtr + ", vertex " + vertexCtr;
                 assertApproximatelyEquals(prefix, expectedPt, actualPt, epsilon);
                 ++vertexCtr;
@@ -832,7 +832,7 @@ public class RegressionSuite extends TestCase {
                 actualRow.get(i,  vt);
                 assertTrue(msg, actualRow.wasNull());
             }
-            else if (expectedObj instanceof PointType) {
+            else if (expectedObj instanceof GeographyPointValue) {
                 assertEquals(msg, expectedObj, actualRow.getPoint(i));
             }
             else if (expectedObj instanceof GeographyValue) {
@@ -856,9 +856,12 @@ public class RegressionSuite extends TestCase {
                     actualValue = Double.MIN_VALUE;
                 }
                 if (epsilon <= 0) {
-                    assertEquals(msg, expectedValue, actualValue);
+                    String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
+                    assertEquals(fullMsg, expectedValue, actualValue);
                 } else {
-                    assertTrue(msg, Math.abs(expectedValue - actualValue) < epsilon);
+                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
+                                                         Math.abs(expectedValue - actualValue), epsilon);
+                    assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
                 }
             }
             else if (expectedObj instanceof String) {

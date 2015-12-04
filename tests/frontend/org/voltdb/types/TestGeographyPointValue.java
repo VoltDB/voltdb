@@ -28,13 +28,13 @@ import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
-public class TestPointType extends TestCase {
+public class TestGeographyPointValue extends TestCase {
     // Points should have this much precision.
     private final double EPSILON = 1.0e-15;
 
     private void assertConstructorThrows(String expectedMessage, double lat, double lng) {
         try {
-            new PointType(lat, lng);
+            new GeographyPointValue(lat, lng);
             fail("Expected constructor to throw an exception");
     }
         catch (IllegalArgumentException iae) {
@@ -44,14 +44,14 @@ public class TestPointType extends TestCase {
     }
 
     public void testPointCtor() {
-        assertEquals(16, PointType.getLengthInBytes());
+        assertEquals(16, GeographyPointValue.getLengthInBytes());
 
-        PointType point = new PointType(10.333, 20.666);
+        GeographyPointValue point = new GeographyPointValue(10.333, 20.666);
         assertEquals(10.333, point.getLatitude(), EPSILON);
         assertEquals(20.666, point.getLongitude(), EPSILON);
 
         assertTrue(point.equals(point));
-        assertFalse(point.equals(new PointType(0.0, 10.0)));
+        assertFalse(point.equals(new GeographyPointValue(0.0, 10.0)));
 
         assertEquals("POINT (10.333 20.666)", point.toString());
 
@@ -65,7 +65,7 @@ public class TestPointType extends TestCase {
 
     public void testPointSerialization() {
 
-        int len = PointType.getLengthInBytes();
+        int len = GeographyPointValue.getLengthInBytes();
         assertEquals(16, len);
 
         ByteBuffer bb = ByteBuffer.allocate(len);
@@ -74,16 +74,16 @@ public class TestPointType extends TestCase {
 
         // Test deserialization
         bb.position(0);
-        PointType pt = PointType.unflattenFromBuffer(bb);
+        GeographyPointValue pt = GeographyPointValue.unflattenFromBuffer(bb);
         assertEquals("POINT (33.0 45.0)", pt.toString());
 
         // Test deserialization with offset argument
         bb.position(0);
-        pt = PointType.unflattenFromBuffer(bb, 0);
+        pt = GeographyPointValue.unflattenFromBuffer(bb, 0);
         assertEquals("POINT (33.0 45.0)", pt.toString());
 
         // Test serialization
-        pt = new PointType(-64.0, -77.0);
+        pt = new GeographyPointValue(-64.0, -77.0);
         bb.position(0);
         pt.flattenToBuffer(bb);
         bb.position(0);
@@ -92,7 +92,7 @@ public class TestPointType extends TestCase {
 
         // Null serialization puts 360.0 in both lat and long
         bb.position(0);
-        PointType.serializeNull(bb);
+        GeographyPointValue.serializeNull(bb);
         bb.position(0);
         assertEquals(360.0, bb.getDouble());
         assertEquals(360.0, bb.getDouble());
@@ -100,7 +100,7 @@ public class TestPointType extends TestCase {
 
     private void testOnePointFromFactory(String aWKT, double aLatitude, double aLongitude, double aEpsilon, String aErrMsg) {
         try {
-            PointType point = PointType.pointFromText(aWKT);
+            GeographyPointValue point = GeographyPointValue.geographyPointFromText(aWKT);
             assertEquals(aLatitude, point.getLatitude(), aEpsilon);
             if (aErrMsg != null) {
                 assertTrue(String.format("Expected error message matching \"%s\", but got no error.", aErrMsg), aErrMsg == null);

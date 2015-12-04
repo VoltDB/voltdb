@@ -35,18 +35,18 @@ public class TestGeographyValue extends TestCase {
     public void testGeographyValuePositive() {
         GeographyValue geog;
         // The Bermuda Triangle
-        List<PointType> outerLoop = Arrays.asList(
-                new PointType(32.305, -64.751),
-                new PointType(25.244, -80.437),
-                new PointType(18.476, -66.371),
-                new PointType(32.305, -64.751));
+        List<GeographyPointValue> outerLoop = Arrays.asList(
+                new GeographyPointValue(32.305, -64.751),
+                new GeographyPointValue(25.244, -80.437),
+                new GeographyPointValue(18.476, -66.371),
+                new GeographyPointValue(32.305, -64.751));
 
         // A triangular hole
-        List<PointType> innerLoop = Arrays.asList(
-                new PointType(28.066, -68.874),
-                new PointType(25.361, -68.855),
-                new PointType(28.376, -73.381),
-                new PointType(28.066, -68.874));
+        List<GeographyPointValue> innerLoop = Arrays.asList(
+                new GeographyPointValue(28.066, -68.874),
+                new GeographyPointValue(25.361, -68.855),
+                new GeographyPointValue(28.376, -73.381),
+                new GeographyPointValue(28.066, -68.874));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
         assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
@@ -81,12 +81,12 @@ public class TestGeographyValue extends TestCase {
     }
 
     public void testGeographyValueNegativeCases() {
-        List<PointType> outerLoop = new ArrayList<PointType>();
-        outerLoop.add(new PointType(32.305, -64.751));
-        outerLoop.add(new PointType(25.244, -80.437));
-        outerLoop.add(new PointType(18.476, -66.371));
-        outerLoop.add(new PointType(20.305, -76.751));
-        outerLoop.add(new PointType(32.305, -64.751));
+        List<GeographyPointValue> outerLoop = new ArrayList<GeographyPointValue>();
+        outerLoop.add(new GeographyPointValue(32.305, -64.751));
+        outerLoop.add(new GeographyPointValue(25.244, -80.437));
+        outerLoop.add(new GeographyPointValue(18.476, -66.371));
+        outerLoop.add(new GeographyPointValue(20.305, -76.751));
+        outerLoop.add(new GeographyPointValue(32.305, -64.751));
         GeographyValue geoValue;
         // start with valid loop
         geoValue = new GeographyValue(Arrays.asList(outerLoop));
@@ -179,7 +179,7 @@ public class TestGeographyValue extends TestCase {
      * S2, 3-dimensinal point and then back again is less than 1.0e-13.
      *
      * We sample the sphere, looking at NUM_PTS X NUM_PTS pairs.  At each pair, <m, n>,
-     * we calculate a latitude and longitude, convert the PointType with this latitude and
+     * we calculate a latitude and longitude, convert the GeographyPointValue with this latitude and
      * longitude to an XYZPoint, and then back.  We then take the maximum error over the
      * entire sphere.
      *
@@ -210,10 +210,10 @@ public class TestGeographyValue extends TestCase {
             double latitude = ycoord*(90.0/NUM_PTS);
             for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
                 double longitude = xcoord*(180.0/NUM_PTS);
-                PointType PT_point = new PointType(latitude, longitude);
+                GeographyPointValue PT_point = new GeographyPointValue(latitude, longitude);
                 for (int idx = 0; idx < NUMBER_TRANSFORMS; idx += 1) {
-                    GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromPointType(PT_point);
-                    PT_point = xyz_point.toPointType();
+                    GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromGeographyPointValue(PT_point);
+                    PT_point = xyz_point.toGeographyPointValue();
                     double laterr = Math.abs(latitude-PT_point.getLatitude());
                     double lngerr = Math.abs(longitude-PT_point.getLongitude());
                     if (laterr > max_latitude_error) {
