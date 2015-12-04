@@ -2282,12 +2282,17 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
+        vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[a-z]', 'iiccii') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]') > 0").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(20, vt.asScalarLong());
+
         boolean expectedExceptionThrowed = false;
         try {
             client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0");
+            assertFalse("Expected exception for illegal regular expression in regexp_position.", true);
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("illegal pattern string"));
+            assertTrue(e.getClientResponse().getStatusString().contains("Regular Expression Compilation Error: missing closing parenthesis"));
             expectedExceptionThrowed = true;
         }
         assertTrue(expectedExceptionThrowed);
@@ -2295,9 +2300,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         expectedExceptionThrowed = false;
         try {
             client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0");
+            assertFalse("Expected exception for illegal match flag in regexp_position.", true);
         } catch (ProcCallException e) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("illegal match flags"));
+            assertTrue(e.getClientResponse().getStatusString().contains("Illegal Match Flags"));
             expectedExceptionThrowed = true;
         }
         assertTrue(expectedExceptionThrowed);

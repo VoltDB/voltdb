@@ -23,7 +23,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/locale.hpp>
 #include <boost/scoped_array.hpp>
-#include <boost/regex.hpp>
+
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <string.h>
+#include <boost/shared_ptr.hpp>
+#include "pcre2.h"
 
 #include <iostream>
 #include <sstream>
@@ -637,6 +641,14 @@ template<> inline NValue NValue::call<FUNC_VOLT_FORMAT_CURRENCY>(const std::vect
     return getTempStringValue(rv.c_str(), rv.length());
 }
 
+static std::string pcre2_error_code_message(int error_code, std::string prefix)
+{
+    unsigned char buffer[1024];
+    /* This function really wants an unsigned char buffer, but std::string wants signed characters. */
+    pcre2_get_error_message(error_code, buffer, sizeof(buffer));
+    return std::string("Regular Expression Compilation Error: ") + reinterpret_cast<char *>(buffer);
+}
+
 /** Implement the VoltDB SQL function regexp_position for re-based pattern matching */
 template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2 || arguments.size() == 3);
@@ -657,8 +669,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
         throwCastSQLException(pat.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    boost::regex_constants::syntax_option_type syntaxOpts = boost::regex_constants::normal;
-    boost::match_flag_type matchFlags = boost::match_default;
+    uint32_t syntaxOpts = PCRE2_UTF;
 
     if (arguments.size() == 3) {
         const NValue& flags = arguments[2];
@@ -675,42 +686,75 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
             for(std::string::iterator it = flagStr.begin(); it != flagStr.end(); ++it) {
                 switch (*it) {
                     case 'c':
+                        syntaxOpts &= ~PCRE2_CASELESS;
                         break;
                     case 'i':
-                        syntaxOpts |= boost::regex_constants::icase;
+                        syntaxOpts |= PCRE2_CASELESS;
                         break;
                     default:
-                        throw SQLException(SQLException::data_exception_invalid_parameter, "illegal match flags");
+                        throw SQLException(SQLException::data_exception_invalid_parameter, "Regular Expression Compilation Error: Illegal Match Flags");
                 }
             }
         }
     }
 
-    char* sourceChars = reinterpret_cast<char*>(source.getObjectValue_withoutNull());
-    int32_t lenSource = source.getObjectLength_withoutNull();
-    std::string sourceStr(sourceChars, lenSource);
+    const unsigned char* sourceChars = reinterpret_cast<const unsigned char*>(source.getObjectValue_withoutNull());
+    unsigned int lenSource = source.getObjectLength_withoutNull();
+    const unsigned char* patChars = reinterpret_cast<const unsigned char*>(pat.getObjectValue_withoutNull());
+    unsigned int lenPat = pat.getObjectLength_withoutNull();
+    // Compile the pattern.
 
-    char* patChars = reinterpret_cast<char*>(pat.getObjectValue_withoutNull());
-    int32_t lenPat = pat.getObjectLength_withoutNull();
-    std::string patStr(patChars, lenPat);
-
-    try {
-        boost::regex patExpr(patStr, syntaxOpts);
-        boost::sregex_iterator rit(sourceStr.begin(), sourceStr.end(), patExpr, matchFlags);
-        boost::sregex_iterator rend;
-
-        if (rit != rend) {
-            return getBigIntValue(getCharLength(sourceStr.c_str(), rit->position()) + 1);
-        } else {
+    int error_code = 0;
+    PCRE2_SIZE error_offset = 0;
+    /*
+     * Note: We use a shared_ptr here, even though nothing is really shared.
+     *       We want to make sure the deleter, pcre2_code_free, is called when
+     *       this goes out of scope.  Scoped_ptr is a better choice here,
+     *       but it will not allow a custom deleter.  Unique_ptr is an even
+     *       better choice, but without C++11 move semantics this is not
+     *       really implementable, and this is a C++03 code.  So we are
+     *       stuck with shared_ptr.  The overhead is a reference count,
+     *       and an increment and decrement.  This is pretty small
+     *       compared with regular expression compilation and matching,
+     *       so it's not likely to be expensive.
+     */
+    boost::shared_ptr<pcre2_code> pattern ( pcre2_compile(patChars,
+                                                          lenPat,
+                                                          syntaxOpts,
+                                                          &error_code,
+                                                          &error_offset,
+                                                          NULL), pcre2_code_free );
+    if (pattern.get() == NULL) {
+        std::string emsg = pcre2_error_code_message(error_code, "Regular Expression Compilation Error: ");
+        throw SQLException(SQLException::data_exception_invalid_parameter, emsg.c_str());
+    }
+    /*
+     * We use a shared_ptr for the same reasons as above.
+     */
+    boost::shared_ptr<pcre2_match_data> match_data(pcre2_match_data_create_from_pattern(pattern.get(), NULL),
+                                                   pcre2_match_data_free);
+    if (match_data.get() == NULL) {
+        throw SQLException(SQLException::data_exception_invalid_parameter, "Internal error: Cannot create PCRE2 match data.");
+    }
+    unsigned int matchFlags = 0;
+    error_code = pcre2_match(pattern.get(),
+                      sourceChars,
+                      lenSource,
+                      0ul,
+                      matchFlags,
+                      match_data.get(),
+                      NULL);
+    if (error_code < 0) {
+        if (error_code == PCRE2_ERROR_NOMATCH) {
             return getBigIntValue(0);
         }
-    } catch (boost::regex_error& e) {
-        throw SQLException(SQLException::data_exception_invalid_parameter, "illegal pattern string");
-    } catch (std::runtime_error& e) {
-        throw SQLException(SQLException::dynamic_sql_error, "Pattern input to REGEXP_POSITION is malformed to cause runtime performance issues.");
+        std::string emsg = pcre2_error_code_message(error_code, "Regular Expression Matching Error: ");
+        throw SQLException(SQLException::data_exception_invalid_parameter, emsg.c_str());
     }
+    PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data.get());
+    unsigned long position = ovector[0];
+    return getBigIntValue(getCharLength(reinterpret_cast<const char *>(sourceChars), position) + 1);
 }
-
 }
 
 #endif /* STRINGFUNCTIONS_H */
