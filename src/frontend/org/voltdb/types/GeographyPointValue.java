@@ -22,7 +22,7 @@ import java.text.DecimalFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class PointType {
+public class GeographyPointValue {
     //
     // It's slightly hard to see this in the actual pattern
     // definition, but the pattern we want to match, ignoring space, is:
@@ -56,16 +56,16 @@ public class PointType {
     // VoltTable.)
     static final double NULL_COORD = 360.0;
 
-    public PointType(double latitude, double longitude) {
+    public GeographyPointValue(double latitude, double longitude) {
         m_latitude = latitude;
         m_longitude = longitude;
 
         if (m_latitude < -90.0 || m_latitude > 90.0) {
-            throw new IllegalArgumentException("Latitude out of range in PointType constructor");
+            throw new IllegalArgumentException("Latitude out of range in GeographyPointValue constructor");
         }
 
         if (m_longitude < -180.0 || m_longitude > 180.0) {
-            throw new IllegalArgumentException("Longitude out of range in PointType constructor");
+            throw new IllegalArgumentException("Longitude out of range in GeographyPointValue constructor");
         }
     }
 
@@ -73,12 +73,12 @@ public class PointType {
         return Double.parseDouble(aInt + "." + (aFrac == null ? "0" : aFrac));
     }
     /**
-     * Create a PointType from a WellKnownText string.
+     * Create a GeographyPointValue from a WellKnownText string.
      * @param param
      */
-    public static PointType pointFromText(String param) {
+    public static GeographyPointValue geographyPointFromText(String param) {
         if (param == null) {
-            throw new IllegalArgumentException("Null well known text argument to PointType constructor.");
+            throw new IllegalArgumentException("Null well known text argument to GeographyPointValue constructor.");
         }
         Matcher m = wktPattern.matcher(param);
         if (m.find()) {
@@ -90,9 +90,9 @@ public class PointType {
             if (Math.abs(longitude) > 180.0) {
                 throw new IllegalArgumentException(String.format("Longitude \"%f\" out of bounds.", longitude));
             }
-            return new PointType(latitude, longitude);
+            return new GeographyPointValue(latitude, longitude);
         } else {
-            throw new IllegalArgumentException("Cannot construct PointType value from \"" + param + "\"");
+            throw new IllegalArgumentException("Cannot construct GeographyPointValue value from \"" + param + "\"");
         }
     }
 
@@ -113,6 +113,7 @@ public class PointType {
 
     @Override
     public String toString() {
+        // This is not GEOGRAPY_POINT.  This is wkt syntax.
         return "POINT (" + formatLatLng() + ")";
     }
 
@@ -120,11 +121,11 @@ public class PointType {
     // longitude.
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof PointType)) {
+        if (!(o instanceof GeographyPointValue)) {
             return false;
         }
 
-        PointType that = (PointType)o;
+        GeographyPointValue that = (GeographyPointValue)o;
 
         if (that.getLatitude() != getLatitude()) {
             return false;
@@ -153,9 +154,9 @@ public class PointType {
      * Deserialize a point type from a byte buffer
      * @param inBuffer
      * @param offset    offset of point data in buffer
-     * @return a new instance of PointType
+     * @return a new instance of GeographyPointValue
      */
-    public static PointType unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
+    public static GeographyPointValue unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
         double lat = inBuffer.getDouble(offset);
         double lng = inBuffer.getDouble(offset + BYTES_IN_A_COORD);
         if (lat == 360.0 && lng == 360.0) {
@@ -163,16 +164,16 @@ public class PointType {
             return null;
         }
 
-        return new PointType(lat, lng);
+        return new GeographyPointValue(lat, lng);
     }
 
     /**
      * Deserialize a point type from a byte buffer
      * @param inBuffer
      * @param offset    offset of point data in buffer
-     * @return a new instance of PointType
+     * @return a new instance of GeographyPointValue
      */
-    public static PointType unflattenFromBuffer(ByteBuffer inBuffer) {
+    public static GeographyPointValue unflattenFromBuffer(ByteBuffer inBuffer) {
         double lat = inBuffer.getDouble();
         double lng = inBuffer.getDouble();
         if (lat == 360.0 && lng == 360.0) {
@@ -180,7 +181,7 @@ public class PointType {
             return null;
         }
 
-        return new PointType(lat, lng);
+        return new GeographyPointValue(lat, lng);
     }
 
     /**

@@ -37,8 +37,6 @@
 #include "catalog/catalog.h"
 #include "common/ExportSerializeIo.h"
 #include "common/FatalException.hpp"
-#include "common/Point.hpp"
-#include "common/Geography.hpp"
 #include "common/MiscUtil.h"
 #include "common/Pool.hpp"
 #include "common/SQLException.h"
@@ -47,6 +45,8 @@
 #include "common/serializeio.h"
 #include "common/types.h"
 #include "common/value_defs.h"
+#include "GeographyPointValue.hpp"
+#include "GeographyValue.hpp"
 #include "utf8.h"
 #include "murmur3/MurmurHash3.h"
 
@@ -1002,28 +1002,28 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
-    Point& getPoint() {
+    GeographyPointValue& getPoint() {
         assert(getValueType() == VALUE_TYPE_POINT);
-        return *reinterpret_cast<Point*>(m_data);
+        return *reinterpret_cast<GeographyPointValue*>(m_data);
     }
 
-    const Point& getPoint() const {
+    const GeographyPointValue& getPoint() const {
 
-        BOOST_STATIC_ASSERT_MSG(sizeof(Point) <= sizeof(m_data),
+        BOOST_STATIC_ASSERT_MSG(sizeof(GeographyPointValue) <= sizeof(m_data),
                                 "Size of Point is too large for NValue m_data");
 
         assert(getValueType() == VALUE_TYPE_POINT);
-        return *reinterpret_cast<const Point*>(m_data);
+        return *reinterpret_cast<const GeographyPointValue*>(m_data);
     }
 
-    const Geography getGeography() const {
+    const GeographyValue getGeography() const {
         assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
 
         if (isNull()) {
-            return Geography();
+            return GeographyValue();
         }
 
-        return Geography(getObjectValue_withoutNull(),
+        return GeographyValue(getObjectValue_withoutNull(),
                          getObjectLength_withoutNull());
     }
 
@@ -2553,7 +2553,7 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
       case VALUE_TYPE_BOOLEAN:
         return sizeof(bool);
       case VALUE_TYPE_POINT:
-        return sizeof(Point);
+        return sizeof(GeographyPointValue);
       default:
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
@@ -2681,7 +2681,7 @@ inline void NValue::setNull() {
         getDecimal().SetMin();
         break;
     case VALUE_TYPE_POINT:
-        getPoint() = Point();
+        getPoint() = GeographyPointValue();
         break;
     default: {
         throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
@@ -2809,7 +2809,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     }
     case VALUE_TYPE_POINT:
     {
-        retval.getPoint() = *reinterpret_cast<const Point*>(storage);
+        retval.getPoint() = *reinterpret_cast<const GeographyPointValue*>(storage);
         break;
     }
     default:
@@ -2854,7 +2854,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         ::memcpy(storage, m_data, sizeof(TTInt));
         break;
     case VALUE_TYPE_POINT:
-        ::memcpy(storage, m_data, sizeof(Point));
+        ::memcpy(storage, m_data, sizeof(GeographyPointValue));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -2926,7 +2926,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
         ::memcpy( storage, m_data, sizeof(TTInt));
         break;
     case VALUE_TYPE_POINT:
-        ::memcpy( storage, m_data, sizeof(Point));
+        ::memcpy( storage, m_data, sizeof(GeographyPointValue));
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -3000,7 +3000,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         *reinterpret_cast<double* >(storage) = input.readDouble();
         break;
     case VALUE_TYPE_POINT:
-        *reinterpret_cast<Point*>(storage) = Point::deserializeFrom(input);
+        *reinterpret_cast<GeographyPointValue*>(storage) = GeographyPointValue::deserializeFrom(input);
         break;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
@@ -3050,7 +3050,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 ::memcpy(copy + lengthLength, data, length);
             }
             else {
-                Geography::deserializeFrom(input, copy + lengthLength, length);
+                GeographyValue::deserializeFrom(input, copy + lengthLength, length);
             }
             *reinterpret_cast<StringRef**>(storage) = sref;
         }
@@ -3160,7 +3160,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         }
         else {
             // We need to do byteswapping to serialize here.
-            Geography::deserializeFrom(input, storage, length);
+            GeographyValue::deserializeFrom(input, storage, length);
         }
         break;
     }
@@ -3170,7 +3170,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         break;
     }
     case VALUE_TYPE_POINT: {
-        getPoint() = Point::deserializeFrom(input);
+        getPoint() = GeographyPointValue::deserializeFrom(input);
         break;
     }
     case VALUE_TYPE_NULL: {

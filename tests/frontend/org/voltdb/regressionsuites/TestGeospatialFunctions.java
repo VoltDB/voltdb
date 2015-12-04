@@ -28,10 +28,18 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 
 public class TestGeospatialFunctions extends RegressionSuite {
+    /*
+     * Distances are within these tolerances.
+     */
+    public final double GEOGRAPHY_DISTANCE_EPSILON = 1.0e-8;
+    /*
+     * The other operations have this tolerance.
+     */
+    public final double GEOGRAPHY_CENTROID_EPSILON = 1.0e-3;
 
     public TestGeospatialFunctions(String name) {
         super(name);
@@ -98,34 +106,36 @@ public class TestGeospatialFunctions extends RegressionSuite {
        new Borders(3, "Wonderland", null)
     };
     private static void populateTables(Client client) throws Exception {
+        // Note: These are all WellKnownText strings.  So they should
+        //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
         client.callProcedure("places.Insert", 0, "Denver",
-                PointType.pointFromText("POINT(39.704 -104.959)"));
+                GeographyPointValue.geographyPointFromText("POINT(39.704 -104.959)"));
         client.callProcedure("places.Insert", 1, "Albuquerque",
-                PointType.pointFromText("POINT(35.113 -106.599)"));
+                GeographyPointValue.geographyPointFromText("POINT(35.113 -106.599)"));
         client.callProcedure("places.Insert", 2, "Cheyenne",
-                PointType.pointFromText("POINT(41.134 -104.813)"));
+                GeographyPointValue.geographyPointFromText("POINT(41.134 -104.813)"));
         client.callProcedure("places.Insert", 3, "Fort Collins",
-                PointType.pointFromText("POINT(40.585 -105.077)"));
+                GeographyPointValue.geographyPointFromText("POINT(40.585 -105.077)"));
         client.callProcedure("places.Insert", 4, "Point near N Colorado border",
-                PointType.pointFromText("POINT(41.002 -105.04)"));
+                GeographyPointValue.geographyPointFromText("POINT(41.002 -105.04)"));
         client.callProcedure("places.Insert", 5, "Point Not On N Colorado Border",
-                PointType.pointFromText("POINT(41.005 -109.025)"));
+                GeographyPointValue.geographyPointFromText("POINT(41.005 -109.025)"));
         client.callProcedure("places.Insert", 6, "Point on N Wyoming Border",
-                PointType.pointFromText("POINT(44.978 -105.058)"));
+                GeographyPointValue.geographyPointFromText("POINT(44.978 -105.058)"));
         client.callProcedure("places.Insert", 7, "North Point Not On Wyoming Border",
-                PointType.pointFromText("POINT(45.119 -105.060)"));
+                GeographyPointValue.geographyPointFromText("POINT(45.119 -105.060)"));
         client.callProcedure("places.Insert", 8, "Point on E Wyoming Border",
-                PointType.pointFromText("POINT(42.988 -104.078)"));
+                GeographyPointValue.geographyPointFromText("POINT(42.988 -104.078)"));
         client.callProcedure("places.Insert", 9, "East Point Not On Wyoming Border",
-                PointType.pointFromText("POINT(42.986 -104.061)"));
+                GeographyPointValue.geographyPointFromText("POINT(42.986 -104.061)"));
         client.callProcedure("places.Insert", 10, "Point On S Wyoming Border",
-                PointType.pointFromText("POINT(41.099 -110.998)"));
+                GeographyPointValue.geographyPointFromText("POINT(41.099 -110.998)"));
         client.callProcedure("places.Insert", 11, "Point On S Colorado Border",
-                PointType.pointFromText("POINT(37.002 -103.008)"));
+                GeographyPointValue.geographyPointFromText("POINT(37.002 -103.008)"));
         client.callProcedure("places.Insert", 12, "Point On W Wyoming Border",
-                PointType.pointFromText("POINT(42.999 -110.998)"));
+                GeographyPointValue.geographyPointFromText("POINT(42.999 -110.998)"));
         client.callProcedure("places.Insert", 13, "West not On South Wyoming Border",
-                PointType.pointFromText("POINT(41.999 -111.052)"));
+                GeographyPointValue.geographyPointFromText("POINT(41.999 -111.052)"));
 
         // A null-valued point
         client.callProcedure("places.Insert", 99, "Neverwhere", null);
@@ -288,13 +298,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // used for polygon are close approximations, not exact, values of the state vertices).
         // Area for Colorado - 269601 sq km and Wyoming 253350 sq km
         // For centroid, the value in table is based on the answer provide by S2 for the given polygons
-        assertContentOfTable(new Object[][]
+        assertApproximateContentOfTable(new Object[][]
                 {{ "Colorado",      2.6886542912139893E11,  39.03372408765194,      -105.5485 },
                  { "Wyoming",       2.5126863189309894E11,  43.01953179182205,      -107.55349999999999 },
                  { "Colorado with a hole around Denver",
                                     2.5206603914764166E11,  38.98811213712535,      -105.5929789796371 },
                  { "Wonderland",    Double.MIN_VALUE,       Double.MIN_VALUE,       Double.MIN_VALUE},
-                }, vt);
+                }, vt, GEOGRAPHY_CENTROID_EPSILON);
     }
 
     public void testPolygonPointDistance() throws Exception {
@@ -308,7 +318,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where borders.pk = 1"
                 + "order by distance, places.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertContentOfTable(new Object[][]
+        assertApproximateContentOfTable(new Object[][]
                 {{"Wyoming",    "Neverwhere",                       Double.MIN_VALUE},
                  {"Wyoming",    "Cheyenne",                         0.0},
                  {"Wyoming",    "Point on N Wyoming Border",        0.0},
@@ -325,7 +335,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Wyoming",    "Point On S Colorado Border",       453545.4800250064},
                  {"Wyoming",    "Albuquerque",                      659769.4012428687}
 
-                }, vt);
+                }, vt, GEOGRAPHY_DISTANCE_EPSILON);
 
         // Validate result set obtained using distance between point and polygon is same as
         // distance between polygon and point
@@ -346,7 +356,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where contains(borders.region, places.loc) "
                 + "order by distance";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        assertContentOfTable(new Object[][]
+        assertApproximateContentOfTable(new Object[][]
                 {{"Colorado",   "Denver",                               90126.31686125314},
                  {"Colorado",   "Fort Collins",                         177132.44115469826},
                  {"Colorado with a hole around Denver", "Fort Collins", 182956.3035588355},
@@ -358,7 +368,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Wyoming",    "Point on N Wyoming Border",            295383.69047235645},
                  {"Wyoming",    "Cheyenne",                             308378.4910583776},
                  {"Wyoming",    "Point On S Wyoming Border",            355573.95574694296}
-                }, vt);
+                }, vt, GEOGRAPHY_DISTANCE_EPSILON);
 
         // distance between polygon and polygon - currently not supported and should generate
         // exception saying incompatible data type supplied
@@ -407,7 +417,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 "CREATE TABLE places (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  name VARCHAR(64),\n"
-                + "  loc POINT\n"
+                + "  loc GEOGRAPHY_POINT\n"
                 + ");\n"
                 + "CREATE TABLE borders (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"

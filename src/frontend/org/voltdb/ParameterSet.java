@@ -29,8 +29,8 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
@@ -151,8 +151,8 @@ public class ParameterSet implements JSONString {
                             }
                         }
                         break;
-                    case POINT:
-                        size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck() * ((PointType[])obj).length;
+                    case GEOGRAPHY_POINT:
+                        size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck() * ((GeographyPointValue[])obj).length;
                         break;
                     case GEOGRAPHY:
                         for (GeographyValue gv : (GeographyValue[])obj) {
@@ -182,7 +182,7 @@ public class ParameterSet implements JSONString {
                 continue;
             }
             else if (obj == VoltType.NULL_POINT) {
-                size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck();
+                size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck();
                 continue;
             }
             else if (obj == VoltType.NULL_GEOGRAPHY) {
@@ -221,8 +221,8 @@ public class ParameterSet implements JSONString {
                 case DECIMAL:
                     size += 16;
                     break;
-                case POINT:
-                    size += VoltType.POINT.getLengthInBytesForFixedTypesWithoutCheck();
+                case GEOGRAPHY_POINT:
+                    size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck();
                     break;
                 case GEOGRAPHY:
                     size += 4 + ((GeographyValue) obj).getLengthInBytes();
@@ -369,14 +369,14 @@ public class ParameterSet implements JSONString {
             else if (array[i] instanceof String) strings++;
             else if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) nulls++;
             else if (null == array[i]) nulls++;  // Handle nulls in an Object array.  Note only support nulls in STRING type, later we'll reject all other null usage.
-            else if (array[i] instanceof PointType
+            else if (array[i] instanceof GeographyPointValue
                     || array[i] instanceof GeographyValue
                     || array[i] == VoltType.NULL_POINT
                     || array[i] == VoltType.NULL_GEOGRAPHY) {
                 // Ticket ENG-9311 exists to make geo types work with Object[] arrays passed as parameters.
                 // Fixing that ticket will require updating the logic below.
-                throw new RuntimeException("PointType or GeographyValue instances are not yet supported in "
-                        + "Object arrays passed as parameters.  Try passing PointType[] or GeographyValue[] instead.");
+                throw new RuntimeException("GeographyPointValue or GeographyValue instances are not yet supported in "
+                        + "Object arrays passed as parameters.  Try passing GeographyPointValue[] or GeographyValue[] instead.");
             }
             else {
                 String msg = String.format("Type %s not supported in parameter set arrays.",
@@ -600,8 +600,8 @@ public class ParameterSet implements JSONString {
                     }
                     break;
                 }
-                case POINT :
-                    value = PointType.unflattenFromBuffer(in);
+                case GEOGRAPHY_POINT :
+                    value = GeographyPointValue.unflattenFromBuffer(in);
                     if (value == null) {
                         value = VoltType.NULL_POINT;
                     }
@@ -724,8 +724,8 @@ public class ParameterSet implements JSONString {
                     case VARBINARY:
                         SerializationHelper.writeArray((byte[][]) obj, buf);
                         break;
-                    case POINT:
-                        SerializationHelper.writeArray((PointType[]) obj, buf);
+                    case GEOGRAPHY_POINT:
+                        SerializationHelper.writeArray((GeographyPointValue[]) obj, buf);
                         break;
                     case GEOGRAPHY:
                         SerializationHelper.writeArray((GeographyValue[]) obj, buf);
@@ -753,8 +753,8 @@ public class ParameterSet implements JSONString {
                 continue;
             }
             else if (obj == VoltType.NULL_POINT) {
-                    buf.put(VoltType.POINT.getValue());
-                    PointType.serializeNull(buf);
+                    buf.put(VoltType.GEOGRAPHY_POINT.getValue());
+                    GeographyPointValue.serializeNull(buf);
                     continue;
             }
             else if (obj == VoltType.NULL_GEOGRAPHY) {
@@ -810,8 +810,8 @@ public class ParameterSet implements JSONString {
                 case VOLTTABLE:
                     ((VoltTable)obj).flattenToBuffer(buf);
                     break;
-                case POINT:
-                    ((PointType)obj).flattenToBuffer(buf);
+                case GEOGRAPHY_POINT:
+                    ((GeographyPointValue)obj).flattenToBuffer(buf);
                     break;
                 case GEOGRAPHY:
                     GeographyValue gv = (GeographyValue)obj;
