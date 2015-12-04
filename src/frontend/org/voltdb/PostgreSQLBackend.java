@@ -262,6 +262,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
      * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
      * as a whole.
+     *
      * @param query - the query text (DDL, DML or DQL) to be transformed.
      * @param queryPattern - the Pattern to be detected and modified, within
      * the query.
@@ -370,7 +371,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * such a way that PostgreSQL results will match VoltDB results, generally
      * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
      * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
-     * as a whole.
+     * as a whole.<p>
+     * This simpler version leaves out the arguments that are usually not
+     * needed, and just calls the complete version with those arguments set
+     * to <b>null</b>.
+     *
      * @param query - the query text (DDL, DML or DQL) to be transformed.
      * @param queryPattern - the Pattern to be detected and modified, within
      * the query.
@@ -411,7 +416,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * such a way that PostgreSQL results will match VoltDB results, generally
      * by adding a <i>prefix</i> and/or <i>suffix</i>, either to individual
      * <i>groups</i> within the <i>queryPattern</i>, or to the <i>queryPattern</i>
-     * as a whole.
+     * as a whole.<p>
+     * This version includes the <i>multiplier</i> and <i>minimum</i> arguments,
+     * but leaves out the ones that are usually not needed with those, and then
+     * calls the complete version with the latter set to <b>null</b>.
+     *
      * @param query - the query text (DDL, DML or DQL) to be transformed.
      * @param queryPattern - the Pattern to be detected and modified, within
      * the query.
