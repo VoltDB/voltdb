@@ -47,6 +47,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 public class ImporterLifeCycleManager implements ChannelChangeCallback
 {
     private final static VoltLogger s_logger = new VoltLogger("ImporterTypeManager");
+    public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
     private final AbstractImporterFactory m_factory;
     private ListeningExecutorService m_executorService;
@@ -98,7 +99,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                 5_000,
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<Runnable>(),
-                getThreadFactory(m_factory.getTypeName(), ImportHandlerProxy.MEDIUM_STACK_SIZE)
+                getThreadFactory(m_factory.getTypeName(), MEDIUM_STACK_SIZE)
                 );
         tpe.allowCoreThreadTimeOut(true);
 

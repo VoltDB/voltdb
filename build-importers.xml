@@ -52,9 +52,9 @@
     <target name="log4jsocketimporter">
         <antcall target="osgibundle">
             <param name="bundle.name" value="log4jsocketimporter"/>
-            <param name="activator" value="org.voltdb.importclient.Log4jSocketHandlerImporter"/>
+            <param name="activator" value="org.voltdb.importclient.log4j.Log4jSocketImporterFactory"/>
             <param name="bundle.displayname" value="Log4jSocketImporter"/>
-            <param name="include.classpattern" value="Log4jSocket*.class"/>
+            <param name="include.classpattern" value="log4j/*.class"/>
         </antcall>
     </target>
 
