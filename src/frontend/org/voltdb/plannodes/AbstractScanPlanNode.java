@@ -275,48 +275,51 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // happen
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null)
-        {
+        if (proj != null) {
             // Does this operation needs to change complex expressions
             // into tuple value expressions with an column alias?
             // Is this always true for clone?  Or do we need a new method?
             m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
-        else
-        {
-            if (m_tableScanSchema.size() != 0)
-            {
-                // Order the scan columns according to the table schema
-                // before we stick them in the projection output
-                List<TupleValueExpression> scan_tves =
+        else if (m_tableScanSchema.size() != 0 && m_isInline == false) {
+            // Order the scan columns according to the table schema
+            // before we stick them in the projection output
+            List<TupleValueExpression> scan_tves =
                     new ArrayList<TupleValueExpression>();
-                for (SchemaColumn col : m_tableScanSchema.getColumns())
-                {
-                    assert(col.getExpression() instanceof TupleValueExpression);
-                    scan_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
-                }
-                // and update their indexes against the table schema
-                for (TupleValueExpression tve : scan_tves)
-                {
-                    int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-                    tve.setColumnIndex(index);
-                }
-                m_tableScanSchema.sortByTveIndex();
-                // Create inline projection to map table outputs to scan outputs
-                ProjectionPlanNode projectionNode = new ProjectionPlanNode();
-                projectionNode.setOutputSchema(m_tableScanSchema);
-                addInlinePlanNode(projectionNode);
-                // a bit redundant but logically consistent
-                m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
-                m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
-            }
-            else
+            for (SchemaColumn col : m_tableScanSchema.getColumns())
             {
-                // just fill m_outputSchema with the table's columns
-                m_outputSchema = m_tableSchema.clone();
-                m_hasSignificantOutputSchema = true;
+                assert(col.getExpression() instanceof TupleValueExpression);
+                scan_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
             }
+            // and update their indexes against the table schema
+            for (TupleValueExpression tve : scan_tves)
+            {
+                int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
+                tve.setColumnIndex(index);
+            }
+            m_tableScanSchema.sortByTveIndex();
+            // Create inline projection to map table outputs to scan outputs
+            ProjectionPlanNode projectionNode = new ProjectionPlanNode();
+            projectionNode.setOutputSchema(m_tableScanSchema);
+            addInlinePlanNode(projectionNode);
+            // a bit redundant but logically consistent
+            m_outputSchema = projectionNode.getOutputSchema().copyAndReplaceWithTVE();
+            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
+        }
+        else {
+            // We come here if this node is an inline scan node, or if m_tableScanSchema is empty.
+            //
+            // If this scan node is inlined into another node, then there is no output temp
+            // table for this node, so the output schema will be the same as the table being scanned.
+            //
+            // m_tableScanSchema might be empty for cases like
+            //   select now from table;
+            // where there are no columns in the table that are accessed.
+            //
+            // Just fill m_outputSchema with the table's columns.
+            m_outputSchema = m_tableSchema.clone();
+            m_hasSignificantOutputSchema = true;
         }
 
         // Generate the output schema for subqueries
