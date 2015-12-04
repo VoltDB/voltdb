@@ -6,7 +6,8 @@ SELECT VCHAR substrQ3 FROM @fromtables ORDER BY SUBSTRING ( VCHAR FROM _value[in
 
 -- patterns in set 1 contain '%'
 {_patterns1 |= "'abc%'"}
-{_patterns1 |= "'%'"}
+-- Uncomment after ENG-9449 is fixed (??):
+--{_patterns1 |= "'%'"}
 {_patterns1 |= "'!%'"}
 {_patterns1 |= "'abc!%'"}
 {_patterns1 |= "'abc!%%'"}

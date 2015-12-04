@@ -24,7 +24,7 @@
 
 {
     "SOURCE_P1": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -32,7 +32,7 @@
         "indexes": ("ID")
         },
     "SOURCE_P2": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -40,7 +40,7 @@
         "indexes": ("ID")
         },
     "SOURCE_R1": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
@@ -48,7 +48,7 @@
         "indexes": ("ID")
         },
     "TARGET_P1": {
-        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+        "columns": (("VCHAR", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
