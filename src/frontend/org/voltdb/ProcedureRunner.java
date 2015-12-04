@@ -864,7 +864,7 @@ public class ProcedureRunner {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
             } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
-            } else if (type == VoltType.POINT) {
+            } else if (type == VoltType.GEOGRAPHY_POINT) {
                 args[ii] = VoltType.NULL_POINT;
             } else if (type == VoltType.GEOGRAPHY) {
                 args[ii] = VoltType.NULL_GEOGRAPHY;
