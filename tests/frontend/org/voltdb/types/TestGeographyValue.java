@@ -56,7 +56,7 @@ public class TestGeographyValue extends TestCase {
         geog = new GeographyValue("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066,-68.855 25.361, -73.381 28.376, -68.874 28.066))");
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-68.874 28.066,-68.855 25.361, -73.381 28.376, -68.874 28.066))",
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
@@ -73,7 +73,7 @@ public class TestGeographyValue extends TestCase {
         // Try the absolute version of unflattening
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
-        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, 32.305  -64.751, "
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(77, buf.position());
@@ -92,14 +92,14 @@ public class TestGeographyValue extends TestCase {
         assertEquals(expected, canonicalizeWkt("PoLyGoN((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
 
         // Parsing is whitespace-insensitive
-        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (   32.305  -64.751 ,   25.244  -80.437 ,   18.476  -66.371 ,   32.305   -64.751 )  ) "));
+        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (   -64.751 32.305  ,   -80.437   25.244  ,   -66.371  18.476  ,   -64.751 32.305   )  ) "));
         assertEquals(expected, canonicalizeWkt("\nPOLYGON\n(\n(\n-64.751\n32.305\n,\n-80.437\n25.244\n,\n-66.371\n18.476\n,-64.751\n32.305\n)\n)\n"));
         assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t-64.751\t32.305\t,\t-80.437\t25.244\t,\t-66.371\t18.476\t,\t-64.751\t32.305\t)\t)\t"));
 
         // Parsing with more than one loop should work the same.
         expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066 ))";
-        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n-64.751\n32.305   ,    25.244\t-80.437\n, -66.371 18.476,-64.751\t\t\t32.305   ),\t "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))";
+        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n, -66.371 18.476,-64.751\t\t\t32.305   ),\t "
                 + "(\n-68.874 28.066,\t    -68.855\n25.361\n,      -73.381\t28.376,\n\n-68.874\t28.066\t)\n)\t"));
     }
 

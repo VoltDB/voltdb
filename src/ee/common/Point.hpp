@@ -44,7 +44,7 @@ public:
     {
     }
 
-    Point(Coord latitude, Coord longitude)
+    Point(Coord longitude, Coord latitude)
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
@@ -124,13 +124,13 @@ public:
 
     template<class Deserializer>
     static Point deserializeFrom(Deserializer& input) {
-        Coord lat = input.readDouble();
         Coord lng = input.readDouble();
+        Coord lat = input.readDouble();
         if (lat == nullCoord() && lng == nullCoord()) {
             return Point();
         }
 
-        return Point(lat, lng);
+        return Point(lng, lat);
     }
 
     template<class Serializer>

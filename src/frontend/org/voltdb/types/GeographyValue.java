@@ -118,12 +118,12 @@ public class GeographyValue {
 
             sb.append("(");
             for (XYZPoint xyz : loop) {
-                sb.append(xyz.toPointType().formatLatLng());
+                sb.append(xyz.toPointType().formatLngLat());
                 sb.append(", ");
             }
 
             // Repeat the first vertex to close the loop as WKT requires.
-            sb.append(loop.get(0).toPointType().formatLatLng());
+            sb.append(loop.get(0).toPointType().formatLngLat());
             sb.append(")");
         }
 

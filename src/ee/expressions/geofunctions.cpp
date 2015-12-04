@@ -102,10 +102,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     ++it;
 
 
-    Point::Coord lat = stringToCoord(POINT, wkt, *it);
+    Point::Coord lng = stringToCoord(POINT, wkt, *it);
     ++it;
 
-    Point::Coord lng = stringToCoord(POINT, wkt, *it);
+    Point::Coord lat = stringToCoord(POINT, wkt, *it);
     ++it;
 
     if (! boost::iequals(*it, ")")) {
@@ -118,7 +118,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     }
 
     NValue returnValue(VALUE_TYPE_POINT);
-    returnValue.getPoint() = Point(lat, lng);
+    returnValue.getPoint() = Point(lng, lat);
 
     return returnValue;
 }
@@ -135,12 +135,14 @@ static void readLoop(const std::string &wkt,
 
     std::vector<S2Point> points;
     while (it != end && *it != ")") {
-        Point::Coord lat = stringToCoord(POLY, wkt, *it);
-        ++it;
-
         Point::Coord lng = stringToCoord(POLY, wkt, *it);
         ++it;
 
+        Point::Coord lat = stringToCoord(POLY, wkt, *it);
+        ++it;
+
+        // Note: This is S2.  It takes latitude, longitude, not
+        //       longitude, latitude.
         points.push_back(S2LatLng::FromDegrees(lat, lng).ToPoint());
 
         if (*it == ",") {

@@ -104,7 +104,7 @@ public class PointType {
         return m_longitude;
     }
 
-    public String formatLatLng() {
+    public String formatLngLat() {
         // Display a maximum of 9 decimal digits after the point.
         // This gives us precision of around 1 mm.
         DecimalFormat df = new DecimalFormat("##0.0########");
@@ -113,7 +113,7 @@ public class PointType {
 
     @Override
     public String toString() {
-        return "POINT (" + formatLatLng() + ")";
+        return "POINT (" + formatLngLat() + ")";
     }
 
     // Returns true for two points that have the same latitude and
