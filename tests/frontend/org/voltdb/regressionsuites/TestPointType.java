@@ -38,9 +38,9 @@ public class TestPointType extends RegressionSuite {
         super(name);
     }
 
-    private static final PointType BEDFORD_PT = new PointType(42.4906, -71.2767);
-    private static final PointType SANTA_CLARA_PT = new PointType(37.3544, -121.9692);
-    private static final PointType LOWELL_PT = new PointType(42.6200, -71.3273);
+    private static final PointType BEDFORD_PT = new PointType(-71.2767, 42.4906);
+    private static final PointType SANTA_CLARA_PT = new PointType(-121.9692, 37.3544);
+    private static final PointType LOWELL_PT = new PointType(-71.3273, 42.6200);
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
@@ -104,7 +104,7 @@ public class TestPointType extends RegressionSuite {
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select pointfromtext('point (42.4906 -71.2767)') from t;").getResults()[0];
+                "select pointfromtext('point (-71.2767 42.4906)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
         PointType pt = vt.getPoint(0);
         assertFalse(vt.wasNull());
@@ -241,8 +241,8 @@ public class TestPointType extends RegressionSuite {
 
         fillTable(client, 0);
 
-        final PointType CAMBRIDGE_PT = new PointType(42.3736, -71.1106);
-        final PointType SAN_JOSE_PT = new PointType(37.3362, -121.8906);
+        final PointType CAMBRIDGE_PT = new PointType(-71.1106, 42.3736);
+        final PointType SAN_JOSE_PT = new PointType(-121.8906, 37.3362);
 
         validateTableOfScalarLongs(client,
                 "update t set "
@@ -295,7 +295,7 @@ public class TestPointType extends RegressionSuite {
                 "CONSTRAINT VIOLATION");
 
         validateTableOfScalarLongs(client,
-                "insert into t_not_null (pk, name, pt) values (0, 'Singapore', pointfromtext('point(1.2905 103.8521)'))",
+                "insert into t_not_null (pk, name, pt) values (0, 'Singapore', pointfromtext('point(103.8521 1.2905)'))",
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
@@ -303,7 +303,7 @@ public class TestPointType extends RegressionSuite {
                 .getResults()[0];
 
         assertContentOfTable (new Object[][] {
-                {0, "Singapore", new PointType(1.2905, 103.8521)}},
+                {0, "Singapore", new PointType(103.8521, 1.2905)}},
                 vt);
     }
 

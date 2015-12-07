@@ -120,12 +120,12 @@ public class GeographyValue {
 
             sb.append("(");
             for (XYZPoint xyz : loop) {
-                sb.append(xyz.toPointType().formatLatLng());
+                sb.append(xyz.toPointType().formatLngLat());
                 sb.append(", ");
             }
 
             // Repeat the first vertex to close the loop as WKT requires.
-            sb.append(loop.get(0).toPointType().formatLatLng());
+            sb.append(loop.get(0).toPointType().formatLngLat());
             sb.append(")");
         }
 
@@ -292,7 +292,7 @@ public class GeographyValue {
 
             double latDegrees = latRadians * (180 / Math.PI);
             double lngDegrees = lngRadians * (180 / Math.PI);
-            return new PointType(latDegrees, lngDegrees);
+            return new PointType(lngDegrees, latDegrees);
         }
 
         @Override
@@ -470,13 +470,13 @@ public class GeographyValue {
                         throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
                     }
 
-                    double lat = tokenizer.nval;
+                    double lng = tokenizer.nval;
                     token = tokenizer.nextToken();
                     if (token != StreamTokenizer.TT_NUMBER) {
                         throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
                     }
-                    double lng = tokenizer.nval;
-                    currentLoop.add(XYZPoint.fromPointType(new PointType(lat, lng)));
+                    double lat = tokenizer.nval;
+                    currentLoop.add(XYZPoint.fromPointType(new PointType(lng, lat)));
 
                     token = tokenizer.nextToken();
                     if (token != ',') {

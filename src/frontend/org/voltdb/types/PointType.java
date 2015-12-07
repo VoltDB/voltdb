@@ -56,7 +56,7 @@ public class PointType {
     // VoltTable.)
     static final double NULL_COORD = 360.0;
 
-    public PointType(double latitude, double longitude) {
+    public PointType(double longitude, double latitude) {
         m_latitude = latitude;
         m_longitude = longitude;
 
@@ -82,15 +82,15 @@ public class PointType {
         }
         Matcher m = wktPattern.matcher(param);
         if (m.find()) {
-            double latitude  = toDouble(m.group(1), m.group(2));
-            double longitude = toDouble(m.group(3), m.group(4));
+            double longitude  = toDouble(m.group(1), m.group(2));
+            double latitude = toDouble(m.group(3), m.group(4));
             if (Math.abs(latitude) > 90.0) {
                 throw new IllegalArgumentException(String.format("Latitude \"%f\" out of bounds.", latitude));
             }
             if (Math.abs(longitude) > 180.0) {
                 throw new IllegalArgumentException(String.format("Longitude \"%f\" out of bounds.", longitude));
             }
-            return new PointType(latitude, longitude);
+            return new PointType(longitude, latitude);
         } else {
             throw new IllegalArgumentException("Cannot construct PointType value from \"" + param + "\"");
         }
@@ -104,16 +104,16 @@ public class PointType {
         return m_longitude;
     }
 
-    public String formatLatLng() {
+    public String formatLngLat() {
         // Display a maximum of 9 decimal digits after the point.
         // This gives us precision of around 1 mm.
         DecimalFormat df = new DecimalFormat("##0.0########");
-        return df.format(m_latitude) + " " + df.format(m_longitude);
+        return df.format(m_longitude) + " " + df.format(m_latitude);
     }
 
     @Override
     public String toString() {
-        return "POINT (" + formatLatLng() + ")";
+        return "POINT (" + formatLngLat() + ")";
     }
 
     // Returns true for two points that have the same latitude and
@@ -145,8 +145,8 @@ public class PointType {
      * @param buffer
      */
     public void flattenToBuffer(ByteBuffer buffer) {
-        buffer.putDouble(getLatitude());
         buffer.putDouble(getLongitude());
+        buffer.putDouble(getLatitude());
     }
 
     /**
@@ -156,14 +156,14 @@ public class PointType {
      * @return a new instance of PointType
      */
     public static PointType unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
-        double lat = inBuffer.getDouble(offset);
-        double lng = inBuffer.getDouble(offset + BYTES_IN_A_COORD);
+        double lng = inBuffer.getDouble(offset);
+        double lat = inBuffer.getDouble(offset + BYTES_IN_A_COORD);
         if (lat == 360.0 && lng == 360.0) {
             // This is a null point.
             return null;
         }
 
-        return new PointType(lat, lng);
+        return new PointType(lng, lat);
     }
 
     /**
@@ -173,14 +173,14 @@ public class PointType {
      * @return a new instance of PointType
      */
     public static PointType unflattenFromBuffer(ByteBuffer inBuffer) {
-        double lat = inBuffer.getDouble();
         double lng = inBuffer.getDouble();
+        double lat = inBuffer.getDouble();
         if (lat == 360.0 && lng == 360.0) {
             // This is a null point.
             return null;
         }
 
-        return new PointType(lat, lng);
+        return new PointType(lng, lat);
     }
 
     /**

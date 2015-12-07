@@ -36,28 +36,28 @@ public class TestGeographyValue extends TestCase {
         GeographyValue geog;
         // The Bermuda Triangle
         List<PointType> outerLoop = Arrays.asList(
-                new PointType(32.305, -64.751),
-                new PointType(25.244, -80.437),
-                new PointType(18.476, -66.371),
-                new PointType(32.305, -64.751));
+                new PointType(-64.751, 32.305),
+                new PointType(-80.437, 25.244),
+                new PointType(-66.371, 18.476),
+                new PointType(-64.751, 32.305));
 
         // A triangular hole
         List<PointType> innerLoop = Arrays.asList(
-                new PointType(28.066, -68.874),
-                new PointType(25.361, -68.855),
-                new PointType(28.376, -73.381),
-                new PointType(28.066, -68.874));
+                new PointType(-68.874, 28.066),
+                new PointType(-68.855, 25.361),
+                new PointType(-73.381, 28.376),
+                new PointType(-68.874, 28.066));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         // round trip
-        geog = new GeographyValue("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))");
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        geog = new GeographyValue("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066,-68.855 25.361, -73.381 28.376, -68.874 28.066))");
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
@@ -66,16 +66,16 @@ public class TestGeographyValue extends TestCase {
 
         buf.position(0);
         GeographyValue newGeog = GeographyValue.unflattenFromBuffer(buf);
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(270, buf.position());
 
         // Try the absolute version of unflattening
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(77, buf.position());
     }
@@ -144,21 +144,21 @@ public class TestGeographyValue extends TestCase {
     public void testWktParsingPositive() {
 
         // Parsing is case-insensitive
-        String expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))";
-        assertEquals(expected, canonicalizeWkt("Polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
-        assertEquals(expected, canonicalizeWkt("polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
-        assertEquals(expected, canonicalizeWkt("PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+        String expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
+        assertEquals(expected, canonicalizeWkt("Polygon((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
+        assertEquals(expected, canonicalizeWkt("polygon((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
+        assertEquals(expected, canonicalizeWkt("PoLyGoN((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
 
         // Parsing is whitespace-insensitive
-        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305   -64.751  )  ) "));
-        assertEquals(expected, canonicalizeWkt("\nPOLYGON\n(\n(\n32.305\n-64.751\n,\n25.244\n-80.437\n,\n18.476\n-66.371\n,32.305\n-64.751\n)\n)\n"));
-        assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t32.305\t-64.751\t,\t25.244\t-80.437\t,\t18.476\t-66.371\t,\t32.305\t-64.751\t)\t)\t"));
+        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (   -64.751 32.305  ,   -80.437   25.244  ,   -66.371  18.476  ,   -64.751 32.305   )  ) "));
+        assertEquals(expected, canonicalizeWkt("\nPOLYGON\n(\n(\n-64.751\n32.305\n,\n-80.437\n25.244\n,\n-66.371\n18.476\n,-64.751\n32.305\n)\n)\n"));
+        assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t-64.751\t32.305\t,\t-80.437\t25.244\t,\t-66.371\t18.476\t,\t-64.751\t32.305\t)\t)\t"));
 
         // Parsing with more than one loop should work the same.
-        expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
-        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n32.305\n-64.751   ,    25.244\t-80.437\n,18.476-66.371,32.305\t\t\t-64.751   ),\t "
-                + "(\n28.066-68.874,\t25.361    -68.855\n,28.376      -73.381,28.066\n\n-68.874\t)\n)\t"));
+        expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))";
+        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n, -66.371 18.476,-64.751\t\t\t32.305   ),\t "
+                + "(\n-68.874 28.066,\t    -68.855\n25.361\n,      -73.381\t28.376,\n\n-68.874\t28.066\t)\n)\t"));
     }
 
     private void assertWktParseError(String error, String wkt) {
@@ -172,64 +172,6 @@ public class TestGeographyValue extends TestCase {
                     + "in exception message\n"
                     + "  \"" + iae.getMessage() + "\"\n",
                     iae.getMessage().contains(error));
-        }
-    }
-    /**
-     * This tests that the maximum error when we transform a latitude/longitude pair to an
-     * S2, 3-dimensinal point and then back again is less than 1.0e-13.
-     *
-     * We sample the sphere, looking at NUM_PTS X NUM_PTS pairs.  At each pair, <m, n>,
-     * we calculate a latitude and longitude, convert the PointType with this latitude and
-     * longitude to an XYZPoint, and then back.  We then take the maximum error over the
-     * entire sphere.
-     *
-     * Setting NUM_PTS to 2000000 is a very bad idea.
-     *
-     * The error bound is 1.0e-13, which is the value of EPSILON below.  We tested 1.0e-14,
-     * but that fails.
-     *
-     * Note that no conversions from text to floating point happen anywhere here, so that
-     * is not a source of precision loss.  Only calculation cause these precision losses.
-     *
-     * @throws Exception
-     */
-    public void testXYZPoint() throws Exception {
-        final double EPSILON = 1.0e-13;
-        // We transform from latitude, longitude to XYZ this many
-        // times for each point.  This could be set higher.  At about 85, there
-        // is more than 1.0e-13 error.  I leave this at 1, because the test
-        // time burden is somewhat severe at higher numbers.
-        final int    NUMBER_TRANSFORMS = 1;
-        // This has been tested at 10000, but it takes too long.
-        final int NUM_PTS = 2000;
-        final int MIN_PTS = -(NUM_PTS/2);
-        final int MAX_PTS = (NUM_PTS/2);
-        double max_latitude_error = 0;
-        double max_longitude_error = 0;
-        for (int ycoord = MIN_PTS; ycoord <= MAX_PTS; ycoord += 1) {
-            double latitude = ycoord*(90.0/NUM_PTS);
-            for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
-                double longitude = xcoord*(180.0/NUM_PTS);
-                PointType PT_point = new PointType(latitude, longitude);
-                for (int idx = 0; idx < NUMBER_TRANSFORMS; idx += 1) {
-                    GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromPointType(PT_point);
-                    PT_point = xyz_point.toPointType();
-                    double laterr = Math.abs(latitude-PT_point.getLatitude());
-                    double lngerr = Math.abs(longitude-PT_point.getLongitude());
-                    if (laterr > max_latitude_error) {
-                        max_latitude_error = laterr;
-                        assertTrue(String.format("Maximum Latitude Error out of range: error=%e >= epsilon = %e, latitude = %f, num_transforms = %d\n",
-                                                 max_latitude_error, EPSILON, latitude, idx),
-                                max_latitude_error < EPSILON);
-                    }
-                    if (lngerr > max_longitude_error) {
-                        max_longitude_error = lngerr;
-                        assertTrue(String.format("Maximum LongitudeError out of range: error=%e >= epsilon = %e, longitude = %f, num_transforms = %d\n",
-                                                 max_longitude_error, EPSILON, longitude, idx),
-                                   max_longitude_error < EPSILON);
-                    }
-                }
-            }
         }
     }
 
