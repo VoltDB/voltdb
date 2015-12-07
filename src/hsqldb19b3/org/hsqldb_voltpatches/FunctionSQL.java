@@ -2422,8 +2422,8 @@ public class FunctionSQL extends Expression {
 
             // in here the only cases needed to be handled are distance between polygon-to-point
             // and point-to-point.
-            assert(leftChildType.isGeographyType() || leftChildType.isPointType());
-            assert(rightChildType.isPointType());
+            assert(leftChildType.isGeographyType() || leftChildType.isGeographyPointType());
+            assert(rightChildType.isGeographyPointType());
 
             if (leftChildType.isGeographyType()) {
                 distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;

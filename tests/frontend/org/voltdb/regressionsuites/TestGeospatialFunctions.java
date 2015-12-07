@@ -28,10 +28,14 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 
 public class TestGeospatialFunctions extends RegressionSuite {
+    /*
+     * Distances are within these tolerances.
+     */
+    public final double GEOGRAPHY_DISTANCE_EPSILON = 1.0e-8;
 
     public TestGeospatialFunctions(String name) {
         super(name);
@@ -98,34 +102,36 @@ public class TestGeospatialFunctions extends RegressionSuite {
        new Borders(3, "Wonderland", null)
     };
     private static void populateTables(Client client) throws Exception {
+        // Note: These are all WellKnownText strings.  So they should
+        //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
         client.callProcedure("places.Insert", 0, "Denver",
-                PointType.pointFromText("POINT(-104.959 39.704)"));
+                GeographyPointValue.geographyPointFromText("POINT(-104.959 39.704)"));
         client.callProcedure("places.Insert", 1, "Albuquerque",
-                PointType.pointFromText("POINT(-106.599 35.113)"));
+                GeographyPointValue.geographyPointFromText("POINT(-106.599 35.113)"));
         client.callProcedure("places.Insert", 2, "Cheyenne",
-                PointType.pointFromText("POINT(-104.813 41.134)"));
+                GeographyPointValue.geographyPointFromText("POINT(-104.813 41.134)"));
         client.callProcedure("places.Insert", 3, "Fort Collins",
-                PointType.pointFromText("POINT(-105.077 40.585)"));
+                GeographyPointValue.geographyPointFromText("POINT(-105.077 40.585)"));
         client.callProcedure("places.Insert", 4, "Point near N Colorado border",
-                PointType.pointFromText("POINT(-105.04 41.002)"));
+                GeographyPointValue.geographyPointFromText("POINT(-105.04 41.002)"));
         client.callProcedure("places.Insert", 5, "Point Not On N Colorado Border",
-                PointType.pointFromText("POINT(-109.025 41.005)"));
+                GeographyPointValue.geographyPointFromText("POINT(-109.025 41.005)"));
         client.callProcedure("places.Insert", 6, "Point on N Wyoming Border",
-                PointType.pointFromText("POINT(-105.058 44.978)"));
+                GeographyPointValue.geographyPointFromText("POINT(-105.058 44.978)"));
         client.callProcedure("places.Insert", 7, "North Point Not On Wyoming Border",
-                PointType.pointFromText("POINT(-105.060 45.119)"));
+                GeographyPointValue.geographyPointFromText("POINT(-105.060 45.119)"));
         client.callProcedure("places.Insert", 8, "Point on E Wyoming Border",
-                PointType.pointFromText("POINT(-104.078 42.988)"));
+                GeographyPointValue.geographyPointFromText("POINT(-104.078 42.988)"));
         client.callProcedure("places.Insert", 9, "East Point Not On Wyoming Border",
-                PointType.pointFromText("POINT(-104.061 42.986)"));
+                GeographyPointValue.geographyPointFromText("POINT(-104.061 42.986)"));
         client.callProcedure("places.Insert", 10, "Point On S Wyoming Border",
-                PointType.pointFromText("POINT(-110.998 41.099)"));
+                GeographyPointValue.geographyPointFromText("POINT(-110.998 41.099)"));
         client.callProcedure("places.Insert", 11, "Point On S Colorado Border",
-                PointType.pointFromText("POINT(-103.008 37.002)"));
+                GeographyPointValue.geographyPointFromText("POINT(-103.008 37.002)"));
         client.callProcedure("places.Insert", 12, "Point On W Wyoming Border",
-                PointType.pointFromText("POINT(-110.998 42.999)"));
+                GeographyPointValue.geographyPointFromText("POINT(-110.998 42.999)"));
         client.callProcedure("places.Insert", 13, "West not On South Wyoming Border",
-                PointType.pointFromText("POINT(-111.052 41.999)"));
+                GeographyPointValue.geographyPointFromText("POINT(-111.052 41.999)"));
 
         // A null-valued point
         client.callProcedure("places.Insert", 99, "Neverwhere", null);
@@ -427,7 +433,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 "CREATE TABLE places (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  name VARCHAR(64),\n"
-                + "  loc POINT\n"
+                + "  loc GEOGRAPHY_POINT\n"
                 + ");\n"
                 + "CREATE TABLE borders (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"

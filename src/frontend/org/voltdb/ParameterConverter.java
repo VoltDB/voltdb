@@ -27,8 +27,8 @@ import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
-import org.voltdb.types.PointType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -496,19 +496,19 @@ public class ParameterConverter {
                 throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
                         inputClz.getName(), expectedClz.getName()));
             }
-        } else if (expectedClz == PointType.class) {
+        } else if (expectedClz == GeographyPointValue.class) {
             // Is it a point already?  If so, just return it.
-            if (inputClz == PointType.class) {
+            if (inputClz == GeographyPointValue.class) {
                 return param;
             }
             // Is it a string from which we can construct a point?
             // If so, return the newly constructed point.
             if (inputClz == String.class) {
                 try {
-                    PointType pt = PointType.pointFromText((String)param);
+                    GeographyPointValue pt = GeographyPointValue.geographyPointFromText((String)param);
                     return pt;
                 } catch (IllegalArgumentException e) {
-                    throw new VoltTypeException(String.format("deserialize PointType from string failed (string %s)",
+                    throw new VoltTypeException(String.format("deserialize GeographyPointValue from string failed (string %s)",
                                                               (String)param));
                 }
             }

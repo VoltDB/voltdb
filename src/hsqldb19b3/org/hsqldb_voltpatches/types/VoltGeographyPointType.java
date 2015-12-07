@@ -21,18 +21,20 @@ import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.SessionInterface;
 import org.hsqldb_voltpatches.Types;
-import org.hsqldb_voltpatches.OpTypes;
 
-public class VoltPointType extends Type {
+/**
+ * This is the HSQL representation of a VoltDB Geography point.
+ */
+public class VoltGeographyPointType extends Type {
 
-    VoltPointType() {
-        super(Types.VOLT_POINT, // comparison group
-                Types.VOLT_POINT,  // type
+    VoltGeographyPointType() {
+        super(Types.VOLT_GEOGRAPHY_POINT, // comparison group
+                Types.VOLT_GEOGRAPHY_POINT,  // type
                 0, // precision
                 0); // scale
     }
 
-    // The length of "point(<float value> <float value>)"
+    // The length of "geography_point(<float value> <float value>)"
     private static final int DISPLAY_SIZE = String.valueOf(-Float.MAX_VALUE).length() * 2 + 8;
 
     @Override
@@ -42,7 +44,7 @@ public class VoltPointType extends Type {
 
     @Override
     public String getNameString() {
-        return "POINT";
+        return "GEOGRAPHY_POINT";
     }
 
     @Override
@@ -51,7 +53,7 @@ public class VoltPointType extends Type {
     }
 
     @Override
-    public boolean isPointType() {
+    public boolean isGeographyPointType() {
         return true;
     }
 
@@ -64,7 +66,7 @@ public class VoltPointType extends Type {
     @Override
     public Object convertToType(SessionInterface session, Object a, Type type) {
         // We come here when parsing default values.
-        if (type instanceof VoltPointType) {
+        if (type instanceof VoltGeographyPointType) {
             // This is currently unreachable, since there's no way to
             // create a POINT object in a DEFAULT clause given allowable syntax.
             assert(false);
@@ -93,7 +95,7 @@ public class VoltPointType extends Type {
 
     @Override
     public boolean canConvertFrom(Type otherType) {
-        return otherType instanceof VoltPointType;
+        return otherType instanceof VoltGeographyPointType;
     }
 
     @Override

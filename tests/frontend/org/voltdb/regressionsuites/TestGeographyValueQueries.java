@@ -496,7 +496,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
             catch (RuntimeException rte) {
                 // When ENG-9311 is fixed, then we shouldn't get this error and
                 // the procedure call should succeed.
-                assertTrue(rte.getMessage().contains("PointType or GeographyValue instances "
+                assertTrue(rte.getMessage().contains("GeographyPointValue or GeographyValue instances "
                         + "are not yet supported in Object arrays passed as parameters"));
             }
         }
@@ -553,6 +553,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
         assertWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
         assertWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
+        assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
+        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
         assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
         assertWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
         assertWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
@@ -561,6 +563,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         assertWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
         assertWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
         assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
+        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
         assertWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
 
         // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates

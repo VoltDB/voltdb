@@ -44,17 +44,19 @@ public class GeographyValue {
      *
      * @param loops
      */
-    public GeographyValue(List<List<PointType>> loops) {
+    public GeographyValue(List<List<GeographyPointValue>> loops) {
         if (loops == null || loops.size() < 1) {
             throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
         }
 
         m_loops = new ArrayList<List<XYZPoint>>();
-        for (List<PointType> loop : loops) {
+        for (List<GeographyPointValue> loop : loops) {
             List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
-            for (int i = 0; i < (loop.size() - 1); ++i) {
-                oneLoop.add(XYZPoint.fromPointType(loop.get(i)));
+            for (int i = 0; i < loop.size(); ++i) {
+                oneLoop.add(XYZPoint.fromGeographyPointValue(loop.get(i)));
             }
+            diagnoseLoop(oneLoop, "Invalid loop for GeographyValue: ");
+            oneLoop.remove(oneLoop.size() - 1);
             m_loops.add(oneLoop);
         }
     }
@@ -86,13 +88,13 @@ public class GeographyValue {
      * Gets the loops that make up the polygon, with the outer loop first.
      * @return  The loops in the polygon as a list of a list of points
      */
-    public List<List<PointType>> getLoops() {
-        List<List<PointType>> llLoops = new ArrayList<List<PointType>>();
+    public List<List<GeographyPointValue>> getLoops() {
+        List<List<GeographyPointValue>> llLoops = new ArrayList<List<GeographyPointValue>>();
 
         for (List<XYZPoint> xyzLoop : m_loops) {
-            List<PointType> llLoop = new ArrayList<PointType>();
+            List<GeographyPointValue> llLoop = new ArrayList<GeographyPointValue>();
             for (XYZPoint xyz : xyzLoop) {
-                llLoop.add(xyz.toPointType());
+                llLoop.add(xyz.toGeographyPointValue());
             }
             llLoops.add(llLoop);
         }
@@ -118,12 +120,12 @@ public class GeographyValue {
 
             sb.append("(");
             for (XYZPoint xyz : loop) {
-                sb.append(xyz.toPointType().formatLngLat());
+                sb.append(xyz.toGeographyPointValue().formatLngLat());
                 sb.append(", ");
             }
 
             // Repeat the first vertex to close the loop as WKT requires.
-            sb.append(loop.get(0).toPointType().formatLngLat());
+            sb.append(loop.get(0).toGeographyPointValue().formatLngLat());
             sb.append(")");
         }
 
@@ -254,7 +256,7 @@ public class GeographyValue {
         private final double m_y;
         private final double m_z;
 
-        public static XYZPoint fromPointType(PointType pt) {
+        public static XYZPoint fromGeographyPointValue(GeographyPointValue pt) {
             double latRadians = pt.getLatitude() * (Math.PI / 180);  // AKA phi
             double lngRadians = pt.getLongitude() * (Math.PI / 180); // AKA theta
 
@@ -284,13 +286,28 @@ public class GeographyValue {
             return m_z;
         }
 
-        public PointType toPointType() {
+        public GeographyPointValue toGeographyPointValue() {
             double latRadians = Math.atan2(m_z, Math.sqrt(m_x * m_x + m_y * m_y));
             double lngRadians = Math.atan2(m_y, m_x);
 
             double latDegrees = latRadians * (180 / Math.PI);
             double lngDegrees = lngRadians * (180 / Math.PI);
-            return new PointType(lngDegrees, latDegrees);
+            return new GeographyPointValue(lngDegrees, latDegrees);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (!(other instanceof XYZPoint)) {
+                return false;
+            }
+
+            XYZPoint compareTo = (XYZPoint) other;
+
+            if(m_x == compareTo.x() && m_y == compareTo.y() && m_z == compareTo.z()) {
+                return true;
+            }
+
+            return false;
         }
     }
 
@@ -328,10 +345,10 @@ public class GeographyValue {
 
     private static void flattenEmptyBoundToBuffer(ByteBuffer buf) {
         buf.put(INCOMPLETE_ENCODING_FROM_JAVA); // for encoding version
-        buf.putDouble(PointType.NULL_COORD);
-        buf.putDouble(PointType.NULL_COORD);
-        buf.putDouble(PointType.NULL_COORD);
-        buf.putDouble(PointType.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
+        buf.putDouble(GeographyPointValue.NULL_COORD);
     }
 
     private static void flattenLoopToBuffer(List<XYZPoint> loop, ByteBuffer buf) {
@@ -387,6 +404,30 @@ public class GeographyValue {
     }
 
 
+
+    /**
+     * A helper function to validate the loop structure
+     * If loop is invalid, it generates IllegalArgumentException exception
+     */
+
+    private static void diagnoseLoop(List<XYZPoint> loop, String excpMsgPrf) throws IllegalArgumentException {
+        if (loop == null) {
+            throw new IllegalArgumentException(excpMsgPrf + "a polygon must contain at least one ring " +
+                    "(with each ring at least 4 points, including repeated closing vertex)");
+        }
+
+        // 4 vertices = 3 unique vertices for polygon + 1 end point which is same as start point
+        if (loop.size() < 4) {
+            throw new IllegalArgumentException(excpMsgPrf + "a polygon ring must contain at least 4 points " +
+                    "(including repeated closing vertex)");
+        }
+
+        // check if the end points of the loop are equal
+        if (loop.get(0).equals(loop.get(loop.size() - 1)) == false) {
+            throw new IllegalArgumentException(excpMsgPrf + "closing points of ring are not equal");
+        }
+    }
+
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
@@ -435,7 +476,7 @@ public class GeographyValue {
                         throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
                     }
                     double lat = tokenizer.nval;
-                    currentLoop.add(XYZPoint.fromPointType(new PointType(lng, lat)));
+                    currentLoop.add(XYZPoint.fromGeographyPointValue(new GeographyPointValue(lng, lat)));
 
                     token = tokenizer.nextToken();
                     if (token != ',') {
@@ -446,11 +487,8 @@ public class GeographyValue {
                     }
                     break;
                 case ')':
-                    if (currentLoop == null) {
-                        throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
-                    }
-
-                    // We really should check that the last vertex is the same as the first here.
+                    // perform basic validation of loop
+                    diagnoseLoop(currentLoop, msgPrefix);
                     currentLoop.remove(currentLoop.size() - 1);
 
                     loops.add(currentLoop);

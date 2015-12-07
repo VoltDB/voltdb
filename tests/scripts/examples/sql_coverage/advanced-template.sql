@@ -96,11 +96,11 @@ SELECT 52, @optionalfn(@onefun(A._variable[#GB @columntype])) as tag1, A._variab
 -- DISTINCT expression (56 - 65)
 -- basic select template has covered multiple columns distinct
 SELECT DISTINCT @optionalfn(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A 
-SELECT DISTINCT @onefun(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A ORDER BY 1, 2 LIMIT 10 
+SELECT DISTINCT @onefun(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A ORDER BY 1, 2 LIMIT 10
 
 -- Edge case: table aggregate with DISTINCT
 SELECT DISTINCT COUNT(*) FROM @fromtables A 
-SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A 
+SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A
 
 -- DISTINCT on GROUP BY
 SELECT DISTINCT   @agg(@optionalfn(A._variable[@columntype]))                                 FROM @fromtables A GROUP BY         A._variable[@comparabletype]
@@ -122,9 +122,12 @@ UPDATE @dmltable A SET @updatecolumn = @updatesource @aftermath WHERE @optionalf
 -- This is mostly just to catch the error of applying different forms of LIKE to non-strings.
 -- TODO: migrate likely-to-error-out cases like this to their own template/suite
 SELECT * FROM @fromtables Q26 WHERE Q26._variable[@columntype] _maybe LIKE 'abc%'
-SELECT * FROM @fromtables Q27 WHERE Q27._variable[@columntype] _maybe LIKE '%'
-SELECT * FROM @fromtables Q28 WHERE Q28._variable[@columntype] _maybe LIKE '%' ESCAPE '!' 
-SELECT * FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '!%' ESCAPE '!' 
+SELECT * FROM @fromtables Q27 WHERE Q27._variable[@columntype]        LIKE '%'
+SELECT * FROM @fromtables Q28 WHERE Q28._variable[@columntype]        LIKE '%' ESCAPE '!'
+-- Uncomment after ENG-9449 is fixed; and delete the two above (??):
+--SELECT * FROM @fromtables Q27 WHERE Q27._variable[@columntype] _maybe LIKE '%'
+--SELECT * FROM @fromtables Q28 WHERE Q28._variable[@columntype] _maybe LIKE '%' ESCAPE '!'
+SELECT * FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '!%' ESCAPE '!'
 
 ----SELECT * FROM @fromtables A WHERE _inoneint
 ----SELECT * FROM @fromtables A WHERE _inpairofints
@@ -135,12 +138,19 @@ SELECT * FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '!%' 
 
 --- Test CASE WHEN
 --- CASE WHEN with expression
-SELECT * FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] _cmp @comparableconstant THEN Q34._variable[#numone @columntype]            ELSE Q34.__[#arg] @aftermath END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] _cmp @comparableconstant THEN Q35._variable[#numone @columntype]                                         END _cmp @comparableconstant + 10
+--- Note: the parens are needed here (in Q34, Q35, Q38, Q39) because without them PostgreSQL does
+--- not parse certain queries correctly: when used with strings (so + is concatenation - translated
+--- to || for PostgreSQL) and with certain comparison operators (<>, <=, >=, !=), an error results:
+--- "operator does not exist: boolean || integer. Hint: No operator matches the given name and
+--- argument type(s). You might need to add explicit type casts", which suggests that the comparison
+--- operators are given higher precedence than the concatenation operator. In contrast, VoltDB and
+--- HSQL behave the same, with or without the parens.
+SELECT * FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] _cmp @comparableconstant THEN Q34._variable[#numone @columntype]            ELSE Q34.__[#arg] @aftermath END _cmp (@comparableconstant + 10)
+SELECT * FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] _cmp @comparableconstant THEN Q35._variable[#numone @columntype]                                         END _cmp (@comparableconstant + 10)
 SELECT __[#numone]        Q36,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A._variable[#numone @columntype]            ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]           Q37,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A.__[#arg]                                                               END FROM @fromtables A WHERE @columnpredicate
 --- CASE WHEN like DECODE
-SELECT * FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] @aftermath ELSE Q38.__[#arg] @aftermath END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END _cmp @comparableconstant + 10
+SELECT * FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] @aftermath ELSE Q38.__[#arg] @aftermath END _cmp (@comparableconstant + 10)
+SELECT * FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] @aftermath                              END _cmp (@comparableconstant + 10)
 SELECT __[#numone]        Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath ELSE   A.__[#arg] @aftermath END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]           Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] @aftermath                              END FROM @fromtables A WHERE @columnpredicate
