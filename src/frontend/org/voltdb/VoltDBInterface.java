@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -179,8 +178,6 @@ public interface VoltDBInterface
     public ProducerDRGateway getNodeDRGateway();
 
     public ConsumerDRGateway getConsumerDRGateway();
-
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener);
 
     public void onSyncSnapshotCompletion();
 

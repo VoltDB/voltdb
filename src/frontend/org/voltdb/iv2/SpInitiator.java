@@ -40,7 +40,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
-import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -114,7 +113,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         PartitionDRGateway mpPDRG = null;
         if (createMpDRGateway) {
             mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
-            setDurableUniqueIdListener(mpPDRG);
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
@@ -225,12 +223,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
-    }
-
-    @Override
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
-    {
-        m_scheduler.setDurableUniqueIdListener(listener);
     }
 
     @Override

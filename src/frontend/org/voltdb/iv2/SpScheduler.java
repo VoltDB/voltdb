@@ -36,7 +36,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
-import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -127,13 +126,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     };
 
-    public interface DurableUniqueIdListener {
-        /**
-         * Notify listener of last durable Single-Part and Multi-Part uniqueIds
-         */
-        public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId);
-    }
-
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
@@ -152,7 +144,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
     // The DurabilityListener is not thread-safe. Access it only on the Site thread.
-    private final DurabilityListener m_durabilityListener;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
 
@@ -164,7 +155,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         super(partitionId, taskQueue);
         m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
-        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
@@ -182,21 +172,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
-    @Override
-    public void setDurableUniqueIdListener(final DurableUniqueIdListener listener) {
-        m_tasks.offer(new SiteTaskerRunnable() {
-            @Override
-            void run()
-            {
-                m_durabilityListener.setUniqueIdListener(listener);
-            }
-        });
-    }
-
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
-        setDurableUniqueIdListener(gateway);
     }
 
     @Override
@@ -541,7 +519,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
         if (!msg.isReadOnly()) {
             ListenableFuture<Object> durabilityBackpressureFuture =
-                    m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
+                    m_cl.log(msg, msg.getSpHandle(), null, null, task);
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
@@ -840,7 +818,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (logThis) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), Ints.toArray(msg.getInvolvedPartitions()),
-                             m_durabilityListener, task);
+                             null, task);
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
@@ -994,8 +972,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
-        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
-        m_cl.registerDurabilityListener(m_durabilityListener);
     }
 
     @Override

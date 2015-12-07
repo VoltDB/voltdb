@@ -28,7 +28,6 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -39,7 +38,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
-public class PartitionDRGateway implements DurableUniqueIdListener {
+public class PartitionDRGateway {
     private static final VoltLogger log = new VoltLogger("DR");
 
     public enum DRRecordType {
@@ -126,9 +125,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         cont.discard();
         return -1;
     }
-
-    @Override
-    public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
     private static final ThreadLocal<AtomicLong> haveOpenTransactionLocal = new ThreadLocal<AtomicLong>() {
         @Override

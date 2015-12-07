@@ -37,7 +37,6 @@ import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
-import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -226,13 +225,6 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
-    }
-
-    @Override
-    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
-    {
-        // Durability Listeners should never be assigned to the MP Scheduler
-        assert false;
     }
 
     @Override

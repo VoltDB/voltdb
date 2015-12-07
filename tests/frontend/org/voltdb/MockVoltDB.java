@@ -56,7 +56,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -676,10 +675,6 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public ConsumerDRGateway getConsumerDRGateway() {
         return null;
-    }
-
-    @Override
-    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener) {
     }
 
     @Override
