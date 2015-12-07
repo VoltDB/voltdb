@@ -494,7 +494,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
             catch (RuntimeException rte) {
                 // When ENG-9311 is fixed, then we shouldn't get this error and
                 // the procedure call should succeed.
-                assertTrue(rte.getMessage().contains("PointType or GeographyValue instances "
+                assertTrue(rte.getMessage().contains("GeographyPointValue or GeographyValue instances "
                         + "are not yet supported in Object arrays passed as parameters"));
             }
         }
