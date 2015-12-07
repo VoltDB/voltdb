@@ -460,18 +460,20 @@ Compression support provided by snappy-java (http://code.google.com/p/snappy-jav
 ================================================================================
 JNA (Java access to native shared libraries)
 
-This copy of JNA is licensed under the
-Apache (Software) License, version 2.0 ("the License").
-See the License for details about distribution rights, and the
-specific rights regarding derivate works.
+Licensed as GNU LGPL (http://www.gnu.org/licenses/lgpl.html)
 
-You may obtain a copy of the License at:
-
-http://www.apache.org/licenses/
-
-A copy is also included in the downloadable source code package
-containing JNA, in file "ASL2.0", under the same directory
-as this file.
+/* Copyright (c) 2007 Timothy Wall, All Rights Reserved
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+* <p/>
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+* Lesser General Public License for more details.
+*/
 
 ================================================================================
 Protobuf (protocol buffer encoding)
@@ -2369,7 +2371,7 @@ The name Michael Bostock may not be used to endorse or promote products derived 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL MICHAEL BOSTOCK BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ================================================================================
 jQuery Cookie Plugin v1.4.1
-Site: https://github.com/carhartl/jquery-cookie
+Site: https://github.com/carhartl/jquery-cookie 
 License Name: MIT license
 ================================================================================
 jQuery Context Menu Plugin
@@ -2377,12 +2379,12 @@ License Name: MIT License
 Site: http://abeautifulsite.net/2008/09/jquery-context-menu-plugin/
 ================================================================================
 Simple Popup plugin for jQuery
-Site: http://plugins.jquery.com/popup/
+Site: http://plugins.jquery.com/popup/ 
 License Name: MIT License (MIT)
-License Url: https://github.com/Toddish/Popup/blob/master/LICENSE.md
+License Url: https://github.com/Toddish/Popup/blob/master/LICENSE.md 
 ================================================================================
 Slim scroll plugin for jQuery
-Site: http://rocha.la
+Site: http://rocha.la 
 License Name: MIT
 License Url: http://www.opensource.org/licenses/mit-license.php
 ================================================================================
@@ -2391,12 +2393,12 @@ License Name: MIT License
 License Url: http://opensource.org/licenses/MIT
 ================================================================================
 jQuery Validation Plugin
-Site url: http://jqueryvalidation.org/
+Site url: http://jqueryvalidation.org/ 
 License Name: MIT License
 License url: http://en.wikipedia.org/wiki/MIT_License
 ================================================================================
 iCheck Plugin
-Site url: http://fronteed.com/iCheck/
+Site url: http://fronteed.com/iCheck/ 
 License Name: MIT License
 License url: http://en.wikipedia.org/wiki/MIT_License
 ================================================================================
@@ -2452,9 +2454,9 @@ jquery.tablesorter.js
 /*global console:false, alert:false */
 ===============================================================================
 DataTables
-Site: http://datatables.net/
-License Name: MIT License
-License Url: http://datatables.net/license/mit
+Site: http://datatables.net/ 
+License Name: MIT License 
+License Url: http://datatables.net/license/mit 
 ===============================================================================
 sha256.js
 CryptoJS v3.1.2

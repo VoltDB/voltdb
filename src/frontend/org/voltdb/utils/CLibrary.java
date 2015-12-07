@@ -18,9 +18,9 @@ package org.voltdb.utils;
 
 import org.voltcore.logging.VoltLogger;
 import com.sun.jna.Native;
+import sun.misc.SharedSecrets;
 
-import java.util.Arrays;
-import java.util.List;
+import java.io.FileDescriptor;
 
 public class CLibrary {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -35,11 +35,6 @@ public class CLibrary {
     public static final class Rlimit extends  com.sun.jna.Structure {
         public long rlim_cur = 0;
         public long rlim_max = 0;
-
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList("rlim_cur", "rlim_max");
-        }
     }
 
     public static final int RLIMIT_NOFILE_LINUX = 7;
