@@ -28,7 +28,6 @@ package org.voltdb.client;
  */
 public enum ProcedureInvocationType {
     ORIGINAL((byte) 0),
-    VERSION1((byte) 1),              // version with individual timeout support
     REPLICATED ((byte) (1 << 7));    // -128
 
     private final byte m_value;
@@ -45,8 +44,6 @@ public enum ProcedureInvocationType {
         switch(b) {
         case 0:
             return ORIGINAL;
-        case 1:
-            return VERSION1;
         case -128:
             return REPLICATED;
         default:

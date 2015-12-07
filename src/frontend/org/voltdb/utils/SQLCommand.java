@@ -51,7 +51,6 @@ import jline.console.history.FileHistory;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -74,7 +73,6 @@ public class SQLCommand
     private static int m_exitCode = 0;
 
     private static boolean m_hasBatchTimeout = false;
-    private static int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     private static final String m_readme = "SQLCommandReadme.txt";
 
@@ -102,11 +100,7 @@ public class SQLCommand
     private static ClientResponse callProcedureHelper(String procName, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse response = null;
-        if (m_hasBatchTimeout) {
-            response = m_client.callProcedureWithTimeout(m_batchTimeout, procName, parameters);
-        } else {
-            response = m_client.callProcedure(procName, parameters);
-        }
+        response = m_client.callProcedure(procName, parameters);
         return response;
     }
 
@@ -1274,10 +1268,6 @@ public class SQLCommand
                 } catch (FileNotFoundException e) {
                     printUsage("DDL file not found at path:" + ddlFilePath);
                 }
-            }
-            else if (arg.startsWith("--query-timeout=")) {
-                m_hasBatchTimeout = true;
-                m_batchTimeout = Integer.valueOf(extractArgInput(arg));
             }
 
             // equals check starting here

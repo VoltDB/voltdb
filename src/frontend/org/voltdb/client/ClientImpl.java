@@ -203,8 +203,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
+        return callProcedure(procName, parameters);
     }
 
     /**
@@ -311,8 +310,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
         //Time unit doesn't matter in this case since the timeout isn't being specified
-        return callProcedureWithClientTimeout(callback, BatchTimeoutOverrideType.NO_TIMEOUT, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
+        return callProcedure(callback, procName, parameters);
     }
 
     /**

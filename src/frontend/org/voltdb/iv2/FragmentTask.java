@@ -30,7 +30,6 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
-import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
@@ -98,22 +97,11 @@ public class FragmentTask extends TransactionTask
         }
 
         int originalTimeout = siteConnection.getBatchTimeout();
-        int individualTimeout = m_fragmentMsg.getBatchTimeout();
-        try {
-            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
-                siteConnection.setBatchTimeout(individualTimeout);
-            }
-
             // execute the procedure
             final FragmentResponseMessage response = processFragmentTask(siteConnection);
             // completion?
             response.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(response);
-        } finally {
-            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
-                siteConnection.setBatchTimeout(originalTimeout);
-            }
-        }
 
         completeFragment();
 

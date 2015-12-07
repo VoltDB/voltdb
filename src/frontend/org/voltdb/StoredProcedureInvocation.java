@@ -27,7 +27,6 @@ import java.util.concurrent.FutureTask;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
@@ -66,8 +65,6 @@ public class StoredProcedureInvocation implements JSONString {
         returned to the client in the ClientResponse */
     long clientHandle = -1;
 
-    int batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
-
     public StoredProcedureInvocation getShallowCopy()
     {
         StoredProcedureInvocation copy = new StoredProcedureInvocation();
@@ -86,18 +83,13 @@ public class StoredProcedureInvocation implements JSONString {
             copy.serializedParams = null;
         }
 
-        copy.batchTimeout = batchTimeout;
 
         return copy;
     }
 
     private void setType() {
         if (originalTxnId == UNITIALIZED_ID && originalUniqueId == UNITIALIZED_ID) {
-            if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
-                type = ProcedureInvocationType.VERSION1;
-            } else {
-                type = ProcedureInvocationType.ORIGINAL;
-            }
+            type = ProcedureInvocationType.ORIGINAL;
         } else {
             type = ProcedureInvocationType.REPLICATED;
         }
@@ -186,13 +178,7 @@ public class StoredProcedureInvocation implements JSONString {
 
     public int getSerializedSize()
     {
-        int timeoutSize = 0;
-        if (type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
-            timeoutSize = 1 + (batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4);
-        }
-
         int size = 1 // Version/type
-            + timeoutSize // batch time out byte
             + 4 // proc name string length
             + procName.length()
             + 8; // clientHandle
@@ -231,14 +217,6 @@ public class StoredProcedureInvocation implements JSONString {
         if (ProcedureInvocationType.isDeprecatedInternalDRType(type)) {
             buf.putLong(originalTxnId);
             buf.putLong(originalUniqueId);
-        }
-        if (type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
-            if (batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
-                buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
-            } else {
-                buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
-                buf.putInt(batchTimeout);
-            }
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes(Constants.UTF8ENCODING));
@@ -291,15 +269,6 @@ public class StoredProcedureInvocation implements JSONString {
             originalUniqueId = in.readLong();
         }
 
-        if (version >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
-            BatchTimeoutOverrideType batchTimeoutType = BatchTimeoutOverrideType.typeFromByte(in.readByte());
-            if (batchTimeoutType == BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT) {
-                batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
-            } else {
-                batchTimeout = in.readInt();
-            }
-        }
-
         procName = in.readString().intern();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
@@ -325,7 +294,6 @@ public class StoredProcedureInvocation implements JSONString {
             retval += "null";
         retval += ")";
         retval += " type=" + String.valueOf(type);
-        retval += " batchTimeout=" + BatchTimeoutOverrideType.toString(batchTimeout);
         retval += " clientHandle=" + String.valueOf(clientHandle);
         retval += " originalTxnId=" + String.valueOf(originalTxnId);
         retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
@@ -385,9 +353,5 @@ public class StoredProcedureInvocation implements JSONString {
             throw new RuntimeException("Failed to serialize an invocation to JSON.", e);
         }
         return js.toString();
-    }
-
-    public int getBatchTimeout() {
-        return batchTimeout;
     }
 }

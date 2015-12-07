@@ -21,7 +21,6 @@ import org.voltcore.network.Connection;
 import org.voltdb.AuthSystem;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
-import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ProcedureInvocationType;
 
 
@@ -122,7 +121,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             // should be no correlation inferred or assumed between the partitioning and the
             // statement's constants or parameters.
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
-            "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0, BatchTimeoutOverrideType.NO_TIMEOUT,
+            "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0, 0,
             false, false, // don't allow adhoc DDL in this path
             completionHandler, new AuthSystem.AuthDisabledUser());
     }
