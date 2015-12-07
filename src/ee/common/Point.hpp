@@ -89,6 +89,7 @@ public:
     }
 
     S2Point toS2Point() const {
+    	// Note: This is for S2LatLng.  So latitude is first and longitude is second.
         return S2LatLng::FromDegrees(getLatitude(), getLongitude()).ToPoint();
     }
 
@@ -98,6 +99,17 @@ public:
         assert(! isNull());
         assert(! rhs.isNull());
 
+        Coord lhsLong = getLongitude();
+        Coord rhsLong = rhs.getLongitude();
+        if (lhsLong < rhsLong) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+
+        if (lhsLong > rhsLong) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+
+        // latitude is equal; compare longitude
         Coord lhsLat = getLatitude();
         Coord rhsLat = rhs.getLatitude();
         if (lhsLat < rhsLat) {
@@ -105,17 +117,6 @@ public:
         }
 
         if (lhsLat > rhsLat) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
-
-        // latitude is equal; compare longitude
-        Coord lhsLng = getLongitude();
-        Coord rhsLng = rhs.getLongitude();
-        if (lhsLng < rhsLng) {
-            return VALUE_COMPARE_LESSTHAN;
-        }
-
-        if (lhsLng > rhsLng) {
             return VALUE_COMPARE_GREATERTHAN;
         }
 
@@ -135,18 +136,18 @@ public:
 
     template<class Serializer>
     void serializeTo(Serializer& output) const {
-        output.writeDouble(getLatitude());
         output.writeDouble(getLongitude());
+        output.writeDouble(getLatitude());
     }
 
     void hashCombine(std::size_t& seed) const {
-        MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
         MiscUtil::hashCombineFloatingPoint(seed, m_longitude);
+        MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
     }
 
     std::string toString() const {
         std::ostringstream oss;
-        oss << "point(" << m_latitude << " " << m_longitude << ")";
+        oss << "point(" << m_longitude << " " << m_latitude << ")";
         return oss.str();
     }
 
