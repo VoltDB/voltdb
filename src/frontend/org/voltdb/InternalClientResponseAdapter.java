@@ -258,7 +258,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
         RateLimitedLogger.tryLogForMessage(
                 EstTime.currentTimeMillis(),
-                ImportHandler.SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                1, TimeUnit.SECONDS,
                 m_logger, level,
                 cause, format, args
                 );
