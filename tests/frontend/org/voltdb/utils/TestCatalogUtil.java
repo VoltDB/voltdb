@@ -1531,7 +1531,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
         DeploymentType valid_deployment_enabled = CatalogUtil.getDeployment(new FileInputStream(tmpEnabled));
@@ -1543,7 +1543,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(drDisabled);
         DeploymentType valid_deployment_disabled = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
@@ -1555,7 +1555,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertFalse(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
         assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabledNoConn = VoltProjectBuilder.writeStringToTempFile(drEnabledNoConnection);
         DeploymentType valid_deployment_enabledNoConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledNoConn));
@@ -1567,7 +1567,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 0);
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
 
         final File tmpTwoClusterIds = VoltProjectBuilder.writeStringToTempFile(twoClusterIds);
         DeploymentType invalid_deployment_twoClusterIds = CatalogUtil.getDeployment(new FileInputStream(tmpTwoClusterIds));
@@ -1587,7 +1587,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDeployment().get("deployment").getClusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabledWithPort = VoltProjectBuilder.writeStringToTempFile(drEnabledWithPort);
         DeploymentType valid_deployment_port = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithPort));

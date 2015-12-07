@@ -284,7 +284,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public int getClusterId() {
-            return m_context.getDeployment().getCluster().getId();
+            return getCorrespondingClusterId();
         }
 
 
@@ -507,7 +507,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_partitionId,
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
-                        deploy.getClusterid(),
+                        m_context.cluster.getDrclusterid(),
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
@@ -521,7 +521,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_partitionId,
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
-                            deploy.getClusterid(),
+                            m_context.cluster.getDrclusterid(),
                             deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
@@ -801,7 +801,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public int getCorrespondingClusterId()
     {
-        return m_context.cluster.getDeployment().get("deployment").getClusterid();
+        return m_context.cluster.getDrclusterid();
     }
 
     @Override

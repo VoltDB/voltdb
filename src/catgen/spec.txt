@@ -17,6 +17,7 @@ begin Cluster                      "A set of connected hosts running one or more
   bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
   bool drConsumerEnabled           "Manage whether this consumer cluster will pull local DR transactions"
   bool drProducerEnabled           "Manage whether this producer cluster will log and distribute local DR transactions"
+  int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
   int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
   string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
   int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
@@ -26,7 +27,6 @@ begin Deployment javaonly         "Run-time deployment settings"
   int hostcount                   "The number of hosts in the cluster"
   int kfactor                     "The required k-safety factor"
   int sitesperhost                "The number of execution sites per host"
-  int clusterId                    "Unique inter-cluster ID used to distinguish clusters"
   Systemsettings* systemsettings  "Values from the systemsettings element"
 end
 

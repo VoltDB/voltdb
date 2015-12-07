@@ -997,12 +997,12 @@ public abstract class CatalogUtil {
             throw new RuntimeException(config.getErrorMsg());
         } else {
             Cluster catCluster = catalog.getClusters().get("cluster");
+            catCluster.setDrclusterid(clusterId);
             // copy the deployment info that is currently not recorded anywhere else
             Deployment catDeploy = catCluster.getDeployment().get("deployment");
             catDeploy.setHostcount(hostCount);
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
-            catDeploy.setClusterid(clusterId);
             // copy partition detection configuration from xml to catalog
             String defaultPPDPrefix = "partition_detection";
             if (deployment.getPartitionDetection().isEnabled()) {
@@ -1780,13 +1780,13 @@ public abstract class CatalogUtil {
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
             // Backward compatibility to support cluster id in DR tag
-            Deployment deployment = catalog.getClusters().get("cluster").getDeployment().get("deployment");
-            if (deployment.getClusterid() != 0 && dr.getId() != 0) {
+            if (cluster.getDrclusterid() != 0 && dr.getId() != 0) {
                 throw new RuntimeException("Detected two cluster ids in deployement file, setting cluster id in DR tag is "
                         + "deprecated, please remove");
             }
-            if (deployment.getClusterid() == 0) {
-                deployment.setClusterid(dr.getId());
+            //Using the clusterId in DR tag to override if Cluster tag doesn't provide clusterId (or provide zero clusterId).
+            if (cluster.getDrclusterid() == 0 && dr.getId() != 0) {
+                cluster.setDrclusterid(dr.getId());
             }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {

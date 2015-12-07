@@ -136,7 +136,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public int getClusterId()
         {
-            return m_context.getDeployment().getCluster().getId();
+            return getCorrespondingClusterId();
         }
 
         @Override
@@ -356,7 +356,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public int getCorrespondingClusterId()
     {
-        return m_context.cluster.getDeployment().get("deployment").getClusterid();
+        return m_context.cluster.getDrclusterid();
     }
 
     @Override
