@@ -89,7 +89,7 @@ public:
     }
 
     S2Point toS2Point() const {
-    	// Note: This is for S2LatLng.  So latitude is first and longitude is second.
+        // Note: This is for S2LatLng.  So latitude is first and longitude is second.
         return S2LatLng::FromDegrees(getLatitude(), getLongitude()).ToPoint();
     }
 
