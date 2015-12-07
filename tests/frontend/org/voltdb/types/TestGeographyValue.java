@@ -211,7 +211,7 @@ public class TestGeographyValue extends TestCase {
             double latitude = ycoord*(90.0/NUM_PTS);
             for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
                 double longitude = xcoord*(180.0/NUM_PTS);
-                GeographyPointValue PT_point = new GeographyPointValue(latitude, longitude);
+                GeographyPointValue PT_point = new GeographyPointValue(longitude, latitude);
                 for (int idx = 0; idx < NUMBER_TRANSFORMS; idx += 1) {
                     GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromGeographyPointValue(PT_point);
                     PT_point = xyz_point.toGeographyPointValue();
