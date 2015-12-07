@@ -186,8 +186,7 @@ public class DiskResourceChecker
                     filePath, featureName.value(),
                     (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB"),
                     CoreUtils.getHostnameOrAddress()));
-            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
-                    filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+
             return false;
         } else {
             return true;

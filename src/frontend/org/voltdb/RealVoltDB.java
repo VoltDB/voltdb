@@ -1303,23 +1303,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
-    private void startResourceUsageMonitor() {
-        if (resMonitorWork != null) {
-            resMonitorWork.cancel(false);
-            try {
-                resMonitorWork.get();
-            } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
-            m_periodicWorks.remove(resMonitorWork);
-        }
-        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(),
-                m_catalogContext.getDeployment().getPaths());
-        resMonitor.logResourceLimitConfigurationInfo();
-        if (resMonitor.hasResourceLimitsConfigured()) {
-            resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
-            m_periodicWorks.add(resMonitorWork);
-        }
-    }
-
     int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
@@ -2229,7 +2212,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // restart resource usage monitoring task
-            startResourceUsageMonitor();
 
             return Pair.of(m_catalogContext, csp);
         }
@@ -2381,7 +2363,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 prepareReplication();
             }
         }
-        startResourceUsageMonitor();
 
         try {
             if (m_adminListener != null) {
@@ -2560,7 +2541,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // Start listening on the DR ports
             prepareReplication();
-            startResourceUsageMonitor();
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete
