@@ -120,7 +120,6 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -1182,9 +1181,6 @@ public abstract class CatalogUtil {
                 hostLog.error(msg);
                 throw new DeploymentCheckException(msg);
             }
-        }
-        if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
-            processorProperties.setProperty(ImportDataProcessor.IMPORT_MODULE, modulePrefix + importBundleUrl);
         }
 
         List<PropertyType> configProperties = importConfiguration.getProperty();
