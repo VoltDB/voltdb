@@ -96,6 +96,7 @@ public class SnapshotUtil {
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
+    public static final String JSON_CHECK_CLUSTER_ID = "checkClusterId";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
