@@ -73,7 +73,7 @@ public class PullSocketImporter extends AbstractImporter {
     private void susceptibleRun() {
         if (m_eos.get()) return;
 
-        info("Starting socket puller for " + m_config.getResourceID(), null);
+        info(null, "Starting socket puller for " + m_config.getResourceID());
 
         m_thread = Optional.of(Thread.currentThread());
         Optional<BufferedReader> reader = null;
@@ -91,12 +91,12 @@ public class PullSocketImporter extends AbstractImporter {
                     CSVInvocation invocation = new CSVInvocation(m_config.getProcedure(), csv);
                     if (!callProcedure(invocation)) {
                         if (isDebugEnabled()) {
-                            debug("Failed to process Invocation possibly bad data: " + csv, null);
+                            debug(null, "Failed to process Invocation possibly bad data: " + csv);
                         }
                     }
                 }
                 if (csv == null) {
-                    warn(m_config.getResourceID() + " peer terminated stream", null);
+                    warn(null, m_config.getResourceID() + " peer terminated stream");
                 }
             } catch (EOFException e) {
                 rateLimitedLog(Level.WARN, e, m_config.getResourceID() + " peer terminated stream");
@@ -111,7 +111,7 @@ public class PullSocketImporter extends AbstractImporter {
             }
         }
 
-        info("Stopping socket puller for " + m_config.getResourceID(), null);
+        info(null, "Stopping socket puller for " + m_config.getResourceID());
     }
 
     private Optional<BufferedReader> attemptBufferedReader() {

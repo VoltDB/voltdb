@@ -18,7 +18,10 @@
 package org.voltdb.importer;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -44,6 +47,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 public class ImporterLifeCycleManager implements ChannelChangeCallback
 {
     private final static VoltLogger s_logger = new VoltLogger("ImporterTypeManager");
+    public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
     private final AbstractImporterFactory m_factory;
     private ListeningExecutorService m_executorService;
@@ -95,7 +99,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                 5_000,
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<Runnable>(),
-                getThreadFactory(m_factory.getTypeName(), ImportHandlerProxy.MEDIUM_STACK_SIZE)
+                getThreadFactory(m_factory.getTypeName(), MEDIUM_STACK_SIZE)
                 );
         tpe.allowCoreThreadTimeOut(true);
 
@@ -108,17 +112,17 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                 builder.put(importer.getResourceID(), importer);
             }
             m_importers = builder.build();
-            startImporters();
+            startImporters(m_importers.values());
         } else {
+            m_importers = ImmutableMap.of();
             distributer.registerCallback(m_factory.getTypeName(), this);
             distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
-            m_importers = ImmutableMap.of();
         }
     }
 
-    private void startImporters()
+    private void startImporters(Collection<AbstractImporter> importers)
     {
-        for (AbstractImporter importer : m_importers.values()) {
+        for (AbstractImporter importer : importers) {
             submitAccept(importer);
         }
     }
@@ -146,13 +150,15 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             }
         }
 
+        List<AbstractImporter> newImporters = new ArrayList<>();
         for (final URI added: assignment.getAdded()) {
             AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
+            newImporters.add(importer);
             builder.put(added, importer);
         }
 
         m_importers = builder.build();
-        startImporters();
+        startImporters(newImporters);
     }
 
     private final static Predicate<URI> notUriIn(final Set<URI> uris) {
