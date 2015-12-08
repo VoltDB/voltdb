@@ -852,6 +852,8 @@ def get_java_version():
             return "1.8"
         elif "1.7" in out:
             return "1.7"
+        else:
+            return ""
     except (OSError):
         return ""
 
