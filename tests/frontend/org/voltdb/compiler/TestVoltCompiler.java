@@ -525,11 +525,64 @@ public class TestVoltCompiler extends TestCase {
 
     // test that the source table for a view is not export only
     public void testViewSourceNotExportOnly() throws IOException {
+        System.setProperty("allowExportTableView", "false");
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
         project.addExport(true /* enabled */);
         project.setTableAsExportOnly("table1r_el_only");
+        try {
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnly() throws IOException {
+        System.setProperty("allowExportTableView", "true");
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table2r_el_only");
+        project.addPartitionInfo("table2r_el_only", "column1_bigint");
+
+        try {
+            assertTrue(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
+        System.setProperty("allowExportTableView", "true");
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table3r_el_only");
+        try {
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
+        System.setProperty("allowExportTableView", "true");
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table4r_el_only");
+        project.addPartitionInfo("table4r_el_only", "column1_bigint");
+
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
