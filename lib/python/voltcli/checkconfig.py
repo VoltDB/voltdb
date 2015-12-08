@@ -237,5 +237,9 @@ def test_hard_requirements():
 # (Moved to end since Python does not handle forward reference.)
 # Define HardRequirements (full name : checker method)
 # and possible SkippableleRequirements(fullname:init)
-hardRequirements = {'TransparentHugePage' : test_thp_config, }
+hardRequirements = {
+        'TransparentHugePage' : test_thp_config,
+        "Java" : test_java_version,
+        "OS Release" : test_os_release,
+}
 skippableRequirements = {'TransparentHugePage':'thp'}
