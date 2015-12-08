@@ -639,7 +639,7 @@ public abstract class CatalogUtil {
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
 
-            setDrInfo(catalog, deployment.getDr());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
 
             validateResourceMonitorInfo(deployment);
         }
@@ -989,7 +989,6 @@ public abstract class CatalogUtil {
         int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
-        int clusterId = cluster.getId();
 
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
 
@@ -997,7 +996,6 @@ public abstract class CatalogUtil {
             throw new RuntimeException(config.getErrorMsg());
         } else {
             Cluster catCluster = catalog.getClusters().get("cluster");
-            catCluster.setDrclusterid(clusterId);
             // copy the deployment info that is currently not recorded anywhere else
             Deployment catDeploy = catCluster.getDeployment().get("deployment");
             catDeploy.setHostcount(hostCount);
@@ -1773,20 +1771,28 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+        int clusterId;
+        Cluster cluster = catalog.getClusters().get("cluster");
         if (dr != null) {
-            Cluster cluster = catalog.getClusters().get("cluster");
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
+
             // Backward compatibility to support cluster id in DR tag
-            if (cluster.getDrclusterid() != 0 && dr.getId() != 0) {
-                throw new RuntimeException("Detected two cluster ids in deployement file, setting cluster id in DR tag is "
-                        + "deprecated, please remove");
-            }
-            //Using the clusterId in DR tag to override if Cluster tag doesn't provide clusterId (or provide zero clusterId).
-            if (cluster.getDrclusterid() == 0 && dr.getId() != 0) {
-                cluster.setDrclusterid(dr.getId());
+            if (clusterType.getId() == null && dr.getId() != null) {
+                clusterId = dr.getId();
+            } else if (clusterType.getId() != null && dr.getId() == null) {
+                clusterId = clusterType.getId();
+            } else if (clusterType.getId() == null && dr.getId() == null) {
+                clusterId = 0;
+            } else {
+                if (clusterType.getId() == dr.getId()) {
+                    clusterId = clusterType.getId();
+                } else {
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                            + "deprecated, please remove");
+                }
             }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
@@ -1795,7 +1801,14 @@ public abstract class CatalogUtil {
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
+        } else {
+            if (clusterType.getId() != null) {
+                clusterId = clusterType.getId();
+            } else {
+                clusterId = 0;
+            }
         }
+        cluster.setDrclusterid(clusterId);
     }
 
     /** Read a hashed password from password.

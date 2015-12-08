@@ -1485,6 +1485,14 @@ public class TestCatalogUtil extends TestCase {
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
+        final String twoConflictingClusterIds =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='5'/>"
+                + "    <dr id='2'>"
+                + "        <connection source='master'/>"
+                + "    </dr>"
+                + "</deployment>";
         final String drEnabledNoConnection =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -1570,11 +1578,19 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
 
         final File tmpTwoClusterIds = VoltProjectBuilder.writeStringToTempFile(twoClusterIds);
-        DeploymentType invalid_deployment_twoClusterIds = CatalogUtil.getDeployment(new FileInputStream(tmpTwoClusterIds));
-        assertNotNull(invalid_deployment_twoClusterIds);
+        DeploymentType valid_deployment_twoClusterIds = CatalogUtil.getDeployment(new FileInputStream(tmpTwoClusterIds));
+        assertNotNull(valid_deployment_twoClusterIds);
 
         setUp();
-        msg = CatalogUtil.compileDeployment(catalog, invalid_deployment_twoClusterIds, false);
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_twoClusterIds, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        final File tmpTwoConflictingClusterIds = VoltProjectBuilder.writeStringToTempFile(twoConflictingClusterIds);
+        DeploymentType invalid_deployment_twoConflictingClusterIds = CatalogUtil.getDeployment(new FileInputStream(tmpTwoConflictingClusterIds));
+        assertNotNull(invalid_deployment_twoConflictingClusterIds);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, invalid_deployment_twoConflictingClusterIds, false);
         assertTrue("Deployment file failed to parse", msg != null);
 
         final File tmpEnabledWithConn = VoltProjectBuilder.writeStringToTempFile(drEnabledWithEnabledConnection);

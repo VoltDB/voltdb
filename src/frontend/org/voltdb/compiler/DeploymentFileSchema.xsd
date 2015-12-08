@@ -72,7 +72,7 @@
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
     <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
-    <xs:attribute name="id" type="clusterIdType" default="0"/>
+    <xs:attribute name="id" type="clusterIdType"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
     <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
@@ -415,7 +415,7 @@
         <!-- Currently, only one DR data source is allowed -->
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
-    <xs:attribute name="id" type="clusterIdType" default="0"/>
+    <xs:attribute name="id" type="clusterIdType"/>
     <xs:attribute name="listen" type="xs:boolean" default="true" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
     <xs:attribute name="flushInterval" default="1000">
