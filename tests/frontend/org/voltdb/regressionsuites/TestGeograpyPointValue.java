@@ -38,9 +38,9 @@ public class TestGeograpyPointValue extends RegressionSuite {
         super(name);
     }
 
-    private static final GeographyPointValue BEDFORD_PT = new GeographyPointValue(42.4906, -71.2767);
-    private static final GeographyPointValue SANTA_CLARA_PT = new GeographyPointValue(37.3544, -121.9692);
-    private static final GeographyPointValue LOWELL_PT = new GeographyPointValue(42.6200, -71.3273);
+    private static final GeographyPointValue BEDFORD_PT = new GeographyPointValue(-71.2767, 42.4906);
+    private static final GeographyPointValue SANTA_CLARA_PT = new GeographyPointValue(-121.9692, 37.3544);
+    private static final GeographyPointValue LOWELL_PT = new GeographyPointValue(-71.3273, 42.6200);
 
     private int fillTable(Client client, int startPk) throws Exception {
         validateTableOfScalarLongs(client,
@@ -97,6 +97,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
     }
 
     public void testPointFromText() throws Exception {
+        final double EPSILON = 1.0e-14;
         Client client = getClient();
 
         validateTableOfScalarLongs(client,
@@ -104,12 +105,12 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
-                "select pointfromtext('point (42.4906 -71.2767)') from t;").getResults()[0];
+                "select pointfromtext('point (-71.2767 42.4906)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
         GeographyPointValue pt = vt.getPoint(0);
         assertFalse(vt.wasNull());
-        assertEquals(42.4906, pt.getLatitude(), 0.001);
-        assertEquals(-71.2767, pt.getLongitude(), 0.001);
+        assertEquals(42.4906, pt.getLatitude(), EPSILON);
+        assertEquals(-71.2767, pt.getLongitude(), EPSILON);
     }
 
 
@@ -241,8 +242,8 @@ public class TestGeograpyPointValue extends RegressionSuite {
 
         fillTable(client, 0);
 
-        final GeographyPointValue CAMBRIDGE_PT = new GeographyPointValue(42.3736, -71.1106);
-        final GeographyPointValue SAN_JOSE_PT = new GeographyPointValue(37.3362, -121.8906);
+        final GeographyPointValue CAMBRIDGE_PT = new GeographyPointValue(-71.1106, 42.3736);
+        final GeographyPointValue SAN_JOSE_PT = new GeographyPointValue(-121.8906, 37.3362);
 
         validateTableOfScalarLongs(client,
                 "update t set "
@@ -295,7 +296,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 "CONSTRAINT VIOLATION");
 
         validateTableOfScalarLongs(client,
-                "insert into t_not_null (pk, name, pt) values (0, 'Singapore', pointfromtext('point(1.2905 103.8521)'))",
+                "insert into t_not_null (pk, name, pt) values (0, 'Singapore', pointfromtext('point(103.8521 1.2905)'))",
                 new long[] {1});
 
         VoltTable vt = client.callProcedure("@AdHoc",
@@ -303,7 +304,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 .getResults()[0];
 
         assertContentOfTable (new Object[][] {
-                {0, "Singapore", new GeographyPointValue(1.2905, 103.8521)}},
+                {0, "Singapore", new GeographyPointValue(103.8521, 1.2905)}},
                 vt);
     }
 
