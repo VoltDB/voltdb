@@ -17,10 +17,10 @@
 
 package org.voltdb.importer.formatter;
 
-import java.util.Properties;
-
-public interface AbstractFormatter {
-    public void configure(Properties p);
-
-    public Object[] transform(Object b) throws FormatException;
+/**
+ * Interface for the formatter, the transform method gets called after the formatter factory
+ * creates the formatter.
+ */
+public interface Formatter<T> {
+    public Object[] transform(T b) throws FormatException;
 }

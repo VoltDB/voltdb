@@ -41,7 +41,7 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
-import org.voltdb.importer.formatter.AbstractFormatter;
+import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatException;
 
@@ -103,10 +103,12 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("format", "csv");
-        AbstractFormatter formatter = o.create(prop);
+        Formatter formatter = o.create("csv", prop);
         Object[] results = formatter.transform("12,10.05,test");
         assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05");
+        assertEquals(results[2], "test");
     }
 
     @Test
@@ -115,10 +117,12 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("format", "tsv");
-        AbstractFormatter formatter = o.create(prop);
+        Formatter formatter = o.create("tsv", prop);
         Object[] results = formatter.transform("12\t10.05\ttest");
         assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05");
+        assertEquals(results[2], "test");
     }
 
     @Test
@@ -127,9 +131,8 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("format", "badformat");
         try {
-            o.create(prop);
+            o.create("badformat", prop);
             fail();
         } catch (RuntimeException e) {
         }
@@ -141,12 +144,11 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("format", "csv");
-        AbstractFormatter formatter = o.create(prop);
+        Formatter formatter = o.create("csv", prop);
         try {
             formatter.transform(null);
             fail();
-        } catch (FormatException e) {
+        } catch (NullPointerException e) {
         }
     }
 
@@ -156,12 +158,11 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        prop.setProperty("format", "csv");
-        AbstractFormatter formatter = o.create(prop);
+        Formatter formatter = o.create("csv", prop);
         try {
             formatter.transform(12345);
             fail();
-        } catch (FormatException e) {
+        } catch (ClassCastException e) {
         }
     }
 

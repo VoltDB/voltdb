@@ -99,10 +99,10 @@
         <mkdir dir="${bundles.dir}" />
         <jar destfile="${bundles.dir}/volt-formatter.jar" basedir="${build.prod.dir}">
             <include name="org/voltdb/importer/formatter/builtin/VoltFormatter.class"/>
-            <include name="org/voltdb/importer/formatter/builtin/FormatterFactory.class"/>
+            <include name="org/voltdb/importer/formatter/builtin/VoltFormatterFactory.class"/>
             <include name="au/com/bytecode/opencsv_voltpatches/CSVParser.class"/>
             <manifest>
-                <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.FormatterFactory" />
+                <attribute name="Bundle-Activator" value="org.voltdb.importer.formatter.builtin.VoltFormatterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
                 <attribute name="Bundle-Name" value="Builtin Formatter OSGi Bundle" />
                 <attribute name="Bundle-SymbolicName" value="VoltFormatter" />

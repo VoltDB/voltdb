@@ -21,29 +21,27 @@ import java.io.IOException;
 import java.util.Properties;
 
 import org.voltdb.common.Constants;
-import org.voltdb.importer.formatter.AbstractFormatter;
 import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
-public class VoltFormatter implements AbstractFormatter {
-    String m_format;
+public class VoltFormatter implements Formatter<String> {
+    final CSVParser m_parser;
 
-    @Override
-    public void configure(Properties p) {
-        m_format = p.getProperty("format", "").trim();
-        if (!("csv".equalsIgnoreCase(m_format) || "tsv".equalsIgnoreCase(m_format))) {
-            throw new RuntimeException("Invalid format " + m_format + ", choices are either \"csv\" or \"tsv\".");
+    VoltFormatter (String name, Properties prop) {
+        if (!("csv".equalsIgnoreCase(name) || "tsv".equalsIgnoreCase(name))) {
+            throw new RuntimeException("Invalid format " + name + ", choices are either \"csv\" or \"tsv\".");
         }
-    };
+        m_parser = new CSVParser("csv".equalsIgnoreCase(name) ? ',' : '\t');
+    }
 
     @Override
-    public Object[] transform(Object b) throws FormatException {
-        if (b == null || !b.getClass().equals(String.class))
-            throw new FormatException("Transform takes an argument of type String.");
-        String line = (String) b;
+    public Object[] transform(String b) throws FormatException {
+        if (b == null)
+            throw new NullPointerException("No argument passed into transform.");
         try {
-            Object list[] = new CSVParser("csv".equalsIgnoreCase(m_format) ? ',' : '\t').parseLine(line);
+            Object list[] = m_parser.parseLine(b);
             if (list != null) {
                 for (int i = 0; i < list.length; i++) {
                     if ("NULL".equals(list[i])
