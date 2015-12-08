@@ -845,13 +845,14 @@ def get_java_version():
     """
     Assumes caller has already run "find_in_path(java)" so we know it can be checked.
     """
-    proc = subprocess.Popen(['java', '-version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    out, err = proc.communicate()
-    if "1.8" in out:
-        return "1.8"
-    elif "1.7" in out:
-        return "1.7"
-    else:
+    try:
+        proc = subprocess.Popen(['java', '-version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        out, err = proc.communicate()
+        if "1.8" in out:
+            return "1.8"
+        elif "1.7" in out:
+            return "1.7"
+    except (OSError):
         return ""
 
 #===============================================================================
