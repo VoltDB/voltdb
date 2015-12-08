@@ -73,14 +73,14 @@ def _check_segmentation_offload():
         generic-receive-offload settings
     """
     results = []
-    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[:-1][0::2]
+    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split('\n')[:-1][0::2]
     for d in map(lambda x: x.split(':'), tokenDevs):
         if len(d) < 2:
             continue
         dev = d[1].strip()
         tcpSeg = False
         genRec = False
-        features = subprocess.Popen("ethtool --show-offload " + dev, stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')
+        features = subprocess.Popen("ethtool --show-offload " + dev, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True).stdout.read().split('\n')
         for f in features:
             if "tcp-segmentation-offload" in f:
                 tcpSeg = f.split()[1] == "off"
