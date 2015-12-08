@@ -367,6 +367,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_LN:
             ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
             break;
+        case FUNC_VOLT_VALIDATE_POLYGON:
+        	ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
+        	break;
         default:
             return NULL;
         }

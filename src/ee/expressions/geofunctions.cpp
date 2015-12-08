@@ -367,4 +367,38 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
     return retVal;
 }
 
+static bool isMultiPolygon(const Polygon &poly) {
+	auto nloops = poly.num_loops();
+	int nouters = 0;
+	for (int idx = 0; idx < nloops; idx += 1) {
+		S2Loop *loop = poly.loop(idx);
+		switch (loop->depth()) {
+		case 0:
+			nouters += 1;
+			break;
+		case 1:
+			break;
+		default:
+			return false;
+		}
+	}
+	return nouters == 1;
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
+	assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+	if (isNull()) {
+		return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+	}
+	// Be optimistic.
+	bool returnval = true;
+	// Extract the polygon and check its validity.
+	Polygon poly;
+	poly.initFromGeography(getGeography());
+	if (!poly.IsValid()
+			|| !isMultiPolygon(poly)) {
+	    returnval = false;
+	}
+	return ValueFactory::getBooleanValue(returnval);
+}
 } // end namespace voltdb

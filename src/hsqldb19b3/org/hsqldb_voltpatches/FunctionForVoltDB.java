@@ -141,6 +141,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DISTANCE                     = 20040;    // wrapper id for distance between all geo types
         static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20041;    // distance between point and point
         static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20042;    // distance between polygon and point
+        static final int FUNC_VOLT_VALIDATE_POLYGON             = 20043;    // Polygon validation.
 
 
         private static final FunctionId[] instances = {
@@ -283,6 +284,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
