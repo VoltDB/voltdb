@@ -388,7 +388,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
         RateLimitedLogger.tryLogForMessage(
                 EstTime.currentTimeMillis(),
-                ImportHandler.SUPPRESS_INTERVAL, TimeUnit.SECONDS,
+                120, TimeUnit.SECONDS,
                 m_logger, level,
                 cause, format, args
                 );
@@ -448,7 +448,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public String getHostnameOrIP(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+            m_logger.rateLimitedLog(120, Level.WARN, null,
                     "Could not find caller details for client handle %d. Using internal adapter name", clientHandle);
             return getHostnameOrIP();
         } else {
@@ -475,14 +475,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public long connectionId(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+            m_logger.rateLimitedLog(120, Level.WARN, null,
                     "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         }
 
         Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
         if (internalId==null) {
-            m_logger.rateLimitedLog(ImportHandler.SUPPRESS_INTERVAL, Level.WARN, null,
+            m_logger.rateLimitedLog(120, Level.WARN, null,
                 "Could not find internal connection id for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         } else {

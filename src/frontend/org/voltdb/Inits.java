@@ -47,7 +47,6 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
-import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -628,22 +627,6 @@ public class Inits {
                         );
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error setting up export", true, t);
-            }
-        }
-    }
-
-    class InitImport extends InitWork {
-        InitImport() {
-            dependsOn(LoadCatalog.class);
-        }
-
-        @Override
-        public void run() {
-            // Let the Import system read its configuration from the catalog.
-            try {
-                ImportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_rvdb.m_messenger);
-            } catch (Throwable t) {
-                VoltDB.crashLocalVoltDB("Error setting up import", true, t);
             }
         }
     }
