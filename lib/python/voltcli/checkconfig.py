@@ -231,7 +231,6 @@ def test_hard_requirements():
     """
     output = {}
     for k in hardRequirements:
-        print "calling hardReq k: " + k
         hardRequirements[k](output)
     return output
 
