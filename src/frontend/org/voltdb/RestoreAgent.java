@@ -127,6 +127,7 @@ SnapshotCompletionInterest, Promotable
     private final String m_snapshotPath;
     private final String m_voltdbrootPath;
     private final Set<Integer> m_liveHosts;
+    private final File m_drOverflow;
 
     private boolean m_planned = false;
 
@@ -183,6 +184,7 @@ SnapshotCompletionInterest, Promotable
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
+                        jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
@@ -190,9 +192,6 @@ SnapshotCompletionInterest, Promotable
                             TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
-                        }
-                        if (m_action == StartAction.RECOVER) {
-                            jsObj.put(SnapshotUtil.JSON_CHECK_CLUSTER_ID, true);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(params);
@@ -449,7 +448,7 @@ SnapshotCompletionInterest, Promotable
                         Callback callback, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        String voltdbrootPath)
+                        String voltdbrootPath, File drOverflow)
     throws IOException {
         m_hostId = hostMessenger.getHostId();
         m_initiator = null;
@@ -463,6 +462,7 @@ SnapshotCompletionInterest, Promotable
         m_snapshotPath = snapshotPath;
         m_liveHosts = ImmutableSet.copyOf(hostMessenger.getLiveHostIds());
         m_voltdbrootPath = voltdbrootPath;
+        m_drOverflow = drOverflow;
 
         initialize(hostMessenger);
     }

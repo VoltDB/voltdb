@@ -199,9 +199,11 @@ public class SnapshotCompletionMonitor {
             Map<Integer, Long> drSequenceNumbers = new HashMap<>();
             JSONObject drTupleStreamJSON = jsonObj.getJSONObject("drTupleStreamStateInfo");
             Iterator<String> partitionKeys = drTupleStreamJSON.keys();
+            byte drVersion = 0;
             while (partitionKeys.hasNext()) {
                 String partitionIdString = partitionKeys.next();
                 JSONObject stateInfo = drTupleStreamJSON.getJSONObject(partitionIdString);
+                drVersion = (byte)stateInfo.getLong("drVersion");
                 drSequenceNumbers.put(Integer.valueOf(partitionIdString), stateInfo.getLong("sequenceNumber"));
             }
 
@@ -255,7 +257,8 @@ public class SnapshotCompletionMonitor {
                                 truncReqId,
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
-                                Collections.unmodifiableMap(remoteDCLastIds)));
+                                Collections.unmodifiableMap(remoteDCLastIds),
+                                drVersion));
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }

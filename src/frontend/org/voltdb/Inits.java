@@ -718,7 +718,8 @@ public class Inits {
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
+                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath(),
+                                                      new File(m_rvdb.m_catalogContext.cluster.getDroverflow()));
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }

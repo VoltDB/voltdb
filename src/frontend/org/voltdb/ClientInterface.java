@@ -160,6 +160,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     public static final long DR_REPLICATION_CID         = Long.MIN_VALUE + 4;
     public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
+    public static final long DR_PROTOCOL_CID    = Long.MIN_VALUE + 6;
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 100;
 

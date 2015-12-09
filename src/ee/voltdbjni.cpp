@@ -1420,10 +1420,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
  * Signature: ()[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz) {
+  (JNIEnv *env, jclass clazz, jbyte version) {
     try {
         char *output = new char[1024 * 256];
-        int32_t length = DRTupleStream::getTestDRBuffer(output);
+        int32_t length = DRTupleStream::getTestDRBuffer(output, version);
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);
         ::memcpy(arrayBytes, output, length);

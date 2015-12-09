@@ -1,0 +1,150 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.sysprocs;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+
+import org.voltdb.DependencyPair;
+import org.voltdb.ParameterSet;
+import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TupleStreamStateInfo;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.jni.ExecutionEngine.TaskType;
+import org.voltdb.utils.VoltTableUtil;
+
+public class ExecuteTask extends VoltSystemProcedure {
+
+    private static final int DEP_executeTask = (int) SysProcFragmentId.PF_executeTask | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
+
+
+    static VoltTable createPartitionDRTupleStreamStateResultTable()
+    {
+        return new VoltTable(new VoltTable.ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
+                             new VoltTable.ColumnInfo(CNAME_PARTITION_ID, CTYPE_ID),
+                             new VoltTable.ColumnInfo("PARTITION_SEQUENCE_NUMBER", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("PARTITION_SP_UNIQUEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("PARTITION_MP_UNIUQEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("DR_VERSION", VoltType.INTEGER));
+    }
+
+    static VoltTable createReplicatedDRTupleStreamStateResultTable()
+    {
+        return new VoltTable(new VoltTable.ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
+                             new VoltTable.ColumnInfo(CNAME_PARTITION_ID, CTYPE_ID),
+                             new VoltTable.ColumnInfo("PARTITION_SEQUENCE_NUMBER", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("PARTITION_SP_UNIQUEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("PARTITION_MP_UNIUQEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("REPLICATED_SEQUENCE_NUMBER", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("REPLICATED_SP_UNIQUEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("REPLICATED_MP_UNIUQEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("DR_VERSION", VoltType.INTEGER));
+    }
+
+    @Override
+    public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_executeTask);
+        registerPlanFragment(SysProcFragmentId.PF_executeTaskAggregate);
+    }
+
+    @Override
+    public DependencyPair executePlanFragment(
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params, SystemProcedureExecutionContext context) {
+        if (fragmentId == SysProcFragmentId.PF_executeTask) {
+            assert(params.toArray()[0] != null);
+            byte[] payload = (byte [])params.toArray()[0];
+            ByteBuffer buffer = ByteBuffer.wrap(payload);
+            int taskId = buffer.getInt();
+            TaskType taskType = TaskType.values()[taskId];
+            VoltTable result = null;
+            switch (taskType) {
+            // @VALIDATE_PARTITIONING is an existing system stored procedure, don't bother to provide another implementation here.
+            case GET_DR_TUPLESTREAM_STATE:
+            {
+                TupleStreamStateInfo stateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
+                if (stateInfo.containsReplicatedStreamInfo) {
+                    result = createReplicatedDRTupleStreamStateResultTable();
+                    result.addRow(context.getHostId(), context.getPartitionId(),
+                            stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
+                            stateInfo.replicatedInfo.drId, stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
+                            stateInfo.drVersion);
+                } else {
+                    result = createPartitionDRTupleStreamStateResultTable();
+                    result.addRow(context.getHostId(), context.getPartitionId(),
+                            stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
+                            stateInfo.drVersion);
+                }
+                break;
+            }
+            case SET_DR_SEQUENCE_NUMBERS:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                result.addRow(STATUS_OK);
+                long partitionSequenceNumber = buffer.getLong();
+                long mpSequenceNumber = buffer.getLong();
+                context.getSiteProcedureConnection().setDRSequenceNumbers(partitionSequenceNumber, mpSequenceNumber);
+                break;
+            }
+            case SET_DR_PROTOCOL_VERSION:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                result.addRow(STATUS_OK);
+                int drVersion = buffer.getInt();
+                context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
+                break;
+            }
+            default:
+                throw new VoltAbortException("Unable to find the task associated with the given task id");
+            }
+            return new DependencyPair(DEP_executeTask, result);
+        } else if (fragmentId == SysProcFragmentId.PF_executeTaskAggregate) {
+            return new DependencyPair(DEP_executeTaskAggregate, VoltTableUtil.unionTables(dependencies.get(DEP_executeTask)));
+        }
+        assert false;
+        return null;
+    }
+
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] params) {
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_executeTask;
+        pfs[0].inputDepIds = new int[]{};
+        pfs[0].outputDepId = DEP_executeTask;
+        pfs[0].multipartition = true;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[] { params });
+
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_executeTaskAggregate;
+        pfs[1].inputDepIds = new int[]{DEP_executeTask};
+        pfs[1].outputDepId = DEP_executeTaskAggregate;
+        pfs[1].multipartition = false;
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
+
+        VoltTable[] results = executeSysProcPlanFragments(pfs, DEP_executeTaskAggregate);
+
+        return results;
+    }
+
+}
