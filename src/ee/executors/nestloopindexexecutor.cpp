@@ -166,9 +166,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     // NULL tuple for outer join
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_out_table = m_indexNode->getOutputTable();
-        assert(inner_out_table);
-        m_null_tuple.init(inner_out_table->schema());
+        m_null_tuple.init(inner_table->schema());
     }
 
     //outer_table is the input table that have tuples to be iterated
@@ -244,7 +242,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     const TableTuple &null_tuple = m_null_tuple.tuple();
-    int num_of_inner_cols = (m_joinType == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
     ProgressMonitorProxy pmp(m_engine, this);
 
     TableTuple join_tuple;
@@ -523,7 +520,19 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     continue;
                 }
                 ++tuple_ctr;
-                join_tuple.setNValues(num_of_outer_cols, m_null_tuple.tuple(), 0, num_of_inner_cols);
+
+                //
+                // Try to put the tuple into our output table
+                // Append the inner values to the end of our join tuple
+                //
+                for (int col_ctr = num_of_outer_cols;
+                     col_ctr < join_tuple.sizeInValues();
+                     ++col_ctr) {
+                    // For the sake of consistency, we don't try to do
+                    // output expressions here with columns from both tables.
+                    join_tuple.setNValue(col_ctr,
+                                         m_outputExpressions[col_ctr]->eval(&outer_tuple, &null_tuple));
+                }
 
                 if (m_aggExec != NULL) {
                     if (m_aggExec->p_execute_tuple(join_tuple)) {

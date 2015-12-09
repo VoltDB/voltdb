@@ -282,7 +282,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
-        else if (m_tableScanSchema.size() != 0 && m_isInline == false) {
+        else if (m_tableScanSchema.size() != 0) {
             // Order the scan columns according to the table schema
             // before we stick them in the projection output
             List<TupleValueExpression> scan_tves =
@@ -308,10 +308,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
         else {
-            // We come here if this node is an inline scan node, or if m_tableScanSchema is empty.
-            //
-            // If this scan node is inlined into another node, then there is no output temp
-            // table for this node, so the output schema will be the same as the table being scanned.
+            // We come here if m_tableScanSchema is empty.
             //
             // m_tableScanSchema might be empty for cases like
             //   select now from table;

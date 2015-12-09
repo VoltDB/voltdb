@@ -109,12 +109,9 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, index_schema);
         resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, index_schema);
 
-        final NodeSchema inline_scan_output_schema = inline_scan.getOutputSchema();
-
-        // resolve other predicates based on inline index scan node output schema
-        resolvePredicate(m_preJoinPredicate, outer_schema, inline_scan_output_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, inline_scan_output_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, inline_scan_output_schema);
+        resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, index_schema);
 
         // resolve subqueries
         Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
