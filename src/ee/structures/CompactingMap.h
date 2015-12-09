@@ -355,7 +355,7 @@ protected:
         void *memory = m_allocator.alloc();
         assert(memory);
         // placement new
-        TreeNode *z = new(memory) TreeNode;
+        TreeNode *z = new(memory) TreeNode();
         z->left = z->right = z->parent = &NIL;
         if (hasRank) {
             z->subct = 1;
