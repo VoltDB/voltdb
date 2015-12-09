@@ -29,7 +29,6 @@
 #include <sys/time.h>
 #include "harness.h"
 #include "structures/CompactingMap.h"
-#include "structures/CompactingSet.h"
 #include "common/FixUnusedAssertHack.h"
 
 using namespace voltdb;
@@ -754,43 +753,6 @@ TEST_F(CompactingMapTest, RandomMulti) {
     // std::cout << "Sizes: " << countSizes << " greatest size: " << size_greatest << std::endl;
     // std::cout << "LowerBounds: " << lowerBounds << " lb greatest chain: " << lb_greatestChain << std::endl;
     // std::cout << "UpperBounds: " << upperBounds << " ub greatest chain: " << ub_greatestChain << std::endl;
-}
-
-TEST_F(CompactingMapTest, Traversal) {
-    CompactingSet<int> s;
-    for (int i = 0; i < 10; i++) {
-        std::cout << "Inserting " << i << std::endl;
-        ASSERT_TRUE(s.insert(i));
-    }
-
-    CompactingSet<int>::const_iterator fi = s.begin();
-    ASSERT_EQ(0, *fi); fi++;
-    ASSERT_EQ(1, *fi); fi++;
-    ASSERT_EQ(2, *fi); fi++;
-    ASSERT_EQ(3, *fi); fi++;
-    ASSERT_EQ(4, *fi); fi++;
-    ASSERT_EQ(5, *fi); fi++;
-    ASSERT_EQ(6, *fi); fi++;
-    ASSERT_EQ(7, *fi); fi++;
-    ASSERT_EQ(8, *fi); fi++;
-    ASSERT_EQ(9, *fi); fi++;
-    ASSERT_EQ(fi, s.end());
-
-    CompactingSet<int>::const_iterator ei = s.end();
-    ASSERT_EQ(ei, s.end()); ei--;
-    ASSERT_EQ(9, *ei); ei--;
-    ASSERT_EQ(8, *ei); ei--;
-    ASSERT_EQ(7, *ei); ei--;
-    ASSERT_EQ(6, *ei); ei--;
-    ASSERT_EQ(5, *ei); ei--;
-    ASSERT_EQ(4, *ei); ei--;
-    ASSERT_EQ(3, *ei); ei--;
-    ASSERT_EQ(2, *ei); ei--;
-    ASSERT_EQ(1, *ei); ei--;
-    ASSERT_EQ(0, *ei); ei--;
-
-    s.clear();
-    ASSERT_TRUE(s.empty());
 }
 
 // ENG-1057
