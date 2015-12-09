@@ -145,11 +145,8 @@ public class TestVoltFormatter extends TestCase {
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
         Formatter formatter = o.create("csv", prop);
-        try {
-            formatter.transform(null);
-            fail();
-        } catch (NullPointerException e) {
-        }
+        Object[] results = formatter.transform(null);
+        assertNull(results);
     }
 
     @Test

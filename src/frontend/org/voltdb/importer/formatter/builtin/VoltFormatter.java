@@ -31,7 +31,7 @@ public class VoltFormatter implements Formatter<String> {
 
     VoltFormatter (String name, Properties prop) {
         if (!("csv".equalsIgnoreCase(name) || "tsv".equalsIgnoreCase(name))) {
-            throw new RuntimeException("Invalid format " + name + ", choices are either \"csv\" or \"tsv\".");
+            throw new IllegalArgumentException("Invalid format " + name + ", choices are either \"csv\" or \"tsv\".");
         }
         m_parser = new CSVParser("csv".equalsIgnoreCase(name) ? ',' : '\t');
     }
@@ -51,7 +51,7 @@ public class VoltFormatter implements Formatter<String> {
             }
             return list;
         } catch (IOException e) {
-            throw new FormatException(e);
+            throw new FormatException("failed to format " + sourceData, e);
         }
     }
 }
