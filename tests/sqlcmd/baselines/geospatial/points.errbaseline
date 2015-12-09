@@ -4,4 +4,4 @@ Longitude "270.000000" out of bounds.
 Latitude "-100.000000" out of bounds.
 Longitude "-360.000000" out of bounds.
 Longitude "-270.000000" out of bounds.
-Cannot construct PointType value from "point(0.0, 0.0)"
+Cannot construct GeographyPointValue value from "point(0.0, 0.0)"
