@@ -82,7 +82,6 @@ import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.jni.SpyExecutionEngineJNI;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -511,8 +510,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
                 Method spyMethod = spyClass.getDeclaredMethod("spy", Object.class);
-                ExecutionEngine internalEE = new SpyExecutionEngineJNI(
-                        Thread.currentThread().getId(),
+                ExecutionEngine internalEE = new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
