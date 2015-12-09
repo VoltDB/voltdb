@@ -43,7 +43,7 @@ static void throwInvalidWktPoint(const std::string& input)
     std::ostringstream oss;
     oss << "Invalid input to POINTFROMTEXT: ";
     oss << "'" << input << "', ";
-    oss << "expected input of the form 'POINT(<lat> <lng>)'";
+    oss << "expected input of the form 'POINT(<lng> <lat>)'";
     throw SQLException(SQLException::data_exception_invalid_parameter,
                        oss.str().c_str());
 }
@@ -52,7 +52,7 @@ static void throwInvalidWktPoly(const std::string& reason)
 {
     std::ostringstream oss;
     oss << "Invalid input to POLYGONFROMTEXT: " << reason << ".  ";
-    oss << "Expected input of the form 'POLYGON((<lat> <lng>, ...), ...)'";
+    oss << "Expected input of the form 'POLYGON((<lng> <lat>, ...), ...)'";
     throw SQLException(SQLException::data_exception_invalid_parameter,
                        oss.str().c_str());
 }

@@ -473,7 +473,7 @@ public class GeographyValue {
                     double lng = tokenizer.nval;
                     token = tokenizer.nextToken();
                     if (token != StreamTokenizer.TT_NUMBER) {
-                        throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
+                        throw new IllegalArgumentException(msgPrefix + "missing latitude in long lat pair");
                     }
                     double lat = tokenizer.nval;
                     currentLoop.add(XYZPoint.fromGeographyPointValue(new GeographyPointValue(lng, lat)));
@@ -481,7 +481,7 @@ public class GeographyValue {
                     token = tokenizer.nextToken();
                     if (token != ',') {
                         if (token != ')') {
-                            throw new IllegalArgumentException(msgPrefix + "missing comma between lat long pairs");
+                            throw new IllegalArgumentException(msgPrefix + "missing comma between long lat pairs");
                         }
                         tokenizer.pushBack();
                     }

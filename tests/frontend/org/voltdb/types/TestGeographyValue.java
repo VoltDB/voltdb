@@ -238,7 +238,7 @@ public class TestGeographyValue extends TestCase {
         assertWktParseError("expected WKT to start with POLYGON", "NOT_A_POLYGON(...)");
         assertWktParseError("expected left parenthesis after POLYGON", "POLYGON []");
         assertWktParseError("missing opening parenthesis", "POLYGON(3 3, 4 4, 5 5, 3 3)");
-        assertWktParseError("missing longitude", "POLYGON ((80 80, 60, 70 70, 90 90))");
+        assertWktParseError("missing latitude", "POLYGON ((80 80, 60, 70 70, 90 90))");
         assertWktParseError("missing comma", "POLYGON ((80 80 60 60, 70 70, 90 90))");
         assertWktParseError("premature end of input", "POLYGON ((80 80, 60 60, 70 70,");
         assertWktParseError("missing closing parenthesis", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");

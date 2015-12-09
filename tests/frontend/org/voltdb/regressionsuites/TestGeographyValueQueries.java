@@ -542,35 +542,48 @@ public class TestGeographyValueQueries extends RegressionSuite {
                         + "(\n-67.448\t27.026,\t-68.992    27.026\n, -68.992     25.968,-67.448\n\n25.968   , -67.448  \n27.026\t)\n)\t"));
     }
 
-    private void assertWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+    private void assertGeographyValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
         String stmt = "select polygonfromtext('" + wkt + "') from t";
         verifyStmtFails(client, stmt, expectedMsg);
+    }
+
+    // This is really misplaced.  But we don't have a regression
+    // suite test for testing points.  We ought to, but we don't.
+    private void assertGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+        String stmt = "select pointfromtext('" + wkt + "') from t";
+        verifyStmtFails(client, stmt, expectedMsg);
+    }
+
+    public void testPointFromTextNegative() throws Exception {
+        Client client = getClient();
+        validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
+        assertGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
     }
 
     public void testPolygonFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
-        assertWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
-        assertWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
-        assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
-        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
-        assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
-        assertWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
-        assertWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
-        assertWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
-        assertWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
-        assertWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
-        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
-        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
-        assertWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
+        assertGeographyValueWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
+        assertGeographyValueWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
+        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
+        assertGeographyValueWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
+        assertGeographyValueWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
+        assertGeographyValueWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
+        assertGeographyValueWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
+        assertGeographyValueWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
+        assertGeographyValueWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
+        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
+        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
+        assertGeographyValueWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
 
         // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates
         // that are separated only by a minus sign indicating that the second coordinate is negative.
         // But boost's tokenizer (at least as its currently configured) will consider "32.305-64.571" as a single
         // token.  This seems like an acceptable discrepancy?
-        assertWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
+        assertGeographyValueWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
     }
 
     static public junit.framework.Test suite() {
