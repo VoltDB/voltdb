@@ -463,9 +463,7 @@ void CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::copyRecursive(
     to->setKey(from->key());
     to->setValue(from->value());
     to->color = from->color;
-    if (hasRank) {
-        to->subct = from->subct;
-    }
+    to->subct = from->subct;
 
     if (from->left != fromNIL) {
         to->left = newNode();
