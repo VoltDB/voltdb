@@ -615,7 +615,11 @@ public abstract class ExpressionUtil {
             }
         } else if (ExpressionType.OPERATOR_NOT == expr.getExpressionType()) {
             AbstractExpression leftExpr = expr.getLeft();
-            if (VoltType.BOOLEAN == leftExpr.getValueType()) {
+            // functions can also return boolean. so the left child expression can be
+            // function expression and there by don't evaluate every left child expr
+            // as constant value expression
+            if ((VoltType.BOOLEAN == leftExpr.getValueType()) &&
+                    (leftExpr instanceof ConstantValueExpression)) {
                 if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
                     return ConstantValueExpression.getFalse();
                 } else {
