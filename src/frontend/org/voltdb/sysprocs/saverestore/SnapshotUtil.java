@@ -1250,13 +1250,14 @@ public class SnapshotUtil {
             if ((table.getMaterializer() != null) &&
                     (CatalogUtil.isTableExportOnly(database, table.getMaterializer())))
             {
-                //This is just a guard compiler should not let this view compile.
-                String bPartName = table.getMaterializer().getPartitioncolumn().getName();
+                //Non partitioned export table are not allowed so it should not get here.
+                Column bpc = table.getMaterializer().getPartitioncolumn();
+                if (bpc == null) continue;
+
+                String bPartName = bpc.getName();
                 Column pc = table.getColumns().get(bPartName);
                 if (pc != null) {
                     my_tables.add(table);
-                } else {
-                    System.out.println("Can not snapshot " + table.toString());
                 }
                 continue;
             }

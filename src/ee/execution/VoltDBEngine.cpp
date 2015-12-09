@@ -751,8 +751,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             }
             m_catalogDelegates[catalogTable->path()] = tcd;
             m_delegatesByName[tcd->getTable()->name()] = tcd;
-//            std::cout << "Creating export table " << tcd->getTable()->name() << "\n";
-//            std::cout.flush();
 
             // set export info on the new table
             if (tcd->exportEnabled()) {
@@ -1018,8 +1016,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 }
                 // This is not a leak -- the view metadata is self-installing into the new table.
                 // Also, it guards its targetTable from accidental deletion with a refcount bump.
-//    std::cout << "Creating reg view 2\n";
-//    std::cout.flush();
                 new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
                 obsoleteViews.push_back(survivingViews[ii]);
             }
@@ -1290,14 +1286,11 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
         StreamedTable *srcSTable = dynamic_cast<StreamedTable*>(srcTable);
 
         if (srcSTable != NULL) {
-//    std::cout << "Found Streamed table " << srcSTable->name() << " \n";
-//    std::cout.flush();
             // walk views
             BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
                 catalog::MaterializedViewInfo *catalogView = labeledView.second;
                 const catalog::Table *destCatalogTable = catalogView->dest();
                 PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
-//    std::cout << "Found streamed table for streamed view " << t->name() << " \n";
                 //assert(destTable);
                 // Either connect source and destination tables with a new link...
                 // Or Ensure that the materialized view is using the latest version of the target table.

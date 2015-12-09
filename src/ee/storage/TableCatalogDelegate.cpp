@@ -479,9 +479,6 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                   PersistentTable *existingTable, PersistentTable *newTable,
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
-    std::cout << "Migrating regular views\n";
-    std::cout.flush();
-
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
     std::vector<MaterializedViewMetadata*> obsoleteViews;
@@ -521,8 +518,6 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
         }
         // This is not a leak -- the materialized view metadata is self-installing into the new table.
         // Also, it guards its targetTable from accidental deletion with a refcount bump.
-    std::cout << "Creating reg view 1\n";
-    std::cout.flush();
         new MaterializedViewMetadata(newTable, targetTable, currInfo);
     }
 }

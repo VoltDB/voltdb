@@ -502,7 +502,7 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Return true if a table is the source table for a materialized view.
+     * Return list of materialized view for table.
      */
     public static List<Table> getMaterializeViews(org.voltdb.catalog.Database database,
                                                        org.voltdb.catalog.Table table)

@@ -36,8 +36,6 @@ StreamedTable::StreamedTable(bool exportEnabled)
     : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
       m_sequenceNo(0)
 {
-//    std::cout << "Streamed Table create " << name() << " \n";
-//    std::cout.flush();
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         enableStream();
@@ -74,14 +72,10 @@ bool StreamedTable::enableStream() {
 void
 StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalog::MaterializedViewInfo* targetMvInfo)
 {
-    if (!target) {
-//    std::cout << "Found NULL target for streamed table\n";
-//    std::cout.flush();
+    if (target == NULL) {
         return;
     }
     std::string targetName = target->name();
-//    std::cout << "Streamed Table with views " << targetName << " \n";
-//    std::cout.flush();
 
     // find the materialized view that uses the table or its precursor (by the same name).
     BOOST_FOREACH(ExportMaterializedViewMetadata* currView, m_views) {
@@ -89,11 +83,7 @@ StreamedTable::updateMaterializedViewTargetTable(PersistentTable* target, catalo
 
         // found: target is alreafy set
         if (currTarget == target) {
-            // The view is already up to date.
-            // but still need to update the index used for min/max
-//            if (currView->indexForMinMax().compare(targetMvInfo->indexForMinMax()) != 0) {
-                currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
-//            }
+            currView->setIndexForMinMax(targetMvInfo->indexForMinMax());
             return;
         }
 
