@@ -2245,6 +2245,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 for (Initiator iv2init : m_iv2Initiators.values()) {
                     iv2init.setConsumerDRGateway(m_consumerDRGateway);
                 }
+                m_consumerDRGateway.initialize(false);
             }
             // 6.2. If we are a DR replica, we may care about a
             // deployment update
@@ -2709,8 +2710,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private boolean createDRConsumerIfNeeded() {
-        if (!m_config.m_isEnterprise ||
-                !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)) {
+        if (!m_config.m_isEnterprise
+                || !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)
+                || !m_catalogContext.cluster.getDrconsumerenabled()) {
             return false;
         }
         if (m_config.m_replicationRole == ReplicationRole.REPLICA ||

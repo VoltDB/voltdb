@@ -966,18 +966,6 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </import>"
                 + "</deployment>";
-        final String goodImport2 =
-                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
-                + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <import>"
-                + "        <configuration type=\"custom\" module=\"org.voltdb.importer.ImportHandlerProxy\" >"
-                + "            <property name=\"foo\">false</property>"
-                + "            <property name=\"type\">CSV</property>"
-                + "            <property name=\"with-schema\">false</property>"
-                + "        </configuration>"
-                + "    </import>"
-                + "</deployment>";
 
 
         final String ddl =
@@ -1039,17 +1027,6 @@ public class TestCatalogUtil extends TestCase {
 
         String msg5 = CatalogUtil.compileDeployment(cat5, good_deployment1, false);
         assertNull(msg5);
-
-        final File good2 = VoltProjectBuilder.writeStringToTempFile(goodImport2);
-        DeploymentType good_deployment2 = CatalogUtil.getDeployment(new FileInputStream(good2));
-
-        VoltCompiler good_compiler2 = new VoltCompiler();
-        String x6[] = {tmpDdl.getAbsolutePath()};
-        Catalog cat6 = good_compiler2.compileCatalogFromDDL(x6);
-
-        String msg6 = CatalogUtil.compileDeployment(cat6, good_deployment2, false);
-        assertNull(msg6);
-
         System.out.println("Import deployment tests done.");
     }
 

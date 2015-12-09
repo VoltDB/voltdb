@@ -1,5 +1,3 @@
-
-
 (function (window, unused) {
 
     var iVoltDbCore = (function () {

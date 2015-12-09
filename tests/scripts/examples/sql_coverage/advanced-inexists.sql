@@ -37,7 +37,9 @@ SELECT * FROM @fromtables A01 WHERE _variable[#agg @columntype] _maybe IN ( SELE
 SELECT * FROM @fromtables A02 WHERE EXISTS ( SELECT _variable[#GB]  FROM @fromtables B GROUP BY B.__[#GB] HAVING MAX(B._variable[@columntype]) _cmp  A02._variable[@columntype] )
 
 SELECT * FROM @fromtables A03 LHS _jointype JOIN @fromtables RHS_10 ON LHS.@idcol = RHS_10.@idcol where LHS._variable[@columntype] _maybe IN (SELECT _variable[@columntype] FROM @fromtables IN_TABLE)
-SELECT 100, * FROM @fromtables A04 WHERE _variable[#col] _maybe IN ( SELECT __[#col] FROM @fromtables LHS _jointype JOIN @fromtables RHS_11 ON LHS.@idcol = RHS_11.@idcol where LHS._variable[@columntype] _cmp A04._variable[@columntype] )
+SELECT 100, * FROM @fromtables A04 WHERE _variable[#col] _maybe IN ( SELECT LHS.__[#col] FROM @fromtables LHS _jointype JOIN @fromtables RHS_11 ON LHS.@idcol = RHS_11.@idcol where LHS._variable[@columntype] _cmp A04._variable[@columntype] )
+-- Uncomment after ENG-9367 is fixed (??):
+--SELECT 100, * FROM @fromtables A05 WHERE _variable[#col] _maybe IN ( SELECT     __[#col] FROM @fromtables LHS _jointype JOIN @fromtables RHS_11 ON LHS.@idcol = RHS_11.@idcol where LHS._variable[@columntype] _cmp A05._variable[@columntype] )
 
 
 --- Additional tests of IN
