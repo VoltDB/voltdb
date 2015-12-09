@@ -1418,11 +1418,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 boolean shutdownAction = false;
 
                 // check license features for community version
-                if ((deployment.getCluster() != null) && (deployment.getCluster().getKfactor() > 0)) {
-                    consoleLog.error("K-Safety is not supported " +
-                            "in the community edition of VoltDB.");
-                    shutdownDeployment = true;
-                }
                 if ((deployment.getSnapshot() != null) && (deployment.getSnapshot().isEnabled())) {
                     consoleLog.error("Snapshots are not supported " +
                             "in the community edition of VoltDB.");
