@@ -32,9 +32,9 @@ public class TestGeographyPointValue extends TestCase {
     // Points should have this much precision.
     private final double EPSILON = 1.0e-15;
 
-    private void assertConstructorThrows(String expectedMessage, double lat, double lng) {
+    private void assertConstructorThrows(String expectedMessage, double lng, double lat) {
         try {
-            new GeographyPointValue(lat, lng);
+            new GeographyPointValue(lng, lat);
             fail("Expected constructor to throw an exception");
     }
         catch (IllegalArgumentException iae) {
@@ -47,8 +47,8 @@ public class TestGeographyPointValue extends TestCase {
         assertEquals(16, GeographyPointValue.getLengthInBytes());
 
         GeographyPointValue point = new GeographyPointValue(10.333, 20.666);
-        assertEquals(10.333, point.getLatitude(), EPSILON);
-        assertEquals(20.666, point.getLongitude(), EPSILON);
+        assertEquals(20.666, point.getLatitude(), EPSILON);
+        assertEquals(10.333, point.getLongitude(), EPSILON);
 
         assertTrue(point.equals(point));
         assertFalse(point.equals(new GeographyPointValue(0.0, 10.0)));
@@ -57,10 +57,10 @@ public class TestGeographyPointValue extends TestCase {
 
         // Make sure that it's not possible to create points
         // with bogus latitude or longitude.
-        assertConstructorThrows("Latitude out of range", -91.0, 100);
-        assertConstructorThrows("Latitude out of range", 91.0, 100);
-        assertConstructorThrows("Longitude out of range", 45.0, 181.0);
-        assertConstructorThrows("Longitude out of range", 45.0, -181.0);
+        assertConstructorThrows("Latitude out of range",   100,  -91.0);
+        assertConstructorThrows("Latitude out of range",   100,   91.0);
+        assertConstructorThrows("Longitude out of range",  181.0, 45.0);
+        assertConstructorThrows("Longitude out of range", -181.0, 45.0);
     }
 
     public void testPointSerialization() {
@@ -98,6 +98,12 @@ public class TestGeographyPointValue extends TestCase {
         assertEquals(360.0, bb.getDouble());
     }
 
+    /*
+     * Note: The parameters are (latitude, longitude), which is the
+     *       opposite of order in which we construct points, and
+     *       the order used in WKT.  This is to try to test that we
+     *       have gotten it right.
+     */
     private void testOnePointFromFactory(String aWKT, double aLatitude, double aLongitude, double aEpsilon, String aErrMsg) {
         try {
             GeographyPointValue point = GeographyPointValue.geographyPointFromText(aWKT);
@@ -117,29 +123,31 @@ public class TestGeographyPointValue extends TestCase {
     }
 
     public void testPointFactory() {
+        // Note that the WKT strings and the test factory parameters are swapped.
+        // This is purposeful.
         testOnePointFromFactory("point(0 0)",                                    0.0,            0.0,          EPSILON, null);
-        testOnePointFromFactory("point(10.3330000000 20.6660000000)",           10.3330000000,  20.6660000000, EPSILON, null);
-        testOnePointFromFactory("  point  (10.3330000000   20.6660000000)    ", 10.333,         20.666,        EPSILON, null);
-        testOnePointFromFactory("point(10.333 20.666)",                         10.333,         20.666,        EPSILON, null);
-        testOnePointFromFactory("  point  (10.333   20.666)    ",               10.333,         20.666,        EPSILON, null);
-        testOnePointFromFactory("point(-10.333 -20.666)",                      -10.333,        -20.666,        EPSILON, null);
-        testOnePointFromFactory("  point  (-10.333   -20.666)    ",            -10.333,        -20.666,        EPSILON, null);
+        testOnePointFromFactory("point(10.3330000000 20.6660000000)",           20.6660000000,  10.3330000000, EPSILON, null);
+        testOnePointFromFactory("  point  (10.3330000000   20.6660000000)    ", 20.666,         10.333,        EPSILON, null);
+        testOnePointFromFactory("point(10.333 20.666)",                         20.666,         10.333,        EPSILON, null);
+        testOnePointFromFactory("  point  (10.333   20.666)    ",               20.666,         10.333,        EPSILON, null);
+        testOnePointFromFactory("point(-10.333 -20.666)",                      -20.666,        -10.333,        EPSILON, null);
+        testOnePointFromFactory("  point  (-10.333   -20.666)    ",            -20.666,        -10.333,        EPSILON, null);
         testOnePointFromFactory("point(10 10)",                                 10.0,           10.0,          EPSILON, null);
         // Test latitude/longitude ranges.
         testOnePointFromFactory("point( 100.0   100.0)", 100.0, 100.0, EPSILON, "Latitude \"100.0+\" out of bounds.");
-        testOnePointFromFactory("point(  45.0   360.0)",  45.0, 360.0, EPSILON, "Longitude \"360.0+\" out of bounds.");
-        testOnePointFromFactory("point(  45.0   270.0)",  45.0, 360.0, EPSILON, "Longitude \"270.0+\" out of bounds.");
+        testOnePointFromFactory("point( 360.0    45.0)", 360.0,  45.0, EPSILON, "Longitude \"360.0+\" out of bounds.");
+        testOnePointFromFactory("point( 270.0    45.0)", 360.0,  45.0, EPSILON, "Longitude \"270.0+\" out of bounds.");
         testOnePointFromFactory("point(-100.0  -100.0)",
                                 -100.0,
                                 -100.0,
                                 EPSILON,
                                 "Latitude \"-100.0+\" out of bounds.");
-        testOnePointFromFactory("point( -45.0  -360.0)",
+        testOnePointFromFactory("point(-360.0  -45.0)",
                                 -45.0,
                                 -360.0,
                                 EPSILON,
                                 "Longitude \"-360.0+\" out of bounds.");
-        testOnePointFromFactory("point( -45.0  -270.0)",
+        testOnePointFromFactory("point(-270.0  -45.0)",
                                 -45.0,
                                 -360.0,
                                 EPSILON,
