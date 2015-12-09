@@ -121,9 +121,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public long m_peakMemoryInBytes = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
-    public Void resetDirtyStatus() {
+    public void resetDirtyStatus() {
         m_dirty = false;
-        return null;
     }
 
     /** Has the database changed any state since the last reset of dirty status? */
@@ -131,9 +130,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return m_dirty;
     }
 
-    public Void setBatchTimeout(int batchTimeout) {
+    public void setBatchTimeout(int batchTimeout) {
         m_batchTimeout = batchTimeout;
-        return null;
     }
 
     public int getBatchTimeout() {
@@ -150,11 +148,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Utility method to verify return code and throw as required */
-    final protected Void checkErrorCode(final int errorCode) {
+    final protected void checkErrorCode(final int errorCode) {
         if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN)) {
             throwExceptionForError(errorCode);
         }
-        return null;
     }
 
     /**
@@ -162,7 +159,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * derived classes. This needs to be implemented by each interface
      * as data is required from the execution engine.
      */
-    protected abstract Void throwExceptionForError(final int errorCode);
+    protected abstract void throwExceptionForError(final int errorCode);
 
     @Override
     public void deserializedBytes(final int numBytes) {
@@ -200,9 +197,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Does not copy the table data - references WorkUnit's tables.
      * @param dependencies
      */
-    public Void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies) {
+    public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies) {
         m_dependencyTracker.trackNewWorkUnit(dependencies);
-        return null;
     }
 
     /**
@@ -210,9 +206,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param depId
      * @param vt
      */
-    public Void stashDependency(final int depId, final VoltTable vt) {
+    public void stashDependency(final int depId, final VoltTable vt) {
         m_dependencyTracker.addDependency(depId, vt);
-        return null;
     }
 
 
@@ -509,10 +504,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                                List<DBBPool.BBContainer> outputBuffers);
 
-    public abstract Void processRecoveryMessage( ByteBuffer buffer, long pointer);
+    public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
     /** Releases the Engine object. */
-    public abstract Void release() throws EEException, InterruptedException;
+    public abstract void release() throws EEException, InterruptedException;
 
     public static byte[] getStringBytes(String string) {
         try {
@@ -527,14 +522,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Pass the catalog to the engine */
-    protected abstract Void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
+    protected abstract void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    public abstract Void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
+    public abstract void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
-    public Void setBatch(int batchIndex) {
+    public void setBatch(int batchIndex) {
         m_currentBatchIndex = batchIndex;
-        return null;
     }
 
     public void setProcedureName(String procedureName) {
@@ -611,13 +605,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param time The current time in milliseconds since the epoch. See
      * System.currentTimeMillis();
      */
-    public abstract Void tick(long time, long lastCommittedSpHandle);
+    public abstract void tick(long time, long lastCommittedSpHandle);
 
     /**
      * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
-    public abstract Void quiesce(long lastCommittedSpHandle);
+    public abstract void quiesce(long lastCommittedSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
@@ -636,7 +630,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Instruct the EE to start/stop its profiler.
      */
-    public abstract Void toggleProfiler(int toggle);
+    public abstract void toggleProfiler(int toggle);
 
     /**
      * Release all undo actions up to and including the specified undo token
@@ -653,7 +647,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Execute an Export action against the execution engine.
      */
-    public abstract Void exportAction( boolean syncAction,
+    public abstract void exportAction( boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String tableSignature);
 
     /**
@@ -686,7 +680,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param type hashinator type
      * @param config new hashinator config
      */
-    public abstract Void updateHashinator(HashinatorConfig config);
+    public abstract void updateHashinator(HashinatorConfig config);
 
     /**
      * Apply binary log data. To be able to advance the DR sequence number and
@@ -1020,11 +1014,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Start collecting statistics (starts timer).
      */
-    protected Void startStatsCollection() {
+    protected void startStatsCollection() {
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
         }
-        return null;
     }
 
     /**
@@ -1033,11 +1026,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param cacheSize  size of cache
      * @param cacheUse   where the plan came from
      */
-    protected Void endStatsCollection(long cacheSize, CacheUse cacheUse) {
+    protected void endStatsCollection(long cacheSize, CacheUse cacheUse) {
         if (m_plannerStats != null) {
             m_plannerStats.endStatsCollection(cacheSize, 0, cacheUse, m_partitionId);
         }
-        return null;
     }
 
     /**
@@ -1047,9 +1039,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param vl  The new logger to install
      */
     @Deprecated
-    public static Void setVoltLoggerForTest(VoltLogger vl) {
+    public static void setVoltLoggerForTest(VoltLogger vl) {
         log = vl;
-        return null;
     }
 
     /**
@@ -1059,9 +1050,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param newDuration  The duration in milliseconds before the first message is logged
      */
     @Deprecated
-    public Void setInitialLogDurationForTest(long newDuration) {
+    public void setInitialLogDurationForTest(long newDuration) {
         INITIAL_LOG_DURATION = newDuration;
-        return null;
     }
 
     /**
