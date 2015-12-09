@@ -37,10 +37,11 @@ import org.voltdb.exceptions.SQLException;
 public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
-    protected void throwExceptionForError(int errorCode) {
+    protected Void throwExceptionForError(int errorCode) {
         if (errorCode == ERRORCODE_ERROR) {
             throw new SQLException("66666");
         }
+        return null;
     }
 
     @Override
@@ -125,11 +126,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
+    public Void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
+        return null;
     }
 
     @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public Void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+        return null;
     }
 
     @Override
@@ -142,7 +145,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void release() throws EEException {
+    public Void release() throws EEException {
+        return null;
     }
 
     @Override
@@ -156,12 +160,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void tick(final long time, final long lastCommittedTxnId) {
+    public Void tick(final long time, final long lastCommittedTxnId) {
+        return null;
     }
 
     @Override
-    public void toggleProfiler(final int toggle) {
-        return;
+    public Void toggleProfiler(final int toggle) {
+        return null;
     }
 
     @Override
@@ -175,8 +180,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void quiesce(long lastCommittedTxnId) {
-
+    public Void quiesce(long lastCommittedTxnId) {
+        return null;
     }
 
     @Override
@@ -191,8 +196,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
+    public Void exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
+        return null;
     }
 
     @Override
@@ -201,7 +207,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
+    public Void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
+        return null;
     }
 
     @Override
@@ -215,9 +222,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorConfig config)
+    public Void updateHashinator(TheHashinator.HashinatorConfig config)
     {
-
+        return null;
     }
 
     @Override

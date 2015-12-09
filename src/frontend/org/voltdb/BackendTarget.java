@@ -33,6 +33,7 @@ package org.voltdb;
  */
 public enum BackendTarget {
     NATIVE_EE_JNI("jni", false),
+    NATIVE_EE_SPY_JNI("jni_spy", false),
     NATIVE_EE_IPC("ipc", true),
     NATIVE_EE_VALGRIND_IPC("valgrind_ipc", true),
     HSQLDB_BACKEND("hsqldb", false),
