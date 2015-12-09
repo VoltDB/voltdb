@@ -56,7 +56,7 @@ public class GeographyPointValue {
     // VoltTable.)
     static final double NULL_COORD = 360.0;
 
-    public GeographyPointValue(double latitude, double longitude) {
+    public GeographyPointValue(double longitude, double latitude) {
         m_latitude = latitude;
         m_longitude = longitude;
 
@@ -82,15 +82,15 @@ public class GeographyPointValue {
         }
         Matcher m = wktPattern.matcher(param);
         if (m.find()) {
-            double latitude  = toDouble(m.group(1), m.group(2));
-            double longitude = toDouble(m.group(3), m.group(4));
+            double longitude = toDouble(m.group(1), m.group(2));
+            double latitude  = toDouble(m.group(3), m.group(4));
             if (Math.abs(latitude) > 90.0) {
                 throw new IllegalArgumentException(String.format("Latitude \"%f\" out of bounds.", latitude));
             }
             if (Math.abs(longitude) > 180.0) {
                 throw new IllegalArgumentException(String.format("Longitude \"%f\" out of bounds.", longitude));
             }
-            return new GeographyPointValue(latitude, longitude);
+            return new GeographyPointValue(longitude, latitude);
         } else {
             throw new IllegalArgumentException("Cannot construct GeographyPointValue value from \"" + param + "\"");
         }
@@ -104,17 +104,17 @@ public class GeographyPointValue {
         return m_longitude;
     }
 
-    public String formatLatLng() {
+    public String formatLngLat() {
         // Display a maximum of 9 decimal digits after the point.
         // This gives us precision of around 1 mm.
         DecimalFormat df = new DecimalFormat("##0.0########");
-        return df.format(m_latitude) + " " + df.format(m_longitude);
+        return df.format(m_longitude) + " " + df.format(m_latitude);
     }
 
     @Override
     public String toString() {
         // This is not GEOGRAPY_POINT.  This is wkt syntax.
-        return "POINT (" + formatLatLng() + ")";
+        return "POINT (" + formatLngLat() + ")";
     }
 
     // Returns true for two points that have the same latitude and
@@ -146,8 +146,8 @@ public class GeographyPointValue {
      * @param buffer
      */
     public void flattenToBuffer(ByteBuffer buffer) {
-        buffer.putDouble(getLatitude());
         buffer.putDouble(getLongitude());
+        buffer.putDouble(getLatitude());
     }
 
     /**
@@ -157,14 +157,14 @@ public class GeographyPointValue {
      * @return a new instance of GeographyPointValue
      */
     public static GeographyPointValue unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
-        double lat = inBuffer.getDouble(offset);
-        double lng = inBuffer.getDouble(offset + BYTES_IN_A_COORD);
+        double lng = inBuffer.getDouble(offset);
+        double lat = inBuffer.getDouble(offset + BYTES_IN_A_COORD);
         if (lat == 360.0 && lng == 360.0) {
             // This is a null point.
             return null;
         }
 
-        return new GeographyPointValue(lat, lng);
+        return new GeographyPointValue(lng, lat);
     }
 
     /**
@@ -174,14 +174,14 @@ public class GeographyPointValue {
      * @return a new instance of GeographyPointValue
      */
     public static GeographyPointValue unflattenFromBuffer(ByteBuffer inBuffer) {
-        double lat = inBuffer.getDouble();
         double lng = inBuffer.getDouble();
+        double lat = inBuffer.getDouble();
         if (lat == 360.0 && lng == 360.0) {
             // This is a null point.
             return null;
         }
 
-        return new GeographyPointValue(lat, lng);
+        return new GeographyPointValue(lng, lat);
     }
 
     /**

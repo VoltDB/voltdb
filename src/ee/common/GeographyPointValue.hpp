@@ -37,14 +37,14 @@ public:
     typedef double Coord;
 
     /** Constructor for a null point,
-     * with both lat and lng init'd to the null coordinate */
+     * with both lng and lat initialized to the null coordinate */
     GeographyPointValue()
         : m_latitude(nullCoord())
         , m_longitude(nullCoord())
     {
     }
 
-    GeographyPointValue(Coord latitude, Coord longitude)
+    GeographyPointValue(Coord longitude, Coord latitude)
         : m_latitude(latitude)
         , m_longitude(longitude)
     {
@@ -98,6 +98,17 @@ public:
         assert(! isNull());
         assert(! rhs.isNull());
 
+        Coord lhsLong = getLongitude();
+        Coord rhsLong = rhs.getLongitude();
+        if (lhsLong < rhsLong) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+
+        if (lhsLong > rhsLong) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+
+        // latitude is equal; compare longitude
         Coord lhsLat = getLatitude();
         Coord rhsLat = rhs.getLatitude();
         if (lhsLat < rhsLat) {
@@ -108,45 +119,34 @@ public:
             return VALUE_COMPARE_GREATERTHAN;
         }
 
-        // latitude is equal; compare longitude
-        Coord lhsLng = getLongitude();
-        Coord rhsLng = rhs.getLongitude();
-        if (lhsLng < rhsLng) {
-            return VALUE_COMPARE_LESSTHAN;
-        }
-
-        if (lhsLng > rhsLng) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
-
         return VALUE_COMPARE_EQUAL;
     }
 
     template<class Deserializer>
     static GeographyPointValue deserializeFrom(Deserializer& input) {
-        Coord lat = input.readDouble();
         Coord lng = input.readDouble();
+        Coord lat = input.readDouble();
         if (lat == nullCoord() && lng == nullCoord()) {
             return GeographyPointValue();
         }
 
-        return GeographyPointValue(lat, lng);
+        return GeographyPointValue(lng, lat);
     }
 
     template<class Serializer>
     void serializeTo(Serializer& output) const {
-        output.writeDouble(getLatitude());
         output.writeDouble(getLongitude());
+        output.writeDouble(getLatitude());
     }
 
     void hashCombine(std::size_t& seed) const {
-        MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
         MiscUtil::hashCombineFloatingPoint(seed, m_longitude);
+        MiscUtil::hashCombineFloatingPoint(seed, m_latitude);
     }
 
     std::string toString() const {
         std::ostringstream oss;
-        oss << "point(" << m_latitude << " " << m_longitude << ")";
+        oss << "point(" << m_longitude << " " << m_latitude << ")";
         return oss.str();
     }
 

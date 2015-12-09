@@ -39,39 +39,39 @@ public class TestGeographyValueQueries extends RegressionSuite {
     }
 
     private final String BERMUDA_TRIANGLE_WKT = "POLYGON("
-            + "(32.305 -64.751, "
-            + "25.244 -80.437, "
-            + "18.476 -66.371, "
-            + "32.305 -64.751))";
+            + "(-64.751 32.305, "
+            + "-80.437 25.244, "
+            + "-66.371 18.476, "
+            + "-64.751 32.305))";
 
     // The Bermuda Triangle with a square hole inside
     private final String BERMUDA_TRIANGLE_HOLE_WKT = "POLYGON("
-            + "(32.305 -64.751, "
-            + "25.244 -80.437, "
-            + "18.476 -66.371, "
-            + "32.305 -64.751), "
-            + "(27.026 -67.448, "
-            + "27.026 -68.992, "
-            + "25.968 -68.992, "
-            + "25.968 -67.448, "
-            + "27.026 -67.448))";
+            + "(-64.751 32.305, "
+            + "-80.437 25.244, "
+            + "-66.371 18.476, "
+            + "-64.751 32.305), "
+            + "(-67.448 27.026, "
+            + "-68.992 27.026, "
+            + "-68.992 25.968, "
+            + "-67.448 25.968, "
+            + "-67.448 27.026))";
 
     // (Useful for testing comparisons since it has the same number of vertices as
     // the Bermuda Triangle)
     private final String BILLERICA_TRIANGLE_WKT = "POLYGON("
-            + "(42.571 -71.276, "
-            + "42.547 -71.308, "
-            + "42.533 -71.231, "
-            + "42.571 -71.276))";
+            + "(-71.276 42.571, "
+            + "-71.308 42.547, "
+            + "-71.231 42.533, "
+            + "-71.276 42.571))";
 
     // The dreaded "Lowell Square".  One loop,
     // five vertices (last is the same as the first)
     private final String LOWELL_SQUARE_WKT = "POLYGON("
-            + "(42.641 -71.338, "
-            + "42.619 -71.340, "
-            + "42.617 -71.313, "
-            + "42.639 -71.316, "
-            + "42.641 -71.338))";
+            + "(-71.338 42.641, "
+            + "-71.340 42.619, "
+            + "-71.313 42.617, "
+            + "-71.316 42.639, "
+            + "-71.338 42.641))";
 
     private final GeographyValue BERMUDA_TRIANGLE_POLY = new GeographyValue(BERMUDA_TRIANGLE_WKT);
     private final GeographyValue BERMUDA_TRIANGLE_HOLE_POLY = new GeographyValue(BERMUDA_TRIANGLE_HOLE_WKT);
@@ -195,6 +195,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
             assertTrue(vt.advanceRow());
             assertEquals(0, vt.getLong(0));
             assertEquals("Bermuda Triangle", vt.getString(1));
+            String btString = vt.getGeographyValue(2).toString();
+            String testString = BERMUDA_TRIANGLE_WKT;
             assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(2).toString());
             assertFalse(vt.advanceRow());
 
@@ -401,16 +403,16 @@ public class TestGeographyValueQueries extends RegressionSuite {
         Client client = getClient();
 
         String santaCruzWkt = "POLYGON("
-                + "(36.999 -122.061, "
-                + "36.950 -122.058, "
-                + "36.955 -121.974, "
-                + "36.999 -122.061))";
+                + "(-122.061 36.999, "
+                + "-122.058 36.950, "
+                + "-121.974 36.955, "
+                + "-122.061 36.999))";
 
         String southValleyWkt = "POLYGON("
-                + "(37.367 -122.038, "
-                + "37.232 -121.980, "
-                +" 37.339 -121.887, "
-                + "37.367 -122.038))";
+                + "(-122.038 37.367, "
+                + "-121.980 37.232, "
+                + "-121.887 37.339, "
+                + "-122.038 37.367))";
 
 
         for (String tbl : TABLES) {
@@ -511,65 +513,77 @@ public class TestGeographyValueQueries extends RegressionSuite {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
-        String expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))";
+        String expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
 
         // Just a simple round trip with reasonable WKT.
         assertEquals(expected, wktRoundTrip(client, expected));
 
         // polygonfromtext should be case-insensitve.
         assertEquals(expected, wktRoundTrip(client,
-                "Polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+                "Polygon((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))"));
         assertEquals(expected, wktRoundTrip(client,
-                "polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+                "polygon((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))"));
         assertEquals(expected, wktRoundTrip(client,
-                "PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+                "PoLyGoN((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))"));
 
         assertEquals(expected, wktRoundTrip(client,
-                "\n\nPOLYGON\n(\n(\n32.305\n-64.751\n,\n25.244\n-80.437\n,\n18.476\n-66.371\n,\n32.305\n-64.751\n)\n)\n"));
+                "\n\nPOLYGON\n(\n(\n-64.751\n32.305\n,\n-80.437\n25.244\n,\n-66.371\n18.476\n,\n-64.751\n32.305\n)\n)\n"));
         assertEquals(expected, wktRoundTrip(client,
-                "\t\tPOLYGON\t(\t(\t32.305\t-64.751\t,\t25.244\t-80.437\t,\t18.476\t-66.371\t,\t32.305\t-64.751\t)\t)\t"));
+                "\t\tPOLYGON\t(\t(\t-64.751\t32.305\t,\t-80.437\t25.244\t,\t-66.371\t18.476\t,\t-64.751\t32.305\t)\t)\t"));
         assertEquals(expected, wktRoundTrip(client,
-                "    POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305  -64.751  )  )  "));
+                "    POLYGON  (  (  -64.751  32.305  ,  -80.437  25.244  ,  -66.371  18.476  ,  -64.751  32.305  )  )  "));
 
         // Parsing with more than one loop should work the same.
-        expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(27.026 -67.448, 27.026 -68.992, 25.968 -68.992, 25.968 -67.448, 27.026 -67.448))";
+        expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-67.448 27.026, -68.992 27.026, -68.992 25.968, -67.448 25.968, -67.448 27.026))";
 
-        expected = BERMUDA_TRIANGLE_HOLE_WKT;
         assertEquals(expected, wktRoundTrip(client,
-                "PoLyGoN\t(  (\n32.305\n-64.751   ,    25.244\t-80.437\n,18.476 -66.371,32.305\t\t\t-64.751   ),\t "
-                        + "(\n27.026\t-67.448,\t27.026    -68.992\n,25.968      -68.992,25.968\n\n-67.448   ,   27.026\n-67.448\t)\n)\t"));
+                "PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n,-66.371 18.476,-64.751\t\t\t32.305   ),\t "
+                        + "(\n-67.448\t27.026,\t-68.992    27.026\n, -68.992     25.968,-67.448\n\n25.968   , -67.448  \n27.026\t)\n)\t"));
     }
 
-    private void assertWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+    private void assertGeographyValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
         String stmt = "select polygonfromtext('" + wkt + "') from t";
         verifyStmtFails(client, stmt, expectedMsg);
+    }
+
+    // This is really misplaced.  But we don't have a regression
+    // suite test for testing points.  We ought to, but we don't.
+    private void assertGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+        String stmt = "select pointfromtext('" + wkt + "') from t";
+        verifyStmtFails(client, stmt, expectedMsg);
+    }
+
+    public void testPointFromTextNegative() throws Exception {
+        Client client = getClient();
+        validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
+        assertGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
     }
 
     public void testPolygonFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
-        assertWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
-        assertWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
-        assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
-        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
-        assertWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
-        assertWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
-        assertWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
-        assertWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
-        assertWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
-        assertWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
-        assertWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
-        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
-        assertWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
-        assertWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
+        assertGeographyValueWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
+        assertGeographyValueWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
+        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
+        assertGeographyValueWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
+        assertGeographyValueWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
+        assertGeographyValueWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
+        assertGeographyValueWktParseError(client, "expected a number but found '\\('", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");
+        assertGeographyValueWktParseError(client, "unexpected token: 'z'", "POLYGON ((80 80, 60 60, 70 70, 80 80)z)");
+        assertGeographyValueWktParseError(client, "unrecognized input after WKT: 'blahblah'", "POLYGON ((80 80, 60 60, 70 70, 80 80))blahblah");
+        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 80 80))");
+        assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON ((80 80, 60 60, 50 80, 80 80), ())");
+        assertGeographyValueWktParseError(client, "A polygon ring's first vertex must be equal to its last vertex", "POLYGON ((80 80, 60 60, 70 70, 81 81))");
 
         // The Java WKT parser (in GeographyValue, which uses Java's StreamTokenizer) can handle coordinates
         // that are separated only by a minus sign indicating that the second coordinate is negative.
         // But boost's tokenizer (at least as its currently configured) will consider "32.305-64.571" as a single
         // token.  This seems like an acceptable discrepancy?
-        assertWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
+        assertGeographyValueWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
     }
 
     static public junit.framework.Test suite() {
