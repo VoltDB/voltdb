@@ -45,6 +45,9 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
+#ifndef BTREE_DEBUG
+#define BTREE_DEBUG
+#endif
 #include <string>
 #include <vector>
 #include <set>
@@ -59,6 +62,7 @@
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
+#include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
@@ -434,4 +438,4 @@ protected:
 };
 
 }
-#endif // HSTORETABLE_H
+#endif
