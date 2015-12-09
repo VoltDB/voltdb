@@ -453,7 +453,7 @@ public class TestCatalogUtil extends TestCase {
         String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), false);
         assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(0, sysset.getQuerytimeout());
+        assertEquals(10000, sysset.getQuerytimeout());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
