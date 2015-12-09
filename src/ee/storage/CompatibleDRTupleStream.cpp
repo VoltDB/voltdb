@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "storage/DRTupleStream.h"
+#include "CompatibleDRTupleStream.h"
 
 #include "common/TupleSchema.h"
 #include "common/types.h"
@@ -37,21 +37,23 @@
 #include <utility>
 #include <math.h>
 
+// IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
+
 using namespace std;
 using namespace voltdb;
 
-DRTupleStream::DRTupleStream()
+CompatibleDRTupleStream::CompatibleDRTupleStream()
     : AbstractDRTupleStream(),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
 
-size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
-                                    char *tableHandle,
-                                    std::string tableName,
-                                    int64_t txnId,
-                                    int64_t spHandle,
-                                    int64_t uniqueId) {
+size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
+                                                char *tableHandle,
+                                                std::string tableName,
+                                                int64_t txnId,
+                                                int64_t spHandle,
+                                                int64_t uniqueId) {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
@@ -72,7 +74,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
 
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
     io.writeInt(static_cast<int32_t>(tableName.size()));
@@ -102,14 +104,14 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
-                                  char *tableHandle,
-                                  int64_t txnId,
-                                  int64_t spHandle,
-                                  int64_t uniqueId,
-                                  TableTuple &tuple,
-                                  DRRecordType type,
-                                  const std::pair<const TableIndex*, uint32_t>& indexPair)
+size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
+                                              char *tableHandle,
+                                              int64_t txnId,
+                                              int64_t spHandle,
+                                              int64_t uniqueId,
+                                              TableTuple &tuple,
+                                              DRRecordType type,
+                                              const std::pair<const TableIndex*, uint32_t>& indexPair)
 {
     size_t startingUso = m_uso;
 
@@ -137,7 +139,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -161,14 +163,14 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
-                                         char *tableHandle,
-                                         int64_t txnId,
-                                         int64_t spHandle,
-                                         int64_t uniqueId,
-                                         TableTuple &oldTuple,
-                                         TableTuple &newTuple,
-                                         const std::pair<const TableIndex*, uint32_t>& indexPair) {
+size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
+                                                     char *tableHandle,
+                                                     int64_t txnId,
+                                                     int64_t spHandle,
+                                                     int64_t uniqueId,
+                                                     TableTuple &oldTuple,
+                                                     TableTuple &newTuple,
+                                                     const std::pair<const TableIndex*, uint32_t>& indexPair) {
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO
@@ -201,7 +203,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                                  m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -226,7 +228,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
     return startingUso;
 }
 
-void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId) {
+void CompatibleDRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId) {
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
     if (spHandle < m_openSpHandle) {
@@ -243,7 +245,7 @@ void DRTupleStream::transactionChecks(int64_t lastCommittedSpHandle, int64_t txn
     assert(m_opened);
 }
 
-void DRTupleStream::writeRowTuple(TableTuple& tuple,
+void CompatibleDRTupleStream::writeRowTuple(TableTuple& tuple,
         size_t rowHeaderSz,
         size_t rowMetadataSz,
         const std::vector<int> *interestingColumns,
@@ -274,7 +276,7 @@ void DRTupleStream::writeRowTuple(TableTuple& tuple,
     }
 }
 
-size_t DRTupleStream::computeOffsets(DRRecordType &type,
+size_t CompatibleDRTupleStream::computeOffsets(DRRecordType &type,
         const std::pair<const TableIndex*, uint32_t> &indexPair,
         TableTuple &tuple,
         size_t &rowHeaderSz,
@@ -308,7 +310,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     return rowHeaderSz + tuple.maxDRSerializationSize(interestingColumns);
 }
 
-void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
+void CompatibleDRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
     assert(!m_opened);
 
     if (!m_currBlock) {
@@ -338,7 +340,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
-     io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+     io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
@@ -353,7 +355,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
      m_opened = true;
 }
 
-void DRTupleStream::endTransaction(int64_t uniqueId) {
+void CompatibleDRTupleStream::endTransaction(int64_t uniqueId) {
     if (!m_opened) {
         return;
     }
@@ -401,7 +403,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
     uint32_t crc = vdbcrc::crc32cInit();
@@ -424,7 +426,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 // If partial transaction is going to span multiple buffer, first time move it to
 // the next buffer, the next time move it to a 45 megabytes buffer, then after throw
 // an exception and rollback.
-bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
+bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size_t& blockSize, size_t& uso) {
     if (sb && sb->hasDRBeginTxn()   /* this block contains a DR begin txn */
            && m_opened) {
         size_t partialTxnLength = sb->offset() - sb->lastDRBeginTxnOffset();
@@ -451,8 +453,8 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
-int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
-    DRTupleStream stream;
+int32_t CompatibleDRTupleStream::getTestDRBuffer(char *outBytes) {
+    CompatibleDRTupleStream stream;
     stream.configure(42);
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',

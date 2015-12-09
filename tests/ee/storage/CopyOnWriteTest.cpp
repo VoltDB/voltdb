@@ -205,7 +205,7 @@ public:
 
         strcpy(m_stage, "Initialize");
 
-        ExecutorContext::getExecutorContext()->setDrStreamForTest(&drStream);
+        ExecutorContext::getExecutorContext()->setDrStream(&drStream);
     }
 
     ~CopyOnWriteTest() {

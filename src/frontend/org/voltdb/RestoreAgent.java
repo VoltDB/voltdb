@@ -183,6 +183,7 @@ SnapshotCompletionInterest, Promotable
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
+                        jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
@@ -190,9 +191,6 @@ SnapshotCompletionInterest, Promotable
                             TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
-                        }
-                        if (m_action == StartAction.RECOVER) {
-                            jsObj.put(SnapshotUtil.JSON_CHECK_CLUSTER_ID, true);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(params);
