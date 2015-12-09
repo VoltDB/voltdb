@@ -63,7 +63,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         m_children.get(0).generateOutputSchema(db);
         // Join the schema together to form the output schema
         // The child subplan's output is the outer table
-        // The inlined node's output is the inner table
+        // The inlined node's output is the inner table.
+        //
+        // Note that the inner table's contribution to the join_tuple doesn't include
+        // all the columns from the inner table---just the ones needed as determined by
+        // the inlined scan's own inlined projection, as described above.
         m_outputSchemaPreInlineAgg =
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
@@ -97,24 +101,25 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
 
         // We need the schema from the target table from the inlined index
-        final NodeSchema index_schema = inline_scan.getTableSchema();
+        final NodeSchema complete_schema_of_inner_table = inline_scan.getTableSchema();
         // We need the output schema from the child node
         final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
 
         // pull every expression out of the inlined index scan
         // and resolve all of the TVEs against our two input schema from above.
-        resolvePredicate(inline_scan.getPredicate(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getEndExpression(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getInitialExpression(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, index_schema);
-
-        final NodeSchema inline_scan_output_schema = inline_scan.getOutputSchema();
-
-        // resolve other predicates based on inline index scan node output schema
-        resolvePredicate(m_preJoinPredicate, outer_schema, inline_scan_output_schema);
-        resolvePredicate(m_joinPredicate, outer_schema, inline_scan_output_schema);
-        resolvePredicate(m_wherePredicate, outer_schema, inline_scan_output_schema);
+        //
+        // Tickets ENG-9389, ENG-9533: we use the complete schema for the inner table
+        // (rather than the smaller schema from the inlined index scan's inlined project node)
+        // because the inlined scan has no temp table, so predicates will be accessing the
+        // scanned table directly.
+        resolvePredicate(inline_scan.getPredicate(), outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(inline_scan.getEndExpression(), outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(inline_scan.getInitialExpression(), outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(m_preJoinPredicate, outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(m_joinPredicate, outer_schema, complete_schema_of_inner_table);
+        resolvePredicate(m_wherePredicate, outer_schema, complete_schema_of_inner_table);
 
         // resolve subqueries
         Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
@@ -135,7 +140,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
-                index = tve.resolveColumnIndexesUsingSchema(index_schema);
+                index = tve.resolveColumnIndexesUsingSchema(complete_schema_of_inner_table);
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +
