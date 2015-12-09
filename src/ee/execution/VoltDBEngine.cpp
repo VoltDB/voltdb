@@ -1145,8 +1145,6 @@ void VoltDBEngine::rebuildTableCollections()
         TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(cd.second);
         if (tcd) {
             catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
-//            std::cout << "Adding table " << tcd->getTable()->name() << " of type " << typeid(tcd->getTable()).name() << "\n";
-//            std::cout.flush();
             m_tables[catTable->relativeIndex()] = tcd->getTable();
             m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
             if (!tcd->exportEnabled() && !tcd->materialized()) {
