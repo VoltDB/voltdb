@@ -85,7 +85,7 @@ a.alertIcon,
 input.icon-search,
 a.save-search,
 a.icon-search,
-ul.clusterStat, li.activeServerName, 
+ul.clusterStat, li.activeServerName,.timeOutCross,
 a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
@@ -316,6 +316,7 @@ html, body {
         float: left;
         width: 140px;
         padding: 8px 0 0 0;
+		margin-right:90px;
     }
 
     .headLeft .menu {
@@ -1577,6 +1578,18 @@ input.count-input {
         background-position: 3px -834px;
     }
 
+.timeOutCross {color: #888;
+    cursor: pointer;
+    padding: 5px;
+    background-position: 0 -795px;
+    height: 15px;
+    width: 15px;
+   }
+
+.timeOutCross:hover {
+    background-position:0 -833px;
+}
+
 .popup_back {
     cursor: pointer;
     background-color: #222;
@@ -1736,7 +1749,7 @@ div.popup {
 /*navigation responsive*/
 
 #nav {
-    position: absolute;
+    /*position: absolute;*/
     left: 250px;
     z-index: 999;
     display: block;
@@ -1869,7 +1882,7 @@ ul.topRightList li a {
 }
 
 .btnList {
-    margin: 10px 0 0 0;
+    margin-top:10px;
     padding: 0;
     float: right;
 }
@@ -1883,6 +1896,15 @@ ul.topRightList li a {
 .blockWrapper h1.theHeading {
     margin: 0 0 1.5px 0 !important;
     padding: 17px 20px 17px 45px;
+    background-color: #FFFFFF;
+    -webkit-box-shadow: 0px 6px 7px -5px #ccc;
+    -moz-box-shadow: 0px 6px 7px -5px #ccc;
+    box-shadow: 0px 6px 7px -5px #ccc;
+}
+
+.blockWrapper h1.theHeadingQuery {
+    margin: 0 0 1.5px 0 !important;
+    padding: 0px 0px 10px 2px;
     background-color: #FFFFFF;
     -webkit-box-shadow: 0px 6px 7px -5px #ccc;
     -moz-box-shadow: 0px 6px 7px -5px #ccc;
@@ -1933,7 +1955,7 @@ h3.ui-accordion-header {
     height: auto !important;
 }
 
-h3.ui-accordion-header, h3.ui-accordion-header-active, h1.icon-query, h1.icon-queryResult {
+h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query, h1.icon-queryResult {
     background-image: url(images/voltdb-icon-sprite.png);
     background-repeat: no-repeat;
 }
@@ -1958,8 +1980,8 @@ h3.ui-state-active {
         background-color: #76bd1d;
     }
 
-h1.icon-query {
-    background-position: 15px -1252px;
+.icon-query {
+    background-position: 15px -1254px;
 }
 
 h1.icon-queryResult {
@@ -2162,6 +2184,7 @@ ul.helpSchemaList {
 
 /**admin**/
 .adminIcons,
+.sqlSetting,
 .pause,
 .resume,
 .save,
@@ -2376,6 +2399,7 @@ ul.adminClusterList li a.shutdown {
     float: left;
 }
 
+
 .serverName { /*cursor:pointer; float:left; background:#D0D2D2; padding:8px; font-weight:bold;*/
     background: none repeat scroll 0 0 #d0d2d2;
     cursor: pointer;
@@ -2393,6 +2417,11 @@ ul.adminClusterList li a.shutdown {
 }
 
 .adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/
+    background-position: -225px -14px;
+    height: 28px;
+    width: 30px;
+}
+.sqlSetting {
     background-position: -225px -14px;
     height: 28px;
     width: 30px;
@@ -3642,6 +3671,57 @@ svg.nvd3-svg { width:95% !important; }
 .nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
 .nvtooltip table tr td { border: none !important;}
 
+
+/**************************QueryTimeOut*************************/
+.queryHeadName { float:left; width:100px; height:22px; text-indent:40px; padding-top:17px;}
+.queryTimeoutName { 
+    background: #d0d2d2 none repeat scroll 0 0;
+    cursor: pointer;
+    float: left;
+    font-weight: bold;
+    height: 27px;
+    line-height: 28px;
+    padding: 2px 0 0 8px;
+}
+.queryTimeoutName span { font-weight:normal; font-size:13px;}
+
+#queryTimeoutConfigControls { width:345px;}
+.queryTimeout { border:1px solid #ccc; margin:20px;}
+.queryTimeout p { padding:10px 5px;border-top:1px solid #ccc;}
+.QueryTbl {}
+.QueryTbl tr td {
+    border:none;
+    padding: 8px 5px 10px 5px;
+    text-align: left;
+}
+.QueryTbl tr td input[type="text"] { width:125px;}
+
+.queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px; }
+.queryTimeOutLabel {
+    background: none repeat scroll 0 0 #d0d2d2;
+    cursor: default;
+    float: left;
+    font-weight: bold;
+    height: 28px;
+    line-height: 28px;
+    padding: 0 0 0 8px;
+}
+.setqueryTimeOut {
+    float: right;
+}
+
+label.errorTimeOut {
+    color: #c70000;
+    width: 115px;
+    display: block;
+    line-height: 12px;
+    font-size: 11px;
+    /* padding: 10px 5px 0 7px; */
+    padding: 10px 5px 0 0;
+    margin: 0 0 22px 0;
+    height: 10px;
+}
+
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
@@ -3692,6 +3772,7 @@ svg.nvd3-svg { width:95% !important; }
   margin-top: 5px;}
     ul.servers-list li span.servIpNum {margin-left: 10%;}
     /*.serverNameAlign { width: 22%;}*/
+	.headLeft .logo{ margin-right:0;}
 
 }
 @media (max-width: 360px) {
@@ -3763,6 +3844,15 @@ svg.nvd3-svg { width:95% !important; }
         position: relative;
         right: 10px;
     }
+	#queryTimeoutConfigControls { width:305px;}
+	.QueryTbl tr td input[type="text"] { width:125px;}
+	label.errorTimeOut { padding-bottom:20px;}
+	.btnList { float:none; margin-left:10px}
+	.btnList li { float:none;}
+	.btnStudio { width:100%;margin-top:2px;}
+	.queryHeadName { float:none;}
+	.queryTimeOutLabel { width:86%; margin-right:2px;}
+
 }
 
 @media (min-width: 639px) and (max-width:640px) {
@@ -3825,6 +3915,7 @@ svg.nvd3-svg { width:95% !important; }
     }
 
     #nav {
+		position:absolute;
         width: 100%;
         top: 65px;
         left: 0;
@@ -4281,6 +4372,7 @@ svg.nvd3-svg { width:95% !important; }
 @media (width: 768px) {
     #nav {
         left: 180px;
+		position:absolute;
     }
 
     .userN {

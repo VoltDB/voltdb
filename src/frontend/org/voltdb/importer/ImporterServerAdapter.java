@@ -17,6 +17,8 @@
 
 package org.voltdb.importer;
 
+import org.voltdb.client.ProcedureCallback;
+
 
 
 /**
@@ -37,6 +39,18 @@ public interface ImporterServerAdapter {
      * @return returns true if the procedure execution was queued successfully; false otherwise.
      */
     public boolean callProcedure(AbstractImporter importer, String proc, Object... fieldList);
+
+    /**
+     * This is used by importers to execute procedures in the server.
+     *
+     * @param importer the calling importer instance. This may be used by the importer framework
+     * to report back pressure.
+     * @param callback the callback object that will receive procedure execution status
+     * @param proc the name of the procedure that is to be executed
+     * @param fieldList the parameters to be passed in to the procedure
+     * @return returns true if the procedure execution was queued successfully; false otherwise.
+     */
+    public boolean callProcedure(AbstractImporter importer, ProcedureCallback callback, String proc, Object... fieldList);
 
     /**
      * This should be used by importers to report failure while trying to execute a procedure.
