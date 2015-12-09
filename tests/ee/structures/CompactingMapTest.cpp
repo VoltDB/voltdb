@@ -759,6 +759,7 @@ TEST_F(CompactingMapTest, RandomMulti) {
 TEST_F(CompactingMapTest, Traversal) {
     CompactingSet<int> s;
     for (int i = 0; i < 10; i++) {
+        std::cout << "Inserting " << i << std::endl;
         ASSERT_TRUE(s.insert(i));
     }
 
