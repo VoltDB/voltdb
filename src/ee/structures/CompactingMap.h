@@ -494,8 +494,6 @@ void CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::clear()
 
     m_root = &NIL;
     m_count = 0;
-    m_allocator.clear();
-    assert(m_allocator.count() == 0);
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank, typename ValueType>
