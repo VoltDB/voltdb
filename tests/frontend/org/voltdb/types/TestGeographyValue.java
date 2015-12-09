@@ -36,28 +36,28 @@ public class TestGeographyValue extends TestCase {
         GeographyValue geog;
         // The Bermuda Triangle
         List<GeographyPointValue> outerLoop = Arrays.asList(
-                new GeographyPointValue(32.305, -64.751),
-                new GeographyPointValue(25.244, -80.437),
-                new GeographyPointValue(18.476, -66.371),
-                new GeographyPointValue(32.305, -64.751));
+                new GeographyPointValue(-64.751, 32.305),
+                new GeographyPointValue(-80.437, 25.244),
+                new GeographyPointValue(-66.371, 18.476),
+                new GeographyPointValue(-64.751, 32.305));
 
         // A triangular hole
         List<GeographyPointValue> innerLoop = Arrays.asList(
-                new GeographyPointValue(28.066, -68.874),
-                new GeographyPointValue(25.361, -68.855),
-                new GeographyPointValue(28.376, -73.381),
-                new GeographyPointValue(28.066, -68.874));
+                new GeographyPointValue(-68.874, 28.066),
+                new GeographyPointValue(-68.855, 25.361),
+                new GeographyPointValue(-73.381, 28.376),
+                new GeographyPointValue(-68.874, 28.066));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         // round trip
-        geog = new GeographyValue("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))");
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        geog = new GeographyValue("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066,-68.855 25.361, -73.381 28.376, -68.874 28.066))");
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
@@ -66,31 +66,31 @@ public class TestGeographyValue extends TestCase {
 
         buf.position(0);
         GeographyValue newGeog = GeographyValue.unflattenFromBuffer(buf);
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(270, buf.position());
 
         // Try the absolute version of unflattening
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(77, buf.position());
     }
 
     public void testGeographyValueNegativeCases() {
         List<GeographyPointValue> outerLoop = new ArrayList<GeographyPointValue>();
-        outerLoop.add(new GeographyPointValue(32.305, -64.751));
-        outerLoop.add(new GeographyPointValue(25.244, -80.437));
-        outerLoop.add(new GeographyPointValue(18.476, -66.371));
-        outerLoop.add(new GeographyPointValue(20.305, -76.751));
-        outerLoop.add(new GeographyPointValue(32.305, -64.751));
+        outerLoop.add(new GeographyPointValue(-64.751, 32.305));
+        outerLoop.add(new GeographyPointValue(-80.437, 25.244));
+        outerLoop.add(new GeographyPointValue(-66.371, 18.476));
+        outerLoop.add(new GeographyPointValue(-76.751, 20.305));
+        outerLoop.add(new GeographyPointValue(-64.751, 32.305));
         GeographyValue geoValue;
         // start with valid loop
         geoValue = new GeographyValue(Arrays.asList(outerLoop));
-        assertEquals("POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 20.305 -76.751, 32.305 -64.751))",
+        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -76.751 20.305, -64.751 32.305))",
                 geoValue.toString());
 
         Exception exception = null;
@@ -144,21 +144,21 @@ public class TestGeographyValue extends TestCase {
     public void testWktParsingPositive() {
 
         // Parsing is case-insensitive
-        String expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))";
-        assertEquals(expected, canonicalizeWkt("Polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
-        assertEquals(expected, canonicalizeWkt("polygon((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
-        assertEquals(expected, canonicalizeWkt("PoLyGoN((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751))"));
+        String expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
+        assertEquals(expected, canonicalizeWkt("Polygon((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
+        assertEquals(expected, canonicalizeWkt("polygon((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
+        assertEquals(expected, canonicalizeWkt("PoLyGoN((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
 
         // Parsing is whitespace-insensitive
-        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (  32.305  -64.751  ,  25.244  -80.437  ,  18.476  -66.371  ,  32.305   -64.751  )  ) "));
-        assertEquals(expected, canonicalizeWkt("\nPOLYGON\n(\n(\n32.305\n-64.751\n,\n25.244\n-80.437\n,\n18.476\n-66.371\n,32.305\n-64.751\n)\n)\n"));
-        assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t32.305\t-64.751\t,\t25.244\t-80.437\t,\t18.476\t-66.371\t,\t32.305\t-64.751\t)\t)\t"));
+        assertEquals(expected, canonicalizeWkt("  POLYGON  (  (   -64.751 32.305  ,   -80.437   25.244  ,   -66.371  18.476  ,   -64.751 32.305   )  ) "));
+        assertEquals(expected, canonicalizeWkt("\nPOLYGON\n(\n(\n-64.751\n32.305\n,\n-80.437\n25.244\n,\n-66.371\n18.476\n,-64.751\n32.305\n)\n)\n"));
+        assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t-64.751\t32.305\t,\t-80.437\t25.244\t,\t-66.371\t18.476\t,\t-64.751\t32.305\t)\t)\t"));
 
         // Parsing with more than one loop should work the same.
-        expected = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), "
-                + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
-        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n32.305\n-64.751   ,    25.244\t-80.437\n,18.476-66.371,32.305\t\t\t-64.751   ),\t "
-                + "(\n28.066-68.874,\t25.361    -68.855\n,28.376      -73.381,28.066\n\n-68.874\t)\n)\t"));
+        expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))";
+        assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n, -66.371 18.476,-64.751\t\t\t32.305   ),\t "
+                + "(\n-68.874 28.066,\t    -68.855\n25.361\n,      -73.381\t28.376,\n\n-68.874\t28.066\t)\n)\t"));
     }
 
     private void assertWktParseError(String error, String wkt) {
@@ -174,6 +174,7 @@ public class TestGeographyValue extends TestCase {
                     iae.getMessage().contains(error));
         }
     }
+
     /**
      * This tests that the maximum error when we transform a latitude/longitude pair to an
      * S2, 3-dimensinal point and then back again is less than 1.0e-13.
@@ -210,7 +211,7 @@ public class TestGeographyValue extends TestCase {
             double latitude = ycoord*(90.0/NUM_PTS);
             for (int xcoord = MIN_PTS; xcoord <= MAX_PTS; xcoord += 1) {
                 double longitude = xcoord*(180.0/NUM_PTS);
-                GeographyPointValue PT_point = new GeographyPointValue(latitude, longitude);
+                GeographyPointValue PT_point = new GeographyPointValue(longitude, latitude);
                 for (int idx = 0; idx < NUMBER_TRANSFORMS; idx += 1) {
                     GeographyValue.XYZPoint xyz_point = GeographyValue.XYZPoint.fromGeographyPointValue(PT_point);
                     PT_point = xyz_point.toGeographyPointValue();
@@ -237,7 +238,7 @@ public class TestGeographyValue extends TestCase {
         assertWktParseError("expected WKT to start with POLYGON", "NOT_A_POLYGON(...)");
         assertWktParseError("expected left parenthesis after POLYGON", "POLYGON []");
         assertWktParseError("missing opening parenthesis", "POLYGON(3 3, 4 4, 5 5, 3 3)");
-        assertWktParseError("missing longitude", "POLYGON ((80 80, 60, 70 70, 90 90))");
+        assertWktParseError("missing latitude", "POLYGON ((80 80, 60, 70 70, 90 90))");
         assertWktParseError("missing comma", "POLYGON ((80 80 60 60, 70 70, 90 90))");
         assertWktParseError("premature end of input", "POLYGON ((80 80, 60 60, 70 70,");
         assertWktParseError("missing closing parenthesis", "POLYGON ((80 80, 60 60, 70 70, (30 15, 15 30, 15 45)))");

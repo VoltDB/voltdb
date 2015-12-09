@@ -120,12 +120,12 @@ public class GeographyValue {
 
             sb.append("(");
             for (XYZPoint xyz : loop) {
-                sb.append(xyz.toGeographyPointValue().formatLatLng());
+                sb.append(xyz.toGeographyPointValue().formatLngLat());
                 sb.append(", ");
             }
 
             // Repeat the first vertex to close the loop as WKT requires.
-            sb.append(loop.get(0).toGeographyPointValue().formatLatLng());
+            sb.append(loop.get(0).toGeographyPointValue().formatLngLat());
             sb.append(")");
         }
 
@@ -292,7 +292,7 @@ public class GeographyValue {
 
             double latDegrees = latRadians * (180 / Math.PI);
             double lngDegrees = lngRadians * (180 / Math.PI);
-            return new GeographyPointValue(latDegrees, lngDegrees);
+            return new GeographyPointValue(lngDegrees, latDegrees);
         }
 
         @Override
@@ -470,18 +470,18 @@ public class GeographyValue {
                         throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
                     }
 
-                    double lat = tokenizer.nval;
+                    double lng = tokenizer.nval;
                     token = tokenizer.nextToken();
                     if (token != StreamTokenizer.TT_NUMBER) {
-                        throw new IllegalArgumentException(msgPrefix + "missing longitude in lat long pair");
+                        throw new IllegalArgumentException(msgPrefix + "missing latitude in long lat pair");
                     }
-                    double lng = tokenizer.nval;
-                    currentLoop.add(XYZPoint.fromGeographyPointValue(new GeographyPointValue(lat, lng)));
+                    double lat = tokenizer.nval;
+                    currentLoop.add(XYZPoint.fromGeographyPointValue(new GeographyPointValue(lng, lat)));
 
                     token = tokenizer.nextToken();
                     if (token != ',') {
                         if (token != ')') {
-                            throw new IllegalArgumentException(msgPrefix + "missing comma between lat long pairs");
+                            throw new IllegalArgumentException(msgPrefix + "missing comma between long lat pairs");
                         }
                         tokenizer.pushBack();
                     }

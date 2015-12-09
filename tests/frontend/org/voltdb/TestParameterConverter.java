@@ -151,10 +151,11 @@ public class TestParameterConverter extends TestCase
 
     public void testStringToGeographyPointValue() throws Exception {
         double epsilon = 1.0e-3;
-        testOneStringToPoint("point(10.333 20.666)",               new GeographyPointValue( 10.333,  20.666), epsilon);
-        testOneStringToPoint("  point  (10.333   20.666)    ",     new GeographyPointValue( 10.333,  20.666), epsilon);
-        testOneStringToPoint("point(-10.333 -20.666)",             new GeographyPointValue(-10.333, -20.666), epsilon);
-        testOneStringToPoint("  point  (-10.333   -20.666)    ",   new GeographyPointValue(-10.333, -20.666), epsilon);
+        // The unfortunately eccentric spacing here is to test parsing white space.
+        testOneStringToPoint("point(20.666 10.333)",               new GeographyPointValue( 20.666,  10.333), epsilon);
+        testOneStringToPoint("  point  (20.666 10.333)    ",       new GeographyPointValue( 20.666,  10.333), epsilon);
+        testOneStringToPoint("point(-20.666 -10.333)",             new GeographyPointValue(-20.666, -10.333), epsilon);
+        testOneStringToPoint("  point  (-20.666   -10.333)    ",   new GeographyPointValue(-20.666, -10.333), epsilon);
         testOneStringToPoint("point(10 10)",                       new GeographyPointValue(10.0,    10.0),    epsilon);
         testOneStringToPoint("point(10.0 10.0)",                   new GeographyPointValue(10.0, 10.0),       epsilon);
         testOneStringToPoint("point(10 10)",                       new GeographyPointValue(10.0, 10.0),       epsilon);
@@ -162,27 +163,27 @@ public class TestParameterConverter extends TestCase
     }
 
     public void testStringToPolygonType() throws Exception {
-        testOneStringToPolygon("polygon((0 0, 0 1, 1 1, 1 0, 0 0))",
+        testOneStringToPolygon("polygon((0 0, 1 0, 1 1, 0 1, 0 0))",
                                new GeographyValue(Collections.singletonList(Arrays.asList(new GeographyPointValue[]{ new GeographyPointValue(0,0),
-                                                                                                           new GeographyPointValue(0, 1),
-                                                                                                           new GeographyPointValue(1, 1),
                                                                                                            new GeographyPointValue(1, 0),
+                                                                                                           new GeographyPointValue(1, 1),
+                                                                                                           new GeographyPointValue(0, 1),
                                                                                                            new GeographyPointValue(0, 0) }))));
         GeographyValue geog;
         // The Bermuda Triangle
-        List<GeographyPointValue> outerLoop = Arrays.asList(new GeographyPointValue(32.305, -64.751),
-                                                  new GeographyPointValue(25.244, -80.437),
-                                                  new GeographyPointValue(18.476, -66.371),
-                                                  new GeographyPointValue(32.305, -64.751));
+        List<GeographyPointValue> outerLoop = Arrays.asList(new GeographyPointValue(-64.751, 32.305),
+                                                  new GeographyPointValue(-80.437, 25.244),
+                                                  new GeographyPointValue(-66.371, 18.476),
+                                                  new GeographyPointValue(-64.751, 32.305));
 
         // A triangular hole
-        List<GeographyPointValue> innerLoop = Arrays.asList(new GeographyPointValue(28.066, -68.874),
-                                                  new GeographyPointValue(25.361, -68.855),
-                                                  new GeographyPointValue(28.376, -73.381),
-                                                  new GeographyPointValue(28.066, -68.874));
+        List<GeographyPointValue> innerLoop = Arrays.asList(new GeographyPointValue(-68.874, 28.066),
+                                                  new GeographyPointValue(-68.855, 25.361),
+                                                  new GeographyPointValue(-73.381, 28.376),
+                                                  new GeographyPointValue(-68.874, 28.066));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        String geogRep = "POLYGON((32.305 -64.751, 25.244 -80.437, 18.476 -66.371, 32.305 -64.751), " + "(28.066 -68.874, 25.361 -68.855, 28.376 -73.381, 28.066 -68.874))";
+        String geogRep = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), " + "(-68.874 28.066,-68.855 25.361, -73.381 28.376,-68.874 28.066))";
         testOneStringToPolygon(geogRep, geog);
         // round trip
         geog = new GeographyValue(geogRep);
