@@ -19,8 +19,6 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -42,9 +40,6 @@ import org.voltdb.exceptions.EEException;
  * guidelines to add/modify JNI methods.
  */
 public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
-    // This map allows Mockito to evaluate the functions (for When clauses) without making EE calls.
-    private final Map<Long, Boolean> m_callingThreadsToBlock = new ConcurrentHashMap<Long, Boolean>();
-
     /**
      * initialize the native Engine object.
      */
@@ -62,11 +57,6 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
     {
         super(clusterIndex, siteId, partitionId, hostId, hostname,
                 drClusterId, tempTableMemory, hashinatorConfig, createDrReplicatedStream);
-        m_callingThreadsToBlock.put(siteThreadId, false);
-    }
-
-    final public void debugTrackExternalThreads(long threadId, boolean ignoreThread) {
-        m_callingThreadsToBlock.put(threadId, ignoreThread);
     }
 
     /**
@@ -76,11 +66,8 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      * using the object.
      */
     @Override
-    public Void release() throws EEException {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.release();
+    public void release() throws EEException {
+        super.release();
     }
 
     /**
@@ -88,11 +75,8 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      *  catalog.
      */
     @Override
-    protected Void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.loadCatalog(timestamp, catalogBytes);
+    protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
+        super.loadCatalog(timestamp, catalogBytes);
     }
 
     /**
@@ -100,11 +84,8 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      * engine's catalog.
      */
     @Override
-    public Void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.updateCatalog(timestamp, catalogDiffs);
+    public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
+        super.updateCatalog(timestamp, catalogDiffs);
     }
 
     /**
@@ -122,18 +103,12 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
             long uniqueId,
             final long undoToken) throws EEException
     {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                 parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoToken);
     }
 
     @Override
     public VoltTable serializeTable(final int tableId) throws EEException {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.serializeTable(tableId);
     }
 
@@ -146,9 +121,6 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
         boolean shouldDRStream,
         long undoToken) throws EEException
     {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.loadTable(tableId, table, txnId, spHandle, lastCommittedSpHandle,
                 uniqueId, returnUniqueViolations, shouldDRStream, undoToken);
     }
@@ -160,19 +132,13 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      * System.currentTimeMillis();
      */
     @Override
-    public Void tick(final long time, final long lastCommittedTxnId) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.tick(time, lastCommittedTxnId);
+    public void tick(final long time, final long lastCommittedTxnId) {
+        super.tick(time, lastCommittedTxnId);
     }
 
     @Override
-    public Void quiesce(long lastCommittedTxnId) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.quiesce(lastCommittedTxnId);
+    public void quiesce(long lastCommittedTxnId) {
+        super.quiesce(lastCommittedTxnId);
     }
 
     /**
@@ -190,33 +156,21 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
             final boolean interval,
             final Long now)
     {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.getStats(selector, locators, interval, now);
     }
 
     @Override
-    public Void toggleProfiler(final int toggle) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.toggleProfiler(toggle);
+    public void toggleProfiler(final int toggle) {
+        super.toggleProfiler(toggle);
     }
 
     @Override
     public boolean releaseUndoToken(final long undoToken) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return false;
-        }
         return super.releaseUndoToken(undoToken);
     }
 
     @Override
     public boolean undoUndoToken(final long undoToken) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return false;
-        }
         return super.undoUndoToken(undoToken);
     }
 
@@ -228,9 +182,6 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      */
     @Override
     public boolean setLogLevels(final long logLevels) throws EEException {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return false;
-        }
         return super.setLogLevels(logLevels);
     }
 
@@ -238,9 +189,6 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
     public boolean activateTableStream(int tableId, TableStreamType streamType,
                                        long undoQuantumToken,
                                        byte[] predicates) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return false;
-        }
         return super.activateTableStream(tableId, streamType, undoQuantumToken, predicates);
     }
 
@@ -248,9 +196,6 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
     public Pair<Long, int[]> tableStreamSerializeMore(int tableId,
                                                       TableStreamType streamType,
                                                       List<BBContainer> outputBuffers) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return new Pair<Long, int[]>(-1l, null);
-        }
         return super.tableStreamSerializeMore(tableId, streamType, outputBuffers);
     }
 
@@ -259,36 +204,24 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public Void exportAction(boolean syncAction,
+    public void exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.exportAction(syncAction, ackTxnId, seqNo, partitionId, tableSignature);
+        super.exportAction(syncAction, ackTxnId, seqNo, partitionId, tableSignature);
     }
 
     @Override
     public long[] getUSOForExportTable(String tableSignature) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.getUSOForExportTable(tableSignature);
     }
 
     @Override
-    public Void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.processRecoveryMessage(buffer, bufferPointer);
+    public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
+        super.processRecoveryMessage(buffer, bufferPointer);
     }
 
     @Override
     public long tableHashCode(int tableId) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return Long.MIN_VALUE;
-        }
         return super.tableHashCode(tableId);
     }
 
@@ -297,36 +230,24 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
             Object value,
             HashinatorConfig config)
     {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return Integer.MIN_VALUE;
-        }
         return super.hashinate(value, config);
     }
 
     @Override
-    public Void updateHashinator(HashinatorConfig config)
+    public void updateHashinator(HashinatorConfig config)
     {
-        if (m_callingThreadsToBlock != null && m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
-        return super.updateHashinator(config);
+        super.updateHashinator(config);
     }
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
                                int remoteClusterId, long undoToken) throws EEException
     {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return Long.MIN_VALUE;
-        }
         return super.applyBinaryLog(log, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
     }
 
     @Override
     public long getThreadLocalPoolAllocations() {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return Long.MIN_VALUE;
-        }
         return super.getThreadLocalPoolAllocations();
     }
 
@@ -335,25 +256,16 @@ public class SpyExecutionEngineJNI extends ExecutionEngineJNI {
      * use this buffer allocated by the EE. This is for one time use.
      */
     public void fallbackToEEAllocatedBuffer(ByteBuffer buffer) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return;
-        }
         super.fallbackToEEAllocatedBuffer(buffer);
     }
 
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.executeTask(taskType, task);
     }
 
     @Override
     public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
-        if (m_callingThreadsToBlock.get(Thread.currentThread().getId())) {
-            return null;
-        }
         return super.getParamBufferForExecuteTask(requiredCapacity);
     }
 }
