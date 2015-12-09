@@ -52,7 +52,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 3;
+    static const uint8_t MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION = 3;
 
     DRTupleStream();
 
@@ -115,6 +115,8 @@ public:
     }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
+    void setDRProtocolVersion(int8_t drVersion);
+
     bool m_enabled;
 
     static int32_t getTestDRBuffer(char *out);
@@ -142,6 +144,7 @@ private:
     size_t m_txnRowCount;
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
+    int8_t m_drVersion;
 };
 
 class MockDRTupleStream : public DRTupleStream {
