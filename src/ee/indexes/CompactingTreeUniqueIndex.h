@@ -144,7 +144,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
     {
         cursor.m_forward = true;
-        MapConstIterator &mapIter = castToIter(cursor);
+        MapIterator &mapIter = castToIter(cursor);
         mapIter = findTuple(*persistentTuple);
 
         if (mapIter.isEnd()) {

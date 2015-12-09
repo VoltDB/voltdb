@@ -276,7 +276,8 @@ bool CompactingMap<KeyValuePair, Compare, hasRank>::erase(iterator &iter)
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank>
-bool CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data &value)
+const typename CompactingMap<KeyValuePair, Compare, hasRank>::Data *
+CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data &value)
 {
     if (m_root != &NIL) {
         // find a place to put the new node

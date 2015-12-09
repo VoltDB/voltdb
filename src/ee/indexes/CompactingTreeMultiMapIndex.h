@@ -142,10 +142,10 @@ class CompactingTreeMultiMapIndex : public TableIndex
     bool moveToKeyByTuple(const TableTuple *persistentTuple, IndexCursor &cursor) const
     {
         cursor.m_forward = true;
-        MapConstRange iter_pair = m_entries.equalRange(setKeyFromTuple(persistentTuple));
+        MapRange iter_pair = m_entries.equalRange(setKeyFromTuple(persistentTuple));
 
-        MapConstIterator &mapIter = castToIter(cursor);
-        MapConstIterator &mapEndIter = castToEndIter(cursor);
+        MapIterator &mapIter = castToIter(cursor);
+        MapIterator &mapEndIter = castToEndIter(cursor);
 
         mapIter = iter_pair.first;
         mapEndIter = iter_pair.second;
