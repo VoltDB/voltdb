@@ -35,8 +35,4 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
      * @return formatter instance created with the given name and properties
      */
     public abstract Formatter<?> create(String name, Properties prop);
-
-    public final Formatter<?> create(Properties prop) {
-        return create(null, prop);
-    }
 }

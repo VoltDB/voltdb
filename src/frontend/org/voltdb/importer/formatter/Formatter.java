@@ -22,5 +22,11 @@ package org.voltdb.importer.formatter;
  * creates the formatter.
  */
 public interface Formatter<T> {
-    public Object[] transform(T b) throws FormatException;
+    /**
+     * Transforms data from one format to another.
+     * @param sourceData - raw data from source
+     * @return Array of data converted from sourceData
+     * @throws FormatException
+     */
+    public Object[] transform(T sourceData) throws FormatException;
 }

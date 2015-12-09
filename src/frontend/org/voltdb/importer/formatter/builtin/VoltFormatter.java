@@ -37,11 +37,9 @@ public class VoltFormatter implements Formatter<String> {
     }
 
     @Override
-    public Object[] transform(String b) throws FormatException {
-        if (b == null)
-            throw new NullPointerException("No argument passed into transform.");
+    public Object[] transform(String sourceData) throws FormatException {
         try {
-            Object list[] = m_parser.parseLine(b);
+            Object list[] = m_parser.parseLine(sourceData);
             if (list != null) {
                 for (int i = 0; i < list.length; i++) {
                     if ("NULL".equals(list[i])
