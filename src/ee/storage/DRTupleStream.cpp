@@ -48,7 +48,8 @@ DRTupleStream::DRTupleStream()
       m_rowTarget(-1),
       m_txnRowCount(0),
       m_lastCommittedSpUniqueId(0),
-      m_lastCommittedMpUniqueId(0)
+      m_lastCommittedMpUniqueId(0),
+      m_drVersion(0)
 {}
 
 void DRTupleStream::setSecondaryCapacity(size_t capacity) {
@@ -88,7 +89,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
 
-    io.writeByte(DR_VERSION);
+    io.writeByte(m_drVersion);
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
     io.writeInt(static_cast<int32_t>(tableName.size()));
@@ -153,7 +154,8 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(DR_VERSION);
+    io.writeByte(m_drVersion);
+    printf("m_drVersion=%d\n", m_drVersion);
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -217,7 +219,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                                  m_currBlock->remaining());
-    io.writeByte(DR_VERSION);
+    io.writeByte(m_drVersion);
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -382,7 +384,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
-     io.writeByte(DR_VERSION);
+     io.writeByte(m_drVersion);
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
@@ -445,7 +447,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(DR_VERSION);
+    io.writeByte(m_drVersion);
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
     uint32_t crc = vdbcrc::crc32cInit();
@@ -551,4 +553,8 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + headerSize, adjustedLength);
     return adjustedLength;
 
+}
+
+void DRTupleStream::setDRProtocolVersion(int8_t drVersion) {
+    m_drVersion = drVersion;
 }

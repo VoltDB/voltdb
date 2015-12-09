@@ -1371,4 +1371,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getBatchTimeout() {
         return m_ee.getBatchTimeout();
     }
+
+    @Override
+    public void setDRProtocolVersion(byte drVersion) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(1);
+        paramBuffer.put(drVersion);
+        m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
+    }
 }
