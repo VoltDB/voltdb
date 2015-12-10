@@ -226,9 +226,9 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 //                throwFatalException("Could not find the expected number of tuples during a table scan");
 //            }
             m_dataPtr = m_blockIterator.key();
-            m_currentBlock = m_blockIterator.value();
+            m_currentBlock = m_blockIterator.data();
             m_blockOffset = 0;
-            m_blockIterator.moveNext();
+            m_blockIterator++;
         } else {
             m_dataPtr += m_tupleLength;
         }
@@ -301,34 +301,36 @@ inline int TableIterator::getLocation() const {
 class JumpingTableIterator : public TableIterator {
 public:
     // Get an iterator via table->iterator()
-    JumpingTableIterator(PersistentTable* table, TBMapI);
+    JumpingTableIterator(PersistentTable* table, TBMapI start, TBMapI end);
     int getTuplesInNextBlock();
     bool hasNextBlock();
     void nextBlock();
+
+private:
+    TBMapI m_end;        // Use here for easy access to end()
 };
 
-
-inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start)
-    : TableIterator((Table*)parent, start)
+inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start, TBMapI end)
+    : TableIterator((Table*)parent, start), m_end(end)
     {
     }
 
 
 inline int JumpingTableIterator::getTuplesInNextBlock() {
-    assert(!m_blockIterator.isEnd());
-    return m_blockIterator.value()->activeTuples();
+    assert(m_blockIterator != m_end);
+    return m_blockIterator.data()->activeTuples();
 }
 
 inline bool JumpingTableIterator::hasNextBlock() {
     assert(m_blockOffset == 0);
-    return !m_blockIterator.isEnd();
+    return m_blockIterator != m_end;
 }
 
 inline void JumpingTableIterator::nextBlock() {
     assert(m_blockOffset == 0);
-    assert(!m_blockIterator.isEnd());
-    TBPtr currentBlock = m_blockIterator.value();
-    m_blockIterator.moveNext();
+    assert(m_blockIterator != m_end);
+    TBPtr currentBlock = m_blockIterator.data();
+    m_blockIterator++;
     m_foundTuples += currentBlock->activeTuples();
     m_location += m_table->getTuplesPerBlock();
 }
