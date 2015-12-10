@@ -68,7 +68,6 @@
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
 #include "storage/CopyOnWriteIterator.h"
-#include "structures/CompactingSet.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -194,6 +193,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
+    friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
@@ -231,7 +231,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     JumpingTableIterator* makeJumpingIterator() {
-        return new JumpingTableIterator(this, m_data.begin());
+        return new JumpingTableIterator(this, m_data.begin(), m_data.end());
     }
 
     TableIterator& iteratorDeletingAsWeGo() {
@@ -651,7 +651,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
-    CompactingSet<TBPtr> m_blocksWithSpace;
+    stx::btree_set<TBPtr > m_blocksWithSpace;
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
@@ -951,20 +951,20 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 
 inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSize) {
     if (!blocks.empty()) {
-        TBMapI i = blocks.lowerBound(tuple);
+        TBMapI i = blocks.lower_bound(tuple);
 
         // Not the first tuple of any known block, move back a block, see if it
         // belongs to the previous block
-        if (i.isEnd() || i.key() != tuple) {
+        if (i == blocks.end() || i.key() != tuple) {
             i--;
         }
 
         // If the tuple is within the block boundaries, we found the block
         if (i.key() <= tuple && tuple < i.key() + blockSize) {
-            if (i.value().get() == NULL) {
+            if (i.data().get() == NULL) {
                 throwFatalException("A block has gone missing in the tuple block map.");
             }
-            return i.value();
+            return i.data();
         }
     }
 
