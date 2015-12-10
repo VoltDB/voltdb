@@ -911,6 +911,8 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
+            rejoinCmdLn.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
+
             rejoinCmdLn.startCommand(startAction);
 
             // This shouldn't collide but apparently it sucks.
