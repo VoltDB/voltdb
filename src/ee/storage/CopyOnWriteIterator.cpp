@@ -33,9 +33,9 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_skippedInactiveRows(0) {
     //Prime the pump
     if (m_blockIterator != m_end) {
-        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
+        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
         m_location = m_blockIterator.key();
-        m_currentBlock = m_blockIterator.value();
+        m_currentBlock = m_blockIterator.data();
         m_blockIterator++;
     }
     m_blockOffset = 0;
@@ -55,12 +55,12 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
             }
-            m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
+            m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
 
             char *finishedBlock = m_currentBlock->address();
 
             m_location = m_blockIterator.key();
-            m_currentBlock = m_blockIterator.value();
+            m_currentBlock = m_blockIterator.data();
             assert(m_currentBlock->address() == m_location);
             m_blockOffset = 0;
 
@@ -69,9 +69,9 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             //
             // This invalidates the iterators, so we have to get new iterators
             // using the current block's start address. m_blockIterator has to
-            // point to the next block, hence the upperBound() call.
+            // point to the next block, hence the upper_bound() call.
             m_blocks.erase(finishedBlock);
-            m_blockIterator = m_blocks.upperBound(m_currentBlock->address());
+            m_blockIterator = m_blocks.upper_bound(m_currentBlock->address());
             m_end = m_blocks.end();
         }
         assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
@@ -115,7 +115,7 @@ int64_t CopyOnWriteIterator::countRemaining() const {
                 break;
             }
             location = blockIterator.key();
-            currentBlock = blockIterator.value();
+            currentBlock = blockIterator.data();
             assert(currentBlock->address() == location);
             blockOffset = 0;
             blockIterator++;
