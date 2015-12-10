@@ -38,7 +38,7 @@ CREATE TABLE bids
 CREATE TABLE devices
 (
   id bigint not null
-, location point not null
+, location geography_point not null
 , primary key (id)
 );
 
