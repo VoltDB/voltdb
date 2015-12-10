@@ -262,6 +262,7 @@ CTX.INPUT['expressions'] = """
  expressionutil.cpp
  vectorexpression.cpp
  functionexpression.cpp
+ geofunctions.cpp
  tupleaddressexpression.cpp
  operatorexpression.cpp
  parametervalueexpression.cpp

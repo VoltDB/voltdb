@@ -244,6 +244,14 @@ static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
 static const int FUNC_VOLT_HEX                         = 20029;
 static const int FUNC_VOLT_BIN                         = 20030;
 
+ static const int FUNC_VOLT_GEO_AREA                    = 20031;
+ static const int FUNC_VOLT_GEO_NUM_POLYGONS            = 20032;
+ static const int FUNC_VOLT_GEO_NUM_INTERIOR_RINGS      = 20033;
+ static const int FUNC_VOLT_GEO_NUM_POINTS              = 20034;
+ static const int FUNC_VOLT_GEO_PERIMETER               = 20035;
+ static const int FUNC_VOLT_GEO_WITHIN                  = 20036;
+ static const int FUNC_VOLT_GEO_DISTANCE                = 20037;
+
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
 static const int SQL_TRIM_TRAILING                    = 284;
@@ -263,5 +271,6 @@ static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSE
 #include "stringfunctions.h"
 #include "logicfunctions.h"
 #include "jsonfunctions.h"
+#include "geofunctions.h"
 
 #endif
