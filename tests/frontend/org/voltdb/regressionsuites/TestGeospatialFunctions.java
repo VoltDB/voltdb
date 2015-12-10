@@ -394,12 +394,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // Validate result set obtained using distance between point and polygon is same as
         // distance between polygon and point
         sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
-                        + "from borders, places "
-                        + "order by borders.pk";
+                + "from borders, places where not contains(borders.region, places.loc) "
+                + "order by borders.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         // distance between point and polygon
         sql = "select borders.name, places.name, distance(places.loc, borders.region) as distance "
-                + "from borders, places "
+                + "from borders, places where not contains(borders.region, places.loc) "
                 + "order by borders.pk";
         VoltTable vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(vt1, vt);
