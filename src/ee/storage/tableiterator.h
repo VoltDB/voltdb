@@ -226,9 +226,9 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 //                throwFatalException("Could not find the expected number of tuples during a table scan");
 //            }
             m_dataPtr = m_blockIterator.key();
-            m_currentBlock = m_blockIterator.value();
+            m_currentBlock = m_blockIterator.data();
             m_blockOffset = 0;
-            m_blockIterator.moveNext();
+            m_blockIterator++;
         } else {
             m_dataPtr += m_tupleLength;
         }
