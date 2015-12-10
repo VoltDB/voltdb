@@ -2518,12 +2518,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         sql = "INSERT INTO t3 VALUES (2, 2, NULL);";
         client.callProcedure("@AdHoc", sql);
-        sql = "INSERT INTO t3 VALUES (3, 3, 3);";
+        sql = "INSERT INTO t3 VALUES (3, 3, 10);";
         client.callProcedure("@AdHoc", sql);
 
         sql = "INSERT INTO t3_no_index VALUES (2, 2, NULL);";
         client.callProcedure("@AdHoc", sql);
-        sql = "INSERT INTO t3_no_index VALUES (3, 3, 3);";
+        sql = "INSERT INTO t3_no_index VALUES (3, 3, 10);";
         client.callProcedure("@AdHoc", sql);
 
         // NULL padded row in T3 will trigger the bug ENG-9389
@@ -2553,6 +2553,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
                     + "where t2.D is null and t3.D is null and t2.B = 2 "
                     + "order by t1.a;";
             validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = "select t1.b + t3.d as thesum "
+                    + "from t1 "
+                    + "left outer join " + innerTable + " as t3 "
+                    + "on t1.a = t3.a "
+                    + "where t1.b > 1 "
+                    + "order by thesum;";
+            System.out.println(client.callProcedure("@Explain", sql).getResults()[0]);
+            validateTableOfScalarLongs(client, sql, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, 12});
         }
 
         truncateTables(client, new String[]{"T1", "T2", "T3", "T3_NO_INDEX"});

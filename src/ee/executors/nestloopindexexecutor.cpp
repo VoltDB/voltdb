@@ -245,6 +245,28 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     ProgressMonitorProxy pmp(m_engine, this);
 
     TableTuple join_tuple;
+    // It's not immediately obvious here, so there's some subtlety to
+    // note with respect to the schema of the join_tuple.
+    //
+    // The inner_tuple is used to represent the values from the inner
+    // table in the case of the join predicate passing, and for left
+    // outer joins, the null_tuple is used if there is no match.  Both
+    // of these tuples include the complete schema of the table being
+    // scanned.  The inner table is being scanned via an inlined scan
+    // node, so there is no temp table corresponding to it.
+    //
+    // Predicates that are evaluated against the inner table should
+    // therefore use the complete schema of the table being scanned.
+    //
+    // The join_tuple is the tuple that contains the values that we
+    // actually want to put in the output of the join (or to aggregate
+    // if there is an inlined agg plan node).  This tuple needs to
+    // omit the unused columns from the inner table.  The inlined
+    // index scan itself has an inlined project node that defines the
+    // columns that should be output by the join, and omits those that
+    // are not needed.  So the join_tuple contains the columns we're
+    // using from the outer table, followed by the "projected" schema
+    // for the inlined scan of the inner table.
     if (m_aggExec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();

@@ -272,7 +272,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // These have the effect of repeatably generating the correct output
         // schema if called again and again, but also allowing the planner
         // to overwrite the inline projection and still have the right thing
-        // happen
+        // happen.
+        //
+        // Note that when an index scan is inlined into a join node (as with
+        // nested loop index joins), then there will be a project node inlined into
+        // the index scan node that determines which columns from the inner table
+        // are used as an output of the join, but that predicates evaluated against
+        // this table should use the complete schema of the table being scanned.
+        // See also the comments in NestLoopIndexPlanNode.resolveColumnIndexes.
+        // Related tickets: ENG-9389, ENG-9533.
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj != null) {
