@@ -525,7 +525,6 @@ public class TestVoltCompiler extends TestCase {
 
     // test that the source table for a view is not export only
     public void testViewSourceNotExportOnly() throws IOException {
-        System.setProperty("allowExportTableView", "false");
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
@@ -541,7 +540,6 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testViewSourceExportOnly() throws IOException {
-        System.setProperty("allowExportTableView", "true");
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
@@ -559,7 +557,6 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
-        System.setProperty("allowExportTableView", "true");
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
@@ -575,7 +572,6 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
-        System.setProperty("allowExportTableView", "true");
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
