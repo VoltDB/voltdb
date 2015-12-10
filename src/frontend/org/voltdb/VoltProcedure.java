@@ -126,6 +126,14 @@ public abstract class VoltProcedure {
         return m_runner.getUniqueId();
     }
 
+    /**
+     * Get the ID of cluster that the client connects to.
+     * @return An ID that identifies the VoltDB cluster
+     */
+    public int getClusterId() {
+        return m_runner.getClusterId();
+    }
+
 
     /**
      * End users should not instantiate VoltProcedure instances.

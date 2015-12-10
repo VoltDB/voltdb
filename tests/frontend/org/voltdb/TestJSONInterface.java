@@ -74,8 +74,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
-
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -106,6 +104,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestJSONInterface extends TestCase {
 
@@ -644,7 +644,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -745,7 +745,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");

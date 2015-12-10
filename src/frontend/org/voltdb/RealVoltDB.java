@@ -106,6 +106,7 @@ import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
+import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
@@ -114,6 +115,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
@@ -175,9 +177,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.9.dev1";
+    static final String m_defaultVersionString = "5.9";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.9.dev1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.9\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -2804,6 +2806,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Initiator init = m_iv2Initiators.get(partition);
             assert init != null;
             init.setDurableUniqueIdListener(listener);
+        }
+    }
+
+    public ExecutionEngine debugGetSpiedEE(int partitionId) {
+        if (m_config.m_backend == BackendTarget.NATIVE_EE_SPY_JNI) {
+            BaseInitiator init = (BaseInitiator)m_iv2Initiators.get(partitionId);
+            return init.debugGetSpiedEE();
+        }
+        else {
+            return null;
         }
     }
 
