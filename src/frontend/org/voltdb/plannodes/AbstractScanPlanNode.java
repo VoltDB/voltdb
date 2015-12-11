@@ -272,7 +272,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // These have the effect of repeatably generating the correct output
         // schema if called again and again, but also allowing the planner
         // to overwrite the inline projection and still have the right thing
-        // happen
+        // happen.
+        //
+        // Note that when an index scan is inlined into a join node (as with
+        // nested loop index joins), then there will be a project node inlined into
+        // the index scan node that determines which columns from the inner table
+        // are used as an output of the join, but that predicates evaluated against
+        // this table should use the complete schema of the table being scanned.
+        // See also the comments in NestLoopIndexPlanNode.resolveColumnIndexes.
+        // Related tickets: ENG-9389, ENG-9533.
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj != null) {
@@ -282,7 +290,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
-        else if (m_tableScanSchema.size() != 0 && m_isInline == false) {
+        else if (m_tableScanSchema.size() != 0) {
             // Order the scan columns according to the table schema
             // before we stick them in the projection output
             List<TupleValueExpression> scan_tves =
@@ -308,10 +316,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
         else {
-            // We come here if this node is an inline scan node, or if m_tableScanSchema is empty.
-            //
-            // If this scan node is inlined into another node, then there is no output temp
-            // table for this node, so the output schema will be the same as the table being scanned.
+            // We come here if m_tableScanSchema is empty.
             //
             // m_tableScanSchema might be empty for cases like
             //   select now from table;
