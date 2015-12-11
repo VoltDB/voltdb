@@ -229,6 +229,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return new TableIterator(this, m_data.begin());
     }
 
+    bool hasNoMoreBlocks(const TBMapI iter) const {
+        return iter == m_data.end();
+    }
+
     JumpingTableIterator* makeJumpingIterator() {
         return new JumpingTableIterator(this, m_data.begin());
     }

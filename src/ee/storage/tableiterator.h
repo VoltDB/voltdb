@@ -315,20 +315,20 @@ inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMap
 
 
 inline int JumpingTableIterator::getTuplesInNextBlock() {
-    assert(!m_blockIterator.isEnd());
-    return m_blockIterator.value()->activeTuples();
+    assert(!(dynamic_cast<PersistentTable*>(m_table)->hasNoMoreBlocks(m_blockIterator)));
+    return m_blockIterator.data()->activeTuples();
 }
 
 inline bool JumpingTableIterator::hasNextBlock() {
     assert(m_blockOffset == 0);
-    return !m_blockIterator.isEnd();
+    return !(dynamic_cast<PersistentTable*>(m_table)->hasNoMoreBlocks(m_blockIterator));
 }
 
 inline void JumpingTableIterator::nextBlock() {
     assert(m_blockOffset == 0);
-    assert(!m_blockIterator.isEnd());
-    TBPtr currentBlock = m_blockIterator.value();
-    m_blockIterator.moveNext();
+    assert(!(dynamic_cast<PersistentTable*>(m_table)->hasNoMoreBlocks(m_blockIterator)));
+    TBPtr currentBlock = m_blockIterator.data();
+    m_blockIterator++;
     m_foundTuples += currentBlock->activeTuples();
     m_location += m_table->getTuplesPerBlock();
 }
