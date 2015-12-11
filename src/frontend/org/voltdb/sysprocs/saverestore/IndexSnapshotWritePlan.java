@@ -35,6 +35,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -55,7 +56,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,
                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                         Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                         Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                          SiteTracker tracker,
                                          HashinatorSnapshotData hashinatorData,
                                          long timestamp)

@@ -1675,7 +1675,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
 }
 
 void VoltDBEngine::collectDRTupleStreamStateInfo() {
-    std::size_t size = 3 * sizeof(int64_t) + 1;
+    std::size_t size = 3 * sizeof(int64_t) + 1 + 1;
     if (m_drReplicatedStream) {
         size += 3 * sizeof(int64_t);
     }
@@ -1684,6 +1684,7 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     m_resultOutput.writeLong(drInfo.seqNum);
     m_resultOutput.writeLong(drInfo.spUniqueId);
     m_resultOutput.writeLong(drInfo.mpUniqueId);
+    m_resultOutput.writeByte(drInfo.drVersion);
     if (m_drReplicatedStream) {
         m_resultOutput.writeByte(static_cast<int8_t>(1));
         drInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueIds();

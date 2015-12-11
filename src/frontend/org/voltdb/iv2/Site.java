@@ -778,7 +778,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
                                         exportSequenceNumbers, drTupleStreamInfo,
@@ -969,6 +969,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         long partitionSequenceNumber = resultBuffer.getLong();
         long partitionSpUniqueId = resultBuffer.getLong();
         long partitionMpUniqueId = resultBuffer.getLong();
+        byte drVersion = resultBuffer.get();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
         TupleStreamStateInfo info = null;
@@ -977,10 +978,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long replicatedSpUniqueId = resultBuffer.getLong();
             long replicatedMpUniqueId = resultBuffer.getLong();
             DRLogSegmentId replicatedInfo = new DRLogSegmentId(replicatedSequenceNumber, replicatedSpUniqueId, replicatedMpUniqueId);
-
-            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo);
+            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo, drVersion);
         } else {
-            info = new TupleStreamStateInfo(partitionInfo);
+            info = new TupleStreamStateInfo(partitionInfo, drVersion);
         }
         return info;
     }

@@ -92,7 +92,7 @@ public class SnapshotSaveAPI
      * published under the snapshot create lock.
      */
     private static Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
-    private static Map<Integer, DRLogSegmentId> drTupleStreamInfo;
+    private static Map<Integer, TupleStreamStateInfo> drTupleStreamInfo;
 
     /*
      * Double ugh!, remote DC unique ids get used the same way as the export IDs, end up going into ZK
@@ -477,7 +477,7 @@ public class SnapshotSaveAPI
             JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)

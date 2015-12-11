@@ -327,6 +327,8 @@ public class RejoinProducer extends JoinProducerBase {
                         drSequenceNumbers = event.drSequenceNumbers;
                         VoltDB.instance().getConsumerDRGateway().populateLastAppliedSegmentIds(event.remoteDCLastIds);
                     }
+                    // Tells EE which DR version going to use
+                    siteConnection.setDRProtocolVersion(event.drVersion);
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
