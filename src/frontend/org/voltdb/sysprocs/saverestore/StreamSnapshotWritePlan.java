@@ -42,6 +42,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
@@ -74,7 +75,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -244,7 +245,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
                                                              Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                             Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                                             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                                              SiteTracker tracker,
                                                              HashinatorSnapshotData hashinatorData,
                                                              long timestamp,

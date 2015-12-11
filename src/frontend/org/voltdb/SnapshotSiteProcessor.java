@@ -119,7 +119,7 @@ public class SnapshotSiteProcessor {
     private static final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers =
         new HashMap<String, Map<Integer, Pair<Long, Long>>>();
 
-    private static final Map<Integer, DRLogSegmentId> m_drTupleStreamInfo = new HashMap<>();
+    private static final Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo = new HashMap<>();
 
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
@@ -133,7 +133,7 @@ public class SnapshotSiteProcessor {
     /**
      * Same as m_exportSequenceNumbersToLogOnCompletion, but for m_drTupleStreamInfo
      */
-    private Map<Integer, DRLogSegmentId> m_drTupleStreamInfoToLogOnCompletion;
+    private Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfoToLogOnCompletion;
 
     /**
      * Used to pass the last seen unique ids from remote datacenters into the snapshot
@@ -243,9 +243,9 @@ public class SnapshotSiteProcessor {
                                 ackOffSetAndSequenceNumber[1]));
         }
         TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
-        m_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo.partitionInfo);
+        m_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
         if (drStateInfo.containsReplicatedStreamInfo) {
-            m_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo.replicatedInfo);
+            m_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
         }
     }
 
@@ -256,8 +256,8 @@ public class SnapshotSiteProcessor {
         return sequenceNumbers;
     }
 
-    public static Map<Integer, DRLogSegmentId> getDRTupleStreamStateInfo() {
-        Map<Integer, DRLogSegmentId> stateInfo = ImmutableMap.copyOf(m_drTupleStreamInfo);
+    public static Map<Integer, TupleStreamStateInfo> getDRTupleStreamStateInfo() {
+        Map<Integer, TupleStreamStateInfo> stateInfo = ImmutableMap.copyOf(m_drTupleStreamInfo);
         m_drTupleStreamInfo.clear();
         return stateInfo;
     }
@@ -397,7 +397,7 @@ public class SnapshotSiteProcessor {
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds)
     {
         ExecutionSitesCurrentlySnapshotting.add(this);
@@ -682,7 +682,7 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
                         m_exportSequenceNumbersToLogOnCompletion;
-                final Map<Integer, DRLogSegmentId> drTupleStreamInfo =
+                final Map<Integer, TupleStreamStateInfo> drTupleStreamInfo =
                         m_drTupleStreamInfoToLogOnCompletion;
                 final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds =
                         m_remoteDCLastSeenIds;
@@ -786,7 +786,7 @@ public class SnapshotSiteProcessor {
             long txnId,
             boolean snapshotSuccess,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
@@ -918,7 +918,7 @@ public class SnapshotSiteProcessor {
     }
 
     private static void mergeDRTupleStreamInfo(JSONObject jsonObj,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo) throws JSONException {
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo) throws JSONException {
         JSONObject stateInfoMap;
         if (jsonObj.has("drTupleStreamStateInfo")) {
             stateInfoMap = jsonObj.getJSONObject("drTupleStreamStateInfo");
@@ -927,15 +927,21 @@ public class SnapshotSiteProcessor {
             jsonObj.put("drTupleStreamStateInfo", stateInfoMap);
         }
 
-        for (Map.Entry<Integer, DRLogSegmentId> e : drTupleStreamInfo.entrySet()) {
+        for (Map.Entry<Integer, TupleStreamStateInfo> e : drTupleStreamInfo.entrySet()) {
             final String partitionId = e.getKey().toString();
-            final DRLogSegmentId partitionStateInfo = e.getValue();
+            DRLogSegmentId partitionStateInfo;
+            if (e.getKey() != MpInitiator.MP_INIT_PID) {
+                partitionStateInfo = e.getValue().partitionInfo;
+            } else {
+                partitionStateInfo = e.getValue().replicatedInfo;
+            }
             JSONObject existingStateInfo = stateInfoMap.optJSONObject(partitionId);
             if (existingStateInfo == null || partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
                 JSONObject stateInfo = new JSONObject();
                 stateInfo.put("sequenceNumber", partitionStateInfo.drId);
                 stateInfo.put("spUniqueId", partitionStateInfo.spUniqueId);
                 stateInfo.put("mpUniqueId", partitionStateInfo.mpUniqueId);
+                stateInfo.put("drVersion", e.getValue().drVersion);
                 stateInfoMap.put(partitionId, stateInfo);
             }
         }

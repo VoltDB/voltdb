@@ -40,8 +40,9 @@ struct DRCommittedInfo{
     int64_t seqNum;
     int64_t spUniqueId;
     int64_t mpUniqueId;
+    int8_t drVersion;
 
-    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
+    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID, int8_t ver) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID), drVersion(ver) {}
 };
 
 class DRTupleStream : public voltdb::TupleStreamBase {
@@ -111,7 +112,7 @@ public:
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
-        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
+        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId, m_drVersion);
     }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
