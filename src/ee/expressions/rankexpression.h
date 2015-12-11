@@ -43,26 +43,57 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREEXPRESSIONS_H
-#define HSTOREEXPRESSIONS_H
+#ifndef HSTORERANKEXPRESSION_H
+#define HSTORERANKEXPRESSION_H
 
-//
-// This is just for convenience
-//
+#include "common/NValue.hpp"
+#include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
 
-#include "expressions/operatorexpression.h"
-#include "expressions/comparisonexpression.h"
-#include "expressions/conjunctionexpression.h"
-#include "expressions/constantvalueexpression.h"
-#include "expressions/functionexpression.h"
-#include "expressions/parametervalueexpression.h"
-#include "expressions/tupleaddressexpression.h"
-#include "expressions/tuplevalueexpression.h"
-#include "expressions/hashrangeexpression.h"
-#include "expressions/subqueryexpression.h"
-#include "expressions/scalarvalueexpression.h"
-#include "expressions/vectorcomparisonexpression.hpp"
-#include "expressions/rankexpression.h"
-#include "expressions/rankpercentageexpression.h"
+#include <vector>
+#include <string>
+#include <sstream>
+#include <cassert>
 
+namespace voltdb {
+
+class TableCatalogDelegate;
+class TableIndex;
+
+class RankExpression : public AbstractExpression {
+public:
+    RankExpression(std::string &tableName, std::string &indexName,
+            int partitionbySize, int numPrefix, bool isDecending);
+
+    ~RankExpression();
+
+    voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
+
+    std::string debugInfo(const std::string &spacer) const {
+        std::ostringstream buffer;
+        buffer << spacer << "RankExpression[" "]\n";
+        return (buffer.str());
+    }
+
+    TableIndex * refreshGetTableIndex();
+
+    int getPartitonbySize() { return m_partitionbySize; }
+    int getOrderbySize() { return m_orderbySize; }
+    bool isDecending() { return m_isDecending; }
+
+  private:
+    std::string m_target_table_name;
+    TableCatalogDelegate* m_tcd;
+    std::string m_target_index_name;
+    int m_partitionbySize;
+    int m_orderbySize;
+    TableIndex * m_tableIndex;
+    bool m_isDecending;
+
+    // So Valgrind doesn't complain:
+    char* m_parititonbySearchKeyBackingStore;
+    char* m_parititonbyMaxSearchKeyBackingStore;
+    char* m_orderbySearchKeyBackingStore;
+};
+}
 #endif

@@ -429,6 +429,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
+    case PLAN_NODE_TYPE_RANKSCAN: {
+        return "RANKSCAN";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }
@@ -481,6 +484,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
+    } else if (str == "RANKSCAN") {
+        return PLAN_NODE_TYPE_RANKSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -620,6 +625,12 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_SELECT_SUBQUERY: {
         return "SELECT_SUBQUERY";
     }
+    case EXPRESSION_TYPE_WINDOWING_RANK: {
+        return "RANK";
+    }
+    case EXPRESSION_TYPE_WINDOWING_RANK_PERCENTAGE: {
+        return "RANK_PERCENTAGE";
+    }
     }
     return "INVALID";
 }
@@ -714,8 +725,11 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_ROW_SUBQUERY;
     } else if (str == "SELECT_SUBQUERY") {
         return EXPRESSION_TYPE_SELECT_SUBQUERY;
+    } else if (str == "RANK") {
+        return EXPRESSION_TYPE_WINDOWING_RANK;
+    } else if (str == "RANK_PERCENTAGE") {
+        return EXPRESSION_TYPE_WINDOWING_RANK_PERCENTAGE;
     }
-
 
     return EXPRESSION_TYPE_INVALID;
 }

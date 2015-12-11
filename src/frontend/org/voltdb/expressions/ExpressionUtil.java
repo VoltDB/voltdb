@@ -72,9 +72,9 @@ public abstract class ExpressionUtil {
             if (ret == null) {
                 ret = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND);
                 ret.setLeft(child_exp);
-            //
-            // Check whether we can add it to the right side
-            //
+                //
+                // Check whether we can add it to the right side
+                //
             } else if (ret.getRight() == null) {
                 ret.setRight(child_exp);
                 stack.push(ret);
@@ -183,7 +183,7 @@ public abstract class ExpressionUtil {
      */
     public static void
     collectPartitioningFilters(Collection<AbstractExpression> filterList,
-                               HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
+            HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
     {
         for (AbstractExpression expr : filterList) {
             if ( ! isColumnEquivalenceFilter(expr)) {
@@ -245,7 +245,7 @@ public abstract class ExpressionUtil {
     getTupleValueExpressions(AbstractExpression input)
     {
         ArrayList<TupleValueExpression> tves =
-            new ArrayList<TupleValueExpression>();
+                new ArrayList<TupleValueExpression>();
         // recursive stopping steps
         if (input == null)
         {
@@ -264,6 +264,22 @@ public abstract class ExpressionUtil {
             }
         }
         return tves;
+    }
+
+    public static boolean containsTVEFromTable(AbstractExpression expr, String tableName) {
+        if (expr == null) {
+            return false;
+        }
+
+        List<TupleValueExpression> tves = getTupleValueExpressions(expr);
+        boolean foundTargetTableTVE = false;
+        for (TupleValueExpression tve: tves) {
+            if (tve.getTableName().contains(tableName)) {
+                foundTargetTableTVE = true;
+                break;
+            }
+        }
+        return foundTargetTableTVE;
     }
 
     /**
@@ -635,4 +651,54 @@ public abstract class ExpressionUtil {
         }
         return expr;
     }
+
+    public static AbstractExpression replaceCVEasRankPercentageExpression(AbstractExpression ae) {
+        if (ae == null) {
+            return null;
+        }
+
+        ae.setLeft(replaceCVEasRankPercentageExpression(ae.getLeft()));
+        ae.setRight(replaceCVEasRankPercentageExpression(ae.getRight()));
+
+        if (ae instanceof ComparisonExpression == false) {
+            return ae;
+        }
+
+        ComparisonExpression ce = (ComparisonExpression) ae;
+        if (ce.getLeft() instanceof RankExpression &&
+                ((RankExpression) ce.getLeft()).isPercentRank()) {
+            if (ce.getRight() instanceof ParameterValueExpression) {
+                ParameterValueExpression pve = (ParameterValueExpression) ce.getRight();
+                if (pve.getOriginalValue() != null) {
+                    ConstantValueExpression cve = pve.getOriginalValue();
+                    if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
+                        RankPercentageExpression rpExpr = new RankPercentageExpression(
+                                (RankExpression)ce.getLeft(), pve);
+                        ae.setRight(rpExpr);
+                    }
+                }
+            } else {
+                throw new PlanningErrorException("PERCENT_RANK clause without constant value from 0 to 1 is not supported");
+            }
+        }
+        else if (ce.getRight() instanceof RankExpression &&
+                ((RankExpression) ce.getRight()).isPercentRank()) {
+
+            if (ce.getLeft() instanceof ParameterValueExpression) {
+                 ParameterValueExpression pve = (ParameterValueExpression) ce.getLeft();
+                 if (pve.getOriginalValue() != null) {
+                     ConstantValueExpression cve = pve.getOriginalValue();
+                     if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
+                         RankPercentageExpression rpExpr = new RankPercentageExpression(
+                                 (RankExpression)ce.getRight(), pve);
+                         ae.setLeft(rpExpr);
+                     }
+                 }
+            } else {
+                throw new PlanningErrorException("PERCENT_RANK clause without constant value from 0 to 1 is not supported");
+            }
+        }
+        return ae;
+    }
+
 }

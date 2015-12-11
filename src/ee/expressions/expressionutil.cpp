@@ -492,6 +492,36 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     return new TupleValueExpression(tableIdx, columnIndex);
 }
 
+static AbstractExpression*
+rankExpressionFactory(PlannerDomValue obj, ExpressionType et,
+                 AbstractExpression *lc, AbstractExpression *rc)
+{
+    // read the tuple value expression specific data
+    std::string targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+    std::string targetIndexName = obj.valueForKey("TARGET_INDEX_NAME").asStr();
+    int partitionbySize = obj.valueForKey("PARTITIONBY_SIZE").asInt();
+    int orderbySize = obj.valueForKey("ORDERBY_SIZE").asInt();
+    int isDecendingOrder = obj.valueForKey("IS_DECENDING_ORDER").asInt();
+    bool isDecending = isDecendingOrder == 1 ? true : false;
+
+    return new RankExpression(targetTableName, targetIndexName,
+            partitionbySize, orderbySize, isDecending);
+}
+
+static AbstractExpression*
+rankPercentageExpressionFactory(PlannerDomValue obj, ExpressionType et,
+                 AbstractExpression *lc, AbstractExpression *rc)
+{
+    // read the tuple value expression specific data
+    std::string targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+    std::string targetIndexName = obj.valueForKey("TARGET_INDEX_NAME").asStr();
+    int partitionbySize = obj.valueForKey("PARTITIONBY_SIZE").asInt();
+    int paramIdx = obj.valueForKey("PARAM_IDX").asInt();
+
+    return new RankPercentageExpression(targetTableName, targetIndexName,
+            partitionbySize, paramIdx);
+}
+
 
 AbstractExpression *
 ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
@@ -645,9 +675,16 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         ret = subqueryFactory(et, obj, args);
         break;
 
-        // must handle all known expressions in this factory
-    default:
+    // RANK
+    case (EXPRESSION_TYPE_WINDOWING_RANK):
+        ret = rankExpressionFactory(obj, et, lc, rc);
+        break;
+    case (EXPRESSION_TYPE_WINDOWING_RANK_PERCENTAGE):
+        ret = rankPercentageExpressionFactory(obj, et, lc, rc);
+        break;
 
+    default:
+        // must handle all known expressions in this factory
         char message[256];
         snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
                 expressionToString(et).c_str(), (int)et);

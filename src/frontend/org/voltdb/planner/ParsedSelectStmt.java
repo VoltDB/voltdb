@@ -40,6 +40,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RankExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
@@ -702,6 +703,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(colExpr.getValueType() != VoltType.NUMERIC);
         }
         assert(colExpr != null);
+
+        // Check RankExpression with where clause
+        List<AbstractExpression> rankExprs = ExpressionUtil.findAllExpressionsOfClass(colExpr, RankExpression.class);
+        if (rankExprs != null && !rankExprs.isEmpty()) {
+            for (AbstractExpression ex: rankExprs) {
+                RankExpression rankExpr = (RankExpression) ex;
+                String tbName = rankExpr.getTableName();
+
+                AbstractExpression predicate = m_joinTree.getAllFilters();
+                StmtTableScan tableScan = m_tableAliasMap.get(tbName);
+                rankExpr.updateWithTheBestIndex(predicate, tableScan);
+            }
+        }
 
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
@@ -1697,8 +1711,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
-                                                     List<ParsedColInfo> orderColumns,
-                                                     List<AbstractExpression> nonOrdered)
+            List<ParsedColInfo> orderColumns,
+            List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
@@ -1723,8 +1737,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
-                                                      List<ParsedColInfo> candidateColumns,
-                                                      List<AbstractExpression> outNonOrdered) {
+            List<ParsedColInfo> candidateColumns,
+            List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
         ArrayList<AbstractExpression> candidateExprHardCases = null;
         // First try to get away with a brute force N by M search for exact equalities.

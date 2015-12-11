@@ -254,6 +254,9 @@ class NValue {
     /* Create an NValue with the null representation for valueType */
     static NValue getNullValue(ValueType);
 
+    /* Create a max NValue with the input valueType */
+    static NValue getMaxValue(ValueType);
+
     /* Create an NValue promoted/demoted to type */
     NValue castAs(ValueType type) const;
 
@@ -3317,6 +3320,21 @@ inline NValue NValue::getNullValue(ValueType type) {
     NValue retval(type);
     retval.setNull();
     return retval;
+}
+
+inline NValue NValue::getMaxValue(ValueType type) {
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        return NValue::getTinyIntValue(INT8_MAX);
+    case VALUE_TYPE_SMALLINT:
+        return NValue::getSmallIntValue(INT16_MAX);
+    case VALUE_TYPE_INTEGER:
+        return NValue::getIntegerValue(INT32_MAX);
+    case VALUE_TYPE_BIGINT:
+        return NValue::getBigIntValue(INT64_MAX);
+    default:
+        return NValue::getNullValue(type);
+    }
 }
 
 inline void NValue::hashCombine(std::size_t &seed) const {

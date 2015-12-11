@@ -43,26 +43,52 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREEXPRESSIONS_H
-#define HSTOREEXPRESSIONS_H
+#ifndef HSTORERANKPERCENTAGEEXPRESSION_H
+#define HSTORERANKPERCENTAGEEXPRESSION_H
 
-//
-// This is just for convenience
-//
+#include "common/NValue.hpp"
+#include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
 
-#include "expressions/operatorexpression.h"
-#include "expressions/comparisonexpression.h"
-#include "expressions/conjunctionexpression.h"
-#include "expressions/constantvalueexpression.h"
-#include "expressions/functionexpression.h"
-#include "expressions/parametervalueexpression.h"
-#include "expressions/tupleaddressexpression.h"
-#include "expressions/tuplevalueexpression.h"
-#include "expressions/hashrangeexpression.h"
-#include "expressions/subqueryexpression.h"
-#include "expressions/scalarvalueexpression.h"
-#include "expressions/vectorcomparisonexpression.hpp"
-#include "expressions/rankexpression.h"
-#include "expressions/rankpercentageexpression.h"
+#include <vector>
+#include <string>
+#include <sstream>
+#include <cassert>
 
+namespace voltdb {
+
+class TableCatalogDelegate;
+class TableIndex;
+
+class RankPercentageExpression : public AbstractExpression {
+public:
+    RankPercentageExpression(std::string &tableName,
+            std::string &indexName, int partitionbySize, int paramIdx);
+
+    ~RankPercentageExpression();
+
+    voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
+
+    std::string debugInfo(const std::string &spacer) const {
+        std::ostringstream buffer;
+        buffer << spacer << "RankPercentageExpression[" "]\n";
+        return (buffer.str());
+    }
+
+private:
+    std::string m_target_table_name;
+    TableCatalogDelegate* m_tcd;
+    std::string m_target_index_name;
+    int m_partitionbySize;
+
+    // HACK: make sure it's valid double in Java
+    voltdb::NValue *m_paramValue;
+
+    TableIndex * m_tableIndex;
+
+    // So Valgrind doesn't complain:
+    char* m_parititonbySearchKeyBackingStore;
+    char* m_parititonbyMaxSearchKeyBackingStore;
+};
+}
 #endif

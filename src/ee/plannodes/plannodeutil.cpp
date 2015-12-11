@@ -62,6 +62,7 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/receivenode.h"
+#include "plannodes/rankscannode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/tuplescannode.h"
@@ -195,6 +196,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_RECEIVE):
             ret = new voltdb::ReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Rank
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_RANKSCAN):
+            ret = new voltdb::RankScanPlanNode();
             break;
         // ------------------------------------------------------------------
         // Merge Receive

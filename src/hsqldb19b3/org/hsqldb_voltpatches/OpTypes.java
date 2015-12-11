@@ -101,6 +101,8 @@ public interface OpTypes {
         MULTICOLUMN          = 97
         // A VoltDB extension APPROX_COUNT_DISTINCT
         , APPROX_COUNT_DISTINCT = 98
+		, RANK               = 99
+        , PERCENT_RANK       = 100 // reserved but not used
         // End VoltDB extension
     ;
 }

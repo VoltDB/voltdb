@@ -45,6 +45,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RankExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -66,7 +67,7 @@ public abstract class AbstractParsedStmt {
 
     protected String m_contentDeterminismMessage = null;
 
-     // Internal statement counter
+    // Internal statement counter
     public static int NEXT_STMT_ID = 0;
     // Internal parameter counter
     public static int NEXT_PARAMETER_ID = 0;
@@ -122,10 +123,10 @@ public abstract class AbstractParsedStmt {
     static final String UNION_NODE_NAME  = "union";
 
     /**
-    * Class constructor
-    * @param paramValues
-    * @param db
-    */
+     * Class constructor
+     * @param paramValues
+     * @param db
+     */
     protected AbstractParsedStmt(String[] paramValues, Database db) {
         m_paramValues = paramValues;
         m_db = db;
@@ -139,46 +140,46 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-    *
-    * @param stmtTypeElement
-    * @param paramValues
-    * @param db
-    */
-   private static AbstractParsedStmt getParsedStmt(VoltXMLElement stmtTypeElement, String[] paramValues,
-           Database db) {
-       AbstractParsedStmt retval = null;
+     *
+     * @param stmtTypeElement
+     * @param paramValues
+     * @param db
+     */
+    private static AbstractParsedStmt getParsedStmt(VoltXMLElement stmtTypeElement, String[] paramValues,
+            Database db) {
+        AbstractParsedStmt retval = null;
 
-       if (stmtTypeElement == null) {
-           System.err.println("Unexpected error parsing hsql parsed stmt xml");
-           throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
-       }
+        if (stmtTypeElement == null) {
+            System.err.println("Unexpected error parsing hsql parsed stmt xml");
+            throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
+        }
 
-       // create non-abstract instances
-       if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
-           retval = new ParsedInsertStmt(paramValues, db);
-           if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
-               retval.m_isUpsert = true;
-           }
-       }
-       else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
-           retval = new ParsedUpdateStmt(paramValues, db);
-       }
-       else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
-           retval = new ParsedDeleteStmt(paramValues, db);
-       }
-       else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-           retval = new ParsedSelectStmt(paramValues, db);
-       }
-       else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
-           retval = new ParsedUnionStmt(paramValues, db);
-       }
-       else {
-           throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
-       }
-       // Set the unique id
-       retval.m_stmtId = NEXT_STMT_ID++;
-       return retval;
-   }
+        // create non-abstract instances
+        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
+            retval = new ParsedInsertStmt(paramValues, db);
+            if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
+                retval.m_isUpsert = true;
+            }
+        }
+        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+            retval = new ParsedUpdateStmt(paramValues, db);
+        }
+        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+            retval = new ParsedDeleteStmt(paramValues, db);
+        }
+        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+            retval = new ParsedSelectStmt(paramValues, db);
+        }
+        else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+            retval = new ParsedUnionStmt(paramValues, db);
+        }
+        else {
+            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
+        }
+        // Set the unique id
+        retval.m_stmtId = NEXT_STMT_ID++;
+        return retval;
+    }
 
     /**
      * @param parsedStmt
@@ -356,6 +357,9 @@ public abstract class AbstractParsedStmt {
         else if (elementName.equals("row")) {
             retval = parseRowExpression(exprNode);
         }
+        else if (elementName.equals("rank")) {
+            retval = parseRankValueExpression(exprNode);
+        }
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
@@ -399,7 +403,7 @@ public abstract class AbstractParsedStmt {
         // EVEN if that constant has been "parameterized" by the plan caching code.
         ConstantValueExpression cve = null;
         boolean needConstant = (needParameter == false) ||
-            ((isPlannerGenerated != null) && (isPlannerGenerated.equalsIgnoreCase("true")));
+                ((isPlannerGenerated != null) && (isPlannerGenerated.equalsIgnoreCase("true")));
 
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
@@ -494,62 +498,102 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-    *
-    * @param exprNode
-    * @return
-    */
-   private AbstractExpression parseRowExpression(VoltXMLElement exprNode) {
-       // Parse individual columnref expressions from the IN output schema
-       // Short-circuit for COL IN (LIST) and COL IN (SELECT COL FROM ..)
-       if (exprNode.children.size() == 1) {
-           return parseExpressionNode(exprNode.children.get(0));
-       } else {
-           // (COL1, COL2) IN (SELECT C1, C2 FROM...)
-           return parseRowExpression(exprNode.children);
-       }
-   }
+     *
+     * @param exprNode
+     * @return
+     */
+    private AbstractExpression parseRowExpression(VoltXMLElement exprNode) {
+        // Parse individual columnref expressions from the IN output schema
+        // Short-circuit for COL IN (LIST) and COL IN (SELECT COL FROM ..)
+        if (exprNode.children.size() == 1) {
+            return parseExpressionNode(exprNode.children.get(0));
+        } else {
+            // (COL1, COL2) IN (SELECT C1, C2 FROM...)
+            return parseRowExpression(exprNode.children);
+        }
+    }
 
-   /**
-    *
-    * @param exprNode
-    * @return
-    */
-   private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
-       // Parse individual columnref expressions from the IN output schema
-       List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-       for (VoltXMLElement exprNode : exprNodes) {
-           AbstractExpression expr = parseExpressionNode(exprNode);
-           exprs.add(expr);
-       }
-       return new RowSubqueryExpression(exprs);
-   }
+    /**
+     *
+     * @param exprNode
+     * @return
+     */
+    private AbstractExpression parseRowExpression(List<VoltXMLElement> exprNodes) {
+        // Parse individual columnref expressions from the IN output schema
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        for (VoltXMLElement exprNode : exprNodes) {
+            AbstractExpression expr = parseExpressionNode(exprNode);
+            exprs.add(expr);
+        }
+        return new RowSubqueryExpression(exprs);
+    }
 
-   public Collection<StmtTableScan> allScans()
-   { return m_tableAliasMap.values(); }
+    private AbstractExpression parseRankValueExpression(VoltXMLElement exprNode) {
+        // Parse individual rank expressions
+        List<AbstractExpression> partitionbyExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> orderbyExprs = new ArrayList<AbstractExpression>();
+        boolean areAllDecending = false;
 
-   /**
-    * Return locally defined StmtTableScan by table alias.
-    * @param tableAlias
-    */
-   public StmtTableScan getStmtTableScanByAlias(String tableAlias)
-   { return m_tableAliasMap.get(tableAlias); }
+        boolean isPercentRank = Boolean.valueOf(exprNode.attributes.get("isPercentRank"));
 
-   /**
-    * Return StmtTableScan by table alias. In case of correlated queries,
-    * may need to walk up the statement tree.
-    * @param tableAlias
-    */
-   private StmtTableScan resolveStmtTableScanByAlias(String tableAlias) {
-       StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
-       if (tableScan != null) {
-           return tableScan;
-       }
-       if (m_parentStmt != null) {
-           // This may be a correlated subquery
-           return m_parentStmt.resolveStmtTableScanByAlias(tableAlias);
-       }
-       return null;
-   }
+        for (VoltXMLElement ele : exprNode.children) {
+            if (ele.name.equals("partitionbyList")) {
+                for(int i = 0; i < ele.children.size(); i++) {
+                    VoltXMLElement childNode = ele.children.get(i);
+                    AbstractExpression expr = parseExpressionNode(childNode);
+                    partitionbyExprs.add(expr);
+                }
+
+            } else if (ele.name.equals("orderbyList")) {
+                for(int i = 0; i < ele.children.size(); i++) {
+                    VoltXMLElement childNode = ele.children.get(i);
+                    boolean isDecending = Boolean.valueOf(childNode.attributes.get("decending"));
+                    if (i == 0) {
+                        areAllDecending = isDecending;
+                    } else if (areAllDecending != isDecending) {
+                        throw new PlanningErrorException("invalid RANK order by expression without consistent "
+                                + "acending order or decending order");
+                    }
+
+                    AbstractExpression expr = parseExpressionNode(childNode.children.get(0));
+                    orderbyExprs.add(expr);
+                }
+            } else {
+                throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
+            }
+        }
+
+        RankExpression rankExpr = new RankExpression(partitionbyExprs, orderbyExprs,
+                m_db, areAllDecending, isPercentRank);
+        return rankExpr;
+    }
+
+    public Collection<StmtTableScan> allScans()
+    { return m_tableAliasMap.values(); }
+
+    /**
+     * Return locally defined StmtTableScan by table alias.
+     * @param tableAlias
+     */
+    public StmtTableScan getStmtTableScanByAlias(String tableAlias)
+    { return m_tableAliasMap.get(tableAlias); }
+
+    /**
+     * Return StmtTableScan by table alias. In case of correlated queries,
+     * may need to walk up the statement tree.
+     * @param tableAlias
+     */
+    private StmtTableScan resolveStmtTableScanByAlias(String tableAlias) {
+        StmtTableScan tableScan = getStmtTableScanByAlias(tableAlias);
+        if (tableScan != null) {
+            return tableScan;
+        }
+        if (m_parentStmt != null) {
+            // This may be a correlated subquery
+            return m_parentStmt.resolveStmtTableScanByAlias(tableAlias);
+        }
+        return null;
+    }
 
     /**
      * Add a table to the statement cache.
@@ -1056,7 +1100,7 @@ public abstract class AbstractParsedStmt {
 
             JoinNode joinNode = new BranchNode(nodeId + 1, joinType, m_joinTree, leafNode);
             m_joinTree = joinNode;
-       }
+        }
     }
 
     /**
@@ -1553,10 +1597,10 @@ public abstract class AbstractParsedStmt {
                     for (ColumnRef cref : index.getColumns()) {
                         Column col = cref.getColumn();
                         TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            orderedAlias.getKey(),
-                                                                            col.getName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
+                                orderedAlias.getKey(),
+                                col.getName(),
+                                col.getName(),
+                                col.getIndex());
                         indexExpressions.add(tve);
                     }
                 }
@@ -1683,10 +1727,10 @@ public abstract class AbstractParsedStmt {
                             // for the column index.  We don't have a column
                             // alias.
                             TupleValueExpression ntve = new TupleValueExpression(tve.getTableName(),
-                                                                                 tve.getTableAlias(),
-                                                                                 addCol.getName(),
-                                                                                 null,
-                                                                                 -1);
+                                    tve.getTableAlias(),
+                                    addCol.getName(),
+                                    null,
+                                    -1);
                             orderByExprs.add(ntve);
                         }
                         // Don't forget to remember to forget the other indices.  (E. Presley, 1955)

@@ -918,7 +918,9 @@ public abstract class StatementDMQL extends Statement {
             }
             QuerySpecification select = (QuerySpecification) queryExpr;
             return voltGetXMLSpecification(select, parameters, session);
-        } else if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
+        } 
+        
+        if (exprType == QueryExpression.UNION || exprType == QueryExpression.UNION_ALL ||
                    exprType == QueryExpression.EXCEPT || exprType == QueryExpression.EXCEPT_ALL ||
                    exprType == QueryExpression.INTERSECT || exprType == QueryExpression.INTERSECT_ALL){
             VoltXMLElement unionExpr = new VoltXMLElement("union");
@@ -980,10 +982,10 @@ public abstract class StatementDMQL extends Statement {
                 unionExpr.children.add(rightExpr);
             }
             return unionExpr;
-        } else {
-            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
-                    queryExpr.operatorName() + " tuple set operator is not supported.");
-        }
+        } 
+        
+        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                queryExpr.operatorName() + " tuple set operator is not supported.");
     }
 
     /**
