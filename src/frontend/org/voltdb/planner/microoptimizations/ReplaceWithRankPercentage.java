@@ -23,6 +23,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.RankScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.PlanNodeType;
 
@@ -74,6 +75,11 @@ public class ReplaceWithRankPercentage extends MicroOptimization {
 
         // In future, index scan search key, end key, etc should also be processed here
         // more complex case like the search key has not been addressed
+
+        RankScanPlanNode rankPlanNode = new RankScanPlanNode(aspn);
+        if (rankPlanNode.isRankScan()) {
+            return rankPlanNode;
+        }
 
         return plan;
     }
