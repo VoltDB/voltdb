@@ -355,6 +355,18 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                     38.98811213712535,      -105.5929789796371 },
                  { "Wonderland",    Double.MIN_VALUE,       Double.MIN_VALUE},
                 }, vt, CENTROID_EPSILON);
+
+        sql = "select borders.name, LATITUDE(centroid(borders.region)), LONGITUDE(centroid(borders.region)) "
+                + "from borders "
+                + "where borders.region is not null "
+                + "order by borders.pk ";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertApproximateContentOfTable(new Object[][]
+                {{ "Colorado",      39.03372408765194,      -105.5485 },
+                 { "Wyoming",       43.01953179182205,      -107.55349999999999 },
+                 { "Colorado with a hole around Denver",
+                                    38.98811213712535,      -105.5929789796371 }
+                }, vt, CENTROID_EPSILON);
     }
 
     public void testPolygonPointDistance() throws Exception {
