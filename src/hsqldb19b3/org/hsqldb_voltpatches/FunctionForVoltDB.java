@@ -129,6 +129,18 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_HEX                    = 20029;
         static final int FUNC_VOLT_BIN                    = 20030;
 
+        static final int FUNC_VOLT_DATEADD                = 20031;
+        static final int FUNC_VOLT_DATEADD_YEAR           = 20032;
+        static final int FUNC_VOLT_DATEADD_QUARTER        = 20033;
+        static final int FUNC_VOLT_DATEADD_MONTH          = 20034;
+        static final int FUNC_VOLT_DATEADD_DAY            = 20035;
+        static final int FUNC_VOLT_DATEADD_HOUR           = 20036;
+        static final int FUNC_VOLT_DATEADD_MINUTE         = 20037;
+        static final int FUNC_VOLT_DATEADD_SECOND         = 20038;
+        static final int FUNC_VOLT_DATEADD_MILLISECOND    = 20039;
+        static final int FUNC_VOLT_DATEADD_MICROSECOND    = 20040;
+        static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -224,6 +236,17 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+           new FunctionId("regexp_position", Type.SQL_BIGINT, FUNC_VOLT_REGEXP_POSITION, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET}),         
+			
+            new FunctionId("dateadd", Type.SQL_TIMESTAMP, FUNC_VOLT_DATEADD, -1, 
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT, Type.SQL_TIMESTAMP }, 
+                    new short[] { Tokens.OPENBRACKET, Tokens.X_KEYSET, 11, Tokens.YEAR,
+                                  Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
+                                  Tokens.MILLIS, Tokens.MILLISECOND, Tokens.MICROS, Tokens.MICROSECOND, Tokens.COMMA,
+                                  Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
         };
 
@@ -427,7 +450,6 @@ public class FunctionForVoltDB extends FunctionSQL {
             voltResolveToBigintType(0);
             dataType = Type.SQL_VARCHAR;
             break;
-
         default:
             break;
         }

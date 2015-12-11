@@ -74,7 +74,7 @@ if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS += """ -g3"""
+CTX.LDFLAGS += """ -g3 -lboost_regex"""
 CTX.LASTLDFLAGS = """ """
 CTX.LASTIPCLDFLAGS = """ -ldl """
 
