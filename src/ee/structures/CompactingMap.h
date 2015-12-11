@@ -327,9 +327,8 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    // TODO(xin): later rename it to rankLower
     // Must pass a key that already in map, or else return -1
-    int64_t rankAsc(const Key& key) const;
+    int64_t rankLower(const Key& key) const;
     int64_t rankUpper(const Key& key) const;
 
     /**
@@ -1115,7 +1114,7 @@ inline void CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::updateSubc
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank, typename ValueType>
-int64_t CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::rankAsc(const Key& key) const
+int64_t CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::rankLower(const Key& key) const
 {
     if (!hasRank) {
         return -1;
@@ -1179,7 +1178,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::rankUpper(cons
         return -1;
     }
     if (m_unique) {
-        return rankAsc(key);
+        return rankLower(key);
     }
     TreeNode *n = lookup(key);
     // return -1 if the key passed in is not in the map
@@ -1192,7 +1191,7 @@ int64_t CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::rankUpper(cons
     if (it.isEnd()) {
         return m_count;
     }
-    return rankAsc(it.key()) - 1;
+    return rankLower(it.key()) - 1;
 }
 
 template<typename KeyValuePair, typename Compare, bool hasRank, typename ValueType>
@@ -1243,7 +1242,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::verifyRank() cons
         }
 
         if (m_unique) {
-            if ((rkasc = rankAsc(it.key())) != i) {
+            if ((rkasc = rankLower(it.key())) != i) {
                 printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
                 return false;
             }
@@ -1271,7 +1270,7 @@ bool CompactingMap<KeyValuePair, Compare, hasRank, ValueType>::verifyRank() cons
                 }
             }
             // test rankAsc
-            rkasc = rankAsc(k);
+            rkasc = rankLower(k);
             int64_t nc = 0;
             it.movePrev();
             while (k == it.key()) {

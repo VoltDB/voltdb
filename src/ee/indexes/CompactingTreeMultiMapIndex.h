@@ -311,7 +311,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
     }
 
@@ -339,8 +339,20 @@ class CompactingTreeMultiMapIndex : public TableIndex
         if (isUpper) {
             return m_entries.rankUpper(mapIter.key());
         } else {
-            return m_entries.rankAsc(mapIter.key());
+            return m_entries.rankLower(mapIter.key());
         }
+    }
+
+    bool findRankTuple(int64_t rank, IndexCursor& cursor) const {
+        MapConstIterator &mapConstIter = castToIter(cursor);
+        mapConstIter = m_entries.findRank(rank);
+
+        if (mapConstIter.isEnd()) {
+            cursor.m_match.move(NULL);
+            return false;
+        }
+        cursor.m_match.move(const_cast<void*>(mapConstIter.value()));
+        return true;
     }
 
     size_t getSize() const { return m_entries.size(); }

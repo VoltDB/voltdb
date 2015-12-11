@@ -331,7 +331,13 @@ enum ExpressionType {
     // Subquery IN/EXISTS
     // -----------------------------
     EXPRESSION_TYPE_ROW_SUBQUERY                       = 400,
-    EXPRESSION_TYPE_SELECT_SUBQUERY                    = 401
+    EXPRESSION_TYPE_SELECT_SUBQUERY                    = 401,
+
+    // -----------------------------
+    // WINDOWING RANK
+    // -----------------------------
+    EXPRESSION_TYPE_WINDOWING_RANK                     = 500,
+    EXPRESSION_TYPE_WINDOWING_RANK_PERCENTAGE          = 501
 
 };
 

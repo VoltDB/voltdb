@@ -267,6 +267,8 @@ CTX.INPUT['expressions'] = """
  parametervalueexpression.cpp
  subqueryexpression.cpp
  scalarvalueexpression.cpp
+ rankexpression.cpp
+ rankpercentageexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """

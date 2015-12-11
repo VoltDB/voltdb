@@ -31,6 +31,8 @@ import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RankExpression;
+import org.voltdb.expressions.RankPercentageExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
@@ -48,21 +50,21 @@ public enum ExpressionType {
     // Arthimetic Operators
     // ----------------------------
     OPERATOR_PLUS                  (OperatorExpression.class,  1, "+"),
-        // left + right (both must be number. implicitly casted)
+    // left + right (both must be number. implicitly casted)
     OPERATOR_MINUS                 (OperatorExpression.class,  2, "-"),
-        // left - right (both must be number. implicitly casted)
+    // left - right (both must be number. implicitly casted)
     OPERATOR_MULTIPLY              (OperatorExpression.class,  3, "*"),
-        // left * right (both must be number. implicitly casted)
+    // left * right (both must be number. implicitly casted)
     OPERATOR_DIVIDE                (OperatorExpression.class,  4, "/"),
-        // left / right (both must be number. implicitly casted)
+    // left / right (both must be number. implicitly casted)
     OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
-        // left || right (both must be char/varchar)
+    // left || right (both must be char/varchar)
     OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
-        // left % right (both must be integer)
+    // left % right (both must be integer)
     OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
-        // explicitly cast left as right (right is integer in ValueType enum)
+    // explicitly cast left as right (right is integer in ValueType enum)
     OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
-        // logical not
+    // logical not
     OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL"),
     // unary null evaluation
     OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS"),
@@ -72,24 +74,24 @@ public enum ExpressionType {
     // Binary Comparison
     // ----------------------------
     COMPARE_EQUAL                (ComparisonExpression.class, 10, "="),
-        // equal operator between left and right
+    // equal operator between left and right
     COMPARE_NOTEQUAL             (ComparisonExpression.class, 11, "<>"),
-        // inequal operator between left and right
+    // inequal operator between left and right
     COMPARE_LESSTHAN             (ComparisonExpression.class, 12, "<"),
-        // less than operator between left and right
+    // less than operator between left and right
     COMPARE_GREATERTHAN          (ComparisonExpression.class, 13, ">"),
-        // greater than operator between left and right
+    // greater than operator between left and right
     COMPARE_LESSTHANOREQUALTO    (ComparisonExpression.class, 14, "<="),
-        // less than equal operator between left and right
+    // less than equal operator between left and right
     COMPARE_GREATERTHANOREQUALTO (ComparisonExpression.class, 15, ">="),
-        // greater than equal operator between left and right
+    // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE"),
-        // LIKE operator (left LIKE right). both children must be string.
+    // LIKE operator (left LIKE right). both children must be string.
     COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
-        // IN operator. left IN right. right must be VectorValue
+    // IN operator. left IN right. right must be VectorValue
     // value 18 is assigned to OPERATOR_EXISTS
     COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT"),
-        // Not distinct operator between left and right
+    // Not distinct operator between left and right
 
     // ----------------------------
     // Conjunction Operator
@@ -144,14 +146,21 @@ public enum ExpressionType {
     // -----------------------------
     ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
     SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
-;
+
+    // ----------------------------
+    // WINDOWING
+    // ----------------------------
+    WINDOWING_RANK                (RankExpression.class, 500, "RANK"),
+    WINDOWING_RANK_PERCENTAGE     (RankPercentageExpression.class, 501, "RANK_PERCENTAGE"),
+    // TODO: dense_rank, row_number, etc
+    ;
 
     private final int m_value;
     private final String m_symbol;
     private final Class<? extends AbstractExpression> m_expressionClass;
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
-                   int val, String symbol) {
+            int val, String symbol) {
         m_value = val;
         m_symbol = symbol;
         m_expressionClass = expressionClass;
@@ -162,9 +171,9 @@ public enum ExpressionType {
     }
 
     private static final Map<Integer, ExpressionType> idx_lookup =
-        new HashMap<Integer, ExpressionType>();
+            new HashMap<Integer, ExpressionType>();
     private static final Map<String, ExpressionType> name_lookup =
-        new HashMap<String, ExpressionType>();
+            new HashMap<String, ExpressionType>();
 
     static {
         for (ExpressionType vt : EnumSet.allOf(ExpressionType.class)) {

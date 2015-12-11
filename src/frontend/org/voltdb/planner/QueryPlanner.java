@@ -96,19 +96,19 @@ public class QueryPlanner {
      * @param joinOrder
      */
     public QueryPlanner(String sql,
-                        String stmtName,
-                        String procName,
-                        Cluster catalogCluster,
-                        Database catalogDb,
-                        StatementPartitioning partitioning,
-                        HSQLInterface HSQL,
-                        DatabaseEstimates estimates,
-                        boolean suppressDebugOutput,
-                        int maxTablesPerJoin,
-                        AbstractCostModel costModel,
-                        ScalarValueHints[] paramHints,
-                        String joinOrder,
-                        DeterminismMode detMode)
+            String stmtName,
+            String procName,
+            Cluster catalogCluster,
+            Database catalogDb,
+            StatementPartitioning partitioning,
+            HSQLInterface HSQL,
+            DatabaseEstimates estimates,
+            boolean suppressDebugOutput,
+            int maxTablesPerJoin,
+            AbstractCostModel costModel,
+            ScalarValueHints[] paramHints,
+            String joinOrder,
+            DeterminismMode detMode)
     {
         assert(sql != null);
         assert(stmtName != null);
@@ -178,6 +178,8 @@ public class QueryPlanner {
             // for AdHoc cache distinguish purpose which is based on the XML
             m_xmlSQL.attributes.put(UPSERT_TAG, "true");
         }
+
+        System.err.println(m_xmlSQL);
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
     }
@@ -255,7 +257,7 @@ public class QueryPlanner {
             try {
                 // compile the plan with new parameters
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
-                                                   m_paramzInfo.paramLiteralValues);
+                        m_paramzInfo.paramLiteralValues);
                 if (plan != null) {
                     if (m_isUpsert) {
                         replacePlanForUpsert(plan);
@@ -265,8 +267,8 @@ public class QueryPlanner {
                     }
                 } else {
                     if (m_debuggingStaticModeToRetryOnError) {
-                         plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
-                                               m_paramzInfo.paramLiteralValues);
+                        plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
+                                m_paramzInfo.paramLiteralValues);
                     }
                 }
                 // fall through to try replan without parameterization.

@@ -102,5 +102,6 @@ public interface OpTypes {
         // A VoltDB extension APPROX_COUNT_DISTINCT
         , APPROX_COUNT_DISTINCT = 98
         // End VoltDB extension
+        , RANK               = 99
     ;
 }

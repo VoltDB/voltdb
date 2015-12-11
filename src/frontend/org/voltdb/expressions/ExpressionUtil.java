@@ -72,9 +72,9 @@ public abstract class ExpressionUtil {
             if (ret == null) {
                 ret = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND);
                 ret.setLeft(child_exp);
-            //
-            // Check whether we can add it to the right side
-            //
+                //
+                // Check whether we can add it to the right side
+                //
             } else if (ret.getRight() == null) {
                 ret.setRight(child_exp);
                 stack.push(ret);
@@ -183,7 +183,7 @@ public abstract class ExpressionUtil {
      */
     public static void
     collectPartitioningFilters(Collection<AbstractExpression> filterList,
-                               HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
+            HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
     {
         for (AbstractExpression expr : filterList) {
             if ( ! isColumnEquivalenceFilter(expr)) {
@@ -245,7 +245,7 @@ public abstract class ExpressionUtil {
     getTupleValueExpressions(AbstractExpression input)
     {
         ArrayList<TupleValueExpression> tves =
-            new ArrayList<TupleValueExpression>();
+                new ArrayList<TupleValueExpression>();
         // recursive stopping steps
         if (input == null)
         {
@@ -635,4 +635,44 @@ public abstract class ExpressionUtil {
         }
         return expr;
     }
+
+    public static AbstractExpression replaceCVEasRankPercentageExpression(AbstractExpression ae) {
+        if (ae == null) {
+            return null;
+        }
+
+        ae.setLeft(replaceCVEasRankPercentageExpression(ae.getLeft()));
+        ae.setRight(replaceCVEasRankPercentageExpression(ae.getRight()));
+
+        if (ae instanceof ComparisonExpression == false) {
+            return ae;
+        }
+
+        ComparisonExpression ce = (ComparisonExpression) ae;
+        if (ce.getLeft() instanceof RankExpression && ce.getRight() instanceof ParameterValueExpression) {
+            ParameterValueExpression pve = (ParameterValueExpression) ce.getRight();
+            if (pve.getOriginalValue() != null) {
+                ConstantValueExpression cve = pve.getOriginalValue();
+                if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
+                    RankPercentageExpression rpExpr = new RankPercentageExpression(
+                            (RankExpression)ce.getLeft(), cve);
+                    ae.setRight(rpExpr);
+                }
+            }
+        }
+        else if (ce.getRight() instanceof RankExpression && ce.getLeft() instanceof ParameterValueExpression) {
+            ParameterValueExpression pve = (ParameterValueExpression) ce.getLeft();
+            if (pve.getOriginalValue() != null) {
+                ConstantValueExpression cve = pve.getOriginalValue();
+                if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
+                    RankPercentageExpression rpExpr = new RankPercentageExpression(
+                            (RankExpression)ce.getRight(), cve);
+                    ae.setLeft(rpExpr);
+                }
+            }
+        }
+
+        return ae;
+    }
+
 }

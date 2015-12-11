@@ -32,6 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
@@ -85,9 +87,9 @@ public class ParserDQL extends ParserBase {
         database       = session.getDatabase();
         compileContext = new CompileContext(session);
         strictSQLNames = database.getProperties().isPropertyTrue(
-            HsqlDatabaseProperties.sql_enforce_keywords);
+                HsqlDatabaseProperties.sql_enforce_keywords);
         strictSQLIdentifierParts = database.getProperties().isPropertyTrue(
-            HsqlDatabaseProperties.sql_enforce_keywords);
+                HsqlDatabaseProperties.sql_enforce_keywords);
     }
 
     /**
@@ -95,6 +97,7 @@ public class ParserDQL extends ParserBase {
      *
      * @param sql a new SQL character sequence to replace the current one
      */
+    @Override
     void reset(String sql) {
 
         super.reset(sql);
@@ -137,7 +140,7 @@ public class ParserDQL extends ParserBase {
 
                 String schemaName = session.getSchemaName(token.namePrefix);
                 Type type = database.schemaManager.getDomain(token.tokenString,
-                    schemaName, false);
+                        schemaName, false);
 
                 if (type != null) {
                     read();
@@ -153,55 +156,55 @@ public class ParserDQL extends ParserBase {
 
         switch (typeNumber) {
 
-            case Types.SQL_CHAR :
-                if (token.tokenType == Tokens.VARYING) {
-                    read();
+        case Types.SQL_CHAR :
+            if (token.tokenType == Tokens.VARYING) {
+                read();
 
-                    typeNumber = Types.SQL_VARCHAR;
-                } else if (token.tokenType == Tokens.LARGE) {
-                    readThis(Tokens.OBJECT);
-                    read();
+                typeNumber = Types.SQL_VARCHAR;
+            } else if (token.tokenType == Tokens.LARGE) {
+                readThis(Tokens.OBJECT);
+                read();
 
-                    typeNumber = Types.SQL_CLOB;
-                }
-                break;
+                typeNumber = Types.SQL_CLOB;
+            }
+            break;
 
-            case Types.SQL_DOUBLE :
-                if (token.tokenType == Tokens.PRECISION) {
-                    read();
-                }
-                break;
+        case Types.SQL_DOUBLE :
+            if (token.tokenType == Tokens.PRECISION) {
+                read();
+            }
+            break;
 
-            case Types.SQL_BINARY :
-                if (token.tokenType == Tokens.VARYING) {
-                    read();
+        case Types.SQL_BINARY :
+            if (token.tokenType == Tokens.VARYING) {
+                read();
 
-                    typeNumber = Types.SQL_VARBINARY;
-                } else if (token.tokenType == Tokens.LARGE) {
-                    readThis(Tokens.OBJECT);
-                    read();
+                typeNumber = Types.SQL_VARBINARY;
+            } else if (token.tokenType == Tokens.LARGE) {
+                readThis(Tokens.OBJECT);
+                read();
 
-                    typeNumber = Types.SQL_BLOB;
-                }
-                break;
+                typeNumber = Types.SQL_BLOB;
+            }
+            break;
 
-            case Types.SQL_BIT :
-                if (token.tokenType == Tokens.VARYING) {
-                    read();
+        case Types.SQL_BIT :
+            if (token.tokenType == Tokens.VARYING) {
+                read();
 
-                    typeNumber = Types.SQL_BIT_VARYING;
-                }
-                break;
+                typeNumber = Types.SQL_BIT_VARYING;
+            }
+            break;
 
-            case Types.SQL_INTERVAL :
-                return readIntervalType();
+        case Types.SQL_INTERVAL :
+            return readIntervalType();
 
-            default :
+        default :
         }
 
         long length = typeNumber == Types.SQL_TIMESTAMP
-                      ? DTIType.defaultTimestampFractionPrecision
-                      : 0;
+                ? DTIType.defaultTimestampFractionPrecision
+                        : 0;
         int scale = 0;
 
         if (Types.requiresPrecision(typeNumber)
@@ -221,50 +224,50 @@ public class ParserDQL extends ParserBase {
 
                 switch (token.tokenType) {
 
-                    case Tokens.X_VALUE :
-                        if (token.dataType.typeCode != Types.SQL_INTEGER
-                                && token.dataType.typeCode
-                                   != Types.SQL_BIGINT) {
+                case Tokens.X_VALUE :
+                    if (token.dataType.typeCode != Types.SQL_INTEGER
+                    && token.dataType.typeCode
+                    != Types.SQL_BIGINT) {
+                        throw unexpectedToken();
+                    }
+                    break;
+
+                case Tokens.X_LOB_SIZE :
+                    if (typeNumber == Types.SQL_BLOB
+                    || typeNumber == Types.SQL_CLOB) {
+                        switch (token.lobMultiplierType) {
+
+                        case Tokens.K :
+                            multiplier = 1024;
+                            break;
+
+                        case Tokens.M :
+                            multiplier = 1024 * 1024;
+                            break;
+
+                        case Tokens.G :
+                            multiplier = 1024 * 1024 * 1024;
+                            break;
+
+                        case Tokens.P :
+                        case Tokens.T :
+                        default :
                             throw unexpectedToken();
                         }
+
                         break;
-
-                    case Tokens.X_LOB_SIZE :
-                        if (typeNumber == Types.SQL_BLOB
-                                || typeNumber == Types.SQL_CLOB) {
-                            switch (token.lobMultiplierType) {
-
-                                case Tokens.K :
-                                    multiplier = 1024;
-                                    break;
-
-                                case Tokens.M :
-                                    multiplier = 1024 * 1024;
-                                    break;
-
-                                case Tokens.G :
-                                    multiplier = 1024 * 1024 * 1024;
-                                    break;
-
-                                case Tokens.P :
-                                case Tokens.T :
-                                default :
-                                    throw unexpectedToken();
-                            }
-
-                            break;
-                        } else {
-                            throw unexpectedToken(token.getFullString());
-                        }
-                    default :
-                        throw unexpectedToken();
+                    } else {
+                        throw unexpectedToken(token.getFullString());
+                    }
+                default :
+                    throw unexpectedToken();
                 }
 
                 length = ((Number) token.tokenValue).longValue();
 
                 if (length < 0
                         || (length == 0
-                            && !Types.acceptsZeroPrecision(typeNumber))) {
+                        && !Types.acceptsZeroPrecision(typeNumber))) {
                     throw Error.error(ErrorCode.X_42592);
                 }
 
@@ -305,7 +308,7 @@ public class ParserDQL extends ParserBase {
             } else if (typeNumber == Types.SQL_BIT) {
                 length = 1;
             } else if (typeNumber == Types.SQL_BLOB
-                       || typeNumber == Types.SQL_CLOB) {
+                    || typeNumber == Types.SQL_CLOB) {
                 length = BlobType.defaultBlobSize;
             } else if (database.sqlEnforceStrictSize) {
 
@@ -358,8 +361,8 @@ public class ParserDQL extends ParserBase {
 
                 String schemaName = session.getSchemaName(token.namePrefix);
                 Charset charset =
-                    (Charset) database.schemaManager.getSchemaObject(
-                        token.tokenString, schemaName, SchemaObject.CHARSET);
+                        (Charset) database.schemaManager.getSchemaObject(
+                                token.tokenString, schemaName, SchemaObject.CHARSET);
 
                 read();
             }
@@ -369,7 +372,7 @@ public class ParserDQL extends ParserBase {
     }
 
     void readSimpleColumnNames(OrderedHashSet columns,
-                               RangeVariable rangeVar) {
+            RangeVariable rangeVar) {
 
         while (true) {
             ColumnSchema col = readSimpleColumnName(rangeVar);
@@ -412,7 +415,7 @@ public class ParserDQL extends ParserBase {
     }
 
     void readColumnNamesForSelectInto(OrderedHashSet columns,
-                                      RangeVariable[] rangeVars) {
+            RangeVariable[] rangeVars) {
 
         while (true) {
             ColumnSchema col = readColumnName(rangeVars);
@@ -487,7 +490,7 @@ public class ParserDQL extends ParserBase {
     }
 
     OrderedHashSet readColumnNameList(BitMap quotedFlags,
-                                      boolean readAscDesc) {
+            boolean readAscDesc) {
 
         int            i   = 0;
         OrderedHashSet set = new OrderedHashSet();
@@ -500,10 +503,10 @@ public class ParserDQL extends ParserBase {
                 // Adding "strictSQLNames" as a param to the next two method calls.
                 // SEE: ENG-912
                 if (!isSimpleName(strictSQLNames)) {
-                /* disable 1 line ...
+                    /* disable 1 line ...
                 if (!isSimpleName()) {
                 ... disabled 1 line */
-                // End of VoltDB extension
+                    // End of VoltDB extension
                     token.isDelimitedIdentifier = true;
                 }
             } else {
@@ -561,51 +564,51 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.UNION :
+        case Tokens.UNION :
+            read();
+
+            unionType = QueryExpression.UNION;
+
+            if (token.tokenType == Tokens.ALL) {
+                unionType = QueryExpression.UNION_ALL;
+
                 read();
-
-                unionType = QueryExpression.UNION;
-
-                if (token.tokenType == Tokens.ALL) {
-                    unionType = QueryExpression.UNION_ALL;
-
-                    read();
-                } else if (token.tokenType == Tokens.DISTINCT) {
-                    read();
-                }
-                break;
-
-            case Tokens.INTERSECT :
+            } else if (token.tokenType == Tokens.DISTINCT) {
                 read();
+            }
+            break;
 
-                unionType = QueryExpression.INTERSECT;
+        case Tokens.INTERSECT :
+            read();
 
-                if (token.tokenType == Tokens.ALL) {
-                    unionType = QueryExpression.INTERSECT_ALL;
+            unionType = QueryExpression.INTERSECT;
 
-                    read();
-                } else if (token.tokenType == Tokens.DISTINCT) {
-                    read();
-                }
-                break;
+            if (token.tokenType == Tokens.ALL) {
+                unionType = QueryExpression.INTERSECT_ALL;
 
-            case Tokens.EXCEPT :
-            case Tokens.MINUS_EXCEPT :
                 read();
+            } else if (token.tokenType == Tokens.DISTINCT) {
+                read();
+            }
+            break;
 
-                unionType = QueryExpression.EXCEPT;
+        case Tokens.EXCEPT :
+        case Tokens.MINUS_EXCEPT :
+            read();
 
-                if (token.tokenType == Tokens.ALL) {
-                    unionType = QueryExpression.EXCEPT_ALL;
+            unionType = QueryExpression.EXCEPT;
 
-                    read();
-                } else if (token.tokenType == Tokens.DISTINCT) {
-                    read();
-                }
-                break;
+            if (token.tokenType == Tokens.ALL) {
+                unionType = QueryExpression.EXCEPT_ALL;
 
-            default :
-                break;
+                read();
+            } else if (token.tokenType == Tokens.DISTINCT) {
+                read();
+            }
+            break;
+
+        default :
+            break;
         }
 
         return unionType;
@@ -664,16 +667,16 @@ public class ParserDQL extends ParserBase {
         while (true) {
             switch (token.tokenType) {
 
-                case Tokens.UNION :
-                case Tokens.EXCEPT :
-                case Tokens.MINUS_EXCEPT : {
-                    queryExpression = XreadSetOperation(queryExpression);
+            case Tokens.UNION :
+            case Tokens.EXCEPT :
+            case Tokens.MINUS_EXCEPT : {
+                queryExpression = XreadSetOperation(queryExpression);
 
-                    break;
-                }
-                default : {
-                    return queryExpression;
-                }
+                break;
+            }
+            default : {
+                return queryExpression;
+            }
             }
         }
     }
@@ -711,46 +714,46 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.TABLE :
-            case Tokens.VALUES :
-            case Tokens.SELECT : {
-                QuerySpecification select = XreadSimpleTable();
+        case Tokens.TABLE :
+        case Tokens.VALUES :
+        case Tokens.SELECT : {
+            QuerySpecification select = XreadSimpleTable();
 
-                return select;
-            }
-            case Tokens.OPENBRACKET : {
-                read();
+            return select;
+        }
+        case Tokens.OPENBRACKET : {
+            read();
 
-                QueryExpression queryExpression = XreadQueryExpressionBody();
-                SortAndSlice    sortAndSlice    = XreadOrderByExpression();
+            QueryExpression queryExpression = XreadQueryExpressionBody();
+            SortAndSlice    sortAndSlice    = XreadOrderByExpression();
 
-                readThis(Tokens.CLOSEBRACKET);
+            readThis(Tokens.CLOSEBRACKET);
 
-                if (queryExpression.sortAndSlice == null) {
-                    queryExpression.addSortAndSlice(sortAndSlice);
-                } else {
-                    if (queryExpression.sortAndSlice.hasLimit()) {
-                        if (sortAndSlice.hasLimit()) {
-                            throw Error.error(ErrorCode.X_42549);
-                        }
+            if (queryExpression.sortAndSlice == null) {
+                queryExpression.addSortAndSlice(sortAndSlice);
+            } else {
+                if (queryExpression.sortAndSlice.hasLimit()) {
+                    if (sortAndSlice.hasLimit()) {
+                        throw Error.error(ErrorCode.X_42549);
+                    }
 
-                        for (int i = 0; i < sortAndSlice.exprList.size();
-                                i++) {
-                            Expression e =
+                    for (int i = 0; i < sortAndSlice.exprList.size();
+                            i++) {
+                        Expression e =
                                 (Expression) sortAndSlice.exprList.get(i);
 
-                            queryExpression.sortAndSlice.addOrderExpression(e);
-                        }
-                    } else {
-                        queryExpression.addSortAndSlice(sortAndSlice);
+                        queryExpression.sortAndSlice.addOrderExpression(e);
                     }
+                } else {
+                    queryExpression.addSortAndSlice(sortAndSlice);
                 }
+            }
 
-                return queryExpression;
-            }
-            default : {
-                throw unexpectedToken();
-            }
+            return queryExpression;
+        }
+        default : {
+            throw unexpectedToken();
+        }
         }
     }
 
@@ -760,34 +763,34 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.TABLE : {
-                read();
+        case Tokens.TABLE : {
+            read();
 
-                Table table = readTableName();
+            Table table = readTableName();
 
-                select = new QuerySpecification(session, table,
-                                                compileContext);
+            select = new QuerySpecification(session, table,
+                    compileContext);
 
-                break;
-            }
-            case Tokens.VALUES : {
-                read();
+            break;
+        }
+        case Tokens.VALUES : {
+            read();
 
-                SubQuery sq = XreadRowValueExpressionList();
+            SubQuery sq = XreadRowValueExpressionList();
 
-                select = new QuerySpecification(session, sq.getTable(),
-                                                compileContext);
+            select = new QuerySpecification(session, sq.getTable(),
+                    compileContext);
 
-                break;
-            }
-            case Tokens.SELECT : {
-                select = XreadQuerySpecification();
+            break;
+        }
+        case Tokens.SELECT : {
+            select = XreadQuerySpecification();
 
-                break;
-            }
-            default : {
-                throw unexpectedToken();
-            }
+            break;
+        }
+        default : {
+            throw unexpectedToken();
+        }
         }
 
         return select;
@@ -895,98 +898,98 @@ public class ParserDQL extends ParserBase {
 
             switch (token.tokenType) {
 
-                case Tokens.INNER :
+            case Tokens.INNER :
+                read();
+                readThis(Tokens.JOIN);
+                break;
+
+            case Tokens.CROSS :
+                if (natural) {
+                    throw unexpectedToken();
+                }
+
+                read();
+                readThis(Tokens.JOIN);
+                break;
+
+            case Tokens.UNION :
+                if (natural) {
+                    throw unexpectedToken();
+                }
+
+                int position = getPosition();
+
+                read();
+
+                if (token.tokenType == Tokens.JOIN) {
                     read();
-                    readThis(Tokens.JOIN);
+
                     break;
-
-                case Tokens.CROSS :
-                    if (natural) {
-                        throw unexpectedToken();
-                    }
-
-                    read();
-                    readThis(Tokens.JOIN);
-                    break;
-
-                case Tokens.UNION :
-                    if (natural) {
-                        throw unexpectedToken();
-                    }
-
-                    int position = getPosition();
-
-                    read();
-
-                    if (token.tokenType == Tokens.JOIN) {
-                        read();
-
-                        break;
-                    } else {
-                        rewind(position);
-
-                        end = true;
-
-                        break;
-                    }
-                case Tokens.NATURAL :
-                    if (natural) {
-                        throw unexpectedToken();
-                    }
-
-                    read();
-
-                    natural = true;
-
-                    continue;
-                case Tokens.LEFT :
-                    read();
-                    readIfThis(Tokens.OUTER);
-                    readThis(Tokens.JOIN);
-
-                    left = true;
-                    break;
-
-                case Tokens.RIGHT :
-                    read();
-                    readIfThis(Tokens.OUTER);
-                    readThis(Tokens.JOIN);
-
-                    right = true;
-                    break;
-
-                case Tokens.FULL :
-                    read();
-                    readIfThis(Tokens.OUTER);
-                    readThis(Tokens.JOIN);
-
-                    left  = true;
-                    right = true;
-                    break;
-
-                case Tokens.JOIN :
-                    read();
-
-                    type = Tokens.INNER;
-                    break;
-
-                case Tokens.COMMA :
-                    if (natural) {
-                        throw unexpectedToken();
-                    }
-
-                    read();
-
-                    type = Tokens.CROSS;
-                    break;
-
-                default :
-                    if (natural) {
-                        throw unexpectedToken();
-                    }
+                } else {
+                    rewind(position);
 
                     end = true;
+
                     break;
+                }
+            case Tokens.NATURAL :
+                if (natural) {
+                    throw unexpectedToken();
+                }
+
+                read();
+
+                natural = true;
+
+                continue;
+            case Tokens.LEFT :
+                read();
+                readIfThis(Tokens.OUTER);
+                readThis(Tokens.JOIN);
+
+                left = true;
+                break;
+
+            case Tokens.RIGHT :
+                read();
+                readIfThis(Tokens.OUTER);
+                readThis(Tokens.JOIN);
+
+                right = true;
+                break;
+
+            case Tokens.FULL :
+                read();
+                readIfThis(Tokens.OUTER);
+                readThis(Tokens.JOIN);
+
+                left  = true;
+                right = true;
+                break;
+
+            case Tokens.JOIN :
+                read();
+
+                type = Tokens.INNER;
+                break;
+
+            case Tokens.COMMA :
+                if (natural) {
+                    throw unexpectedToken();
+                }
+
+                read();
+
+                type = Tokens.CROSS;
+                break;
+
+            default :
+                if (natural) {
+                    throw unexpectedToken();
+                }
+
+                end = true;
+                break;
             }
 
             if (end) {
@@ -999,61 +1002,61 @@ public class ParserDQL extends ParserBase {
 
             switch (type) {
 
-                case Tokens.CROSS :
-                    select.addRangeVariable(range);
-                    break;
+            case Tokens.CROSS :
+                select.addRangeVariable(range);
+                break;
 
-                case Tokens.UNION :
-                    select.addRangeVariable(range);
+            case Tokens.UNION :
+                select.addRangeVariable(range);
 
-                    condition = Expression.EXPR_FALSE;
+                condition = Expression.EXPR_FALSE;
 
-                    range.setJoinType(true, true);
-                    break;
+                range.setJoinType(true, true);
+                break;
 
-                case Tokens.LEFT :
-                case Tokens.RIGHT :
-                case Tokens.INNER :
-                case Tokens.FULL : {
-                    if (natural) {
-                        OrderedHashSet columns =
+            case Tokens.LEFT :
+            case Tokens.RIGHT :
+            case Tokens.INNER :
+            case Tokens.FULL : {
+                if (natural) {
+                    OrderedHashSet columns =
                             range.getUniqueColumnNameSet();
 
-                        condition = select.getEquiJoinExpressions(columns,
-                                range, false);
+                    condition = select.getEquiJoinExpressions(columns,
+                            range, false);
 
-                        select.addRangeVariable(range);
-                    } else if (token.tokenType == Tokens.USING) {
-                        read();
+                    select.addRangeVariable(range);
+                } else if (token.tokenType == Tokens.USING) {
+                    read();
 
-                        OrderedHashSet columns = new OrderedHashSet();
+                    OrderedHashSet columns = new OrderedHashSet();
 
-                        readThis(Tokens.OPENBRACKET);
-                        readSimpleColumnNames(columns, range);
-                        readThis(Tokens.CLOSEBRACKET);
+                    readThis(Tokens.OPENBRACKET);
+                    readSimpleColumnNames(columns, range);
+                    readThis(Tokens.CLOSEBRACKET);
 
-                        condition = select.getEquiJoinExpressions(columns,
-                                range, true);
+                    condition = select.getEquiJoinExpressions(columns,
+                            range, true);
 
-                        select.addRangeVariable(range);
-                    } else if (token.tokenType == Tokens.ON) {
-                        read();
+                    select.addRangeVariable(range);
+                } else if (token.tokenType == Tokens.ON) {
+                    read();
 
-                        condition = XreadBooleanValueExpression();
+                    condition = XreadBooleanValueExpression();
 
-                        select.addRangeVariable(range);
+                    select.addRangeVariable(range);
 
-                        // must ensure references are limited to the current table
-//                        select.finaliseRangeVariables();
-//                        select.resolveColumnReferencesAndAllocate(condition);
-                    } else {
-                        throw Error.error(ErrorCode.X_42581);
-                    }
-
-                    range.setJoinType(left, right);
-
-                    break;
+                    // must ensure references are limited to the current table
+                    //                        select.finaliseRangeVariables();
+                    //                        select.resolveColumnReferencesAndAllocate(condition);
+                } else {
+                    throw Error.error(ErrorCode.X_42581);
                 }
+
+                range.setJoinType(left, right);
+
+                break;
+            }
             }
 
             range.addJoinCondition(condition);
@@ -1137,7 +1140,7 @@ public class ParserDQL extends ParserBase {
         }
 
         return sortAndSlice == null ? SortAndSlice.noSort
-                                    : sortAndSlice;
+                : sortAndSlice;
     }
 
     private SortAndSlice XreadTopOrLimit() {
@@ -1185,14 +1188,14 @@ public class ParserDQL extends ParserBase {
             e1.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid = (e1.getDataType().typeCode == Types.SQL_INTEGER
-                     && ((Integer) e1.getValue(null)).intValue() >= 0);
+                    && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
         if (e2.isParam()) {
             e2.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
-                      && ((Integer) e2.getValue(null)).intValue() >= 0);
+                    && ((Integer) e2.getValue(null)).intValue() >= 0);
         }
 
         if (valid) {
@@ -1248,7 +1251,7 @@ public class ParserDQL extends ParserBase {
 
             if (e2 == null) {
                 e2 = new ExpressionValue(ValuePool.INTEGER_1,
-                                         Type.SQL_INTEGER);
+                        Type.SQL_INTEGER);
             }
 
             if (token.tokenType == Tokens.ROW
@@ -1269,7 +1272,7 @@ public class ParserDQL extends ParserBase {
             e1.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid = (e1.getDataType().typeCode == Types.SQL_INTEGER
-                     && ((Integer) e1.getValue(null)).intValue() >= 0);
+                    && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
         // A VoltDB extension to allow OFFSET without LIMIT
@@ -1357,7 +1360,7 @@ public class ParserDQL extends ParserBase {
 
             if (isNonCoreReservedIdentifier()) {
                 alias = HsqlNameManager.getSimpleName(token.tokenString,
-                                                      isDelimitedIdentifier());
+                        isDelimitedIdentifier());
 
                 read();
             }
@@ -1366,18 +1369,18 @@ public class ParserDQL extends ParserBase {
         if (table.isView) {
             switch (operation) {
 
-                case StatementTypes.MERGE :
-                    if (!table.isUpdatable() || !table.isInsertable()) {
-                        throw Error.error(ErrorCode.X_42545);
-                    }
-                    break;
+            case StatementTypes.MERGE :
+                if (!table.isUpdatable() || !table.isInsertable()) {
+                    throw Error.error(ErrorCode.X_42545);
+                }
+                break;
 
-                case StatementTypes.UPDATE_WHERE :
-                case StatementTypes.DELETE_WHERE :
-                    if (!table.isUpdatable()) {
-                        throw Error.error(ErrorCode.X_42545);
-                    }
-                    break;
+            case StatementTypes.UPDATE_WHERE :
+            case StatementTypes.DELETE_WHERE :
+                if (!table.isUpdatable()) {
+                    throw Error.error(ErrorCode.X_42545);
+                }
+                break;
             }
 
             SubQuery sq = getViewSubquery((View) table);
@@ -1386,7 +1389,7 @@ public class ParserDQL extends ParserBase {
         }
 
         RangeVariable range = new RangeVariable(table, alias, null, null,
-            compileContext);
+                compileContext);
 
         return range;
     }
@@ -1415,7 +1418,7 @@ public class ParserDQL extends ParserBase {
             if (table.isView()) {
                 SubQuery sq = getViewSubquery((View) table);
 
-//                sq.queryExpression = ((View) table).queryExpression;
+                //                sq.queryExpression = ((View) table).queryExpression;
                 table = sq.getTable();
             }
         }
@@ -1431,11 +1434,11 @@ public class ParserDQL extends ParserBase {
 
         if (isNonCoreReservedIdentifier()) {
             boolean limit = token.tokenType == Tokens.LIMIT
-                            || token.tokenType == Tokens.OFFSET;
+                    || token.tokenType == Tokens.OFFSET;
             int position = getPosition();
 
             alias = HsqlNameManager.getSimpleName(token.tokenString,
-                                                  isDelimitedIdentifier());
+                    isDelimitedIdentifier());
 
             read();
 
@@ -1461,15 +1464,15 @@ public class ParserDQL extends ParserBase {
 
             for (int i = 0; i < columnList.size(); i++) {
                 SimpleName name =
-                    HsqlNameManager.getSimpleName((String) columnList.get(i),
-                                                  columnNameQuoted.isSet(i));
+                        HsqlNameManager.getSimpleName((String) columnList.get(i),
+                                columnNameQuoted.isSet(i));
 
                 columnNameList[i] = name;
             }
         }
 
         RangeVariable range = new RangeVariable(table, alias, columnList,
-            columnNameList, compileContext);
+                columnNameList, compileContext);
 
         return range;
     }
@@ -1509,36 +1512,36 @@ public class ParserDQL extends ParserBase {
 
         switch (type) {
 
-            case OpTypes.COUNT :
-                if (e.getType() == OpTypes.MULTICOLUMN) {
-                    if (((ExpressionColumn) e).tableName != null) {
-                        throw unexpectedToken();
-                    }
-
-                    e.opType = OpTypes.ASTERISK;
-
-                    break;
-                } else {
-                    break;
-                }
-            case OpTypes.STDDEV_POP :
-            case OpTypes.STDDEV_SAMP :
-            case OpTypes.VAR_POP :
-            case OpTypes.VAR_SAMP :
-            // A VoltDB extension APPROX_COUNT_DISTINCT
-            case OpTypes.APPROX_COUNT_DISTINCT :
-            // End of VoltDB extension
-                if (all || distinct) {
-                    throw Error.error(ErrorCode.X_42582, all ? Tokens.T_ALL
-                                                             : Tokens
-                                                             .T_DISTINCT);
-                }
-                break;
-
-            default :
-                if (e.getType() == OpTypes.ASTERISK) {
+        case OpTypes.COUNT :
+            if (e.getType() == OpTypes.MULTICOLUMN) {
+                if (((ExpressionColumn) e).tableName != null) {
                     throw unexpectedToken();
                 }
+
+                e.opType = OpTypes.ASTERISK;
+
+                break;
+            } else {
+                break;
+            }
+        case OpTypes.STDDEV_POP :
+        case OpTypes.STDDEV_SAMP :
+        case OpTypes.VAR_POP :
+        case OpTypes.VAR_SAMP :
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+        case OpTypes.APPROX_COUNT_DISTINCT :
+            // End of VoltDB extension
+            if (all || distinct) {
+                throw Error.error(ErrorCode.X_42582, all ? Tokens.T_ALL
+                        : Tokens
+                        .T_DISTINCT);
+            }
+            break;
+
+        default :
+            if (e.getType() == OpTypes.ASTERISK) {
+                throw unexpectedToken();
+            }
         }
 
         Expression aggregateExp = new ExpressionAggregate(type, distinct, e);
@@ -1546,7 +1549,49 @@ public class ParserDQL extends ParserBase {
         return aggregateExp;
     }
 
-//--------------------------------------
+    private Expression readRank() {
+        SortAndSlice sortAndSlice = null;
+
+        read();
+        readThis(Tokens.OPENBRACKET);
+        readThis(Tokens.CLOSEBRACKET);
+        readThis(Tokens.OVER);
+        readThis(Tokens.OPENBRACKET);
+
+        List<Expression> partitionByList = new ArrayList<Expression>();
+        if (token.tokenType == Tokens.PARTITION) {
+            read();
+            readThis(Tokens.BY);
+
+            while (true) {
+                Expression e = XreadValueExpression();
+                partitionByList.add(e);
+
+                if (token.tokenType == Tokens.COMMA) {
+                    read();
+                    continue;
+                }
+                break;
+            }
+        }
+
+        if (token.tokenType != Tokens.ORDER) {
+            throw unexpectedToken();
+        }
+        assert(token.tokenType == Tokens.ORDER);
+        // order by clause
+        read();
+        readThis(Tokens.BY);
+        sortAndSlice = XreadOrderBy();
+
+        readThis(Tokens.CLOSEBRACKET);
+
+        ExpressionRank erank = new ExpressionRank(sortAndSlice, partitionByList);
+
+        return erank;
+    }
+
+    //--------------------------------------
     // returns null
     // := <unsigned literal> | <general value specification>
     Expression XreadValueSpecificationOrNull() {
@@ -1556,15 +1601,15 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.PLUS :
-                read();
-                break;
+        case Tokens.PLUS :
+            read();
+            break;
 
-            case Tokens.MINUS :
-                read();
+        case Tokens.MINUS :
+            read();
 
-                minus = true;
-                break;
+            minus = true;
+            break;
         }
 
         e = XreadUnsignedValueSpecificationOrNull();
@@ -1588,78 +1633,78 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.TRUE :
+        case Tokens.TRUE :
+            read();
+
+            return Expression.EXPR_TRUE;
+
+        case Tokens.FALSE :
+            read();
+
+            return Expression.EXPR_FALSE;
+
+        case Tokens.DEFAULT :
+            if (compileContext.contextuallyTypedExpression) {
                 read();
 
-                return Expression.EXPR_TRUE;
-
-            case Tokens.FALSE :
-                read();
-
-                return Expression.EXPR_FALSE;
-
-            case Tokens.DEFAULT :
-                if (compileContext.contextuallyTypedExpression) {
-                    read();
-
-                    e = new ExpressionColumn(OpTypes.DEFAULT);
-
-                    return e;
-                }
-                break;
-
-            case Tokens.NULL :
-                e = new ExpressionValue(null, null);
-
-                read();
+                e = new ExpressionColumn(OpTypes.DEFAULT);
 
                 return e;
+            }
+            break;
 
-            case Tokens.X_VALUE :
-                e = new ExpressionValue(token.tokenValue, token.dataType);
+        case Tokens.NULL :
+            e = new ExpressionValue(null, null);
 
-                read();
+            read();
 
-                return e;
+            return e;
 
-            case Tokens.X_DELIMITED_IDENTIFIER :
-            case Tokens.X_IDENTIFIER :
-                if (!token.isHostParameter) {
-                    return null;
-                }
+        case Tokens.X_VALUE :
+            e = new ExpressionValue(token.tokenValue, token.dataType);
+
+            read();
+
+            return e;
+
+        case Tokens.X_DELIMITED_IDENTIFIER :
+        case Tokens.X_IDENTIFIER :
+            if (!token.isHostParameter) {
+                return null;
+            }
 
             // $FALL-THROUGH$
-            case Tokens.QUESTION :
-                e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
+        case Tokens.QUESTION :
+            e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
 
-                compileContext.parameters.add(e);
-                read();
+            compileContext.parameters.add(e);
+            read();
 
-                return e;
+            return e;
 
-            case Tokens.COLLATION :
-                return XreadCurrentCollationSpec();
+        case Tokens.COLLATION :
+            return XreadCurrentCollationSpec();
 
-            case Tokens.VALUE :
-            case Tokens.CURRENT_CATALOG :
-            case Tokens.CURRENT_DEFAULT_TRANSFORM_GROUP :
-            case Tokens.CURRENT_PATH :
-            case Tokens.CURRENT_ROLE :
-            case Tokens.CURRENT_SCHEMA :
-            case Tokens.CURRENT_TRANSFORM_GROUP_FOR_TYPE :
-            case Tokens.CURRENT_USER :
-            case Tokens.SESSION_USER :
-            case Tokens.SYSTEM_USER :
-            case Tokens.USER :
-                FunctionSQL function =
-                    FunctionSQL.newSQLFunction(token.tokenString,
-                                               compileContext);
+        case Tokens.VALUE :
+        case Tokens.CURRENT_CATALOG :
+        case Tokens.CURRENT_DEFAULT_TRANSFORM_GROUP :
+        case Tokens.CURRENT_PATH :
+        case Tokens.CURRENT_ROLE :
+        case Tokens.CURRENT_SCHEMA :
+        case Tokens.CURRENT_TRANSFORM_GROUP_FOR_TYPE :
+        case Tokens.CURRENT_USER :
+        case Tokens.SESSION_USER :
+        case Tokens.SYSTEM_USER :
+        case Tokens.USER :
+            FunctionSQL function =
+            FunctionSQL.newSQLFunction(token.tokenString,
+                    compileContext);
 
-                if (function == null) {
-                    return null;
-                }
+            if (function == null) {
+                return null;
+            }
 
-                return readSQLFunction(function);
+            return readSQLFunction(function);
 
             // read SQL parameter reference
         }
@@ -1674,23 +1719,23 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.X_VALUE :
-                e = new ExpressionValue(token.tokenValue, token.dataType);
+        case Tokens.X_VALUE :
+            e = new ExpressionValue(token.tokenValue, token.dataType);
 
-                read();
+            read();
 
-                return e;
+            return e;
 
-            case Tokens.QUESTION :
-                e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
+        case Tokens.QUESTION :
+            e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
 
-                compileContext.parameters.add(e);
-                read();
+            compileContext.parameters.add(e);
+            read();
 
-                return e;
+            return e;
 
-            default :
-                return null;
+        default :
+            return null;
         }
     }
 
@@ -1703,28 +1748,28 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.EXISTS :
-            case Tokens.UNIQUE :
-                if (boole) {
-                    return XreadPredicate();
-                }
+        case Tokens.EXISTS :
+        case Tokens.UNIQUE :
+            if (boole) {
+                return XreadPredicate();
+            }
+            break;
+
+        case Tokens.ROW :
+            if (boole) {
                 break;
+            }
 
-            case Tokens.ROW :
-                if (boole) {
-                    break;
-                }
+            read();
+            readThis(Tokens.OPENBRACKET);
 
-                read();
-                readThis(Tokens.OPENBRACKET);
+            e = XreadRowElementList(true);
 
-                e = XreadRowElementList(true);
+            readThis(Tokens.CLOSEBRACKET);
+            break;
 
-                readThis(Tokens.CLOSEBRACKET);
-                break;
-
-            default :
-                e = XreadSimpleValueExpressionPrimary();
+        default :
+            e = XreadSimpleValueExpressionPrimary();
         }
 
         if (e == null && token.tokenType == Tokens.OPENBRACKET) {
@@ -1783,135 +1828,140 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.OPENBRACKET :
-                int position = getPosition();
+        case Tokens.OPENBRACKET :
+            int position = getPosition();
 
-                read();
+            read();
 
-                int subqueryPosition = getPosition();
+            int subqueryPosition = getPosition();
 
-                readOpenBrackets();
+            readOpenBrackets();
 
-                switch (token.tokenType) {
+            switch (token.tokenType) {
 
-                    case Tokens.TABLE :
-                    case Tokens.VALUES :
-                    case Tokens.SELECT :
-                        SubQuery sq = null;
+            case Tokens.TABLE :
+            case Tokens.VALUES :
+            case Tokens.SELECT :
+                SubQuery sq = null;
 
-                        rewind(subqueryPosition);
+                rewind(subqueryPosition);
 
-                        try {
-                            sq = XreadSubqueryBody(false,
-                                                   OpTypes.SCALAR_SUBQUERY);
+                try {
+                    sq = XreadSubqueryBody(false,
+                            OpTypes.SCALAR_SUBQUERY);
 
-                            readThis(Tokens.CLOSEBRACKET);
-                        } catch (HsqlException ex) {
-                            compileContext.resetSubQueryLevel();
-                            ex.setLevel(compileContext.subQueryDepth);
+                    readThis(Tokens.CLOSEBRACKET);
+                } catch (HsqlException ex) {
+                    compileContext.resetSubQueryLevel();
+                    ex.setLevel(compileContext.subQueryDepth);
 
-                            if (lastError == null
-                                    || lastError.getLevel() < ex.getLevel()) {
-                                lastError = ex;
-                            }
+                    if (lastError == null
+                            || lastError.getLevel() < ex.getLevel()) {
+                        lastError = ex;
+                    }
 
-                            rewind(position);
+                    rewind(position);
 
-                            return null;
-                        }
+                    return null;
+                }
 
-                        // A VoltDB extension to adapt to the hsqldb 2.3.2 change for fuller subquery support.
-                        SubQuery td = sq;
-                        // End of VoltDB extension
-                        // BEGIN Cherry-picked code change from hsqldb-2.3.2
-                        if (td.queryExpression.isSingleColumn()) {
-                            e = new Expression(OpTypes.SCALAR_SUBQUERY, td);
-                        } else {
-                            e = new Expression(OpTypes.ROW_SUBQUERY, td);
-                        }
+                // A VoltDB extension to adapt to the hsqldb 2.3.2 change for fuller subquery support.
+                SubQuery td = sq;
+                // End of VoltDB extension
+                // BEGIN Cherry-picked code change from hsqldb-2.3.2
+                if (td.queryExpression.isSingleColumn()) {
+                    e = new Expression(OpTypes.SCALAR_SUBQUERY, td);
+                } else {
+                    e = new Expression(OpTypes.ROW_SUBQUERY, td);
+                }
 
-                        return e;
-                        /* Disable 5 lines ...
+                return e;
+                /* Disable 5 lines ...
                         if (!sq.queryExpression.isSingleColumn()) {
                             throw Error.error(ErrorCode.W_01000);
                         }
 
                         return new Expression(OpTypes.SCALAR_SUBQUERY, sq);
                         ... disabled 5 lines. */
-                        // END Cherry-picked code change from hsqldb-2.3.2
-
-                    default :
-                        rewind(position);
-
-                        return null;
-                }
-            case Tokens.ASTERISK :
-                e = new ExpressionColumn(token.namePrePrefix,
-                                         token.namePrefix);
-
-                recordExpressionForToken((ExpressionColumn) e);
-                read();
-
-                return e;
-
-            case Tokens.CASEWHEN :
-                return readCaseWhenExpression();
-
-            case Tokens.CASE :
-                return readCaseExpression();
-
-            case Tokens.NULLIF :
-                return readNullIfExpression();
-
-            case Tokens.COALESCE :
-            case Tokens.IFNULL :
-                return readCoalesceExpression();
-
-            case Tokens.CAST :
-            case Tokens.CONVERT :
-                return readCastExpression();
-
-            case Tokens.DATE :
-            case Tokens.TIME :
-            case Tokens.TIMESTAMP :
-            case Tokens.INTERVAL :
-                e = readDateTimeIntervalLiteral();
-
-                if (e != null) {
-                    return e;
-                }
-                break;
-
-            case Tokens.ANY :
-            case Tokens.SOME :
-            case Tokens.EVERY :
-            case Tokens.COUNT :
-            // A VoltDB extension APPROX_COUNT_DISTINCT
-            case Tokens.APPROX_COUNT_DISTINCT :
-            // End of VoltDB extension
-            case Tokens.MAX :
-            case Tokens.MIN :
-            case Tokens.SUM :
-            case Tokens.AVG :
-            case Tokens.STDDEV_POP :
-            case Tokens.STDDEV_SAMP :
-            case Tokens.VAR_POP :
-            case Tokens.VAR_SAMP :
-                return readAggregate();
-
-            case Tokens.NEXT :
-                return readSequenceExpression();
-
-            case Tokens.LEFT :
-            case Tokens.RIGHT :
-
-                // CLI function names
-                break;
+                // END Cherry-picked code change from hsqldb-2.3.2
 
             default :
-                if (isCoreReservedKey()) {
-                    throw unexpectedToken();
-                }
+                rewind(position);
+
+                return null;
+            }
+        case Tokens.ASTERISK :
+            e = new ExpressionColumn(token.namePrePrefix,
+                    token.namePrefix);
+
+            recordExpressionForToken((ExpressionColumn) e);
+            read();
+
+            return e;
+
+        case Tokens.CASEWHEN :
+            return readCaseWhenExpression();
+
+        case Tokens.CASE :
+            return readCaseExpression();
+
+        case Tokens.NULLIF :
+            return readNullIfExpression();
+
+        case Tokens.COALESCE :
+        case Tokens.IFNULL :
+            return readCoalesceExpression();
+
+        case Tokens.CAST :
+        case Tokens.CONVERT :
+            return readCastExpression();
+
+        case Tokens.DATE :
+        case Tokens.TIME :
+        case Tokens.TIMESTAMP :
+        case Tokens.INTERVAL :
+            e = readDateTimeIntervalLiteral();
+
+            if (e != null) {
+                return e;
+            }
+            break;
+
+        case Tokens.ANY :
+        case Tokens.SOME :
+        case Tokens.EVERY :
+        case Tokens.COUNT :
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+        case Tokens.APPROX_COUNT_DISTINCT :
+            // End of VoltDB extension
+        case Tokens.MAX :
+        case Tokens.MIN :
+        case Tokens.SUM :
+        case Tokens.AVG :
+        case Tokens.STDDEV_POP :
+        case Tokens.STDDEV_SAMP :
+        case Tokens.VAR_POP :
+        case Tokens.VAR_SAMP :
+            return readAggregate();
+
+        case Tokens.NEXT :
+            return readSequenceExpression();
+
+        case Tokens.LEFT :
+        case Tokens.RIGHT :
+
+            // CLI function names
+            break;
+
+        case Tokens.RANK :
+
+            return readRank();
+
+
+        default :
+            if (isCoreReservedKey()) {
+                throw unexpectedToken();
+            }
         }
 
         return readColumnOrFunctionExpression();
@@ -1925,47 +1975,47 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.SUBSTRING :
-            case Tokens.SUBSTRING_REGEX :
-            case Tokens.LOWER :
-            case Tokens.UPPER :
-            case Tokens.TRANSLATE_REGEX :
-            case Tokens.TRIM :
-            case Tokens.OVERLAY :
-            case Tokens.NORMALIZE :
+        case Tokens.SUBSTRING :
+        case Tokens.SUBSTRING_REGEX :
+        case Tokens.LOWER :
+        case Tokens.UPPER :
+        case Tokens.TRANSLATE_REGEX :
+        case Tokens.TRIM :
+        case Tokens.OVERLAY :
+        case Tokens.NORMALIZE :
 
             //
-            case Tokens.POSITION :
-            case Tokens.OCCURRENCES_REGEX :
-            case Tokens.POSITION_REGEX :
-            case Tokens.EXTRACT :
-            case Tokens.CHAR_LENGTH :
-            case Tokens.CHARACTER_LENGTH :
-            case Tokens.OCTET_LENGTH :
-            case Tokens.CARDINALITY :
-            case Tokens.ABS :
-            case Tokens.MOD :
-            case Tokens.LN :
-            case Tokens.EXP :
-            case Tokens.POWER :
-            case Tokens.SQRT :
-            case Tokens.FLOOR :
-            case Tokens.CEILING :
-            case Tokens.CEIL :
-            case Tokens.WIDTH_BUCKET :
-                FunctionSQL function =
-                    FunctionSQL.newSQLFunction(token.tokenString,
-                                               compileContext);
+        case Tokens.POSITION :
+        case Tokens.OCCURRENCES_REGEX :
+        case Tokens.POSITION_REGEX :
+        case Tokens.EXTRACT :
+        case Tokens.CHAR_LENGTH :
+        case Tokens.CHARACTER_LENGTH :
+        case Tokens.OCTET_LENGTH :
+        case Tokens.CARDINALITY :
+        case Tokens.ABS :
+        case Tokens.MOD :
+        case Tokens.LN :
+        case Tokens.EXP :
+        case Tokens.POWER :
+        case Tokens.SQRT :
+        case Tokens.FLOOR :
+        case Tokens.CEILING :
+        case Tokens.CEIL :
+        case Tokens.WIDTH_BUCKET :
+            FunctionSQL function =
+            FunctionSQL.newSQLFunction(token.tokenString,
+                    compileContext);
 
-                if (function == null) {
-                    throw unsupportedFeature();
-                }
+            if (function == null) {
+                throw unsupportedFeature();
+            }
 
-                e = readSQLFunction(function);
-                break;
+            e = readSQLFunction(function);
+            break;
 
-            default :
-                e = XreadAllTypesValueExpressionPrimary(boole);
+        default :
+            e = XreadAllTypesValueExpressionPrimary(boole);
         }
 
         e = XreadModifier(e);
@@ -1977,65 +2027,65 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.AT : {
+        case Tokens.AT : {
+            read();
+
+            Expression e1 = null;
+
+            if (token.tokenType == Tokens.LOCAL) {
                 read();
+            } else {
+                readThis(Tokens.TIME);
+                readThis(Tokens.ZONE);
 
-                Expression e1 = null;
+                e1 = XreadValueExpressionPrimary();
 
-                if (token.tokenType == Tokens.LOCAL) {
-                    read();
-                } else {
-                    readThis(Tokens.TIME);
-                    readThis(Tokens.ZONE);
+                switch (token.tokenType) {
 
-                    e1 = XreadValueExpressionPrimary();
+                case Tokens.YEAR :
+                case Tokens.MONTH :
+                case Tokens.DAY :
+                case Tokens.HOUR :
+                case Tokens.MINUTE :
+                case Tokens.SECOND : {
+                    IntervalType type = readIntervalType();
 
-                    switch (token.tokenType) {
-
-                        case Tokens.YEAR :
-                        case Tokens.MONTH :
-                        case Tokens.DAY :
-                        case Tokens.HOUR :
-                        case Tokens.MINUTE :
-                        case Tokens.SECOND : {
-                            IntervalType type = readIntervalType();
-
-                            if (e1.getType() == OpTypes.SUBTRACT) {
-                                e1.dataType = type;
-                            } else {
-                                e1 = new ExpressionOp(e1, type);
-                            }
-                        }
+                    if (e1.getType() == OpTypes.SUBTRACT) {
+                        e1.dataType = type;
+                    } else {
+                        e1 = new ExpressionOp(e1, type);
                     }
                 }
-
-                e = new ExpressionOp(OpTypes.ZONE_MODIFIER, e, e1);
-
-                break;
-            }
-            case Tokens.YEAR :
-            case Tokens.MONTH :
-            case Tokens.DAY :
-            case Tokens.HOUR :
-            case Tokens.MINUTE :
-            case Tokens.SECOND : {
-                IntervalType type = readIntervalType();
-
-                if (e.getType() == OpTypes.SUBTRACT) {
-                    e.dataType = type;
-                } else {
-                    e = new ExpressionOp(e, type);
                 }
-
-                break;
             }
-            case Tokens.COLLATE : {
-                read();
 
-                SchemaObject collation =
+            e = new ExpressionOp(OpTypes.ZONE_MODIFIER, e, e1);
+
+            break;
+        }
+        case Tokens.YEAR :
+        case Tokens.MONTH :
+        case Tokens.DAY :
+        case Tokens.HOUR :
+        case Tokens.MINUTE :
+        case Tokens.SECOND : {
+            IntervalType type = readIntervalType();
+
+            if (e.getType() == OpTypes.SUBTRACT) {
+                e.dataType = type;
+            } else {
+                e = new ExpressionOp(e, type);
+            }
+
+            break;
+        }
+        case Tokens.COLLATE : {
+            read();
+
+            SchemaObject collation =
                     database.schemaManager.getSchemaObject(token.namePrefix,
-                        token.tokenString, SchemaObject.COLLATION);
-            }
+                            token.tokenString, SchemaObject.COLLATION);
+        }
         }
 
         return e;
@@ -2083,32 +2133,32 @@ public class ParserDQL extends ParserBase {
         while (true) {
             switch (token.tokenType) {
 
-                case Tokens.PLUS :
-                    type  = OpTypes.ADD;
-                    boole = false;
+            case Tokens.PLUS :
+                type  = OpTypes.ADD;
+                boole = false;
+                break;
+
+            case Tokens.MINUS :
+                type  = OpTypes.SUBTRACT;
+                boole = false;
+                break;
+
+            case Tokens.CONCAT :
+                type  = OpTypes.CONCAT;
+                boole = false;
+                break;
+
+            case Tokens.OR :
+                if (boole) {
+                    type = OpTypes.OR;
+
                     break;
-
-                case Tokens.MINUS :
-                    type  = OpTypes.SUBTRACT;
-                    boole = false;
-                    break;
-
-                case Tokens.CONCAT :
-                    type  = OpTypes.CONCAT;
-                    boole = false;
-                    break;
-
-                case Tokens.OR :
-                    if (boole) {
-                        type = OpTypes.OR;
-
-                        break;
-                    }
+                }
 
                 // $FALL-THROUGH$
-                default :
-                    end = true;
-                    break;
+            default :
+                end = true;
+                break;
             }
 
             if (end) {
@@ -2121,7 +2171,7 @@ public class ParserDQL extends ParserBase {
 
             e = XreadAllTypesTerm(boole);
             e = boole ? new ExpressionLogical(type, a, e)
-                      : new ExpressionArithmetic(type, a, e);
+            : new ExpressionArithmetic(type, a, e);
         }
 
         return e;
@@ -2136,27 +2186,27 @@ public class ParserDQL extends ParserBase {
         while (true) {
             switch (token.tokenType) {
 
-                case Tokens.ASTERISK :
-                    type  = OpTypes.MULTIPLY;
-                    boole = false;
+            case Tokens.ASTERISK :
+                type  = OpTypes.MULTIPLY;
+                boole = false;
+                break;
+
+            case Tokens.DIVIDE :
+                type  = OpTypes.DIVIDE;
+                boole = false;
+                break;
+
+            case Tokens.AND :
+                if (boole) {
+                    type = OpTypes.AND;
+
                     break;
-
-                case Tokens.DIVIDE :
-                    type  = OpTypes.DIVIDE;
-                    boole = false;
-                    break;
-
-                case Tokens.AND :
-                    if (boole) {
-                        type = OpTypes.AND;
-
-                        break;
-                    }
+                }
 
                 // $FALL-THROUGH$
-                default :
-                    end = true;
-                    break;
+            default :
+                end = true;
+                break;
             }
 
             if (end) {
@@ -2174,7 +2224,7 @@ public class ParserDQL extends ParserBase {
             }
 
             e = boole ? new ExpressionLogical(type, a, e)
-                      : new ExpressionArithmetic(type, a, e);
+            : new ExpressionArithmetic(type, a, e);
         }
 
         return e;
@@ -2189,26 +2239,26 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.PLUS :
+        case Tokens.PLUS :
+            read();
+
+            boole = false;
+            break;
+
+        case Tokens.MINUS :
+            read();
+
+            boole = false;
+            minus = true;
+            break;
+
+        case Tokens.NOT :
+            if (boole) {
                 read();
 
-                boole = false;
-                break;
-
-            case Tokens.MINUS :
-                read();
-
-                boole = false;
-                minus = true;
-                break;
-
-            case Tokens.NOT :
-                if (boole) {
-                    read();
-
-                    not = true;
-                }
-                break;
+                not = true;
+            }
+            break;
         }
 
         e = XreadAllTypesPrimary(boole);
@@ -2252,7 +2302,7 @@ public class ParserDQL extends ParserBase {
 
         return XreadCharacterValueExpression();
 
-//        XreadBinaryValueExpression();
+        //        XreadBinaryValueExpression();
     }
 
     Expression XreadCharacterValueExpression() {
@@ -2277,24 +2327,24 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.SUBSTRING :
+        case Tokens.SUBSTRING :
 
-//            case Token.SUBSTRING_REGEX :
-            case Tokens.LOWER :
-            case Tokens.UPPER :
+            //            case Token.SUBSTRING_REGEX :
+        case Tokens.LOWER :
+        case Tokens.UPPER :
 
-//            case Token.TRANSLATE_REGEX :
-            case Tokens.TRIM :
-            case Tokens.OVERLAY :
+            //            case Token.TRANSLATE_REGEX :
+        case Tokens.TRIM :
+        case Tokens.OVERLAY :
 
-//            case Token.NORMALIZE :
-                FunctionSQL function =
-                    FunctionSQL.newSQLFunction(token.tokenString,
-                                               compileContext);
+            //            case Token.NORMALIZE :
+            FunctionSQL function =
+            FunctionSQL.newSQLFunction(token.tokenString,
+                    compileContext);
 
-                return readSQLFunction(function);
+            return readSQLFunction(function);
 
-            default :
+        default :
         }
 
         return XreadValueExpressionPrimary();
@@ -2304,37 +2354,37 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.POSITION :
+        case Tokens.POSITION :
 
-//            case Token.OCCURRENCES_REGEX :
-//            case Token.POSITION_REGEX :
-            case Tokens.EXTRACT :
-            case Tokens.CHAR_LENGTH :
-            case Tokens.CHARACTER_LENGTH :
-            case Tokens.OCTET_LENGTH :
-            case Tokens.CARDINALITY :
-            case Tokens.ABS :
-            case Tokens.MOD :
-            case Tokens.LN :
-            case Tokens.EXP :
-            case Tokens.POWER :
-            case Tokens.SQRT :
-            case Tokens.FLOOR :
-            case Tokens.CEILING :
-            case Tokens.CEIL :
+            //            case Token.OCCURRENCES_REGEX :
+            //            case Token.POSITION_REGEX :
+        case Tokens.EXTRACT :
+        case Tokens.CHAR_LENGTH :
+        case Tokens.CHARACTER_LENGTH :
+        case Tokens.OCTET_LENGTH :
+        case Tokens.CARDINALITY :
+        case Tokens.ABS :
+        case Tokens.MOD :
+        case Tokens.LN :
+        case Tokens.EXP :
+        case Tokens.POWER :
+        case Tokens.SQRT :
+        case Tokens.FLOOR :
+        case Tokens.CEILING :
+        case Tokens.CEIL :
 
-//            case Token.WIDTH_BUCKET :
-                FunctionSQL function =
-                    FunctionSQL.newSQLFunction(token.tokenString,
-                                               compileContext);
+            //            case Token.WIDTH_BUCKET :
+            FunctionSQL function =
+            FunctionSQL.newSQLFunction(token.tokenString,
+                    compileContext);
 
-                if (function == null) {
-                    throw super.unexpectedToken();
-                }
+            if (function == null) {
+                throw super.unexpectedToken();
+            }
 
-                return readSQLFunction(function);
+            return readSQLFunction(function);
 
-            default :
+        default :
         }
 
         return XreadValueExpressionPrimary();
@@ -2478,25 +2528,25 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.CURRENT_DATE :
-            case Tokens.CURRENT_TIME :
-            case Tokens.CURRENT_TIMESTAMP :
-            case Tokens.LOCALTIME :
-            case Tokens.LOCALTIMESTAMP :
+        case Tokens.CURRENT_DATE :
+        case Tokens.CURRENT_TIME :
+        case Tokens.CURRENT_TIMESTAMP :
+        case Tokens.LOCALTIME :
+        case Tokens.LOCALTIMESTAMP :
 
             //
-            case Tokens.ABS :
-                FunctionSQL function =
-                    FunctionSQL.newSQLFunction(token.tokenString,
-                                               compileContext);
+        case Tokens.ABS :
+            FunctionSQL function =
+            FunctionSQL.newSQLFunction(token.tokenString,
+                    compileContext);
 
-                if (function == null) {
-                    throw super.unexpectedToken();
-                }
+            if (function == null) {
+                throw super.unexpectedToken();
+            }
 
-                return readSQLFunction(function);
+            return readSQLFunction(function);
 
-            default :
+        default :
         }
 
         return XreadValueExpressionPrimary();
@@ -2509,23 +2559,23 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.CURRENT_DATE :
-            case Tokens.CURRENT_TIME :
-            case Tokens.CURRENT_TIMESTAMP :
-            case Tokens.LOCALTIME :
-            case Tokens.LOCALTIMESTAMP :
-                function = FunctionSQL.newSQLFunction(token.tokenString,
-                                                      compileContext);
-                break;
+        case Tokens.CURRENT_DATE :
+        case Tokens.CURRENT_TIME :
+        case Tokens.CURRENT_TIMESTAMP :
+        case Tokens.LOCALTIME :
+        case Tokens.LOCALTIMESTAMP :
+            function = FunctionSQL.newSQLFunction(token.tokenString,
+                    compileContext);
+            break;
 
-            case Tokens.NOW :
-            case Tokens.TODAY :
-                function = FunctionCustom.newCustomFunction(token.tokenString,
-                        token.tokenType);
-                break;
+        case Tokens.NOW :
+        case Tokens.TODAY :
+            function = FunctionCustom.newCustomFunction(token.tokenString,
+                    token.tokenType);
+            break;
 
-            default :
-                return null;
+        default :
+            return null;
         }
 
         if (function == null) {
@@ -2661,34 +2711,34 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.EXISTS :
-            case Tokens.UNIQUE :
-                return XreadPredicate();
+        case Tokens.EXISTS :
+        case Tokens.UNIQUE :
+            return XreadPredicate();
 
-            case Tokens.ROW :
-                read();
-                readThis(Tokens.OPENBRACKET);
+        case Tokens.ROW :
+            read();
+            readThis(Tokens.OPENBRACKET);
 
-                e = XreadRowElementList(true);
+            e = XreadRowElementList(true);
 
-                readThis(Tokens.CLOSEBRACKET);
-                break;
+            readThis(Tokens.CLOSEBRACKET);
+            break;
 
-            default :
-                position = getPosition();
+        default :
+            position = getPosition();
 
-                try {
-                    e = XreadAllTypesCommonValueExpression(false);
-                } catch (HsqlException ex) {
-                    ex.setLevel(compileContext.subQueryDepth);
+            try {
+                e = XreadAllTypesCommonValueExpression(false);
+            } catch (HsqlException ex) {
+                ex.setLevel(compileContext.subQueryDepth);
 
-                    if (lastError == null
-                            || lastError.getLevel() < ex.getLevel()) {
-                        lastError = ex;
-                    }
-
-                    rewind(position);
+                if (lastError == null
+                        || lastError.getLevel() < ex.getLevel()) {
+                    lastError = ex;
                 }
+
+                rewind(position);
+            }
         }
 
         if (e == null && token.tokenType == Tokens.OPENBRACKET) {
@@ -2745,25 +2795,25 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.EXISTS : {
-                read();
+        case Tokens.EXISTS : {
+            read();
 
-                Expression s = XreadTableSubqueryForPredicate(OpTypes.EXISTS);
+            Expression s = XreadTableSubqueryForPredicate(OpTypes.EXISTS);
 
-                return new ExpressionLogical(OpTypes.EXISTS, s);
-            }
-            case Tokens.UNIQUE : {
-                read();
+            return new ExpressionLogical(OpTypes.EXISTS, s);
+        }
+        case Tokens.UNIQUE : {
+            read();
 
-                Expression s = XreadTableSubqueryForPredicate(OpTypes.UNIQUE);
+            Expression s = XreadTableSubqueryForPredicate(OpTypes.UNIQUE);
 
-                return new ExpressionLogical(OpTypes.UNIQUE, s);
-            }
-            default : {
-                Expression a = XreadRowValuePredicand();
+            return new ExpressionLogical(OpTypes.UNIQUE, s);
+        }
+        default : {
+            Expression a = XreadRowValuePredicand();
 
-                return XreadPredicateRightPart(a);
-            }
+            return XreadPredicateRightPart(a);
+        }
         }
     }
 
@@ -2781,112 +2831,112 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.IS : {
-                if (hasNot) {
-                    throw unexpectedToken();
-                }
-
-                read();
-
-                if (token.tokenType == Tokens.NOT) {
-                    hasNot = true;
-
-                    read();
-                }
-
-                if (token.tokenType == Tokens.DISTINCT) {
-                    read();
-                    readThis(Tokens.FROM);
-
-                    r      = XreadRowValuePredicand();
-                    e      = new ExpressionLogical(OpTypes.NOT_DISTINCT, l, r);
-                    hasNot = !hasNot;
-
-                    break;
-                }
-
-                if (token.tokenType == Tokens.NULL
-                        || token.tokenType == Tokens.UNKNOWN) {
-                    read();
-
-                    e = new ExpressionLogical(OpTypes.IS_NULL, l);
-
-                    break;
-                }
-
+        case Tokens.IS : {
+            if (hasNot) {
                 throw unexpectedToken();
             }
-            case Tokens.LIKE : {
-                e                = XreadLikePredicateRightPart(l);
-                e.noOptimisation = isCheckOrTriggerCondition;
 
-                break;
-            }
-            case Tokens.BETWEEN : {
-                e = XreadBetweenPredicateRightPart(l);
+            read();
 
-                break;
-            }
-            case Tokens.IN : {
-                e                = XreadInPredicateRightPart(l);
-                e.noOptimisation = isCheckOrTriggerCondition;
-
-                break;
-            }
-            case Tokens.OVERLAPS : {
-                if (hasNot) {
-                    throw unexpectedToken();
-                }
-
-                e = XreadOverlapsPredicateRightPart(l);
-
-                break;
-            }
-            case Tokens.EQUALS :
-            case Tokens.GREATER_EQUALS :
-            case Tokens.GREATER :
-            case Tokens.LESS :
-            case Tokens.LESS_EQUALS :
-            case Tokens.NOT_EQUALS : {
-                if (hasNot) {
-                    throw unexpectedToken();
-                }
-
-                int type = getExpressionType(token.tokenType);
+            if (token.tokenType == Tokens.NOT) {
+                hasNot = true;
 
                 read();
+            }
 
-                switch (token.tokenType) {
+            if (token.tokenType == Tokens.DISTINCT) {
+                read();
+                readThis(Tokens.FROM);
 
-                    case Tokens.ANY :
-                    case Tokens.SOME :
-                    case Tokens.ALL :
-                        e = XreadQuantifiedComparisonRightPart(type, l);
-                        break;
-
-                    default : {
-                        Expression row = XreadRowValuePredicand();
-
-                        e = new ExpressionLogical(type, l, row);
-
-                        break;
-                    }
-                }
+                r      = XreadRowValuePredicand();
+                e      = new ExpressionLogical(OpTypes.NOT_DISTINCT, l, r);
+                hasNot = !hasNot;
 
                 break;
             }
-            case Tokens.MATCH : {
-                e = XreadMatchPredicateRightPart(l);
+
+            if (token.tokenType == Tokens.NULL
+                    || token.tokenType == Tokens.UNKNOWN) {
+                read();
+
+                e = new ExpressionLogical(OpTypes.IS_NULL, l);
 
                 break;
             }
+
+            throw unexpectedToken();
+        }
+        case Tokens.LIKE : {
+            e                = XreadLikePredicateRightPart(l);
+            e.noOptimisation = isCheckOrTriggerCondition;
+
+            break;
+        }
+        case Tokens.BETWEEN : {
+            e = XreadBetweenPredicateRightPart(l);
+
+            break;
+        }
+        case Tokens.IN : {
+            e                = XreadInPredicateRightPart(l);
+            e.noOptimisation = isCheckOrTriggerCondition;
+
+            break;
+        }
+        case Tokens.OVERLAPS : {
+            if (hasNot) {
+                throw unexpectedToken();
+            }
+
+            e = XreadOverlapsPredicateRightPart(l);
+
+            break;
+        }
+        case Tokens.EQUALS :
+        case Tokens.GREATER_EQUALS :
+        case Tokens.GREATER :
+        case Tokens.LESS :
+        case Tokens.LESS_EQUALS :
+        case Tokens.NOT_EQUALS : {
+            if (hasNot) {
+                throw unexpectedToken();
+            }
+
+            int type = getExpressionType(token.tokenType);
+
+            read();
+
+            switch (token.tokenType) {
+
+            case Tokens.ANY :
+            case Tokens.SOME :
+            case Tokens.ALL :
+                e = XreadQuantifiedComparisonRightPart(type, l);
+                break;
+
             default : {
-                if (hasNot) {
-                    throw unexpectedToken();
-                }
+                Expression row = XreadRowValuePredicand();
 
-                return l;
+                e = new ExpressionLogical(type, l, row);
+
+                break;
             }
+            }
+
+            break;
+        }
+        case Tokens.MATCH : {
+            e = XreadMatchPredicateRightPart(l);
+
+            break;
+        }
+        default : {
+            if (hasNot) {
+                throw unexpectedToken();
+            }
+
+            return l;
+        }
         }
 
         if (hasNot) {
@@ -2928,7 +2978,7 @@ public class ParserDQL extends ParserBase {
         Expression l = new ExpressionLogical(OpTypes.GREATER_EQUAL, a, left);
         Expression r = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a, right);
         ExpressionLogical leftToRight = new ExpressionLogical(OpTypes.AND, l,
-            r);
+                r);
 
         if (symmetric) {
             l = new ExpressionLogical(OpTypes.SMALLER_EQUAL, a, left);
@@ -2951,17 +3001,17 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.ANY :
-            case Tokens.SOME :
-                exprSubType = OpTypes.ANY_QUANTIFIED;
-                break;
+        case Tokens.ANY :
+        case Tokens.SOME :
+            exprSubType = OpTypes.ANY_QUANTIFIED;
+            break;
 
-            case Tokens.ALL :
-                exprSubType = OpTypes.ALL_QUANTIFIED;
-                break;
+        case Tokens.ALL :
+            exprSubType = OpTypes.ALL_QUANTIFIED;
+            break;
 
-            default :
-                throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
+        default :
+            throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
         }
 
         read();
@@ -2973,24 +3023,24 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.TABLE :
-            case Tokens.VALUES :
-            case Tokens.SELECT :
-                rewind(position);
+        case Tokens.TABLE :
+        case Tokens.VALUES :
+        case Tokens.SELECT :
+            rewind(position);
 
-                SubQuery sq = XreadSubqueryBody(false, OpTypes.IN);
+            SubQuery sq = XreadSubqueryBody(false, OpTypes.IN);
 
-                e = new Expression(OpTypes.TABLE_SUBQUERY, sq);
+            e = new Expression(OpTypes.TABLE_SUBQUERY, sq);
 
-                readThis(Tokens.CLOSEBRACKET);
-                break;
+            readThis(Tokens.CLOSEBRACKET);
+            break;
 
-            default :
-                rewind(position);
+        default :
+            rewind(position);
 
-                e = readAggregateExpression(tokenT);
+            e = readAggregateExpression(tokenT);
 
-                readThis(Tokens.CLOSEBRACKET);
+            readThis(Tokens.CLOSEBRACKET);
         }
 
         ExpressionLogical r = new ExpressionLogical(exprType, l, e);
@@ -3008,7 +3058,7 @@ public class ParserDQL extends ParserBase {
         read();
         // A VoltDB extension to add support for x IN ?
         if (token.tokenType == Tokens.QUESTION &&
-            ! isCheckOrTriggerCondition) {
+                ! isCheckOrTriggerCondition) {
             read();
             e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
             compileContext.parameters.add(e);
@@ -3026,28 +3076,28 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.TABLE :
-            case Tokens.VALUES :
-            case Tokens.SELECT : {
-                rewind(position);
+        case Tokens.TABLE :
+        case Tokens.VALUES :
+        case Tokens.SELECT : {
+            rewind(position);
 
-                SubQuery sq = XreadSubqueryBody(false, OpTypes.IN);
+            SubQuery sq = XreadSubqueryBody(false, OpTypes.IN);
 
-                e = new Expression(OpTypes.TABLE_SUBQUERY, sq);
+            e = new Expression(OpTypes.TABLE_SUBQUERY, sq);
 
-                readThis(Tokens.CLOSEBRACKET);
+            readThis(Tokens.CLOSEBRACKET);
 
-                break;
-            }
-            default : {
-                rewind(position);
+            break;
+        }
+        default : {
+            rewind(position);
 
-                e = XreadInValueListConstructor(degree);
+            e = XreadInValueListConstructor(degree);
 
-                readThis(Tokens.CLOSEBRACKET);
+            readThis(Tokens.CLOSEBRACKET);
 
-                break;
-            }
+            break;
+        }
         }
 
         ExpressionLogical r;
@@ -3093,7 +3143,7 @@ public class ParserDQL extends ParserBase {
         for (int i = 0; i < array.length; i++) {
             if (array[i].getType() != OpTypes.ROW) {
                 array[i] = new Expression(OpTypes.ROW,
-                                          new Expression[]{ array[i] });
+                        new Expression[]{ array[i] });
             }
 
             Expression[] args = array[i].nodes;
@@ -3130,7 +3180,7 @@ public class ParserDQL extends ParserBase {
         }
 
         return new ExpressionLike(a, b, escape,
-                                  this.isCheckOrTriggerCondition);
+                this.isCheckOrTriggerCondition);
     }
 
     private ExpressionLogical XreadMatchPredicateRightPart(Expression a) {
@@ -3150,21 +3200,21 @@ public class ParserDQL extends ParserBase {
             read();
 
             matchType = isUnique ? OpTypes.MATCH_UNIQUE_SIMPLE
-                                 : OpTypes.MATCH_SIMPLE;
+                    : OpTypes.MATCH_SIMPLE;
         } else if (token.tokenType == Tokens.PARTIAL) {
             read();
 
             matchType = isUnique ? OpTypes.MATCH_UNIQUE_PARTIAL
-                                 : OpTypes.MATCH_PARTIAL;
+                    : OpTypes.MATCH_PARTIAL;
         } else if (token.tokenType == Tokens.FULL) {
             read();
 
             matchType = isUnique ? OpTypes.MATCH_UNIQUE_FULL
-                                 : OpTypes.MATCH_FULL;
+                    : OpTypes.MATCH_FULL;
         }
 
         int        mode = isUnique ? OpTypes.TABLE_SUBQUERY
-                                   : OpTypes.IN;
+                : OpTypes.IN;
         Expression s    = XreadTableSubqueryForPredicate(mode);
 
         return new ExpressionLogical(matchType, a, s);
@@ -3258,46 +3308,46 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.OPENBRACKET : {
-                read();
+        case Tokens.OPENBRACKET : {
+            read();
 
-                int position = getPosition();
-                int brackets = readOpenBrackets();
+            int position = getPosition();
+            int brackets = readOpenBrackets();
 
-                switch (token.tokenType) {
+            switch (token.tokenType) {
 
-                    case Tokens.TABLE :
-                    case Tokens.VALUES :
-                    case Tokens.SELECT :
-                        rewind(position);
+            case Tokens.TABLE :
+            case Tokens.VALUES :
+            case Tokens.SELECT :
+                rewind(position);
 
-                        SubQuery sq = XreadSubqueryBody(false,
-                                                        OpTypes.ROW_SUBQUERY);
+                SubQuery sq = XreadSubqueryBody(false,
+                        OpTypes.ROW_SUBQUERY);
 
-                        readThis(Tokens.CLOSEBRACKET);
+                readThis(Tokens.CLOSEBRACKET);
 
-                        return new Expression(OpTypes.ROW_SUBQUERY, sq);
+                return new Expression(OpTypes.ROW_SUBQUERY, sq);
 
-                    default :
-                        rewind(position);
+            default :
+                rewind(position);
 
-                        e = XreadRowElementList(true);
-
-                        readThis(Tokens.CLOSEBRACKET);
-
-                        return e;
-                }
-            }
-            case Tokens.ROW : {
-                read();
-                readThis(Tokens.OPENBRACKET);
-
-                e = XreadRowElementList(false);
+                e = XreadRowElementList(true);
 
                 readThis(Tokens.CLOSEBRACKET);
 
                 return e;
             }
+        }
+        case Tokens.ROW : {
+            read();
+            readThis(Tokens.OPENBRACKET);
+
+            e = XreadRowElementList(false);
+
+            readThis(Tokens.CLOSEBRACKET);
+
+            return e;
+        }
         }
 
         return null;
@@ -3372,14 +3422,14 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.TABLE :
-            case Tokens.VALUES :
-            case Tokens.SELECT :
-            case Tokens.WITH :
-                break;
+        case Tokens.TABLE :
+        case Tokens.VALUES :
+        case Tokens.SELECT :
+        case Tokens.WITH :
+            break;
 
-            default :
-                joinedTable = true;
+        default :
+            joinedTable = true;
         }
 
         rewind(position);
@@ -3412,7 +3462,7 @@ public class ParserDQL extends ParserBase {
         }
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, OpTypes.TABLE_SUBQUERY);
+                queryExpression, OpTypes.TABLE_SUBQUERY);
 
         sq.prepareTable(session);
 
@@ -3438,7 +3488,7 @@ public class ParserDQL extends ParserBase {
 
         SubQuery sq = XreadSubqueryBody(true, OpTypes.TABLE_SUBQUERY);
 
-/*
+        /*
         Select   select = sq.queryExpression.getMainSelect();
 
         for (int i = 0; i < select.indexLimitVisible; i++) {
@@ -3453,7 +3503,7 @@ public class ParserDQL extends ParserBase {
                 select.exprColumns[i].setAlias(colname, false);
             }
         }
-*/
+         */
         sq.prepareTable(session);
 
         return sq;
@@ -3472,7 +3522,7 @@ public class ParserDQL extends ParserBase {
         }
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, mode);
+                queryExpression, mode);
 
         compileContext.subQueryList.add(sq);
 
@@ -3498,7 +3548,7 @@ public class ParserDQL extends ParserBase {
         queryExpression.resolve(session);
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth,
-                                   queryExpression, view);
+                queryExpression, view);
 
         compileContext.subQueryList.add(sq);
 
@@ -3507,16 +3557,16 @@ public class ParserDQL extends ParserBase {
         return sq;
     }
 
-// Additional Common Elements
-// returns null
+    // Additional Common Elements
+    // returns null
     SchemaObject readCollateClauseOrNull() {
 
         if (token.tokenType == Tokens.COLLATE) {
             read();
 
             SchemaObject collation =
-                database.schemaManager.getSchemaObject(token.namePrefix,
-                    token.tokenString, SchemaObject.COLLATION);
+                    database.schemaManager.getSchemaObject(token.namePrefix,
+                            token.tokenString, SchemaObject.COLLATION);
 
             return collation;
         }
@@ -3537,7 +3587,7 @@ public class ParserDQL extends ParserBase {
                 if (e.getType() == OpTypes.ROW
                         && r.nodes[0].getType() != OpTypes.ROW) {
                     r = new Expression(OpTypes.ROW, new Expression[] {
-                        r, e
+                            r, e
                     });
                 } else {
                     r.nodes = (Expression[]) ArrayUtil.resizeArray(r.nodes,
@@ -3546,7 +3596,7 @@ public class ParserDQL extends ParserBase {
                 }
             } else {
                 r = new Expression(OpTypes.ROW, new Expression[] {
-                    r, e
+                        r, e
                 });
             }
 
@@ -3573,7 +3623,7 @@ public class ParserDQL extends ParserBase {
                 for (int i = 0; i < list.length; i++) {
                     if (list[i].getType() != OpTypes.ROW) {
                         list[i] = new Expression(OpTypes.ROW,
-                                                 new Expression[]{ list[i] });
+                                new Expression[]{ list[i] });
                     } else if (list[i].nodes.length != degree) {
                         throw Error.error(ErrorCode.X_42564);
                     }
@@ -3637,7 +3687,7 @@ public class ParserDQL extends ParserBase {
 
         Expression e = XreadInValueList(degree);
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth, e,
-                                   OpTypes.IN);
+                OpTypes.IN);
 
         compileContext.subQueryList.add(sq);
 
@@ -3652,14 +3702,14 @@ public class ParserDQL extends ParserBase {
 
         Expression e = XreadRowValueExpressionListBody();
         HsqlList unresolved =
-            e.resolveColumnReferences(RangeVariable.emptyArray, null);
+                e.resolveColumnReferences(RangeVariable.emptyArray, null);
 
         ExpressionColumn.checkColumnsResolved(unresolved);
         e.resolveTypes(session, null);
         e.prepareTable(session, null, e.nodes[0].nodes.length);
 
         SubQuery sq = new SubQuery(database, compileContext.subQueryDepth, e,
-                                   OpTypes.TABLE);
+                OpTypes.TABLE);
 
         sq.prepareTable(session);
         compileContext.subQueryList.add(sq);
@@ -3714,7 +3764,7 @@ public class ParserDQL extends ParserBase {
                 }
 
                 list[i] = new Expression(OpTypes.ROW,
-                                         new Expression[]{ list[i] });
+                        new Expression[]{ list[i] });
             }
         }
 
@@ -3751,14 +3801,14 @@ public class ParserDQL extends ParserBase {
 
                 if (l == newCondition) {
                     newCondition =
-                        new ExpressionLogical(l, XreadRowValuePredicand());
+                            new ExpressionLogical(l, XreadRowValuePredicand());
                 }
 
                 if (condition == null) {
                     condition = newCondition;
                 } else {
                     condition = new ExpressionLogical(OpTypes.OR, condition,
-                                                      newCondition);
+                            newCondition);
                 }
 
                 if (token.tokenType == Tokens.COMMA) {
@@ -3791,9 +3841,9 @@ public class ParserDQL extends ParserBase {
         }
 
         Expression alternatives = new ExpressionOp(OpTypes.ALTERNATIVE,
-            current, elseExpr);
+                current, elseExpr);
         Expression casewhen = new ExpressionOp(OpTypes.CASEWHEN, condition,
-                                               alternatives);
+                alternatives);
 
         return casewhen;
     }
@@ -3817,7 +3867,7 @@ public class ParserDQL extends ParserBase {
         readThis(Tokens.COMMA);
 
         thenelse = new ExpressionOp(OpTypes.ALTERNATIVE, thenelse,
-                                    XreadValueExpression());
+                XreadValueExpression());
         l = new ExpressionOp(OpTypes.CASEWHEN, l, thenelse);
 
         readThis(Tokens.CLOSEBRACKET);
@@ -3897,12 +3947,12 @@ public class ParserDQL extends ParserBase {
                     ex = caught;
                 }
                 if (ex != null) {
-                /* disable 3 lines ...
+                    /* disable 3 lines ...
                 try {
                     return readSQLFunction(function);
                 } catch (HsqlException ex) {
                 ... disabled 3 lines */
-                // End of VoltDB extension
+                    // End of VoltDB extension
                     ex.setLevel(compileContext.subQueryDepth);
 
                     if (lastError == null
@@ -3936,32 +3986,32 @@ public class ParserDQL extends ParserBase {
         prefix = session.getSchemaName(prefix);
 
         RoutineSchema routineSchema =
-            (RoutineSchema) database.schemaManager.findSchemaObject(name,
-                prefix, SchemaObject.FUNCTION);
+                (RoutineSchema) database.schemaManager.findSchemaObject(name,
+                        prefix, SchemaObject.FUNCTION);
 
         if (routineSchema == null && isSimpleQuoted) {
             HsqlName schema =
-                database.schemaManager.getDefaultSchemaHsqlName();
+                    database.schemaManager.getDefaultSchemaHsqlName();
 
             routineSchema =
-                (RoutineSchema) database.schemaManager.findSchemaObject(name,
-                    schema.name, SchemaObject.FUNCTION);
+                    (RoutineSchema) database.schemaManager.findSchemaObject(name,
+                            schema.name, SchemaObject.FUNCTION);
 
             if (routineSchema == null) {
                 Method[]  methods  = Routine.getMethods(name);
                 Routine[] routines = Routine.newRoutines(methods);
                 HsqlName routineName = database.nameManager.newHsqlName(schema,
-                    name, true, SchemaObject.FUNCTION);
+                        name, true, SchemaObject.FUNCTION);
 
                 for (int i = 0; i < routines.length; i++) {
                     routines[i].setName(routineName);
                     session.database.schemaManager.addSchemaObject(
-                        routines[i]);
+                            routines[i]);
                 }
 
                 routineSchema =
-                    (RoutineSchema) database.schemaManager.findSchemaObject(
-                        name, schema.name, SchemaObject.FUNCTION);
+                        (RoutineSchema) database.schemaManager.findSchemaObject(
+                                name, schema.name, SchemaObject.FUNCTION);
             }
         }
 
@@ -4015,9 +4065,9 @@ public class ParserDQL extends ParserBase {
         readThis(Tokens.COMMA);
 
         Expression thenelse =
-            new ExpressionOp(OpTypes.ALTERNATIVE,
-                             new ExpressionValue((Object) null, (Type) null),
-                             c);
+                new ExpressionOp(OpTypes.ALTERNATIVE,
+                        new ExpressionValue((Object) null, (Type) null),
+                        c);
 
         c = new ExpressionLogical(c, XreadValueExpression());
         c = new ExpressionOp(OpTypes.CASEWHEN, c, thenelse);
@@ -4051,11 +4101,11 @@ public class ParserDQL extends ParserBase {
             }
 
             Expression condition = new ExpressionLogical(OpTypes.IS_NULL,
-                current);
+                    current);
             Expression alternatives = new ExpressionOp(OpTypes.ALTERNATIVE,
-                new ExpressionValue((Object) null, (Type) null), current);
+                    new ExpressionValue((Object) null, (Type) null), current);
             Expression casewhen = new ExpressionOp(OpTypes.CASEWHEN,
-                                                   condition, alternatives);
+                    condition, alternatives);
 
             if (c == null) {
                 c = casewhen;
@@ -4109,13 +4159,13 @@ public class ParserDQL extends ParserBase {
                 if ( ! preferToThrow) {
                     return new ExpressionOrException(e);
                 }
-        /* disable 4 lines ...
+                /* disable 4 lines ...
         try {
             readExpression(exprList, parseList, 0, parseList.length, false);
         } catch (HsqlException e) {
             if (function.parseListAlt == null) {
         ... disabled 4 lines */
-        // End of VoltDB extension
+                // End of VoltDB extension
                 throw e;
             }
 
@@ -4171,58 +4221,58 @@ public class ParserDQL extends ParserBase {
      * @return a non-thrown HsqlException that can be thrown later if/when the alternatives have run out.
      */
     private HsqlException readExpression(HsqlArrayList exprList, short[] parseList, int start,
-                                          int count, boolean isOption, boolean preferToThrow) {
-    /* disable 2 lines ...
+            int count, boolean isOption, boolean preferToThrow) {
+        /* disable 2 lines ...
     void readExpression(HsqlArrayList exprList, short[] parseList, int start,
                         int count, boolean isOption) {
     ... disabled 2 lines */
-    // End of VoltDB extension
+        // End of VoltDB extension
 
         for (int i = start; i < start + count; i++) {
             int exprType = parseList[i];
 
             switch (exprType) {
 
-                case Tokens.QUESTION : {
-                    Expression e = null;
+            case Tokens.QUESTION : {
+                Expression e = null;
 
-                    e = XreadAllTypesCommonValueExpression(false);
+                e = XreadAllTypesCommonValueExpression(false);
 
-                    exprList.add(e);
+                exprList.add(e);
 
-                    continue;
+                continue;
+            }
+            case Tokens.X_POS_INTEGER : {
+                Expression e       = null;
+                int        integer = readInteger();
+
+                if (integer < 0) {
+                    throw Error.error(ErrorCode.X_42592);
                 }
-                case Tokens.X_POS_INTEGER : {
-                    Expression e       = null;
-                    int        integer = readInteger();
 
-                    if (integer < 0) {
-                        throw Error.error(ErrorCode.X_42592);
-                    }
+                e = new ExpressionValue(ValuePool.getInt(integer),
+                        Type.SQL_INTEGER);
 
-                    e = new ExpressionValue(ValuePool.getInt(integer),
-                                            Type.SQL_INTEGER);
+                exprList.add(e);
 
-                    exprList.add(e);
+                continue;
+            }
+            case Tokens.X_OPTION : {
+                i++;
 
-                    continue;
+                int expressionCount  = exprList.size();
+                int position         = getPosition();
+                int elementCount     = parseList[i++];
+                int initialExprIndex = exprList.size();
+
+                // A VoltDB extension to avoid using exceptions for flow control.
+                HsqlException ex = null;
+                try {
+                    ex = readExpression(exprList, parseList, i, elementCount, true, false);
+                } catch (HsqlException caught) {
+                    ex = caught;
                 }
-                case Tokens.X_OPTION : {
-                    i++;
-
-                    int expressionCount  = exprList.size();
-                    int position         = getPosition();
-                    int elementCount     = parseList[i++];
-                    int initialExprIndex = exprList.size();
-
-                    // A VoltDB extension to avoid using exceptions for flow control.
-                    HsqlException ex = null;
-                    try {
-                        ex = readExpression(exprList, parseList, i, elementCount, true, false);
-                    } catch (HsqlException caught) {
-                        ex = caught;
-                    }
-                    if (ex != null) {
+                if (ex != null) {
                     /* disable 4 lines ...
                     try {
                         readExpression(exprList, parseList, i, elementCount,
@@ -4230,117 +4280,91 @@ public class ParserDQL extends ParserBase {
                     } catch (HsqlException ex) {
                     ... disabled 4 lines */
                     // End of VoltDB extension
-                        ex.setLevel(compileContext.subQueryDepth);
+                    ex.setLevel(compileContext.subQueryDepth);
 
-                        if (lastError == null
-                                || lastError.getLevel() < ex.getLevel()) {
-                            lastError = ex;
-                        }
-
-                        rewind(position);
-                        exprList.setSize(expressionCount);
-
-                        for (int j = i; j < i + elementCount; j++) {
-                            if (parseList[j] == Tokens.QUESTION
-                                    || parseList[j] == Tokens.X_KEYSET
-                                    || parseList[j] == Tokens.X_POS_INTEGER) {
-                                exprList.add(null);
-                            }
-                        }
-
-                        i += elementCount - 1;
-
-                        continue;
+                    if (lastError == null
+                            || lastError.getLevel() < ex.getLevel()) {
+                        lastError = ex;
                     }
 
-                    if (initialExprIndex == exprList.size()) {
-                        exprList.add(null);
+                    rewind(position);
+                    exprList.setSize(expressionCount);
+
+                    for (int j = i; j < i + elementCount; j++) {
+                        if (parseList[j] == Tokens.QUESTION
+                                || parseList[j] == Tokens.X_KEYSET
+                                || parseList[j] == Tokens.X_POS_INTEGER) {
+                            exprList.add(null);
+                        }
                     }
 
                     i += elementCount - 1;
 
                     continue;
                 }
-                case Tokens.X_REPEAT : {
-                    i++;
 
-                    int elementCount = parseList[i++];
-                    int parseIndex   = i;
+                if (initialExprIndex == exprList.size()) {
+                    exprList.add(null);
+                }
 
-                    while (true) {
-                        int initialExprIndex = exprList.size();
+                i += elementCount - 1;
 
-                        // A VoltDB extension to avoid using exceptions for flow control.
-                        if (preferToThrow) {
-                            readExpression(exprList, parseList, parseIndex,
-                                           elementCount, true, true);
-                        } else {
-                            HsqlException ex = null;
-                            try {
-                                ex = readExpression(exprList, parseList, parseIndex,
-                                                           elementCount, true, false);
-                            } catch (HsqlException caught) {
-                                ex = caught;
-                            }
-                            if (ex != null) {
-                                // TODO: There is likely a more elegant pre-emptive way of handling
-                                // the inevitable close paren that properly terminates a repeating group.
-                                // This filtering probably masks/ignores some syntax errors such as
-                                // a trailing comma right before the paren.
-                                if (ex.getMessage().equalsIgnoreCase("unexpected token: )")) {
-                                    break;
-                                }
-                                return ex;
-                            }
+                continue;
+            }
+            case Tokens.X_REPEAT : {
+                i++;
+
+                int elementCount = parseList[i++];
+                int parseIndex   = i;
+
+                while (true) {
+                    int initialExprIndex = exprList.size();
+
+                    // A VoltDB extension to avoid using exceptions for flow control.
+                    if (preferToThrow) {
+                        readExpression(exprList, parseList, parseIndex,
+                                elementCount, true, true);
+                    } else {
+                        HsqlException ex = null;
+                        try {
+                            ex = readExpression(exprList, parseList, parseIndex,
+                                    elementCount, true, false);
+                        } catch (HsqlException caught) {
+                            ex = caught;
                         }
-                        /* disable 2 lines ...
+                        if (ex != null) {
+                            // TODO: There is likely a more elegant pre-emptive way of handling
+                            // the inevitable close paren that properly terminates a repeating group.
+                            // This filtering probably masks/ignores some syntax errors such as
+                            // a trailing comma right before the paren.
+                            if (ex.getMessage().equalsIgnoreCase("unexpected token: )")) {
+                                break;
+                            }
+                            return ex;
+                        }
+                    }
+                    /* disable 2 lines ...
                         readExpression(exprList, parseList, parseIndex,
                                        elementCount, true);
                         ... disabled 2 lines */
-                        // End of VoltDB extension
+                    // End of VoltDB extension
 
-                        if (exprList.size() == initialExprIndex) {
-                            break;
-                        }
+                    if (exprList.size() == initialExprIndex) {
+                        break;
                     }
-
-                    i += elementCount - 1;
-
-                    continue;
                 }
-                case Tokens.X_KEYSET : {
-                    int        elementCount = parseList[++i];
-                    Expression e            = null;
 
-                    if (ArrayUtil.find(parseList, token.tokenType, i
-                                       + 1, elementCount) == -1) {
-                        if (!isOption) {
-                            // A VoltDB extension to avoid using exceptions for flow control.
-                            if ( ! preferToThrow) {
-                                return unexpectedToken();
-                            }
-                            // End of VoltDB extension
-                            throw unexpectedToken();
-                        }
-                    } else {
-                        e = new ExpressionValue(
-                            ValuePool.getInt(token.tokenType),
-                            Type.SQL_INTEGER);
+                i += elementCount - 1;
 
-                        read();
-                    }
+                continue;
+            }
+            case Tokens.X_KEYSET : {
+                int        elementCount = parseList[++i];
+                Expression e            = null;
 
-                    exprList.add(e);
-
-                    i += elementCount;
-
-                    continue;
-                }
-                case Tokens.OPENBRACKET :
-                case Tokens.CLOSEBRACKET :
-                case Tokens.COMMA :
-                default :
-                    if (token.tokenType != exprType) {
+                if (ArrayUtil.find(parseList, token.tokenType, i
+                        + 1, elementCount) == -1) {
+                    if (!isOption) {
                         // A VoltDB extension to avoid using exceptions for flow control.
                         if ( ! preferToThrow) {
                             return unexpectedToken();
@@ -4348,10 +4372,36 @@ public class ParserDQL extends ParserBase {
                         // End of VoltDB extension
                         throw unexpectedToken();
                     }
+                } else {
+                    e = new ExpressionValue(
+                            ValuePool.getInt(token.tokenType),
+                            Type.SQL_INTEGER);
 
                     read();
+                }
 
-                    continue;
+                exprList.add(e);
+
+                i += elementCount;
+
+                continue;
+            }
+            case Tokens.OPENBRACKET :
+            case Tokens.CLOSEBRACKET :
+            case Tokens.COMMA :
+            default :
+                if (token.tokenType != exprType) {
+                    // A VoltDB extension to avoid using exceptions for flow control.
+                    if ( ! preferToThrow) {
+                        return unexpectedToken();
+                    }
+                    // End of VoltDB extension
+                    throw unexpectedToken();
+                }
+
+                read();
+
+                continue;
             }
         }
         // A VoltDB extension to avoid using exceptions for flow control.
@@ -4368,8 +4418,8 @@ public class ParserDQL extends ParserBase {
 
         String schema = session.getSchemaName(token.namePrefix);
         NumberSequence sequence =
-            database.schemaManager.getSequence(token.tokenString, schema,
-                                               true);
+                database.schemaManager.getSequence(token.tokenString, schema,
+                        true);
 
         read();
 
@@ -4387,7 +4437,7 @@ public class ParserDQL extends ParserBase {
         SqlInvariants.checkSchemaNameNotSystem(token.tokenString);
 
         HsqlName name = database.nameManager.newHsqlName(token.tokenString,
-            isDelimitedIdentifier(), SchemaObject.SCHEMA);
+                isDelimitedIdentifier(), SchemaObject.SCHEMA);
 
         read();
 
@@ -4399,7 +4449,7 @@ public class ParserDQL extends ParserBase {
         checkIsSchemaObjectName();
 
         HsqlName hsqlName = database.nameManager.newHsqlName(token.tokenString,
-            isDelimitedIdentifier(), type);
+                isDelimitedIdentifier(), type);
 
         if (token.namePrefix != null) {
             if (type == SchemaObject.GRANTEE) {
@@ -4407,8 +4457,8 @@ public class ParserDQL extends ParserBase {
             }
 
             HsqlName schemaName =
-                session.database.schemaManager.findSchemaHsqlName(
-                    token.namePrefix);
+                    session.database.schemaManager.findSchemaHsqlName(
+                            token.namePrefix);
 
             if (schemaName == null) {
                 schemaName = database.nameManager.newHsqlName(token.namePrefix,
@@ -4428,7 +4478,7 @@ public class ParserDQL extends ParserBase {
         checkIsSchemaObjectName();
 
         HsqlName hsqlName = database.nameManager.newHsqlName(token.tokenString,
-            isDelimitedIdentifier(), type);
+                isDelimitedIdentifier(), type);
 
         if (token.namePrefix != null) {
             if (type == SchemaObject.GRANTEE || type == SchemaObject.VARIABLE
@@ -4479,8 +4529,8 @@ public class ParserDQL extends ParserBase {
         checkIsSchemaObjectName();
 
         SchemaObject object =
-            database.schemaManager.getSchemaObject(token.tokenString,
-                token.namePrefix, type);
+                database.schemaManager.getSchemaObject(token.tokenString,
+                        token.namePrefix, type);
 
         if (token.namePrePrefix != null) {
             if (!token.namePrePrefix.equals(database.getCatalogName().name)) {
@@ -4498,8 +4548,8 @@ public class ParserDQL extends ParserBase {
         checkIsSchemaObjectName();
 
         SchemaObject object =
-            database.schemaManager.getSchemaObject(token.tokenString,
-                parentName.schema.name, type);
+                database.schemaManager.getSchemaObject(token.tokenString,
+                        parentName.schema.name, type);
 
         if (token.namePrefix != null) {
             if (!token.namePrefix.equals(parentName.name)) {
@@ -4531,7 +4581,7 @@ public class ParserDQL extends ParserBase {
         }
 
         Table table = database.schemaManager.getTable(session,
-            token.tokenString, token.namePrefix);
+                token.tokenString, token.namePrefix);
 
         read();
 
@@ -4621,21 +4671,21 @@ public class ParserDQL extends ParserBase {
 
         switch (token.tokenType) {
 
-            case Tokens.SENSITIVE :
-                read();
+        case Tokens.SENSITIVE :
+            read();
 
-                // sensitivity = SENSITIVE
-                break;
+            // sensitivity = SENSITIVE
+            break;
 
-            case Tokens.INSENSITIVE :
-                read();
+        case Tokens.INSENSITIVE :
+            read();
 
-                // sensitivity = INSENSITIVE
-                break;
+            // sensitivity = INSENSITIVE
+            break;
 
-            case Tokens.ASENSITIVE :
-                read();
-                break;
+        case Tokens.ASENSITIVE :
+            read();
+            break;
         }
 
         if (token.tokenType == Tokens.NO) {
@@ -4711,7 +4761,7 @@ public class ParserDQL extends ParserBase {
         }
 
         StatementDMQL cs = new StatementQuery(session, queryExpression,
-                                              compileContext);
+                compileContext);
 
         return cs;
     }
@@ -4836,7 +4886,7 @@ public class ParserDQL extends ParserBase {
 
             for (int i = 0; i < usedRoutines.size(); i++) {
                 FunctionSQLInvoked function =
-                    (FunctionSQLInvoked) usedRoutines.get(i);
+                        (FunctionSQLInvoked) usedRoutines.get(i);
 
                 usedRoutines.set(i, function.routine);
             }
@@ -4912,8 +4962,8 @@ public class ParserDQL extends ParserBase {
             }
 
             ExpressionColumn[] result =
-                (ExpressionColumn[]) parameters.toArray(
-                    new ExpressionColumn[parameters.size()]);
+                    (ExpressionColumn[]) parameters.toArray(
+                            new ExpressionColumn[parameters.size()]);
 
             parameters.clear();
 
@@ -4930,7 +4980,7 @@ public class ParserDQL extends ParserBase {
 
             for (int i = 0; i < usedSequences.size(); i++) {
                 NumberSequence sequence =
-                    (NumberSequence) usedSequences.get(i);
+                        (NumberSequence) usedSequences.get(i);
 
                 set.add(sequence.getName());
             }
