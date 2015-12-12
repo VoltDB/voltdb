@@ -23,14 +23,13 @@
 
 package geospatial;
 
-import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ClientFactory;
+import org.voltdb.client.NullCallback;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
@@ -45,26 +44,29 @@ import org.voltdb.types.TimestampType;
  */
 public class BidGenerator implements Runnable {
 
-    private final AdBrokerBenchmark.AdBrokerConfig m_config;
+    private final Random m_rand;
     private final Client m_client;
     private final List<GeographyValue> m_bidRegions;
+    private long m_bidId;
 
-    BidGenerator(AdBrokerBenchmark.AdBrokerConfig config) throws Exception {
-        m_config = config;
+    private final long NUM_ADVERTISERS;
 
-        ClientConfig clientConfig = new ClientConfig(m_config.user, m_config.password, null);
-        clientConfig.setMaxTransactionsPerSecond(m_config.ratelimit);
-        m_client = ClientFactory.createClient(clientConfig);
-        AdBrokerBenchmark.connect(m_client, config.servers);
-
+    BidGenerator(AdBrokerBenchmark.AdBrokerConfig config, Client client) throws Exception {
+        m_rand = new Random(777);
+        //m_config = config;
+        m_client = client;
         m_bidRegions = getRandomRegions();
+
+        NUM_ADVERTISERS = m_client.callProcedure("@AdHoc", "select count(*) from advertisers")
+                .getResults()[0].asScalarLong();
+        m_bidId = m_client.callProcedure("@AdHoc", "select max(id) from bids")
+                .getResults()[0].asScalarLong() + 1;
     }
 
     /**
      * For now, just produce rectangular regions.
      */
     private List<GeographyValue> getRandomRegions() {
-        Random rand = new Random(777);
         List<GeographyValue> regions = new ArrayList<GeographyValue>();
 
         // Units here are degrees.  This is around 100 yards near the equator.
@@ -78,15 +80,15 @@ public class BidGenerator implements Runnable {
 
         for (int i = 0; i < AdBrokerBenchmark.NUM_BID_REGIONS; ++i) {
 
-            double d = rand.nextDouble(); // between 0 (inclusive) and 1 (exclusive)
+            double d = m_rand.nextDouble(); // between 0 (inclusive) and 1 (exclusive)
             double regLngMin = LNG_MIN + d * (LNG_MAX - LNG_MIN);
-            d = rand.nextDouble();
+            d = m_rand.nextDouble();
             double regLatMin = LAT_MIN + d * (LAT_MAX - LAT_MIN);
 
-            // Region between 100 and 500 yards.
-            d = rand.nextDouble();
+            // Sides of region are between 100 and 500 yards.
+            d = m_rand.nextDouble();
             double lngSideLength = MIN_SIDE_LENGTH + d * (MAX_SIDE_LENGTH - MIN_SIDE_LENGTH);
-            d = rand.nextDouble();
+            d = m_rand.nextDouble();
             double latSideLength = MIN_SIDE_LENGTH + d * (MAX_SIDE_LENGTH - MIN_SIDE_LENGTH);
 
             List<GeographyPointValue> ring = new ArrayList<GeographyPointValue>();
@@ -103,18 +105,38 @@ public class BidGenerator implements Runnable {
         return regions;
     }
 
-    /** Just to test. Remove this later. */
-    void generateOneBid() throws Exception {
-        TimestampType now = new TimestampType();
-        TimestampType later = new TimestampType(now.getTime() + 5 * 60 * 1000000);
-        m_client.callProcedure("bids.Insert", 0, 0, m_bidRegions.get(0), now, later, 1.25);
-
-        System.out.println("Successfully inserted test row!");
-    }
-
+    /**
+     * Generate one new row for the bids table, and insert it.
+     * Also delete any expired bids.
+     */
     @Override
     public void run() {
-        // Code to generate bids periodically will go here.
+        long bidId = m_bidId++;
+        long advertiserId = m_rand.nextLong() % NUM_ADVERTISERS;
+        GeographyValue bidRegion = m_bidRegions.get(m_rand.nextInt(m_bidRegions.size()));
+        TimestampType bidStartTime = new TimestampType();
+        TimestampType bidEndTime = new TimestampType(
+                bidStartTime.getTime() + AdBrokerBenchmark.BID_DURATION_SECONDS * 1000000);
+
+        // Amount of bid: at least a tenth of a penny, up to a max of $1.001.
+        double amount = 0.001 + m_rand.nextDouble();
+        DecimalFormat df = new DecimalFormat("#.###");
+        amount = Double.valueOf(df.format(amount));
+
+        try {
+            m_client.callProcedure(new NullCallback(), "bids.Insert",
+                    bidId,
+                    advertiserId,
+                    bidRegion,
+                    bidStartTime,
+                    bidEndTime,
+                    amount);
+
+            m_client.callProcedure(new NullCallback(), "DeleteExpiredBids");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void dumpRegions() {

@@ -23,9 +23,13 @@
 
 package geospatial;
 
+import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
@@ -68,10 +72,17 @@ public class AdBrokerBenchmark {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
+    final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+
     // Some parameters.  These may eventually be configurable.
 
+    // Each bid lasts for 5 seconds and there are 10 new bids per second.
+    // There will be 50 active bids in steady state after ramping up
+    static final int BID_DURATION_SECONDS = 5;
+    static final int BID_FREQUENCY_PER_SECOND = 10;
+
     // Each generated bid will have this many different regions to choose from.
-    static final int NUM_BID_REGIONS = 50;
+    static final int NUM_BID_REGIONS = BID_DURATION_SECONDS * BID_FREQUENCY_PER_SECOND;
 
     // A bounding box that will contain all the bid regions, and the points
     // corresponding to devices.  This is a 2-mile-by-2-mile square centered at (0, 0)
@@ -91,9 +102,6 @@ public class AdBrokerBenchmark {
 
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 20;
-
-        @Option(desc = "Warmup duration in seconds.")
-        int warmup = 2;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -116,7 +124,6 @@ public class AdBrokerBenchmark {
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
-            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
         }
@@ -288,6 +295,30 @@ public class AdBrokerBenchmark {
         client.writeSummaryCSV(stats, config.statsfile);
     }
 
+    private void shutdown() {
+        scheduler.shutdown();
+
+        // cancel periodic stats printing
+        timer.cancel();
+
+        try {
+            scheduler.awaitTermination(60, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        try {
+            // block until all outstanding txns return
+            client.drain();
+            // close down the client connections
+            client.close();
+        }
+        catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -302,31 +333,23 @@ public class AdBrokerBenchmark {
         // connect to one or more servers, loop until success
         connect(client, config.servers);
 
-        // initialize using synchronous call
-        System.out.println("\nCreating Bid Generator\n");
-        BidGenerator bidGenerator = new BidGenerator(config);
-        bidGenerator.generateOneBid();
-
         System.out.print("\n\n" + HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
-        System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            Thread.sleep(1000);
-            // Do something here.
-        }
-
-        // reset the stats after warmup
+        // reset the stats
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
+
+        // Start bid generator thread.
+        System.out.println("\nStarting bid generator\n");
+        BidGenerator bidGenerator = new BidGenerator(config, client);
+        long usDelay = (long) ((1.0 / BID_FREQUENCY_PER_SECOND) * 1000000.0);
+        scheduler.scheduleWithFixedDelay(bidGenerator, 0, usDelay, TimeUnit.MICROSECONDS);
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -337,17 +360,9 @@ public class AdBrokerBenchmark {
             // Do something here.
         }
 
-        // cancel periodic stats printing
-        timer.cancel();
-
-        // block until all outstanding txns return
-        client.drain();
-
-        // print the summary results
         printResults();
 
-        // close down the client connections
-        client.close();
+        shutdown();
     }
 
     /**
