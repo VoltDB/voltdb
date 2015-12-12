@@ -75,10 +75,9 @@
 using namespace std;
 using namespace voltdb;
 
-static void collectAllTableTuples(boost::unordered_set<uint64_t>& tupleAddressSet, Table* table, TableIndex* index)
+static void collectAllTableTuples(boost::unordered_set<uint64_t>& tupleAddressSet, Table* table)
 {
     assert(table != NULL);
-    assert(index != NULL);
 
     typedef std::pair<boost::unordered_set<uint64_t>::iterator, bool> Result;
 
@@ -86,9 +85,8 @@ static void collectAllTableTuples(boost::unordered_set<uint64_t>& tupleAddressSe
     tupleAddressSet.reserve(count);
 
     TableTuple tuple(table->schema());
-    IndexCursor indexCursor(index->getTupleSchema());
-    index->moveToEnd(true, indexCursor);
-    while (!(tuple = index->nextValue(indexCursor)).isNullTuple()) {
+    TableIterator iterator = table->iterator();
+    while (iterator.next(tuple)) {
         Result result = tupleAddressSet.insert((uint64_t) tuple.address());
         assert(result.second == true);
         // to get around 'unused variable' warning
@@ -329,7 +327,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     boost::unordered_set<uint64_t> innerNoMatchTuples;
     if (m_joinType == JOIN_TYPE_FULL) {
         // Prepopulate the set with all inner tuples
-        collectAllTableTuples(innerNoMatchTuples, inner_table, index);
+        collectAllTableTuples(innerNoMatchTuples, inner_table);
     }
 
     TableTuple join_tuple;
