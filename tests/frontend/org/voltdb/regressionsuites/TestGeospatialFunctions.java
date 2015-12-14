@@ -46,11 +46,12 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * without repeating ourselves. This class holds geometry values for us for
      * inserting and for testing later on.
      */
-    private static class Borders {
-        Borders(long pk, String name, GeographyValue region) {
+    private static class Border {
+        Border(long pk, String name, String message, GeographyValue region) {
             m_pk = pk;
             m_name = name;
             m_region = region;
+            m_message = message;
         }
 
         public final long getPk() {
@@ -65,29 +66,36 @@ public class TestGeospatialFunctions extends RegressionSuite {
             return m_region;
         }
 
+        public final String getMessage() {
+            return m_message;
+        }
+
         private final long m_pk;
         private final String m_name;
         private final GeographyValue m_region;
+        private final String m_message;
     }
 
     /*
      * This is the array of borders we know about. We will insert these
      * borders and then extract them.
      */
-    private static Borders borders[] = {
-        new Borders(0, "Colorado", new GeographyValue("POLYGON(("
-                                                  + "-102.052 41.002, "
-                                                  + "-109.045 41.002,"
-                                                  + "-109.045 36.999,"
-                                                  + "-102.052 36.999,"
-                                                  + "-102.052 41.002))")),
-        new Borders(1, "Wyoming", new GeographyValue("POLYGON(("
-                                                + "-104.061 44.978, "
-                                                + "-111.046 44.978, "
-                                                + "-111.046 40.998, "
-                                                + "-104.061 40.998, "
-                                                + "-104.061 44.978))")),
-       new Borders(2, "Colorado with a hole around Denver",
+    private static Border borders[] = {
+        new Border(0, "Colorado", null,
+                   new GeographyValue("POLYGON(("
+                                      + "-102.052 41.002, "
+                                      + "-109.045 41.002,"
+                                      + "-109.045 36.999,"
+                                      + "-102.052 36.999,"
+                                      + "-102.052 41.002))")),
+        new Border(1, "Wyoming", null,
+                   new GeographyValue("POLYGON(("
+                                      + "-104.061 44.978, "
+                                      + "-111.046 44.978, "
+                                      + "-111.046 40.998, "
+                                      + "-104.061 40.998, "
+                                      + "-104.061 44.978))")),
+       new Border(2, "Colorado with a hole around Denver", null,
                new GeographyValue("POLYGON("
                                   + "(-102.052 41.002, "
                                   + "-109.045 41.002,"
@@ -95,18 +103,19 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                   + "-102.052 36.999,"
                                   + "-102.052 41.002), "
                                   + "(-104.035 40.240, "
-                                  + "-105.714 40.240, "
-                                  + "-105.714 39.188, "
                                   + "-104.035 39.188,"
+                                  + "-105.714 39.188, "
+                                  + "-105.714 40.240, "
                                   + "-104.035 40.240))")),
-       new Borders(3, "Wonderland", null)
+       new Border(3, "Wonderland", null, null)
     };
 
-    private static void populateBorders(Client client, Borders borders[]) throws Exception {
-        for (Borders b : borders) {
+    private static void populateBorders(Client client, Border borders[]) throws Exception {
+        for (Border b : borders) {
             client.callProcedure("borders.Insert",
                                  b.getPk(),
                                  b.getName(),
+                                 b.getMessage(),
                                  b.getRegion());
         }
     }
@@ -149,7 +158,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         populateBorders(client, borders);
     }
 
-    public void notestContains() throws Exception {
+    public void testContains() throws Exception {
         Client client = getClient();
 
         populateTables(client);
@@ -174,7 +183,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     }
 
-    public void notestPolygonInteriorRings() throws Exception {
+    public void testPolygonInteriorRings() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -189,7 +198,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 }, vt);
     }
 
-    public void notestPolygonNumberOfPoints() throws Exception {
+    public void testPolygonNumberOfPoints() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -227,7 +236,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
     }
 
-    public void notestLongitudeLatitude() throws Exception {
+    public void testLongitudeLatitude() throws Exception {
         Client client = getClient();
         populateTables(client);
 
@@ -270,7 +279,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
             }, vt);
     }
 
-    public void notestPolygonFloatingPrecision() throws Exception {
+    public void testPolygonFloatingPrecision() throws Exception {
         final double EPSILON = -1.0;
         Client client = getClient();
         populateTables(client);
@@ -287,7 +296,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                         EPSILON);
     }
 
-    public void notestPolygonCentroidAndArea() throws Exception {
+    public void testPolygonCentroidAndArea() throws Exception {
         // The AREA_EPSILON here is 1.0e-1, because the values are in the range
         // 1.0e11, and we expect 1.0e12 precision.
         final double AREA_EPSILON=1.0e-1;
@@ -322,7 +331,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 }, vt, CENTROID_EPSILON);
     }
 
-    public void notestPolygonPointDistance() throws Exception {
+    public void testPolygonPointDistance() throws Exception {
         // The distances we consider are all in the thousands of square
         // meters.  We expect 1.0e-12 precision, so that's 1.0e-8 relative
         // precision.  Note that we have determined empirically that
@@ -471,7 +480,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *  X------------------------------X
      */
     private static String SHARED_INNER_VERTICES
-      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .9 .1, .1 .1), (.5 .1, .5 .9, .9 .9, .9 .1, .5 .1))";
+        = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .9 .1, .1 .1), (.5 .1, .5 .9, .9 .9, .9 .1, .5 .1))";
     /*
      *
      *  X------------------------------X
@@ -484,6 +493,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
      */
     private static String SHARED_INNER_EDGES
       = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .5 .1, .1 .1), (.5 .2, .5 .8, .9 .8, .9 .2, .5 .2))";
+    // The collinear polygons are currently legal.  But they should not be.
+    // So we are going to leave them here until we can figure out what to do
+    // with them.
     /*
      * X-----X-----X
      */
@@ -498,97 +510,103 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * X-----X-----X-----X----X
      */
     private static String COLLINEAR5
-      = "POLYGON((0 0, 10, 2 , 3 0, 4 0, 0 0))";
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR6
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR7
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR8
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR9
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 8 0, 0 0))";
     /*
      * X-----X-----X-----X----X----X----X----X----X----X
      */
+    @SuppressWarnings("unused")
     private static String COLLINEAR10
       = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 8 0, 9 0, 0 0))";
     /*
-     * X------------------------------X
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * |                              |
-     * X------------------------------X
+     * It's hard to draw this with ascii art, but the outer shell
+     * is a rectangle, and the would-be holes are triangles.  The
+     * first one, (33 67, 67 67, 50 33, 33 67), points down, and
+     * the second one, (33, 50 67, 67 33, 33 33), points up.  These
+     * two intersect, which is why this is not valid.
      */
     private static String INTERSECTING_HOLES
         = "POLYGON((0 0, 80 0, 80 80, 0 80, 0 0),"
-               +  "(33 67, 50 33, 67 67, 33 67),"
+               +  "(33 67, 67 67, 50 33, 33 67),"
                +  "(33 33, 50 67, 67 33, 33 33))";
+    /*
+     * It's not easy to see this in ascii art, but the hole
+     * here leaks out of the shell to the top and right.
+     */
     private static String OUTER_INNER_INTERSECT
        = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0),"
               +  "(.1 .1, .1 1.1, 1.1 1.1, 1.1 .1, .1 .1)"
-               + ")";
+              + ")";
+
+    /*
+     * These are two nested Clockwise (Sunwise) rectangles.
+     */
     private static String TWO_NESTED_SUNWISE
-       = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
-              +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"
-               + ")";
-    private static String TWO_NESTED_WIDDERSHINS
        = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
               +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
-               + ")";
+              + ")";
 
-
-   private static Borders invalidBorders[] = {
-       new Borders(100, "CrossedEdges",        GeographyValue.geographyValueFromText(CROSSED_EDGES)),
-       new Borders(101, "Sunwise",             GeographyValue.geographyValueFromText(CW_EDGES)),
-       new Borders(102, "MultiPolygon",        GeographyValue.geographyValueFromText(MULTI_POLYGON)),
-       new Borders(103, "SharedInnerVertices", GeographyValue.geographyValueFromText(SHARED_INNER_VERTICES)),
-       new Borders(104, "SharedInnerEdges",    GeographyValue.geographyValueFromText(SHARED_INNER_EDGES)),
-       new Borders(105, "IntersectingHoles",   GeographyValue.geographyValueFromText(INTERSECTING_HOLES)),
-       new Borders(106, "OuterInnerIntersect", GeographyValue.geographyValueFromText(OUTER_INNER_INTERSECT)),
-       new Borders(107, "TwoNestedSunwise",    GeographyValue.geographyValueFromText(TWO_NESTED_SUNWISE)),
-       new Borders(108, "TwoNestedWiddershins",GeographyValue.geographyValueFromText(TWO_NESTED_WIDDERSHINS)),
     /*
-     * These are apparently legal. Should they be?
+     * These are two nested CCW (Widdershins) rectangles.
      */
-     // new Borders(205, "Collinear3",          GeographyValue.geographyValueFromText(COLLINEAR3)),
-     // new Borders(206, "Collinear4",          GeographyValue.geographyValueFromText(COLLINEAR4)),
-     // new Borders(207, "Collinear5",          GeographyValue.geographyValueFromText(COLLINEAR5)),
-     // new Borders(208, "Collinear6",          GeographyValue.geographyValueFromText(COLLINEAR6)),
-     // new Borders(209, "Collinear7",          GeographyValue.geographyValueFromText(COLLINEAR7)),
-     // new Borders(210, "Collinear8",          GeographyValue.geographyValueFromText(COLLINEAR8)),
-     // new Borders(211, "Collinear9",          GeographyValue.geographyValueFromText(COLLINEAR9)),
-     // new Borders(212, "Collinear10",         GeographyValue.geographyValueFromText(COLLINEAR10)),
+    private static String TWO_NESTED_WIDDERSHINS
+    = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
+           +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"
+           + ")";
+
+   private static Border invalidBorders[] = {
+       new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
+                  GeographyValue.geographyValueFromText(CROSSED_EDGES)),
+       new Border(101, "Sunwise", "Loop 0 encloses more than half the sphere",
+                  GeographyValue.geographyValueFromText(CW_EDGES)),
+       new Border(102, "MultiPolygon", "Polygons can have only one shell",
+                  GeographyValue.geographyValueFromText(MULTI_POLYGON)),
+       new Border(103, "SharedInnerVertices", "Loop 1 crosses loop 2",
+                  GeographyValue.geographyValueFromText(SHARED_INNER_VERTICES)),
+       new Border(104, "SharedInnerEdges", "Loop 1 crosses loop 2",
+                  GeographyValue.geographyValueFromText(SHARED_INNER_EDGES)),
+       new Border(105, "IntersectingHoles", "Loop 1 crosses loop 2",
+                  GeographyValue.geographyValueFromText(INTERSECTING_HOLES)),
+       new Border(106, "OuterInnerIntersect", "Loop 1 crosses loop 2",
+                  GeographyValue.geographyValueFromText(OUTER_INNER_INTERSECT)),
+       new Border(108, "TwoNestedSunwise", "Loop 0 encloses more than half the sphere",
+                  GeographyValue.geographyValueFromText(TWO_NESTED_SUNWISE)),
+       new Border(109, "TwoNestedWiddershins", "Loop 0 encloses more than half the sphere",
+                  GeographyValue.geographyValueFromText(TWO_NESTED_WIDDERSHINS)),
+      /*
+       * These are apparently legal. Should they be?
+       */
+    // new Border(205, "Collinear3", null,          GeographyValue.geographyValueFromText(COLLINEAR3)),
+    // new Border(206, "Collinear4", null,          GeographyValue.geographyValueFromText(COLLINEAR4)),
+    // new Border(207, "Collinear5", null,          GeographyValue.geographyValueFromText(COLLINEAR5)),
+    // new Border(208, "Collinear6", null,          GeographyValue.geographyValueFromText(COLLINEAR6)),
+    // new Border(209, "Collinear7", null,          GeographyValue.geographyValueFromText(COLLINEAR7)),
+    // new Border(210, "Collinear8", null,          GeographyValue.geographyValueFromText(COLLINEAR8)),
+    // new Border(211, "Collinear9", null,          GeographyValue.geographyValueFromText(COLLINEAR9)),
+    // new Border(212, "Collinear10", null,         GeographyValue.geographyValueFromText(COLLINEAR10)),
     };
 
     public void testInvalidPolygons() throws Exception {
@@ -605,6 +623,19 @@ public class TestGeospatialFunctions extends RegressionSuite {
             sep = ", ";
         }
         assertEquals(sb.toString(), 0, rowCount);
+    }
+
+    public void testInvalidPolygonReasons() throws Exception {
+        Client client = getClient();
+        populateBorders(client, invalidBorders);
+
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, invalid_polygon_reason(region), message from borders").getResults()[0];
+        while (vt.advanceRow()) {
+            assertTrue(String.format("Expected error message containing \"%s\" but got \"%s\"",
+                                       vt.getString(3),
+                                       vt.getString(2)),
+                         vt.getString(2).contains(vt.getString(2)));
+        }
     }
 
     static public junit.framework.Test suite() {
@@ -625,6 +656,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "CREATE TABLE borders (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  name VARCHAR(64),\n"
+                + "  message VARCHAR(64),\n"
                 + "  region GEOGRAPHY\n"
                 + ");\n"
                 + "\n"

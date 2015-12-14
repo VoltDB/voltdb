@@ -123,7 +123,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     return returnValue;
 }
 
-static void readLoop(const std::string &wkt,
+static void readLoop(bool is_shell,
+                     const std::string &wkt,
                      Tokenizer::iterator &it,
                      const Tokenizer::iterator &end,
                      S2Loop *loop)
@@ -179,12 +180,17 @@ static void readLoop(const std::string &wkt,
     // implicit, while in WKT it is explicit.  Remove the closing
     // vertex here to reflect this.
     points.pop_back();
-
+    // The first is a shell.  All others are holes.  We need to reverse
+    // the order of the vertices for holes.
+    if (!is_shell) {
+        std::reverse(points.begin(), points.end());
+    }
     loop->Init(points);
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
 {
+    bool is_shell = true;
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
     }
@@ -211,7 +217,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     std::vector<std::unique_ptr<S2Loop> > loops;
     while (it != end) {
         loops.push_back(std::unique_ptr<S2Loop>(new S2Loop()));
-        readLoop(wkt, it, end, loops.back().get());
+        readLoop(is_shell, wkt, it, end, loops.back().get());
+        // Only the first loop is a shell.
+        is_shell = false;
         length += Loop::serializedLength(loops.back()->num_vertices());
         if (*it == ",") {
             ++it;
@@ -369,38 +377,64 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
     return retVal;
 }
 
-static bool isMultiPolygon(const Polygon &poly) {
-	auto nloops = poly.num_loops();
-	int nouters = 0;
-	for (int idx = 0; idx < nloops; idx += 1) {
-		S2Loop *loop = poly.loop(idx);
-		switch (loop->depth()) {
-		case 0:
-			nouters += 1;
-			break;
-		case 1:
-			break;
-		default:
-			return false;
-		}
-	}
-	return nouters == 1;
+static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
+    auto nloops = poly.num_loops();
+    int nouters = 0;
+    for (int idx = 0; idx < nloops; idx += 1) {
+        S2Loop *loop = poly.loop(idx);
+        switch (loop->depth()) {
+        case 0:
+            nouters += 1;
+            break;
+        case 1:
+            break;
+        default:
+            VMLOG(2, msg) << "Polygons can only be shells or holes." << std::endl;
+            return false;
+        }
+        if (!loop->IsNormalized(msg)) {
+            return false;
+        }
+    }
+    if (nouters != 1) {
+        VMLOG(2, msg) << "Polygons can have only one shell.";
+    }
+    return nouters == 1;
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
-	assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
-	if (isNull()) {
-		return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
-	}
-	// Be optimistic.
-	bool returnval = true;
-	// Extract the polygon and check its validity.
-	Polygon poly;
-	poly.initFromGeography(getGeography());
-	if (!poly.IsValid()
-			|| !isMultiPolygon(poly)) {
-	    returnval = false;
-	}
-	return ValueFactory::getBooleanValue(returnval);
+    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
+    }
+    // Be optimistic.
+    bool returnval = true;
+    // Extract the polygon and check its validity.
+    Polygon poly;
+    poly.initFromGeography(getGeography());
+    if (!poly.IsValid()
+            || !isMultiPolygon(poly)) {
+        returnval = false;
+    }
+    return ValueFactory::getBooleanValue(returnval);
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
+    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_VARCHAR);
+    }
+    // Extract the polygon and check its validity.
+    std::stringstream msg;
+    Polygon poly;
+    poly.initFromGeography(getGeography());
+    if (poly.IsValid(&msg)) {
+        isMultiPolygon(poly, &msg);
+    }
+    std::string res (msg.str());
+    if (res.size() == 0) {
+        res = std::string("Valid Polygon");
+    }
+    return getTempStringValue(res.c_str(),res.length());
 }
 } // end namespace voltdb

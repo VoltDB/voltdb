@@ -22,6 +22,7 @@ import java.io.StreamTokenizer;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -110,23 +111,30 @@ public class GeographyValue {
         sb.append("POLYGON(");
 
         boolean isFirstLoop = true;
-        for (List<XYZPoint> loop : m_loops) {
-            if (isFirstLoop) {
-                isFirstLoop = false;
-            }
-            else {
+        // S2 will reorder the loops in depth-first order.  This will not be
+        // the original order.  However, we know that the shell, which is the
+        // top of the tree, will be last in the depth-first order.   So, we
+        // create the string in loop-reverse order.
+        for (int oidx = m_loops.size() - 1; 0 <= oidx; oidx -= 1) {
+            List<XYZPoint> loop = m_loops.get(oidx);
+            if (!isFirstLoop) {
                 sb.append(", ");
             }
 
             sb.append("(");
-            for (XYZPoint xyz : loop) {
+            int startIdx = (isFirstLoop ? 0 : loop.size()-1);
+            int endIdx = (isFirstLoop ? loop.size() : -1);
+            int increment = (isFirstLoop ? 1 : -1);
+            for (int idx = startIdx; idx != endIdx; idx += increment) {
+                XYZPoint xyz = loop.get(idx);
                 sb.append(xyz.toGeographyPointValue().formatLngLat());
                 sb.append(", ");
             }
 
-            // Repeat the first vertex to close the loop as WKT requires.
-            sb.append(loop.get(0).toGeographyPointValue().formatLngLat());
+            // Repeat the start vertex to close the loop as WKT requires.
+            sb.append(loop.get(startIdx).toGeographyPointValue().formatLngLat());
             sb.append(")");
+            isFirstLoop = false;
         }
 
         sb.append(")");
@@ -441,6 +449,7 @@ public class GeographyValue {
 
         List<XYZPoint> currentLoop = null;
         List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
+        boolean is_shell = true;
         try {
             int token = tokenizer.nextToken();
             if (token != StreamTokenizer.TT_WORD
@@ -490,7 +499,14 @@ public class GeographyValue {
                     // perform basic validation of loop
                     diagnoseLoop(currentLoop, msgPrefix);
                     currentLoop.remove(currentLoop.size() - 1);
-
+                    // Following the OGC standard, the first loop should be CCW, and subsequent loops
+                    // should be CW.  But we will be building the S2 polygon here,
+                    // and S2 wants everything to be CCW.  So, we need to
+                    // reverse all but the first loop.
+                    if (!is_shell) {
+                        Collections.reverse(currentLoop);
+                    }
+                    is_shell = false;
                     loops.add(currentLoop);
                     currentLoop = null;
 

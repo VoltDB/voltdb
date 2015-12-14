@@ -368,8 +368,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
             break;
         case FUNC_VOLT_VALIDATE_POLYGON:
-        	ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
-        	break;
+            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_INVALID_REASON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
+            break;
         default:
             return NULL;
         }

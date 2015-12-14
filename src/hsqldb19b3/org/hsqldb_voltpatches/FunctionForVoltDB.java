@@ -142,6 +142,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20041;    // distance between point and point
         static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20042;    // distance between polygon and point
         static final int FUNC_VOLT_VALIDATE_POLYGON             = 20043;    // Polygon validation.
+        static final int FUNC_VOLT_POLYGON_INVALID_REASON       = 20044;    // Reason a polygon may be invalid.
 
 
         private static final FunctionId[] instances = {
@@ -286,6 +287,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("invalid_polygon_reason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };

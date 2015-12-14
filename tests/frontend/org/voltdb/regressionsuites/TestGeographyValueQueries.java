@@ -51,9 +51,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
             + "-66.371 18.476, "
             + "-64.751 32.305), "
             + "(-67.448 27.026, "
-            + "-68.992 27.026, "
-            + "-68.992 25.968, "
             + "-67.448 25.968, "
+            + "-68.992 25.968, "
+            + "-68.992 27.026, "
             + "-67.448 27.026))";
 
     // (Useful for testing comparisons since it has the same number of vertices as
@@ -534,8 +534,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 "    POLYGON  (  (  -64.751  32.305  ,  -80.437  25.244  ,  -66.371  18.476  ,  -64.751  32.305  )  )  "));
 
         // Parsing with more than one loop should work the same.
+        // However, we need to understand that the loops may be ordered in a different order.
+        // after they have gone through S2.
         expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-67.448 27.026, -68.992 27.026, -68.992 25.968, -67.448 25.968, -67.448 27.026))";
+                         + "(-67.448 27.026, -68.992 27.026, -68.992 25.968, -67.448 25.968, -67.448 27.026))";
 
         assertEquals(expected, wktRoundTrip(client,
                 "PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n,-66.371 18.476,-64.751\t\t\t32.305   ),\t "
