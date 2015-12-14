@@ -97,6 +97,7 @@ public class SnapshotUtil {
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
+    public static final String JSON_CHECK_CLUSTER_ID = "checkClusterId";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -150,7 +151,8 @@ public class SnapshotUtil {
         InstanceId instanceId,
         long timestamp,
         long clusterCreateTime,
-        int newPartitionCount)
+        int newPartitionCount,
+        int clusterId)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -167,6 +169,7 @@ public class SnapshotUtil {
             try {
                 stringer.object();
                 stringer.key("version").value(1);
+                stringer.key("clusterid").value(clusterId);
                 stringer.key("txnId").value(txnId);
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));

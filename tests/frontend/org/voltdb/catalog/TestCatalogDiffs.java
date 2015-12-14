@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import junit.framework.TestCase;
-
 import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -40,6 +38,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestCatalogDiffs extends TestCase {
 
@@ -335,14 +335,14 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "adminstartup1.jar",
-                1, 1, 0, 1000, true));
+                1, 1, 0, 1000, true, 0));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "adminstartup1.jar");
 
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "adminstartup2.jar",
-                1, 1, 0, 1000, false)); // setting adminstartup to false is the test
+                1, 1, 0, 1000, false, 0)); // setting adminstartup to false is the test
         Catalog catUpdated = catalogForJar(testDir + File.separator + "adminstartup2.jar");
 
         verifyDiff(catOriginal, catUpdated);
