@@ -69,6 +69,7 @@ class AddDropTableTest : public Test {
         std::string initialCatalog =
           "add / clusters cluster\n"
           "add /clusters#cluster databases database\n"
+          "set /clusters#cluster/databases#database isActiveActiveDRed false\n"
           "add /clusters#cluster/databases#database programs program\n";
 
         bool loadResult = m_engine->loadCatalog( -2, initialCatalog);

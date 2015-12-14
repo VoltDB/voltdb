@@ -17,14 +17,11 @@
 
 package org.voltdb.importer;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +34,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
-import org.voltdb.ImportHandler;
+import org.voltdb.ImporterServerAdapterImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
 
@@ -52,54 +49,44 @@ public class ImportProcessor implements ImportDataProcessor {
     private final Framework m_framework;
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
-    private final ImporterStatsCollector m_importStatsCollector;
+    private final ImporterServerAdapter m_importServerAdapter;
 
     public ImportProcessor(int myHostId, ChannelDistributer distributer, Framework framework, ImporterStatsCollector statsCollector)
             throws BundleException {
         m_framework = framework;
         m_distributer = distributer;
-        m_importStatsCollector = statsCollector;
+        m_importServerAdapter = new ImporterServerAdapterImpl(statsCollector);
     }
 
     //This abstracts OSGi based and class based importers.
     public class BundleWrapper {
-        public final Bundle m_bundle;
-        public final Properties m_properties;
-        public final ImportHandlerProxy m_handlerProxy;
-        private ImportHandler m_handler;
-        private ChannelDistributer m_channelDistributer;
+        private final Bundle m_bundle;
+        private AbstractImporterFactory m_importerFactory;
+        private ImporterLifeCycleManager m_importerTypeMgr;
 
-        public BundleWrapper(ImportHandlerProxy handler, Properties properties, Bundle bundle) {
+        public BundleWrapper(Object o, Bundle bundle) {
             m_bundle = bundle;
-            m_handlerProxy = handler;
-            m_properties = properties;
+            m_importerFactory = (AbstractImporterFactory) o;
+            m_importerFactory.setImportServerAdapter(m_importServerAdapter);
+            m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory);
         }
 
-        public void setChannelDistributer(ChannelDistributer distributer) {
-            m_channelDistributer = distributer;
+        public String getImporterType() {
+            return m_importerFactory.getTypeName();
         }
 
-        public void setHandler(ImportHandler handler) throws Exception {
-            Preconditions.checkState((m_handler == null), "ImportHandler can only be set once.");
-            m_handler = handler;
-            m_handlerProxy.setHandler(handler);
-        }
-
-        public ImportHandler getHandler() {
-            return m_handler;
+        public void configure(Properties props) {
+            m_importerTypeMgr.configure(props);
         }
 
         public void stop() {
             try {
                 //Handler can be null for initial period if shutdown come quickly.
-                if (m_handler != null) {
-                    m_handler.stop();
+                if (m_importerFactory != null) {
+                    m_importerTypeMgr.stop(m_distributer);
                 }
                 if (m_bundle != null) {
                     m_bundle.stop();
-                }
-                if (m_channelDistributer != null) {
-                    m_channelDistributer.registerChannels(m_handlerProxy.getName(), new HashSet<URI>());
                 }
             } catch (Exception ex) {
                 m_logger.error("Failed to stop the import bundles.", ex);
@@ -115,7 +102,6 @@ public class ImportProcessor implements ImportDataProcessor {
 
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
-            ImportHandlerProxy importHandlerProxy = null;
             if (wrapper == null) {
                 if (moduleType.equalsIgnoreCase("osgi")) {
 
@@ -130,8 +116,7 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
                     Object o = bundle.getBundleContext().getService(reference);
-                    importHandlerProxy = (ImportHandlerProxy )o;
-                    wrapper = new BundleWrapper(importHandlerProxy, properties, bundle);
+                    wrapper = new BundleWrapper(o, bundle);
                 } else {
                     //Class based importer.
                     Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
@@ -140,19 +125,18 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
 
-                    importHandlerProxy = (ImportHandlerProxy )reference.newInstance();
-                     wrapper = new BundleWrapper(importHandlerProxy, properties, null);
+                     wrapper = new BundleWrapper(reference.newInstance(), null);
                 }
-                String name = importHandlerProxy.getName();
+                String name = wrapper.getImporterType();
                 if (name == null || name.trim().length() == 0) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                importHandlerProxy.configure(properties);
+                wrapper.configure(properties);
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             } else {
-                wrapper.m_handlerProxy.configure(properties);
+                wrapper.configure(properties);
             }
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
@@ -168,25 +152,11 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        ImportHandler importHandler = new ImportHandler(bw.m_handlerProxy, m_importStatsCollector);
-                        //Set the internal handler
-                        bw.setHandler(importHandler);
-                        if (!bw.m_handlerProxy.isRunEveryWhere()) {
-                            //This is a distributed and fault tolerant importer so get the resources.
-                            Set<URI> allResources = bw.m_handlerProxy.getAllResponsibleResources();
-                            m_logger.info("All Available Resources for " + bw.m_handlerProxy.getName() + " Are: " + allResources);
-
-                            bw.setChannelDistributer(m_distributer);
-                            //Register callback
-                            m_distributer.registerCallback(bw.m_handlerProxy.getName(), bw.m_handlerProxy);
-                            m_distributer.registerChannels(bw.m_handlerProxy.getName(), allResources);
-                        }
-                        importHandler.readyForData();
-                        m_logger.info("Importer started: " + bw.m_handlerProxy.getName());
+                        bw.m_importerTypeMgr.readyForData(m_distributer);
                     } catch (Exception ex) {
                         //Should never fail. crash.
                         VoltDB.crashLocalVoltDB("Import failed to set Handler", true, ex);
-                        m_logger.error("Failed to start the import handler: " + bw.m_handlerProxy.getName(), ex);
+                        m_logger.error("Failed to start the import handler: " + bw.m_importerFactory.getTypeName(), ex);
                     }
                 }
             }
@@ -205,7 +175,7 @@ public class ImportProcessor implements ImportDataProcessor {
                         try {
                             bw.stop();
                         } catch (Exception ex) {
-                            m_logger.error("Failed to stop the import handler: " + bw.m_handlerProxy.getName(), ex);
+                            m_logger.error("Failed to stop the import handler: " + bw.m_importerFactory.getTypeName(), ex);
                         }
                     }
                     m_bundles.clear();
