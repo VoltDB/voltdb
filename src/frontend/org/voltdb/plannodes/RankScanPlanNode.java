@@ -30,6 +30,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.RankExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -57,7 +58,9 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
 
     public RankScanPlanNode(AbstractScanPlanNode scan) {
         m_isRankScan = false;
+        m_rankStartExpression = null;
         m_rankStartType = IndexLookupType.INVALID;
+        m_rankEndExpression = null;
         m_rankEndType = IndexLookupType.INVALID;
 
         // copy inlined nodes
@@ -86,22 +89,6 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    protected String explainPlanForNode(String indent) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Rank SCAN of \"").append(m_targetTableName).append("\" using ");
-        sb.append(m_rankExpression.explain(getTableNameForExplain()))
-        .append("\n" + indent + "scan matches for RANK value from ")
-        .append(m_rankStartExpression.explain(m_targetTableName));
-
-        if (m_rankEndExpression != null) {
-            sb.append(" to ").append(m_rankEndExpression.explain(m_targetTableName));
-        }
-
-        sb.append(explainPredicate("\n" + indent + " filter by "));
-        return sb.toString();
-    }
-
-    @Override
     public void generateOutputSchema(Database db)
     {
         super.generateOutputSchema(db);
@@ -113,7 +100,14 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
     }
 
     private void swapStartWithEnd() {
+        AbstractExpression tmpExpr = m_rankStartExpression;
+        IndexLookupType tmpType = m_rankStartType;
 
+        m_rankStartExpression = m_rankEndExpression;
+        m_rankStartType = m_rankEndType;
+
+        m_rankEndExpression = tmpExpr;
+        m_rankEndType = tmpType;
     }
 
     private boolean setupRankScanNode(SeqScanPlanNode seqScan) {
@@ -159,7 +153,7 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
     }
 
     private int findRankExpressionComparison(List<AbstractExpression> expressList, boolean forStart) {
-        int hasRank = -1;
+        int NOT_RANK_CANDIDATE = -1;
 
         for (int i = 00; i < expressList.size(); i++) {
             AbstractExpression ex = expressList.get(i);
@@ -169,7 +163,7 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
             if (forStart) {
                 m_rankStartType = setupLookupType(ce.getExpressionType());
                 if (m_rankStartType == IndexLookupType.INVALID) {
-                    return hasRank;
+                    continue;
                 }
 
                 if (ce.getLeft() instanceof RankExpression) {
@@ -179,13 +173,37 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
                     m_rankExpression = (RankExpression) ce.getRight();
                     m_rankStartExpression = ce.getLeft();
                 } else {
-                    return hasRank;
+                    continue;
                 }
+
+                // temporary feature guards
+                // The partition by is not supported right now
+                assert(m_rankExpression != null);
+                if (m_rankExpression.getPartitionbySize() > 0) {
+                    continue;
+                }
+
+                // The descending is not supported right now
+                if (m_rankExpression.isDecending()) {
+                    continue;
+                }
+
+                // The rankStart and rankEnd has to be constant, no tuple involved
+                if (! ExpressionUtil.findAllExpressionsOfClass(
+                        m_rankStartExpression, TupleValueExpression.class).isEmpty()) {
+                    continue;
+                }
+
+                // The partition by order by has to cover all the index definition
+                if (! m_rankExpression.areAllIndexColumnsCovered()) {
+                    continue;
+                }
+
                 m_targetTableName = m_rankExpression.getTableName();
             } else {
                 m_rankEndType = setupLookupType(ce.getExpressionType());
                 if (m_rankEndType == IndexLookupType.INVALID) {
-                    return hasRank;
+                    continue;
                 }
 
                 RankExpression rankExpr = null;
@@ -205,12 +223,18 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
                     // in future, iterate them and find the best rank expression to use
                     continue;
                 }
+
+                if (! ExpressionUtil.findAllExpressionsOfClass(
+                        m_rankEndExpression, TupleValueExpression.class).isEmpty()) {
+                    continue;
+                }
             }
+
             // return the ith index for the matched comparison expression
             return i;
         }
 
-        return hasRank;
+        return NOT_RANK_CANDIDATE;
     }
 
     public static IndexLookupType setupLookupType(ExpressionType type) {
@@ -267,4 +291,19 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
                 jobj, Members.RANK_START_VALUE_EXPRESSION.name(), m_tableScan);
     }
 
+    @Override
+    protected String explainPlanForNode(String indent) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Rank SCAN of \"").append(m_targetTableName).append("\" using ");
+        sb.append(m_rankExpression.explain(getTableNameForExplain()))
+        .append("\n" + indent + "scan matches for RANK value from ")
+        .append(m_rankStartExpression.explain(m_targetTableName));
+
+        if (m_rankEndExpression != null) {
+            sb.append(" to ").append(m_rankEndExpression.explain(m_targetTableName));
+        }
+
+        sb.append(explainPredicate("\n" + indent + " filter by "));
+        return sb.toString();
+    }
 }

@@ -48,6 +48,8 @@ public class RankExpression extends AbstractExpression {
     private int m_orderbySize = -1;
     private boolean m_isDecending = false;
 
+    private boolean m_areAllIndexColumnsCovered = false;
+
     public String getTableName() {
         return m_tableName;
     }
@@ -80,12 +82,16 @@ public class RankExpression extends AbstractExpression {
         m_partitionbySize = partitionbySize;
     }
 
-    public boolean getIsDecending() {
+    public boolean isDecending() {
         return m_isDecending;
     }
 
     public void setIsDecending(boolean isDecending) {
         m_isDecending = isDecending;
+    }
+
+    public boolean areAllIndexColumnsCovered() {
+        return m_areAllIndexColumnsCovered;
     }
 
     public RankExpression() {
@@ -117,7 +123,7 @@ public class RankExpression extends AbstractExpression {
                     && rankExpr.getIndexName().equals(m_indexName)
                     && rankExpr.getPartitionbySize() == m_partitionbySize
                     && rankExpr.getOrderbySize() == m_orderbySize
-                    && rankExpr.getIsDecending() == m_isDecending) {
+                    && rankExpr.isDecending() == m_isDecending) {
                 return true;
             }
         }
@@ -226,6 +232,7 @@ public class RankExpression extends AbstractExpression {
         assert(targetTable != null);
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
+        // TODO(xin): find the minimal length of index covering the partition by/order by clause
         for (Index index : allIndexes) {
             if ( ! IndexType.isScannable(index.getType())) {
                 continue;
@@ -246,7 +253,7 @@ public class RankExpression extends AbstractExpression {
                 + "Tree INDEX defined in its table.");
     }
 
-    public static boolean isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
+    public boolean isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
@@ -265,8 +272,13 @@ public class RankExpression extends AbstractExpression {
                     return false;
                 }
             }
+
+            if (exprs.size() == indexedColRefs.size()) {
+                m_areAllIndexColumnsCovered = true;
+            }
+
         } else {
-            // TODO:
+            // TODO(xin): add support for expression index
 
             return false;
         }

@@ -37,6 +37,7 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
     IndexLookupType getLookupType() const { return m_lookupType; }
+    IndexLookupType getEndType() const { return m_endType; }
 
     RankExpression* getRankExpression() const;
 

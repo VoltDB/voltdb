@@ -79,6 +79,9 @@ void RankScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
         lookupTypeString = obj.valueForKey("RANK_END_TYPE").asStr();
         m_endType = stringToIndexLookup(lookupTypeString);
         m_end_expression.reset(loadExpressionFromJSONObject("RANK_END_VALUE_EXPRESSION", obj));
+    } else {
+        m_endType = INDEX_LOOKUP_TYPE_INVALID;
+        m_end_expression.reset(NULL);
     }
 
     m_rank_expression.reset(loadExpressionFromJSONObject("RANK_EXPRESSION", obj));

@@ -67,7 +67,7 @@ private:
 
     RankScanPlanNode *m_node;
     IndexLookupType m_lookupType;
-//    IndexLookupType m_endType;
+    IndexLookupType m_endType;
 
     int64_t m_rkStart;
     int64_t m_rkEnd;

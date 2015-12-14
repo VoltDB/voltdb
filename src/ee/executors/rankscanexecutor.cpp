@@ -53,18 +53,7 @@ bool RankScanExecutor::p_init(AbstractPlanNode *abstractNode,
 
     // Miscellanous Information
     m_lookupType = m_node->getLookupType();
-
-    NValue rkKeyNvalue = m_node->getRankKeyExpression()->eval(NULL, NULL);
-    m_rkStart = ValuePeeker::peekAsBigInt(rkKeyNvalue);
-
-    if (m_node->getEndExpression() != NULL) {
-        NValue rkEndNvalue = m_node->getEndExpression()->eval(NULL, NULL);
-        m_rkEnd = ValuePeeker::peekAsBigInt(rkEndNvalue);
-        m_rkOffset = m_rkEnd - m_rkStart;
-    } else {
-        m_rkEnd = -1;
-        m_rkOffset = -1;
-    }
+    m_endType = m_node->getEndType();
 
     m_predicate = m_node->getPredicate();
     m_projectionNode = dynamic_cast<ProjectionPlanNode*>(m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
@@ -72,6 +61,12 @@ bool RankScanExecutor::p_init(AbstractPlanNode *abstractNode,
     if (m_projectionNode != NULL) {
         m_numOfColumns = static_cast<int> (m_projectionNode->getOutputColumnExpressions().size());
     }
+
+    //output table should be temptable
+    m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
+
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(m_node);
 
     return true;
 }
@@ -81,7 +76,6 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
     // update local target table with its most recent reference
     RankExpression * rankExpr = m_node->getRankExpression();
     TableIndex * tableIndex = rankExpr->refreshGetTableIndex();
-    IndexCursor indexCursor(tableIndex->getTupleSchema());
 
     if (rankExpr->getPartitonbySize() > 0) {
         throwDynamicSQLException("rank partition by clause is not supported");
@@ -114,23 +108,36 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
 
     if (m_node->getEndExpression() != NULL && m_rkEnd < m_rkStart) {
         // no rows returned from the scan
-        p_tryToInsertTuple(NULL, pmp);
+        if (m_aggExec != NULL)
+            m_aggExec->p_execute_finish();
         return true;
     }
+    if (m_node->getEndExpression() != NULL) {
+        NValue rkEndNvalue = m_node->getEndExpression()->eval(NULL, NULL);
+        m_rkEnd = ValuePeeker::peekAsBigInt(rkEndNvalue);
+        m_rkOffset = m_rkEnd - m_rkStart;
+    } else {
+        m_rkEnd = -1;
+        m_rkOffset = -1;
+    }
 
-    TableTuple firstTuple(input_table->schema());
+    NValue rkKeyNvalue = m_node->getRankKeyExpression()->eval(NULL, NULL);
+    m_rkStart = ValuePeeker::peekAsBigInt(rkKeyNvalue);
+
+    IndexCursor indexCursor(tableIndex->getTupleSchema());
+    TableTuple tuple(input_table->schema());
     bool found = tableIndex->findRankTuple(m_rkStart, indexCursor);
     if (m_lookupType == INDEX_LOOKUP_TYPE_EQ) {
         if (! found) {
-            p_tryToInsertTuple(NULL, pmp);
+            if (m_aggExec != NULL)
+                m_aggExec->p_execute_finish();
             return true;
         }
-        firstTuple = tableIndex->nextValueAtKey(indexCursor);
-        p_tryToInsertTuple(&firstTuple, pmp);
+        tuple = indexCursor.m_match;
+        p_tryToInsertTuple(&tuple, pmp);
     }
 
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-    TableTuple tuple(input_table->schema());
     int tuple_ctr = 0, rank_ctr = 0;
     while ((m_limit == -1 || tuple_ctr < m_limit) &&
            ((m_lookupType == INDEX_LOOKUP_TYPE_EQ && tableIndex->isTheNextKeySame(indexCursor)) ||
@@ -160,6 +167,8 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
 }
 
 RANK_INSERT_RESULT RankScanExecutor::p_tryToInsertTuple(TableTuple* tuple, ProgressMonitorProxy &pmp) {
+    assert(tuple != NULL);
+
     if (! (m_predicate == NULL || m_predicate->eval(tuple, NULL).isTrue())) {
         return RANK_INSERT_FAIL_ON_PREDICATE;
     }
