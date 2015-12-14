@@ -248,6 +248,7 @@ CTX.INPUT['executors'] = """
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
  projectionexecutor.cpp
+ rankscanexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
@@ -293,6 +294,7 @@ CTX.INPUT['plannodes'] = """
  plannodefragment.cpp
  plannodeutil.cpp
  projectionnode.cpp
+ rankscannode.cpp
  receivenode.cpp
  SchemaColumn.cpp
  sendnode.cpp

@@ -75,6 +75,11 @@ public:
         return (buffer.str());
     }
 
+    TableIndex * refreshGetTableIndex();
+
+    int getPartitonbySize() { return m_partitionbySize; }
+    int getOrderbySize() { return m_orderbySize; }
+    bool isDecending() { return m_isDecending; }
 
   private:
     std::string m_target_table_name;

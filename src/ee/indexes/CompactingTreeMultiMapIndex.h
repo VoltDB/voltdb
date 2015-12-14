@@ -355,6 +355,24 @@ class CompactingTreeMultiMapIndex : public TableIndex
         return true;
     }
 
+    bool isTheNextKeySame(IndexCursor& cursor) const {
+        TableTuple currentTuple = nextValueAtKey(cursor);
+        TableTuple nextTuple = nextValue(cursor);
+
+        if (nextTuple.isNullTuple()) {
+            return false;
+        }
+
+        const KeyType currentKey = setKeyFromTuple(&currentTuple);
+        const KeyType nextKey = setKeyFromTuple(&nextTuple);
+
+        if (m_cmp(currentKey, nextKey) == 0) {
+            return true;
+        }
+
+        return false;
+    }
+
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const

@@ -429,6 +429,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
+    case PLAN_NODE_TYPE_RANKSCAN: {
+        return "RANKSCAN";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }
@@ -481,6 +484,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
+    } else if (str == "RANKSCAN") {
+        return PLAN_NODE_TYPE_RANKSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }

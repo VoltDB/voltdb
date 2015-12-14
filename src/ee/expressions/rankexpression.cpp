@@ -77,6 +77,14 @@ namespace voltdb {
         delete []m_orderbySearchKeyBackingStore;
     }
 
+    TableIndex * RankExpression::refreshGetTableIndex() {
+        VoltDBEngine* engine = ExecutorContext::getEngine();
+        m_tcd = engine->getTableDelegate(m_target_table_name);
+        Table* targetTable = m_tcd->getTable();
+        m_tableIndex = targetTable->index(m_target_index_name);
+        return m_tableIndex;
+    }
+
     voltdb::NValue RankExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
         TableTuple partitionbySearchKey = TableTuple(m_tableIndex->getKeySchema());

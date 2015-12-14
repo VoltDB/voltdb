@@ -184,6 +184,8 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_MATERIALIZEDSCAN = 14,
     // for sql-expression-select
     PLAN_NODE_TYPE_TUPLESCAN        = 15,
+    // for windowing-rank
+    PLAN_NODE_TYPE_RANKSCAN         = 16,
     //
     // Join Nodes
     //

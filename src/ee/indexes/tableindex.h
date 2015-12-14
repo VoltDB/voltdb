@@ -441,6 +441,10 @@ public:
         throwFatalException("Invoked non-countable TableIndex virtual method findRank which has no implementation");
     }
 
+    virtual bool isTheNextKeySame(IndexCursor& cursor) const {
+        throwFatalException("Invoked TableIndex virtual method isTheNextKeySame which has no implementation");
+    }
+
     virtual size_t getSize() const = 0;
 
     // Return the amount of memory we think is allocated for this

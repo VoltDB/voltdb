@@ -119,7 +119,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestWindowingRank extends RegressionSuite {
 
-    public void testRank() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestRank() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -154,7 +154,7 @@ public class TestWindowingRank extends RegressionSuite {
 
     }
 
-    public void testRankPartition() throws NoConnectionsException, IOException, ProcCallException {
+    public void notestRankPartition() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -189,7 +189,8 @@ public class TestWindowingRank extends RegressionSuite {
 
         //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 3;").getResults()[0];
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 0.4;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        //        vt = client.callProcedure("@Explain", "select a from t1 where a = 2 and b != 3;").getResults()[0];
         System.err.println(vt);
     }
 
@@ -222,7 +223,7 @@ public class TestWindowingRank extends RegressionSuite {
         //        project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM var16) from r1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
-        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
