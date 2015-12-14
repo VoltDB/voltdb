@@ -343,7 +343,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         //cut-off for table with views
         const double tableWithViewsLFCutoffForTrunc = 0.015416;
 
-        const double blockLoadFactor = m_data.begin()->getValue()->loadFactor();
+        const double blockLoadFactor = m_data.begin().data()->loadFactor();
         if ((blockLoadFactor <= tableLFCutoffForTrunc) ||
             (m_views.size() > 0 && blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) {
             return deleteAllTuples(true);

@@ -301,32 +301,34 @@ inline int TableIterator::getLocation() const {
 class JumpingTableIterator : public TableIterator {
 public:
     // Get an iterator via table->iterator()
-    JumpingTableIterator(PersistentTable* table, TBMapI);
+    JumpingTableIterator(PersistentTable* table, TBMapI start, TBMapI end);
     int getTuplesInNextBlock();
     bool hasNextBlock();
     void nextBlock();
+
+private:
+    TBMapI m_end;        // Use here for easy access to end()
 };
 
-
-inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start)
-    : TableIterator((Table*)parent, start)
+inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start, TBMapI end)
+    : TableIterator((Table*)parent, start), m_end(end)
     {
     }
 
 
 inline int JumpingTableIterator::getTuplesInNextBlock() {
-    assert(!(dynamic_cast<PersistentTable*>(m_table)->hasNoMoreBlocks(m_blockIterator)));
+    assert(m_blockIterator != m_end);
     return m_blockIterator.data()->activeTuples();
 }
 
 inline bool JumpingTableIterator::hasNextBlock() {
     assert(m_blockOffset == 0);
-    return !(dynamic_cast<PersistentTable*>(m_table)->hasNoMoreBlocks(m_blockIterator));
+    return m_blockIterator != m_end;
 }
 
 inline void JumpingTableIterator::nextBlock() {
     assert(m_blockOffset == 0);
-    assert(!(dynamic_cast<PersistentTable*>(m_table)->hasNoMoreBlocks(m_blockIterator)));
+    assert(m_blockIterator != m_end);
     TBPtr currentBlock = m_blockIterator.data();
     m_blockIterator++;
     m_foundTuples += currentBlock->activeTuples();

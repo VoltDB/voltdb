@@ -224,7 +224,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                     // We have orphaned or corrupted some tables. Let's make them pristine.
                     TBMapI iter = m_surgeon.getData().begin();
                     while (iter != m_surgeon.getData().end()) {
-                        m_surgeon.snapshotFinishedScanningBlock(iter.value(), TBPtr());
+                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
                         iter++;
                     }
                 }

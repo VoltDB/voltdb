@@ -193,6 +193,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
+    friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
@@ -229,12 +230,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return new TableIterator(this, m_data.begin());
     }
 
-    bool hasNoMoreBlocks(const TBMapI iter) const {
-        return iter == m_data.end();
-    }
-
     JumpingTableIterator* makeJumpingIterator() {
-        return new JumpingTableIterator(this, m_data.begin());
+        return new JumpingTableIterator(this, m_data.begin(), m_data.end());
     }
 
     TableIterator& iteratorDeletingAsWeGo() {
