@@ -1,3 +1,6 @@
+
+load classes geospatial-procs.jar;
+
 -- Tell sqlcmd to batch the following commands together,
 -- so that the schema loads quickly.
 file -inlinebatch END_OF_BATCH
@@ -35,38 +38,31 @@ CREATE TABLE bids
 
 CREATE INDEX bids_end ON bids(ts_end);
 
--- This table has one row for each device that is being served ads,
--- including the location from where it last appeared.
-CREATE TABLE devices
+-- This table contains one row for each occurence of a
+-- device requesting an ad.  If an ad was served, it
+-- includes the winning bid info, and nulls otherwise.
+CREATE TABLE ad_requests
 (
-  id bigint not null
-, location geography_point not null
-, primary key (id)
-);
-
-partition table devices on column id;
-
--- This table contains one row for each ad served to a device
-CREATE TABLE impressions
-(
-  bid_id bigint not null
-, advertiser_id bigint not null
-, bid_amount float not null
-, device_id bigint not null
+  device_id bigint not null
 , ts timestamp not null
+, bid_id bigint
+, advertiser_id bigint
+, bid_amount float
 );
 
-partition table impressions on column device_id;
+partition table ad_requests on column device_id;
+
+CREATE INDEX requests_ts ON ad_requests(ts);
 
 -- This materiazlied view aggregates the number of ads served from
 -- each advertiser per second, and the amount their account will be
 -- charged.
-CREATE VIEW impressions_by_second_by_advertiser
+CREATE VIEW requests_by_second_by_advertiser
 (
   ts_second
 , advertiser_id
-, impression_count
-, sum_of_impression_revenue
+, request_count
+, sum_of_ad_revenue
 )
 AS
   select
@@ -74,10 +70,27 @@ AS
   , advertiser_id
   , count(*)
   , sum(bid_amount)
-  from impressions
+  from ad_requests
   group by ts_second, advertiser_id;
 
+-- A stored procedure that gets the bid id for the highest bid given a
+-- device's location and the current time.
+CREATE PROCEDURE
+       partition on table ad_requests column device_id
+       FROM CLASS geospatial.GetHighestBidForLocation;
+
+-- A stored procedure that reports statistics on winning bids for the
+-- most recent time period.
+CREATE PROCEDURE FROM CLASS geospatial.GetStats;
+
+-- Delete expired bids from the bids table.
 CREATE PROCEDURE DeleteExpiredBids AS
        DELETE FROM bids WHERE current_timestamp > ts_end;
+
+-- Delete rows from ad_requests that are older than the time period
+-- specified by the caller.
+CREATE PROCEDURE
+       partition on table ad_requests column device_id
+       FROM CLASS geospatial.DeleteOldAdRequests;
 
 END_OF_BATCH
