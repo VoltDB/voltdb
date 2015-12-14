@@ -2415,6 +2415,62 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD :
+            implied_argument = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            int dateadd_func = -1;
+            switch (keywordConstant) {
+            case Tokens.YEAR :
+                implied_argument = "YEAR";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_YEAR;
+                break;
+            case Tokens.QUARTER :
+                implied_argument = "QUARTER";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_QUARTER;
+                break;
+            case Tokens.MONTH :
+                implied_argument = "MONTH";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MONTH;
+                break;
+            case Tokens.DAY :
+                implied_argument = "DAY";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_DAY;
+                break;
+            case Tokens.HOUR :
+                implied_argument = "HOUR";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_HOUR;
+                break;
+            case Tokens.MINUTE :
+                implied_argument = "MINUTE";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MINUTE;
+                break;
+            case Tokens.SECOND :
+                implied_argument = "SECOND";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_SECOND;
+                break;
+            case Tokens.MILLIS:
+            case Tokens.MILLISECOND :
+                implied_argument = "MILLISECOND";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MILLISECOND;
+                break;
+            case Tokens.MICROS:
+            case Tokens.MICROSECOND :
+                implied_argument = "MICROSECOND";
+                dateadd_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD_MICROSECOND;
+                break;
+            default:
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            assert(implied_argument != null);
+            assert(-1 != dateadd_func);
+            exp.attributes.put("function_id", String.valueOf(dateadd_func));
+            exp.attributes.put("implied_argument", implied_argument);
+
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+            
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
