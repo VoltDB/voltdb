@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "RankScanExecutor.h"
+#include "rankscanexecutor.h"
 
 #include "common/debuglog.h"
 #include "common/common.h"
