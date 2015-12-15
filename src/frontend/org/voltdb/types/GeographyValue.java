@@ -43,6 +43,10 @@ public class GeographyValue {
      *     so that the area inside the ring is on the left side of the line segments
      *     formed by adjacent vertices.
      *
+     * Note that this is different from the order expected by the OGC standard's
+     * Well Known Text format.  See GeographyValue.fromText for this format's
+     * definition.
+     *
      * @param loops
      */
     public GeographyValue(List<List<GeographyPointValue>> loops) {
@@ -63,10 +67,18 @@ public class GeographyValue {
     }
 
     /**
-     * Create a polygon given the well-known text representation.  As with the
-     * above constructor, the outer ring should be first and vertices should be
-     * listed on counter-clockwise order.
-     *
+     * Create a GeometryValue object from an OGC Well Known Text format string.
+     * The format, which is different from the raw loop constructor above, is
+     * as follows.
+     * <ol>
+     *   <li>Each polygon is a sequence of loops.</li>
+     *   <li>Each loop is either a shell or a hole.  There is exactly
+     *       one shell, but there may be zero or more holes.</li>
+     *   <li>The first loop in the sequence is the only shell.  Its vertices
+     *       should be given in counterclockwise order</li>
+     *   <li>All subsequent loops, if there are any, are holes.  Their vertices
+     *       should be given in <em>clockwise</em> order.  Note that this
+     *       is the opposite of the raw loop constructor from above.
      * @param wkt
      */
     public GeographyValue(String wkt) {
@@ -81,7 +93,15 @@ public class GeographyValue {
         }
     }
 
-    public static GeographyValue geographyValueFromText(String text) {
+    /**
+     * This is a factory function to create a GeometryValue object
+     * from OGC's Well Known Text strings.  The format is given
+     * in the documentation for {@link GeographyValue.GeographyValue(String)}.
+     *
+     * @param text
+     * @return
+     */
+    public static GeographyValue fromText(String text) {
         return new GeographyValue(text);
     }
 
@@ -111,12 +131,7 @@ public class GeographyValue {
         sb.append("POLYGON(");
 
         boolean isFirstLoop = true;
-        // S2 will reorder the loops in depth-first order.  This will not be
-        // the original order.  However, we know that the shell, which is the
-        // top of the tree, will be last in the depth-first order.   So, we
-        // create the string in loop-reverse order.
-        for (int oidx = m_loops.size() - 1; 0 <= oidx; oidx -= 1) {
-            List<XYZPoint> loop = m_loops.get(oidx);
+        for (List<XYZPoint> loop : m_loops) {
             if (!isFirstLoop) {
                 sb.append(", ");
             }
@@ -439,6 +454,11 @@ public class GeographyValue {
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
+     *
+     * Note that we assume that the vertices of the first loop are in counter-clockwise
+     * order, and that subsequent loops are in clockwise order.  This is the OGC format's
+     * definition.  When we send these to the EE we need to put them all into counter-clockwise
+     * order.  So, we need to reverse the order of all but the first loop.
      */
     private static List<List<XYZPoint>> loopsFromWkt(String wkt) throws IllegalArgumentException {
         final String msgPrefix = "Improperly formatted WKT for polygon: ";

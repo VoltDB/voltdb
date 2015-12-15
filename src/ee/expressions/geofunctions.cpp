@@ -123,6 +123,33 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     return returnValue;
 }
 
+#if defined(DEBUG_POLYGONS)
+static void printLoop(int lidx,
+                      bool is_shell,
+                      S2Loop *loop) {
+    std::cout << "Loop " << lidx << ": ";
+    std::cout << (is_shell ? "" : "not ") << "a shell, ";
+    std::cout << "depth = " << loop->depth();
+    std::cout << ", is_hole = " << loop->is_hole();
+    std::cout << ", points: ";
+    std::string sep("");
+    for (int idx = 0; idx < loop->num_vertices(); idx += 1) {
+        S2LatLng ll(loop->vertex(idx));
+        std::cout << sep << "(" << ll.lng().degrees() << ", " << ll.lat().degrees() << ")";
+        sep = ", ";
+    }
+    std::cout << "\n";
+}
+
+static void printPolygon(const std::string &label, const S2Polygon *poly) {
+    std::cout << label << ":\n";
+    for (int lidx = 0; lidx < poly->num_loops(); lidx += 1) {
+        S2Loop *loop = poly->loop(lidx);
+        printLoop(lidx, !loop->is_hole(), loop);
+    }
+}
+#endif
+
 static void readLoop(bool is_shell,
                      const std::string &wkt,
                      Tokenizer::iterator &it,
@@ -197,7 +224,6 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
 
     const std::string wkt(reinterpret_cast<char*>(getObjectValue_withoutNull()),
                           getObjectLength_withoutNull());
-
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
     Tokenizer::iterator it = tokens.begin();

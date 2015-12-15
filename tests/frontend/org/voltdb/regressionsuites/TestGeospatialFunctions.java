@@ -579,23 +579,23 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
    private static Border invalidBorders[] = {
        new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
-                  GeographyValue.geographyValueFromText(CROSSED_EDGES)),
+                  GeographyValue.fromText(CROSSED_EDGES)),
        new Border(101, "Sunwise", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.geographyValueFromText(CW_EDGES)),
+                  GeographyValue.fromText(CW_EDGES)),
        new Border(102, "MultiPolygon", "Polygons can have only one shell",
-                  GeographyValue.geographyValueFromText(MULTI_POLYGON)),
+                  GeographyValue.fromText(MULTI_POLYGON)),
        new Border(103, "SharedInnerVertices", "Loop 1 crosses loop 2",
-                  GeographyValue.geographyValueFromText(SHARED_INNER_VERTICES)),
+                  GeographyValue.fromText(SHARED_INNER_VERTICES)),
        new Border(104, "SharedInnerEdges", "Loop 1 crosses loop 2",
-                  GeographyValue.geographyValueFromText(SHARED_INNER_EDGES)),
+                  GeographyValue.fromText(SHARED_INNER_EDGES)),
        new Border(105, "IntersectingHoles", "Loop 1 crosses loop 2",
-                  GeographyValue.geographyValueFromText(INTERSECTING_HOLES)),
+                  GeographyValue.fromText(INTERSECTING_HOLES)),
        new Border(106, "OuterInnerIntersect", "Loop 1 crosses loop 2",
-                  GeographyValue.geographyValueFromText(OUTER_INNER_INTERSECT)),
+                  GeographyValue.fromText(OUTER_INNER_INTERSECT)),
        new Border(108, "TwoNestedSunwise", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.geographyValueFromText(TWO_NESTED_SUNWISE)),
+                  GeographyValue.fromText(TWO_NESTED_SUNWISE)),
        new Border(109, "TwoNestedWiddershins", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.geographyValueFromText(TWO_NESTED_WIDDERSHINS)),
+                  GeographyValue.fromText(TWO_NESTED_WIDDERSHINS)),
       /*
        * These are apparently legal. Should they be?
        */

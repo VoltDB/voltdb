@@ -519,7 +519,7 @@ public class ParameterConverter {
             if (inputClz == String.class) {
                 String paramStr = (String)param;
                 try {
-                    GeographyValue gv = GeographyValue.geographyValueFromText(paramStr);
+                    GeographyValue gv = GeographyValue.fromText(paramStr);
                     return gv;
                 } catch (IllegalArgumentException e) {
                     throw new VoltTypeException(String.format("deserialize GeographyValue from string failed (string %s)",
