@@ -533,6 +533,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     void nextFreeTuple(TableTuple *tuple);
+    void freeTupleBlock(bool fromPending, TBPtr erasedTupleBlock);
     bool doCompactionWithinSubset(TBBucketMap *bucketMap);
     void doForcedCompaction();
 
@@ -913,12 +914,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     }
 
     if (block->isEmpty()) {
-        m_data.erase(block->address());
-        m_blocksWithSpace.erase(block);
-        m_blocksNotPendingSnapshot.erase(block);
-        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
-        //Eliminates circular reference
-        block->swapToBucket(TBBucketPtr());
+        freeTupleBlock(false, block);
     } else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
     }

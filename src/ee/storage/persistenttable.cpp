@@ -252,6 +252,20 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 }
 
+void PersistentTable::freeTupleBlock(bool fromPending, TBPtr erasedTupleBlock) {
+    m_data.erase(erasedTupleBlock->address());
+    m_blocksWithSpace.erase(erasedTupleBlock);
+    m_blocksNotPendingSnapshot.erase(erasedTupleBlock);
+    if (fromPending) {
+        m_blocksPendingSnapshot.erase(erasedTupleBlock);
+    }
+    else {
+        assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
+    }
+    //Eliminates circular reference and remove from load map
+    erasedTupleBlock->swapToBucket(TBBucketPtr());
+}
+
 void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
     TableIterator ti(this, m_data.begin());
@@ -1473,11 +1487,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
 
         if (lightest->isEmpty()) {
             notifyBlockWasCompactedAway(lightest);
-            m_data.erase(lightest->address());
-            m_blocksWithSpace.erase(lightest);
-            m_blocksNotPendingSnapshot.erase(lightest);
-            m_blocksPendingSnapshot.erase(lightest);
-            lightest->swapToBucket(TBBucketPtr());
+            freeTupleBlock(true, lightest);
         } else {
             int lightestBucketChange = bucketChanges.second;
             if (lightestBucketChange != -1) {
