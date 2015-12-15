@@ -87,12 +87,6 @@
                   org/cliffc_voltpatches/**/*.java
                   org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
-                  org/voltdb/importer/Invocation.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
                   "
@@ -150,12 +144,6 @@
                   org/voltdb/VoltTableRow.java
                   org/voltdb/VoltType.java
                   org/voltdb/VoltTypeException.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/Invocation.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
                   "
 />
 

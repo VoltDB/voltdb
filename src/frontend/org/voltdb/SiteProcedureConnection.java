@@ -59,6 +59,11 @@ public interface SiteProcedureConnection {
     public int getCorrespondingHostId();
 
     /**
+     * Get the catalog cluster id for the corresponding SiteProcedureConnection
+     */
+    public int getCorrespondingClusterId();
+
+    /**
      * Log settings changed. Signal EE to update log level.
      */
     public void updateBackendLogLevels();

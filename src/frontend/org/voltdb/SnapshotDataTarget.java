@@ -17,12 +17,12 @@
 
 package org.voltdb;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public interface SnapshotDataTarget {
     public final static int ROW_COUNT_UNSUPPORTED = -1;
@@ -41,6 +41,11 @@ public interface SnapshotDataTarget {
      * @param tableId   The catalog tableId
      */
     public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId);
+
+    /**
+     * Site reported failures (like streaming failures
+     */
+    public void reportSerializationFailure(IOException ex);
 
     /**
      * Does this target need to be closed by the last site to finish snapshotting?

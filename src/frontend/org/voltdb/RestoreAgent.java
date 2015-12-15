@@ -191,6 +191,9 @@ SnapshotCompletionInterest, Promotable
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
                         }
+                        if (m_action == StartAction.RECOVER) {
+                            jsObj.put(SnapshotUtil.JSON_CHECK_CLUSTER_ID, true);
+                        }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(params);
                     }

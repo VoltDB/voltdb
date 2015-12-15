@@ -335,7 +335,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 instId,
                 timestamp,
                 clusterCreateTime,
-                newPartitionCount);
+                newPartitionCount,
+                context.getClusterId());
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }
