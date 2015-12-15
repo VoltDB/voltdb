@@ -356,7 +356,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
     }
 
     bool isTheNextKeySame(IndexCursor& cursor) const {
-        TableTuple currentTuple = nextValueAtKey(cursor);
+        TableTuple currentTuple = cursor.m_match;
         TableTuple nextTuple = nextValue(cursor);
 
         if (nextTuple.isNullTuple()) {

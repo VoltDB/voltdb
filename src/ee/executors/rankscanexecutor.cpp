@@ -138,7 +138,6 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
-
     IndexCursor indexCursor(tableIndex->getTupleSchema());
     TableTuple tuple(input_table->schema());
     bool found = tableIndex->findRankTuple(m_rkStart, indexCursor);
