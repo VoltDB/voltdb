@@ -131,7 +131,7 @@ namespace voltdb {
                 rkStart = m_tableIndex->getCounterGET(&partitionbySearchKey, false, partitionbyCursor);
             }
         }
-        std::cout << "rkEnd: " << rkEnd << ", rkStart: " << rkStart << std::endl;
+//        std::cout << "rkEnd: " << rkEnd << ", rkStart: " << rkStart << std::endl;
         rkRes = rkEnd - rkStart + 1;
 
         return ValueFactory::getBigIntValue(rkRes);

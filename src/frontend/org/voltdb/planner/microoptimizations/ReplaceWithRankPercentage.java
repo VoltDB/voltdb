@@ -75,10 +75,11 @@ public class ReplaceWithRankPercentage extends MicroOptimization {
 
         // In future, index scan search key, end key, etc should also be processed here
         // more complex case like the search key has not been addressed
-
-        RankScanPlanNode rankPlanNode = new RankScanPlanNode(aspn);
-        if (rankPlanNode.isRankScan()) {
-            return rankPlanNode;
+        if (aspn.getPlanNodeType() == PlanNodeType.SEQSCAN) {
+            RankScanPlanNode rankPlanNode = new RankScanPlanNode((SeqScanPlanNode)aspn);
+            if (rankPlanNode.isRankScan()) {
+                return rankPlanNode;
+            }
         }
 
         return plan;

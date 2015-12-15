@@ -112,6 +112,9 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
     if (m_lookupType == INDEX_LOOKUP_TYPE_GT) {
         m_rkStart++;
     }
+    if (m_rkStart <= 0 && (m_lookupType == INDEX_LOOKUP_TYPE_GT || m_lookupType == INDEX_LOOKUP_TYPE_GTE)) {
+        m_rkStart = 1;
+    }
     assert(m_lookupType == INDEX_LOOKUP_TYPE_GT ||
             m_lookupType == INDEX_LOOKUP_TYPE_EQ ||
             m_lookupType == INDEX_LOOKUP_TYPE_GTE);
@@ -127,9 +130,12 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
         m_rkOffset = m_rkEnd - m_rkStart;
 
         // no rows returned from the scan
-        if (m_rkOffset <= 0 && m_aggExec != NULL)
-            m_aggExec->p_execute_finish();
-        return true;
+        if (m_rkOffset <= 0) {
+            if (m_aggExec != NULL) {
+                m_aggExec->p_execute_finish();
+            }
+            return true;
+        }
     }
 
 
@@ -138,8 +144,9 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
     bool found = tableIndex->findRankTuple(m_rkStart, indexCursor);
     if (m_lookupType == INDEX_LOOKUP_TYPE_EQ) {
         if (! found) {
-            if (m_aggExec != NULL)
+            if (m_aggExec != NULL) {
                 m_aggExec->p_execute_finish();
+            }
             return true;
         }
         tuple = indexCursor.m_match;
@@ -152,7 +159,7 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
            ((m_lookupType == INDEX_LOOKUP_TYPE_EQ && tableIndex->isTheNextKeySame(indexCursor)) ||
             (m_lookupType != INDEX_LOOKUP_TYPE_EQ &&
              !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple() &&
-             (m_rkOffset = -1 || rank_ctr++ < m_rkOffset)) ))
+             (m_rkOffset == -1 || rank_ctr++ < m_rkOffset)) ))
     {
         RANK_INSERT_RESULT res = p_tryToInsertTuple(&tuple, pmp);
 

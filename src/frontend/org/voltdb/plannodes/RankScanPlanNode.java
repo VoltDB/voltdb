@@ -56,7 +56,10 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
     public RankScanPlanNode() {
     }
 
-    public RankScanPlanNode(AbstractScanPlanNode scan) {
+    public RankScanPlanNode(SeqScanPlanNode scan) {
+        super(scan.m_targetTableName, scan.m_targetTableAlias);
+        setPredicate(scan.getPredicate());
+
         m_isRankScan = false;
         m_rankStartExpression = null;
         m_rankStartType = IndexLookupType.INVALID;
@@ -68,9 +71,11 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
             addInlinePlanNode(entry.getValue());
         }
 
-        if (scan instanceof SeqScanPlanNode) {
-            SeqScanPlanNode seqScan = (SeqScanPlanNode) scan;
-            m_isRankScan = setupRankScanNode(seqScan);
+        m_isRankScan = setupRankScanNode(scan);
+        if (m_isRankScan) {
+            m_tableScanSchema = scan.m_tableScanSchema.clone();
+            m_tableScan = scan.getTableScan();
+            m_hasSignificantOutputSchema = true;
         }
     }
 
@@ -114,6 +119,7 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
         if (seqScan.isSubQuery()) {
             return false;
         }
+
         AbstractExpression ex = seqScan.getPredicate();
         List<AbstractExpression> expressionList = ExpressionUtil.uncombine(ex);
         int rankIdx = findRankExpressionComparison(expressionList, true);
@@ -130,8 +136,6 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
         rankIdx = findRankExpressionComparison(expressionList, false);
         if (rankIdx < 0) {
             m_rankEndType = IndexLookupType.INVALID;
-        } else {
-            expressionList.remove(rankIdx);
         }
 
         if (m_rankStartType == IndexLookupType.LT || m_rankStartType == IndexLookupType.LTE) {
@@ -142,8 +146,15 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
                 m_rankEndExpression = m_rankStartExpression;
 
                 m_rankStartType = IndexLookupType.GTE;
-                m_rankStartExpression = ConstantValueExpression.makeExpression(VoltType.BIGINT, "0");
+                m_rankStartExpression = ConstantValueExpression.makeExpression(VoltType.BIGINT, "1");
+            } else if (m_rankEndType == IndexLookupType.LT || m_rankEndType == IndexLookupType.LTE) {
+                rankIdx = -1;
+                m_rankEndType = IndexLookupType.INVALID;
             }
+        }
+
+        if (rankIdx >= 0) {
+            expressionList.remove(rankIdx);
         }
 
         AbstractExpression newPredicate = ExpressionUtil.combine(expressionList);
@@ -280,15 +291,18 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         m_rankStartType = IndexLookupType.get( jobj.getString( Members.RANK_START_TYPE.name() ) );
-        if (jobj.has("Members.RANK_END_TYPE.name()")) {
-            m_rankEndType = IndexLookupType.get( jobj.getString( Members.RANK_END_TYPE.name() ) );
-            m_rankEndExpression = AbstractExpression.fromJSONChild(
-                    jobj, Members.RANK_END_VALUE_EXPRESSION.name(), m_tableScan);
-        }
+        m_rankEndType = IndexLookupType.INVALID;
+
         m_rankExpression = (RankExpression) AbstractExpression.fromJSONChild(
                 jobj, Members.RANK_EXPRESSION.name(), m_tableScan);
         m_rankStartExpression = AbstractExpression.fromJSONChild(
                 jobj, Members.RANK_START_VALUE_EXPRESSION.name(), m_tableScan);
+
+        if (jobj.has(Members.RANK_END_TYPE.name())) {
+            m_rankEndType = IndexLookupType.get( jobj.getString( Members.RANK_END_TYPE.name() ) );
+            m_rankEndExpression = AbstractExpression.fromJSONChild(
+                    jobj, Members.RANK_END_VALUE_EXPRESSION.name(), m_tableScan);
+        }
     }
 
     @Override

@@ -119,7 +119,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestWindowingRank extends RegressionSuite {
 
-    public void notestRank() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRank() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -154,7 +154,7 @@ public class TestWindowingRank extends RegressionSuite {
 
     }
 
-    public void notestRankPartition() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRankPartition() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -167,44 +167,178 @@ public class TestWindowingRank extends RegressionSuite {
         client.callProcedure("T1.insert", 60, 8);
 
         vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) from t1 order by a;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][]{{10, 1}, {30, 1}, {40, 1}, {50, 2}, {50, 2}, {60, 2}});
 
         vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a desc) from t1 order by a;").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][]{{10, 1}, {30, 3}, {40, 2}, {50, 1}, {50, 1}, {60, 1}});
     }
 
-    public void testRankIndexScan() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRankScan_UNIQUE_EQ() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
-        client.callProcedure("T1.insert", 30, 7);
-        client.callProcedure("T1.insert", 10, 5);
-        client.callProcedure("T1.insert", 20, 6);
-        client.callProcedure("T1.insert", 40, 8);
-        client.callProcedure("T1.insert", 50, 9);
+        client.callProcedure("T1.insert", 30, 1);
+        client.callProcedure("T1.insert", 10, 2);
+        client.callProcedure("T1.insert", 20, 1);
+        client.callProcedure("T1.insert", 40, 2);
+        client.callProcedure("T1.insert", 50, 1);
 
-        //        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
-        //        assertTrue(vt.toString().contains("Rank SCAN"));
-        //
-        //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
-        //        validateTableOfScalarLongs(vt, new long[]{20});
-        //
-        //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 5;").getResults()[0];
-        //        validateTableOfScalarLongs(vt, new long[]{50});
-        //
-        //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 10;").getResults()[0];
-        //        validateTableOfScalarLongs(vt, new long[]{});
+        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        assertTrue(vt.toString().contains("Rank SCAN"));
 
-        //        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
-        //        System.err.println(vt);
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 5;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{50});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 10;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        assertTrue(vt.toString().contains("Rank SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
+
+        // aggregates
+        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) = 3;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{30});
+    }
+
+    public void testRankScan_UNIQUE_GT_GTE() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING xin......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        client.callProcedure("T1.insert", 30, 1);
+        client.callProcedure("T1.insert", 10, 2);
+        client.callProcedure("T1.insert", 20, 1);
+        client.callProcedure("T1.insert", 40, 2);
+        client.callProcedure("T1.insert", 50, 1);
+
+        // TODO(xin): NOT TESTED against KEY exception
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > -2 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{10, 20, 30, 40, 50});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) >= 3 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{30, 40, 50});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 3 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{40, 50});
 
         vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 3 and a + 10 != 50;").getResults()[0];
-        System.err.println(vt);
-        //        validateTableOfScalarLongs(vt, new long[]{20});
+        validateTableOfScalarLongs(vt, new long[]{50});
 
+        // aggregates
+        vt = client.callProcedure("@Explain", "select sum(a) from t1 where rank() over (order by a) >= 3;").getResults()[0];
+        assertTrue(vt.toString().contains("Rank SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) >= 3;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{120});
+
+        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) >= 0.7;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{120});
+
+        vt = client.callProcedure("@AdHoc", "select b, sum(a) from t1 where rank() over (order by a) >= 2 "
+                + " group by b order by b;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1, 100}, {2, 40}});
+    }
+
+    public void testRankScan_UNIQUE_LT_LTE() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING xin......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        client.callProcedure("T1.insert", 30, 1);
+        client.callProcedure("T1.insert", 10, 2);
+        client.callProcedure("T1.insert", 20, 1);
+        client.callProcedure("T1.insert", 40, 2);
+        client.callProcedure("T1.insert", 50, 1);
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 3 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{10, 20});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) <= 3 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{10, 20, 30});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 1 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 10 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{10, 20, 30, 40, 50});
+    }
+
+
+    public void testRankScan_UNIQUE_ALL() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING xin......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        client.callProcedure("T1.insert", 30, 1);
+        client.callProcedure("T1.insert", 10, 2);
+        client.callProcedure("T1.insert", 20, 1);
+        client.callProcedure("T1.insert", 40, 2);
+        client.callProcedure("T1.insert", 50, 1);
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 4 "
+                + " and rank() over (order by a) > 1 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20, 30});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 1 "
+                + " and rank() over (order by a) < 4 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20, 30});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 1 "
+                + " and rank() over (order by a) < 4 and a + 10 != 30 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{30});
+
+
+        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) > 1 "
+                + " and rank() over (order by a) < 10 order by a;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{140});
+
+        vt = client.callProcedure("@AdHoc", "select b, sum(a) from t1 where rank() over (order by a) > 0 "
+                + " and rank() over (order by a) < 10 group by b order by b;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{1, 100}, {2, 50}});
+    }
+
+    //
+    // NON-UNIQUE RANK SCAN TEST
+    //
+    public void testRankScan_NON_UNIQUE_EQ() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING xin......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        client.callProcedure("T1.insert", 30, 1);
+        client.callProcedure("T1.insert", 10, 2);
+        client.callProcedure("T1.insert", 20, 1);
+        client.callProcedure("T1.insert", 40, 2);
+        client.callProcedure("T1.insert", 50, 1);
+
+        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        assertTrue(vt.toString().contains("Rank SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 5;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{50});
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 10;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        assertTrue(vt.toString().contains("Rank SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
+
+        // aggregates
+        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) = 3;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{30});
     }
 
     //
