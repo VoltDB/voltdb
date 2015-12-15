@@ -483,9 +483,10 @@ public class FunctionCustom extends FunctionSQL {
                 break;
 
             case FUNC_PI :
+                name = Tokens.T_PI;
                 parseList = emptyParamList;
                 // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 // End of VoltDB extension
                 break;
 
