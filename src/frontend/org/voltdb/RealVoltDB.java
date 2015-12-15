@@ -106,6 +106,7 @@ import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
+import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.KSafetyStats;
@@ -114,6 +115,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.join.ElasticJoinService;
 import org.voltdb.licensetool.LicenseApi;
@@ -175,9 +177,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.9.dev1";
+    static final String m_defaultVersionString = "5.9";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.9.dev1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.9\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -2245,6 +2247,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 for (Initiator iv2init : m_iv2Initiators.values()) {
                     iv2init.setConsumerDRGateway(m_consumerDRGateway);
                 }
+                m_consumerDRGateway.initialize(false);
             }
             // 6.2. If we are a DR replica, we may care about a
             // deployment update
@@ -2266,6 +2269,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // restart resource usage monitoring task
             startResourceUsageMonitor();
+
+            checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                    (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
 
             return Pair.of(m_catalogContext, csp);
         }
@@ -2706,8 +2712,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private boolean createDRConsumerIfNeeded() {
-        if (!m_config.m_isEnterprise ||
-                !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)) {
+        if (!m_config.m_isEnterprise
+                || !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)
+                || !m_catalogContext.cluster.getDrconsumerenabled()) {
             return false;
         }
         if (m_config.m_replicationRole == ReplicationRole.REPLICA ||
@@ -2799,6 +2806,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Initiator init = m_iv2Initiators.get(partition);
             assert init != null;
             init.setDurableUniqueIdListener(listener);
+        }
+    }
+
+    public ExecutionEngine debugGetSpiedEE(int partitionId) {
+        if (m_config.m_backend == BackendTarget.NATIVE_EE_SPY_JNI) {
+            BaseInitiator init = (BaseInitiator)m_iv2Initiators.get(partitionId);
+            return init.debugGetSpiedEE();
+        }
+        else {
+            return null;
         }
     }
 
@@ -2913,9 +2930,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         long megabytes = 1024 * 1024;
         long maxMemory = Runtime.getRuntime().maxMemory() / megabytes;
-        long drRqt = isPro ? 128 * sitesPerHost : 0;
+        // DRv2 now is off heap
         long crazyThresh = computeMinimumHeapRqt(isPro, tableCount, sitesPerHost, kfactor);
-        long warnThresh = crazyThresh + drRqt;
 
         if (maxMemory < crazyThresh) {
             StringBuilder builder = new StringBuilder();
@@ -2924,14 +2940,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             builder.append("Please increase the maximum heap size using the VOLTDB_HEAPMAX environment variable and then restart VoltDB.");
             consoleLog.warn(builder.toString());
         }
-        else if (maxMemory < warnThresh) {
-            StringBuilder builder = new StringBuilder();
-            builder.append(String.format("The configuration of %d tables, %d sites-per-host, and k-factor of %d requires at least %d MB of Java heap memory. ", tableCount, sitesPerHost, kfactor, crazyThresh));
-            builder.append(String.format("The maximum amount of heap memory available to the JVM is %d MB. ", maxMemory));
-            builder.append("The system has enough memory for normal operation but is in danger of running out of Java heap space if the DR feature is used. ");
-            builder.append("Use the VOLTDB_HEAPMAX environment variable to adjust the Java max heap size before starting VoltDB, as necessary.");
-            consoleLog.warn(builder.toString());
-        }
+
     }
 
     // Compute the minimum required heap to run this configuration.  This comes from the documentation,
@@ -2941,6 +2950,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         long baseRqt = 384;
         long tableRqt = 10 * tableCount;
+        // K-safety Heap consumption drop to 8 MB (per node)
+        // Snapshot cost 32 MB (per node)
+        // Theoretically, 40 MB (per node) should be enough
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
     }

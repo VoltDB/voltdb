@@ -427,12 +427,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param child The node to add.
      */
     public void addAndLinkChild(AbstractPlanNode child) {
+        assert(child != null);
         m_children.add(child);
         child.m_parents.add(this);
     }
 
     // called by PushDownLimit, re-link the child without changing the order
     public void setAndLinkChild(int index, AbstractPlanNode child) {
+        assert(child != null);
         m_children.set(index, child);
         child.m_parents.add(this);
     }
@@ -441,6 +443,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @param child to remove.
      */
     public void unlinkChild(AbstractPlanNode child) {
+        assert(child != null);
         m_children.remove(child);
         child.m_parents.remove(this);
     }
@@ -452,6 +455,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return true if the child was replaced
      */
     public boolean replaceChild(AbstractPlanNode oldChild, AbstractPlanNode newChild) {
+        assert(oldChild != null);
+        assert(newChild != null);
         int idx = 0;
         for (AbstractPlanNode child : m_children) {
             if (child.equals(oldChild)) {
@@ -464,15 +469,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return false;
     }
 
-    public boolean replaceChild(int oldChildIdx, AbstractPlanNode newChild) {
-        if (oldChildIdx < 0 || oldChildIdx >= getChildCount()) {
-            return false;
-        }
-
+    public void replaceChild(int oldChildIdx, AbstractPlanNode newChild) {
+        assert(oldChildIdx >= 0 && oldChildIdx < getChildCount());
+        assert(newChild != null);
         AbstractPlanNode oldChild = m_children.get(oldChildIdx);
+        assert(oldChild != null);
         oldChild.m_parents.clear();
         setAndLinkChild(oldChildIdx, newChild);
-        return true;
     }
 
 
