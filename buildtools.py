@@ -7,6 +7,7 @@ class BuildContext:
         self.CPPFLAGS = ""
         self.EXTRAFLAGS = ""
         self.LDFLAGS = "-L${INSTALL_DIR}/lib"
+        self.LASTLDFLAGS = ""
         self.JNIEXT = ""
         self.JNILIBFLAGS = ""
         self.JNIBINFLAGS = ""
@@ -140,13 +141,17 @@ except:
     print "ERROR: Unable to read version number from version.txt."
     sys.exit(-1)
 
+# Replace the extension of filename with the
+# new extension.  If the filename does not
+# have an extension, the new extension is just
+# appended.
 def replaceSuffix(name, suffix):
     pos = name.rindex(".")
     if pos < 0:
         return name + suffix;
     else:
         return name[:pos] + suffix;
-
+    
 def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
     jni_objname = "objects/" + replaceSuffix(relativepath, ".o")
@@ -230,6 +235,7 @@ def buildMakefile(CTX):
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
+    makefile.write('RM = /bin/rm -rf\n')
     makefile.write("#\n")
     makefile.write("# Capture the (relative) name of the root directory.\n")
     makefile.write("# Also, remember the obj directory,\n")
@@ -258,12 +264,26 @@ def buildMakefile(CTX):
     makefile.write('OPENSSL_SRC=${THIRD_PARTY_SRC}/openssl/openssl-${OPENSSL_VERSION}\n')
     makefile.write('OPENSSL_INSTALL=${INSTALL_DIR}\n')
     makefile.write("\n")
+    makefile.write('#\n')
+    makefile.write('# We keep tarballs of third party sources here.\n')
+    makefile.write('#\n')
+    makefile.write('TARBALLS_DIR=${THIRD_PARTY_SRC}/tarballs\n')
+    makefile.write('\n')
+    makefile.write('# These are the PCRE2 library\'s source, build and install directories,\n')
+    makefile.write('# and the location of the source tarball\n')
+    makefile.write('PCRE2_VERSION=10.10\n')
+    makefile.write('PCRE2_NAME=pcre2-${PCRE2_VERSION}\n')
+    makefile.write('PCRE2_SRC=${THIRD_PARTY_SRC}/${PCRE2_NAME}\n')
+    makefile.write('PCRE2_OBJ=${OBJDIR}/${PCRE2_NAME}\n')
+    makefile.write('PCRE2_INSTALL=${INSTALL_DIR}\n')
+    makefile.write('PCRE2_TARBALL=${TARBALLS_DIR}/${PCRE2_NAME}.tar.bz2\n')
 
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
-        makefile.write("\trm -rf *\n")
+	makefile.write('\t${RM} "${PCRE2_SRC}"\n')
         makefile.write('\t(cd "${OPENSSL_SRC}"; make clean)\n')
+        makefile.write('\trm -rf "${OBJDIR}"\n')
         makefile.close()
         return
 
@@ -474,9 +494,55 @@ def buildMakefile(CTX):
 
     makefile.write("########################################################################\n")
     makefile.write("#\n")
-    makefile.write("# Tests\n")
+    makefile.write("# Third Party Tools.\n")
     makefile.write("#\n")
     makefile.write("########################################################################\n")
+    makefile.write('.PHONY: build-third-party-tools\n')
+    makefile.write('build-third-party-tools: build-pcre2\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('# Testing of third party tools.  We do not run this usually, but\n')
+    makefile.write('# it is convenient to put it in the makefile.\n')
+    makefile.write('# Note that these will not be run by Jenkins.\n')
+    makefile.write('########################################################################\n')
+    makefile.write('test-third-party-tools: test-pcre2\n')
+    makefile.write('.PHONY: test-third-party-tools')
+    makefile.write('\n')
+    makefile.write('test-pcre2: build-pcre2\n')
+    makefile.write('\t@echo Testing PCRE2 in ${PCRE2_OBJ}\n')
+    makefile.write('\t(cd "${PCRE2_OBJ}"; ${MAKE} check)\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('# pcre2 - regular expressions.\n')
+    makefile.write('########################################################################\n')
+    makefile.write('build-pcre2: configure-pcre2\n')
+    makefile.write('\tif [ ! -f "${PCRE2_INSTALL}/lib/libpcre2-8.a" ] ; then \\\n')
+    makefile.write('\t  @echo Building PCRE2 ; \\\n')
+    makefile.write('\t  (cd "$(PCRE2_OBJ)"; ${MAKE} install); \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('.PHONY: build-pcre2\n')
+    makefile.write('\n')
+    makefile.write('configure-pcre2: unpack-pcre2\n')
+    makefile.write('\tif [ ! -d "${PCRE2_OBJ}" ] ; then \\\n')
+    makefile.write('\t  @echo Configuring PCRE2; \\\n')
+    makefile.write('\t  /bin/rm -rf "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  mkdir -p "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  cd "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  "${PCRE2_SRC}/configure" --disable-shared --with-pic --prefix="${PCRE2_INSTALL}" ; \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('.PHONY: configure-pcre2\n')
+    makefile.write('\n')
+    makefile.write('unpack-pcre2:\n')
+    makefile.write('\tif [ ! -d "$PCRE2_SRC" ] ; then \\\n')
+    makefile.write('\t  tar -x -j -f "${PCRE2_TARBALL}" -C "${THIRD_PARTY_SRC}" ; \\\n')
+    makefile.write('fi\n')
+    makefile.write('.PHONY: unpack-pcre2\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('#\n')
+    makefile.write('# Tests\n')
+    makefile.write('#\n')
+    makefile.write('########################################################################\n')
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
@@ -512,7 +578,12 @@ def buildMakefile(CTX):
     makefile.write("\n")
     makefile.write("clean-3pty-install:\n")
     makefile.write("\t${RM} -r \"${INSTALL_DIR}\"\n")
+    makefile.write("\n")
     makefile.write(".PHONY: clean-3pty-install\n")
+    makefile.write('\t@${RM} %s\n' % formatList(cleanobjs))
+    makefile.write('\t@${RM} "${PCRE2_OBJ}"\n')
+    makefile.write('\t@${RM} "${INSTALL_DIR}/*"\n')
+    makefile.write('\t@${RM} "${PCRE2_SRC}"\n')
     makefile.write("\n")
     makefile.close()
     return True
