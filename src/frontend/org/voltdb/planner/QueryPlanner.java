@@ -179,8 +179,6 @@ public class QueryPlanner {
             m_xmlSQL.attributes.put(UPSERT_TAG, "true");
         }
 
-        System.err.println(m_xmlSQL);
-
         m_planSelector.outputCompiledStatement(m_xmlSQL);
     }
 

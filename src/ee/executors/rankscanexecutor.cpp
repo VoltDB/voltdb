@@ -46,7 +46,6 @@ bool RankScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_node = dynamic_cast<RankScanPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
-    assert(m_node->getPredicate() == NULL);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
@@ -105,24 +104,34 @@ bool RankScanExecutor::p_execute(const NValueArray &params)
     } else {
         m_tempTuple = output_temp_table->tempTuple();
     }
+    m_rkEnd = -1;
+    m_rkOffset = -1;
+    NValue rkKeyNvalue = m_node->getRankKeyExpression()->eval(NULL, NULL);
+    m_rkStart = ValuePeeker::peekAsBigInt(rkKeyNvalue);
 
-    if (m_node->getEndExpression() != NULL && m_rkEnd < m_rkStart) {
-        // no rows returned from the scan
-        if (m_aggExec != NULL)
-            m_aggExec->p_execute_finish();
-        return true;
+    if (m_lookupType == INDEX_LOOKUP_TYPE_GT) {
+        m_rkStart++;
     }
+    assert(m_lookupType == INDEX_LOOKUP_TYPE_GT ||
+            m_lookupType == INDEX_LOOKUP_TYPE_EQ ||
+            m_lookupType == INDEX_LOOKUP_TYPE_GTE);
+
     if (m_node->getEndExpression() != NULL) {
         NValue rkEndNvalue = m_node->getEndExpression()->eval(NULL, NULL);
         m_rkEnd = ValuePeeker::peekAsBigInt(rkEndNvalue);
+
+        assert(m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
+        if (m_endType == INDEX_LOOKUP_TYPE_LTE) {
+            m_rkEnd++;
+        }
         m_rkOffset = m_rkEnd - m_rkStart;
-    } else {
-        m_rkEnd = -1;
-        m_rkOffset = -1;
+
+        // no rows returned from the scan
+        if (m_rkOffset <= 0 && m_aggExec != NULL)
+            m_aggExec->p_execute_finish();
+        return true;
     }
 
-    NValue rkKeyNvalue = m_node->getRankKeyExpression()->eval(NULL, NULL);
-    m_rkStart = ValuePeeker::peekAsBigInt(rkKeyNvalue);
 
     IndexCursor indexCursor(tableIndex->getTupleSchema());
     TableTuple tuple(input_table->schema());

@@ -127,7 +127,7 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
         // find the rank comparison expression
         expressionList.remove(rankIdx);
 
-        rankIdx = findRankExpressionComparison(expressionList, true);
+        rankIdx = findRankExpressionComparison(expressionList, false);
         if (rankIdx < 0) {
             m_rankEndType = IndexLookupType.INVALID;
         } else {

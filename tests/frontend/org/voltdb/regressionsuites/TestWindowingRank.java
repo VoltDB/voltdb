@@ -186,24 +186,24 @@ public class TestWindowingRank extends RegressionSuite {
         client.callProcedure("T1.insert", 40, 8);
         client.callProcedure("T1.insert", 50, 9);
 
-//        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
-//        assertTrue(vt.toString().contains("Rank SCAN"));
-//
-//        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
-//        validateTableOfScalarLongs(vt, new long[]{20});
-//
-//        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 5;").getResults()[0];
-//        validateTableOfScalarLongs(vt, new long[]{50});
-//
-//        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 10;").getResults()[0];
-//        validateTableOfScalarLongs(vt, new long[]{});
+        //        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        //        assertTrue(vt.toString().contains("Rank SCAN"));
+        //
+        //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        //        validateTableOfScalarLongs(vt, new long[]{20});
+        //
+        //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 5;").getResults()[0];
+        //        validateTableOfScalarLongs(vt, new long[]{50});
+        //
+        //        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 10;").getResults()[0];
+        //        validateTableOfScalarLongs(vt, new long[]{});
 
-        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
-        System.err.println(vt);
+        //        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        //        System.err.println(vt);
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 3 and a + 10 != 50;").getResults()[0];
         System.err.println(vt);
-//        validateTableOfScalarLongs(vt, new long[]{20});
+        //        validateTableOfScalarLongs(vt, new long[]{20});
 
     }
 
