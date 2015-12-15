@@ -141,18 +141,19 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DATEADD_MICROSECOND    = 20040;
         static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
 
-        static final int FUNC_VOLT_POINTFROMTEXT                = 20042;
-        static final int FUNC_VOLT_POLYGONFROMTEXT              = 20043;
-        static final int FUNC_VOLT_CONTAINS                     = 20044;
-        static final int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS   = 20045;
-        static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 20046;
-        static final int FUNC_VOLT_POINT_LATITUDE               = 20047;
-        static final int FUNC_VOLT_POINT_LONGITUDE              = 20048;
-        static final int FUNC_VOLT_POLYGON_CENTROID             = 20049;
-        static final int FUNC_VOLT_POLYGON_AREA                 = 20050;
-        static final int FUNC_VOLT_DISTANCE                     = 20051;    // wrapper id for distance between all geo types
-        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20052;    // distance between point and point
-        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20053;    // distance between polygon and point
+        // Geospatial functions
+        static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
+        static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
+        static final int FUNC_VOLT_CONTAINS                     = 21002;
+        static final int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS   = 21003;
+        static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 21004;
+        static final int FUNC_VOLT_POINT_LATITUDE               = 21005;
+        static final int FUNC_VOLT_POINT_LONGITUDE              = 21006;
+        static final int FUNC_VOLT_POLYGON_CENTROID             = 21007;
+        static final int FUNC_VOLT_POLYGON_AREA                 = 21008;
+        static final int FUNC_VOLT_DISTANCE                     = 21009;    // wrapper id for distance between all geo types
+        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 21010;    // distance between point and point
+        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 21011;    // distance between polygon and point
 
 
         private static final FunctionId[] instances = {
