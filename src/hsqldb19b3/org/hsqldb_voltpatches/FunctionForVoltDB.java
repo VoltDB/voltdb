@@ -558,7 +558,7 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
 
             if (! (nodes[0].dataType.isGeographyPointType() || nodes[0].dataType.isGeographyType())) {
-                // either of the nodes is not a valid type
+                // "incompatible data type in operation"
                 throw Error.error(ErrorCode.X_42565,
                         "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types.");
             }
