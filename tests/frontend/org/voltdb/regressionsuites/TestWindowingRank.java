@@ -73,7 +73,7 @@ public class TestWindowingRank extends RegressionSuite {
         client.callProcedure("tu.insert", 80, 2);
     }
 
-    public void notestRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -114,7 +114,7 @@ public class TestWindowingRank extends RegressionSuite {
 
     }
 
-    public void notestRankScan_UNIQUE_EQ() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRankScan_UNIQUE_EQ() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -144,7 +144,7 @@ public class TestWindowingRank extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{30});
     }
 
-    public void notestRankScan_UNIQUE_GT_GTE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRankScan_UNIQUE_GT_GTE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -179,7 +179,7 @@ public class TestWindowingRank extends RegressionSuite {
         validateTableOfLongs(vt, new long[][]{{1, 100}, {3, 40}});
     }
 
-    public void notestRankScan_UNIQUE_LT_LTE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRankScan_UNIQUE_LT_LTE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -200,7 +200,7 @@ public class TestWindowingRank extends RegressionSuite {
     }
 
 
-    public void notestRankScan_UNIQUE_ALL() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRankScan_UNIQUE_ALL() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
@@ -232,37 +232,37 @@ public class TestWindowingRank extends RegressionSuite {
     //
     // NON-UNIQUE RANK SCAN TEST
     //
-    public void notestRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
-        client.callProcedure("tu.insert", 10, 1);
-        client.callProcedure("tu.insert", 10, 1);
-        client.callProcedure("tu.insert", 10, 2);
-        client.callProcedure("tu.insert", 20, 1);
-        client.callProcedure("tu.insert", 30, 3);
-        client.callProcedure("tu.insert", 30, 1);
-        client.callProcedure("tu.insert", 40, 2);
-        client.callProcedure("tu.insert", 40, 3);
-        client.callProcedure("tu.insert", 50, 2);
+        client.callProcedure("tm.insert", 10, 1);
+        client.callProcedure("tm.insert", 10, 1);
+        client.callProcedure("tm.insert", 10, 2);
+        client.callProcedure("tm.insert", 20, 1);
+        client.callProcedure("tm.insert", 30, 3);
+        client.callProcedure("tm.insert", 30, 1);
+        client.callProcedure("tm.insert", 40, 2);
+        client.callProcedure("tm.insert", 40, 3);
+        client.callProcedure("tm.insert", 50, 2);
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tm order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1},{10, 1},{10, 1},
                 {20, 4}, {30, 5}, {30, 5}, {40, 7}, {40, 7}, {50, 9}});
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from tu order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from tm order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 7},{10, 7},{10, 7},
                 {20, 6}, {30, 4}, {30, 4}, {40, 2}, {40, 2}, {50, 1}});
 
         //
         // PARTITION BY
         //
-        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a) from tu order by b, a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a) from tm order by b, a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1, 10, 1},{1, 10, 1}, {1, 20, 3}, {1, 30, 4}, {2, 10, 1},
                 {2, 40, 2}, {2, 50, 3}, {3, 30, 1}, {3, 40, 2}});
 
-        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a desc) from tu order by b, a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a desc) from tm order by b, a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1, 10, 3},{1, 10, 3}, {1, 20, 2}, {1, 30, 1}, {2, 10, 3},
                 {2, 40, 2}, {2, 50, 1}, {3, 30, 2}, {3, 40, 1}});
     }
