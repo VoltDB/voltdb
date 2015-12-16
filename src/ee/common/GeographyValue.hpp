@@ -94,7 +94,6 @@ public:
         S1Angle distanceRadians = S1Angle(Project(s2Point), s2Point);
         return distanceRadians.radians();
     }
-
 };
 
 /**

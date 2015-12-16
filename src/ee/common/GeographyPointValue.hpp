@@ -169,7 +169,14 @@ private:
     std::string toString(double number, int decimalPrecision=12) const {
         double decimalNumber;
         char buffer[32];
+
+        // provided precision should be less than that can survive roundtrip of double -> text -> double
+#if __cplusplus > 199711L
+        // if platform supports C++11
         assert(decimalPrecision <= std::numeric_limits< double >::max_digits10);
+#else
+        assert(decimalPrecision <= 17);
+#endif
 
         decimalNumber = number - floor(number);
         if (decimalNumber == 0) {
