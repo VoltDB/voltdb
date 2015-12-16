@@ -150,6 +150,35 @@ public:
         return oss.str();
     }
 
+    std::string formatLngLat() const{
+        std::ostringstream oss;
+        oss << toString(m_longitude) << " " << toString(m_latitude);
+        return oss.str();
+    }
+
+    std::string toWKT() const {
+        std::ostringstream oss;
+        oss <<"Point (" << formatLngLat() << ")";
+        return oss.str();
+    }
+
+private:
+    std::string toString(double number, int decimalPrecision=12) const {
+        double decimalNumber;
+        char buffer[32];
+        assert(decimalPrecision <= std::numeric_limits< double >::max_digits10);
+
+        decimalNumber = number - floor(number);
+        if (decimalNumber == 0) {
+            snprintf(buffer, sizeof(buffer), "%3.1f", number);
+        }
+        else {
+            int wholeNumber = log10(abs(number));
+            snprintf(buffer, sizeof(buffer), "%.*g", (wholeNumber + 1 + decimalPrecision), number);
+        }
+        return buffer;
+    }
+
 private:
     Coord m_latitude;
     Coord m_longitude;

@@ -256,6 +256,9 @@ static const int FUNC_VOLT_POLYGON_AREA                = 20039;
 static const int FUNC_VOLT_DISTANCE                    = 20040;     // wrapper id for distance between all geo types
 static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 20041;     // distance between point and point
 static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 20042;     // distance between polygon and point
+static const int FUNC_VOLT_ASTEXT                      = 20043;     // wrapper function id for converting geography types into wkt
+static const int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT      = 20044;     // asText(<point value>)
+static const int FUNC_VOLT_ASTEXT_GEOGRAPHY            = 20045;     // asText(<geography value>)
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

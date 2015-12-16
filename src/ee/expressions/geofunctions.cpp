@@ -369,4 +369,24 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
     return retVal;
 }
 
+template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
+    assert(getValueType() == VALUE_TYPE_POINT);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_VARCHAR);
+    }
+
+    const std::string pointAsText = getPoint().toWKT();
+    return getTempStringValue(pointAsText.c_str(), pointAsText.length());
+}
+
+template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
+    assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
+    if (isNull()) {
+        return NValue::getNullValue(VALUE_TYPE_VARCHAR);
+    }
+
+    const std::string polygonAsText = getGeography().toWKT();
+    return getTempStringValue(polygonAsText.c_str(), polygonAsText.length());
+}
+
 } // end namespace voltdb
