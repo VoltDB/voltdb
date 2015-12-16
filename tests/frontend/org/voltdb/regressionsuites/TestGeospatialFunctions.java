@@ -489,19 +489,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
-    public void testPointAsTextNegative() throws Exception {
-        Client client = getClient();
-        populateTables(client);
-
-        verifyStmtFails(client, "select asText(?) from places order by pk",
-                "data type cast needed for parameter or null literal: "
-                        + "input type to ASTEXT function is ambiguous");
-        verifyStmtFails(client, "select asText(null) from places order by pk",
-                "data type cast needed for parameter or null literal: "
-                        + "input type to ASTEXT function is ambiguous");
-
-    }
-
     public void testPolygonAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
@@ -537,6 +524,18 @@ public class TestGeospatialFunctions extends RegressionSuite {
         gv = vt.getGeographyValue(0);
         assertEquals(gv.toString().toLowerCase(), vt.getString(1).toLowerCase());
 
+    }
+
+    public void testPointPlygonAsTextNegative() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        verifyStmtFails(client, "select asText(?) from places order by pk",
+                "data type cast needed for parameter or null literal: "
+                        + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(null) from places order by pk",
+                "data type cast needed for parameter or null literal: "
+                        + "input type to ASTEXT function is ambiguous");
     }
 
     static public junit.framework.Test suite() {
