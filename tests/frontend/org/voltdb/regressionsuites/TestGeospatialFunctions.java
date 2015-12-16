@@ -114,7 +114,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 GeographyPointValue.geographyPointFromText("POINT(-105.077 40.585)"));
         client.callProcedure("places.Insert", 4, "Point near N Colorado border",
                 GeographyPointValue.geographyPointFromText("POINT(-105.04 41.002)"));
-        client.callProcedure("places.Insert", 5, "Point Not On N Colorado Border",
+        client.callProcedure("places.Insert", 5, "North Point Not On Colorado Border",
                 GeographyPointValue.geographyPointFromText("POINT(-109.025 41.005)"));
         client.callProcedure("places.Insert", 6, "Point on N Wyoming Border",
                 GeographyPointValue.geographyPointFromText("POINT(-105.058 44.978)"));
@@ -126,11 +126,11 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 GeographyPointValue.geographyPointFromText("POINT(-104.061 42.986)"));
         client.callProcedure("places.Insert", 10, "Point On S Wyoming Border",
                 GeographyPointValue.geographyPointFromText("POINT(-110.998 41.099)"));
-        client.callProcedure("places.Insert", 11, "Point On S Colorado Border",
+        client.callProcedure("places.Insert", 11, "South Point Not On Colorado Border",
                 GeographyPointValue.geographyPointFromText("POINT(-103.008 37.002)"));
         client.callProcedure("places.Insert", 12, "Point On W Wyoming Border",
                 GeographyPointValue.geographyPointFromText("POINT(-110.998 42.999)"));
-        client.callProcedure("places.Insert", 13, "West not On South Wyoming Border",
+        client.callProcedure("places.Insert", 13, "West Point Not on Wyoming Border",
                 GeographyPointValue.geographyPointFromText("POINT(-111.052 41.999)"));
 
         // A null-valued point
@@ -166,6 +166,45 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Point on E Wyoming Border, Wyoming"},
                  {"Point On S Wyoming Border, Wyoming"},
                  {"Point On W Wyoming Border, Wyoming"},
+                }, vt);
+
+        vt = client.callProcedure("@AdHoc", "select places.name, borders.name "
+                + "from places, borders "
+                + "where not contains(borders.region, places.loc) "
+                + "order by places.pk, borders.pk").getResults()[0];
+        assertContentOfTable(new Object[][]
+                {{"Denver",                             "Wyoming"},
+                 {"Denver",                             "Colorado with a hole around Denver"},
+                 {"Albuquerque",                        "Colorado"},
+                 {"Albuquerque",                        "Wyoming"},
+                 {"Albuquerque",                        "Colorado with a hole around Denver"},
+                 {"Cheyenne",                           "Colorado"},
+                 {"Cheyenne",                           "Colorado with a hole around Denver"},
+                 {"Fort Collins",                       "Wyoming"},
+                 {"Point near N Colorado border",       "Wyoming"},
+                 {"North Point Not On Colorado Border", "Colorado"},
+                 {"North Point Not On Colorado Border", "Wyoming"},
+                 {"North Point Not On Colorado Border", "Colorado with a hole around Denver"},
+                 {"Point on N Wyoming Border",          "Colorado"},
+                 {"Point on N Wyoming Border",          "Colorado with a hole around Denver"},
+                 {"North Point Not On Wyoming Border",  "Colorado"},
+                 {"North Point Not On Wyoming Border",  "Wyoming"},
+                 {"North Point Not On Wyoming Border",  "Colorado with a hole around Denver"},
+                 {"Point on E Wyoming Border",          "Colorado"},
+                 {"Point on E Wyoming Border",          "Colorado with a hole around Denver"},
+                 {"East Point Not On Wyoming Border",   "Colorado"},
+                 {"East Point Not On Wyoming Border",   "Wyoming"},
+                 {"East Point Not On Wyoming Border",   "Colorado with a hole around Denver"},
+                 {"Point On S Wyoming Border",          "Colorado"},
+                 {"Point On S Wyoming Border",          "Colorado with a hole around Denver"},
+                 {"South Point Not On Colorado Border", "Colorado"},
+                 {"South Point Not On Colorado Border", "Wyoming"},
+                 {"South Point Not On Colorado Border", "Colorado with a hole around Denver"},
+                 {"Point On W Wyoming Border",          "Colorado"},
+                 {"Point On W Wyoming Border",          "Colorado with a hole around Denver"},
+                 {"West Point Not on Wyoming Border",   "Colorado"},
+                 {"West Point Not on Wyoming Border",   "Wyoming"},
+                 {"West Point Not on Wyoming Border",   "Colorado with a hole around Denver"}
                 }, vt);
 
     }
@@ -236,15 +275,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
              {"Cheyenne",                           -104.813, 41.134},
              {"Fort Collins",                       -105.077, 40.585},
              {"Point near N Colorado border",       -105.04, 41.002},
-             {"Point Not On N Colorado Border",     -109.025, 41.005},
+             {"North Point Not On Colorado Border", -109.025, 41.005},
              {"Point on N Wyoming Border",          -105.058, 44.978},
              {"North Point Not On Wyoming Border",  -105.06, 45.119},
              {"Point on E Wyoming Border",          -104.078, 42.988},
              {"East Point Not On Wyoming Border",   -104.061, 42.986},
              {"Point On S Wyoming Border",          -110.998, 41.099},
-             {"Point On S Colorado Border",         -103.008, 37.002},
+             {"South Point Not On Colorado Border", -103.008, 37.002},
              {"Point On W Wyoming Border",          -110.998, 42.999},
-             {"West not On South Wyoming Border",   -111.052, 41.999},
+             {"West Point Not on Wyoming Border",   -111.052, 41.999},
              {"Neverwhere",     Double.MIN_VALUE,   Double.MIN_VALUE},
             }, vt);
 
@@ -316,6 +355,18 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                     38.98811213712535,      -105.5929789796371 },
                  { "Wonderland",    Double.MIN_VALUE,       Double.MIN_VALUE},
                 }, vt, CENTROID_EPSILON);
+
+        sql = "select borders.name, LATITUDE(centroid(borders.region)), LONGITUDE(centroid(borders.region)) "
+                + "from borders "
+                + "where borders.region is not null "
+                + "order by borders.pk ";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertApproximateContentOfTable(new Object[][]
+                {{ "Colorado",      39.03372408765194,      -105.5485 },
+                 { "Wyoming",       43.01953179182205,      -107.55349999999999 },
+                 { "Colorado with a hole around Denver",
+                                    38.98811213712535,      -105.5929789796371 }
+                }, vt, CENTROID_EPSILON);
     }
 
     public void testPolygonPointDistance() throws Exception {
@@ -335,33 +386,32 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "order by distance, places.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertApproximateContentOfTable(new Object[][]
-                {{"Wyoming",    "Neverwhere",                       Double.MIN_VALUE},
-                 {"Wyoming",    "Cheyenne",                         0.0},
-                 {"Wyoming",    "Point on N Wyoming Border",        0.0},
-                 {"Wyoming",    "Point on E Wyoming Border",        0.0},
-                 {"Wyoming",    "Point On S Wyoming Border",        0.0},
-                 {"Wyoming",    "Point On W Wyoming Border",        0.0},
-                 {"Wyoming",    "East Point Not On Wyoming Border", 1.9770281362922971E-10},
-                 {"Wyoming",    "West not On South Wyoming Border", 495.8113972117496},
-                 {"Wyoming",    "Point near N Colorado border",     2382.0692767400983},
-                 {"Wyoming",    "Point Not On N Colorado Border",   4045.111373096421},
-                 {"Wyoming",    "North Point Not On Wyoming Border",12768.336788711755},
-                 {"Wyoming",    "Fort Collins",                     48820.44699386174},
-                 {"Wyoming",    "Denver",                           146450.36252816164},
-                 {"Wyoming",    "Point On S Colorado Border",       453545.4800250064},
-                 {"Wyoming",    "Albuquerque",                      659769.4012428687}
-
+                {{"Wyoming",    "Neverwhere",                           Double.MIN_VALUE},
+                 {"Wyoming",    "Cheyenne",                             0.0},
+                 {"Wyoming",    "Point on N Wyoming Border",            0.0},
+                 {"Wyoming",    "Point on E Wyoming Border",            0.0},
+                 {"Wyoming",    "Point On S Wyoming Border",            0.0},
+                 {"Wyoming",    "Point On W Wyoming Border",            0.0},
+                 {"Wyoming",    "East Point Not On Wyoming Border",     1.9770281362922971E-10},
+                 {"Wyoming",    "West Point Not on Wyoming Border",     495.8113972117496},
+                 {"Wyoming",    "Point near N Colorado border",         2382.0692767400983},
+                 {"Wyoming",    "North Point Not On Colorado Border",   4045.111373096421},
+                 {"Wyoming",    "North Point Not On Wyoming Border",    12768.336788711755},
+                 {"Wyoming",    "Fort Collins",                         48820.44699386174},
+                 {"Wyoming",    "Denver",                               146450.36252816164},
+                 {"Wyoming",    "South Point Not On Colorado Border",   453545.4800250064},
+                 {"Wyoming",    "Albuquerque",                          659769.4012428687},
                 }, vt, DISTANCE_EPSILON);
 
         // Validate result set obtained using distance between point and polygon is same as
         // distance between polygon and point
         sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
-                        + "from borders, places "
-                        + "order by borders.pk";
+                + "from borders, places where not contains(borders.region, places.loc) "
+                + "order by borders.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         // distance between point and polygon
         sql = "select borders.name, places.name, distance(places.loc, borders.region) as distance "
-                + "from borders, places "
+                + "from borders, places where not contains(borders.region, places.loc) "
                 + "order by borders.pk";
         VoltTable vt1 = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(vt1, vt);
