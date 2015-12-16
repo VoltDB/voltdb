@@ -1,11 +1,13 @@
-import os, sys, threading, shutil
+import os, sys, threading, shutil, re
 from subprocess import Popen, PIPE, STDOUT
+
 
 class BuildContext:
     def __init__(self, args):
         self.CPPFLAGS = ""
         self.EXTRAFLAGS = ""
-        self.LDFLAGS = ""
+        self.LDFLAGS = "-L${INSTALL_DIR}/lib"
+        self.LASTLDFLAGS = ""
         self.JNIEXT = ""
         self.JNILIBFLAGS = ""
         self.JNIBINFLAGS = ""
@@ -17,6 +19,8 @@ class BuildContext:
         self.OUTPUT_PREFIX = ""
         self.TEST_PREFIX = ""
         self.INPUT = {}
+        self.SRC_INCLUDE_DIRS = []
+        self.OBJ_INCLUDE_DIRS = ["3pty-install/include"]
         self.THIRD_PARTY_INPUT = {}
         self.TESTS = {}
         self.PLATFORM = os.uname()[0]
@@ -26,8 +30,14 @@ class BuildContext:
         self.NMFLAGS = "-n"    # specialized by platform in build.py
         self.COVERAGE = False
         self.PROFILE = False
+        # Compiler Configuration
         self.CC = "gcc"
         self.CXX = "g++"
+        self.COMPILER_NAME = "Unknown"
+        self.COMPILER_CONFIGURED = False
+        self.MAJORVERSION = 0
+        self.MINORVERSION = 0
+        self.PATCHLEVEL   = 0
         for arg in [x.strip().upper() for x in args]:
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
@@ -45,6 +55,62 @@ class BuildContext:
         buildLocal = os.path.join(os.path.dirname(__file__), "build.local")
         if os.path.exists(buildLocal):
             execfile(buildLocal, dict(BUILD = self))
+        
+    def compilerName(self):
+        self.getCompilerVersion()
+        if self.COMPILER_NAME:
+            return self.COMPILER_NAME
+        else:
+            return "UnknownCompiler"
+    def compilerMajorVersion(self):
+        self.getCompilerVersion()
+        return self.MAJORVERSION
+    def compilerMinorVersion(self):
+        self.getCompilerVersion()
+        return self.MINORVERSION
+    def compilerPatchLevel(self):
+        self.getCompilerVersion()
+        return self.PATCHLEVEL
+    def getCompilerVersion(self):
+        if self.COMPILER_CONFIGURED:
+            return
+        self.COMPILER_CONFIGURED = True
+        vinfo = output = Popen([self.CXX, "-v"], stderr=PIPE).communicate()[1]
+        self.MAJORVERSION = 0
+        self.MINORVERSION = 0
+        self.PATCHLEVEL   = 0
+        vvector = [0, 0, 0]
+        # Apple now uses clang and has its own versioning system.
+        # The version 7 compiler needs special compilation options.
+        # This is pretty dumb code that could be improved as we support more
+        # compilers and versions.
+        #   Xcode versions before 10.10
+        #   Xcode version 10.11
+        #   Clang built not from apple.
+        #   gcc
+        patterns = [
+                    [ r"based on LLVM ([.0-9]*)[^.0-9]",      "clang"],
+                    [ r"Apple LLVM version ([.0-9]*)[^.0-9]", "clang"],
+                    [ r"clang version ([.0-9]*)[^.0-9]",      "clang"],
+                    [ r"gcc version ([.0-9]*)[^.0-9]",        "gcc"  ],
+                   ]
+        for pattern in patterns:
+            m = re.search(pattern[0], vinfo)
+            if m:
+                self.COMPILER_NAME = pattern[1]
+                vinfo = m.group(1)
+                vvector = vinfo.split(".")
+                break
+        if self.COMPILER_NAME == "Unknown":
+            print("Cannot find compiler version by running \"%s\"" % self.CXX)
+        else:
+            vlen = len(vvector)
+            if vlen > 0:
+                self.MAJORVERSION = int(vvector[0])
+                if vlen > 1:
+                    self.MINORVERSION = int(vvector[1])
+                    if vlen > 2:
+                        self.PATCHLEVEL = int(vvector[2])
 
 def readFile(filename):
     "read a file into a string"
@@ -62,60 +128,40 @@ except:
     print "ERROR: Unable to read version number from version.txt."
     sys.exit(-1)
 
-def getAllDependencies(inputs, threads, retval={}):
-    if threads == 1:
-        for filename, cppflags, sysprefixes in inputs:
-            retval[filename] = getDependencies(filename, cppflags, sysprefixes)
+# Replace the extension of filename with the
+# new extension.  If the filename does not
+# have an extension, the new extension is just
+# appended.
+def replaceSuffix(name, suffix):
+    pos = name.rindex(".")
+    if pos < 0:
+        return name + suffix;
     else:
-        r2 = {}
-        t1 = threading.Thread(None, getAllDependencies, "checkdeps1", (inputs[:len(inputs)/2], 1, retval))
-        t2 = threading.Thread(None, getAllDependencies, "checkdeps2", (inputs[len(inputs)/2:], 1, r2))
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
-        retval.update(r2)
-    return retval
-
-def startsWithFromTuple(strValue, prefixes):
-    for prefix in prefixes:
-        if strValue.startswith(prefix):
-            return True
-    return False
-
-def getDependencies(filename, cppflags, sysprefixes):
-    command = "g++ %s -MM %s" % (cppflags, filename)
-
-    pipe = Popen(args=command, shell=True, bufsize=-1, stdout=PIPE, stderr=PIPE)
-    out = pipe.stdout.readlines()
-    out_err = pipe.stderr.readlines()
-    retcode = pipe.wait()
-    if retcode != 0:
-        print "Error Determining Dependencies for: %s" % (filename)
-        print ''.join(out_err)
-        sys.exit(-1)
-
-    if len(out) > 0:
-        out = out[1:]
-    out = " ".join(out)
-    out = out.split()
-    out = [x.strip() for x in out]
-    out = [x for x in out if x != "\\"]
-    out = [x for x in out if not startsWithFromTuple(x, tuple(sysprefixes))]
-    return out
-
+        return name[:pos] + suffix;
+    
 def outputNamesForSource(filename):
     relativepath = "/".join(filename.split("/")[2:])
-    jni_objname = "objects/" + relativepath[:-2] + "o"
-    static_objname = "static_objects/" + relativepath[:-2] + "o"
-    return jni_objname, static_objname
+    jni_objname = "objects/" + replaceSuffix(relativepath, ".o")
+    static_objname = "static_objects/" + replaceSuffix(relativepath, ".o")
+    return os.path.normpath(jni_objname), os.path.normpath(static_objname)
 
 def namesForTestCode(filename):
     relativepath = "/".join(filename.split("/")[2:])
     binname = "cpptests/" + relativepath
     sourcename = filename + ".cpp"
     objectname = "static_objects/" + filename.split("/")[-1] + ".o"
-    return binname, objectname, sourcename
+    return os.path.normpath(binname), os.path.normpath(objectname), os.path.normpath(sourcename)
+
+def formatList(list):
+    str = ""
+    indent = 16
+    for name in list:
+        if indent + len(name) + 1 > 120:
+            str += " \\\n\t\t"
+            indent = 16
+        str += (" " + name)
+        indent += len(name) + 1
+    return str
 
 def buildMakefile(CTX):
     global version
@@ -123,14 +169,12 @@ def buildMakefile(CTX):
     CPPFLAGS = " ".join(CTX.CPPFLAGS.split())
     MAKECPPFLAGS = CPPFLAGS
     for dir in CTX.SYSTEM_DIRS:
-        MAKECPPFLAGS += " -isystem ../../%s" % (dir)
-    for dir in CTX.INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I../../%s" % (dir)
-    LOCALCPPFLAGS = CPPFLAGS
-    for dir in CTX.SYSTEM_DIRS:
-        LOCALCPPFLAGS += " -isystem %s" % (dir)
-    for dir in CTX.INCLUDE_DIRS:
-        LOCALCPPFLAGS += " -I%s" % (dir)
+        MAKECPPFLAGS += " -isystem $(ROOTDIR)/%s" % (dir)
+    for dir in CTX.SRC_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I$(ROOTDIR)/%s" % (dir)
+    for dir in CTX.OBJ_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
+    MAKECPPFLAGS += " -I${OBJDIR}"
     JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
     JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
     INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
@@ -141,9 +185,11 @@ def buildMakefile(CTX):
     JNIEXT = CTX.JNIEXT.strip()
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
+    THIRD_PARTY_INSTALL_DIR=(OUTPUT_PREFIX + "/" + "3pty-install")
 
     # create directories for output if they don't exist
     os.system("mkdir -p %s" % (OUTPUT_PREFIX))
+    os.system("mkdir -p %s" % THIRD_PARTY_INSTALL_DIR)
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
@@ -166,31 +212,61 @@ def buildMakefile(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
 
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
+    makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
     makefile.write("CXX = %s\n" % CTX.CXX)
-    makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
+    makefile.write("CPPFLAGS += %s\n" % formatList(MAKECPPFLAGS.split(" ")))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
     makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
-    makefile.write("SRC = ../../%s\n" % (INPUT_PREFIX))
-    makefile.write("THIRD_PARTY_SRC = ../../%s\n" % (THIRD_PARTY_INPUT_PREFIX))
     makefile.write("NM = %s\n" % (NM))
     makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
+    makefile.write('RM = /bin/rm -rf\n')
+    makefile.write("#\n")
+    makefile.write("# Capture the (relative) name of the root directory.\n")
+    makefile.write("# Also, remember the obj directory,\n")
+    makefile.write("# which should be the directory we are currently in.\n")
+    makefile.write("#\n")
+    makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
+    makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
+    makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
+    makefile.write('#\n')
+    makefile.write('# This is the root of the cpp sources.\n')
+    makefile.write('#\n')
+    makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
+    makefile.write('#\n')
+    makefile.write('# This is the root of the third party sources.\n')
+    makefile.write('#\n')
+    makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
     makefile.write("\n")
+    makefile.write('#\n')
+    makefile.write('# We keep tarballs of third party sources here.\n')
+    makefile.write('#\n')
+    makefile.write('TARBALLS_DIR=${THIRD_PARTY_SRC}/tarballs\n')
+    makefile.write('\n')
+    makefile.write('# These are the PCRE2 library\'s source, build and install directories,\n')
+    makefile.write('# and the location of the source tarball\n')
+    makefile.write('PCRE2_VERSION=10.10\n')
+    makefile.write('PCRE2_NAME=pcre2-${PCRE2_VERSION}\n')
+    makefile.write('PCRE2_SRC=${THIRD_PARTY_SRC}/${PCRE2_NAME}\n')
+    makefile.write('PCRE2_OBJ=${OBJDIR}/${PCRE2_NAME}\n')
+    makefile.write('PCRE2_INSTALL=${INSTALL_DIR}\n')
+    makefile.write('PCRE2_TARBALL=${TARBALLS_DIR}/${PCRE2_NAME}.tar.bz2\n')
 
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
-        makefile.write("\trm -rf *\n")
+	makefile.write('\t${RM} "${PCRE2_SRC}"\n')
+        makefile.write('\trm -rf "${OBJDIR}"\n')
         makefile.close()
         return
 
-    makefile.write(".PHONY: main\n")
+    makefile.write(".PHONY: main\n\n")
     if CTX.TARGET == "VOLTRUN":
         makefile.write("main: prod/voltrun\n")
     elif CTX.TARGET == "TEST":
-        makefile.write("main: ")
+        makefile.write("main:\n")
     else:
         makefile.write("main: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % version)
     makefile.write("\n")
@@ -206,107 +282,198 @@ def buildMakefile(CTX):
         jni_objects.append(jni)
         static_objects.append(static)
 
+    cleanobjs = []
     makefile.write("# create symbols by running nm against libvoltdb-%s\n" % version)
-    makefile.write("nativelibs/libvoltdb-%s.sym: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % (version, version))
-    makefile.write("\t$(NM) $(NMFLAGS) nativelibs/libvoltdb-%s.$(JNIEXT) > $@\n" % version)
+    nmfilename = ("nativelibs/libvoltdb-%s.sym" % version)
+    jnilibname = ("nativelibs/libvoltdb-%s.$(JNIEXT)" % version)
+    cleanobjs += [nmfilename]
+    makefile.write("%s: %s\n" % (nmfilename, jnilibname))
+    makefile.write("\t$(NM) $(NMFLAGS) %s > $@\n" % jnilibname)
     makefile.write("\n")
 
     makefile.write("# main jnilib target\n")
-    makefile.write("nativelibs/libvoltdb-%s.$(JNIEXT): " % version + " ".join(jni_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^\n")
+    makefile.write("%s: %s\n" % (jnilibname, formatList(jni_objects)))
+    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ %s \n" % ( CTX.LASTLDFLAGS ) )
     makefile.write("\n")
+    cleanobjs += [ jnilibname ]
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
-    makefile.write("prod/voltrun: $(SRC)/voltrun.cpp " + " ".join(static_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^\n")
+    makefile.write("prod/voltrun: $(SRCDIR)/voltrun.cpp " + formatList(static_objects) + "\n")
+    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ %s\n" % ( CTX.LASTLDFLAGS ))
     makefile.write("\n")
+    cleanobjs += ["prod/voltrun"]
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
-    makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) -o $@ $^ %s\n" % (CTX.LASTLDFLAGS))
+    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp " + " objects/volt.a\n")
+    makefile.write("\t$(LINK.cpp) -o $@ $^ %s %s\n" % (CTX.LASTLDFLAGS, CTX.LASTIPCLDFLAGS))
     makefile.write("\n")
+    cleanobjs += ["prod/voltdbipc"]
 
-
+    # If this is a memcheck or memcheck_nofreelist build, then
+    # building test requires building the ipc executable as well.
+    IPC_EXENAME = ""
+    if CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST":
+        IPC_EXENAME = "prod/voltdbipc "
     makefile.write(".PHONY: test\n")
-    makefile.write("test: ")
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
-        makefile.write(binname + " ")
-    if CTX.LEVEL == "MEMCHECK":
-        makefile.write("prod/voltdbipc")
-    if CTX.LEVEL == "MEMCHECK_NOFREELIST":
-        makefile.write("prod/voltdbipc")
-    makefile.write("\n\n")
-    makefile.write("objects/volt.a: " + " ".join(jni_objects) + " objects/harness.o\n")
+    makefile.write("test: %s%s\n" % (IPC_EXENAME, formatList((namesForTestCode(test)[0] for test in tests))))
+        
+    makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
-    makefile.write("objects/harness.o: ../../" + TEST_PREFIX + "/harness.cpp\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -o $@ $^\n")
+    harness_source = TEST_PREFIX + "/harness.cpp"
+    makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $^\n")
+    makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
-
-    LOCALTESTCPPFLAGS = LOCALCPPFLAGS + " -I%s" % (TEST_PREFIX)
-    allsources = []
+    cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
+    
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# %s\n#\n" % "Volt Files")
+    makefile.write("########################################################################\n")
     for filename in input_paths:
-        allsources += [(filename, LOCALCPPFLAGS, IGNORE_SYS_PREFIXES)]
-    for filename in third_party_input_paths:
-        allsources += [(filename, LOCALCPPFLAGS, IGNORE_SYS_PREFIXES)]
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
-        allsources += [(sourcename, LOCALTESTCPPFLAGS, IGNORE_SYS_PREFIXES)]
-    deps = getAllDependencies(allsources, 1)
-
-    for filename in input_paths:
-        mydeps = deps[filename]
-        mydeps = [x.replace(INPUT_PREFIX, "$(SRC)") for x in mydeps]
         jni_objname, static_objname = outputNamesForSource(filename)
-        filename = filename.replace(INPUT_PREFIX, "$(SRC)")
+        filename = os.path.normpath(filename.replace(INPUT_PREFIX, "$(SRCDIR)"))
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write(jni_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write(static_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("########################################################################\n")
+        makefile.write("#\n# %s\n#\n" % filename)
+        makefile.write("########################################################################\n")
+        makefile.write("%s: %s | build-third-party-tools \n" % (jni_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (static_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("-include %s\n" % replaceSuffix(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(static_objname, ".d"))
+        cleanobjs += [jni_objname,
+                      static_objname,
+                      replaceSuffix(jni_objname, ".d"),
+                      replaceSuffix(jni_objname, ".d")]
+        makefile.write("\n")
     makefile.write("\n")
 
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# %s\n#\n" % "Third Party Files")
+    makefile.write("########################################################################\n")
     for filename in third_party_input_paths:
-        mydeps = deps[filename]
-        mydeps = [x.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)") for x in mydeps]
         jni_objname, static_objname = outputNamesForSource(filename)
         filename = filename.replace(THIRD_PARTY_INPUT_PREFIX, "$(THIRD_PARTY_SRC)")
         jni_targetpath = OUTPUT_PREFIX + "/" + "/".join(jni_objname.split("/")[:-1])
         static_targetpath = OUTPUT_PREFIX + "/" + "/".join(static_objname.split("/")[:-1])
         os.system("mkdir -p %s" % (jni_targetpath))
         os.system("mkdir -p %s" % (static_targetpath))
-        makefile.write(jni_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
-        makefile.write(static_objname + ": " + filename + " " + " ".join(mydeps) + "\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("########################################################################\n")
+        makefile.write("#\n# %s\n#\n" % filename)
+        makefile.write("########################################################################\n")
+        makefile.write("%s: %s | build-third-party-tools \n" % (jni_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("%s: %s | build-third-party-tools \n" % (static_objname, filename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) %s -MMD -MP -o $@ %s\n" % (CTX.EXTRAFLAGS, filename))
+        makefile.write("-include %s\n" % replaceSuffix(jni_objname, ".d"))
+        makefile.write("-include %s\n" % replaceSuffix(static_objname, ".d"))
+        cleanobjs += [jni_objname,
+                      static_objname,
+                      replaceSuffix(jni_objname, ".d"),
+                      replaceSuffix(jni_objname, ".d")]
+        makefile.write("\n")
     makefile.write("\n")
 
+    makefile.write("########################################################################\n")
+    makefile.write("#\n# This target lets us print makefile variables, for debugging\n")
+    makefile.write("########################################################################\n")
+    makefile.write("echo_makefile_config:\n")
+    makefile.write('\t@echo "ROOTDIR = $(ROOTDIR)"\n')
+    makefile.write('\t@echo "OBJDIR = $(OBJDIR)"\n')
+    makefile.write('\t@echo "SRCDIR = $(SRCDIR)"\n')
+    makefile.write('\t@echo "THIRD_PARTY_SRC = $(THIRD_PARTY_SRC)"\n\n')
+
+    makefile.write("########################################################################\n")
+    makefile.write("#\n")
+    makefile.write("# Third Party Tools.\n")
+    makefile.write("#\n")
+    makefile.write("########################################################################\n")
+    makefile.write('.PHONY: build-third-party-tools\n')
+    makefile.write('build-third-party-tools: build-pcre2\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('# Testing of third party tools.  We do not run this usually, but\n')
+    makefile.write('# it is convenient to put it in the makefile.\n')
+    makefile.write('# Note that these will not be run by Jenkins.\n')
+    makefile.write('########################################################################\n')
+    makefile.write('test-third-party-tools: test-pcre2\n')
+    makefile.write('.PHONY: test-third-party-tools')
+    makefile.write('\n')
+    makefile.write('test-pcre2: build-pcre2\n')
+    makefile.write('\t@echo Testing PCRE2 in ${PCRE2_OBJ}\n')
+    makefile.write('\t(cd "${PCRE2_OBJ}"; ${MAKE} check)\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('# pcre2 - regular expressions.\n')
+    makefile.write('########################################################################\n')
+    makefile.write('build-pcre2: configure-pcre2\n')
+    makefile.write('\tif [ ! -f "${PCRE2_INSTALL}/lib/libpcre2-8.a" ] ; then \\\n')
+    makefile.write('\t  @echo Building PCRE2 ; \\\n')
+    makefile.write('\t  (cd "$(PCRE2_OBJ)"; ${MAKE} install); \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('.PHONY: build-pcre2\n')
+    makefile.write('\n')
+    makefile.write('configure-pcre2: unpack-pcre2\n')
+    makefile.write('\tif [ ! -d "${PCRE2_OBJ}" ] ; then \\\n')
+    makefile.write('\t  @echo Configuring PCRE2; \\\n')
+    makefile.write('\t  /bin/rm -rf "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  mkdir -p "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  cd "${PCRE2_OBJ}"; \\\n')
+    makefile.write('\t  "${PCRE2_SRC}/configure" --disable-shared --with-pic --prefix="${PCRE2_INSTALL}" ; \\\n')
+    makefile.write('\tfi\n')
+    makefile.write('.PHONY: configure-pcre2\n')
+    makefile.write('\n')
+    makefile.write('unpack-pcre2:\n')
+    makefile.write('\tif [ ! -d "$PCRE2_SRC" ] ; then \\\n')
+    makefile.write('\t  tar -x -j -f "${PCRE2_TARBALL}" -C "${THIRD_PARTY_SRC}" ; \\\n')
+    makefile.write('fi\n')
+    makefile.write('.PHONY: unpack-pcre2\n')
+    makefile.write('\n')
+    makefile.write('########################################################################\n')
+    makefile.write('#\n')
+    makefile.write('# Tests\n')
+    makefile.write('#\n')
+    makefile.write('########################################################################\n')
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
         # build the object file
-        makefile.write("%s: ../../%s" % (objectname, sourcename))
-        mydeps = deps[sourcename]
-        for dep in mydeps:
-            makefile.write(" ../../%s" % (dep))
-        makefile.write("\n")
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I../../%s -o $@ ../../%s\n" % (TEST_PREFIX, sourcename))
-
+        makefile.write("########################################################################\n")
+        makefile.write("#\n")
+        makefile.write("# %s\n" % sourcename)
+        makefile.write("#\n")
+        makefile.write("########################################################################\n")
+        makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
-        makefile.write("%s: %s objects/volt.a\n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a\n" % (binname, objectname))
+        makefile.write("%s: %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
+        makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
-
         pysourcename = sourcename[:-3] + "py"
+        cleanobjs += [objectname, replaceSuffix(objectname, ".d"), binname]
         if os.path.exists(pysourcename):
             shutil.copy(pysourcename, targetpath)
+            cleanobjs += [targetpath]
 
+    makefile.write("########################################################################\n")
+    makefile.write("#\n")
+    makefile.write("# Cleaning\n")
+    makefile.write("#\n")
+    makefile.write("########################################################################\n")
     makefile.write("\n")
+    makefile.write("clean: \n")
+    makefile.write("\t@echo Deleting all derived files.\n")
+    makefile.write('\t@${RM} %s\n' % formatList(cleanobjs))
+    makefile.write('\t@${RM} "${PCRE2_OBJ}"\n')
+    makefile.write('\t@${RM} "${INSTALL_DIR}/*"\n')
+    makefile.write('\t@${RM} "${PCRE2_SRC}"\n')
     makefile.close()
     return True
 
@@ -378,33 +545,4 @@ def runTests(CTX):
     print "==============================================================================="
 
     return failures
-
-def getCompilerVersion():
-    vinfo = output = Popen(["gcc", "-v"], stderr=PIPE).communicate()[1]
-    # Apple now uses clang and has its own versioning system.
-    # Not sure we do anything that cares which version of clang yet.
-    # This is pretty dumb code that could be improved as we support more
-    #  compilers and versions.
-    if output.find('clang') != -1:
-        # this is a hacky way to find the real clang version from the output of
-        # gcc -v on the mac. The version is right after the string "based on LLVM ".
-        token = "based on LLVM "
-        pos = vinfo.find(token)
-        if pos != -1:
-            pos += len(token)
-            vinfo = vinfo[pos:pos+3]
-            vinfo = vinfo.split(".")
-            return "clang", vinfo, vinfo, 0
-        # if not the expected apple clang format
-        # this probably needs to be adjusted for clang on linux or from source
-        return "clang", 0, 0, 0
-    else:
-        vinfo = vinfo.strip().split("\n")
-        vinfo = vinfo[-1]
-        vinfo = vinfo.split()[2]
-        vinfo = vinfo.split(".")
-        return "gcc", int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
-
-# get the version of gcc and make it avaliable
-compiler_name, compiler_major, compiler_minor, compiler_point = getCompilerVersion()
 

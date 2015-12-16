@@ -619,13 +619,17 @@ public class CatalogDiffEngine {
         }
 
         // Support any modification of these
+        // I added Statement and PlanFragment for the need of materialized view recalculation plan updates.
+        // ENG-8641, yzhang.
         if (suspect instanceof User ||
             suspect instanceof Group ||
             suspect instanceof Procedure ||
             suspect instanceof SnapshotSchedule ||
             suspect instanceof UserRef ||
             suspect instanceof GroupRef ||
-            suspect instanceof ColumnRef) {
+            suspect instanceof ColumnRef ||
+            suspect instanceof Statement ||
+            suspect instanceof PlanFragment) {
             return null;
         }
 
@@ -656,24 +660,28 @@ public class CatalogDiffEngine {
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
 
-        if (suspect instanceof Cluster && field.equals("drProducerPort")) {
-            // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
-            if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
-                restrictionQualifier = " while DR is enabled";
-            }
-            else {
+        if (suspect instanceof Cluster) {
+            if (field.equals("drFlushInterval")) {
                 return null;
+            } else if (field.equals("drProducerPort")) {
+                // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
+                if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
+                    restrictionQualifier = " while DR is enabled";
+                }
+                else {
+                    return null;
+                }
+            } else if (field.equals("drMasterHost")) {
+                String source = (String)suspect.getField("drMasterHost");
+                if (source.isEmpty() && (Boolean)suspect.getField("drConsumerEnabled")) {
+                    restrictionQualifier = " while DR is enabled";
+                }
+                else {
+                    return null;
+                }
             }
         }
-        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
-            String source = (String)suspect.getField("drMasterHost");
-            if (source.isEmpty() && (Boolean)suspect.getField("drConsumerEnabled")) {
-                restrictionQualifier = " while DR is enabled";
-            }
-            else {
-                return null;
-            }
-        }
+
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {

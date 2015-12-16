@@ -1,0 +1,19 @@
+# Expected Default Stored Procedures: (when running the Voter example app)
+AREA_CODE_STATE.delete
+AREA_CODE_STATE.insert
+AREA_CODE_STATE.update
+AREA_CODE_STATE.upsert
+CONTESTANTS.delete
+CONTESTANTS.insert
+CONTESTANTS.update
+CONTESTANTS.upsert
+PARTITIONED_TABLE.delete
+PARTITIONED_TABLE.insert
+PARTITIONED_TABLE.select
+PARTITIONED_TABLE.update
+PARTITIONED_TABLE.upsert
+REPLICATED_TABLE.delete
+REPLICATED_TABLE.insert
+REPLICATED_TABLE.update
+REPLICATED_TABLE.upsert
+VOTES.insert

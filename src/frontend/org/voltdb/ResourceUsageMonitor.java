@@ -99,7 +99,7 @@ public class ResourceUsageMonitor implements Runnable, InternalConnectionContext
         }
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
-            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, 0, "@Pause");
+            VoltDB.instance().getClientInterface().getInternalConnectionHandler().callProcedure(this, null, "@Pause");
         }
     }
 

@@ -20,6 +20,6 @@
 --{@onefun = "LOWER"}
 {@optionalfn = "_stringfun"}
 
-{@updatecolumn = "_value[string]"}
-{@updatesource = "_value[string]"}
-{@updatevalue = "_value[string]"}
+{@updatecolumn = "VCHAR"}
+{@updatesource = "VCHAR_INLINE"}
+{{@updatevalue = "_value[string]"}

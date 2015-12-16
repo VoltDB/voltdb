@@ -19,6 +19,7 @@
 #define PERSISTENTTABLEUNDOINSERTACTION_H_
 
 #include "common/UndoAction.h"
+#include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
@@ -39,7 +40,7 @@ public:
      */
     virtual void undo() {
         m_table->deleteTupleForUndo(m_tuple);
-        m_table->DRRollback(m_drMark);
+        m_table->DRRollback(m_drMark, rowCostForDRRecord(DR_RECORD_INSERT));
     }
 
     /*

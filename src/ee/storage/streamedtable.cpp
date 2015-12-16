@@ -33,6 +33,16 @@ StreamedTable::StreamedTable(bool exportEnabled)
     }
 }
 
+StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
+    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(wrapper),
+    m_sequenceNo(0)
+{
+    // In StreamedTable, a non-null m_wrapper implies export enabled.
+    if (exportEnabled) {
+        enableStream();
+    }
+}
+
 StreamedTable *
 StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     StreamedTable * st = new StreamedTable(true);
@@ -161,7 +171,7 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
 void StreamedTable::undo(size_t mark)
 {
     if (m_wrapper) {
-        m_wrapper->rollbackTo(mark);
+        m_wrapper->rollbackTo(mark, SIZE_MAX);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //then having gaps.

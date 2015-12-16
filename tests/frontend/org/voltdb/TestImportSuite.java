@@ -93,10 +93,12 @@ public class TestImportSuite extends RegressionSuite {
     abstract class DataPusher extends Thread {
         private final int m_count;
         private final CountDownLatch m_latch;
+        private final char m_separator;
 
-        public DataPusher(int count, CountDownLatch latch) {
+        public DataPusher(int count, CountDownLatch latch, char separator) {
             m_count = count;
             m_latch = latch;
+            m_separator = separator;
         }
 
         protected abstract void initialize();
@@ -109,7 +111,7 @@ public class TestImportSuite extends RegressionSuite {
 
             try {
                 for (int icnt = 0; icnt < m_count; icnt++) {
-                    String s = String.valueOf(System.nanoTime() + icnt) + "," + System.currentTimeMillis() + "\n";
+                    String s = String.valueOf(System.nanoTime() + icnt) + m_separator + System.currentTimeMillis() + "\n";
                     pushData(s);
                     Thread.sleep(0, 1);
                 }
@@ -128,8 +130,8 @@ public class TestImportSuite extends RegressionSuite {
         private final int m_port;
         private OutputStream m_sout;
 
-        public SocketDataPusher(String server, int port, int count, CountDownLatch latch) {
-            super(count, latch);
+        public SocketDataPusher(String server, int port, int count, CountDownLatch latch, char separator) {
+            super(count, latch, separator);
             m_server = server;
             m_port = port;
         }
@@ -159,8 +161,8 @@ public class TestImportSuite extends RegressionSuite {
 
         private final Random random = new Random();
 
-        public Log4jDataPusher(int count, CountDownLatch latch) {
-            super(count, latch);
+        public Log4jDataPusher(int count, CountDownLatch latch, char separator) {
+            super(count, latch, separator);
         }
 
         @Override
@@ -181,11 +183,20 @@ public class TestImportSuite extends RegressionSuite {
     private void pushDataToImporters(int count, int loops) throws Exception {
         CountDownLatch latch = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
-            (new SocketDataPusher("localhost", 7001, count, latch)).start();
-            (new Log4jDataPusher(count, latch)).start();
+            (new SocketDataPusher("localhost", 7001, count, latch, '\t')).start();
+            (new Log4jDataPusher(count, latch, ',')).start();
         }
         latch.await();
     }
+
+    private static Map<String, String> expectedStatRows = new HashMap<>();
+    static {
+        expectedStatRows.put("SocketServerImporter", "importTable.insert");
+        expectedStatRows.put("Log4jSocketHandlerImporter", "log_events.insert");
+    };
+    private static final String CONN_HOST_COL = "CONNECTION_HOSTNAME";
+    private static final String PROC_NAME_COL = "PROCEDURE_NAME";
+    private static final String INVOCATIONS_COL = "INVOCATIONS";
 
     private void verifyData(Client client, int count) throws Exception {
         verifyData(client, count, -1);
@@ -222,6 +233,27 @@ public class TestImportSuite extends RegressionSuite {
             Thread.sleep(50);
         }
         assertTrue(error, success);
+
+       ClientResponse response = client.callProcedure("@Statistics", "Initiator", 0);
+       VoltTable stats = response.getResults()[0];
+       int foundCount = 0;
+       for (int i=0; i<stats.getRowCount(); i++) {
+           VoltTableRow row = stats.fetchRow(i);
+           String name = row.getString(CONN_HOST_COL);
+           if (!expectedStatRows.containsKey(name)) {
+               continue;
+           }
+           foundCount++;
+           assertEquals(expectedStatRows.get(name), row.getString(PROC_NAME_COL));
+           long invocations = row.getLong(INVOCATIONS_COL);
+           if (min<0) {
+               assertEquals(count, invocations);
+           } else {
+               assertTrue(invocations>=min && invocations <= count);
+           }
+       }
+
+       assertEquals(expectedStatRows.size(), foundCount);
     }
 
     public void testImportSimpleData() throws Exception {
@@ -320,7 +352,6 @@ public class TestImportSuite extends RegressionSuite {
 
     static public junit.framework.Test suite() throws Exception
     {
-
         LocalCluster config;
         Map<String, String> additionalEnv = new HashMap<String, String>();
         //Specify bundle location
@@ -341,14 +372,14 @@ public class TestImportSuite extends RegressionSuite {
                 "port", "7001",
                 "decode", "true",
                 "procedure", "importTable.insert"));
-        project.addImport(true, "custom", "csv", "socketstream.jar", props);
+        project.addImport(true, "custom", "tsv", "socketstream.jar", props);
         project.addPartitionInfo("importTable", "PKEY");
 
         // configure log4j socket handler importer
         props = new Properties();
         props.putAll(ImmutableMap.<String, String>of(
                 "port", "6060",
-                "procedure", "importTable.insert",
+                "procedure", "log_events.insert",
                 "log-event-table", "log_events"));
         project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 

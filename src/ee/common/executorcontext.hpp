@@ -22,16 +22,18 @@
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
+#include "common/ValuePeeker.hpp"
 
 #include <vector>
 #include <map>
 
 namespace voltdb {
 
+extern const int64_t VOLT_EPOCH;
+
 class AbstractExecutor;
 class DRTupleStream;
 class VoltDBEngine;
-
 
 /*
  * EE site global data required by executors at runtime.
@@ -69,11 +71,6 @@ class ExecutorContext {
         m_partitionId = partitionId;
     }
 
-    // not always known at initial construction
-    void setEpoch(int64_t epoch) {
-        m_epoch = epoch;
-    }
-
     // helper to configure the context for a new jni call
     void setupForPlanFragments(UndoQuantum *undoQuantum,
                                int64_t txnId,
@@ -85,9 +82,9 @@ class ExecutorContext {
         m_spHandle = spHandle;
         m_txnId = txnId;
         m_lastCommittedSpHandle = lastCommittedSpHandle;
-        m_currentTxnTimestamp = (m_uniqueId >> 23) + m_epoch;
         m_uniqueId = uniqueId;
-        m_currentDRTimestamp = (static_cast<int64_t>(m_drClusterId) << 49) | (m_uniqueId >> 14);
+        m_currentTxnTimestamp = (m_uniqueId >> 23) + VOLT_EPOCH;
+        m_currentDRTimestamp = createDRTimestampHiddenValue(static_cast<int64_t>(m_drClusterId), m_uniqueId);
     }
 
     // data available via tick()
@@ -116,6 +113,24 @@ class ExecutorContext {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
         assert(m_subqueryContextMap.empty());
+    }
+
+    static int64_t createDRTimestampHiddenValue(int64_t clusterId, int64_t uniqueId) {
+        return (clusterId << 49) | (uniqueId >> 14);
+    }
+
+    static int64_t getDRTimestampFromHiddenNValue(NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        // Convert this into a microsecond-resolution timestamp; treat the time
+        // portion as the time in milliseconds, and the sequence number as if
+        // it is a time in microseconds
+        int64_t ts = hiddenValue & ((1LL << 49) - 1LL);
+        return (ts >> 9) * 1000 + VOLT_EPOCH + (ts & 0x1ff);
+    }
+
+    static int8_t getClusterIdFromHiddenNValue(NValue &value) {
+        int64_t hiddenValue = ValuePeeker::peekAsBigInt(value);
+        return static_cast<int8_t>(hiddenValue >> 49);
     }
 
     UndoQuantum *getCurrentUndoQuantum() {
@@ -206,6 +221,7 @@ class ExecutorContext {
 
     void cleanupAllExecutors();
 
+    void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
     DRTupleStream* drStream() {
@@ -258,9 +274,6 @@ class ExecutorContext {
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
-
-    /** local epoch for voltdb, somtime around 2008, pulled from catalog */
-    int64_t m_epoch;
 };
 
 }

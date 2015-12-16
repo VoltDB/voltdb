@@ -69,6 +69,7 @@ h1, h2, h3, h4, h5, h6 {
 .errorValue {
     color: #c70000;
 }
+.notActive {-moz-opacity:0.5; -khtml-opacity: 0.5; filter: alpha(opacity=50); opacity: 0.5; }
 
 /*****Global Ends******/
 /******sprite*************/
@@ -84,7 +85,7 @@ a.alertIcon,
 input.icon-search,
 a.save-search,
 a.icon-search,
-ul.clusterStat, li.activeServerName, 
+ul.clusterStat, li.activeServerName,.timeOutCross,
 a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
@@ -315,6 +316,7 @@ html, body {
         float: left;
         width: 140px;
         padding: 8px 0 0 0;
+		margin-right:90px;
     }
 
     .headLeft .menu {
@@ -410,7 +412,8 @@ ul.topRightList {
             display: block;
             text-decoration: none;
             color: #000000;
-            padding: 3px 2px 5px 15px;
+		  /*padding: 3px 2px 5px 15px;*/
+            padding: 3px 2px 5px 72px;
             white-space: nowrap;
         }
 
@@ -419,7 +422,7 @@ ul.topRightList {
 
         .menuHome ul li:hover ul {
             display: block;
-            position: absolute;
+            /*position: absolute;*/
         }
 
         .menuHome ul li:hover li {
@@ -432,7 +435,7 @@ ul.topRightList {
             border-left: 1px solid #CCCCCC;
             border-right: 1px solid #CCCCCC;
             position: relative;
-            right: 50px;
+            right:0 /*50px*/;
             z-index: 1;
             width: 115px;
         }
@@ -515,7 +518,7 @@ ul.topRightList {
 
 .clusterDetailsContLeft {
     float: left;
-    width: 50%;
+    width: 60%;
 }
 
 .clusterDetailsContRight {
@@ -625,13 +628,14 @@ ul.rightShowhideList {
         border: 1px solid #aaaaaa;
         height: 28px;
         line-height: 28px;
-        width: 150px;
+        width: 140px;
     }
 
 
 .graphChart {
     width: 100%;
 }
+
 
 
 .chart {
@@ -1106,7 +1110,6 @@ a.setVal {
     }
 
 
-
 table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
@@ -1128,12 +1131,10 @@ table.serversTbl tr td.pauseActiveMonitoring {
 
 table.serversTbl tr td.active{
     background-position: 5px 17px;
-
 }
 
 table.serversListTbl tr td.active {
     background-position: 5px 20px;
-
 }
 
 table.serversTbl tr td.pauseMonitoring {
@@ -1363,8 +1364,8 @@ ul.catalogNav {
     border-top: none;
 }
 
-tr.trLicenseInfo td {
-    border: none !important;
+td.trLicenseInfo{
+    padding-top: 20px!important;
 }
 
 
@@ -1577,6 +1578,18 @@ input.count-input {
         background-position: 3px -834px;
     }
 
+.timeOutCross {color: #888;
+    cursor: pointer;
+    padding: 5px;
+    background-position: 0 -795px;
+    height: 15px;
+    width: 15px;
+   }
+
+.timeOutCross:hover {
+    background-position:0 -833px;
+}
+
 .popup_back {
     cursor: pointer;
     background-color: #222;
@@ -1611,6 +1624,12 @@ div.popup {
     overflow: auto;
     line-height: 18px;
 }
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+     ::i-block-chrome,.overlay-content  {
+     width: 450px;
+    }
+   
+}
 
 .graphPop {
     height: 110px;
@@ -1629,6 +1648,7 @@ div.popup {
     margin-bottom: 5px;
     height: 30px;
     line-height: 35px;
+   
 }
 
     .user-preferences li.last {
@@ -1640,7 +1660,7 @@ div.popup {
     .user-preferences li input[type='checkbox'] {
         float: right;
         position: relative;
-        top: 8px;
+        top: 10px;
     }
 
 .msg-pop-info {
@@ -1729,7 +1749,7 @@ div.popup {
 /*navigation responsive*/
 
 #nav {
-    position: absolute;
+    /*position: absolute;*/
     left: 250px;
     z-index: 999;
     display: block;
@@ -1862,7 +1882,7 @@ ul.topRightList li a {
 }
 
 .btnList {
-    margin: 10px 0 0 0;
+    margin-top:10px;
     padding: 0;
     float: right;
 }
@@ -1876,6 +1896,15 @@ ul.topRightList li a {
 .blockWrapper h1.theHeading {
     margin: 0 0 1.5px 0 !important;
     padding: 17px 20px 17px 45px;
+    background-color: #FFFFFF;
+    -webkit-box-shadow: 0px 6px 7px -5px #ccc;
+    -moz-box-shadow: 0px 6px 7px -5px #ccc;
+    box-shadow: 0px 6px 7px -5px #ccc;
+}
+
+.blockWrapper h1.theHeadingQuery {
+    margin: 0 0 1.5px 0 !important;
+    padding: 0px 0px 10px 2px;
     background-color: #FFFFFF;
     -webkit-box-shadow: 0px 6px 7px -5px #ccc;
     -moz-box-shadow: 0px 6px 7px -5px #ccc;
@@ -1926,7 +1955,7 @@ h3.ui-accordion-header {
     height: auto !important;
 }
 
-h3.ui-accordion-header, h3.ui-accordion-header-active, h1.icon-query, h1.icon-queryResult {
+h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query, h1.icon-queryResult {
     background-image: url(images/voltdb-icon-sprite.png);
     background-repeat: no-repeat;
 }
@@ -1951,8 +1980,8 @@ h3.ui-state-active {
         background-color: #76bd1d;
     }
 
-h1.icon-query {
-    background-position: 15px -1252px;
+.icon-query {
+    background-position: 15px -1254px;
 }
 
 h1.icon-queryResult {
@@ -2095,7 +2124,7 @@ right: -31px!important;
 h2.help {
     font: bold 15px Arial, Helvetica, sans-serif;
     padding-bottom: 10px;
-    border-bottom: 1px dashed #ddd;
+    /*border-bottom: 1px dashed #ddd;*/
 }
 
 .VDBMonitorHelp p {
@@ -2155,6 +2184,7 @@ ul.helpSchemaList {
 
 /**admin**/
 .adminIcons,
+.sqlSetting,
 .pause,
 .resume,
 .save,
@@ -2172,8 +2202,8 @@ ul.helpSchemaList {
 .edit,
 .editDisabled,
 .arrow,
-.labelCollapsed,
-.labelExpanded,
+/*.labelCollapsed,*/
+/*.labelExpanded,*/
 a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
     background-image: url(images/admin-icons.png);
 }
@@ -2298,7 +2328,7 @@ ul.adminClusterList li a.stop {
 
 ul.adminClusterList li a.shutdown {
     display: inline-block;
-    background-position: -358px -56px;
+    background-position: -165px -56px;
     width: 40px;
     height: 36px;
 }
@@ -2369,6 +2399,7 @@ ul.adminClusterList li a.shutdown {
     float: left;
 }
 
+
 .serverName { /*cursor:pointer; float:left; background:#D0D2D2; padding:8px; font-weight:bold;*/
     background: none repeat scroll 0 0 #d0d2d2;
     cursor: pointer;
@@ -2386,6 +2417,11 @@ ul.adminClusterList li a.shutdown {
 }
 
 .adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/
+    background-position: -225px -14px;
+    height: 28px;
+    width: 30px;
+}
+.sqlSetting {
     background-position: -225px -14px;
     height: 28px;
     width: 30px;
@@ -2592,13 +2628,15 @@ ul.adminClusterList li a.shutdown {
 }
 
 .labelCollapsed {
-    background-position: -468px -11px;
+    /*background-position: -468px -11px;*/
     padding-left: 22px;
+    background: url("images/up.png")0 1px no-repeat; 
 }
 
 .labelExpanded {
-    background-position: -468px -55px;
+    /*background-position: -468px -55px;*/
     padding-left: 22px;
+    background: url("images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
@@ -2914,7 +2952,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
 .overviewTbl {
-    overflow: auto;
+    /*overflow: auto;*/
     width: auto;
 }
 
@@ -3625,7 +3663,64 @@ a:hover.changePsd {
 /*add idsk limit*/
 table.diskLimitTbl tr td { border: none;}
 
+/*********overlapping nv.d3.css*********/
+.nvtooltip{border: 1px solid #CCCCCC !important;}
 
+
+svg.nvd3-svg { width:95% !important; }
+.nvtooltip table thead tr:first-child{ border-bottom: 1px solid #CCCCCC;text-align: center;}
+.nvtooltip table tr td { border: none !important;}
+
+
+/**************************QueryTimeOut*************************/
+.queryHeadName { float:left; width:100px; height:22px; text-indent:40px; padding-top:17px;}
+.queryTimeoutName { 
+    background: #d0d2d2 none repeat scroll 0 0;
+    cursor: pointer;
+    float: left;
+    font-weight: bold;
+    height: 27px;
+    line-height: 28px;
+    padding: 2px 0 0 8px;
+}
+.queryTimeoutName span { font-weight:normal; font-size:13px;}
+
+#queryTimeoutConfigControls { width:345px;}
+.queryTimeout { border:1px solid #ccc; margin:20px;}
+.queryTimeout p { padding:10px 5px;border-top:1px solid #ccc;}
+.QueryTbl {}
+.QueryTbl tr td {
+    border:none;
+    padding: 8px 5px 10px 5px;
+    text-align: left;
+}
+.QueryTbl tr td input[type="text"] { width:125px;}
+
+.queryTimeOutLabel span.qtmText { font-size: 12px; font-weight: normal; margin-right: 5px; }
+.queryTimeOutLabel {
+    background: none repeat scroll 0 0 #d0d2d2;
+    cursor: default;
+    float: left;
+    font-weight: bold;
+    height: 28px;
+    line-height: 28px;
+    padding: 0 0 0 8px;
+}
+.setqueryTimeOut {
+    float: right;
+}
+
+label.errorTimeOut {
+    color: #c70000;
+    width: 115px;
+    display: block;
+    line-height: 12px;
+    font-size: 11px;
+    /* padding: 10px 5px 0 7px; */
+    padding: 10px 5px 0 0;
+    margin: 0 0 22px 0;
+    height: 10px;
+}
 
 /*********************************************media Qu********************/
 
@@ -3648,6 +3743,7 @@ table.diskLimitTbl tr td { border: none;}
     ul.topRightList li {
         padding:12px 0 0 2px;
     }
+	.downloadConfig { margin-bottom:5px;}
 
   
 }
@@ -3676,6 +3772,7 @@ table.diskLimitTbl tr td { border: none;}
   margin-top: 5px;}
     ul.servers-list li span.servIpNum {margin-left: 10%;}
     /*.serverNameAlign { width: 22%;}*/
+	.headLeft .logo{ margin-right:0;}
 
 }
 @media (max-width: 360px) {
@@ -3747,6 +3844,15 @@ table.diskLimitTbl tr td { border: none;}
         position: relative;
         right: 10px;
     }
+	#queryTimeoutConfigControls { width:305px;}
+	.QueryTbl tr td input[type="text"] { width:125px;}
+	label.errorTimeOut { padding-bottom:20px;}
+	.btnList { float:none; margin-left:10px}
+	.btnList li { float:none;}
+	.btnStudio { width:100%;margin-top:2px;}
+	.queryHeadName { float:none;}
+	.queryTimeOutLabel { width:86%; margin-right:2px;}
+
 }
 
 @media (min-width: 639px) and (max-width:640px) {
@@ -3809,6 +3915,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     #nav {
+		position:absolute;
         width: 100%;
         top: 65px;
         left: 0;
@@ -4092,7 +4199,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 350px;
+        height: 350px!important;
         margin-top: 30px;
     }
     .logHeight {
@@ -4111,11 +4218,12 @@ table.diskLimitTbl tr td { border: none;}
         width: 100%;
         position: absolute;
         right: -1px;
-        top: 205px;
+       /* top: 205px;*/
+	   top:151px;
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 30px;
     }
     .logHeight {
@@ -4168,8 +4276,8 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .overviewTbl {
-        overflow: auto;
-        width: auto;
+         overflow: auto;
+       width: auto;
     }
 
     .adminLeft {
@@ -4231,6 +4339,8 @@ table.diskLimitTbl tr td { border: none;}
     .refreshBtn {
         margin-bottom: 10px;
     }
+	.menuHome ul li:hover ul{ position:absolute;}
+	.menuHome ul li a{padding: 3px 2px 5px 15px;}
 }
 
 @media (min-width: 480px) and (max-width: 700px) {
@@ -4250,17 +4360,19 @@ table.diskLimitTbl tr td { border: none;}
         width: 80%;
     }
 
-    /* .configWrapper {
-        width: 380px;
-    }*/
-    .popup_cont {
+     .configWrapper {
         width: 380px;
     }
+    /*.popup_cont {
+        width: 380px;
+    }*/
+	
 }
 
 @media (width: 768px) {
     #nav {
         left: 180px;
+		position:absolute;
     }
 
     .userN {
@@ -4285,6 +4397,12 @@ table.diskLimitTbl tr td { border: none;}
 @media (min-width: 768px) and (max-width: 800px) {
      .server-info-heading .servIp{margin-left: 14%;}
     ul.servers-list li span.servIpNum {margin-left: 3%;}
+}
+@media (min-width: 700px) and (max-width: 902px) {
+    .overviewTbl {
+    overflow: auto;
+    width: auto;
+}
 }
 
 @media (max-width: 980px) {
@@ -4339,7 +4457,7 @@ table.diskLimitTbl tr td { border: none;}
     }
 
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
         margin-top: 75px;
     }
 }
@@ -4347,7 +4465,7 @@ table.diskLimitTbl tr td { border: none;}
 
 @media (min-width: 300px) and (max-width:438px) {
     .partitionHeight {
-        height: 300px;
+        height: 300px!important;
     }
      .logHeight {
           height: 364px;
@@ -4375,12 +4493,13 @@ table.diskLimitTbl tr td { border: none;}
     .server-info-heading .servIp {
   margin-left: 30%;
 }
+.refreshBtn { margin-bottom:10px;}
 }
 
 
 @media (min-width: 768px) and (max-width:1246px) {
     .partitionHeight {
-        height: 310px;
+        height: 310px!important;
     }
      
 
@@ -4392,6 +4511,7 @@ table.diskLimitTbl tr td { border: none;}
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
+		
     }
 }
 
@@ -4404,7 +4524,7 @@ table.diskLimitTbl tr td { border: none;}
 
     .graphPop {
         height: 110px;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     /*.restoreInfo .overlay-content { height:200px;}
 		.restoreCont {height:200px;}*/

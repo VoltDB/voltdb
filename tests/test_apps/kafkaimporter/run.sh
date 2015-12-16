@@ -38,7 +38,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 # LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -143,10 +142,10 @@ function async-benchmark() {
         kafkaimporter.client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
         --ratelimit=20000 \
-        --duration=60 \
+        --duration=180 \
         --alltypes=false \
-        --useexport=false \
-        --expected_rows=100000 \
+        --useexport=true \
+        --expected_rows=1194113 \
         --servers=localhost
 }
 

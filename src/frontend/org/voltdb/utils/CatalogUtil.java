@@ -123,6 +123,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -147,12 +148,13 @@ public abstract class CatalogUtil {
     public static final String SIGNATURE_DELIMITER = ",";
 
     // DR conflicts export table name prefix
-    public static final String DR_CONFLICTS_TABLE_PREFIX = "VOLTDB_AUTOGEN_DR_CONFLICTS__";
+    public static final String DR_CONFLICTS_PARTITIONED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
+    public static final String DR_CONFLICTS_REPLICATED_EXPORT_TABLE = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
     // DR conflicts export group name
-    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_AUTOGEN_DR_CONFLICTS";
+    public static final String DR_CONFLICTS_TABLE_EXPORT_GROUP = "VOLTDB_XDCR_CONFLICTS";
     public static final String DEFAULT_DR_CONFLICTS_EXPORT_TYPE = "csv";
-    public static final String DEFAULT_DR_CONFLICTS_NONCE = "MyExport";
-    public static final String DEFAULT_DR_CONFLICTS_DIR = "dr_conflicts";
+    public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
+    public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
@@ -363,6 +365,17 @@ public abstract class CatalogUtil {
         }
 
         return retval;
+    }
+
+    /**
+     * A getSortedCatalogItems variant with the result list filled in-place
+     * @param <T> The type of item to sort.
+     * @param items The set of catalog items.
+     * @param sortFieldName The name of the field to sort on.
+     * @param An output list of catalog items, sorted on the specified field.
+     */
+    public static <T extends CatalogType> void getSortedCatalogItems(CatalogMap<T> items, String sortFieldName, List<T> result) {
+        result.addAll(getSortedCatalogItems(items, sortFieldName    ));
     }
 
     /**
@@ -626,7 +639,7 @@ public abstract class CatalogUtil {
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
 
-            setDrInfo(catalog, deployment.getDr());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
 
             validateResourceMonitorInfo(deployment);
         }
@@ -1383,6 +1396,10 @@ public abstract class CatalogUtil {
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            String formatter = importConfiguration.getFormat();
+            if (formatter != null && !formatter.isEmpty()) {
+                processorProperties.put(ImportDataProcessor.IMPORT_FORMATTER, formatter);
+            }
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;
@@ -1754,20 +1771,44 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+        int clusterId;
+        Cluster cluster = catalog.getClusters().get("cluster");
         if (dr != null) {
-            Cluster cluster = catalog.getClusters().get("cluster");
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
-            cluster.setDrclusterid(dr.getId());
             cluster.setDrproducerport(dr.getPort());
+
+            // Backward compatibility to support cluster id in DR tag
+            if (clusterType.getId() == null && dr.getId() != null) {
+                clusterId = dr.getId();
+            } else if (clusterType.getId() != null && dr.getId() == null) {
+                clusterId = clusterType.getId();
+            } else if (clusterType.getId() == null && dr.getId() == null) {
+                clusterId = 0;
+            } else {
+                if (clusterType.getId() == dr.getId()) {
+                    clusterId = clusterType.getId();
+                } else {
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                            + "deprecated, please remove");
+                }
+            }
+            cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 cluster.setDrmasterhost(drSource);
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
+        } else {
+            if (clusterType.getId() != null) {
+                clusterId = clusterType.getId();
+            } else {
+                clusterId = 0;
+            }
         }
+        cluster.setDrclusterid(clusterId);
     }
 
     /** Read a hashed password from password.
@@ -2227,8 +2268,45 @@ public abstract class CatalogUtil {
             outdir.setValue(catalog.getClusters().get("cluster").getVoltroot() + "/" + DEFAULT_DR_CONFLICTS_DIR);
             defaultConfiguration.getProperty().add(outdir);
 
+            // k-safe file export
+            PropertyType ksafe = new PropertyType();
+            ksafe.setName("replicated");
+            ksafe.setValue("true");
+            defaultConfiguration.getProperty().add(ksafe);
+
+            // skip internal export columns
+            PropertyType skipinternal = new PropertyType();
+            skipinternal.setName("skipinternals");
+            skipinternal.setValue("true");
+            defaultConfiguration.getProperty().add(skipinternal);
+
             export.getConfiguration().add(defaultConfiguration);
         }
         return export;
+    }
+
+    /*
+     * Given an index return its expressions or list of indexed columns
+     *
+     * @param index  Catalog Index
+     * @param tableScan table
+     * @param indexedExprs   index expressions. This list remains empty if the index is just on simple columns.
+     * @param indexedColRefs indexed columns. This list remains empty if indexedExprs is in use.
+     * @return true if this is a column based index
+     */
+    public static boolean getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs) {
+        String exprsjson = index.getExpressionsjson();
+        if (exprsjson.isEmpty()) {
+            CatalogUtil.getSortedCatalogItems(index.getColumns(), "index", indexedColRefs);
+        } else {
+            try {
+                AbstractExpression.fromJSONArrayString(exprsjson, tableScan, indexedExprs);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+            }
+        }
+        return exprsjson.isEmpty();
     }
 }

@@ -31,7 +31,9 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -74,8 +76,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
-    // Still need m_hsql here.
-    HsqlBackend m_hsql;
+    // Still need m_non_voltdb_backend (formerly m_hsql) here
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Current catalog
     volatile CatalogContext m_context;
@@ -129,6 +131,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         public boolean isLowestSiteId()
         {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public int getClusterId()
+        {
+            return getCorrespondingClusterId();
         }
 
         @Override
@@ -222,7 +230,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void forceAllBuffersToDiskForDRAndExport(final boolean nofsync)
+        public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -265,11 +273,14 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     void initialize()
     {
         if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
         }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+        }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
         }
     }
 
@@ -316,8 +327,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     void shutdown()
     {
-        if (m_hsql != null) {
-            HsqlBackend.shutdownInstance();
+        if (m_non_voltdb_backend != null) {
+            m_non_voltdb_backend.shutdownInstance();
         }
     }
 
@@ -340,6 +351,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingHostId()
     {
         return CoreUtils.getHostIdFromHSId(m_siteId);
+    }
+
+    @Override
+    public int getCorrespondingClusterId()
+    {
+        return m_context.cluster.getDrclusterid();
     }
 
     @Override
@@ -400,9 +417,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override
@@ -545,7 +562,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, byte log[]) {
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
 

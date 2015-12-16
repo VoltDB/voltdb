@@ -167,6 +167,7 @@
     <exclude name="**/TestCommandLogServer.class" />
     <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
     <exclude name="**/TestExportBase.class"/>
+    <exclude name="**/TestExportBaseSocketExport.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
 
 </patternset>
@@ -736,6 +737,9 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/ProcInfo.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporter.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
+            <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
@@ -938,7 +942,7 @@ DISTRIBUTION
 </target>
 
 <target name="prep_libvoltdb">
-    <copy todir='voltdb'>
+    <copy todir='voltdb' overwrite="true">
         <fileset dir="${build.dir}/nativelibs">
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
@@ -1971,6 +1975,7 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
+                <exclude name="**/TestExportBaseSocketExport.class"/>
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- regressed during 3.0 bugfix? -->
             </fileset>
         </tests>
@@ -2293,6 +2298,9 @@ TEST CASES
     <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
     </condition>
+    <condition property="config_postgresql" value="-P" else="">
+        <isset property="postgresql"/>
+    </condition>
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
@@ -2353,6 +2361,7 @@ TEST CASES
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
+        <arg line="${config_postgresql}" />
         <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />

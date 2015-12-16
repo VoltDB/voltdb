@@ -244,6 +244,18 @@ static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
 static const int FUNC_VOLT_HEX                         = 20029;
 static const int FUNC_VOLT_BIN                         = 20030;
 
+static const int FUNC_VOLT_DATEADD                     = 20031;
+static const int FUNC_VOLT_DATEADD_YEAR                = 20032;
+static const int FUNC_VOLT_DATEADD_QUARTER             = 20033;
+static const int FUNC_VOLT_DATEADD_MONTH               = 20034;
+static const int FUNC_VOLT_DATEADD_DAY                 = 20035;
+static const int FUNC_VOLT_DATEADD_HOUR                = 20036;
+static const int FUNC_VOLT_DATEADD_MINUTE              = 20037;
+static const int FUNC_VOLT_DATEADD_SECOND              = 20038;
+static const int FUNC_VOLT_DATEADD_MILLISECOND         = 20039;
+static const int FUNC_VOLT_DATEADD_MICROSECOND         = 20040;
+static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
+
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
 static const int SQL_TRIM_TRAILING                    = 284;

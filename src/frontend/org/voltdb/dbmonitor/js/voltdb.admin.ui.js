@@ -78,6 +78,7 @@ function loadAdminPage() {
         exportOverflow: $('#exportOverflow'),
         commandLogPath: $('#commandlogpath'),
         commandLogSnapshotPath: $('#commandlogsnapshotpath'),
+        drOverflowPath: $('#droverflowpath'),
         clusterClientPort: $('#clusterClientport'),
         clusterAdminPort: $('#clusterAdminport'),
         clusterHttpPort: $('#clusterHttpport'),
@@ -1555,7 +1556,6 @@ function loadAdminPage() {
 
     //Memory Limit
     var toggleMemorySizeEdit = function (state) {
-        debugger;
         adminEditObjects.txtMemoryLimitSize.val(adminEditObjects.spanMemoryLimitSizeValue);
         if (adminEditObjects.spanMemoryLimitSizeUnit.text() != "")
             adminEditObjects.ddlMemoryLimitSizeUnit.val(adminEditObjects.spanMemoryLimitSizeUnit.text());
@@ -1627,10 +1627,12 @@ function loadAdminPage() {
             $("#txtMemoryLimitSize").rules("add", {
                 required: true,
                 min: 1,
+                max: 2147483647,
                 digits: true,
                 messages: {
                     required: "This field is required",
                     min: "Please enter a positive number.",
+                    max: "Maximum value of GB cannot be greater than 2147483647.",
                     digits: "Please enter a positive number without any decimal."
                 }
             });
@@ -1981,7 +1983,9 @@ function loadAdminPage() {
                 '    <td>' +
                 '       <select id="txtType" name="txtType"> ';
 
-            exporttypes.type.splice(3, 1);
+            var customIndex = $.inArray('CUSTOM', exporttypes.type);
+            
+            exporttypes.type.splice(customIndex, 1);
 
             exporttypes.type.push("CUSTOM");
 
@@ -2485,10 +2489,12 @@ function loadAdminPage() {
                         $(newFeatureValues[j]).rules("add", {
                             required: true,
                             min: 0,
+                            max: 2147483647,
                             digits: true,
                             messages: {
                                 required: "This field is required",
                                 min: "Please enter a positive number.",
+                                max: "Maximum value of GB cannot be greater than 2147483647.",
                                 digits: "Please enter a positive number without any decimal."
                             }
                         });
@@ -4059,6 +4065,7 @@ function loadAdminPage() {
             adminDOMObjects.exportOverflow.text(directoryConfigValues.exportOverflow);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
+            adminDOMObjects.drOverflowPath.text(directoryConfigValues.drOverflowPath);
         };
 
         var configurePromoteAction = function (adminConfigValues) {

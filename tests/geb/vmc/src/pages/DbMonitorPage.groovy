@@ -226,7 +226,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         // Command Log Table
 
-        showHideCLPBlock {$("#showHideCLPBlock")}
+        showHideCLPBlock (required:false) {$("#showHideCLPBlock")}
         clpSection {$("#clpSection")}
 
         cmdServer {$("#cmdServer")}

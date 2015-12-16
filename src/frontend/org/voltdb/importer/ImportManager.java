@@ -35,6 +35,7 @@ import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.utils.CatalogUtil;
@@ -70,6 +71,7 @@ public class ImportManager implements ChannelChangeCallback {
     private Framework m_framework;
     private ChannelDistributer m_distributer;
     private boolean m_serverStarted;
+    private final ImporterStatsCollector m_statsCollector;
 
     /**
      * Get the global instance of the ImportManager.
@@ -86,9 +88,10 @@ public class ImportManager implements ChannelChangeCallback {
         }
     };
 
-    protected ImportManager(int myHostId, HostMessenger messenger) throws IOException {
+    protected ImportManager(int myHostId, HostMessenger messenger, ImporterStatsCollector statsCollector) throws IOException {
         m_myHostId = myHostId;
         m_messenger = messenger;
+        m_statsCollector = statsCollector;
 
         String tmpFilePath = System.getProperty(VOLT_TMP_DIR, System.getProperty("java.io.tmpdir"));
         //Create a directory in temp + username
@@ -103,6 +106,7 @@ public class ImportManager implements ChannelChangeCallback {
 
         List<String> packages = ImmutableList.<String>builder()
                 .add("org.voltcore.network")
+                .add("org.voltcore.logging")
                 .add("org.voltdb.importer")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")
@@ -147,7 +151,12 @@ public class ImportManager implements ChannelChangeCallback {
      * @throws java.io.IOException
      */
     public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
-        ImportManager em = new ImportManager(myHostId, messenger);
+        ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
+        ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
+        VoltDB.instance().getStatsAgent().registerStatsSource(
+                StatsSelector.IMPORTER,
+                myHostId,
+                statsCollector);
 
         m_self = em;
         em.create(myHostId, catalogContext);
@@ -166,7 +175,7 @@ public class ImportManager implements ChannelChangeCallback {
             }
             startOSGiFramework();
 
-            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework);
+            ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework, m_statsCollector);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
             newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);

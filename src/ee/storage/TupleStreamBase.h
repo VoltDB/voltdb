@@ -64,7 +64,7 @@ public:
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) = 0;
 
     /** truncate stream back to mark */
-    virtual void rollbackTo(size_t mark);
+    virtual void rollbackTo(size_t mark, size_t drRowCost);
 
     /** age out committed data */
     void periodicFlush(int64_t timeInMillis,
@@ -78,6 +78,9 @@ public:
 
     /** Send committed data to the top end. */
     void commit(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t txnId, int64_t uniqueId, bool sync, bool flush);
+
+    /** time interval between flushing partially filled buffers */
+    int64_t m_flushInterval;
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;

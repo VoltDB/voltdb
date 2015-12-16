@@ -23,7 +23,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -128,12 +127,17 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
     static final Charset ROWDATA_ENCODING = Constants.UTF8ENCODING;
 
-    static final AtomicInteger expandCountDouble = new AtomicInteger(0);
-
     boolean m_readOnly = false;
     int m_rowStart = -1; // the beginning of the row data (points to before the row count int)
     int m_rowCount = -1;
     int m_colCount = -1;
+
+    // non-positive value that probably shouldn't be -1 to avoid off-by-one errors
+    private static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
+
+    // memoized offsets used when users iterate rows with fetchrow()
+    private int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
+    private int m_memoizedBufferOffset;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
@@ -712,16 +716,23 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final VoltTableRow fetchRow(int index) {
         assert(verifyTableInvariants());
+
+        // check bounds
         if ((index < 0) || (index >= m_rowCount)) {
             throw new IndexOutOfBoundsException("index = " + index + "; rows = " + m_rowCount);
         }
 
-        int pos = m_rowStart + 4;
-        for (int i = 0; i < index; i++) {
-            // add 4 bytes as the row size is non-inclusive
-            pos += m_buffer.getInt(pos) + 4;
+        // if no memoized value or looking in front of the memoized value, reset
+        if ((m_memoizedRowOffset == NO_MEMOIZED_ROW_OFFSET) || (index < m_memoizedRowOffset)) {
+            m_memoizedRowOffset = 0; m_memoizedBufferOffset = m_rowStart + ROW_COUNT_SIZE;
         }
-        Row retval = new Row(pos + 4);
+
+        while (m_memoizedRowOffset < index) {
+            // add 4 bytes as the row size is non-inclusive
+            m_memoizedBufferOffset += m_buffer.getInt(m_memoizedBufferOffset) + ROW_HEADER_SIZE;
+            m_memoizedRowOffset++;
+        }
+        Row retval = new Row(m_memoizedBufferOffset + ROW_HEADER_SIZE);
         retval.m_activeRowIndex = index;
         return retval;
     }

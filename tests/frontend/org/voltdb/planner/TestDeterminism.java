@@ -35,8 +35,45 @@ public class TestDeterminism extends PlannerTestCase {
 
     private final static boolean m_staticRetryForDebugOnFailure = /**/ false; //*/ = true;//to debug
 
-    private void assertPlanDeterminismCore(String sql, boolean order, boolean content,
-            DeterminismMode detMode)
+    /**
+     * This is the older interface to the determinism test function. It just
+     * asserts that the sql argument passes the tests and expects the results to
+     * be inherently deterministic. See
+     * {@link assertPlanDeterminismFullCore(String sql, boolean order, boolean
+     * orderLimitContent, boolean inherentContent, DeterminismMode detMode)}.
+     *
+     * @param sql
+     *            SQL text to test.
+     * @param order
+     *            Do we expect the sql to be order deterministic.
+     * @param orderLimitContent
+     *            to we expect the sql to be order-limit determistic.
+     * @param detMode
+     *            FASTER or SAFER.
+     */
+    private void assertPlanDeterminismCore(String sql,
+                                           boolean order,
+                                           boolean orderLimitContent,
+                                           DeterminismMode detMode) {
+        assertPlanDeterminismFullCore(sql, order, orderLimitContent, true, detMode);
+    }
+
+    /**
+     * This is the core test for determinism. We plan the sql and test that the
+     * order determinism, orderLimit content determinism and inherent
+     * determinism are as we expect.
+     *
+     * @param sql
+     * @param order
+     * @param orderLimitContent
+     * @param inherentContent
+     * @param detMode
+     */
+    private void assertPlanDeterminismFullCore(String sql,
+                                               boolean order,
+                                               boolean orderLimitContent,
+                                               boolean inherentContent,
+                                               DeterminismMode detMode)
     {
         CompiledPlan cp = compileAdHocPlan(sql, detMode);
         if (order != cp.isOrderDeterministic()) {
@@ -47,16 +84,27 @@ public class TestDeterminism extends PlannerTestCase {
             }
         }
         assertEquals(order, cp.isOrderDeterministic());
-        if (content != (cp.isOrderDeterministic() || ! cp.hasLimitOrOffset())) {
-            System.out.println((content ? "EXPECTED CONSISTENT CONTENT: " : "UNEXPECTED CONSISTENT CONTENT: ") + sql);
+        if (orderLimitContent != (cp.isOrderDeterministic() || !cp.hasLimitOrOffset())) {
+            System.out.println((orderLimitContent ? "EXPECTED CONSISTENT CONTENT: " : "UNEXPECTED CONSISTENT CONTENT: ")
+                               + sql);
             // retry failed case for debugging
             if (m_staticRetryForDebugOnFailure) {
                 // retry failed case for debugging
                 cp = compileAdHocPlan(sql, detMode);
             }
         }
-        assertEquals(content, cp.isOrderDeterministic() || ! cp.hasLimitOrOffset());
+        assertEquals(orderLimitContent, cp.isOrderDeterministic() || !cp.hasLimitOrOffset());
         assertTrue(cp.isOrderDeterministic() || (null != cp.nondeterminismDetail()));
+        if (inherentContent != cp.isContentDeterministic()) {
+            System.out.println((inherentContent ? "EXPECTED CONSISTENT CONTENT: " : "UNEXPECTED CONSISTENT CONTENT: ")
+                               + sql);
+            // retry failed case for debugging
+            if (m_staticRetryForDebugOnFailure) {
+                // retry failed case for debugging
+                cp = compileAdHocPlan(sql, detMode);
+            }
+        }
+        assertEquals(cp.isContentDeterministic(), inherentContent);
     }
 
     // This is a weakened version of assertPlanDeterminismCore that only complains to the system output
@@ -554,6 +602,14 @@ public class TestDeterminism extends PlannerTestCase {
         assertPlanDeterminismCore("(select a, b, c from ttree_with_key order by a, b, c limit 1) union (select a, b, c from ttree_with_key);", !ENG8790IsFixed, true, DeterminismMode.FASTER);
         assertPlanDeterminismCore("(select a, b, c from ttree_with_key) union (select a, b, c from ttree_with_key order by a, b, c limit 1);", ENG8790IsFixed, true, DeterminismMode.FASTER);
         assertPlanDeterminismCore("select a from tonecolumn order by abs(a)", false, true, DeterminismMode.FASTER);
+    }
+
+    public void testFloatingAggs() throws Exception {
+        assertPlanDeterminismFullCore("select sum(alpha + beta + gamma) as fsum from floataggs order by fsum;",
+                                      true,
+                                      true,
+                                      false,
+                                      DeterminismMode.FASTER);
     }
 
     private void assertMPPlanDeterminismCore(String sql, boolean order, boolean content,

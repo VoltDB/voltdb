@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import os, sys, commands, string
 from buildtools import *
 
@@ -26,12 +25,13 @@ from buildtools import *
 #  - Parse Target and Level from Command Line
 ###############################################################################
 
-CTX = BuildContext(sys.argv)
-
+###############################################################################
 # CTX is an instance of BuildContext, which is declared in buildtools.py
 # BuildContext contains vars that determine how the makefile will be built
 #  and how the build will go down. It also checks the platform and parses
 #  command line args to determine target and build level.
+###############################################################################
+CTX = BuildContext(sys.argv)
 
 ###############################################################################
 # SET GLOBAL CONTEXT VARIABLES FOR BUILDING
@@ -49,22 +49,30 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
 
 # clang doesn't seem to want this
-if compiler_name == 'gcc':
+if CTX.compilerName() == 'gcc':
     CTX.CPPFLAGS += " -pthread"
     CTX.LDFLAGS += " -rdynamic"
+    if (CTX.compilerMajorVersion() >= 4):
+        CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas"
+	if (CTX.compilerMinorVersion() == 6):
+	    CTX.CPPFLAGS += " -Wno-unused-but-set-variable"
+	if (CTX.compilerMinorVersion() == 9):
+            CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
+        elif (CTX.compilerMinorVersion() == 8):
+	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
 
-if (compiler_name == 'clang') and (compiler_major == 3 and compiler_minor >= 4):
+if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
-if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
+if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 7):
+    CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
+
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
+
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
-
-# linker flags
-CTX.LDFLAGS += """ -g3"""
-CTX.LASTLDFLAGS = """ -ldl"""
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -78,7 +86,7 @@ if CTX.PROFILE:
 
 # this is where the build will look for header files
 # - the test source will also automatically look in the test root dir
-CTX.INCLUDE_DIRS = ['src/ee']
+CTX.SRC_INCLUDE_DIRS += ['src/ee' ]
 CTX.SYSTEM_DIRS = ['third_party/cpp']
 
 # don't worry about checking for changes in header files in the following
@@ -89,10 +97,15 @@ CTX.IGNORE_SYS_PREFIXES = ['/usr/include', '/usr/lib', 'third_party']
 CTX.INPUT_PREFIX = "src/ee/"
 
 # where to find the source
-CTX.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp/"
+CTX.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp"
 
 # where to find the tests
 CTX.TEST_PREFIX = "tests/ee/"
+
+# linker flags
+CTX.LDFLAGS += """ -g3"""
+CTX.LASTLDFLAGS += """ -lpcre2-8 """
+CTX.LASTIPCLDFLAGS = """ -ldl """
 
 ###############################################################################
 # SET RELEASE LEVEL CONTEXT
@@ -182,13 +195,10 @@ CTX.INPUT['catalog'] = """
 """
 
 CTX.INPUT['structures'] = """
- CompactingPool.cpp
  ContiguousAllocator.cpp
 """
 
 CTX.INPUT['common'] = """
- CompactingStringPool.cpp
- CompactingStringStorage.cpp
  FatalException.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
@@ -219,6 +229,7 @@ CTX.INPUT['execution'] = """
  FragmentManager.cpp
  JNITopend.cpp
  VoltDBEngine.cpp
+ ExecutorVector.cpp
 """
 
 CTX.INPUT['executors'] = """
@@ -233,6 +244,7 @@ CTX.INPUT['executors'] = """
  limitexecutor.cpp
  materializedscanexecutor.cpp
  materializeexecutor.cpp
+ mergereceiveexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -262,6 +274,7 @@ CTX.INPUT['plannodes'] = """
  abstractjoinnode.cpp
  abstractoperationnode.cpp
  abstractplannode.cpp
+ abstractreceivenode.cpp
  abstractscannode.cpp
  aggregatenode.cpp
  deletenode.cpp
@@ -272,6 +285,7 @@ CTX.INPUT['plannodes'] = """
  limitnode.cpp
  materializenode.cpp
  materializedscanplannode.cpp
+ mergereceivenode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
@@ -400,6 +414,7 @@ if whichtests in ("${eetestsuite}", "execution"):
 if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
+    MergeReceiveExecutorTest
     """
 
 
@@ -451,6 +466,13 @@ if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
      PlanNodeFragmentTest
     """
+
+###############################################################################
+#
+# Print some configuration information.  This is useful for debugging.
+#
+###############################################################################
+print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
 
 ###############################################################################
 # BUILD THE MAKEFILE

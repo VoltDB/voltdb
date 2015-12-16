@@ -36,11 +36,11 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.types.JoinType;
-import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.PermutationGenerator;
 
 /**
@@ -213,8 +213,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // should propagate an error message identifying partitioning as the problem.
                 HashMap<AbstractExpression, Set<AbstractExpression>>
                     valueEquivalence = joinTree.getAllEquivalenceFilters();
-                m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.m_tableAliasMap.values(),
-                                                                      valueEquivalence);
+                Collection<StmtTableScan> scans = m_parsedStmt.allScans();
+                m_partitioning.analyzeForMultiPartitionAccess(scans, valueEquivalence);
                 if ( ! m_partitioning.isJoinValid() ) {
                     // The case of more than one independent partitioned table
                     // would result in an illegal plan with more than two fragments.
@@ -609,7 +609,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // right child node.
             if (needInnerSendReceive) {
                 // This trick only works once per plan.
-                if (outerPlan.hasAnyNodeOfType(PlanNodeType.RECEIVE) || innerPlan.hasAnyNodeOfType(PlanNodeType.RECEIVE)) {
+                if (outerPlan.hasAnyNodeOfClass(AbstractReceivePlanNode.class) || innerPlan.hasAnyNodeOfClass(AbstractReceivePlanNode.class)) {
                     return null;
                 }
                 innerPlan = addSendReceivePair(innerPlan);

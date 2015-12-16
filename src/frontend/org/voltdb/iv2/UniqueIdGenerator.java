@@ -69,7 +69,7 @@ public class UniqueIdGenerator {
     static final long PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
 
     // the local siteid
-    long partitionId;
+    int partitionId;
     // the time of the previous unique id generation
     long lastUsedTime = -1;
     // the number of unique ids generated during the same value
@@ -77,7 +77,7 @@ public class UniqueIdGenerator {
     long counterValue = 0;
 
     // remembers the last unique id generated
-    long lastUniqueId = 0;
+    long lastUniqueId;
 
 
     // salt used for testing to simulate clock skew
@@ -102,7 +102,7 @@ public class UniqueIdGenerator {
 
     private final Clock m_clock;
 
-    public UniqueIdGenerator(long partitionId, long timestampTestingSalt) {
+    public UniqueIdGenerator(int partitionId, long timestampTestingSalt) {
         this(partitionId, timestampTestingSalt, new Clock() {
             @Override
             public long get() {
@@ -121,7 +121,7 @@ public class UniqueIdGenerator {
      * @param partitionId The partitionId of the site generating ids
      * @param timestampTestingSalt Value of the salt used to skew a clock in testing.
      */
-    public UniqueIdGenerator(long partitionId, long timestampTestingSalt, Clock clock) {
+    public UniqueIdGenerator(int partitionId, long timestampTestingSalt, Clock clock) {
         this.partitionId = partitionId;
 
         m_timestampTestingSalt = timestampTestingSalt;
@@ -134,6 +134,9 @@ public class UniqueIdGenerator {
             log.warn(String.format("Partition (id=%d) running in test mode with non-zero timestamp testing value: %d",
                      partitionId, timestampTestingSalt));
         }
+
+        // initialize the last used unique ID to a valid value
+        lastUniqueId = makeZero(this.partitionId);
     }
 
     public void updateMostRecentlyGeneratedUniqueId(long uniqueId) {
@@ -336,7 +339,11 @@ public class UniqueIdGenerator {
         sb.append(" Date: ").append(getDateFromUniqueId(uniqueId));
         return sb.toString();
     }
-
+    public static String toShortString(long uniqueId) {
+        return new String(getPartitionIdFromUniqueId(uniqueId) + ":" +
+                getTimestampFromUniqueId(uniqueId) + ":" +
+                getSequenceNumberFromUniqueId(uniqueId));
+    }
     public static String toBitString(long uniqueId) {
         String retval = "";
         long mask = 0x8000000000000000L;

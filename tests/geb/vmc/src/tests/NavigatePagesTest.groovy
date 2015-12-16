@@ -58,12 +58,19 @@ class NavigatePagesTest extends TestBase {
     }
 
     def navigatePages() {
+
+        // Visit each page (tab), moving from left to right
         when: 'click the DB Monitor link (if not already on DB Monitor page)'
         page.openDbMonitorPage()
         then: 'should be on DB Monitor page'
         at DbMonitorPage
 
-        when: 'click the Schema link (from DB Monitor page)'
+        when: 'click the Admin link (from DB Monitor page)'
+        page.openAdminPage()
+        then: 'should be on Admin page'
+        at AdminPage
+
+        when: 'click the Schema link (from Admin page)'
         page.openSchemaPage()
         then: 'should be on Schema page'
         at SchemaPage
@@ -73,9 +80,10 @@ class NavigatePagesTest extends TestBase {
         then: 'should be on SQL Query page'
         at SqlQueryPage
 
+        // Visit each page (tab), moving from right to left
         when: 'click the DB Monitor link (from SQL Query page)'
         page.openDbMonitorPage()
-        then: 'should be on DB Monitor page'
+        then: 'should be on DB Monitor page (again)'
         at DbMonitorPage
 
         when: 'click the SQL Query link (from DB Monitor page)'
@@ -88,9 +96,35 @@ class NavigatePagesTest extends TestBase {
         then: 'should be on Schema page (again)'
         at SchemaPage
 
+        when: 'click the Admin link (from Schema page)'
+        page.openAdminPage()
+        then: 'should be on Admin page (again)'
+        at AdminPage
+
+        // Visit each page (tab), coming from the pages not covered above
+        when: 'click the SQL Query link (from Admin page)'
+        page.openSqlQueryPage()
+        then: 'should be on SQL Query page (yet again)'
+        at SqlQueryPage
+
+        when: 'click the Admin link (from SQL Query page)'
+        page.openAdminPage()
+        then: 'should be on Admin page (yet again)'
+        at AdminPage
+
+        when: 'click the DB Monitor link (from Admin page)'
+        page.openDbMonitorPage()
+        then: 'should be on DB Monitor page (yet again)'
+        at DbMonitorPage
+
+        when: 'click the Schema link (from DB Monitor page)'
+        page.openSchemaPage()
+        then: 'should be on Schema page (yet again)'
+        at SchemaPage
+
         when: 'click the DB Monitor link (from Schema page)'
         page.openDbMonitorPage()
-        then: 'should be on DB Monitor page (again)'
+        then: 'should be on DB Monitor page (one final time)'
         at DbMonitorPage
     }
 }

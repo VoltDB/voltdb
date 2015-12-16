@@ -60,6 +60,9 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
+    public void initializeLastDurableUniqueId(DurabilityListener listener, long uniqueId) {}
+
+    @Override
     public boolean isEnabled()
     {
         // No real command log, obviously not enabled

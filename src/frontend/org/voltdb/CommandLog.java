@@ -77,13 +77,43 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
+    /**
+     * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
+     * Thread it through here because the durability listener is owned by the command log thread.
+     * @param uniqueId    The last durable unique ID passed from the master.
+     */
+    void initializeLastDurableUniqueId(DurabilityListener listener, long uniqueId);
+
     interface CompletionChecks {
+        /**
+         * Use the current CompletionChecks object to create a new CompletionChecks object
+         * @param startSize - pre-allocated size of the next empty transaction list
+         * @return the newly created CompletionChecks object
+         */
         public CompletionChecks startNewCheckList(int startSize);
 
+        /**
+         * Add a new transaction to the per-scheduler durable transaction tracker
+         * @param task
+         */
         public void addTask(TransactionTask task);
 
+        /**
+         * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
+         * @param uniqueId    The last durable unique ID passed from the master.
+         */
+        void setLastDurableUniqueId(long uniqueId);
+
+        /**
+         * Get the number of TransactionTasks tracked by this instance of CompletionChecks
+         * @return
+         */
         public int getTaskListSize();
 
+        /**
+         * Perform all class-specific processing for this batch of transactions including
+         * Durability Listener notifications
+         */
         public void processChecks();
     }
 
@@ -107,6 +137,12 @@ public interface CommandLog {
          * Called from CommandLog to assign a new task to be tracked by the DurabilityListener
          */
         public void addTransaction(TransactionTask pendingTask);
+
+        /**
+         * Called on the very first message a rejoined SpScheduler receives to initialize the last durable value.
+         * @param uniqueId    The last durable unique ID passed from the master.
+         */
+        void initializeLastDurableUniqueId(long uniqueId);
 
         /**
          * Used by CommandLog to calculate the next task list size

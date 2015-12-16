@@ -69,9 +69,6 @@
 
 <path id='project.classpath'>
     <pathelement location='${build.client.dir}' />
-    <fileset dir='${lib.dir}'>
-        <include name='commons-cli-1.2.jar' />
-    </fileset>
     <fileset dir='${vendor.lib.dir}'>
         <include name='javaee-api-6.0.jar' />
     </fileset>
@@ -82,7 +79,7 @@
         includes="com/google_voltpatches/**/*.java
                   javax/annotation_voltpatches/**/*.java
                   org/apache/cassandra_voltpatches/MurmurHash3.java
-                  org/apache/commons/cli_voltpatches/**/*.java
+                  org/apache/commons_voltpatches/cli/**/*.java
                   org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
                   org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
                   org/apache/jute_voltpatches/**/*.java
@@ -90,12 +87,6 @@
                   org/cliffc_voltpatches/**/*.java
                   org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
-                  org/voltdb/importer/Invocation.java
                   jsr166y/**/*.java
                   io/netty_voltpatches/NinjaKeySet.java
                   "
@@ -153,12 +144,6 @@
                   org/voltdb/VoltTableRow.java
                   org/voltdb/VoltType.java
                   org/voltdb/VoltTypeException.java
-                  org/voltdb/importer/ImportContext.java
-                  org/voltdb/importer/ImportHandlerProxy.java
-                  org/voltdb/importer/ChannelChangeCallback.java
-                  org/voltdb/importer/Invocation.java
-                  org/voltdb/importer/VersionedOperationMode.java
-                  org/voltdb/importer/ImporterChannelAssignment.java
                   "
 />
 

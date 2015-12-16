@@ -145,16 +145,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void setSkipNullPredicate() {
         // prepare position of non null key
-        int searchKeySize = m_searchkeyExpressions.size();
-        if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
+        if (m_lookupType == IndexLookupType.EQ || isReverseScan()) {
             m_skip_null_predicate = null;
             return;
         }
+        int searchKeySize = m_searchkeyExpressions.size();
 
         int nextKeyIndex;
         if (m_endExpression != null &&
                 searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
             nextKeyIndex = searchKeySize;
+        } else if (searchKeySize == 0) {
+            m_skip_null_predicate = null;
+            return;
         } else {
             nextKeyIndex = searchKeySize - 1;
         }
@@ -163,6 +166,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate(int nextKeyIndex) {
+        assert(nextKeyIndex >= 0);
+
         m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
     }
 
@@ -318,6 +323,78 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     public SortDirectionType getSortDirection() {
         return m_sortDirection;
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.size() == sortDirections.size());
+        // The output is unordered if there is an inline hash aggregate
+        AbstractPlanNode agg = AggregatePlanNode.getInlineAggregationNode(this);
+        if (agg != null && agg.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) {
+            return false;
+        }
+
+        // Verify that all sortDirections match
+        for(SortDirectionType sortDirection : sortDirections) {
+            if (sortDirection != getSortDirection()) {
+                return false;
+            }
+        }
+        // Verify that all sort expressions are covered by the consecutive index expressions
+        // starting from the first one
+        List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
+        List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
+        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
+                indexedExprs, indexedColRefs);
+        int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
+        if (indexExprCount < sortExpressions.size()) {
+            // Not enough index expressions to cover all of the sort expressions
+            return false;
+        }
+        if (columnIndex) {
+            for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+                AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+                if (!isSortExpressionCovered(sortExpression, indexedColRefs, idxToCover, getTableScan())) {
+                    return false;
+                }
+            }
+        } else {
+            for (int idxToCover = 0; idxToCover < sortExpressions.size(); ++idxToCover) {
+                AbstractExpression sortExpression = sortExpressions.get(idxToCover);
+                if (!isSortExpressionCovered(sortExpression, indexedExprs, idxToCover)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<AbstractExpression> indexedExprs,
+            int idxToCover) {
+        assert(idxToCover < indexedExprs.size());
+        AbstractExpression indexExpression = indexedExprs.get(idxToCover);
+        List<AbstractExpression> bindings = sortExpression.bindingToIndexedExpression(indexExpression);
+        if (bindings != null) {
+            m_bindings.addAll(bindings);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isSortExpressionCovered(AbstractExpression sortExpression, List<ColumnRef> indexedColRefs,
+            int idxToCover, StmtTableScan tableScan) {
+        assert(idxToCover < indexedColRefs.size());
+        TupleValueExpression tve = null;
+        if (sortExpression instanceof TupleValueExpression) {
+            tve = (TupleValueExpression) sortExpression;
+        }
+        if (tve != null && tableScan.getTableAlias().equals(tve.getTableAlias())) {
+            ColumnRef indexColumn = indexedColRefs.get(idxToCover);
+            if (indexColumn.getColumn().getTypeName().equals(tve.getColumnName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

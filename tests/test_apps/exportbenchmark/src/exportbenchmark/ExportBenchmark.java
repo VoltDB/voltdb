@@ -36,11 +36,7 @@ package exportbenchmark;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.Math;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.InetSocketAddress;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
@@ -49,7 +45,6 @@ import java.nio.channels.spi.SelectorProvider;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -61,7 +56,6 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -72,7 +66,6 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.types.TimestampType;
 
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
@@ -152,11 +145,17 @@ public class ExportBenchmark {
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
 
+        @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka)")
+        String target = "socket";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (!target.equals("socket") && !target.equals("kafka")) {
+                exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\"");
+            }
         }
     }
 
@@ -250,7 +249,7 @@ public class ExportBenchmark {
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");
                 Long tts = stats.getLong("TIMESTAMP");
-                //Get highest timestamp and watch is change
+                //Get highest timestamp and watch it change
                 if (tts > ts) {
                     ts = tts;
                 }
@@ -397,7 +396,9 @@ public class ExportBenchmark {
         System.out.println("Failed to insert " + failedInserts.get() + " objects");
 
         testFinished.set(true);
-        statsSocketSelector.wakeup();
+        if (config.target.equals("socket")) {
+            statsSocketSelector.wakeup();
+        }
     }
 
     /**
@@ -563,23 +564,30 @@ public class ExportBenchmark {
 
         // Listen for stats until we stop
         Thread.sleep(config.warmup * 1000);
-        setupSocketListener();
-        listenForStats();
+        // don't do this for Kafka -- nothing to listen to
+        if (config.target.equals("socket")) {
+            setupSocketListener();
+            listenForStats();
+        }
 
         writes.join();
         periodicStatsTimer.cancel();
         System.out.println("Client flushed; waiting for export to finish");
 
-        // Wait until export is done
+        // Wait until export is done -- socket target only
         boolean success = false;
-        try {
-            success = waitForStreamedAllocatedMemoryZero();
-        } catch (IOException e) {
-            System.err.println("Error while waiting for export: ");
-            e.getLocalizedMessage();
-        } catch (ProcCallException e) {
-            System.err.println("Error while calling procedures: ");
-            e.getLocalizedMessage();
+        if (config.target.equals("socket")) {
+            try {
+                success = waitForStreamedAllocatedMemoryZero();
+            } catch (IOException e) {
+                System.err.println("Error while waiting for export: ");
+                e.getLocalizedMessage();
+            } catch (ProcCallException e) {
+                System.err.println("Error while calling procedures: ");
+                e.getLocalizedMessage();
+            }
+        } else {
+            success = true; // kafka case -- no waiting
         }
 
         System.out.println("Finished benchmark");
@@ -589,7 +597,7 @@ public class ExportBenchmark {
         client.close();
 
         // Make sure we got serverside stats
-        if (serverStats.size() == 0) {
+        if (config.target.equals("socket") && serverStats.size() == 0) {
             System.err.println("ERROR: Never received stats from export clients");
             success = false;
         }

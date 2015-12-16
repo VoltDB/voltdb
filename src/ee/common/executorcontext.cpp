@@ -21,6 +21,8 @@
 
 #include "boost/foreach.hpp"
 
+#include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
+
 #include <pthread.h>
 #ifdef LINUX
 #include <malloc.h>
@@ -29,6 +31,8 @@
 using namespace std;
 
 namespace voltdb {
+
+const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
 
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
@@ -94,8 +98,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_partitionId(partitionId),
     m_hostname(hostname),
     m_hostId(hostId),
-    m_drClusterId(drClusterId),
-    m_epoch(0) // set later
+    m_drClusterId(drClusterId)
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
@@ -104,8 +107,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 ExecutorContext::~ExecutorContext() {
     // currently does not own any of its pointers
 
-    // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == this);
     // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
 
@@ -114,8 +115,6 @@ ExecutorContext::~ExecutorContext() {
 
 void ExecutorContext::bindToThread()
 {
-    // There can be only one (per thread).
-    assert(pthread_getspecific(static_key) == NULL);
     pthread_setspecific(static_key, this);
     VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
@@ -207,13 +206,17 @@ void ExecutorContext::cleanupAllExecutors()
     m_subqueryContextMap.clear();
 }
 
-void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
-{
-    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const {
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
         assert(executor);
         executor->cleanupTempOutputTable();
     }
+}
+
+void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
+{
+    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+    cleanupExecutorsForSubquery(executorList);
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {

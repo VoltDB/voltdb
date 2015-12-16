@@ -286,47 +286,51 @@ class AdminDrTest extends TestBase {
         when:
         at AdminPage
         then:
-        waitFor(waitTime) {
-            page.drMasterEdit.isDisplayed()
-        }
-
-        when:
-        page.drMasterEdit.click()
-        String enabledDisabled = page.masterValue.text()
-        println(enabledDisabled)
-        then:
-        waitFor(waitTime){
-            page.chkDrMaster.isDisplayed()
-            page.btnEditDrMasterOk.isDisplayed()
-            page.btnEditDrMasterCancel.isDisplayed()
-        }
-
-        when:
-        page.chkDrMaster.click()
-        then:
-        String enabledDisabledEdited = page.masterValue.text()
-        println(enabledDisabledEdited)
-
-        waitFor(waitTime){ page.drMode.isDisplayed()}
-        String drState = page.drMode.text()
-        if ( enabledDisabled.toLowerCase() == "on" ) {
-            assert enabledDisabledEdited.toLowerCase().equals("off")
-        }
-        else if ( enabledDisabled.toLowerCase() == "off" ) {
-            assert enabledDisabledEdited.toLowerCase().equals("on")
-        }
-
-        when: 'click the DB Monitor link (if needed)'
-        page.openDbMonitorPage()
-        then: 'should be on DB Monitor page'
-        at DbMonitorPage
-
-        if((drState.toLowerCase() == 'master' || drState.toLowerCase() == 'both')){
-            if(enabledDisabledEdited.toLowerCase().equals("off")){
-                !page.drMasterSection.isDisplayed()
-            } else {
-                page.drMasterSection.isDisplayed()
+        boolean result = page.CheckIfDREnabled();
+        if(result) {
+            waitFor(waitTime) {
+                page.drMasterEdit.isDisplayed()
             }
+
+            when:
+            page.drMasterEdit.click()
+            String enabledDisabled = page.masterValue.text()
+            println(enabledDisabled)
+            then:
+            waitFor(waitTime) {
+                page.chkDrMaster.isDisplayed()
+                page.btnEditDrMasterOk.isDisplayed()
+                page.btnEditDrMasterCancel.isDisplayed()
+            }
+
+            when:
+            page.chkDrMaster.click()
+            then:
+            String enabledDisabledEdited = page.masterValue.text()
+            println(enabledDisabledEdited)
+
+            waitFor(waitTime) { page.drMode.isDisplayed() }
+            String drState = page.drMode.text()
+            if (enabledDisabled.toLowerCase() == "on") {
+                assert enabledDisabledEdited.toLowerCase().equals("off")
+            } else if (enabledDisabled.toLowerCase() == "off") {
+                assert enabledDisabledEdited.toLowerCase().equals("on")
+            }
+
+            when: 'click the DB Monitor link (if needed)'
+            page.openDbMonitorPage()
+            then: 'should be on DB Monitor page'
+            at DbMonitorPage
+
+            if ((drState.toLowerCase() == 'master' || drState.toLowerCase() == 'both')) {
+                if (enabledDisabledEdited.toLowerCase().equals("off")) {
+                    !page.drMasterSection.isDisplayed()
+                } else {
+                    page.drMasterSection.isDisplayed()
+                }
+            }
+        }else{
+            println("DR is not enabled. DR should be enable to check master edit.")
         }
     }
 }

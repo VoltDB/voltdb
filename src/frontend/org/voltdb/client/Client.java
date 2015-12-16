@@ -126,7 +126,6 @@ public interface Client {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    @Deprecated
     public ClientResponse callProcedureWithTimeout(int queryTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException, ProcCallException;
 
@@ -150,7 +149,6 @@ public interface Client {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    @Deprecated
     public boolean callProcedureWithTimeout(ProcedureCallback callback, int queryTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException;
 

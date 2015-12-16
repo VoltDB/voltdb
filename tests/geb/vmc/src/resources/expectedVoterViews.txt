@@ -1,0 +1,3 @@
+# Expected Views: (when running the Voter example app)
+V_VOTES_BY_CONTESTANT_NUMBER_STATE
+V_VOTES_BY_PHONE_NUMBER
