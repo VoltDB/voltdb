@@ -175,15 +175,15 @@ public class TestParameterConverter extends TestCase
                                                   new GeographyPointValue(-80.437, 25.244),
                                                   new GeographyPointValue(-66.371, 18.476),
                                                   new GeographyPointValue(-64.751, 32.305));
-
         // A triangular hole
+        // Note that this needs to be counter clockwise,
+        // though the WKT string wants it to be clockwise.
         List<GeographyPointValue> innerLoop = Arrays.asList(new GeographyPointValue(-68.874, 28.066),
-                                                  new GeographyPointValue(-68.855, 25.361),
-                                                  new GeographyPointValue(-73.381, 28.376),
-                                                  new GeographyPointValue(-68.874, 28.066));
-
+                                                            new GeographyPointValue(-73.381, 28.376),
+                                                            new GeographyPointValue(-68.855, 25.361),
+                                                            new GeographyPointValue(-68.874, 28.066));
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        String geogRep = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), " + "(-68.874 28.066,-68.855 25.361, -73.381 28.376,-68.874 28.066))";
+        String geogRep = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), " + "(-68.855 25.361, -73.381 28.376,-68.874 28.066, -68.855 25.361))";
         testOneStringToPolygon(geogRep, geog);
         // round trip
         geog = new GeographyValue(geogRep);
