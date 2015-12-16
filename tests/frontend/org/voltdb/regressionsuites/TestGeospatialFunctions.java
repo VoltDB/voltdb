@@ -536,6 +536,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
         verifyStmtFails(client, "select asText(null) from places order by pk",
                 "data type cast needed for parameter or null literal: "
                         + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(pk) from borders order by pk",
+                "incompatible data type in operation: "
+                        + "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types");
     }
 
     static public junit.framework.Test suite() {
