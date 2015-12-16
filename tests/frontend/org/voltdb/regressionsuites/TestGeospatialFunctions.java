@@ -448,7 +448,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         catch (ProcCallException excp) {
             exception = excp;
             assertTrue(exception.getMessage().contains("incompatible data type in operation"));
-            assertTrue(exception.getMessage().contains("Distance between two polygons not supported"));
+            assertTrue(exception.getMessage().contains("DISTANCE between two POLYGONS not supported"));
         } finally {
             assertNotNull(exception);
         }
@@ -468,6 +468,75 @@ public class TestGeospatialFunctions extends RegressionSuite {
         } finally {
             assertNotNull(exception);
         }
+    }
+
+    public void testPointAsText() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select loc, asText(loc) from places order by pk").getResults()[0];
+
+        while (vt.advanceRow()) {
+            GeographyPointValue gpv = vt.getPoint(0);
+            if (gpv == null) {
+                assertEquals(null, vt.getString(1));
+            }
+            else {
+                String wkt = vt.getString(1);
+                assertEquals(gpv.toString().toLowerCase(), wkt.toLowerCase());
+            }
+        }
+    }
+
+    public void testPointAsTextNegative() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        verifyStmtFails(client, "select asText(?) from places order by pk",
+                "data type cast needed for parameter or null literal: "
+                        + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(null) from places order by pk",
+                "data type cast needed for parameter or null literal: "
+                        + "input type to ASTEXT function is ambiguous");
+
+    }
+
+    public void testPolygonAsText() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select region, asText(region) from borders order by pk").getResults()[0];
+
+        GeographyValue gv;
+        int index = 0;
+        while (vt.advanceRow()) {
+            gv = vt.getGeographyValue(0);
+            if (gv == null) {
+                assertEquals(null, vt.getString(1));
+            }
+            else {
+                assertEquals(gv.toString().toLowerCase(), vt.getString(1).toLowerCase());
+            }
+            index++;
+        }
+
+        Borders someWhere = new Borders(index, "someWhere",
+                new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
+                                             "-14.1234567891264 10.1234567891234, " +
+                                             "-14.0 4.1234567891234, " +
+                                             "-10.1234567891234 10.1234567891234))"));
+        vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        vt = client.callProcedure("@AdHoc",
+                "select region, asText(region) from borders where pk = " + index).getResults()[0];
+        vt.advanceRow();
+        gv = vt.getGeographyValue(0);
+        assertEquals(gv.toString().toLowerCase(), vt.getString(1).toLowerCase());
+
     }
 
     static public junit.framework.Test suite() {

@@ -49,14 +49,14 @@ public class TestGeographyValue extends TestCase {
                 new GeographyPointValue(-68.874, 28.066));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+        assertEquals("POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         // round trip
         geog = new GeographyValue("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066,-68.855 25.361, -73.381 28.376, -68.874 28.066))");
-        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+        assertEquals("POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
@@ -66,7 +66,7 @@ public class TestGeographyValue extends TestCase {
 
         buf.position(0);
         GeographyValue newGeog = GeographyValue.unflattenFromBuffer(buf);
-        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+        assertEquals("POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(270, buf.position());
@@ -74,7 +74,7 @@ public class TestGeographyValue extends TestCase {
         // Try the absolute version of unflattening
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
-        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+        assertEquals("POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 newGeog.toString());
         assertEquals(77, buf.position());
@@ -90,7 +90,7 @@ public class TestGeographyValue extends TestCase {
         GeographyValue geoValue;
         // start with valid loop
         geoValue = new GeographyValue(Arrays.asList(outerLoop));
-        assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -76.751 20.305, -64.751 32.305))",
+        assertEquals("POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -76.751 20.305, -64.751 32.305))",
                 geoValue.toString());
 
         Exception exception = null;
@@ -144,7 +144,7 @@ public class TestGeographyValue extends TestCase {
     public void testWktParsingPositive() {
 
         // Parsing is case-insensitive
-        String expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
+        String expected = "POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
         assertEquals(expected, canonicalizeWkt("Polygon((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
         assertEquals(expected, canonicalizeWkt("polygon((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
         assertEquals(expected, canonicalizeWkt("PoLyGoN((-64.751 32.305,-80.437  25.244,-66.371  18.476,-64.751  32.305))"));
@@ -155,7 +155,7 @@ public class TestGeographyValue extends TestCase {
         assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t-64.751\t32.305\t,\t-80.437\t25.244\t,\t-66.371\t18.476\t,\t-64.751\t32.305\t)\t)\t"));
 
         // Parsing with more than one loop should work the same.
-        expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+        expected = "POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))";
         assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n, -66.371 18.476,-64.751\t\t\t32.305   ),\t "
                 + "(\n-68.874 28.066,\t    -68.855\n25.361\n,      -73.381\t28.376,\n\n-68.874\t28.066\t)\n)\t"));

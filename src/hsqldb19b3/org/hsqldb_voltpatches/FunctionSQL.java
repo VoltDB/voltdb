@@ -2418,7 +2418,6 @@ public class FunctionSQL extends Expression {
         case FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE :
             Type leftChildType = nodes[0].dataType;
             Type rightChildType = nodes[1].dataType;
-            int distanceFunctionId = -1;
 
             // in here the only cases needed to be handled are distance between polygon-to-point
             // and point-to-point.
@@ -2426,13 +2425,26 @@ public class FunctionSQL extends Expression {
             assert(rightChildType.isGeographyPointType());
 
             if (leftChildType.isGeographyType()) {
-                distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT;
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POLYGON_POINT));
             }
             else {
-                distanceFunctionId = FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT;
-            }
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_DISTANCE_POINT_POINT));
 
-            exp.attributes.put("function_id", String.valueOf(distanceFunctionId));
+            }
+            return exp;
+
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_ASTEXT:
+            // only valid types for asText are geography and geography-point
+            // resolveTypes in FunctionForVoltDB will block any other types
+            // as unsupported types
+            assert(nodes[0].dataType.isGeographyPointType() || nodes[0].dataType.isGeographyType());
+
+            if (nodes[0].dataType.isGeographyPointType()) {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT));
+            }
+            else {
+                exp.attributes.put("function_id", String.valueOf(FunctionForVoltDB.FunctionId.FUNC_VOLT_ASTEXT_GEOGRAPHY));
+            }
             return exp;
 
         case FunctionForVoltDB.FunctionId.FUNC_VOLT_DATEADD :
