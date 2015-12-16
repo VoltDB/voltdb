@@ -49,6 +49,7 @@ public class RankExpression extends AbstractExpression {
     private boolean m_isDecending = false;
 
     private boolean m_areAllIndexColumnsCovered = false;
+    private boolean m_isIndexUnique = true;
 
     public String getTableName() {
         return m_tableName;
@@ -94,6 +95,10 @@ public class RankExpression extends AbstractExpression {
         return m_areAllIndexColumnsCovered;
     }
 
+    public boolean isIndexUnqiue() {
+        return m_isIndexUnique;
+    }
+
     public RankExpression() {
         //
         // This is needed for serialization
@@ -113,6 +118,8 @@ public class RankExpression extends AbstractExpression {
         m_partitionbySize = partitionbyExprs.size();
         m_orderbySize = orderbyExprs.size();
         m_isDecending = isDecending;
+
+        m_isIndexUnique = index.getUnique();
     }
 
     @Override

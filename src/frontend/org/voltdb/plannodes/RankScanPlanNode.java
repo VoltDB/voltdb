@@ -199,6 +199,12 @@ public class RankScanPlanNode extends AbstractScanPlanNode {
                     continue;
                 }
 
+                // Rank Value LOG(N) look up does not support multiple tree map right now
+                // use the default expression instead, slow but worked.
+                if (! m_rankExpression.isIndexUnqiue()) {
+                    continue;
+                }
+
                 // The rankStart and rankEnd has to be constant, no tuple involved
                 if (! ExpressionUtil.findAllExpressionsOfClass(
                         m_rankStartExpression, TupleValueExpression.class).isEmpty()) {

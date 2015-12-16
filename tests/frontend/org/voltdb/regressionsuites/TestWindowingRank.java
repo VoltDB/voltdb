@@ -54,11 +54,11 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestWindowingRank extends RegressionSuite {
 
     private void initUniqueTable(Client client) throws NoConnectionsException, IOException, ProcCallException {
-        client.callProcedure("T1.insert", 10, 2);
-        client.callProcedure("T1.insert", 20, 1);
-        client.callProcedure("T1.insert", 30, 1);
-        client.callProcedure("T1.insert", 40, 3);
-        client.callProcedure("T1.insert", 50, 1);
+        client.callProcedure("tu.insert", 10, 2);
+        client.callProcedure("tu.insert", 20, 1);
+        client.callProcedure("tu.insert", 30, 1);
+        client.callProcedure("tu.insert", 40, 3);
+        client.callProcedure("tu.insert", 50, 1);
     }
 
     private void initUniqueTableExtra(Client client, boolean append)
@@ -68,9 +68,9 @@ public class TestWindowingRank extends RegressionSuite {
         }
 
         // extra data
-        client.callProcedure("T1.insert", 60, 2);
-        client.callProcedure("T1.insert", 70, 3);
-        client.callProcedure("T1.insert", 80, 2);
+        client.callProcedure("tu.insert", 60, 2);
+        client.callProcedure("tu.insert", 70, 3);
+        client.callProcedure("tu.insert", 80, 2);
     }
 
     public void notestRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
@@ -80,24 +80,24 @@ public class TestWindowingRank extends RegressionSuite {
 
         initUniqueTable(client);
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from t1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1}, {20, 2}, {30, 3}, {40, 4}, {50, 5}});
 
         // decending
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from t1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 5}, {20, 4}, {30, 3}, {40, 2}, {50, 1}});
 
         // where clause
-        vt = client.callProcedure("@AdHoc", "select a from t1 "
+        vt = client.callProcedure("@AdHoc", "select a from tu "
                 + "where rank() over (order by a) <= 3 order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10}, {20}, {30}});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 "
+        vt = client.callProcedure("@AdHoc", "select a from tu "
                 + "where rank() over (order by a) >= 2 and "
                 + "rank() over (order by a) < 4 order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{20}, {30}});
 
-        vt = client.callProcedure("@AdHoc", "select * from t1 "
+        vt = client.callProcedure("@AdHoc", "select * from tu "
                 + "where rank() over (order by a) = 3 order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{30, 1}});
 
@@ -106,10 +106,10 @@ public class TestWindowingRank extends RegressionSuite {
         //
         initUniqueTableExtra(client, true);
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) from t1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1}, {20, 1}, {30, 2}, {40, 1}, {50, 3}, {60, 2}, {70, 2}, {80, 3}});
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a desc) from t1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a desc) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 3}, {20, 3}, {30, 2}, {40, 2}, {50, 1}, {60, 2}, {70, 1}, {80, 1}});
 
     }
@@ -121,26 +121,26 @@ public class TestWindowingRank extends RegressionSuite {
 
         initUniqueTable(client);
 
-        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        vt = client.callProcedure("@Explain", "select a from tu where rank() over (order by a) = 2;").getResults()[0];
         assertTrue(vt.toString().contains("Rank SCAN"));
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 2;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) = 2;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{20});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 5;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) = 5;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{50});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 10;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) = 10;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
 
-        vt = client.callProcedure("@Explain", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        vt = client.callProcedure("@Explain", "select a from tu where rank() over (order by a) = 0.5;").getResults()[0];
         assertTrue(vt.toString().contains("Rank SCAN"));
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 0.5;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) = 0.5;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{20});
 
         // aggregates
-        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) = 3;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) = 3;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{30});
     }
 
@@ -152,29 +152,29 @@ public class TestWindowingRank extends RegressionSuite {
         initUniqueTable(client);
 
         // TODO(xin): NOT TESTED against KEY exception
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > -2 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) > -2 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{10, 20, 30, 40, 50});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) >= 3 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) >= 3 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{30, 40, 50});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 3 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) > 3 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{40, 50});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 3 and a + 10 != 50;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) > 3 and a + 10 != 50;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{50});
 
         // aggregates
-        vt = client.callProcedure("@Explain", "select sum(a) from t1 where rank() over (order by a) >= 3;").getResults()[0];
+        vt = client.callProcedure("@Explain", "select sum(a) from tu where rank() over (order by a) >= 3;").getResults()[0];
         assertTrue(vt.toString().contains("Rank SCAN"));
 
-        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) >= 3;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) >= 3;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{120});
 
-        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) >= 0.7;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) >= 0.7;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{120});
 
-        vt = client.callProcedure("@AdHoc", "select b, sum(a) from t1 where rank() over (order by a) >= 2 "
+        vt = client.callProcedure("@AdHoc", "select b, sum(a) from tu where rank() over (order by a) >= 2 "
                 + " group by b order by b;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1, 100}, {3, 40}});
     }
@@ -186,16 +186,16 @@ public class TestWindowingRank extends RegressionSuite {
 
         initUniqueTable(client);
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 3 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) < 3 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{10, 20});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) <= 3 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) <= 3 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{10, 20, 30});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) < 1 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 10 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) < 10 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{10, 20, 30, 40, 50});
     }
 
@@ -207,24 +207,24 @@ public class TestWindowingRank extends RegressionSuite {
 
         initUniqueTable(client);
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) < 4 "
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) < 4 "
                 + " and rank() over (order by a) > 1 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{20, 30});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 1 "
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) > 1 "
                 + " and rank() over (order by a) < 4 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{20, 30});
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) > 1 "
+        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) > 1 "
                 + " and rank() over (order by a) < 4 and a + 10 != 30 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{30});
 
 
-        vt = client.callProcedure("@AdHoc", "select sum(a) from t1 where rank() over (order by a) > 1 "
+        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) > 1 "
                 + " and rank() over (order by a) < 10 order by a;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{140});
 
-        vt = client.callProcedure("@AdHoc", "select b, sum(a) from t1 where rank() over (order by a) > 0 "
+        vt = client.callProcedure("@AdHoc", "select b, sum(a) from tu where rank() over (order by a) > 0 "
                 + " and rank() over (order by a) < 10 group by b order by b;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1, 100}, {2, 10}, {3, 40}});
     }
@@ -237,58 +237,94 @@ public class TestWindowingRank extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        client.callProcedure("T1.insert", 10, 1);
-        client.callProcedure("T1.insert", 10, 1);
-        client.callProcedure("T1.insert", 10, 2);
-        client.callProcedure("T1.insert", 20, 1);
-        client.callProcedure("T1.insert", 30, 3);
-        client.callProcedure("T1.insert", 30, 1);
-        client.callProcedure("T1.insert", 40, 2);
-        client.callProcedure("T1.insert", 40, 3);
-        client.callProcedure("T1.insert", 50, 2);
+        client.callProcedure("tu.insert", 10, 1);
+        client.callProcedure("tu.insert", 10, 1);
+        client.callProcedure("tu.insert", 10, 2);
+        client.callProcedure("tu.insert", 20, 1);
+        client.callProcedure("tu.insert", 30, 3);
+        client.callProcedure("tu.insert", 30, 1);
+        client.callProcedure("tu.insert", 40, 2);
+        client.callProcedure("tu.insert", 40, 3);
+        client.callProcedure("tu.insert", 50, 2);
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from t1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1},{10, 1},{10, 1},
                 {20, 4}, {30, 5}, {30, 5}, {40, 7}, {40, 7}, {50, 9}});
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from t1 order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a desc) from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 7},{10, 7},{10, 7},
                 {20, 6}, {30, 4}, {30, 4}, {40, 2}, {40, 2}, {50, 1}});
 
         //
         // PARTITION BY
         //
-        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a) from t1 order by b, a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a) from tu order by b, a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1, 10, 1},{1, 10, 1}, {1, 20, 3}, {1, 30, 4}, {2, 10, 1},
                 {2, 40, 2}, {2, 50, 3}, {3, 30, 1}, {3, 40, 2}});
 
-        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a desc) from t1 order by b, a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select b, a, rank() over (partition by b order by a desc) from tu order by b, a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{1, 10, 3},{1, 10, 3}, {1, 20, 2}, {1, 30, 1}, {2, 10, 3},
                 {2, 40, 2}, {2, 50, 1}, {3, 30, 2}, {3, 40, 1}});
     }
 
 
-    public void testRankScan_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testNoRankScan_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
         VoltTable vt = null;
 
-        client.callProcedure("T1.insert", 10, 1);
-        client.callProcedure("T1.insert", 10, 1);
-        client.callProcedure("T1.insert", 10, 2);
-        client.callProcedure("T1.insert", 20, 1);
-        client.callProcedure("T1.insert", 30, 3);
-        client.callProcedure("T1.insert", 30, 1);
-        client.callProcedure("T1.insert", 40, 2);
-        client.callProcedure("T1.insert", 40, 3);
-        client.callProcedure("T1.insert", 50, 2);
+        client.callProcedure("tm.insert", 10, 1);
+        client.callProcedure("tm.insert", 10, 1);
+        client.callProcedure("tm.insert", 10, 2);
+        client.callProcedure("tm.insert", 20, 1);
+        client.callProcedure("tm.insert", 30, 3);
+        client.callProcedure("tm.insert", 30, 1);
+        client.callProcedure("tm.insert", 40, 2);
+        client.callProcedure("tm.insert", 40, 3);
+        client.callProcedure("tm.insert", 50, 2);
 
+        // SEQ SCAN
 
-        vt = client.callProcedure("@AdHoc", "select a from t1 where rank() over (order by a) = 1;").getResults()[0];
-        System.err.println(vt);
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 1;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{10, 10, 10});
 
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 2;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
 
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 3;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 4;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 5;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{30, 30});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 6;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 7;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{40, 40});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 8;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 9;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{50});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 10;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = -1;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+
+        // INDEX SCAN
+        vt = client.callProcedure("@Explain", "select a from tm where rank() over (order by a) = 4 and a >= 20 and a < 40;").getResults()[0];
+        assertTrue(vt.toString().contains("INDEX SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from tm where rank() over (order by a) = 4 and a >= 20 and a < 40;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
     }
 
     //
@@ -307,10 +343,16 @@ public class TestWindowingRank extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         final String literalSchema =
-                "create table t1 (a integer, b integer);" +
-                        "create index idx1 on t1 (a);" +
-                        "create index idx2 on t1 (b, a);"
-                        ;
+            "create table tu (a integer, b integer);" +
+            "create unique index idx1 on tu (a);" +
+            "create unique index idx2 on tu (b, a);" +
+
+            "create table tm (a integer, b integer);" +
+            "create index tm_idx1 on tm (a);" +
+            "create index tm_idx2 on tm (b, a);" +
+
+            ""
+            ;
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
@@ -320,7 +362,7 @@ public class TestWindowingRank extends RegressionSuite {
         //        project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM var16) from r1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
-        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
