@@ -163,6 +163,9 @@ public:
     }
 
 private:
+    // converts double value to string with specified precision displaying
+    // only significant decimal value.
+    // Output pattern is similar to "...##0.0##..."
     std::string toString(double number, int decimalPrecision=12) const {
         double decimalNumber;
         char buffer[32];
@@ -173,8 +176,8 @@ private:
             snprintf(buffer, sizeof(buffer), "%3.1f", number);
         }
         else {
-            int wholeNumber = log10(abs(number));
-            snprintf(buffer, sizeof(buffer), "%.*g", (wholeNumber + 1 + decimalPrecision), number);
+            int wholeNumberDigits = log10(abs(number)) + 1;
+            snprintf(buffer, sizeof(buffer), "%.*g", (wholeNumberDigits + decimalPrecision), number);
         }
         return buffer;
     }
