@@ -73,6 +73,19 @@ public class TestWindowingRank extends RegressionSuite {
         client.callProcedure("tu.insert", 80, 2);
     }
 
+    public void testNonSupportedCase() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING xin......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        initUniqueTable(client);
+
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu where a > 30 order by a;").getResults()[0];
+        validateTableOfLongs(vt, new long[][]{{40, 4}, {50, 5}});
+
+        // decending
+    }
+
     public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING xin......");
         Client client = getClient();
@@ -346,10 +359,15 @@ public class TestWindowingRank extends RegressionSuite {
             "create table tu (a integer, b integer);" +
             "create unique index idx1 on tu (a);" +
             "create unique index idx2 on tu (b, a);" +
+            "create unique index idx3 on tu (a) where a > 30;" +
 
             "create table tm (a integer, b integer);" +
             "create index tm_idx1 on tm (a);" +
             "create index tm_idx2 on tm (b, a);" +
+
+            "create table pu (a integer, b integer);" +
+            "create index pu_idx1 on pu (a);" +
+            "create index pu_idx2 on pu (b, a);" +
 
             ""
             ;

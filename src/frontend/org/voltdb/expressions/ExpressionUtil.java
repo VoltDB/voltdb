@@ -266,6 +266,22 @@ public abstract class ExpressionUtil {
         return tves;
     }
 
+    public static boolean containsTVEFromTable(AbstractExpression expr, String tableName) {
+        if (expr == null) {
+            return false;
+        }
+
+        List<TupleValueExpression> tves = getTupleValueExpressions(expr);
+        boolean foundTargetTableTVE = false;
+        for (TupleValueExpression tve: tves) {
+            if (tve.getTableName().contains(tableName)) {
+                foundTargetTableTVE = true;
+                break;
+            }
+        }
+        return foundTargetTableTVE;
+    }
+
     /**
      * A convenience wrapper around AbstractExpression.findAllExpressionsOfClass
      * Recursively walk an expression and return a list of all the expressions

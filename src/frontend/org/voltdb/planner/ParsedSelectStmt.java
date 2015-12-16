@@ -40,6 +40,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RankExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
@@ -702,6 +703,40 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(colExpr.getValueType() != VoltType.NUMERIC);
         }
         assert(colExpr != null);
+
+        // Check RankExpression with where clause
+        List<AbstractExpression> rankExprs = ExpressionUtil.findAllExpressionsOfClass(colExpr, RankExpression.class);
+        if (rankExprs != null && !rankExprs.isEmpty()) {
+            for (AbstractExpression ex: rankExprs) {
+                RankExpression rankExpr = (RankExpression) ex;
+                String tbName = rankExpr.getTableName();
+
+                AbstractExpression predicate = m_joinTree.getAllFilters();
+                List<AbstractExpression> predicateList = ExpressionUtil.uncombine(predicate);
+                List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
+                for (AbstractExpression expr: predicateList) {
+                    if (ExpressionUtil.containsTVEFromTable(expr, tbName)) {
+                        coveringExprs.add(expr);
+                    }
+                }
+
+                if (! coveringExprs.isEmpty()) {
+                    if (! rankExpr.isUsingPartialIndex()) {
+                        throw new PlanningErrorException(
+                                "Rank clause without using partial index matching table where clause is not allowed.");
+                    }
+                    StmtTableScan tableScan = m_tableAliasMap.get(tbName);
+
+                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                    if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs,
+                            rankExpr.getIndex(), exactMatchCoveringExprs) ) {
+                          throw new PlanningErrorException(
+                                  "Rank clause without using partial index matching table where clause is not allowed.");
+                    }
+                }
+            }
+        }
+
 
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();

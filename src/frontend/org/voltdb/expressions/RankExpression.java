@@ -24,6 +24,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
@@ -48,8 +49,32 @@ public class RankExpression extends AbstractExpression {
     private int m_orderbySize = -1;
     private boolean m_isDecending = false;
 
+    private Index m_index;
     private boolean m_areAllIndexColumnsCovered = false;
-    private boolean m_isIndexUnique = true;
+
+    public RankExpression() {
+        //
+        // This is needed for serialization
+        //
+        super();
+    }
+
+    public RankExpression(
+            List<AbstractExpression> partitionbyExprs,
+            List<AbstractExpression> orderbyExprs,
+            Database db, boolean isDecending)
+    {
+        super(ExpressionType.WINDOWING_RANK);
+        m_tableName = findTableName(orderbyExprs);
+        Index index = findTableIndex(partitionbyExprs, orderbyExprs, db);
+        m_index = index;
+
+        m_indexName = index.getTypeName();
+        m_partitionbySize = partitionbyExprs.size();
+        m_orderbySize = orderbyExprs.size();
+        m_isDecending = isDecending;
+    }
+
 
     public String getTableName() {
         return m_tableName;
@@ -96,30 +121,38 @@ public class RankExpression extends AbstractExpression {
     }
 
     public boolean isIndexUnqiue() {
-        return m_isIndexUnique;
+        return m_index.getUnique();
     }
 
-    public RankExpression() {
-        //
-        // This is needed for serialization
-        //
-        super();
+    public Index getIndex() {
+        return m_index;
     }
 
-    public RankExpression(
-            List<AbstractExpression> partitionbyExprs,
-            List<AbstractExpression> orderbyExprs,
-            Database db, boolean isDecending)
-    {
-        super(ExpressionType.WINDOWING_RANK);
-        m_tableName = findTableName(orderbyExprs);
-        Index index = findTableIndex(partitionbyExprs, orderbyExprs, db);
-        m_indexName = index.getTypeName();
-        m_partitionbySize = partitionbyExprs.size();
-        m_orderbySize = orderbyExprs.size();
-        m_isDecending = isDecending;
+    public boolean isUsingPartialIndex() {
+        return ! m_index.getPredicatejson().isEmpty();
+    }
 
-        m_isIndexUnique = index.getUnique();
+    public boolean hasPartitionTableIssue(Database db, Table targetTable, List<AbstractExpression> partitionbyExprs) {
+        Column partitionCol = targetTable.getPartitioncolumn() ;
+        if (partitionCol == null) {
+             // replicated table has no partition data issue
+             return false;
+         }
+         String colName = partitionCol.getTypeName();
+         TupleValueExpression tve = new TupleValueExpression(
+                 m_tableName, m_tableName, colName, colName, partitionCol.getIndex());
+         tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
+
+         boolean pkCovered = false;
+         for (AbstractExpression ex: partitionbyExprs) {
+             if (ex.equals(tve)) {
+                 pkCovered = true;
+                 break;
+             }
+         }
+         // If PARTITION BY not covering PK, we can not use that index to calculate ranking
+         // because our index is not distributed implemented.
+        return ! pkCovered;
     }
 
     @Override
@@ -232,7 +265,7 @@ public class RankExpression extends AbstractExpression {
         return tableName;
     }
 
-    public Index findTableIndex(
+    private Index findTableIndex(
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs, Database db) {
         Table targetTable = db.getTables().get(m_tableName);
@@ -244,12 +277,13 @@ public class RankExpression extends AbstractExpression {
             if ( ! IndexType.isScannable(index.getType())) {
                 continue;
             }
-            if (! index.getPredicatejson().isEmpty()) {
-                // do not try to look at Partial/Sparse index right now
-                continue;
-            }
+
             ArrayList<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
             allExprs.addAll(partitionbyExprs);
+
+            if (hasPartitionTableIssue(db, targetTable, partitionbyExprs)) {
+                continue;
+            }
             allExprs.addAll(orderbyExprs);
 
             if (isExpressionListSubsetOfIndex(allExprs, index)) {
@@ -260,7 +294,7 @@ public class RankExpression extends AbstractExpression {
                 + "Tree INDEX defined in its table.");
     }
 
-    public boolean isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
+    private boolean isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
