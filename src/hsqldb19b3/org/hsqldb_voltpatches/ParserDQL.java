@@ -1549,7 +1549,7 @@ public class ParserDQL extends ParserBase {
         return aggregateExp;
     }
 
-    private Expression readRank() {
+    private Expression readRank(boolean isPercent) {
         SortAndSlice sortAndSlice = null;
 
         read();
@@ -1586,7 +1586,7 @@ public class ParserDQL extends ParserBase {
 
         readThis(Tokens.CLOSEBRACKET);
 
-        ExpressionRank erank = new ExpressionRank(sortAndSlice, partitionByList);
+        ExpressionRank erank = new ExpressionRank(sortAndSlice, partitionByList, isPercent);
 
         return erank;
     }
@@ -1954,9 +1954,10 @@ public class ParserDQL extends ParserBase {
             break;
 
         case Tokens.RANK :
+            return readRank(false);
 
-            return readRank();
-
+        case Tokens.PERCENT_RANK :
+        	return readRank(true);
 
         default :
             if (isCoreReservedKey()) {

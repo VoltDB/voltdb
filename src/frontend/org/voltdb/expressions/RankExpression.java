@@ -39,12 +39,15 @@ import org.voltdb.utils.CatalogUtil;
 
 public class RankExpression extends AbstractExpression {
     public enum Members {
+        IS_PERCENT_RANK,
         TARGET_TABLE_NAME,
         TARGET_INDEX_NAME,
         PARTITIONBY_SIZE,
         ORDERBY_SIZE,
         IS_DECENDING_ORDER;
     }
+
+    private boolean m_isPercentRank = false;
 
     private String m_tableName = null;
     private String m_indexName = null;
@@ -68,13 +71,14 @@ public class RankExpression extends AbstractExpression {
     public RankExpression(
             List<AbstractExpression> partitionbyExprs,
             List<AbstractExpression> orderbyExprs,
-            Database db, boolean isDecending)
+            Database db, boolean isDecending, boolean isPercentRank)
     {
         super(ExpressionType.WINDOWING_RANK);
         m_tableName = findTableName(orderbyExprs);
         m_partitionbySize = partitionbyExprs.size();
         m_orderbySize = orderbyExprs.size();
         m_isDecending = isDecending;
+        m_isPercentRank = isPercentRank;
 
         Index index = findTableIndex(partitionbyExprs, orderbyExprs, db);
 
@@ -121,6 +125,14 @@ public class RankExpression extends AbstractExpression {
 
     public void setIsDecending(boolean isDecending) {
         m_isDecending = isDecending;
+    }
+
+    public boolean isPercentRank() {
+        return m_isPercentRank;
+    }
+
+    public void setIsPercentRank(boolean isPercentRank) {
+        m_isPercentRank = isPercentRank;
     }
 
     public boolean areAllIndexColumnsCovered() {
@@ -170,7 +182,8 @@ public class RankExpression extends AbstractExpression {
                     && rankExpr.getIndexName().equals(m_indexName)
                     && rankExpr.getPartitionbySize() == m_partitionbySize
                     && rankExpr.getOrderbySize() == m_orderbySize
-                    && rankExpr.isDecending() == m_isDecending) {
+                    && rankExpr.isDecending() == m_isDecending
+                    && rankExpr.isPercentRank() == m_isPercentRank) {
                 return true;
             }
         }
@@ -190,6 +203,7 @@ public class RankExpression extends AbstractExpression {
         hash += m_partitionbySize;
         hash += m_orderbySize;
         hash += m_isDecending ? 1 : 0;
+        hash += m_isPercentRank ? 1 : 0;
 
         return hash;
     }
@@ -202,6 +216,7 @@ public class RankExpression extends AbstractExpression {
         clone.setPartitionbySize(m_partitionbySize);
         clone.setOrderbySize(m_orderbySize);
         clone.setIsDecending(m_isDecending);
+        clone.setIsPercentRank(m_isPercentRank);
         return clone;
     }
 
@@ -213,6 +228,7 @@ public class RankExpression extends AbstractExpression {
         m_partitionbySize = obj.getInt(Members.PARTITIONBY_SIZE.name());
         m_orderbySize = obj.getInt(Members.ORDERBY_SIZE.name());
         m_isDecending = obj.getInt(Members.IS_DECENDING_ORDER.name()) == 1 ? true : false;
+        m_isPercentRank = obj.getInt(Members.IS_PERCENT_RANK.name()) == 1 ? true : false;
     }
 
     @Override
@@ -225,25 +241,28 @@ public class RankExpression extends AbstractExpression {
         assert(m_orderbySize > 0);
         stringer.key(Members.ORDERBY_SIZE.name()).value(m_orderbySize);
         stringer.key(Members.IS_DECENDING_ORDER.name()).value(m_isDecending? 1 : 0);
+        stringer.key(Members.IS_PERCENT_RANK.name()).value(m_isPercentRank? 1 : 0);
     }
 
     @Override
     public void finalizeValueTypes() {
+//      if (m_isPercentRank) {
+//          m_valueType = VoltType.DECIMAL;
+//            m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
+//      } else {
+//          m_valueType = VoltType.BIGINT;
+//            m_valueSize = VoltType.BIGINT.getLengthInBytesForFixedTypes();
+//      }
+
+        // HACK!!! for Percent_rank look up later...
         m_valueType = VoltType.BIGINT;
         m_valueSize = VoltType.BIGINT.getLengthInBytesForFixedTypes();
     }
 
     @Override
     public String explain(String impliedTableName) {
-        String str = "RANK expression using index " + m_indexName;
-        //        List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
-        //        if (m_partitionbySize > 0) {
-        //            str += " partition by " + indexedColRefs.get(m_partitionbySize - 1).getTypeName();
-        //        }
-        //        str += " order by ";
-        //        for (int i = 0; i < m_orderbySize; i++) {
-        //            str += indexedColRefs.get(m_partitionbySize + i).getTypeName() + " ";
-        //        }
+        String type = m_isPercentRank ? "PERCENT_RANK" : "RANK";
+        String str = type + " expression using index " + m_indexName;
 
         if (m_partitionbySize > 0) {
             str += " partition by index column #" + (m_partitionbySize - 1);
@@ -331,7 +350,7 @@ public class RankExpression extends AbstractExpression {
             m_indexColumnsCovered.add(left);
             m_indexCandidates.add(index);
         } else {
-            // TODO(xin): add support for expression index
+            // TODO(xin): add support of expression index for rank
         }
     }
 
@@ -380,8 +399,8 @@ public class RankExpression extends AbstractExpression {
 
             return;
         }
-        throw new PlanningErrorException(
-                "Rank clause without using partial index matching table where clause is not allowed.");
+        throw new PlanningErrorException( m_isPercentRank ? "PERCENT_RANK" : "RANK" +
+                " clause without using partial index matching table where clause is not allowed.");
     }
 
 }

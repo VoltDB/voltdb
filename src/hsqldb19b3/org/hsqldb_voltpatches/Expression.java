@@ -1546,7 +1546,8 @@ public class Expression {
         prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
         prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
         prototypes.put(OpTypes.LIMIT,         new VoltXMLElement("limit"));
-        prototypes.put(OpTypes.RANK,          new VoltXMLElement("rank"));
+        prototypes.put(OpTypes.RANK,          new VoltXMLElement("rank").withValue("percentage", "false"));
+        prototypes.put(OpTypes.PERCENT_RANK,  new VoltXMLElement("rank").withValue("percentage", "true"));
         prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
     }

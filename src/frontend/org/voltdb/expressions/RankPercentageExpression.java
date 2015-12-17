@@ -26,16 +26,17 @@ import org.voltdb.types.ExpressionType;
 
 public class RankPercentageExpression extends AbstractExpression {
     public enum Members {
-        VALUE,
         TARGET_TABLE_NAME,
         TARGET_INDEX_NAME,
-        PARTITIONBY_SIZE;
+        PARTITIONBY_SIZE,
+        PARAM_IDX;
     }
 
-    private String m_value = null;
     private String m_tableName = null;
     private String m_indexName = null;
     private int m_partitionbySize = 0;
+
+    private int m_pveIndex = -1;
 
 
     public RankPercentageExpression() {
@@ -45,20 +46,13 @@ public class RankPercentageExpression extends AbstractExpression {
         super();
     }
 
-    public RankPercentageExpression(RankExpression rankExpr, ConstantValueExpression cve) {
+    public RankPercentageExpression(RankExpression rankExpr, ParameterValueExpression pve) {
         super(ExpressionType.WINDOWING_RANK_PERCENTAGE);
-        m_value = cve.getValue();
         m_tableName = rankExpr.getTableName();
         m_indexName = rankExpr.getIndexName();
         m_partitionbySize = rankExpr.getPartitionbySize();
-    }
 
-    public String getValue() {
-        return m_value;
-    }
-
-    public void setValue(String value) {
-        m_value = value;
+        m_pveIndex = pve.getParameterIndex();
     }
 
     public String getTableName() {
@@ -85,6 +79,13 @@ public class RankPercentageExpression extends AbstractExpression {
         m_partitionbySize = partitionbySize;
     }
 
+    public int getPVEIndex() {
+        return m_pveIndex;
+    }
+
+    public void setPVEIndex(int pveIndex) {
+        m_pveIndex = pveIndex;;
+    }
 
     @Override
     public void finalizeValueTypes() {
@@ -98,11 +99,10 @@ public class RankPercentageExpression extends AbstractExpression {
             RankPercentageExpression rankPercentageExpr =
                     (RankPercentageExpression) obj;
 
-            if (rankPercentageExpr.getValue().equals(m_value)
-                    && rankPercentageExpr.getTableName().equals(m_tableName)
-                    && rankPercentageExpr.getIndexName().equals(m_indexName)
-                    && rankPercentageExpr.getPartitionbySize() == m_partitionbySize
-                    ) {
+            if (rankPercentageExpr.getTableName().equals(m_tableName) &&
+                rankPercentageExpr.getIndexName().equals(m_indexName) &&
+                rankPercentageExpr.getPartitionbySize() == m_partitionbySize &&
+                rankPercentageExpr.getPVEIndex() == m_pveIndex) {
                 return true;
             }
         }
@@ -112,7 +112,7 @@ public class RankPercentageExpression extends AbstractExpression {
 
     @Override
     public int hashCode() {
-        int hash = super.hashCode() + m_value.hashCode();
+        int hash = super.hashCode();
         if (m_tableName != null) {
             hash += m_tableName.hashCode();
         }
@@ -121,16 +121,17 @@ public class RankPercentageExpression extends AbstractExpression {
         }
 
         hash += m_partitionbySize;
+        hash += m_pveIndex;
         return hash;
     }
 
     @Override
     public Object clone() {
         RankPercentageExpression clone = (RankPercentageExpression) super.clone();
-        clone.setValue(m_value);
         clone.setTableName(m_tableName);
         clone.setIndexName(m_indexName);
         clone.setPartitionbySize(m_partitionbySize);
+        clone.setPVEIndex(m_pveIndex);
         return clone;
     }
 
@@ -138,26 +139,25 @@ public class RankPercentageExpression extends AbstractExpression {
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         super.loadFromJSONObject(obj);
-        m_value = obj.getString(Members.VALUE.name());
         m_tableName = obj.getString(Members.TARGET_TABLE_NAME.name());
         m_indexName = obj.getString(Members.TARGET_INDEX_NAME.name());
         m_partitionbySize = obj.getInt(Members.PARTITIONBY_SIZE.name());
+        m_pveIndex = obj.getInt(Members.PARAM_IDX.name());
     }
 
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.VALUE.name()).value(m_value);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_tableName);
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_indexName);
         stringer.key(Members.PARTITIONBY_SIZE.name()).value(m_partitionbySize);
+        stringer.key(Members.PARAM_IDX.name()).value(m_pveIndex);
     }
 
     @Override
     public String explain (String impliedTableName) {
-
-        return "RankPercentageExpression with value: " + m_value;
+        return "RankPercentageExpression with pve index: " + m_pveIndex;
     }
 
     public static boolean isConstantValueExpressionValid(ConstantValueExpression cve) {

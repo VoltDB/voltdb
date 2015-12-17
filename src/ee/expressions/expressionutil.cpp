@@ -513,13 +513,13 @@ rankPercentageExpressionFactory(PlannerDomValue obj, ExpressionType et,
                  AbstractExpression *lc, AbstractExpression *rc)
 {
     // read the tuple value expression specific data
-    std::string percentageValue = obj.valueForKey("VALUE").asStr();
     std::string targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
     std::string targetIndexName = obj.valueForKey("TARGET_INDEX_NAME").asStr();
     int partitionbySize = obj.valueForKey("PARTITIONBY_SIZE").asInt();
+    int paramIdx = obj.valueForKey("PARAM_IDX").asInt();
 
-    return new RankPercentageExpression(percentageValue, targetTableName, targetIndexName,
-            partitionbySize);
+    return new RankPercentageExpression(targetTableName, targetIndexName,
+            partitionbySize, paramIdx);
 }
 
 

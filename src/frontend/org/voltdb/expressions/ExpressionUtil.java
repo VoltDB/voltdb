@@ -665,29 +665,39 @@ public abstract class ExpressionUtil {
         }
 
         ComparisonExpression ce = (ComparisonExpression) ae;
-        if (ce.getLeft() instanceof RankExpression && ce.getRight() instanceof ParameterValueExpression) {
-            ParameterValueExpression pve = (ParameterValueExpression) ce.getRight();
-            if (pve.getOriginalValue() != null) {
-                ConstantValueExpression cve = pve.getOriginalValue();
-                if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
-                    RankPercentageExpression rpExpr = new RankPercentageExpression(
-                            (RankExpression)ce.getLeft(), cve);
-                    ae.setRight(rpExpr);
+        if (ce.getLeft() instanceof RankExpression &&
+                ((RankExpression) ce.getLeft()).isPercentRank()) {
+            if (ce.getRight() instanceof ParameterValueExpression) {
+                ParameterValueExpression pve = (ParameterValueExpression) ce.getRight();
+                if (pve.getOriginalValue() != null) {
+                    ConstantValueExpression cve = pve.getOriginalValue();
+                    if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
+                        RankPercentageExpression rpExpr = new RankPercentageExpression(
+                                (RankExpression)ce.getLeft(), pve);
+                        ae.setRight(rpExpr);
+                    }
                 }
+            } else {
+                throw new PlanningErrorException("PERCENT_RANK clause without constant value from 0 to 1 is not supported");
             }
         }
-        else if (ce.getRight() instanceof RankExpression && ce.getLeft() instanceof ParameterValueExpression) {
-            ParameterValueExpression pve = (ParameterValueExpression) ce.getLeft();
-            if (pve.getOriginalValue() != null) {
-                ConstantValueExpression cve = pve.getOriginalValue();
-                if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
-                    RankPercentageExpression rpExpr = new RankPercentageExpression(
-                            (RankExpression)ce.getRight(), cve);
-                    ae.setLeft(rpExpr);
-                }
-            }
-        }
+        else if (ce.getRight() instanceof RankExpression &&
+                ((RankExpression) ce.getRight()).isPercentRank()) {
 
+            if (ce.getLeft() instanceof ParameterValueExpression) {
+                 ParameterValueExpression pve = (ParameterValueExpression) ce.getLeft();
+                 if (pve.getOriginalValue() != null) {
+                     ConstantValueExpression cve = pve.getOriginalValue();
+                     if (RankPercentageExpression.isConstantValueExpressionValid(cve)) {
+                         RankPercentageExpression rpExpr = new RankPercentageExpression(
+                                 (RankExpression)ce.getRight(), pve);
+                         ae.setLeft(rpExpr);
+                     }
+                 }
+            } else {
+                throw new PlanningErrorException("PERCENT_RANK clause without constant value from 0 to 1 is not supported");
+            }
+        }
         return ae;
     }
 

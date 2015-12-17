@@ -53,16 +53,12 @@
 
 namespace voltdb {
     RankPercentageExpression::RankPercentageExpression(
-            std::string &percentage,
             std::string &tableName, std::string &indexName,
-            int partitionbySize)
+            int partitionbySize, int paramIdx)
         : AbstractExpression(EXPRESSION_TYPE_WINDOWING_RANK_PERCENTAGE),
         m_target_table_name(tableName), m_target_index_name(indexName),
         m_partitionbySize(partitionbySize)
     {
-        // make sure it's valid double string in Java
-        m_percentage = std::atof(percentage.c_str());
-
         VoltDBEngine* engine = ExecutorContext::getEngine();
         m_tcd = engine->getTableDelegate(m_target_table_name);
         Table* targetTable = m_tcd->getTable();
@@ -72,6 +68,13 @@ namespace voltdb {
         int tupleLen = m_tableIndex->getKeySchema()->tupleLength();
         m_parititonbySearchKeyBackingStore = new char[tupleLen];
         m_parititonbyMaxSearchKeyBackingStore = new char[tupleLen];
+
+
+        ExecutorContext* context = ExecutorContext::getExecutorContext();
+        NValueArray* params = context->getParameterContainer();
+        assert(paramIdx < params->size());
+
+        m_paramValue = &(*params)[paramIdx];
     };
 
     RankPercentageExpression::~RankPercentageExpression() {
@@ -81,18 +84,25 @@ namespace voltdb {
 
     voltdb::NValue RankPercentageExpression::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
+        assert(m_paramValue != NULL);
+        NValue percentNvalue = *m_paramValue;
+        double percent = ValuePeeker::peekDouble(percentNvalue.castAs(VALUE_TYPE_DOUBLE));
+        int64_t counts = 0;
+
         if (m_partitionbySize <= 0) {
             // apply to whole table
-            int64_t tupleCount = m_tcd->getTable()->activeTupleCount();
+            counts = m_tcd->getTable()->activeTupleCount();
 
-            int64_t rank = static_cast<int64_t>((double)tupleCount * m_percentage);
+            int64_t rank = static_cast<int64_t>((double)counts * percent);
+//            std::cout << "RankPercentageExpression : percent" << percent
+//                    << ", counts " << counts << ", rank " << rank << std::endl;
             return ValueFactory::getBigIntValue(rank);
         }
 
         //
         // calculate group tuple counts
         //
-        int64_t rkStart, rkEnd, counts = 0;
+        int64_t rkStart, rkEnd;
 
         TableTuple partitionbySearchKey = TableTuple(m_tableIndex->getKeySchema());
         partitionbySearchKey.moveNoHeader(m_parititonbySearchKeyBackingStore);
@@ -113,10 +123,11 @@ namespace voltdb {
                 m_tableIndex->getKeySchema()->columnCount(), m_partitionbySize);
         rkEnd = m_tableIndex->getCounterLET(&partitionbyMaxSearchKey, true, partitionbyMaxCursor);
 
-        std::cout << "rkEnd: " << rkEnd << ", rkStart: " << rkStart << std::endl;
         counts = rkEnd - rkStart + 1;
+        int64_t rank = static_cast<int64_t>((double)counts * percent);
 
-        int64_t rank = static_cast<int64_t>((double)counts * m_percentage);
+//        std::cout << "RankPercentageExpression : percent" << percent
+//                << ", counts " << counts << ", rank " << rank << std::endl;
 
         return ValueFactory::getBigIntValue(rank);
     }

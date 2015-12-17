@@ -62,8 +62,8 @@ class TableIndex;
 
 class RankPercentageExpression : public AbstractExpression {
 public:
-    RankPercentageExpression(std::string &percentage, std::string &tableName,
-            std::string &indexName, int partitionbySize);
+    RankPercentageExpression(std::string &tableName,
+            std::string &indexName, int partitionbySize, int paramIdx);
 
     ~RankPercentageExpression();
 
@@ -76,11 +76,13 @@ public:
     }
 
 private:
-    double m_percentage;
     std::string m_target_table_name;
     TableCatalogDelegate* m_tcd;
     std::string m_target_index_name;
     int m_partitionbySize;
+
+    // HACK: make sure it's valid double in Java
+    voltdb::NValue *m_paramValue;
 
     TableIndex * m_tableIndex;
 

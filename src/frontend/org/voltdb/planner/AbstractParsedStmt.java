@@ -534,6 +534,8 @@ public abstract class AbstractParsedStmt {
         List<AbstractExpression> orderbyExprs = new ArrayList<AbstractExpression>();
         boolean areAllDecending = false;
 
+        boolean isPercentRank = Boolean.valueOf(exprNode.attributes.get("isPercentRank"));
+
         for (VoltXMLElement ele : exprNode.children) {
             if (ele.name.equals("partitionbyList")) {
                 for(int i = 0; i < ele.children.size(); i++) {
@@ -561,8 +563,8 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        RankExpression rankExpr = new RankExpression(
-                partitionbyExprs, orderbyExprs, m_db, areAllDecending);
+        RankExpression rankExpr = new RankExpression(partitionbyExprs, orderbyExprs,
+                m_db, areAllDecending, isPercentRank);
         return rankExpr;
     }
 

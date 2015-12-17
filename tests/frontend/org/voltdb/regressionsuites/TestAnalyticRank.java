@@ -51,7 +51,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestWindowingRank extends RegressionSuite {
+public class TestAnalyticRank extends RegressionSuite {
 
     private void initUniqueTable(Client client) throws NoConnectionsException, IOException, ProcCallException {
         client.callProcedure("tu.insert", 10, 2);
@@ -80,13 +80,58 @@ public class TestWindowingRank extends RegressionSuite {
 
         initUniqueTable(client);
 
-        verifyAdHocFails(client, "Rank clause without using partial index matching table where clause is not allowed",
+        verifyAdHocFails(client, "RANK clause without using partial index matching table where clause is not allowed",
                 "select a, rank() over (order by a) from tu where a > 20 order by a;");
 
         vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu where a > 30 order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{40, 1}, {50, 2}});
+    }
 
-        // decending
+    public void testPercentRank() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING xin......");
+        Client client = getClient();
+        VoltTable vt = null;
+
+        initUniqueTable(client);
+
+        vt = client.callProcedure("@Explain", "select a from tu where percent_rank() over (order by a) = 0.5;").getResults()[0];
+        assertTrue(vt.toString().contains("Rank SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from tu where percent_rank() over (order by a) = 0.5;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{20});
+
+        vt = client.callProcedure("@AdHoc", "select a from tu where percent_rank() over (order by a) = 0.61;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{30});
+
+        vt = client.callProcedure("@AdHoc", "select a from tu where percent_rank() over (order by a) = 0.8;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{40});
+
+        vt = client.callProcedure("@AdHoc", "select a from tu where percent_rank() over (order by a) = 0.9;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{40});
+
+        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where percent_rank() over (order by a) >= 0.4;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{140});
+
+        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where percent_rank() over (order by a) >= 0.7;").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{120});
+
+        //
+        // partition by
+        //
+
+        // no rank scan support yet
+        vt = client.callProcedure("@Explain", "select a from tu where percent_rank() over (partition by b order by a) > 0.1 order by abs(a);").getResults()[0];
+        assertTrue(vt.toString().contains("SEQUENTIAL SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from tu where percent_rank() over (partition by b order by a) > 0.1 order by abs(a);").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{10, 20, 30, 40, 50});
+
+        vt = client.callProcedure("@Explain", "select a from tu where percent_rank() over (partition by b order by a) > 0.5 order by abs(a);").getResults()[0];
+        System.err.println(vt);
+        assertTrue(vt.toString().contains("SEQUENTIAL SCAN"));
+
+        vt = client.callProcedure("@AdHoc", "select a from tu where percent_rank() over (partition by b order by a) > 0.5 order by abs(a);").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{10, 30, 40, 50});
     }
 
     public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
@@ -149,12 +194,6 @@ public class TestWindowingRank extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) = 10;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{});
 
-        vt = client.callProcedure("@Explain", "select a from tu where rank() over (order by a) = 0.5;").getResults()[0];
-        assertTrue(vt.toString().contains("Rank SCAN"));
-
-        vt = client.callProcedure("@AdHoc", "select a from tu where rank() over (order by a) = 0.5;").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{20});
-
         // aggregates
         vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) = 3;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{30});
@@ -185,9 +224,6 @@ public class TestWindowingRank extends RegressionSuite {
         assertTrue(vt.toString().contains("Rank SCAN"));
 
         vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) >= 3;").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{120});
-
-        vt = client.callProcedure("@AdHoc", "select sum(a) from tu where rank() over (order by a) >= 0.7;").getResults()[0];
         validateTableOfScalarLongs(vt, new long[]{120});
 
         vt = client.callProcedure("@AdHoc", "select b, sum(a) from tu where rank() over (order by a) >= 2 "
@@ -346,7 +382,7 @@ public class TestWindowingRank extends RegressionSuite {
     //
     // JUnit / RegressionSuite boilerplate
     //
-    public TestWindowingRank(String name) {
+    public TestAnalyticRank(String name) {
         super(name);
     }
 
@@ -354,7 +390,7 @@ public class TestWindowingRank extends RegressionSuite {
 
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-                new MultiConfigSuiteBuilder(TestWindowingRank.class);
+                new MultiConfigSuiteBuilder(TestAnalyticRank.class);
         boolean success;
         VoltProjectBuilder project = new VoltProjectBuilder();
 
