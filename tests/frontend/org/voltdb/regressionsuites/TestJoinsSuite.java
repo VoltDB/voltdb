@@ -889,8 +889,11 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 1, NULL);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(1, 2, 2);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 1, 1);");
+        client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(2, 4, 4);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(3, 3, 3);");
         client.callProcedure("@AdHoc", "INSERT INTO R1 VALUES(4, 4, 4);");
+        // Delete one row to have non-active tuples in the table
+        client.callProcedure("@AdHoc", "DELETE FROM R1 WHERE A = 2 AND C = 4 AND D = 4;");
 
         // case: Right table is empty
         sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +
@@ -918,8 +921,11 @@ public class TestJoinsSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 1);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(2, 2);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(3, 3);");
+        client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(4, 4);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, 5);");
         client.callProcedure("@AdHoc", "INSERT INTO R2 VALUES(5, NULL);");
+        // Delete one row to have non-active tuples in the table
+        client.callProcedure("@AdHoc", "DELETE FROM R2 WHERE A = 4 AND C = 4;");
 
         // case 1: equality join on two columns
         sql = "SELECT R1.A, R1.D, R2.A, R2.C FROM R1 FULL JOIN R2 ON " +

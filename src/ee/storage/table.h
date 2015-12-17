@@ -80,6 +80,7 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
+    friend class TableView;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;
@@ -380,6 +381,9 @@ protected:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "May not use freeLastScanedBlock with streamed tables or persistent tables.");
     }
+
+    // Return tuple blocks addresses
+    virtual std::vector<uint64_t> getBlockAddresses() const = 0;
 
     Table(int tableAllocationTargetSize);
     void resetTable();
