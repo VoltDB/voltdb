@@ -85,7 +85,7 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
         return false;
     }
     while (true) {
-        if (m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+        if (m_currentBlock->outsideUsedTupleBoundary(m_blockOffset)) {
             if (m_blockIterator == m_end) {
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
@@ -109,8 +109,8 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             m_blockIterator = m_blocks.upperBound(m_currentBlock->address());
             m_end = m_blocks.end();
         }
-        assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
-        assert(m_location < m_currentBlock.get()->address() + (m_table->getTupleLength() * m_table->getTuplesPerBlock()));
+        assert(m_location < m_currentBlock->address() + m_table->getTableAllocationSize());
+        assert(m_location < m_currentBlock->tupleAtIndex(m_table->getTuplesPerBlock()));
         assert (out.sizeInValues() == m_table->columnCount());
         m_blockOffset++;
         out.move(m_location);
@@ -120,14 +120,11 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
         if (dirty) m_skippedDirtyRows++;
         if (!active) m_skippedInactiveRows++;
 
-        // Return this tuple only when this tuple is not marked as deleted and isn't dirty
+        out.setDirtyFalse();
+        m_location += m_tupleLength;
+        // Return this tuple only when this tuple is not marked as deleted and wasn't dirty
         if (active && !dirty) {
-            out.setDirtyFalse();
-            m_location += m_tupleLength;
             return true;
-        } else {
-            out.setDirtyFalse();
-            m_location += m_tupleLength;
         }
     }
     return false;
@@ -145,7 +142,7 @@ int64_t CopyOnWriteIterator::countRemaining() const {
     TBMapI blockIterator = m_blockIterator;
     int64_t count = 0;
     while (true) {
-        if (blockOffset >= currentBlock->unusedTupleBoundry()) {
+        if (currentBlock->outsideUsedTupleBoundary(blockOffset)) {
             if (blockIterator == m_end) {
                 break;
             }

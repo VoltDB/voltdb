@@ -120,6 +120,11 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     m_columnCount = schema->columnCount();
 
     m_tupleLength = m_schema->tupleLength() + TUPLE_HEADER_SIZE;
+    if (m_tupleLength < sizeof(uint32_t)) {
+        // PersistentTable requires enough room to store a freed tuple offset
+        // within a freed tuple.
+        m_tupleLength = sizeof(uint32_t);
+    }
 #ifdef MEMCHECK
     m_tuplesPerBlock = 1;
     m_tableAllocationSize = m_tupleLength;
@@ -148,9 +153,10 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
         m_columnNames[i] = columnNames[i];
 
     // initialize the temp tuple
-    m_tempTupleMemory.reset(new char[m_schema->tupleLength() + TUPLE_HEADER_SIZE]);
-    m_tempTuple = TableTuple(m_tempTupleMemory.get(), m_schema);
-    ::memset(m_tempTupleMemory.get(), 0, m_tempTuple.tupleLength());
+    char* tempTupleStorage = new char[m_tupleLength];
+    m_tempTupleMemory.reset(tempTupleStorage);
+    m_tempTuple = TableTuple(tempTupleStorage, m_schema);
+    ::memset(tempTupleStorage, 0, m_tupleLength);
     // default value of hidden dr timestamp is null
     if (m_schema->hiddenColumnCount() > 0) {
         m_tempTuple.setHiddenNValue(0, NValue::getNullValue(VALUE_TYPE_BIGINT));

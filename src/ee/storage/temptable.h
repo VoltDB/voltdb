@@ -269,8 +269,8 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
         block = allocateNextBlock();
     }
 
-    std::pair<char*, int> pair = block->nextFreeTuple();
-    tuple->move(pair.first);
+    char* tupleStorage = block->nextFreeTuple();
+    tuple->move(tupleStorage);
     ++m_tupleCount;
     return;
 }

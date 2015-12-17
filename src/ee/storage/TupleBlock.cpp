@@ -30,7 +30,8 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_tupleLength(table->m_tupleLength),
         m_tuplesPerBlock(table->m_tuplesPerBlock),
         m_activeTuples(0),
-        m_nextFreeTuple(0),
+        m_boundaryTuple(0),
+        m_freedTuple(0),
         m_lastCompactionOffset(0),
         m_bucket(bucket),
         m_bucketIndex(0)
@@ -60,76 +61,4 @@ TupleBlock::~TupleBlock() {
 #endif
 }
 
-std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementListener *listener) {
-    assert(source != this);
-    /*
-      std::cout << "Attempting to merge " << static_cast<void*> (this)
-                << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get())
-                << "(" << source->m_activeTuples << ")";
-      std::cout << " source last compaction offset is " << source->lastCompactionOffset()
-                << " and active tuple count is " << source->m_activeTuples << std::endl;
-    */
-
-    uint32_t m_nextTupleInSourceOffset = source->lastCompactionOffset();
-    int sourceTuplesPendingDeleteOnUndoRelease = 0;
-    while (hasFreeTuples() && !source->isEmpty()) {
-        TableTuple sourceTupleWithNewValues(table->schema());
-        TableTuple destinationTuple(table->schema());
-
-        bool foundSourceTuple = false;
-        //Iterate further into the block looking for active tuples
-        //Stop when running into the unused tuple boundry
-        while (m_nextTupleInSourceOffset < source->unusedTupleBoundry()) {
-            sourceTupleWithNewValues.move(&source->address()[m_tupleLength * m_nextTupleInSourceOffset]);
-            m_nextTupleInSourceOffset++;
-            if (sourceTupleWithNewValues.isActive()) {
-                foundSourceTuple = true;
-                break;
-            }
-        }
-
-        if (!foundSourceTuple) {
-           //The block isn't empty, but there are no more active tuples.
-           //Some of the tuples that make it register as not empty must have been
-           //pending delete and those aren't mergable
-            assert(sourceTuplesPendingDeleteOnUndoRelease);
-            break;
-        }
-
-        //Can't move a tuple with a pending undo action, it would invalidate the pointer
-        //Keep a count so that the block can be notified of the number
-        //of tuples pending delete on undo release when calculating the correct bucket
-        //index. If all the active tuples are pending delete on undo release the block
-        //is effectively empty and shouldn't be considered for merge ops.
-        //It will be completely discarded once the undo log releases the block.
-        if (sourceTupleWithNewValues.isPendingDeleteOnUndoRelease()) {
-            sourceTuplesPendingDeleteOnUndoRelease++;
-            continue;
-        }
-
-        destinationTuple.move(nextFreeTuple().first);
-        table->swapTuples(sourceTupleWithNewValues, destinationTuple);
-
-        // Notify the listener if provided.
-        if (listener != NULL) {
-            listener->notifyTupleMovement(source, this, sourceTupleWithNewValues, destinationTuple);
-        }
-
-        source->freeTuple(sourceTupleWithNewValues.address());
-    }
-    source->lastCompactionOffset(m_nextTupleInSourceOffset);
-
-    int newBucketIndex = calculateBucketIndex();
-    if (newBucketIndex != m_bucketIndex) {
-        m_bucketIndex = newBucketIndex;
-        //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get())  << "(" << source->m_activeTuples << ")";
-        //std::cout << " found " << sourceTuplesPendingDeleteOnUndoRelease << " tuples pending delete on undo release "<< std::endl;
-        return std::pair<int, int>(newBucketIndex, source->calculateBucketIndex(sourceTuplesPendingDeleteOnUndoRelease));
-    } else {
-        //std::cout << "Merged " << static_cast<void*> (this) << "(" << m_activeTuples << ") with " << static_cast<void*>(source.get()) << "(" << source->m_activeTuples << ")";
-        //std::cout << " found " << sourceTuplesPendingDeleteOnUndoRelease << " tuples pending delete on undo release "<< std::endl;
-        return std::pair<int, int>(NO_NEW_BUCKET_INDEX, source->calculateBucketIndex(sourceTuplesPendingDeleteOnUndoRelease));
-    }
-}
-}
-
+} // namespace voltdb

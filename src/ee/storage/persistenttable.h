@@ -190,8 +190,7 @@ private:
  * policy because we expect reverting rarely occurs.
  */
 
-class PersistentTable : public Table, public UndoQuantumReleaseInterest,
-                        public TupleMovementListener {
+class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
     friend class ::CopyOnWriteTest;
@@ -573,10 +572,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void notifyBlockWasCompactedAway(TBPtr block);
 
-    // Call-back from TupleBlock::merge() for each tuple moved.
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple);
-
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
     // The source tuple is used to create the ConstraintFailureException if one
@@ -933,16 +928,19 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 
-    int retval = block->freeTuple(tuple.address());
-    if (retval != NO_NEW_BUCKET_INDEX) {
+    block->freeTuple(tuple.address());
+    int nwBucketIndex = block->nextBucketIndex();
+    if (nwBucketIndex != NO_NEW_BUCKET_INDEX) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
-            block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval]);
+            block->swapToBucket(m_blocksNotPendingSnapshotLoad[nwBucketIndex]);
         //Check if the block goes into the pending snapshot set of buckets
-        } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-            block->swapToBucket(m_blocksPendingSnapshotLoad[retval]);
-        } else {
+        }
+        else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+            block->swapToBucket(m_blocksPendingSnapshotLoad[nwBucketIndex]);
+        }
+        else {
             //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
             //do nothing, once the block is finished by the iterator, the iterator will return it
         }
@@ -955,7 +953,8 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
         //Eliminates circular reference
         block->swapToBucket(TBBucketPtr());
-    } else if (transitioningToBlockWithSpace) {
+    }
+    else if (transitioningToBlockWithSpace) {
         m_blocksWithSpace.insert(block);
     }
 }

@@ -220,7 +220,7 @@ inline bool TableIterator::next(TableTuple &out) {
 inline bool TableIterator::persistentNext(TableTuple &out) {
     while (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
-            m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
+            m_currentBlock->outsideUsedTupleBoundary(m_blockOffset)) {
 //            assert(m_blockIterator != m_table->m_data.end());
 //            if (m_blockIterator == m_table->m_data.end()) {
 //                throwFatalException("Could not find the expected number of tuples during a table scan");
@@ -260,8 +260,7 @@ inline bool TableIterator::persistentNext(TableTuple &out) {
 inline bool TableIterator::tempNext(TableTuple &out) {
     if (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
-            m_blockOffset >= m_currentBlock->unusedTupleBoundry())
-        {
+            m_currentBlock->outsideUsedTupleBoundary(m_blockOffset)) {
             // delete the last block of tuples in this temp table when they will never be used
             if (m_tempTableDeleteAsGo) {
                 m_table->freeLastScanedBlock(m_tempBlockIterator);

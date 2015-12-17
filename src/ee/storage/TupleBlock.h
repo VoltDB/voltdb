@@ -17,6 +17,12 @@
 
 #ifndef VOLTDB_TUPLEBLOCK_H_
 #define VOLTDB_TUPLEBLOCK_H_
+
+#include "common/ThreadLocalPool.h"
+#include "common/tabletuple.h"
+#include "structures/CompactingMap.h"
+#include "structures/CompactingSet.h"
+
 #include <vector>
 #include <stdint.h>
 #include <string.h>
@@ -27,15 +33,8 @@
 #include "boost/unordered_set.hpp"
 #include <math.h>
 #include <iostream>
-#include "boost_ext/FastAllocator.hpp"
-#include "common/ThreadLocalPool.h"
-#include "common/tabletuple.h"
-#include "structures/CompactingMap.h"
-#include "structures/CompactingSet.h"
-#include <deque>
 
 namespace voltdb {
-const int NO_NEW_BUCKET_INDEX = -1;
 class TupleBlock;
 }
 
@@ -47,32 +46,6 @@ void intrusive_ptr_release(voltdb::TupleBlock * p);
 
 namespace voltdb {
 class Table;
-class TupleMovementListener;
-
-class TruncatedInt {
-public:
-    TruncatedInt(uint32_t value) {
-        ::memcpy(m_data, reinterpret_cast<char*>(&value), 3);
-    }
-
-    TruncatedInt(const TruncatedInt &other) {
-        ::memcpy(m_data, other.m_data, 3);
-    }
-
-    TruncatedInt& operator=(const TruncatedInt&rhs) {
-        ::memcpy(m_data, rhs.m_data, 3);
-        return *this;
-    }
-
-    uint32_t unpack() {
-        char valueBytes[4];
-        ::memcpy(valueBytes, m_data, 3);
-        valueBytes[3] = 0;
-        return *reinterpret_cast<int32_t*>(valueBytes);
-    }
-private:
-    char m_data[3];
-};
 
 //typedef boost::shared_ptr<TupleBlock> TBPtr;
 typedef boost::intrusive_ptr<TupleBlock> TBPtr;
@@ -84,6 +57,8 @@ typedef TBBucket::iterator TBBucketI;
 typedef boost::shared_ptr<TBBucket> TBBucketPtr;
 typedef std::vector<TBBucketPtr> TBBucketPtrVector;
 const int TUPLE_BLOCK_NUM_BUCKETS = 20;
+
+const int NO_NEW_BUCKET_INDEX = -1;
 
 class TupleBlock {
     friend void ::intrusive_ptr_add_ref(voltdb::TupleBlock * p);
@@ -149,34 +124,36 @@ public:
         return m_bucketIndex;
     }
 
-    std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
-
     /**
-     * Find next free tuple storage address and its tupleblock's bucket index,
-     * return them as a pair.
+     * Find next free tuple storage address.
      */
-    inline std::pair<char*, int> nextFreeTuple() {
+    char* nextFreeTuple() {
         char *retval = NULL;
-        if (!m_freeList.empty()) {
+        if (m_freedTuple < m_boundaryTuple) {
             m_lastCompactionOffset = 0;
-            retval = m_storage;
-            TruncatedInt offset = m_freeList.back();
-            m_freeList.pop_back();
-            retval += offset.unpack();
-        } else {
-            retval = &(m_storage[m_tupleLength * m_nextFreeTuple]);
-            m_nextFreeTuple++;
+            retval = popFreedTuple();
+        }
+        else {
+            retval = tupleAtIndex(m_boundaryTuple);
+            ++m_boundaryTuple;
+            m_freedTuple = m_boundaryTuple;
         }
         m_activeTuples++;
+        return retval;
+    }
+
+    /**
+     * Detect a changed bucket index after allocating or freeing tuples.
+     */
+    int nextBucketIndex() {
         int newBucketIndex = calculateBucketIndex();
         if (newBucketIndex == m_bucketIndex) {
             // tuple block is not too full for its current bucket
-            newBucketIndex = NO_NEW_BUCKET_INDEX;
-        } else {
-            // needs a new bucket and update bucket index
-            m_bucketIndex = newBucketIndex;
+            return NO_NEW_BUCKET_INDEX;
         }
-        return std::pair<char*, int>(retval, newBucketIndex);
+        // needs a new bucket and update bucket index
+        m_bucketIndex = newBucketIndex;
+        return newBucketIndex;
     }
 
     void swapToBucket(TBBucketPtr newBucket) {
@@ -189,33 +166,33 @@ public:
         }
     }
 
-    inline int freeTuple(char *tupleStorage) {
+    void freeTuple(char *tupleStorage) {
         m_lastCompactionOffset = 0;
         m_activeTuples--;
-        //Find the offset
-        uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage);
-        m_freeList.push_back(offset);
-        int newBucketIndex = calculateBucketIndex();
-        if (newBucketIndex == m_bucketIndex) {
-            return NO_NEW_BUCKET_INDEX;
+        //Find the "row index" of the tupleStorage relative to the start of the block.
+        uint32_t offset = static_cast<uint32_t>(tupleStorage - m_storage) / m_tupleLength;
+        if (offset == m_boundaryTuple - 1) {
+            // Pull in the boundary to absorb the neighboring tuple
+            --m_boundaryTuple;
         }
-
-        m_bucketIndex = newBucketIndex;
-        return newBucketIndex;
+        else {
+            // Add the "hole" to the free chain.
+            pushFreedTuple(tupleStorage, offset);
+        }
     }
 
-    inline char * address() {
-        return m_storage;
-    }
+    char* address() { return m_storage; }
 
-    inline void reset() {
+    char* tupleAtIndex(uint32_t index) { return m_storage + (m_tupleLength * index); }
+
+    void reset() {
         m_activeTuples = 0;
-        m_nextFreeTuple = 0;
-        m_freeList.clear();
+        m_boundaryTuple = 0;
+        m_freedTuple = 0;
     }
 
-    inline uint32_t unusedTupleBoundry() {
-        return m_nextFreeTuple;
+    bool outsideUsedTupleBoundary(uint32_t offset) const {
+        return offset >= m_boundaryTuple;
     }
 
     ~TupleBlock();
@@ -236,40 +213,32 @@ public:
         return m_bucket;
     }
 private:
-    char*   m_storage;
-    uint32_t m_references;
-    uint32_t m_tupleLength;
-    uint32_t m_tuplesPerBlock;
-    uint32_t m_activeTuples;
-    uint32_t m_nextFreeTuple;
-    uint32_t m_lastCompactionOffset;
+    void pushFreedTuple(char* tupleStorage, uint32_t offset) {
+        uint32_t* tupleHeader = reinterpret_cast<uint32_t*>(tupleStorage);
+        *tupleHeader = m_freedTuple << 8; // shift to keep the tuple flag byte clear
+        m_freedTuple = offset;
+    }
 
-    /*
-     * queue of offsets to <b>once used and then deleted</b> tuples.
-     * Tuples after m_nextFreeTuple are also free, this queue
-     * is used to find "hole" tuples which were once used (before used_tuples index)
-     * and also deleted.
-     * NOTE THAT THESE ARE NOT THE ONLY FREE TUPLES.
-     **/
-    std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
+    char* popFreedTuple() {
+        char* retval = tupleAtIndex(m_freedTuple);
+        m_freedTuple = *reinterpret_cast<uint32_t*>(retval) >> 8;
+        return retval;
+    }
+
+    char* m_storage;
+    uint32_t m_references;
+    const uint32_t m_tupleLength;
+    const uint32_t m_tuplesPerBlock;
+    uint32_t m_activeTuples;
+    uint32_t m_boundaryTuple;
+    uint32_t m_freedTuple;
+    uint32_t m_lastCompactionOffset;
 
     TBBucketPtr m_bucket;
     int m_bucketIndex;
 };
 
-/**
- * Interface for tuple movement notification.
- */
-class TupleMovementListener {
-public:
-    virtual ~TupleMovementListener() {}
-
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
-                                     TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
-};
-
-}
-
+} // namespace voltdb
 
 inline void intrusive_ptr_add_ref(voltdb::TupleBlock * p)
 {

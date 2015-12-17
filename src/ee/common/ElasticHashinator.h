@@ -18,20 +18,15 @@
 #ifndef ELASTICHASHINATOR_H_
 #define ELASTICHASHINATOR_H_
 
-#include "common/FatalException.hpp"
-#include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/serializeio.h"
 #include "common/TheHashinator.h"
-#include "boost_ext/FastAllocator.hpp"
+#include "common/serializeio.h"
 
-#include <cstring>
-#include <string>
-#include <cassert>
-#include <stdlib.h>
+//#include <cstring>
+//#include <string>
+//#include <cassert>
+//#include <stdlib.h>
 #include <murmur3/MurmurHash3.h>
-#include <limits>
+//#include <limits>
 
 /*
  * Forward declaration for test friendship
@@ -56,25 +51,24 @@ public:
      *
      * Config can be serialized or raw, if it is raw the pointer is stored and the data
      * can be shared across EEs and with Java.
-     * The raw version consists of an array of integers where even values are tokens and odd values are partitions.
-     *
+     * The raw version consists of an array of integers where even-indexed
+     * values are tokens and odd-indexed values are partition ids.
      */
     static ElasticHashinator* newInstance(const char *config, int32_t *configPtr, uint32_t tokenCount) {
-        if (configPtr == NULL) {
+        bool ownConfig = (configPtr == NULL);
+        if (ownConfig) {
             ReferenceSerializeInputBE countInput(config, 4);
-            int numEntries = countInput.readInt();
-            ReferenceSerializeInputBE entryInput(&config[sizeof(int32_t)], numEntries * (sizeof(int32_t) + sizeof(int32_t)));
-            int32_t *tokens = new int32_t[numEntries * 2];
-            for (int ii = 0; ii < numEntries; ii++) {
+            tokenCount = countInput.readInt();
+            configPtr = new int32_t[tokenCount * 2];
+            ReferenceSerializeInputBE entryInput(config + sizeof(int32_t), tokenCount * (sizeof(int32_t) + sizeof(int32_t)));
+            for (int ii = 0; ii < tokenCount; ii++) {
                 const int32_t token = entryInput.readInt();
                 const int32_t partitionId = entryInput.readInt();
-                tokens[ii * 2] = token;
-                tokens[ii * 2 + 1] = partitionId;
+                configPtr[ii * 2] = token;
+                configPtr[ii * 2 + 1] = partitionId;
             }
-            return new ElasticHashinator(tokens, numEntries, true);
-        } else {
-            return new ElasticHashinator(configPtr, tokenCount, false);
         }
+        return new ElasticHashinator(configPtr, tokenCount, ownConfig);
     }
 
     ~ElasticHashinator() {}
@@ -106,31 +100,40 @@ protected:
 
 private:
 
-    ElasticHashinator(int32_t *tokens, uint32_t tokenCount, bool owned) : tokens(tokens), tokenCount(tokenCount), tokensOwner( owned ? tokens : NULL ) {}
+    ElasticHashinator(const int32_t* tokens, uint32_t tokenCount, bool owned)
+      : m_tokens(tokens)
+      , m_tokenCount(tokenCount)
+      , m_tokensOwner( owned ? tokens : NULL )
+    {}
 
-    const int32_t *tokens;
-    const uint32_t tokenCount;
-    boost::scoped_array<int32_t> tokensOwner;
+    const int32_t* const m_tokens;
+    const uint32_t m_tokenCount;
+    const boost::scoped_array<const int32_t> m_tokensOwner;
+
+    int32_t tokenAt(int32_t index) const { return m_tokens[index * 2]; }
+    int32_t partitionIdAt(int32_t index) const { return m_tokens[index * 2 + 1]; }
 
     int32_t partitionForToken(int32_t hash) const {
         int32_t min = 0;
-        int32_t max = tokenCount - 1;
+        int32_t max = m_tokenCount - 1;
 
         while (min <= max) {
             assert(min >= 0);
             assert(max >= 0);
             uint32_t mid = (min + max) >> 1;
-            int32_t midval = tokens[mid * 2];
+            int32_t midval = tokenAt(mid);
 
             if (midval < hash) {
                 min = mid + 1;
-            } else if (midval > hash) {
+            }
+            else if (midval > hash) {
                 max = mid - 1;
-            } else {
-                return tokens[mid * 2 + 1];
+            }
+            else {
+                return partitionIdAt(mid);
             }
         }
-        return tokens[(min - 1) * 2 + 1];
+        return partitionIdAt(min - 1);
     }
 };
 }

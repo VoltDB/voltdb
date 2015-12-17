@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "storage/persistenttable.h"
 #include "storage/ElasticScanner.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb
 {
@@ -27,7 +27,7 @@ namespace voltdb
 ElasticScanner::ElasticScanner(PersistentTable &table, TBMap &data) :
     m_table(table),
     m_blockMap(data),
-    m_tupleSize(m_table.getTupleLength()),
+    m_tupleLength(m_table.getTupleLength()),
     m_blockIterator(m_blockMap.begin()),
     m_blockEnd(m_blockMap.end()),
     m_currentBlockPtr(NULL),
@@ -46,7 +46,7 @@ ElasticScanner::~ElasticScanner()
 bool ElasticScanner::continueScan() {
     if (!m_scanComplete) {
         // First block or end of block?
-        if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundry()) {
+        if (m_currentBlockPtr == NULL || m_currentBlockPtr->outsideUsedTupleBoundary(m_tupleIndex)) {
             // No more blocks?
             m_scanComplete = (m_blockIterator == m_blockEnd);
             if (!m_scanComplete) {
@@ -69,23 +69,24 @@ bool ElasticScanner::continueScan() {
  */
 bool ElasticScanner::next(TableTuple &out)
 {
-    bool found = false;
-    while (!found && continueScan()) {
+    while (continueScan()) {
         assert(m_currentBlockPtr != NULL);
         // Sanity checks.
-        assert(m_tuplePtr < m_currentBlockPtr.get()->address() + m_table.getTableAllocationSize());
-        assert(m_tuplePtr < m_currentBlockPtr.get()->address() + (m_tupleSize * m_table.getTuplesPerBlock()));
+        assert(m_tuplePtr < m_currentBlockPtr->address() + m_table.getTableAllocationSize());
+        assert(m_tuplePtr < m_currentBlockPtr->tupleAtIndex(m_table.getTuplesPerBlock()));
         assert (out.sizeInValues() == m_table.columnCount());
         // Grab the tuple pointer.
         out.move(m_tuplePtr);
         // Shift to the next tuple in block.
         // continueScan() will check if it's the last one in the block.
         m_tupleIndex++;
-        m_tuplePtr += m_tupleSize;
+        m_tuplePtr += m_tupleLength;
         // The next active/non-dirty tuple is return-worthy.
-        found = out.isActive() && !out.isDirty();
+        if (out.isActive() && !out.isDirty()) {
+            return true;
+        }
     }
-    return found;
+    return false;
 }
 
 /**
