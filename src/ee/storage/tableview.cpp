@@ -75,7 +75,7 @@ void TableView::init(const std::vector<uint64_t>& blocks, uint32_t tuplesPerBloc
     m_tupleLength = tupleLength;
     std::sort(m_blocks.begin(), m_blocks.end());
     for(size_t i = 0; i < m_blocks.size(); ++i) {
-        m_blockIndexes.insert(std::make_pair(blocks[i], i * m_tuplesPerBlock));
+        m_blockIndexes.insert(std::make_pair(m_blocks[i], i * m_tuplesPerBlock));
     }
 }
 

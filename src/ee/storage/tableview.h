@@ -147,14 +147,17 @@ class TableView {
      * This method should be called only once during the initialization.
      * To update tuple value use setTupleBit method
      */
-    void initTupleBit(const TableTuple& tuple, char bit)
+    void initTupleBit(const TableTuple& tuple, char marker)
     {
-        assert(bit != INACTIVE_TUPLE);
+        assert(marker != INACTIVE_TUPLE);
         uint64_t tupleIdx = getTupleIndex(tuple);
-        m_tuples[tupleIdx] = bit;
-        assert(tupleIdx > m_lastActiveTupleIndex ||
-            (tupleIdx  == 0 && m_lastActiveTupleIndex == INVALID_INDEX));
-        m_lastActiveTupleIndex = tupleIdx;
+        assert(m_tuples[tupleIdx] == INACTIVE_TUPLE);
+        m_tuples[tupleIdx] = marker;
+        // Advance last active tuple index if necessary
+        if (m_lastActiveTupleIndex == INVALID_INDEX || m_lastActiveTupleIndex < tupleIdx)
+        {
+            m_lastActiveTupleIndex = tupleIdx;
+        }
     }
 
     size_t getLastActiveTupleIndex() const
