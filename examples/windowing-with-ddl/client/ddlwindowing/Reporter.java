@@ -65,7 +65,7 @@ public class Reporter implements Runnable {
                 //  SELECT SUM(sum_values) / SUM(count_values)
                 //  FROM agg_by_second
                 //  WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
-                ClientResponse cr = app.client.callProcedure("Average", seconds);
+                ClientResponse cr = app.client.callProcedure("Average", -seconds);
                 VoltTable result = cr.getResults()[0];
                 long average = result.asScalarLong();
                 if (! result.wasNull()) {
