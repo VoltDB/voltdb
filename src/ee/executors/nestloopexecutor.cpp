@@ -57,11 +57,10 @@
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
+#include "storage/tableview.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
-
-#include <boost/unordered_set.hpp>
 
 #ifdef VOLT_DEBUG_ENABLED
 #include <ctime>
@@ -72,24 +71,8 @@
 using namespace std;
 using namespace voltdb;
 
-static void collectAllTableTuples(boost::unordered_set<uint64_t>& tupleAddressSet, Table* table)
-{
-    assert(table != NULL);
-
-    typedef std::pair<boost::unordered_set<uint64_t>::iterator, bool> Result;
-
-    int64_t count = table->activeTupleCount();
-    tupleAddressSet.reserve(count);
-
-    TableTuple tuple(table->schema());
-    TableIterator iterator = table->iterator();
-    while (iterator.next(tuple)) {
-        Result result = tupleAddressSet.insert((uint64_t) tuple.address());
-        assert(result.second == true);
-        // to get around 'unused variable' warning
-        result.second = true;
-    }
-}
+static const char UNMATCHED_TUPLE(0);
+static const char MATCHED_TUPLE(1);
 
 struct PredicateLimitEvaluator
 {
@@ -225,11 +208,11 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     JoinType join_type = node->getJoinType();
     assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT || join_type == JOIN_TYPE_FULL);
 
-    // The set to keep track of inner tuples that don't match any of outer tuples for FULL joins
-    boost::unordered_set<uint64_t> innerNoMatchTuples;
+    // The table view to keep track of inner tuples that don't match any of outer tuples for FULL joins
+    TableView innerTableView;
     if (join_type == JOIN_TYPE_FULL) {
-        // Prepopulate the set with all inner tuples
-        collectAllTableTuples(innerNoMatchTuples, inner_table);
+        // Prepopulate the view with all inner tuples
+        innerTableView.init(inner_table, UNMATCHED_TUPLE);
     }
 
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
@@ -283,8 +266,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     outerMatch = true;
                     // The inner tuple passed the join predicate
                     if (join_type == JOIN_TYPE_FULL) {
-                        // Remove it from the set of inner tuples
-                        innerNoMatchTuples.erase((uint64_t) inner_tuple.address());
+                        // Mark it as matched
+                        innerTableView.setTupleBit(inner_tuple, MATCHED_TUPLE);
                     }
                     // Filter the joined tuple
                     if (whereEvaluator.eval(outer_tuple, inner_tuple)) {
@@ -314,20 +297,23 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     } // END OUTER WHILE LOOP
 
     //
-    // FULL Outer Join
+    // FULL Outer Join. Iterate over the unmatched inner tuples
     //
-    if (join_type == JOIN_TYPE_FULL && !innerNoMatchTuples.empty() && whereEvaluator.isUnderLimit()) {
+    if (join_type == JOIN_TYPE_FULL && whereEvaluator.isUnderLimit()) {
         // Preset outer columns to null
         const TableTuple& null_outer_tuple = m_null_outer_tuple.tuple();
         join_tuple.setNValues(0, null_outer_tuple, 0, outer_cols);
 
-        for (boost::unordered_set<uint64_t>::iterator itr = innerNoMatchTuples.begin();
-                itr != innerNoMatchTuples.end() && whereEvaluator.isUnderLimit(); ++itr) {
+        TableView_iterator endItr = innerTableView.end(UNMATCHED_TUPLE);
+        for (TableView_iterator itr = innerTableView.begin(UNMATCHED_TUPLE);
+                itr != endItr && whereEvaluator.isUnderLimit(); ++itr) {
             // Restore the tuple value
-            inner_tuple.move((char *)*itr);
+            uint64_t tupleAddr = innerTableView.getTupleAddress(*itr);
+            inner_tuple.move((char *)tupleAddr);
             // Still needs to pass the filter
+            assert(inner_tuple.isActive());
             if (whereEvaluator.eval(null_outer_tuple, inner_tuple)) {
-                // Matched! Complete the joined tuple with the inner column values.
+                // Passed! Complete the joined tuple with the inner column values.
                 join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
                 if (outputTuple(join_tuple, pmp)) {
                     whereEvaluator.setAboveLimit();

@@ -324,6 +324,7 @@ CTX.INPUT['storage'] = """
  tablefactory.cpp
  TableStats.cpp
  tableutil.cpp
+ tableview.cpp
  temptable.cpp
  TempTableLimits.cpp
  TupleStreamBase.cpp
