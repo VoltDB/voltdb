@@ -17,6 +17,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -30,6 +31,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.planner.SubPlanAssembler;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.CatalogUtil;
@@ -49,7 +52,10 @@ public class RankExpression extends AbstractExpression {
     private int m_orderbySize = -1;
     private boolean m_isDecending = false;
 
+    private List<Index> m_indexCandidates = new ArrayList<Index>();
+    private List<Integer> m_indexColumnsCovered = new ArrayList<Integer>();
     private Index m_index;
+
     private boolean m_areAllIndexColumnsCovered = false;
 
     public RankExpression() {
@@ -66,13 +72,14 @@ public class RankExpression extends AbstractExpression {
     {
         super(ExpressionType.WINDOWING_RANK);
         m_tableName = findTableName(orderbyExprs);
-        Index index = findTableIndex(partitionbyExprs, orderbyExprs, db);
-        m_index = index;
-
-        m_indexName = index.getTypeName();
         m_partitionbySize = partitionbyExprs.size();
         m_orderbySize = orderbyExprs.size();
         m_isDecending = isDecending;
+
+        Index index = findTableIndex(partitionbyExprs, orderbyExprs, db);
+
+        m_index = index;
+        m_indexName = index.getTypeName();
     }
 
 
@@ -135,23 +142,23 @@ public class RankExpression extends AbstractExpression {
     public boolean hasPartitionTableIssue(Database db, Table targetTable, List<AbstractExpression> partitionbyExprs) {
         Column partitionCol = targetTable.getPartitioncolumn() ;
         if (partitionCol == null) {
-             // replicated table has no partition data issue
-             return false;
-         }
-         String colName = partitionCol.getTypeName();
-         TupleValueExpression tve = new TupleValueExpression(
-                 m_tableName, m_tableName, colName, colName, partitionCol.getIndex());
-         tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
+            // replicated table has no partition data issue
+            return false;
+        }
+        String colName = partitionCol.getTypeName();
+        TupleValueExpression tve = new TupleValueExpression(
+                m_tableName, m_tableName, colName, colName, partitionCol.getIndex());
+        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
 
-         boolean pkCovered = false;
-         for (AbstractExpression ex: partitionbyExprs) {
-             if (ex.equals(tve)) {
-                 pkCovered = true;
-                 break;
-             }
-         }
-         // If PARTITION BY not covering PK, we can not use that index to calculate ranking
-         // because our index is not distributed implemented.
+        boolean pkCovered = false;
+        for (AbstractExpression ex: partitionbyExprs) {
+            if (ex.equals(tve)) {
+                pkCovered = true;
+                break;
+            }
+        }
+        // If PARTITION BY not covering PK, we can not use that index to calculate ranking
+        // because our index is not distributed implemented.
         return ! pkCovered;
     }
 
@@ -272,7 +279,6 @@ public class RankExpression extends AbstractExpression {
         assert(targetTable != null);
         CatalogMap<Index> allIndexes = targetTable.getIndexes();
 
-        // TODO(xin): find the minimal length of index covering the partition by/order by clause
         for (Index index : allIndexes) {
             if ( ! IndexType.isScannable(index.getType())) {
                 continue;
@@ -286,45 +292,96 @@ public class RankExpression extends AbstractExpression {
             }
             allExprs.addAll(orderbyExprs);
 
-            if (isExpressionListSubsetOfIndex(allExprs, index)) {
-                return index;
-            }
+            isExpressionListSubsetOfIndex(allExprs, index);
         }
-        throw new PlanningErrorException("RANK expressions of PARTITION BY and ORDER BY do not match any "
-                + "Tree INDEX defined in its table.");
+        if (m_indexCandidates.size() == 0) {
+            throw new PlanningErrorException("RANK expressions of PARTITION BY and ORDER BY do not match any "
+                    + "Tree INDEX defined in its table.");
+        }
+
+        int minValue = Collections.min(m_indexColumnsCovered);
+        int minIndex = m_indexColumnsCovered.indexOf(minValue);
+        Index index = m_indexCandidates.get(minIndex);
+        refreshWithBestIndex(index, minValue);
+        return index;
     }
 
-    private boolean isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
+    private void isExpressionListSubsetOfIndex(List<AbstractExpression> exprs, Index index) {
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
             if (exprs.size() > indexedColRefs.size()) {
-                return false;
+                return;
             }
 
             for (int j = 0; j < exprs.size(); j++) {
                 AbstractExpression expr = exprs.get(j);
                 if (expr instanceof TupleValueExpression == false) {
-                    return false;
+                    return;
                 }
                 String indexColumnName = indexedColRefs.get(j).getColumn().getName();
                 String tveColumnName = ((TupleValueExpression)expr).getColumnName();
                 if (! (tveColumnName.equals(indexColumnName))) {
-                    return false;
+                    return;
                 }
             }
-
-            if (exprs.size() == indexedColRefs.size()) {
-                m_areAllIndexColumnsCovered = true;
-            }
-
+            // find index candidate
+            Integer left = indexedColRefs.size() - exprs.size();
+            assert(left >= 0);
+            m_indexColumnsCovered.add(left);
+            m_indexCandidates.add(index);
         } else {
             // TODO(xin): add support for expression index
+        }
+    }
 
-            return false;
+    private void refreshWithBestIndex(Index index, int indexLeftCovered) {
+        m_index = index;
+        m_indexName = index.getTypeName();
+        m_areAllIndexColumnsCovered = indexLeftCovered == 0 ? true : false;
+    }
+
+
+    public void updateWithTheBestIndex(AbstractExpression predicate, StmtTableScan tableScan) {
+        List<AbstractExpression> predicateList = ExpressionUtil.uncombine(predicate);
+        List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
+        for (AbstractExpression expr: predicateList) {
+            if (ExpressionUtil.containsTVEFromTable(expr, m_tableName)) {
+                coveringExprs.add(expr);
+            }
+        }
+        assert(m_indexColumnsCovered.size() > 0);
+        assert(m_indexCandidates.size() > 0);
+
+        if (coveringExprs.isEmpty()) {
+            // case covered already
+            return;
         }
 
-        return true;
+        // where clause has predicates, check partial index filter and match them
+        for (int i = 0 ; i < m_indexCandidates.size(); i++) {
+            Index index = m_indexCandidates.get(i);
+            // check partial index
+            if (index.getPredicatejson().isEmpty()) {
+                continue;
+            }
+
+            List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+            if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs,
+                    index, exactMatchCoveringExprs) ) {
+                continue;
+            }
+
+            // may guard against more extra where clause filters
+
+            //
+            int left = m_indexColumnsCovered.get(i);
+            refreshWithBestIndex(index, left);
+
+            return;
+        }
+        throw new PlanningErrorException(
+                "Rank clause without using partial index matching table where clause is not allowed.");
     }
 
 }

@@ -80,8 +80,11 @@ public class TestWindowingRank extends RegressionSuite {
 
         initUniqueTable(client);
 
+        verifyAdHocFails(client, "Rank clause without using partial index matching table where clause is not allowed",
+                "select a, rank() over (order by a) from tu where a > 20 order by a;");
+
         vt = client.callProcedure("@AdHoc", "select a, rank() over (order by a) from tu where a > 30 order by a;").getResults()[0];
-        validateTableOfLongs(vt, new long[][]{{40, 4}, {50, 5}});
+        validateTableOfLongs(vt, new long[][]{{40, 1}, {50, 2}});
 
         // decending
     }
@@ -356,10 +359,10 @@ public class TestWindowingRank extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         final String literalSchema =
-            "create table tu (a integer, b integer);" +
-            "create unique index idx1 on tu (a);" +
-            "create unique index idx2 on tu (b, a);" +
-            "create unique index idx3 on tu (a) where a > 30;" +
+                "create table tu (a integer, b integer);" +
+                        "create unique index idx1 on tu (a);" +
+                        "create unique index idx2 on tu (b, a);" +
+                        "create unique index idx3 on tu (a) where a > 30;" +
 
             "create table tm (a integer, b integer);" +
             "create index tm_idx1 on tm (a);" +

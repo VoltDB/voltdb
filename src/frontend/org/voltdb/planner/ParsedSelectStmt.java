@@ -712,31 +712,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 String tbName = rankExpr.getTableName();
 
                 AbstractExpression predicate = m_joinTree.getAllFilters();
-                List<AbstractExpression> predicateList = ExpressionUtil.uncombine(predicate);
-                List<AbstractExpression> coveringExprs = new ArrayList<AbstractExpression>();
-                for (AbstractExpression expr: predicateList) {
-                    if (ExpressionUtil.containsTVEFromTable(expr, tbName)) {
-                        coveringExprs.add(expr);
-                    }
-                }
-
-                if (! coveringExprs.isEmpty()) {
-                    if (! rankExpr.isUsingPartialIndex()) {
-                        throw new PlanningErrorException(
-                                "Rank clause without using partial index matching table where clause is not allowed.");
-                    }
-                    StmtTableScan tableScan = m_tableAliasMap.get(tbName);
-
-                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                    if (! SubPlanAssembler.isPartialIndexPredicateIsCovered(tableScan, coveringExprs,
-                            rankExpr.getIndex(), exactMatchCoveringExprs) ) {
-                          throw new PlanningErrorException(
-                                  "Rank clause without using partial index matching table where clause is not allowed.");
-                    }
-                }
+                StmtTableScan tableScan = m_tableAliasMap.get(tbName);
+                rankExpr.updateWithTheBestIndex(predicate, tableScan);
             }
         }
-
 
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
@@ -1732,8 +1711,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     boolean orderByColumnsDetermineAllDisplayColumns(List<ParsedColInfo> displayColumns,
-                                                     List<ParsedColInfo> orderColumns,
-                                                     List<AbstractExpression> nonOrdered)
+            List<ParsedColInfo> orderColumns,
+            List<AbstractExpression> nonOrdered)
     {
         ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : displayColumns) {
@@ -1758,8 +1737,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean orderByColumnsDetermineAllColumns(List<ParsedColInfo> orderColumns,
-                                                      List<ParsedColInfo> candidateColumns,
-                                                      List<AbstractExpression> outNonOrdered) {
+            List<ParsedColInfo> candidateColumns,
+            List<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
         ArrayList<AbstractExpression> candidateExprHardCases = null;
         // First try to get away with a brute force N by M search for exact equalities.
