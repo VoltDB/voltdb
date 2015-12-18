@@ -51,7 +51,7 @@ bool ElasticIndexTupleRangeIterator::next(TableTuple &tuple)
     if (m_iter == m_end) {
         return false;
     }
-    tuple = TableTuple(m_iter++.key().getTupleAddress(), &m_schema);
+    tuple = TableTuple(m_iter++->getTupleAddress(), &m_schema);
     return true;
 }
 

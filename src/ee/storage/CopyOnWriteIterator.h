@@ -19,6 +19,7 @@
 #include <vector>
 #include "common/tabletuple.h"
 #include "storage/TupleIterator.h"
+#include "stx/btree_map.h"
 #include "storage/TupleBlock.h"
 
 namespace voltdb {
@@ -40,7 +41,7 @@ public:
 
     void notifyBlockWasCompactedAway(TBPtr block) {
         if (m_blockIterator != m_end) {
-            TBPtr nextBlock = m_blockIterator.value();
+            TBPtr nextBlock = m_blockIterator.data();
             //The next block is the one that was compacted away
             //Need to move the iterator forward to skip it
             if (nextBlock == block) {
@@ -48,7 +49,7 @@ public:
 
                 //There is another block after the one that was compacted away
                 if (m_blockIterator != m_end) {
-                    TBPtr newNextBlock = m_blockIterator.value();
+                    TBPtr newNextBlock = m_blockIterator.data();
                     m_blocks.erase(block->address());
                     m_blockIterator = m_blocks.find(newNextBlock->address());
                     m_end = m_blocks.end();
