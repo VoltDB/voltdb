@@ -33,6 +33,8 @@ CREATE TABLE bids
 , primary key (id)
 );
 
+CREATE INDEX bids_end ON bids(ts_end);
+
 -- This table has one row for each device that is being served ads,
 -- including the location from where it last appeared.
 CREATE TABLE devices
@@ -74,5 +76,8 @@ AS
   , sum(bid_amount)
   from impressions
   group by ts_second, advertiser_id;
+
+CREATE PROCEDURE DeleteExpiredBids AS
+       DELETE FROM bids WHERE current_timestamp > ts_end;
 
 END_OF_BATCH

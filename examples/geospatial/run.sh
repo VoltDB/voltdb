@@ -48,7 +48,8 @@ function clean() {
     rm -rf debugoutput voltdbroot log catalog-report.html \
          statement-plans procedures/geospatial/*.class \
          client/geospatial/*.class \
-         geospatial-client.jar
+         geospatial-client.jar \
+         geospatial-procedures.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
@@ -72,18 +73,11 @@ function jars-ifneeded() {
     fi
 }
 
-# run the voltdb server locally
-function server() {
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -l $LICENSE -H $HOST"
-    echo
-    voltdb create -l $LICENSE -H $HOST
-}
-
-# load schema, procedures, and static data
+# Start DB, load schema, procedures, and static data
 function init() {
+    echo "starting server in background..."
+    voltdb create -B -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    wait_for_startup
     jars-ifneeded
     sqlcmd < ddl.sql
     csvloader -f advertisers.csv advertisers
@@ -102,14 +96,6 @@ function wait_for_startup() {
     done
 }
 
-# startup server in background and load schema
-function background_server_andload() {
-    # run the server in the background
-    voltdb create -B -l $LICENSE -H $HOST > nohup.log 2>&1 &
-    wait_for_startup
-    init
-}
-
 # run the client that drives the example
 function client() {
     adbroker-benchmark
@@ -121,18 +107,16 @@ function client() {
 function adbroker-benchmark() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        geospatial.AdBrokerBenchmark \
-        --displayinterval=5 \
-        --warmup=1 \
-        --duration=10 \
-        --servers=localhost:21212 \
-        --ratelimit=2000000
-#        --latencyreport=true \
+        geospatial.AdBrokerBenchmark
 }
 
 function demo() {
-    echo "starting server in background..."
-    background_server_andload
+
+
+    # start database and load static data
+    init
+
+    # Run the demo app
     client
 
     echo
@@ -142,11 +126,14 @@ function demo() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|server|init|demo|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "Usage: ./run.sh {demo|clean|init|client|demo}"
 }
 
-# Run the target passed as the first arg on the command line
-# If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+# Run the targets pass on the command line
+# If no first arg, run demo
+if [ $# -eq 0 ]; then demo; exit; fi
+for arg in "$@"
+do
+    echo "${0}: Performing $arg..."
+    $arg
+done
