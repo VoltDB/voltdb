@@ -141,9 +141,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DISTANCE                     = 20040;    // wrapper id for distance between all geo types
         static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20041;    // distance between point and point
         static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20042;    // distance between polygon and point
-        static final int FUNC_VOLT_ASTEXT                       = 20043;    // wrapper for asText function for all geo types
-        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT       = 20044;    // point to text
-        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY             = 20045;    // polygon to text
+        static final int FUNC_VOLT_ASTEXT                       = 20045;    // wrapper for asText function for all geo types
+        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT       = 20046;    // point to text
+        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY             = 20047;    // polygon to text
 
         private static final FunctionId[] instances = {
 
