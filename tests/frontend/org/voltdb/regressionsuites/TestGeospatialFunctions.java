@@ -483,8 +483,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 assertEquals(null, vt.getString(1));
             }
             else {
-                String wkt = vt.getString(1);
-                assertEquals(gpv.toString().toLowerCase(), wkt.toLowerCase());
+                assertEquals(gpv.toString(), vt.getString(1));
             }
         }
     }
@@ -492,37 +491,37 @@ public class TestGeospatialFunctions extends RegressionSuite {
     public void testPolygonAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
+        // polygon whose co-ordinates are mix of decimal and whole numbers
+        Borders someWhere = new Borders(50, "someWhere",
+                new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
+                                             "-14.1234567891264 10.1234567891234, " +
+                                             "-14.0 4.1234567891234, " +
+                                             "-10.1234567891234 10.1234567891234))"));
+        VoltTable vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        // polygon with hole whose co-ordinates are whole numbers
+        someWhere = new Borders(51, "someWhereWithHoles",
+                new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
+                                            "(-8 9, -9 9, -9 8, -8 8, -8 9)," +
+                                            "(9 9, 9 8, 8 8, 9 8, 9 9))"));
+        vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
 
-        VoltTable vt = client.callProcedure("@AdHoc",
+        vt = client.callProcedure("@AdHoc",
                 "select region, asText(region) from borders order by pk").getResults()[0];
 
         GeographyValue gv;
-        int index = 0;
         while (vt.advanceRow()) {
             gv = vt.getGeographyValue(0);
             if (gv == null) {
                 assertEquals(null, vt.getString(1));
             }
             else {
-                assertEquals(gv.toString().toLowerCase(), vt.getString(1).toLowerCase());
+                assertEquals(gv.toString(), vt.getString(1));
             }
-            index++;
         }
-
-        Borders someWhere = new Borders(index, "someWhere",
-                new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
-                                             "-14.1234567891264 10.1234567891234, " +
-                                             "-14.0 4.1234567891234, " +
-                                             "-10.1234567891234 10.1234567891234))"));
-        vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-
-        vt = client.callProcedure("@AdHoc",
-                "select region, asText(region) from borders where pk = " + index).getResults()[0];
-        vt.advanceRow();
-        gv = vt.getGeographyValue(0);
-        assertEquals(gv.toString().toLowerCase(), vt.getString(1).toLowerCase());
 
     }
 
