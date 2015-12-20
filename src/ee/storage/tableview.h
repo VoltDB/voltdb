@@ -242,7 +242,9 @@ private:
 
     bool equal(TableView_iter const& other) const
     {
-        return m_tableView == other.m_tableView && m_tupleIdx == other.m_tupleIdx && m_marker == other.m_marker;
+        // Shouldn't compare iterators from different tables and locking for different values
+        assert(m_tableView == other.m_tableView && m_marker == other.m_marker);
+        return m_tupleIdx == other.m_tupleIdx;
     }
 
     Value& dereference() const
