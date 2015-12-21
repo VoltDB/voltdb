@@ -2297,6 +2297,9 @@ TEST CASES
     <condition property="config_postgresql" value="-P" else="">
         <isset property="postgresql"/>
     </condition>
+    <condition property="config_postgis" value="-G" else="">
+        <isset property="postgis"/>
+    </condition>
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
@@ -2358,6 +2361,7 @@ TEST CASES
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
         <arg line="${config_postgresql}" />
+        <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />
