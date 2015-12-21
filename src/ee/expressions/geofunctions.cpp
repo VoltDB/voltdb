@@ -210,8 +210,8 @@ static void readLoop(bool is_shell,
     // The first is a shell.  All others are holes.  We need to reverse
     // the order of the vertices for holes.
     if (!is_shell) {
-    	// Don't touch the first point.  We don't want to
-    	// cycle the vertices.
+        // Don't touch the first point.  We don't want to
+        // cycle the vertices.
         std::reverse(++(points.begin()), points.end());
     }
     loop->Init(points);
