@@ -224,7 +224,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                     // We have orphaned or corrupted some tables. Let's make them pristine.
                     TBMapI iter = m_surgeon.getData().begin();
                     while (iter != m_surgeon.getData().end()) {
-                        m_surgeon.snapshotFinishedScanningBlock(iter.value(), TBPtr());
+                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
                         iter++;
                     }
                 }
@@ -360,6 +360,8 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     }
     m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+        TBPtr nextBlock = iter->m_blockIterator.data();
+                TBPtr newNextBlock = iter->m_blockIterator.data();
     iter->notifyBlockWasCompactedAway(block);
 }
 
