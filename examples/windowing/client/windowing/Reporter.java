@@ -61,8 +61,8 @@ public class Reporter implements Runnable {
                 // SQL BEING RUN:
                 //  SELECT SUM(sum_values) / SUM(count_values)
                 //  FROM agg_by_second
-                //  WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
-                ClientResponse cr = app.client.callProcedure("Average", seconds);
+                //  WHERE second_ts >= DATEADD(SECOND, CAST(? as INTEGER), NOW);
+                ClientResponse cr = app.client.callProcedure("Average", -seconds);
                 long average = cr.getResults()[0].asScalarLong();
                 averagesForWindows.put(seconds, average);
             } catch (IOException | ProcCallException e) {

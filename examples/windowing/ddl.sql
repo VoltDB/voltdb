@@ -54,7 +54,7 @@ CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.In
 CREATE PROCEDURE Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second
-    WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
+    WHERE second_ts >= DATEADD(SECOND, CAST(? as INTEGER), NOW);
 
 -- Find the maximum value across all rows and partitions.
 CREATE PROCEDURE MaxValue AS
