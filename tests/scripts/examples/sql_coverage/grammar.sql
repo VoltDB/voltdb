@@ -29,6 +29,15 @@
 {_distinctableagg |= "SUM"}
 --HSQL refuses to do AVG(DISTINCT) {_distinctableagg |= "AVG"}
 
+{_geofun1arg |= ""}
+{_geofun1arg |= "LATITUDE"}
+{_geofun1arg |= "LONGITUDE"}
+{_geofun1arg |= "AREA"}
+--{_geofun1arg |= "CENTROID"}
+
+{_geofun2arg |= "DISTANCE"}
+{_geofun2arg |= "CONTAINS"}
+
 {_maybe |= ""}
 {_maybe |= " NOT "}
 

@@ -15,6 +15,7 @@
 -- {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
 -- {@idcol = "ID"}
 -- {@optionalfn = "_numfun"}
+-- {@star = "*"}
 -- {@updatecolumn = "CASH"}
 -- {@updatevalue = "_value[decimal]"}
 
