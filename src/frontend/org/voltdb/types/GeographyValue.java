@@ -22,6 +22,7 @@ import java.io.StreamTokenizer;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -30,42 +31,85 @@ import java.util.List;
  * types in the future (linestring, etc)
  */
 public class GeographyValue {
-
+    //
+    // This is a list of loops.  Each loop must be in
+    // S2Loop format.  That is to say, it must have type XYPPoint
+    // type, it must be in counter-clockwise order and it must not
+    // be closed.  All loops, even holes, are CCW.
+    //
     private List<List<XYZPoint>> m_loops;
 
-    /**
+     /**
      * Create a polygon from a list of rings.  Each ring is a list of points:
-     *   - The first ring in the list is the outer ring
+     *   - The first ring in the list is the outer ring, also known as the
+     *     shell.
      *   - Subsequent rings should be inside of the outer ring and represent
-     *     "holes" in the polygon
-     *   - Each ring should have its vertices listed in counter-clockwise order,
+     *     "holes" in the polygon.
+     *   - Each shell should have its vertices listed in counter-clockwise order,
      *     so that the area inside the ring is on the left side of the line segments
      *     formed by adjacent vertices.
+     *   - Each hole, or inner ring, should have its vertices listed in clockwise
+     *     order, so that the area inside the ring is on the right side of the
+     *     line segments formed by adjacent vertices.
+     *
+     * Note that this is the same as the order expected by the OGC standard's
+     * Well Known Text format.
+     *
+     * Note also that the loops here are GeographyPointValues, and that they
+     * are closed loops.  That is to say, the first vertex and the last
+     * vertex must be equal.
      *
      * @param loops
      */
-    public GeographyValue(List<List<GeographyPointValue>> loops) {
-        if (loops == null || loops.size() < 1) {
-            throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
-        }
-
-        m_loops = new ArrayList<List<XYZPoint>>();
-        for (List<GeographyPointValue> loop : loops) {
-            List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
-            for (int i = 0; i < loop.size(); ++i) {
-                oneLoop.add(XYZPoint.fromGeographyPointValue(loop.get(i)));
-            }
-            diagnoseLoop(oneLoop, "Invalid loop for GeographyValue: ");
-            oneLoop.remove(oneLoop.size() - 1);
-            m_loops.add(oneLoop);
-        }
+     public GeographyValue(List<List<GeographyPointValue>> loops) {
+         if (loops == null || loops.size() < 1) {
+             throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
+         }
+         // Note that we need to reverse all but the
+         // first loop, since the EE wants them all in CCW order,
+         // and the OGC order for holes is CW.
+         //
+         m_loops = new ArrayList<List<XYZPoint>>();
+         boolean firstLoop = true;
+         for (List<GeographyPointValue> loop : loops) {
+             diagnoseLoop(loop, "Invalid loop for GeographyValue: ");
+             List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
+             int startIdx;
+             int endIdx;
+             int delta;
+             if (firstLoop) {
+                 startIdx = 1;
+                 // Don't copy the last vertex.
+                 endIdx = loop.size() - 1;
+                 delta = 1;
+             } else {
+                 // Don't copy the last vertex.
+                 startIdx = loop.size() - 2;
+                 endIdx = 0;
+                 delta = -1;
+             }
+             oneLoop.add(XYZPoint.fromGeographyPointValue(loop.get(0)));
+             for (int i = startIdx; i != endIdx; i += delta) {
+                 oneLoop.add(XYZPoint.fromGeographyPointValue(loop.get(i)));
+             }
+             m_loops.add(oneLoop);
+             firstLoop = false;
+         }
     }
 
     /**
-     * Create a polygon given the well-known text representation.  As with the
-     * above constructor, the outer ring should be first and vertices should be
-     * listed on counter-clockwise order.
-     *
+     * Create a GeometryValue object from an OGC Well Known Text format string.
+     * The format, which is different from the raw loop constructor above, is
+     * as follows.
+     * <ol>
+     *   <li>Each polygon is a sequence of loops.</li>
+     *   <li>Each loop is either a shell or a hole.  There is exactly
+     *       one shell, but there may be zero or more holes.</li>
+     *   <li>The first loop in the sequence is the only shell.  Its vertices
+     *       should be given in counterclockwise order</li>
+     *   <li>All subsequent loops, if there are any, are holes.  Their vertices
+     *       should be given in <em>clockwise</em> order.  Note that this
+     *       is the opposite of the raw loop constructor from above.
      * @param wkt
      */
     public GeographyValue(String wkt) {
@@ -80,7 +124,15 @@ public class GeographyValue {
         }
     }
 
-    public static GeographyValue geographyValueFromText(String text) {
+    /**
+     * This is a factory function to create a GeometryValue object
+     * from OGC's Well Known Text strings.  The format is given
+     * in the documentation for {@link GeographyValue.GeographyValue(String)}.
+     *
+     * @param text
+     * @return
+     */
+    public static GeographyValue fromText(String text) {
         return new GeographyValue(text);
     }
 
@@ -111,22 +163,25 @@ public class GeographyValue {
 
         boolean isFirstLoop = true;
         for (List<XYZPoint> loop : m_loops) {
-            if (isFirstLoop) {
-                isFirstLoop = false;
-            }
-            else {
+            if (!isFirstLoop) {
                 sb.append(", ");
             }
 
             sb.append("(");
-            for (XYZPoint xyz : loop) {
+            int startIdx = (isFirstLoop ? 1 : loop.size()-1);
+            int endIdx = (isFirstLoop ? loop.size() : 0);
+            int increment = (isFirstLoop ? 1 : -1);
+            sb.append(loop.get(0).toGeographyPointValue().formatLngLat()).append(", ");
+            for (int idx = startIdx; idx != endIdx; idx += increment) {
+                XYZPoint xyz = loop.get(idx);
                 sb.append(xyz.toGeographyPointValue().formatLngLat());
                 sb.append(", ");
             }
 
-            // Repeat the first vertex to close the loop as WKT requires.
+            // Repeat the start vertex to close the loop as WKT requires.
             sb.append(loop.get(0).toGeographyPointValue().formatLngLat());
             sb.append(")");
+            isFirstLoop = false;
         }
 
         sb.append(")");
@@ -309,6 +364,11 @@ public class GeographyValue {
 
             return false;
         }
+
+        @Override
+        public String toString() {
+            return String.format(toGeographyPointValue().toString());
+        }
     }
 
 
@@ -410,7 +470,7 @@ public class GeographyValue {
      * If loop is invalid, it generates IllegalArgumentException exception
      */
 
-    private static void diagnoseLoop(List<XYZPoint> loop, String excpMsgPrf) throws IllegalArgumentException {
+    private static <T> void diagnoseLoop(List<T> loop, String excpMsgPrf) throws IllegalArgumentException {
         if (loop == null) {
             throw new IllegalArgumentException(excpMsgPrf + "a polygon must contain at least one ring " +
                     "(with each ring at least 4 points, including repeated closing vertex)");
@@ -431,6 +491,11 @@ public class GeographyValue {
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
+     *
+     * Note that we assume that the vertices of the first loop are in counter-clockwise
+     * order, and that subsequent loops are in clockwise order.  This is the OGC format's
+     * definition.  When we send these to the EE we need to put them all into counter-clockwise
+     * order.  So, we need to reverse the order of all but the first loop.
      */
     private static List<List<XYZPoint>> loopsFromWkt(String wkt) throws IllegalArgumentException {
         final String msgPrefix = "Improperly formatted WKT for polygon: ";
@@ -441,6 +506,7 @@ public class GeographyValue {
 
         List<XYZPoint> currentLoop = null;
         List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
+        boolean is_shell = true;
         try {
             int token = tokenizer.nextToken();
             if (token != StreamTokenizer.TT_WORD
@@ -489,8 +555,27 @@ public class GeographyValue {
                 case ')':
                     // perform basic validation of loop
                     diagnoseLoop(currentLoop, msgPrefix);
+                    // Following the OGC standard, the first loop should be CCW, and subsequent loops
+                    // should be CW.  But we will be building the S2 polygon here,
+                    // and S2 wants everything to be CCW.  So, we need to
+                    // reverse all but the first loop.
+                    //
+                    // Note also that we don't want to touch the vertex at index 0, and we want
+                    // to remove the vertex at index currentLoop.size() - 1.  We want to hold the first
+                    // vertex invariant.  The vertex at currentLoop.size() - 1 should be a duplicate
+                    // of the vertex at index 0, and should be removed before pushing it into the
+                    // list of loops.
+                    //
+                    // We are also allowed to swap these out, because they have been
+                    // created and are owned by us.
+                    //
                     currentLoop.remove(currentLoop.size() - 1);
-
+                    if (!is_shell) {
+                        for (int fidx = 1, lidx = currentLoop.size() - 1; fidx < lidx; ++fidx, --lidx) {
+                            Collections.swap(currentLoop, fidx, lidx);
+                        }
+                    }
+                    is_shell = false;
                     loops.add(currentLoop);
                     currentLoop = null;
 

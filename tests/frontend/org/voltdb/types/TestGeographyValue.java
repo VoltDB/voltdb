@@ -55,11 +55,12 @@ public class TestGeographyValue extends TestCase {
 
         // round trip
         geog = new GeographyValue("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-68.874 28.066,-68.855 25.361, -73.381 28.376, -68.874 28.066))");
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))");
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))",
                 geog.toString());
 
+        // serialize this.
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
         geog.flattenToBuffer(buf);
         assertEquals(270, buf.position());
@@ -67,15 +68,16 @@ public class TestGeographyValue extends TestCase {
         buf.position(0);
         GeographyValue newGeog = GeographyValue.unflattenFromBuffer(buf);
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))",
                 newGeog.toString());
         assertEquals(270, buf.position());
 
         // Try the absolute version of unflattening
+        // Note that the hole's coordinates have been reversed again.
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))",
                 newGeog.toString());
         assertEquals(77, buf.position());
     }

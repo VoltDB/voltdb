@@ -1399,7 +1399,7 @@ public class SQLParser extends SQLPatternFactory
         if (epos < 0) {
             epos = param.length();
         }
-        return GeographyValue.geographyValueFromText(param.substring(spos+1, epos));
+        return GeographyValue.fromText(param.substring(spos+1, epos));
     }
 
 

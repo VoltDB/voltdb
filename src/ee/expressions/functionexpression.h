@@ -256,6 +256,8 @@ static const int FUNC_VOLT_POLYGON_AREA                = 20039;
 static const int FUNC_VOLT_DISTANCE                    = 20040;     // wrapper id for distance between all geo types
 static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 20041;     // distance between point and point
 static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 20042;     // distance between polygon and point
+static const int FUNC_VOLT_VALIDATE_POLYGON            = 20043;     // Validate a polygon.
+static const int FUNC_VOLT_POLYGON_INVALID_REASON      = 20044;     // Reason a polygon is invalid.
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

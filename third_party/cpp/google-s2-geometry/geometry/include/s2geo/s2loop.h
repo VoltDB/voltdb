@@ -76,10 +76,12 @@ class S2Loop : public S2Region {
   /// deprecated version of IsValid.
   static int const kDefaultMaxAdjacent = 0;
 
-  /// Check whether this loop is valid.  Note that in debug mode, validity
-  /// is checked at loop creation time, so IsValid()
-  /// should always return true.
-  bool IsValid() const;
+  /// Check whether this loop is valid.  Note that in debug mode, when using
+  /// the S2 constructor, validity is checked at loop creation time, so IsValid()
+  /// should always return true.  For VoltDB, polygons are created by the
+  /// Java code, and are the data provided by the user.  Consequently this
+  /// may return false.
+  bool IsValid(std::stringstream *msg = NULL) const;
 
 
   /// These two versions are deprecated and ignore max_adjacent.
@@ -122,7 +124,7 @@ class S2Loop : public S2Region {
   /// handled consistently with S2::RobustCCW(), i.e., if a loop can be
   /// expressed as the union of degenerate or nearly-degenerate CCW triangles,
   /// then it will always be considered normalized.
-  bool IsNormalized() const;
+  bool IsNormalized(std::stringstream *msg = NULL) const;
 
   /// Invert the loop if necessary so that the area enclosed by the loop is at
   /// most 2*Pi.

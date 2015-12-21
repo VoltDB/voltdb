@@ -1,5 +1,6 @@
 /// Copyright 2005 Google Inc. All Rights Reserved.
 
+#include <sstream>
 #include <algorithm>
 using std::min;
 using std::max;
@@ -120,7 +121,7 @@ template<> struct hash<S2PointPair> {
 }  // namespace std
 
 
-bool S2Polygon::IsValid(const vector<S2Loop*>& loops) {
+bool S2Polygon::IsValid(const vector<S2Loop*>& loops, std::stringstream *msg) {
   /// If a loop contains an edge AB, then no other loop may contain AB or BA.
   if (loops.size() > 1) {
     unordered_map<S2PointPair, pair<int, int> > edges;
@@ -134,8 +135,9 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops) {
             continue;
         }
         pair<int, int> other = edges[key];
-        VLOG(2) << "Duplicate edge: loop " << i << ", edge " << j
-                 << " and loop " << other.first << ", edge " << other.second;
+        VMLOG(2, msg) << "Duplicate edge: loop " << i << ", edge " << j
+                      << " and loop " << other.first << ", edge " << other.second;
+
         return false;
       }
     }
@@ -145,14 +147,14 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops) {
   /// two loops cross.
   for (int i = 0; i < loops.size(); ++i) {
     if (!loops[i]->IsNormalized()) {
-      VLOG(2) << "Loop " << i << " encloses more than half the sphere";
+      VMLOG(2, msg) << "Loop " << i << " encloses more than half the sphere";
       return false;
     }
     for (int j = i + 1; j < loops.size(); ++j) {
       /// This test not only checks for edge crossings, it also detects
       /// cases where the two boundaries cross at a shared vertex.
       if (loops[i]->ContainsOrCrosses(loops[j]) < 0) {
-        VLOG(2) << "Loop " << i << " crosses loop " << j;
+        VMLOG(2, msg) << "Loop " << i << " crosses loop " << j;
         return false;
       }
     }
@@ -161,13 +163,13 @@ bool S2Polygon::IsValid(const vector<S2Loop*>& loops) {
   return true;
 }
 
-bool S2Polygon::IsValid() const {
+bool S2Polygon::IsValid(std::stringstream *msg) const {
   for (int i = 0; i < num_loops(); ++i) {
-    if (!loop(i)->IsValid()) {
+    if (!loop(i)->IsValid(msg)) {
       return false;
     }
   }
-  return IsValid(loops_);
+  return IsValid(loops_, msg);
 }
 
 bool S2Polygon::IsValid(bool check_loops, int max_adjacent) const {
