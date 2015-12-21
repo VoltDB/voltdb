@@ -629,7 +629,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateBorders(client, invalidBorders);
 
-        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, invalid_polygon_reason(region), message from borders").getResults()[0];
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message from borders").getResults()[0];
         while (vt.advanceRow()) {
             assertTrue(String.format("Expected error message containing \"%s\" but got \"%s\"",
                                        vt.getString(3),

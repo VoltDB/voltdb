@@ -49,25 +49,18 @@ public class TestGeographyValue extends TestCase {
                 new GeographyPointValue(-68.874, 28.066));
 
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        /*
-         * Note that the order of the hole, which is the second loop, is
-         * not the same as the order of the triangular hole's vertices
-         * above.  The convertion to WKT reverses it.
-         */
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-73.381 28.376, -68.855 25.361, -68.874 28.066, -73.381 28.376))",
+                + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
         // round trip
-        // Note that the hole's coordinates have been reversed again.
         geog = new GeographyValue("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-73.381 28.376, -68.855 25.361, -68.874 28.066, -73.381 28.376))");
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))");
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-73.381 28.376, -68.855 25.361, -68.874 28.066, -73.381 28.376))",
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))",
                 geog.toString());
 
         // serialize this.
-        // Note that the hole's coordinates have been reversed again.
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
         geog.flattenToBuffer(buf);
         assertEquals(270, buf.position());
@@ -75,7 +68,7 @@ public class TestGeographyValue extends TestCase {
         buf.position(0);
         GeographyValue newGeog = GeographyValue.unflattenFromBuffer(buf);
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-73.381 28.376, -68.855 25.361, -68.874 28.066, -73.381 28.376))",
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))",
                 newGeog.toString());
         assertEquals(270, buf.position());
 
@@ -84,7 +77,7 @@ public class TestGeographyValue extends TestCase {
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
         assertEquals("POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
-                + "(-73.381 28.376, -68.855 25.361, -68.874 28.066, -73.381 28.376))",
+                + "(-73.381 28.376, -68.874 28.066, -68.855 25.361, -73.381 28.376))",
                 newGeog.toString());
         assertEquals(77, buf.position());
     }
@@ -164,10 +157,6 @@ public class TestGeographyValue extends TestCase {
         assertEquals(expected, canonicalizeWkt("\tPOLYGON\t(\t(\t-64.751\t32.305\t,\t-80.437\t25.244\t,\t-66.371\t18.476\t,\t-64.751\t32.305\t)\t)\t"));
 
         // Parsing with more than one loop should work the same.
-        // Note that the hole's loop has *not* been reversed.  It
-        // is reversed by the WKT parser, and is then re-reversed by
-        // the GeographyValue.toString method.  One could call this
-        // Double Rot-13 encoding.
         expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))";
         assertEquals(expected, canonicalizeWkt("PoLyGoN\t(  (\n-64.751\n32.305   ,    -80.437\t25.244\n, -66.371 18.476,-64.751\t\t\t32.305   ),\t "

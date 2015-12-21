@@ -143,10 +143,10 @@ public class TestParameterConverter extends TestCase
         assertEquals("Cannot convert string to geography point.", pt.getLongitude(), rpt.getLongitude(), epsilon);
     }
 
-    public void testOneStringToPolygon(String rep, GeographyValue gv) throws Exception {
-        Object r = ParameterConverter.tryToMakeCompatible(GeographyValue.class, rep);
-        assertTrue("expected GeographyValue", r.getClass() == GeographyValue.class);
-        assertEquals("Cannot convert string to polygon.", gv.toString(), r.toString());
+    public void testOneStringToPolygon(String actualAsString, GeographyValue expected) throws Exception {
+        Object actual = ParameterConverter.tryToMakeCompatible(GeographyValue.class, actualAsString);
+        assertTrue("expected GeographyValue", actual.getClass() == GeographyValue.class);
+        assertEquals("Cannot convert string to polygon.", expected.toString(), actual.toString());
     }
 
     public void testStringToGeographyPointValue() throws Exception {
@@ -170,20 +170,19 @@ public class TestParameterConverter extends TestCase
                                                                                                            new GeographyPointValue(0, 1),
                                                                                                            new GeographyPointValue(0, 0) }))));
         GeographyValue geog;
-        // The Bermuda Triangle
+        // The Bermuda Triangle, counter clockwise.
         List<GeographyPointValue> outerLoop = Arrays.asList(new GeographyPointValue(-64.751, 32.305),
                                                   new GeographyPointValue(-80.437, 25.244),
                                                   new GeographyPointValue(-66.371, 18.476),
                                                   new GeographyPointValue(-64.751, 32.305));
         // A triangular hole
-        // Note that this needs to be counter clockwise,
-        // though the WKT string wants it to be clockwise.
-        List<GeographyPointValue> innerLoop = Arrays.asList(new GeographyPointValue(-68.874, 28.066),
+        // Note that this needs to be clockwise.
+        List<GeographyPointValue> innerLoop = Arrays.asList(new GeographyPointValue(-68.855, 25.361),
                                                             new GeographyPointValue(-73.381, 28.376),
-                                                            new GeographyPointValue(-68.855, 25.361),
-                                                            new GeographyPointValue(-68.874, 28.066));
+                                                            new GeographyPointValue(-68.874, 28.066),
+                                                            new GeographyPointValue(-68.855, 25.361));
         geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
-        String geogRep = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), " + "(-68.855 25.361, -73.381 28.376,-68.874 28.066, -68.855 25.361))";
+        String geogRep = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), " + "(-68.855 25.361, -73.381 28.376, -68.874 28.066, -68.855 25.361))";
         testOneStringToPolygon(geogRep, geog);
         // round trip
         geog = new GeographyValue(geogRep);

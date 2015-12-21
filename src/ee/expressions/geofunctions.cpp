@@ -210,7 +210,9 @@ static void readLoop(bool is_shell,
     // The first is a shell.  All others are holes.  We need to reverse
     // the order of the vertices for holes.
     if (!is_shell) {
-        std::reverse(points.begin(), points.end());
+    	// Don't touch the first point.  We don't want to
+    	// cycle the vertices.
+        std::reverse(++(points.begin()), points.end());
     }
     loop->Init(points);
 }
@@ -403,6 +405,10 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
     return retVal;
 }
 
+//
+// Return true if poly has more than one shell, or has shells
+// inside holes.
+//
 static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
     auto nloops = poly.num_loops();
     int nouters = 0;
@@ -416,16 +422,17 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
             break;
         default:
             VMLOG(2, msg) << "Polygons can only be shells or holes." << std::endl;
-            return false;
+            return true;
         }
         if (!loop->IsNormalized(msg)) {
-            return false;
+            return true;
         }
     }
     if (nouters != 1) {
         VMLOG(2, msg) << "Polygons can have only one shell.";
+        return true;
     }
-    return nouters == 1;
+    return false;
 }
 
 template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
@@ -439,7 +446,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     Polygon poly;
     poly.initFromGeography(getGeography());
     if (!poly.IsValid()
-            || !isMultiPolygon(poly)) {
+            || isMultiPolygon(poly)) {
         returnval = false;
     }
     return ValueFactory::getBooleanValue(returnval);

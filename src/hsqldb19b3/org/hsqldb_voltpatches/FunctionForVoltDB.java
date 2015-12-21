@@ -145,6 +145,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_POLYGON_INVALID_REASON       = 20044;    // Reason a polygon may be invalid.
 
 
+        /*
+         * Note: The name must be all lower case.
+         */
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -290,7 +293,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("invalid_polygon_reason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
+            new FunctionId("isinvalidreason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
                     new Type[] { Type.VOLT_GEOGRAPHY },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
