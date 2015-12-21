@@ -474,6 +474,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
+        // test for border case of rounding up the deciaml number
+        client.callProcedure("places.Insert", 50, "Someplace1",
+                GeographyPointValue.geographyPointFromText("POINT(13.4999999999995 17)"));
+        // test for border case of rounding up the deciaml number
+        client.callProcedure("places.Insert", 51, "Someplace2",
+                GeographyPointValue.geographyPointFromText("POINT(-13.499999999999999995 -17)"));
+
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select loc, asText(loc) from places order by pk").getResults()[0];
 
@@ -495,7 +502,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Borders someWhere = new Borders(50, "someWhere",
                 new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
                                              "-14.1234567891264 10.1234567891234, " +
-                                             "-14.0 4.1234567891234, " +
+                                             "-14.0 4.1234567891235, " +
+                                             "-12.0 4.4555555555555555550, " +
+                                             "-11.0 4.4999999999996, " +
                                              "-10.1234567891234 10.1234567891234))"));
         VoltTable vt = client.callProcedure("BORDERS.Insert",
                 someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
@@ -505,6 +514,16 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
                                             "(-8 9, -9 9, -9 8, -8 8, -8 9)," +
                                             "(9 9, 9 8, 8 8, 9 8, 9 9))"));
+        vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+
+        // polygon with hole whose co-ordinates are whole numbers
+        someWhere = new Borders(52, "someWhereWithHoles",
+                new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
+                                            "(9 9, 9 8, 8 8, 9 8, 9 9)," +
+                                            "(-8 9, -9 9, -9 8, -8 8, -8 9))"));
         vt = client.callProcedure("BORDERS.Insert",
                 someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
