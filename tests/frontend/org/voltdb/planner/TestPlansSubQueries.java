@@ -833,7 +833,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P1", "A", "C");
         // Check inlined index scan
         pn = ((NestLoopIndexPlanNode) nlpn).getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        checkPrimaryKeyIndexScan(pn, "P2", "A","D");
+        checkPrimaryKeyIndexScan(pn, "P2", "A", "D");
 
 
         planNodes = compileToFragments("SELECT A, C FROM P2, (SELECT A, C FROM P1) T1 " +

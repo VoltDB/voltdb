@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import os, sys, commands, string
 from buildtools import *
 
@@ -26,14 +25,14 @@ from buildtools import *
 #  - Parse Target and Level from Command Line
 ###############################################################################
 
-CTX = BuildContext(sys.argv)
-
+###############################################################################
 # CTX is an instance of BuildContext, which is declared in buildtools.py
 # BuildContext contains vars that determine how the makefile will be built
 #  and how the build will go down. It also checks the platform and parses
 #  command line args to determine target and build level.
+###############################################################################
+CTX = BuildContext(sys.argv)
 
-# print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
 ###############################################################################
 # SET GLOBAL CONTEXT VARIABLES FOR BUILDING
 ###############################################################################
@@ -55,6 +54,8 @@ if CTX.compilerName() == 'gcc':
     CTX.LDFLAGS += " -rdynamic"
     if (CTX.compilerMajorVersion() >= 4):
         CTX.CPPFLAGS += " -Wno-deprecated-declarations  -Wno-unknown-pragmas"
+	if (CTX.compilerMinorVersion() == 6):
+	    CTX.CPPFLAGS += " -Wno-unused-but-set-variable"
 	if (CTX.compilerMinorVersion() == 9):
             CTX.CPPFLAGS += " -Wno-float-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
         elif (CTX.compilerMinorVersion() == 8):
@@ -72,11 +73,6 @@ if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.com
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
-
-# linker flags
-CTX.LDFLAGS += """ -g3"""
-CTX.LASTLDFLAGS = """ """
-CTX.LASTIPCLDFLAGS = """ -ldl """
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -101,10 +97,15 @@ CTX.IGNORE_SYS_PREFIXES = ['/usr/include', '/usr/lib', 'third_party']
 CTX.INPUT_PREFIX = "src/ee/"
 
 # where to find the source
-CTX.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp/"
+CTX.THIRD_PARTY_INPUT_PREFIX = "third_party/cpp"
 
 # where to find the tests
 CTX.TEST_PREFIX = "tests/ee/"
+
+# linker flags
+CTX.LDFLAGS += """ -g3"""
+CTX.LASTLDFLAGS += """ -lpcre2-8 """
+CTX.LASTIPCLDFLAGS = """ -ldl """
 
 ###############################################################################
 # SET RELEASE LEVEL CONTEXT
@@ -466,6 +467,13 @@ if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
      PlanNodeFragmentTest
     """
+
+###############################################################################
+#
+# Print some configuration information.  This is useful for debugging.
+#
+###############################################################################
+print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
 
 ###############################################################################
 # BUILD THE MAKEFILE

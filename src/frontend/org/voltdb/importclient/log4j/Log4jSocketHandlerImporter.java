@@ -15,49 +15,70 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.importclient;
+package org.voltdb.importclient.log4j;
 
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URI;
 import java.util.ArrayList;
-import java.util.Properties;
 
 import org.apache.log4j.spi.LoggingEvent;
-import org.osgi.framework.BundleActivator;
-import org.osgi.framework.BundleContext;
 import org.voltcore.network.ReverseDNSCache;
-import org.voltdb.importer.ImportHandlerProxy;
+import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
 
 /**
- * ImportHandlerProxy implementation for importer that picks up log4j socket appender events.
+ * Log4j socket handler importer that listens on a specified port.
  */
-public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements BundleActivator
+public class Log4jSocketHandlerImporter extends AbstractImporter
 {
-
-    private static final String PORT_CONFIG = "port";
-    private static final String EVENT_TABLE_CONFIG = "log-event-table";
-
-    private int m_port;
-    private String m_tableName;
-    private ServerSocket m_serverSocket;
     private final ArrayList<SocketReader> m_connections = new ArrayList<SocketReader>();
-    private SocketReader m_reader = null;
+    private final Log4jSocketImporterConfig m_config;
 
-    @Override
-    public void start(BundleContext context)
+    public Log4jSocketHandlerImporter(Log4jSocketImporterConfig config)
     {
-        context.registerService(Log4jSocketHandlerImporter.class.getName(), this, null);
+        m_config = config;
     }
 
     @Override
-    public void stop(BundleContext context)
+    public URI getResourceID()
     {
-        stop();
+        return m_config.getResourceID();
+    }
+
+    @Override
+    public String getName()
+    {
+        return "Log4jSocketHandlerImporter";
+    }
+
+    @Override
+    public void accept()
+    {
+        /*
+        if (!hasTable(m_config.getTableName())) {
+            printCreateTableError();
+            return;
+        }
+        */
+
+        try {
+            while (shouldRun()) {
+                Socket socket = m_config.getServerSocket().accept();
+                SocketReader reader = new SocketReader(socket);
+                m_connections.add(reader);
+                new Thread(reader).start();
+            }
+        } catch (IOException e) {
+            if (shouldRun()) {
+                error(null, String.format("Unexpected error [%s] accepting connections on port [%d]", e.getMessage(), m_config.getPort()));
+            }
+        } finally {
+            closeServerSocket();
+        }
     }
 
     @Override
@@ -65,98 +86,19 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     {
         closeServerSocket();
 
-        for (SocketReader conn : m_connections) {
-            conn.stop();
+        for (SocketReader reader : m_connections) {
+            reader.stop();
         }
-        m_connections.clear();
     }
 
     private void closeServerSocket()
     {
         try {
-            if (m_serverSocket!=null) {
-                m_serverSocket.close();
-            }
+            m_config.getServerSocket().close();
         } catch(IOException e) { // nothing to do other than log
-            info("Unexpected error closing log4j socket appender listener on " + m_port);
-        }
-    }
-
-    /**
-     * Return a name for VoltDB to log with friendly name.
-     * @return name of the importer.
-     */
-    @Override
-    public String getName()
-    {
-        return "Log4jSocketHandlerImporter";
-    }
-
-    /**
-     * This is called with the properties that are supplied in the deployment.xml
-     * Do any initialization here.
-     * @param p
-     */
-    @Override
-    public void configure(Properties p)
-    {
-        Properties properties = (Properties) p.clone();
-        String str = properties.getProperty(PORT_CONFIG);
-        if (str == null || str.trim().length() == 0) {
-            throw new RuntimeException(PORT_CONFIG + " must be specified as a log4j socket importer property");
-        }
-        m_port = Integer.parseInt(str);
-
-        closeServerSocket(); // just in case something was not cleaned up properly
-        try {
-            m_serverSocket = new ServerSocket(m_port);
-            info("Log4j socket appender listener listening on port: " + m_port);
-        } catch(IOException e) {
-            error("IOException opening server socket on port " + m_port + " - " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        m_tableName = properties.getProperty(EVENT_TABLE_CONFIG);
-        if (m_tableName==null || m_tableName.trim().length()==0) {
-            throw new RuntimeException(EVENT_TABLE_CONFIG + " must be specified as a log4j socket importer property");
-        }
-
-        //TODO:
-        // - Config for Anish's idea of deleting old events
-        // May be use a configuration that says "keep 'n' hrs data" or "keep 'n' rows", whichever is larger.
-    }
-
-
-    @Override
-    public void setBackPressure(boolean flag) {
-        if (m_reader != null) {
-            m_reader.m_hasBackPressure = flag;
-        }
-    }
-
-    /**
-     * This is called when server is ready to accept any transactions.
-     */
-    @Override
-    public void readyForData()
-    {
-        if (!hasTable(m_tableName)) {
-            printCreateTableError();
-            return;
-        }
-
-        try {
-            while (true) {
-                Socket socket = m_serverSocket.accept();
-                SocketReader reader = new SocketReader(socket);
-                m_connections.add(reader);
-                new Thread(reader).start();
+            if (isDebugEnabled()) {
+                debug(null, "Unexpected error closing log4j socket appender listener on " + m_config.getPort());
             }
-        } catch (IOException e) {
-            //TODO: Could check if this was stopped and log info level message to avoid erroneous error log
-            error(String.format("Unexpected error [%s] accepting connections on port [%d]", e.getMessage(), m_serverSocket.getLocalPort()));
-        } finally {
-            closeServerSocket();
         }
     }
 
@@ -164,7 +106,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     {
             System.err.println("Log event table must exist before Log4j socket importer can be used");
             System.err.println("Please create the table using the following ddl and use appropriate partition:");
-            System.err.println("CREATE TABLE " + m_tableName + "\n" +
+            System.err.println("CREATE TABLE " + m_config.getTableName() + "\n" +
             "(\n" +
             "  log_event_host    varchar(256) NOT NULL\n" +
             ", logger_name       varchar(256) NOT NULL\n" +
@@ -174,7 +116,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
             ", log_message       varchar(1024)\n" +
             ", throwable_str_rep varchar(4096)\n" +
             ");\n" +
-            "PARTITION TABLE " + m_tableName + " ON COLUMN log_event_host;");
+            "PARTITION TABLE " + m_config.getTableName() + " ON COLUMN log_event_host;");
     }
 
     /**
@@ -183,12 +125,11 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
     private class SocketReader implements Runnable
     {
         private final Socket m_socket;
-        private volatile boolean m_hasBackPressure = false;
 
         public SocketReader(Socket socket)
         {
             m_socket = socket;
-            Log4jSocketHandlerImporter.this.info("Connected to socket appender at " + socket.getRemoteSocketAddress());
+            Log4jSocketHandlerImporter.this.info(null, "Connected to socket appender at " + socket.getRemoteSocketAddress());
         }
 
         @Override
@@ -199,22 +140,15 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
                 ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(m_socket.getInputStream()));
                 while (true) {
                     LoggingEvent event = (LoggingEvent) ois.readObject();
-                    if (!Log4jSocketHandlerImporter.this.callProcedure(new SaveLog4jEventInvocation(hostname, event, m_tableName))) {
-                        Log4jSocketHandlerImporter.this.error("Failed to insert log4j event");
-                    }
-                    if (m_hasBackPressure) {
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException ioe) {
-                            //
-                        }
+                    if (!Log4jSocketHandlerImporter.this.callProcedure(new SaveLog4jEventInvocation(hostname, event, m_config.getTableName()))) {
+                        Log4jSocketHandlerImporter.this.error(null, "Failed to insert log4j event");
                     }
                 }
             } catch(EOFException e) { // normal exit condition
-                Log4jSocketHandlerImporter.this.info("Client disconnected from " + m_socket.getRemoteSocketAddress());
+                Log4jSocketHandlerImporter.this.info(null, "Client disconnected from " + m_socket.getRemoteSocketAddress());
             } catch (ClassNotFoundException | IOException e) { // assume that these are unrecoverable
                                                                // errors and exit from thread
-                Log4jSocketHandlerImporter.this.error(String.format("Unexpected error [%s] reading from %s", e.getMessage(), m_socket.getRemoteSocketAddress()));
+                Log4jSocketHandlerImporter.this.error(null, String.format("Unexpected error [%s] reading from %s", e.getMessage(), m_socket.getRemoteSocketAddress()));
                 e.printStackTrace();
             } finally {
                 closeSocket();
@@ -231,7 +165,7 @@ public class Log4jSocketHandlerImporter extends ImportHandlerProxy implements Bu
             try {
                 m_socket.close();
             } catch(IOException e) {
-                Log4jSocketHandlerImporter.this.error("Could not close log4j event reader socket on " + m_socket.getLocalPort());
+                Log4jSocketHandlerImporter.this.error(null, "Could not close log4j event reader socket on " + m_socket.getLocalPort());
                 e.printStackTrace();
             }
         }

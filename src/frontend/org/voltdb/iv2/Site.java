@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Deque;
@@ -70,6 +71,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -91,9 +93,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -279,6 +281,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_isLowestSiteId = m_siteId == lowestSiteId;
                 return m_isLowestSiteId;
             }
+        }
+
+        @Override
+        public int getClusterId() {
+            return getCorrespondingClusterId();
         }
 
 
@@ -491,6 +498,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         String hostname = CoreUtils.getHostnameOrAddress();
         HashinatorConfig hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
+        Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
                 eeTemp =
@@ -501,10 +509,25 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDrclusterid(),
+                        deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        hashinatorConfig,
+                        m_mpDrGateway != null);
+            }
+            else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
+                Class<?> spyClass = Class.forName("org.mockito.Mockito");
+                Method spyMethod = spyClass.getDeclaredMethod("spy", Object.class);
+                ExecutionEngine internalEE = new ExecutionEngineJNI(
+                        m_context.cluster.getRelativeIndex(),
+                        m_siteId,
+                        m_partitionId,
+                        CoreUtils.getHostIdFromHSId(m_siteId),
+                        hostname,
+                        m_context.cluster.getDrclusterid(),
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
+                eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {
                 // set up the EE over IPC
@@ -516,8 +539,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDrclusterid(),
-                            m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                            deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
@@ -791,6 +813,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getCorrespondingHostId()
     {
         return CoreUtils.getHostIdFromHSId(m_siteId);
+    }
+
+    @Override
+    public int getCorrespondingClusterId()
+    {
+        return m_context.cluster.getDrclusterid();
     }
 
     @Override

@@ -737,6 +737,9 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/ProcInfo.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporter.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
+            <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>

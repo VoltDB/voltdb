@@ -226,15 +226,17 @@ public class VoltProjectBuilder {
         final boolean useCustomAdmin;
         final int adminPort;
         final boolean adminOnStartup;
+        final int clusterId;
 
         public DeploymentInfo(int hostCount, int sitesPerHost, int replication,
-                boolean useCustomAdmin, int adminPort, boolean adminOnStartup) {
+                boolean useCustomAdmin, int adminPort, boolean adminOnStartup, int id) {
             this.hostCount = hostCount;
             this.sitesPerHost = sitesPerHost;
             this.replication = replication;
             this.useCustomAdmin = useCustomAdmin;
             this.adminPort = adminPort;
             this.adminOnStartup = adminOnStartup;
+            this.clusterId = id;
         }
     }
 
@@ -295,7 +297,6 @@ public class VoltProjectBuilder {
 
     private String m_drMasterHost;
     private Boolean m_drProducerEnabled = null;
-    private Integer m_drProducerClusterId = null;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -668,16 +669,14 @@ public class VoltProjectBuilder {
         m_drMasterHost = drMasterHost;
     }
 
-    public void setDrProducerEnabled(int clusterId)
+    public void setDrProducerEnabled()
     {
         m_drProducerEnabled = true;
-        m_drProducerClusterId = new Integer(clusterId);
     }
 
-    public void setDrProducerDisabled(int clusterId)
+    public void setDrProducerDisabled()
     {
         m_drProducerEnabled = false;
-        m_drProducerClusterId = new Integer(clusterId);
     }
 
     /**
@@ -694,14 +693,14 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(jarPath, 1, 1, 0, null) != null;
+        return compile(jarPath, 1, 1, 0, null, 0) != null;
     }
 
     public boolean compile(final String jarPath,
             final int sitesPerHost,
             final int replication) {
         return compile(jarPath, sitesPerHost, 1,
-                replication, null) != null;
+                replication, null, 0) != null;
     }
 
     public boolean compile(final String jarPath,
@@ -709,7 +708,7 @@ public class VoltProjectBuilder {
             final int hostCount,
             final int replication) {
         return compile(jarPath, sitesPerHost, hostCount,
-                replication, null) != null;
+                replication, null, 0) != null;
     }
 
     public Catalog compile(final String jarPath,
@@ -717,9 +716,18 @@ public class VoltProjectBuilder {
             final int hostCount,
             final int replication,
             final String voltRoot) {
+       return compile(jarPath, sitesPerHost, hostCount, replication, voltRoot, 0);
+    }
+
+    public Catalog compile(final String jarPath,
+            final int sitesPerHost,
+            final int hostCount,
+            final int replication,
+            final String voltRoot,
+            final int clusterId) {
         VoltCompiler compiler = new VoltCompiler();
         if (compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
             return compiler.getCatalog();
         } else {
@@ -730,21 +738,23 @@ public class VoltProjectBuilder {
     public boolean compile(
             final String jarPath, final int sitesPerHost,
             final int hostCount, final int replication,
-            final String voltRoot, final boolean ppdEnabled, final String snapshotPath, final String ppdPrefix)
+            final String voltRoot, final int clusterId,
+            final boolean ppdEnabled, final String snapshotPath,
+            final String ppdPrefix)
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
     }
 
     public boolean compile(final String jarPath, final int sitesPerHost,
             final int hostCount, final int replication,
-            final int adminPort, final boolean adminOnStartup)
+            final int adminPort, final boolean adminOnStartup, final int clusterId)
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, null,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, true, adminPort, adminOnStartup),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, true, adminPort, adminOnStartup, clusterId),
                        m_ppdEnabled,  m_snapshotPath, m_ppdPrefix);
     }
 
@@ -759,6 +769,7 @@ public class VoltProjectBuilder {
         assert(jarPath != null);
         assert(deployment == null || deployment.sitesPerHost >= 1);
         assert(deployment == null || deployment.hostCount >= 1);
+        assert(deployment == null || (deployment.clusterId >= 0 && deployment.clusterId <= 127));
 
         String deploymentVoltRoot = voltRoot;
         if (deployment != null) {
@@ -827,6 +838,7 @@ public class VoltProjectBuilder {
                 e.printStackTrace();
                 System.out.println("hostcount: " + deployment.hostCount);
                 System.out.println("sitesPerHost: " + deployment.sitesPerHost);
+                System.out.println("clusterId: " + deployment.clusterId);
                 System.out.println("replication: " + deployment.replication);
                 System.out.println("voltRoot: " + deploymentVoltRoot);
                 System.out.println("ppdEnabled: " + ppdEnabled);
@@ -924,6 +936,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
+        cluster.setId(dinfo.clusterId);
         cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
@@ -1119,18 +1132,13 @@ public class VoltProjectBuilder {
             importt.getConfiguration().add(importConfig);
         }
 
-        if (m_drProducerClusterId != null || (m_drMasterHost != null && !m_drMasterHost.isEmpty())) {
-            DrType dr = factory.createDrType();
-            deployment.setDr(dr);
-            if (m_drProducerClusterId != null) {
-                dr.setListen(m_drProducerEnabled);
-                dr.setId(m_drProducerClusterId);
-            }
-            if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
-                ConnectionType conn = factory.createConnectionType();
-                dr.setConnection(conn);
-                conn.setSource(m_drMasterHost);
-            }
+        DrType dr = factory.createDrType();
+        deployment.setDr(dr);
+        dr.setListen(m_drProducerEnabled);
+        if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
+            ConnectionType conn = factory.createConnectionType();
+            dr.setConnection(conn);
+            conn.setSource(m_drMasterHost);
         }
 
         // Have some yummy boilerplate!

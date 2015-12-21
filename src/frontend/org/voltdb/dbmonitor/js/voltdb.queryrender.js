@@ -219,14 +219,15 @@ function QueryUI(queryString, userName) {
             }
             else
                 if (/^explain /i.test(statements[i])) {
-                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
+                    connectionQueue.BeginExecute('@Explain', statements[i].substr(8).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true,
+                        SQLQueryRender.getCookie("timeoutTime"));
                 }
                 else
                     if (/^explainproc /i.test(statements[i])) {
-                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
+                        connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true, SQLQueryRender.getCookie("timeoutTime"));
                     }
                     else {
-                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true);
+                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true, SQLQueryRender.getCookie("timeoutTime"));
                     }
         }
 

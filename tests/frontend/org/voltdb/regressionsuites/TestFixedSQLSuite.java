@@ -692,6 +692,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG8120();
         subTestENG9032();
         subTestENG9389();
+        subTestENG9533();
     }
 
     private void subTestTicket196() throws IOException, ProcCallException
@@ -2507,23 +2508,97 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         sql = "INSERT INTO t1 VALUES (1, 2);";
         client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (2, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (3, 2);";
+
+        client.callProcedure("@AdHoc", sql);
         sql = "INSERT INTO t2 VALUES (2, NULL);";
         client.callProcedure("@AdHoc", sql);
 
+        sql = "INSERT INTO t3 VALUES (2, 2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t3 VALUES (3, 3, 10);";
+        client.callProcedure("@AdHoc", sql);
+
+        sql = "INSERT INTO t3_no_index VALUES (2, 2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t3_no_index VALUES (3, 3, 10);";
+        client.callProcedure("@AdHoc", sql);
+
         // NULL padded row in T3 will trigger the bug ENG-9389
+        // Test with both indexed and unindexed inner table to exercise both
+        // nested-loop and nested-loop-index joins
+        for (String innerTable : new String[] {"t3", "t3_no_index"}) {
 
-        sql = "select t1.A from t1 left join t3 on t3.A = t1.A where t3.D is null and t1.B = 2;";
-        validateTableOfScalarLongs(client, sql, new long[]{1});
+            sql = "select t1.A "
+                    + "from t1 left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t3.D is null and t1.B = 2 "
+                    + "order by t1.A;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
 
-        sql = " select t1.A from T1 left join t3 on t3.A = t1.A where t3.D is null and t1.B = 2 "
-                + "and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) ; ";
-        validateTableOfScalarLongs(client, sql, new long[]{1});
+            sql = " select t1.A "
+                    + "from T1 left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t3.D is null and t1.B = 2 "
+                    + "and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) "
+                    + "order by t1.a;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
 
-        sql = "select t1.A from t1 inner join t2 on t2.B = t1.B left join t3 on t3.A = t1.A "
-                + "where t2.D is null and t3.D is null and t2.B = 2;";
-        validateTableOfScalarLongs(client, sql, new long[]{1});
+            sql = "select t1.A "
+                    + "from t1 inner join t2 on t2.B = t1.B "
+                    + "left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t2.D is null and t3.D is null and t2.B = 2 "
+                    + "order by t1.a;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
 
-        truncateTables(client, new String[]{"T1", "T2"});
+            sql = "select t1.b + t3.d as thesum "
+                    + "from t1 "
+                    + "left outer join " + innerTable + " as t3 "
+                    + "on t1.a = t3.a "
+                    + "where t1.b > 1 "
+                    + "order by thesum;";
+            System.out.println(client.callProcedure("@Explain", sql).getResults()[0]);
+            validateTableOfScalarLongs(client, sql, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, 12});
+        }
+
+        truncateTables(client, new String[]{"T1", "T2", "T3", "T3_NO_INDEX"});
+    }
+
+    private void subTestENG9533() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9533 outerjoin with OR pred...");
+        Client client = getClient();
+        String insStmts[] = {
+                "insert into test1_eng_9533 values (0);",
+                "insert into test1_eng_9533 values (1);",
+                "insert into test1_eng_9533 values (2);",
+                "insert into test1_eng_9533 values (3);",
+                "insert into test2_eng_9533 values (1, 'athing', 'one', 5);",
+                "insert into test2_eng_9533 values (2, 'otherthing', 'two', 10);",
+                "insert into test2_eng_9533 values (3, 'yetotherthing', 'three', 3);"
+        };
+
+        for (String stmt : insStmts) {
+            validateTableOfScalarLongs(client, stmt, new long[] {1});
+        }
+
+        String sqlStmt =
+                "select "
+                + "  id, t_int "
+                + "from test1_eng_9533 "
+                + "  left join test2_eng_9533 "
+                + "  on t_id = id "
+                + "where "
+                + "  id <= 1 or t_int > 4 "
+                + "order by id * 2"; // this order by is so that we don't force an index scan on the outer table.
+
+        validateTableOfLongs(client, sqlStmt, new long[][] {
+                {0, Long.MIN_VALUE},
+                {1, 5},
+                {2, 10}
+        });
     }
 
     //
