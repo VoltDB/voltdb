@@ -47,6 +47,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
@@ -468,6 +469,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
             m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+            m_ee = new MockExecutionEngine();
+        }
+        else if (m_backend == BackendTarget.POSTGIS_BACKEND) {
+            m_non_voltdb_backend = PostGISBackend.initializePostGISBackend(m_context);
             m_ee = new MockExecutionEngine();
         }
         else {

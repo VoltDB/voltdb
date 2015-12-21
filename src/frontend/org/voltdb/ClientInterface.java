@@ -1215,7 +1215,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_siteId = m_mailbox.getHSId();
         BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
         m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
-                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGIS_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
         bindAdapter(internalAdapter, null, true);
