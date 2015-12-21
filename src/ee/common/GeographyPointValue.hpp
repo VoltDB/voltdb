@@ -194,7 +194,7 @@ private:
 
         // check if rounded value is a whole number
         double shiftNum = pow(10, decimalPrecision);
-        double roundedNumber = ceil((number * shiftNum) - 0.49 ) / shiftNum;
+        double roundedNumber = ceil((number * shiftNum) - 0.4999999) / shiftNum;
         if (roundedNumber == floor(roundedNumber)) {
             return true;
         }
