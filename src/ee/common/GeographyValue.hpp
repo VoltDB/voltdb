@@ -352,7 +352,7 @@ inline std::string GeographyValue::toString() const {
 }
 
 inline std::string GeographyValue::toWKT() const {
-    assert(isNull());
+    assert(!isNull());
 
     Polygon poly;
     poly.initFromGeography(*this);
