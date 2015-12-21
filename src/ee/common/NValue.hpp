@@ -263,24 +263,27 @@ class NValue {
        assume out-of-band tuple storage */
     static uint16_t getTupleStorageSize(const ValueType type);
 
-       // todo: Could the isInlined argument be removed by have the
-       // caller dereference the pointer?
-
-    /* Deserialize a scalar of the specified type from the tuple
-       storage area provided. If this is an Object type then the third
-       argument indicates whether the object is stored in the tuple
-       inline */
+    /** Deserialize a scalar of the specified type from the tuple
+        storage area provided. If this is an Object type then the third
+        argument indicates whether the object is stored in the tuple
+        inline **/
     static NValue initFromTupleStorage(const void *storage, ValueType type, bool isInlined);
 
-    /* Serialize the scalar this NValue represents to the storage area
-       provided. If the scalar is an Object type then the object will
-       be copy if it can be inlined into the tuple. Otherwise a
-       pointer to the object will be copied into the storage area. Any
-       allocations needed (if this NValue refers to inlined memory
-       whereas the field in the tuple is not inlined), will be done in
-       the temp string pool. */
+    /** Serialize this NValue's value into the storage area provided.
+        This will require an object allocation in two cases.
+        In both cases, "isInlined = false" indicates that the tuple storage
+        requires an object pointer.
+        In the first case, "allocateObjects = true" indicates a persistent tuple
+        that requires its own copy of the object, regardless of whether the
+        original value is stored in a persistent object, a temporary object,
+        or the inlined storage of a tuple; a persistent copy of the object is
+        required.
+        In the second case, "m_sourceIsInlined = true" indicates that
+        there is no persistent or temp object that can be shared by the
+        temp target tuple; the object must be allocated from the temp data
+        Pool provided. **/
     void serializeToTupleStorage(void *storage, bool isInlined, int32_t maxLength, bool isInBytes,
-                                 bool allocateObjects, Pool* dataPool) const;
+                                 bool allocateObjects, Pool* tempPool) const;
 
     /* Deserialize a scalar value of the specified type from the
        SerializeInput directly into the tuple storage area
@@ -289,10 +292,10 @@ class NValue {
        heap. This is used to deserialize tables. */
     template <TupleSerializationFormat F, Endianess E>
     static void deserializeFrom(
-        SerializeInput<E> &input, Pool *dataPool, char *storage,
+        SerializeInput<E>& input, Pool* tempPool, char* storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
     static void deserializeFrom(
-        SerializeInputBE &input, Pool *dataPool, char *storage,
+        SerializeInputBE& input, Pool* tempPool, char* storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
 
         // TODO: no callers use the first form; Should combine these
@@ -301,8 +304,8 @@ class NValue {
     /* Read a ValueType from the SerializeInput stream and deserialize
        a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
-    void deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool);
-    void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(SerializeInputBE& input, Pool* tempPool);
+    void deserializeFromAllocateForStorage(ValueType vt, SerializeInputBE& input, Pool* tempPool);
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
@@ -740,7 +743,7 @@ private:
 
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool);
+    void deserializeIntoANewNValueList(SerializeInputBE& input, Pool* tempPool);
     void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
@@ -2639,7 +2642,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
  */
 inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
                                             int32_t maxLength, bool isInBytes,
-                                            bool allocateObjects, Pool* dataPool) const
+                                            bool allocateObjects, Pool* tempPool) const
 {
     const ValueType type = getValueType();
     switch (type) {
@@ -2682,7 +2685,7 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
         const StringRef* sref;
         if (allocateObjects) {
             // Need to copy a StringRef pointer.
-            sref = StringRef::create(length, buf, dataPool);
+            sref = StringRef::create(length, buf, tempPool);
         }
         else if (m_sourceInlined) {
             sref = StringRef::create(length, buf, getTempStringPool());
@@ -2711,14 +2714,14 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
  * Object types as necessary using the provided data pool or the
  * heap. This is used to deserialize tables.
  */
-inline void NValue::deserializeFrom(SerializeInputBE &input, Pool *dataPool, char *storage,
+inline void NValue::deserializeFrom(SerializeInputBE& input, Pool* tempPool, char *storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
-    deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, dataPool, storage,
+    deserializeFrom<TUPLE_SERIALIZATION_NATIVE>(input, tempPool, storage,
                                                 type, isInlined, maxLength, isInBytes);
 }
 
 template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(
-        SerializeInput<E> &input, Pool *dataPool, char *storage,
+        SerializeInput<E>& input, Pool* tempPool, char *storage,
         ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
     switch (type) {
     case VALUE_TYPE_BIGINT:
@@ -2763,7 +2766,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         }
         const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
         checkTooNarrowVarcharAndVarbinary(type, data, length, maxLength, isInBytes);
-        StringRef* sref = StringRef::create(length, data, dataPool);
+        StringRef* sref = StringRef::create(length, data, tempPool);
         *reinterpret_cast<StringRef**>(storage) = sref;
         return;
     }
@@ -2805,13 +2808,13 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
  * provided SerializeInput and perform allocations as necessary.
  * This is used to deserialize parameter sets.
  */
-inline void NValue::deserializeFromAllocateForStorage(SerializeInputBE &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(SerializeInputBE& input, Pool* tempPool)
 {
     const ValueType type = static_cast<ValueType>(input.readByte());
-    deserializeFromAllocateForStorage(type, input, dataPool);
+    deserializeFromAllocateForStorage(type, input, tempPool);
 }
 
-inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInputBE &input, Pool *dataPool)
+inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInputBE& input, Pool* tempPool)
 {
     setValueType(type);
     // Parameter array NValue elements are reused from one executor call to the next,
@@ -2864,7 +2867,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
             return;
         }
         const char *str = (const char*) input.getRawPointer(length);
-        createObjectPointer(length, str, dataPool);
+        createObjectPointer(length, str, tempPool);
         return;
     }
     case VALUE_TYPE_DECIMAL: {
@@ -2877,7 +2880,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         return;
     }
     case VALUE_TYPE_ARRAY: {
-        deserializeIntoANewNValueList(input, dataPool);
+        deserializeIntoANewNValueList(input, tempPool);
         return;
     }
     default:

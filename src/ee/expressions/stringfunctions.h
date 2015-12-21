@@ -81,7 +81,7 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
             msg);
     }
 
-    std::string spacesStr (count, ' ');
+    std::string spacesStr(count, ' ');
     return getTempStringValue(spacesStr.c_str(),count);
 }
 
@@ -177,13 +177,12 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     }
     int32_t lenTarget;
     const char* targetChars = target.getObject_withoutNull(&lenTarget);
-    std::string targetStr(targetChars, lenTarget);
 
     int32_t lenPool;
     const char* poolChars = pool.getObject_withoutNull(&lenPool);
     std::string poolStr(poolChars, lenPool);
 
-    size_t position = poolStr.find(targetStr);
+    size_t position = poolStr.find(targetChars, 0, lenTarget);
     if (position == std::string::npos)
         position = 0;
     else {
@@ -683,8 +682,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
                  throwCastSQLException(flags.getValueType(), VALUE_TYPE_VARCHAR);
             }
 
-            int32_t lenFlags = flags.getObjectLength_withoutNull();
-            const char* flagChars = reinterpret_cast<const char*>(flags.getObjectValue_withoutNull());
+            int32_t lenFlags;
+            const char* flagChars = reinterpret_cast<const char*>(flags.getObject_withoutNull(&lenFlags));
             // temporary workaround to make sure the string we are operating on is null terminated
             std::string flagStr(flagChars, lenFlags);
 
@@ -703,10 +702,12 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
         }
     }
 
-    const unsigned char* sourceChars = reinterpret_cast<const unsigned char*>(source.getObjectValue_withoutNull());
-    unsigned int lenSource = source.getObjectLength_withoutNull();
-    const unsigned char* patChars = reinterpret_cast<const unsigned char*>(pat.getObjectValue_withoutNull());
-    unsigned int lenPat = pat.getObjectLength_withoutNull();
+    int32_t lenSource;
+    const unsigned char* sourceChars = reinterpret_cast<const unsigned char*>
+        (source.getObject_withoutNull(&lenSource));
+    int32_t lenPat;
+    const unsigned char* patChars = reinterpret_cast<const unsigned char*>
+        (pat.getObject_withoutNull(&lenPat));
     // Compile the pattern.
 
     int error_code = 0;
