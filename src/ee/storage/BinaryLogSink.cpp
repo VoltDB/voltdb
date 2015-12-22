@@ -197,7 +197,7 @@ private:
 
 BinaryLogSink::BinaryLogSink() {}
 
-int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId) {
+int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId, uint8_t *version) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
@@ -211,6 +211,9 @@ int64_t BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_
         const uint8_t drVersion = taskInfo.readByte();
         if (drVersion < DRTupleStream::MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION) {
             throwFatalException("Unsupported DR version %d", drVersion);
+        }
+        if (version) {
+            *version = drVersion;
         }
         const DRRecordType type = static_cast<DRRecordType>(taskInfo.readByte());
         rowCount += rowCostForDRRecord(type);

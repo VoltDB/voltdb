@@ -1718,7 +1718,13 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    uint8_t version;
+    int64_t rowCount = m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, &version);
+    m_drStream->setDRProtocolVersion(version);
+    if (m_drReplicatedStream) {
+        m_drReplicatedStream->setDRProtocolVersion(version);
+    }
+    return rowCount;
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
@@ -1743,7 +1749,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
         ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
-        int8_t drVersion = taskInfo.readByte();
+        uint8_t drVersion = taskInfo.readByte();
         m_drStream->setDRProtocolVersion(drVersion);
         if (m_drReplicatedStream) {
             m_drReplicatedStream->setDRProtocolVersion(drVersion);

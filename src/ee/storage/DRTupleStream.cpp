@@ -155,7 +155,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
     io.writeByte(m_drVersion);
-    printf("m_drVersion=%d\n", m_drVersion);
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -555,6 +554,6 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
 
 }
 
-void DRTupleStream::setDRProtocolVersion(int8_t drVersion) {
+void DRTupleStream::setDRProtocolVersion(uint8_t drVersion) {
     m_drVersion = drVersion;
 }

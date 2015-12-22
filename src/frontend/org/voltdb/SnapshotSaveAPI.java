@@ -212,9 +212,9 @@ public class SnapshotSaveAPI
                             CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
                     SNAP_LOG.debug("Looking for local HSID: " +
                             CoreUtils.hsIdToString(context.getSiteId()));
-                    if (finalJsData != null && finalJsData.has("drversion")) {
+                    if (finalJsData != null && finalJsData.has("drVersion")) {
                         try {
-                            byte drVersion = (byte)finalJsData.getLong("drversion");
+                            byte drVersion = (byte)finalJsData.getLong("drVersion");
                             context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
                         } catch (JSONException e) {
                             SNAP_LOG.error("Failed to set DR protocol version to execution engine");
