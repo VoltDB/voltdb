@@ -382,7 +382,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
         topLines += "<td rowspan=2 align=center>Test Suite</td>"
     topLines += """
 <td colspan=5 align=center>SQL Statements</td>
-<td colspan=4 align=center>Test Failures</td>
+<td colspan=5 align=center>Test Failures</td>
 <td colspan=4 align=center>SQL Statements per Pattern</td>
 <td colspan=5 align=center>Time (min:sec)</td>
 </tr><tr>
@@ -390,10 +390,10 @@ def getTopSummaryLines(cmpdb, includeAll=True):
 <td>Invalid</td><td>Invalid %%</td>
 <td>Total</td>
 <td>Mismatched</td><td>Mismatched %%</td>
-<td>NPE's</td><td>Crashes</td>
+<td>NPE's(V)</td><td>NPE's(%s)</td><td>Crashes</td>
 <td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td>
 <td>Generating SQL</td><td>VoltDB</td><td>%s</td>
-""" % (cmpdb)
+""" % (cmpdb[:1], cmpdb)
     if includeAll:
         topLines += "<td>Comparing</td><td>Total</td>"
     topLines += "</tr>"
@@ -426,13 +426,15 @@ def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes, extra_
     misRow = cell4misCnt + cell4misPct
 
     if (voltdb_npes > 0):
-        color = "#FFA500" # orange
-        npeRow = "<td align=right bgcolor=" + color + ">" + str(voltdb_npes + cmpdb_npes) + "</td>"
-    elif (cmpdb_npes > 0):
-        color = "#FFFF00" # yellow
-        npeRow = "<td align=right bgcolor=" + color + ">" + str(voltdb_npes + cmpdb_npes) + "</td>"
+        color = "#FF0000" # red
+        voltNpeRow = "<td align=right bgcolor=" + color + ">" + str(voltdb_npes) + "</td>"
     else:
-        npeRow = "<td align=right>0</td>"
+        voltNpeRow = "<td align=right>0</td>"
+    if (cmpdb_npes > 0):
+        color = "#FFA500" # orange
+        cmpNpeRow = "<td align=right bgcolor=" + color + ">" + str(cmpdb_npes) + "</td>"
+    else:
+        cmpNpeRow = "<td align=right>0</td>"
 
     if (passed == count and passed > 0):
         passed_ps = "100.00%"
@@ -444,8 +446,8 @@ def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes, extra_
 <td align=right>%d</td>
 <td align=right%s>%s</td>
 <td align=right%s>%d</td>
-%s%s%s</tr>
-""" % (passed, passed_ps, failures, fail_color, fail_ps, count_color, count, misRow, npeRow, extra_stats)
+%s%s%s%s</tr>
+""" % (passed, passed_ps, failures, fail_color, fail_ps, count_color, count, misRow, voltNpeRow, cmpNpeRow, extra_stats)
 
     return stats
 
@@ -455,7 +457,7 @@ def generate_summary(output_dir, statistics, cmpdb='HSqlDB'):
     content = """
 <html>
 <head>
-<title>SQL Coverage Test Report</title>
+<title>SQL Coverage Test Summary</title>
 <style>
 h2 {text-transform: uppercase}
 </style>
@@ -478,17 +480,19 @@ h2 {text-transform: uppercase}
     content += "<tr><td>Totals</td>%s</tr>\n</table>" % statistics["totals"]
     content += """
 <table border=0><tr><td>Key:</td></tr>
-<tr><td align=right bgcolor=#FF0000>Red</td><td>table elements indicate a test failure(s), due to a mismatch between VoltDB and %s results, or a crash
-                                                   (or, an <i>extremely</i> slow test suite).</td></tr>
-<tr><td align=right bgcolor=#FFA500>Orange</td><td>table elements indicate a strong warning, for something that should be looked into (e.g. an NPE in VoltDB,
-                                                   a pattern that generated no SQL queries, or a <i>very</i> slow test suite), but no test failures.</td></tr>
-<tr><td align=right bgcolor=#FFFF00>Yellow</td><td>table elements indicate a mild warning, for something you might want to improve (e.g. an NPE in %s,
-                                                   a pattern that generated a very large number of SQL queries, or a somewhat slow test suite).</td></tr>
+<tr><td align=right bgcolor=#FF0000>Red</td><td>table elements indicate a test failure(s), due to a mismatch between VoltDB and %s results, a crash,
+                                                   or an NPE in VoltDB (or, an <i>extremely</i> slow test suite).</td></tr>
+<tr><td align=right bgcolor=#FFA500>Orange</td><td>table elements indicate a strong warning, for something that should be looked into (e.g. a pattern
+                                                   that generated no SQL queries, an NPE in %s, or a <i>very</i> slow test suite), but no test failures.</td></tr>
+<tr><td align=right bgcolor=#FFFF00>Yellow</td><td>table elements indicate a mild warning, for something you might want to improve (e.g. a pattern
+                                                   that generated a very large number of SQL queries, or a somewhat slow test suite).</td></tr>
 <tr><td align=right bgcolor=#D3D3D3>Gray</td><td>table elements indicate data that was not computed, due to a crash.</td></tr>
+<tr><td colspan=2>NPE's(V): number of NullPointerExceptions while running against VoltDB.</td></tr>
+<tr><td colspan=2>NPE's(%s): number of NullPointerExceptions while running against %s (likely in VoltDB's %s backend code).</td></tr>
 </table>
 </body>
 </html>
-""" % (cmpdb, cmpdb)
+""" % (cmpdb, cmpdb, cmpdb[:1], cmpdb, cmpdb)
 
     fd.write(content)
     fd.close()

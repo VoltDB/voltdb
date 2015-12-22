@@ -229,6 +229,17 @@ def test_full_config(output):
 def test_hard_requirements():
     """ Returns any errors resulting from hard config requirement violations
     """
-    return _check_thp_config()
+    output = {}
+    for k in hardRequirements:
+        hardRequirements[k](output)
+    return output
 
-
+# (Moved to end since Python does not handle forward reference.)
+# Define HardRequirements (full name : checker method)
+# and possible SkippableleRequirements(fullname:init)
+hardRequirements = {
+        'TransparentHugePage' : test_thp_config,
+        "Java" : test_java_version,
+        "OS Release" : test_os_release,
+}
+skippableRequirements = {'TransparentHugePage':'thp'}

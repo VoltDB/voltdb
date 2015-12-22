@@ -167,6 +167,7 @@
     <exclude name="**/TestCommandLogServer.class" />
     <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
     <exclude name="**/TestExportBase.class"/>
+    <exclude name="**/TestExportBaseSocketExport.class"/>
     <exclude name="org/voltdb/regressionsuites/TestIV2BlacklistSaveRestoreSysprocSuite.class" /> <!-- fails legacy -->
 
 </patternset>
@@ -736,6 +737,9 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/ProcInfo.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporter.java" />
+            <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
+            <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
@@ -1972,6 +1976,7 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
+                <exclude name="**/TestExportBaseSocketExport.class"/>
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- regressed during 3.0 bugfix? -->
             </fileset>
         </tests>

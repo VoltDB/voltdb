@@ -23,12 +23,20 @@
 
 package org.voltdb.planner;
 
+import static org.voltdb.types.ExpressionType.AGGREGATE_APPROX_COUNT_DISTINCT;
+import static org.voltdb.types.ExpressionType.AGGREGATE_AVG;
+import static org.voltdb.types.ExpressionType.AGGREGATE_COUNT;
+import static org.voltdb.types.ExpressionType.AGGREGATE_HYPERLOGLOGS_TO_CARD;
+import static org.voltdb.types.ExpressionType.AGGREGATE_MAX;
+import static org.voltdb.types.ExpressionType.AGGREGATE_MIN;
+import static org.voltdb.types.ExpressionType.AGGREGATE_SUM;
+import static org.voltdb.types.ExpressionType.AGGREGATE_VALS_TO_HYPERLOGLOG;
+
 import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.types.ExpressionType;
-import static org.voltdb.types.ExpressionType.*;
 
 /**
  * Mostly here we're concerned that an APPROX_COUNT_DISTINCT aggregate function is

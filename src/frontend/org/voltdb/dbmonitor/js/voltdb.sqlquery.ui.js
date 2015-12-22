@@ -2,9 +2,84 @@ var sqlPortForPausedDB = {
     UseAdminPort: 'UseAdminPort',
     UseNormalPort: 'UseNormalPort'
 };
-
+var INT_MAX_VALUE = 2147483647;
 $(document).ready(function () {
+    var sqlValidationRule = {
+        numericRules: {
+            min: 1,
+            max: INT_MAX_VALUE,
+            digits: true
+        },
+        numericMessages: {
+            min: "Please enter a positive number. Its minimum value should be 1.",
+            max: "Please enter a positive number between 1 and " + INT_MAX_VALUE + ".",
+            digits: "Please enter a positive number without any decimal."
+        }
+    }
 
+
+    $("#bntTimeoutSetting").popup({
+        open: function (event, ui, ele) {
+            $("#errorQueryTimeoutConfig").hide();
+            $("#txtQueryTimeoutConfig").val(SQLQueryRender.getCookie("timeoutTime") == undefined ? "" : SQLQueryRender.getCookie("timeoutTime"))
+        },
+        afterOpen: function () {
+            $("#formQueryTimeoutConfiguration").validate({
+                rules: {
+                    txtQueryTimeoutConfig: sqlValidationRule.numericRules
+                },
+                messages: {
+                    txtQueryTimeoutConfig: sqlValidationRule.numericMessages
+                }
+            });
+            var popup = $(this)[0];
+            $("#btnQueryTimeoutConfigSave").unbind("click");
+            $("#btnQueryTimeoutConfigSave").on("click", function(){
+                if (!$("#formQueryTimeoutConfiguration").valid()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                var timeoutTime = $("#txtQueryTimeoutConfig").val();
+                if(timeoutTime == ""){
+                    SQLQueryRender.removeCookie("timeoutTime")
+                }else{
+                    SQLQueryRender.SaveQueryTimeout(timeoutTime);
+                }
+                displayQueryTimeout();
+                popup.close();
+            });
+            $("#btnQueryTimeoutConfigCancel").on("click", function () {
+                popup.close();
+            });
+            $("#btnQueryTimeoutConfigClear").on("click", function(){
+                $("#txtQueryTimeoutConfig").val("");
+                $("#errorQueryTimeoutConfig").hide();
+            });
+        }
+    });
+
+    $("#timeoutCross").on("click", function(){
+        SQLQueryRender.removeCookie("timeoutTime")
+        displayQueryTimeout()
+    });
+
+    var displayQueryTimeout = function() {
+        try {
+            var timeoutTime = SQLQueryRender.getCookie("timeoutTime");
+            if(timeoutTime != undefined) {
+                $("#queryTimeoutTxt").html("Query Timeout: " + timeoutTime)
+                $("#divQueryTimeOut").show();
+            } else {
+                $("#divQueryTimeOut").hide();
+            }
+        } catch (e) {
+            $("#divQueryTimeOut").hide();
+        }
+    }
+
+
+
+    displayQueryTimeout();
     //Default Action
     $(".tab_content").hide(); //Hide all content
     $("ul.tabs li:first").addClass("active").show(); //Activate first tab
@@ -19,7 +94,6 @@ $(document).ready(function () {
         $(activeTab).fadeIn(); //Fade in the active content
         return false;
     });
-
 
     // Table Accordion	
     $('#accordionTable').accordion({
@@ -398,6 +472,17 @@ $(document).ready(function () {
 
         };
 
+        this.SaveQueryTimeout = function(timeoutTime){
+            saveCookie("timeoutTime", timeoutTime);
+        }
+
+        this.getCookie = function (name) {
+            return $.cookie(name + "_" + VoltDBConfig.GetPortId());
+        }
+
+        this.removeCookie = function (name) {
+            return $.removeCookie(name + "_" + VoltDBConfig.GetPortId());
+        }
     });
     window.SQLQueryRender = SQLQueryRender = new iSqlQueryRender();
 })(window);

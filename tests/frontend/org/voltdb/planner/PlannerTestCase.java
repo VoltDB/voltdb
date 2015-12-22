@@ -26,13 +26,13 @@ package org.voltdb.planner;
 import java.net.URL;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.PlanNodeType;
+
+import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -63,8 +63,9 @@ public class PlannerTestCase extends TestCase {
     {
         int paramCount = countQuestionMarks(sql);
         try {
-            m_aide.compile(sql, paramCount,
+            List<AbstractPlanNode> unexpected = m_aide.compile(sql, paramCount,
                     m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
+            printExplainPlan(unexpected);
             fail("Expected planner failure, but found success.");
         }
         catch (Exception ex) {

@@ -639,7 +639,7 @@ public abstract class CatalogUtil {
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
 
-            setDrInfo(catalog, deployment.getDr());
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
 
             validateResourceMonitorInfo(deployment);
         }
@@ -1396,6 +1396,10 @@ public abstract class CatalogUtil {
             }
 
             Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
+            String formatter = importConfiguration.getFormat();
+            if (formatter != null && !formatter.isEmpty()) {
+                processorProperties.put(ImportDataProcessor.IMPORT_FORMATTER, formatter);
+            }
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;
@@ -1767,13 +1771,29 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
-    private static void setDrInfo(Catalog catalog, DrType dr) {
+    private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
+        int clusterId;
+        Cluster cluster = catalog.getClusters().get("cluster");
         if (dr != null) {
-            Cluster cluster = catalog.getClusters().get("cluster");
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
-            cluster.setDrclusterid(dr.getId());
             cluster.setDrproducerport(dr.getPort());
+
+            // Backward compatibility to support cluster id in DR tag
+            if (clusterType.getId() == null && dr.getId() != null) {
+                clusterId = dr.getId();
+            } else if (clusterType.getId() != null && dr.getId() == null) {
+                clusterId = clusterType.getId();
+            } else if (clusterType.getId() == null && dr.getId() == null) {
+                clusterId = 0;
+            } else {
+                if (clusterType.getId() == dr.getId()) {
+                    clusterId = clusterType.getId();
+                } else {
+                    throw new RuntimeException("Detected two conflicting cluster ids in deployement file, setting cluster id in DR tag is "
+                            + "deprecated, please remove");
+                }
+            }
             cluster.setDrflushinterval(dr.getFlushInterval());
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
@@ -1781,7 +1801,14 @@ public abstract class CatalogUtil {
                 cluster.setDrconsumerenabled(drConnection.isEnabled());
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
+        } else {
+            if (clusterType.getId() != null) {
+                clusterId = clusterType.getId();
+            } else {
+                clusterId = 0;
+            }
         }
+        cluster.setDrclusterid(clusterId);
     }
 
     /** Read a hashed password from password.

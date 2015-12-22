@@ -172,7 +172,7 @@ public class ServerThread extends Thread {
      */
     public static String getTestLicensePath() {
         // magic license stored in the voltdb enterprise code
-        URL resource = ServerThread.class.getResource("valid_subscription.xml");
+        URL resource = ServerThread.class.getResource("valid_dr_active_subscription.xml");
 
         // in the community edition, any non-empty string
         // should work fine here, as it won't be checked

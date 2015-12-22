@@ -203,6 +203,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
             break;
+        case FUNC_PI:
+            ret = new ConstantFunctionExpression<FUNC_PI>();
+            break;
         default:
             return NULL;
         }
@@ -434,11 +437,41 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_BIT_SHIFT_RIGHT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_RIGHT>(*arguments);
             break;
+        case FUNC_VOLT_DATEADD_YEAR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_YEAR>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_QUARTER:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_QUARTER>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MONTH:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MONTH>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_DAY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_DAY>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_HOUR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_HOUR>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MINUTE:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MINUTE>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_SECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_SECOND>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MILLISECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MILLISECOND>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MICROSECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MICROSECOND>(*arguments);
+            break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
             break;
         case FUNC_VOLT_FORMAT_CURRENCY:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
+            break;
+        case FUNC_VOLT_REGEXP_POSITION:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_REGEXP_POSITION>(*arguments);
             break;
         case FUNC_VOLT_SET_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);

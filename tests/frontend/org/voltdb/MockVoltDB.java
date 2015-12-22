@@ -197,10 +197,9 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
-    public void setDRProducerClusterId(int clusterId)
+    public void setDRProducerEnabled()
     {
         getCluster().setDrproducerenabled(true);
-        getCluster().setDrclusterid(clusterId);
     }
 
     public void setDRConsumerConnectionEnabled(boolean enabled) {
@@ -622,6 +621,7 @@ public class MockVoltDB implements VoltDBInterface
                 return false;
             }
 
+            @Override
             public boolean isDrActiveActiveAllowed() {
                 // TestExecutionSite (and probably others)
                 // use MockVoltDB without requiring unique

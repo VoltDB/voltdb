@@ -244,18 +244,31 @@ static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
 static const int FUNC_VOLT_HEX                         = 20029;
 static const int FUNC_VOLT_BIN                         = 20030;
 
-static const int FUNC_VOLT_POINTFROMTEXT               = 20031;
-static const int FUNC_VOLT_POLYGONFROMTEXT             = 20032;
-static const int FUNC_VOLT_CONTAINS                    = 20033;
-static const int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS  = 20034;
-static const int FUNC_VOLT_POLYGON_NUM_POINTS          = 20035;
-static const int FUNC_VOLT_POINT_LATITUDE              = 20036;
-static const int FUNC_VOLT_POINT_LONGITUDE             = 20037;
-static const int FUNC_VOLT_POLYGON_CENTROID            = 20038;
-static const int FUNC_VOLT_POLYGON_AREA                = 20039;
-static const int FUNC_VOLT_DISTANCE                    = 20040;     // wrapper id for distance between all geo types
-static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 20041;     // distance between point and point
-static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 20042;     // distance between polygon and point
+static const int FUNC_VOLT_DATEADD                     = 20031;
+static const int FUNC_VOLT_DATEADD_YEAR                = 20032;
+static const int FUNC_VOLT_DATEADD_QUARTER             = 20033;
+static const int FUNC_VOLT_DATEADD_MONTH               = 20034;
+static const int FUNC_VOLT_DATEADD_DAY                 = 20035;
+static const int FUNC_VOLT_DATEADD_HOUR                = 20036;
+static const int FUNC_VOLT_DATEADD_MINUTE              = 20037;
+static const int FUNC_VOLT_DATEADD_SECOND              = 20038;
+static const int FUNC_VOLT_DATEADD_MILLISECOND         = 20039;
+static const int FUNC_VOLT_DATEADD_MICROSECOND         = 20040;
+static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
+
+// Geospatial functions
+static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
+static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;
+static const int FUNC_VOLT_CONTAINS                    = 21002;
+static const int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS  = 21003;
+static const int FUNC_VOLT_POLYGON_NUM_POINTS          = 21004;
+static const int FUNC_VOLT_POINT_LATITUDE              = 21005;
+static const int FUNC_VOLT_POINT_LONGITUDE             = 21006;
+static const int FUNC_VOLT_POLYGON_CENTROID            = 21007;
+static const int FUNC_VOLT_POLYGON_AREA                = 21008;
+static const int FUNC_VOLT_DISTANCE                    = 21009;     // wrapper id for distance between all geo types
+static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 21010;     // distance between point and point
+static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 21011;     // distance between polygon and point
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;

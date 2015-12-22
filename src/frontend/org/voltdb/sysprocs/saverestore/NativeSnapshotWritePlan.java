@@ -103,7 +103,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
         final Table[] tableArray;
-        if (config.tables.length == 0) {
+        if (config.tables.length == 0 && (jsData == null || !jsData.has("tables"))) {
             tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
         } else {
             tableArray = config.tables;
@@ -335,7 +335,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 instId,
                 timestamp,
                 clusterCreateTime,
-                newPartitionCount);
+                newPartitionCount,
+                context.getClusterId());
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }

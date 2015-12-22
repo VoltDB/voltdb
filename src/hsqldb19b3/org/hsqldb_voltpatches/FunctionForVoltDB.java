@@ -129,18 +129,31 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_HEX                    = 20029;
         static final int FUNC_VOLT_BIN                    = 20030;
 
-        static final int FUNC_VOLT_POINTFROMTEXT                = 20031;
-        static final int FUNC_VOLT_POLYGONFROMTEXT              = 20032;
-        static final int FUNC_VOLT_CONTAINS                     = 20033;
-        static final int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS   = 20034;
-        static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 20035;
-        static final int FUNC_VOLT_POINT_LATITUDE               = 20036;
-        static final int FUNC_VOLT_POINT_LONGITUDE              = 20037;
-        static final int FUNC_VOLT_POLYGON_CENTROID             = 20038;
-        static final int FUNC_VOLT_POLYGON_AREA                 = 20039;
-        static final int FUNC_VOLT_DISTANCE                     = 20040;    // wrapper id for distance between all geo types
-        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 20041;    // distance between point and point
-        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 20042;    // distance between polygon and point
+        static final int FUNC_VOLT_DATEADD                = 20031;
+        static final int FUNC_VOLT_DATEADD_YEAR           = 20032;
+        static final int FUNC_VOLT_DATEADD_QUARTER        = 20033;
+        static final int FUNC_VOLT_DATEADD_MONTH          = 20034;
+        static final int FUNC_VOLT_DATEADD_DAY            = 20035;
+        static final int FUNC_VOLT_DATEADD_HOUR           = 20036;
+        static final int FUNC_VOLT_DATEADD_MINUTE         = 20037;
+        static final int FUNC_VOLT_DATEADD_SECOND         = 20038;
+        static final int FUNC_VOLT_DATEADD_MILLISECOND    = 20039;
+        static final int FUNC_VOLT_DATEADD_MICROSECOND    = 20040;
+        static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
+
+        // Geospatial functions
+        static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
+        static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
+        static final int FUNC_VOLT_CONTAINS                     = 21002;
+        static final int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS   = 21003;
+        static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 21004;
+        static final int FUNC_VOLT_POINT_LATITUDE               = 21005;
+        static final int FUNC_VOLT_POINT_LONGITUDE              = 21006;
+        static final int FUNC_VOLT_POLYGON_CENTROID             = 21007;
+        static final int FUNC_VOLT_POLYGON_AREA                 = 21008;
+        static final int FUNC_VOLT_DISTANCE                     = 21009;    // wrapper id for distance between all geo types
+        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 21010;    // distance between point and point
+        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 21011;    // distance between polygon and point
 
 
         private static final FunctionId[] instances = {
@@ -238,6 +251,18 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+            new FunctionId("dateadd", Type.SQL_TIMESTAMP, FUNC_VOLT_DATEADD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT, Type.SQL_TIMESTAMP },
+                    new short[] { Tokens.OPENBRACKET, Tokens.X_KEYSET, 11, Tokens.YEAR,
+                                  Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
+                                  Tokens.MILLIS, Tokens.MILLISECOND, Tokens.MICROS, Tokens.MICROSECOND, Tokens.COMMA,
+                                  Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("regexp_position", Type.SQL_BIGINT, FUNC_VOLT_REGEXP_POSITION, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
+
             new FunctionId("pointfromtext", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
@@ -283,7 +308,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
-        };
+		};
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
 
@@ -516,7 +541,6 @@ public class FunctionForVoltDB extends FunctionSQL {
                 nodes[1] = tempNode;
             }
             break;
-
         default:
             break;
         }

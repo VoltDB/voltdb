@@ -21,6 +21,8 @@
 
 #include "boost/foreach.hpp"
 
+#include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
+
 #include <pthread.h>
 #ifdef LINUX
 #include <malloc.h>
@@ -29,6 +31,8 @@
 using namespace std;
 
 namespace voltdb {
+
+const int64_t VOLT_EPOCH = epoch_microseconds_from_components(2008);
 
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
@@ -94,8 +98,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_partitionId(partitionId),
     m_hostname(hostname),
     m_hostId(hostId),
-    m_drClusterId(drClusterId),
-    m_epoch(0) // set later
+    m_drClusterId(drClusterId)
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();

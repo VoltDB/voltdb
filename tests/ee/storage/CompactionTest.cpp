@@ -38,7 +38,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/DRTupleStream.h"
 #include "common/DefaultTupleSerializer.h"
-#include "structures/CompactingSet.h"
+#include "stx/btree_set.h"
 
 #include <vector>
 #include <string>
@@ -294,7 +294,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     ASSERT_EQ(20, m_table->m_data.size());
 #endif
 
-    CompactingSet<int32_t> pkeysNotDeleted;
+    stx::btree_set<int32_t> pkeysNotDeleted;
     std::vector<int32_t> pkeysToDelete;
     for (int ii = 0; ii < tupleCount; ii ++) {
         if (ii % 2 == 0) {
@@ -320,7 +320,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 
     m_table->doForcedCompaction();
 
-    CompactingSet<int32_t> pkeysFoundAfterDelete;
+    stx::btree_set<int32_t> pkeysFoundAfterDelete;
     TableIterator& iter = m_table->iterator();
     TableTuple tuple(m_table->schema());
     while (iter.next(tuple)) {
@@ -350,14 +350,15 @@ TEST_F(CompactionTest, BasicCompaction) {
 
     ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
     ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
+    //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
 #ifdef MEMCHECK
     ASSERT_EQ( m_table->m_data.size(), 500);
 #else
     ASSERT_EQ( m_table->m_data.size(), 13);
 #endif
 
-    for (CompactingSet<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
-        key.setNValue(0, ValueFactory::getIntegerValue(ii.key()));
+    for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
+        key.setNValue(0, ValueFactory::getIntegerValue(*ii));
         ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
         TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
@@ -382,7 +383,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     ASSERT_EQ(20, m_table->m_data.size());
 #endif
 
-    CompactingSet<int32_t> pkeysNotDeleted[3];
+    stx::btree_set<int32_t> pkeysNotDeleted[3];
     std::vector<int32_t> pkeysToDelete[3];
     for (int ii = 0; ii < tupleCount; ii ++) {
         int foo = ii % 3;
@@ -398,7 +399,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     }
     //std::cout << pkeysToDelete[0].size() << "," << pkeysToDelete[1].size() << "," << pkeysToDelete[2].size() << std::endl;
 
-    CompactingSet<int32_t> COWTuples;
+    stx::btree_set<int32_t> COWTuples;
     int totalInsertedCOWTuples = 0;
     DefaultTupleSerializer serializer;
     char config[5];
@@ -425,7 +426,8 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
                 int32_t value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-                const bool inserted = COWTuples.insert(value);
+                const bool inserted =
+                COWTuples.insert(value).second;
                 if (!inserted) {
                     printf("Failed in iteration %d, total inserted %d, with pkey %d\n", qq, totalInsertedCOWTuples, value);
                 }
@@ -463,7 +465,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         //std::cout << "Allocated tuple count after idle compactions " << m_table->allocatedTupleCount() << std::endl;
         m_table->doForcedCompaction();
 
-        CompactingSet<int32_t> pkeysFoundAfterDelete;
+        stx::btree_set<int32_t> pkeysFoundAfterDelete;
         TableIterator& iter = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iter.next(tuple)) {
@@ -490,12 +492,25 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         for (int ii = 0; ii < diff.size(); ii++) {
             printf("Key that was found after deletes, but shouldn't have been there was %d\n", diff[ii]);
         }
+
+        //        ASSERT_EQ(pkeysFoundAfterDelete.size(), pkeysNotDeleted.size());
+        //        ASSERT_TRUE(pkeysFoundAfterDelete == pkeysNotDeleted);
+        //    std::cout << "Have " << m_table->m_data.size() << " blocks left " << m_table->allocatedTupleCount() << ", " << m_table->activeTupleCount() << std::endl;
+        //        ASSERT_EQ( m_table->m_data.size(), 13);
+        //
+        //        for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
+        //            key.setNValue(0, ValueFactory::getIntegerValue(*ii));
+        //            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
+        //            TableTuple tuple = pkeyIndex->nextValueAtKey();
+        //            m_table->deleteTuple(tuple, true);
+        //        }
+
     }
     m_table->doForcedCompaction();
     ASSERT_EQ( m_table->m_data.size(), 0);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
     for (int ii = 0; ii < tupleCount; ii++) {
-        ASSERT_TRUE(COWTuples.exists(ii));
+        ASSERT_TRUE(COWTuples.find(ii) != COWTuples.end());
     }
 }
 
