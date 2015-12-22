@@ -40,9 +40,9 @@ struct DRCommittedInfo{
     int64_t seqNum;
     int64_t spUniqueId;
     int64_t mpUniqueId;
-    int8_t drVersion;
+    uint8_t drVersion;
 
-    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID, int8_t ver) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID), drVersion(ver) {}
+    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID, uint8_t ver) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID), drVersion(ver) {}
 };
 
 class DRTupleStream : public voltdb::TupleStreamBase {
@@ -116,7 +116,7 @@ public:
     }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
-    void setDRProtocolVersion(int8_t drVersion);
+    void setDRProtocolVersion(uint8_t drVersion);
 
     bool m_enabled;
 
@@ -145,7 +145,7 @@ private:
     size_t m_txnRowCount;
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
-    int8_t m_drVersion;
+    uint8_t m_drVersion;
 };
 
 class MockDRTupleStream : public DRTupleStream {
