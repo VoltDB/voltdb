@@ -17,6 +17,8 @@
 {@insertvals = "_id, _value[int:-10,10], _value[byte null30], _value[byte]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
+{@star = "*"}
+{@lhsstar = "*"}
 {@updatecolumn = "BIG"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[byte]"}

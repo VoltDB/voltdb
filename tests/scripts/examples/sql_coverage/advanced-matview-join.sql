@@ -16,6 +16,8 @@
 {@insertvals = "_id, 9, 9, 9, 9"}
 {@idcol = "V_G1"}
 {@numcol = "V_SUM_AGE"}
+{@star = "*"}
+{@lhsstar = "*"}
 
 {@dmltable = "_basetables"}
 {@fromtables = "_table"}

@@ -16,6 +16,7 @@
 -- {@idcol = "ID"}
 -- {@optionalfn = "_numfun"}
 -- {@star = "*"}
+-- {@lhsstar = "*"}
 -- {@updatecolumn = "CASH"}
 -- {@updatevalue = "_value[decimal]"}
 
