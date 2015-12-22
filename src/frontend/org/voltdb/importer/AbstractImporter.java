@@ -102,7 +102,7 @@ public abstract class AbstractImporter
     protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
-            boolean result = m_importServerAdapter.callProcedure(this, invocation.getProcedure(), invocation.getParams());
+            boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
             applyBackPressureAsNeeded();
             return result;
