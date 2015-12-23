@@ -264,24 +264,25 @@ class NValue {
     static uint16_t getTupleStorageSize(const ValueType type);
 
     /** Deserialize a scalar of the specified type from the tuple
-        storage area provided. If this is an Object type then the third
-        argument indicates whether the object is stored in the tuple
-        inline **/
+        storage area provided. If this is an Object type, the "isInlined"
+        argument indicates whether the value is stored directly inline
+        in the tupleStorage. **/
     static NValue initFromTupleStorage(const void *storage, ValueType type, bool isInlined);
 
     /** Serialize this NValue's value into the storage area provided.
         This will require an object allocation in two cases.
         In both cases, "isInlined = false" indicates that the tuple storage
-        requires an object pointer.
-        In the first case, "allocateObjects = true" indicates a persistent tuple
-        that requires its own copy of the object, regardless of whether the
-        original value is stored in a persistent object, a temporary object,
-        or the inlined storage of a tuple; a persistent copy of the object is
-        required.
+        requires an object pointer rather than an inlined value.
+        In the first case, "allocateObjects = true" indicates that the tuple
+        is persistent and so requires its OWN persistent copy of the object.
+        This can happen regardless of whether the original value is stored in
+        a persistent object, in a temporary object, or in the inlined storage
+        of a tuple.
         In the second case, "m_sourceIsInlined = true" indicates that
-        there is no persistent or temp object that can be shared by the
-        temp target tuple; the object must be allocated from the temp data
-        Pool provided. **/
+        there is no pre-existing persistent or temp object to share with
+        the temp target tuple. If "isInlined = false" indicates that the
+        temp tuple requires an object, one must be allocated from the temp
+        data Pool provided. **/
     void serializeToTupleStorage(void *storage, bool isInlined, int32_t maxLength, bool isInBytes,
                                  bool allocateObjects, Pool* tempPool) const;
 
@@ -2544,11 +2545,6 @@ inline void NValue::setNull() {
     }
 }
 
-/**
- * Initialize an NValue of the specified type from the tuple
- * storage area provided. If this is an Object type then the third
- * argument indicates whether the object is stored in the tuple inline.
- */
 inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, bool isInlined)
 {
     NValue retval(type);
@@ -2629,17 +2625,6 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     return retval;
 }
 
-/**
- * Serialize the scalar this NValue represents to the storage area
- * provided. If the scalar is an Object type and the object can not be
- * inlined into the tuple, a pointer to the object will be copied into
- * the storage area.  If allocateObjects is specifically requested,
- * the object will be newly created in the provided temp Pool to prevent
- * a dependency on a value that may have a limited lifetime.
- * If allocateObjects is NOT requested, the object will only be
- * allocated from the temporary string pool and copied if its source
- * value is inlined, so it is not in the required object pointer format.
- */
 inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
                                             int32_t maxLength, bool isInBytes,
                                             bool allocateObjects, Pool* tempPool) const

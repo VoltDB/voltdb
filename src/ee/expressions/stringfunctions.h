@@ -327,7 +327,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::
     return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
 }
 
-static inline std::string trim_function(std::string source, const std::string match,
+static inline std::string trim_function(std::string source, const std::string& match,
         bool doltrim, bool dortrim) {
     // Assuming SOURCE string and MATCH string are both valid UTF-8 strings
     size_t mlen = match.length();
@@ -365,6 +365,14 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
 
     int32_t length;
     const char* buf = trimChar.getObject_withoutNull(&length);
+    // SQL03 standard only allows a 1-character trim character.
+    // In order to be compatible with other popular databases like MySQL,
+    // our implementation also allows multiple characters, but rejects 0 characters.
+    if (length == 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "data exception -- trim error, invalid trim character length 0");
+    }
+
     std::string trimArg(buf, length);
 
     const NValue& strVal = arguments[1];
@@ -374,14 +382,6 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
 
     buf = strVal.getObject_withoutNull(&length);
     std::string inputStr(buf, length);
-
-    // SQL03 standard only allows 1 character trim character.
-    // In order to be compatible with other popular databases like MySQL,
-    // our implementation also allows multiple characters, but rejects 0 characters.
-    if (length == 0) {
-        throw SQLException( SQLException::data_exception_numeric_value_out_of_range,
-                "data exception -- trim error, invalid length argument 0");
-    }
 
     std::string result = trim_function(inputStr, trimArg, leading, trailing);
     return getTempStringValue(result.c_str(), result.length());
@@ -683,7 +683,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_REGEXP_POSITION>(const std::vect
             }
 
             int32_t lenFlags;
-            const char* flagChars = reinterpret_cast<const char*>(flags.getObject_withoutNull(&lenFlags));
+            const char* flagChars = reinterpret_cast<const char*>
+                (flags.getObject_withoutNull(&lenFlags));
             // temporary workaround to make sure the string we are operating on is null terminated
             std::string flagStr(flagChars, lenFlags);
 
