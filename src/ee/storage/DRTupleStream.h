@@ -120,7 +120,7 @@ public:
 
     bool m_enabled;
 
-    static int32_t getTestDRBuffer(char *out);
+    static int32_t getTestDRBuffer(char *out, uint8_t version);
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 

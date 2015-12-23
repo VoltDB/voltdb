@@ -502,7 +502,7 @@ void DRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
     m_committedSequenceNumber = sequenceNumber;
 }
 
-int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
+int32_t DRTupleStream::getTestDRBuffer(char *outBytes, uint8_t version) {
     DRTupleStream stream;
     stream.configure(42);
 
@@ -510,6 +510,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
                            'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
 
     // set up the schema used to fill the new buffer
+    stream.setDRProtocolVersion(version);
     std::vector<ValueType> columnTypes;
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull;

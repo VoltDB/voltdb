@@ -1010,7 +1010,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public native static long nativeGetRSS();
 
-    public native static byte[] getTestDRBuffer();
+    public native static byte[] getTestDRBuffer(byte version);
 
     /**
      * Start collecting statistics (starts timer).
