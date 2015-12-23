@@ -45,7 +45,7 @@ bid's polygon, and return the bid with the highest dollar amount.
 
 In addition to using a geospatial query to find matching bids, `GetHighestBidForLocation`
 also stores info about winning bids (and unmet ad requests) in the table
-`ad_requests`.  
+`ad_requests`.
 
 ## Periodic Reporting of Statistics
 Every five seconds, statistics for the most recent five-second period are displayed
@@ -55,8 +55,8 @@ on the console:
 - The top 5 customers ordered by the sum of the dollar amounts of the bids they won.  This is achieved using a materialized view `requests_by_second_by_advertiser` on the table `ad_requests`.
 
 ## Nibble Deletion
-As time passes, old bids will no longer be active, because their end timestamp is in the past.  Rows in the `bids` table 
-should therefore be purged to make room for new bids.  
+As time passes, old bids will no longer be active, because their end timestamp is in the past.  Rows in the `bids` table
+should therefore be purged to make room for new bids.
 
 Likewise, the oldest rows in the `ad_requests` table should be periodically aged out, once historical data has completed its useful lifetime.  We arbitrarily choose this time to be 6 seconds, to allow time for statistics to be displayed.  In a real application, this data might be written to an export table before being deleted.
 
@@ -65,6 +65,6 @@ To achieve the deletion of unneeded data, we define a class called `NibbleDelete
 https://voltdb.com/blog/aging-out-data-voltdb
 
 ## Performance
-We've rate-limited the number of transactions in this application to 10,000/s.  At any given time there are 100 active bids, so we're doing about one million CONTAINS operations per second, with each ad request being completed with sub-millisecond latency on average.  Naturally, these figures are for the hardware upon which we devloped this app, and your mileage may vary.
+We've rate-limited the number of transactions in this application to 10,000/s.  At any given time there are 100 active bids, so we're doing about one million CONTAINS operations per second, with each ad request being completed with sub-millisecond latency on average.  Naturally, these figures are for the hardware upon which we developed this app, and your mileage may vary.
 
 Currently, each ad request must scan many rows of the bids table to find matching bids.  In future versions of VoltDB, geospatial indexes will provide a many-fold increase to throughput, allowing us to handle many more active bids, and more frequent ad requests with ease.
