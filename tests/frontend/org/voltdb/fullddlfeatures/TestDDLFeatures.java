@@ -747,4 +747,15 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(verifyTableColumnType("T61", "C3", "INTEGER"));
         assertFalse(isDRedTable("T61"));
     }
+
+    @Test
+    public void testGEOIndex() throws Exception {
+        assertTrue(findTableInSystemCatalogResults("GEO"));
+        // assertTrue(findIndexInSystemCatalogResults("GEOINDEX_ISVALID"));
+        assertTrue(findIndexInSystemCatalogResults("GEOINDEX_REASONS"));
+        // GEO has three index columns.  Two for IDX
+        // and one for the primary key.
+        assertEquals(3, indexedColumnCount("GEO"));
+    }
+
 }
