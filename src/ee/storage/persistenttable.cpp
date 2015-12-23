@@ -82,6 +82,7 @@
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/DRTupleStream.h"
+#include "ExportMaterializedViewMetadata.h"
 
 namespace voltdb {
 
@@ -134,6 +135,7 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     }
 
     m_preTruncateTable = NULL;
+
     ::memcpy(&m_signature, signature, 20);
 }
 

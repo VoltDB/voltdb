@@ -316,6 +316,7 @@ CTX.INPUT['storage'] = """
  TableStreamer.cpp
  ElasticScanner.cpp
  MaterializedViewMetadata.cpp
+ ExportMaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
  StreamedTableStats.cpp

@@ -502,6 +502,23 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Return list of materialized view for table.
+     */
+    public static List<Table> getMaterializeViews(org.voltdb.catalog.Database database,
+                                                       org.voltdb.catalog.Table table)
+    {
+        ArrayList<Table> tlist = new ArrayList<Table>();
+        CatalogMap<Table> tables = database.getTables();
+        for (Table t : tables) {
+            Table matsrc = t.getMaterializer();
+            if ((matsrc != null) && (matsrc.getRelativeIndex() == table.getRelativeIndex())) {
+                tlist.add(t);
+            }
+        }
+        return tlist;
+    }
+
+    /**
      * Check if a catalog compiled with the given version of VoltDB is
      * compatible with the current version of VoltDB.
      *
@@ -2066,6 +2083,23 @@ public abstract class CatalogUtil {
             }
         }
         return tables;
+    }
+
+    /**
+     * Iterate through all the tables in the catalog, find a table with an id that matches the
+     * given table id, and return its name.
+     *
+     * @param catalog  Catalog database
+     * @param tableId  table id
+     * @return table name associated with the given table id (null if no association is found)
+     */
+    public static Table getTableObjectNameFromId(Database catalog, int tableId) {
+        for (Table table: catalog.getTables()) {
+            if (table.getRelativeIndex() == tableId) {
+                return table;
+            }
+        }
+        return null;
     }
 
     /**

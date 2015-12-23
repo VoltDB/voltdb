@@ -539,6 +539,55 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    public void testViewSourceExportOnly() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table2r_el_only");
+        project.addPartitionInfo("table2r_el_only", "column1_bigint");
+
+        try {
+            assertTrue(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table3r_el_only");
+        try {
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
+    public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
+        final VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
+        project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
+        project.addExport(true /* enabled */);
+        project.setTableAsExportOnly("table4r_el_only");
+        project.addPartitionInfo("table4r_el_only", "column1_bigint");
+
+        try {
+            assertFalse(project.compile("/tmp/exporttestview.jar"));
+        }
+        finally {
+            final File jar = new File("/tmp/exporttestview.jar");
+            jar.delete();
+        }
+    }
+
     // test that a view is not export only
     public void testViewNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();

@@ -34,6 +34,7 @@
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
+#include "storage/ExportMaterializedViewMetadata.h"
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
@@ -521,6 +522,56 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
     }
 }
 
+void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
+                  StreamedTable *existingTable, StreamedTable *newTable,
+                  std::map<std::string, CatalogDelegate*> const &delegatesByName)
+{
+//    std::cout << "Migrating export views\n";
+//    std::cout.flush();
+
+    std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+    std::vector<ExportMaterializedViewMetadata*> survivingViews;
+    std::vector<ExportMaterializedViewMetadata*> obsoleteViews;
+
+    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
+    existingTable->segregateMaterializedViews(views.begin(), views.end(),
+                                              survivingInfos, survivingViews,
+                                              obsoleteViews);
+
+    // This process temporarily duplicates the materialized view definitions and their
+    // target table reference counts for all the right materialized view tables,
+    // leaving the others to go away with the existingTable.
+    // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
+    // there needs to be a way to handle cases where the target table HAS been redefined already and
+    // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
+    // At this point, the materialized view makes a best effort to use the
+    // current/latest version of the table -- particularly, because it will have made off with the
+    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+    // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
+    // an obsolete target table needs to be brought forward to reference the replacement table.
+    // See initMaterializedViews
+
+    for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+        // Use the now-current definiton of the target table, to be updated later, if needed.
+        TableCatalogDelegate* targetDelegate =
+            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                delegatesByName));
+        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        if (targetDelegate) {
+            PersistentTable* newTargetTable =
+                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
+            if (newTargetTable) {
+                targetTable = newTargetTable;
+            }
+        }
+        // This is not a leak -- the materialized view metadata is self-installing into the new table.
+        // Also, it guards its targetTable from accidental deletion with a refcount bump.
+        new ExportMaterializedViewMetadata(newTable, targetTable, currInfo);
+    }
+}
+
 
 void
 TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
@@ -545,6 +596,11 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     migrateChangedTuples(catalogTable, existingTable, newTable);
 
     migrateViews(catalogTable.views(), existingTable, newTable, delegatesByName);
+    StreamedTable *streamedTable = dynamic_cast<StreamedTable*>(m_table);
+    if (streamedTable) {
+        StreamedTable *newSTable = dynamic_cast<StreamedTable*>(newTable);
+        migrateExportViews(catalogTable.views(), streamedTable, newSTable, delegatesByName);
+    }
 
     ///////////////////////////////////////////////
     // Drop the old table
