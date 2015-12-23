@@ -90,14 +90,14 @@ def _check_segmentation_offload():
 def test_os_release(output):
     if platform.system() == "Linux":
         output['OS'] = ["PASS", "Linux"]
-        distInfo = platform.linux_distribution()
-        distName = distInfo[0].replace(' ', '').lower()
+        distInfo = platform.dist()
         supported = False
-        if "centos" == distName or "redhat" == distName or "rhel" == distName:
-            if float(distInfo[1]) >= 6.3:
+        if distInfo[0] in ("centos", "redhat", "rhel"):
+            releaseNum = ".".join(distInfo[1].split(".")[0:2]) # release goes to 3 parts in Centos/Redhat 7.x(.y)
+            if releaseNum >= "6.3":
                 supported = True
-        elif "ubuntu" == distName:
-            if '10.04' == distInfo[1] or '12.04' == distInfo[1] or '14.04' == distInfo[1]:
+        elif "ubuntu" in distInfo[0].lower():
+            if distInfo[1] in ("10.04", "12.04", "14.04"):
                 supported = True
         formatString = "{0} release {1} {2}"
         if not supported:
