@@ -521,7 +521,15 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
         }
         for (int ii = 1; ii < nodes.length; ii++) {
-            sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+            if (nodes[ii] != null) {
+                sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+            }
+            else {
+                // regexp_position has an optional third parameter.
+                // No other VoltDB functions have optional params.
+                assert (ii == 2);
+                assert (m_def.getId() == FunctionId.FUNC_VOLT_REGEXP_POSITION);
+            }
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();
