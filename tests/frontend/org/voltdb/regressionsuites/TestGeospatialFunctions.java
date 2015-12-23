@@ -448,7 +448,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         catch (ProcCallException excp) {
             exception = excp;
             assertTrue(exception.getMessage().contains("incompatible data type in operation"));
-            assertTrue(exception.getMessage().contains("Distance between two polygons not supported"));
+            assertTrue(exception.getMessage().contains("DISTANCE between two POLYGONS not supported"));
         } finally {
             assertNotNull(exception);
         }
@@ -468,6 +468,95 @@ public class TestGeospatialFunctions extends RegressionSuite {
         } finally {
             assertNotNull(exception);
         }
+    }
+
+    public void testPointAsText() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        // test for border case of rounding up the deciaml number
+        client.callProcedure("places.Insert", 50, "Someplace1",
+                GeographyPointValue.geographyPointFromText("POINT(13.4999999999995 17)"));
+        // test for border case of rounding up the deciaml number
+        client.callProcedure("places.Insert", 51, "Someplace2",
+                GeographyPointValue.geographyPointFromText("POINT(-13.499999999999999995 -17)"));
+
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select loc, asText(loc) from places order by pk").getResults()[0];
+
+        while (vt.advanceRow()) {
+            GeographyPointValue gpv = vt.getPoint(0);
+            if (gpv == null) {
+                assertEquals(null, vt.getString(1));
+            }
+            else {
+                assertEquals(gpv.toString(), vt.getString(1));
+            }
+        }
+    }
+
+    public void testPolygonAsText() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+        // polygon whose co-ordinates are mix of decimal and whole numbers
+        Borders someWhere = new Borders(50, "someWhere",
+                new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
+                                             "-14.1234567891264 10.1234567891234, " +
+                                             "-14.0 4.1234567891235, " +
+                                             "-12.0 4.4555555555555555550, " +
+                                             "-11.0 4.4999999999996, " +
+                                             "-10.1234567891234 10.1234567891234))"));
+        VoltTable vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+        // polygon with hole whose co-ordinates are whole numbers
+        someWhere = new Borders(51, "someWhereWithHoles",
+                new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
+                                            "(-8 9, -9 9, -9 8, -8 8, -8 9)," +
+                                            "(9 9, 9 8, 8 8, 9 8, 9 9))"));
+        vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+
+        // polygon with hole whose co-ordinates are whole numbers
+        someWhere = new Borders(52, "someWhereWithHoles",
+                new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
+                                            "(9 9, 9 8, 8 8, 9 8, 9 9)," +
+                                            "(-8 9, -9 9, -9 8, -8 8, -8 9))"));
+        vt = client.callProcedure("BORDERS.Insert",
+                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        vt = client.callProcedure("@AdHoc",
+                "select region, asText(region) from borders order by pk").getResults()[0];
+
+        GeographyValue gv;
+        while (vt.advanceRow()) {
+            gv = vt.getGeographyValue(0);
+            if (gv == null) {
+                assertEquals(null, vt.getString(1));
+            }
+            else {
+                assertEquals(gv.toString(), vt.getString(1));
+            }
+        }
+
+    }
+
+    public void testPointPlygonAsTextNegative() throws Exception {
+        Client client = getClient();
+        populateTables(client);
+
+        verifyStmtFails(client, "select asText(?) from places order by pk",
+                "data type cast needed for parameter or null literal: "
+                        + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(null) from places order by pk",
+                "data type cast needed for parameter or null literal: "
+                        + "input type to ASTEXT function is ambiguous");
+        verifyStmtFails(client, "select asText(pk) from borders order by pk",
+                "incompatible data type in operation: "
+                        + "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types");
     }
 
     static public junit.framework.Test suite() {

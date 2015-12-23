@@ -150,7 +150,59 @@ public:
         return oss.str();
     }
 
+    std::string formatLngLat() const {
+        std::ostringstream oss;
+        oss << toString(m_longitude) << " " << toString(m_latitude);
+        return oss.str();
+    }
+
+    // returns wkt representation for given point: "POINT (<Longitude> <Latitude>)"
+    std::string toWKT() const {
+        std::ostringstream oss;
+        oss <<"POINT (" << formatLngLat() << ")";
+        return oss.str();
+    }
+
 private:
+    // converts double value to string with specified precision displaying
+    // only significant decimal value.
+    // Output pattern is similar to "...##0.0##..."
+    std::string toString(double number) const {
+        char buffer[32];
+        const int8_t decimalPrecision = 12;
+
+        bool wholeNumber = isWholeNumberWithRounding(number);
+        if (wholeNumber) {
+            snprintf(buffer, sizeof(buffer), "%3.1f", number);
+        }
+        else {
+            int wholeNumberDigits = log10(abs(number)) + 1;
+            snprintf(buffer, sizeof(buffer), "%.*g", (wholeNumberDigits + decimalPrecision), number);
+        }
+        return buffer;
+    }
+
+    // function checks if the given number is whole number taking into account
+    // rounding to 12 decimal digit precision
+    bool isWholeNumberWithRounding(double number) const {
+        const int8_t decimalPrecision = 12;
+
+        // check if it's whole number
+        if (number == floor(number)) {
+            return true;
+        }
+
+        // check if rounded value is a whole number
+        double shiftNum = pow(10, decimalPrecision);
+        double roundedNumber = ceil((number * shiftNum) - 0.4999999) / shiftNum;
+        if (roundedNumber == floor(roundedNumber)) {
+            return true;
+        }
+
+        // decimal number
+        return false;
+    }
+
     Coord m_latitude;
     Coord m_longitude;
 };

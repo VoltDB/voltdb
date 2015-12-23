@@ -38,14 +38,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
         super(name);
     }
 
-    private final String BERMUDA_TRIANGLE_WKT = "POLYGON("
+    private final String BERMUDA_TRIANGLE_WKT = "POLYGON ("
             + "(-64.751 32.305, "
             + "-80.437 25.244, "
             + "-66.371 18.476, "
             + "-64.751 32.305))";
 
     // The Bermuda Triangle with a square hole inside
-    private final String BERMUDA_TRIANGLE_HOLE_WKT = "POLYGON("
+    private final String BERMUDA_TRIANGLE_HOLE_WKT = "POLYGON ("
             + "(-64.751 32.305, "
             + "-80.437 25.244, "
             + "-66.371 18.476, "
@@ -58,7 +58,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     // (Useful for testing comparisons since it has the same number of vertices as
     // the Bermuda Triangle)
-    private final String BILLERICA_TRIANGLE_WKT = "POLYGON("
+    private final String BILLERICA_TRIANGLE_WKT = "POLYGON ("
             + "(-71.276 42.571, "
             + "-71.308 42.547, "
             + "-71.231 42.533, "
@@ -66,7 +66,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     // The dreaded "Lowell Square".  One loop,
     // five vertices (last is the same as the first)
-    private final String LOWELL_SQUARE_WKT = "POLYGON("
+    private final String LOWELL_SQUARE_WKT = "POLYGON ("
             + "(-71.338 42.641, "
             + "-71.340 42.619, "
             + "-71.313 42.617, "
@@ -195,8 +195,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
             assertTrue(vt.advanceRow());
             assertEquals(0, vt.getLong(0));
             assertEquals("Bermuda Triangle", vt.getString(1));
-            String btString = vt.getGeographyValue(2).toString();
-            String testString = BERMUDA_TRIANGLE_WKT;
+            vt.getGeographyValue(2).toString();
             assertEquals(BERMUDA_TRIANGLE_WKT, vt.getGeographyValue(2).toString());
             assertFalse(vt.advanceRow());
 
@@ -513,7 +512,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
-        String expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
+        String expected = "POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))";
 
         // Just a simple round trip with reasonable WKT.
         assertEquals(expected, wktRoundTrip(client, expected));
@@ -534,7 +533,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 "    POLYGON  (  (  -64.751  32.305  ,  -80.437  25.244  ,  -66.371  18.476  ,  -64.751  32.305  )  )  "));
 
         // Parsing with more than one loop should work the same.
-        expected = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
+        expected = "POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "
                 + "(-67.448 27.026, -68.992 27.026, -68.992 25.968, -67.448 25.968, -67.448 27.026))";
 
         assertEquals(expected, wktRoundTrip(client,

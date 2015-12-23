@@ -154,7 +154,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DISTANCE                     = 21009;    // wrapper id for distance between all geo types
         static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 21010;    // distance between point and point
         static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 21011;    // distance between polygon and point
-
+        static final int FUNC_VOLT_ASTEXT                       = 21012;    // wrapper for asText function for all geo types
+        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT       = 21013;    // point to text
+        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY             = 21014;    // polygon to text
 
         private static final FunctionId[] instances = {
 
@@ -308,7 +310,11 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
-		};
+
+            new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
+                    new Type[] { Type.SQL_ALL_TYPES },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET })
+        };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
 
@@ -515,22 +521,24 @@ public class FunctionForVoltDB extends FunctionSQL {
             // validate the types of argument is valid
             if ((nodes[0].dataType == null && nodes[0].isParam) ||
                 (nodes[1].dataType == null && nodes[1].isParam)) {
-                // todo: throw exception indicating the type is ambigous
-                throw Error.error(ErrorCode.X_42561);
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to DISTANCE function is ambiguous");
             }
             else if (nodes[0].dataType == null || nodes[1].dataType == null) {
-                // todo: throw exception indicating the type invalid type
-                throw Error.error(ErrorCode.X_42561);
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to DISTANCE function is ambiguous");
             }
             else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isGeographyPointType()) ||
                      (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isGeographyPointType())) {
                 // either of the nodes is not a valid type
                 throw Error.error(ErrorCode.X_42565,
-                        "The distance function is only able to compute point-to-point, point-to-polygon " +
-                        "and polygon-to-point distances.");
+                        "The DISTANCE function computes distances between POINT-to-POINT, POINT-to-POLYGON " +
+                        "and POLYGON-to-POINT only.");
             } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
                 // distance between two polygons is not supported, flag as an error
-                throw Error.error(ErrorCode.X_42565, "Distance between two polygons not supported");
+                throw Error.error(ErrorCode.X_42565, "DISTANCE between two POLYGONS not supported");
             } else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
                 // distance between polygon-to-point and point-to-polygon is symmetric.
                 // So, update the the expression for distance between point and polygon to
@@ -541,6 +549,21 @@ public class FunctionForVoltDB extends FunctionSQL {
                 nodes[1] = tempNode;
             }
             break;
+
+        case FunctionId.FUNC_VOLT_ASTEXT:
+            if (nodes[0].dataType == null) {
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to ASTEXT function is ambiguous");
+            }
+
+            if (! (nodes[0].dataType.isGeographyPointType() || nodes[0].dataType.isGeographyType())) {
+                // "incompatible data type in operation"
+                throw Error.error(ErrorCode.X_42565,
+                        "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types.");
+            }
+            break;
+
         default:
             break;
         }

@@ -33,6 +33,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const;
 template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const;
 template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector<NValue>& arguments);
 template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vector<NValue>& arguments);
+template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const;
+template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const;
 }
 
 #endif

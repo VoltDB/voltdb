@@ -107,7 +107,7 @@ public class GeographyValue {
     @Override
     public String toString() {
         StringBuffer sb = new StringBuffer();
-        sb.append("POLYGON(");
+        sb.append("POLYGON (");
 
         boolean isFirstLoop = true;
         for (List<XYZPoint> loop : m_loops) {

@@ -168,6 +168,9 @@ public:
      * Produce a human-readable summary of this geography
      */
     std::string toString() const;
+    // returns wkt representation for given polygon:
+    // "POLYGON ((<Longitude> <Latitude>, <Longitude> <Latitude> .. <Longitude> <Latitude>)[,(..), (..),..(..)])"
+    std::string toWKT() const;
 
 private:
     char* m_data;
@@ -344,6 +347,41 @@ inline std::string GeographyValue::toString() const {
                 << " (depth=" << poly.loop(i)->depth() << ")";
         }
     }
+
+    return oss.str();
+}
+
+inline std::string GeographyValue::toWKT() const {
+    assert(!isNull());
+
+    Polygon poly;
+    poly.initFromGeography(*this);
+    int numLoops = poly.num_loops();
+    assert (numLoops > 0);
+    GeographyPointValue point;
+
+    std::ostringstream oss;
+    oss << "POLYGON (";
+    // capture all the loops
+    for (int i = 0; i < numLoops; ++i) {
+        const S2Loop *loop = poly.loop(i);
+        const int numVertices = loop->num_vertices();
+        assert(numVertices >= 3); // each loop will be composed of at least 3 vertices. This does not include repeated end vertex
+        oss << "(";
+        for (int j = 0; j < numVertices; ++j) {
+            point = GeographyPointValue(loop->vertex(j));
+            oss << point.formatLngLat() << ", ";
+        }
+
+        // repeat the first vertex to close the loop
+        point = GeographyPointValue(loop->vertex(0));
+        oss << point.formatLngLat() << ")";
+        // last loop?
+        if (i < numLoops -1) {
+            oss << ", " ;
+        }
+    }
+    oss << ")";
 
     return oss.str();
 }
