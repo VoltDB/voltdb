@@ -75,7 +75,33 @@ public class VoltDecimalHelper {
         BigInteger.TEN.pow(9),
         BigInteger.TEN.pow(10),
         BigInteger.TEN.pow(11),
-        BigInteger.TEN.pow(12)
+        BigInteger.TEN.pow(12),
+        BigInteger.TEN.pow(13),
+        BigInteger.TEN.pow(14),
+        BigInteger.TEN.pow(15),
+        BigInteger.TEN.pow(16),
+        BigInteger.TEN.pow(17),
+        BigInteger.TEN.pow(18),
+        BigInteger.TEN.pow(19),
+        BigInteger.TEN.pow(20),
+        BigInteger.TEN.pow(21),
+        BigInteger.TEN.pow(22),
+        BigInteger.TEN.pow(23),
+        BigInteger.TEN.pow(24),
+        BigInteger.TEN.pow(25),
+        BigInteger.TEN.pow(26),
+        BigInteger.TEN.pow(27),
+        BigInteger.TEN.pow(28),
+        BigInteger.TEN.pow(29),
+        BigInteger.TEN.pow(30),
+        BigInteger.TEN.pow(31),
+        BigInteger.TEN.pow(32),
+        BigInteger.TEN.pow(33),
+        BigInteger.TEN.pow(34),
+        BigInteger.TEN.pow(35),
+        BigInteger.TEN.pow(36),
+        BigInteger.TEN.pow(37),
+        BigInteger.TEN.pow(38)
     };
 
     private final static String m_roundingEnabledProperty = "BIGDECIMAL_ROUND";
@@ -114,34 +140,6 @@ public class VoltDecimalHelper {
         = new RoundingConfiguration(Boolean.valueOf(System.getProperty(m_roundingEnabledProperty, m_defaultRoundingEnablement)),
                                     RoundingMode.valueOf(System.getProperty(m_roundingModeProperty, m_defaultRoundingMode)));
 
-
-    static public byte[] getUnscaledBytes(BigDecimal bd) throws IOException {
-        if (bd == null) {
-            return Arrays.copyOf(NULL_INDICATOR, NULL_INDICATOR.length);
-        }
-        if (bd.scale() > kDefaultScale) {
-            bd = roundToScale(bd, kDefaultScale, getRoundingMode());
-        }
-        int scale = bd.scale();
-        int precision = bd.precision();
-        final int precisionMinusScale = precision - scale;
-        if ( precisionMinusScale > 26 ) {
-            throw new IOException("Precision of " + bd + " to the left of the decimal point is " +
-                    precisionMinusScale + " and the max is 26");
-        }
-        final int scaleFactor = kDefaultScale - bd.scale();
-        BigInteger unscaledBI = bd.unscaledValue().multiply(scaleFactors[scaleFactor]);
-        boolean isNegative = false;
-        if (unscaledBI.signum() < 0) {
-            isNegative = true;
-        }
-        final byte unscaledValue[] = unscaledBI.toByteArray();
-        if (unscaledValue.length > 16) {
-            throw new IOException("Precision of " + bd + " is >38 digits");
-        }
-        return expandToLength16(unscaledValue, isNegative);
-    }
-
     /**
      * Serialize the null decimal sigil to a the provided {@link java.nio.ByteBuffer ByteBuffer}
      * @param buf <code>ByteBuffer</code> to serialize the decimal into
@@ -162,11 +160,12 @@ public class VoltDecimalHelper {
             return scaledValue;
         }
         byte replacement[] = new byte[16];
-        if (isNegative){
-            java.util.Arrays.fill( replacement, (byte)-1);
+        if (isNegative) {
+            Arrays.fill(replacement, (byte)-1);
         }
-        for (int ii = 15; 15 - ii < scaledValue.length; ii--) {
-            replacement[ii] = scaledValue[ii - (replacement.length - scaledValue.length)];
+        int shift = (16 - scaledValue.length);
+        for (int ii = 0; ii < scaledValue.length; ++ii) {
+            replacement[ii+shift] = scaledValue[ii];
         }
         return replacement;
     }
@@ -225,31 +224,33 @@ public class VoltDecimalHelper {
      */
     static public void serializeBigDecimal(BigDecimal bd, ByteBuffer buf)
     {
-          if (bd == null) {
-              serializeNull(buf);
-              return;
-          }
-          if (bd.scale() > 12) {
-              bd = roundToScale(bd, kDefaultScale, getRoundingMode());
-          }
-          int scale = bd.scale();
-          int precision = bd.precision();
-          final int precisionMinusScale = precision - scale;
-          if ( precisionMinusScale > 26) {
-              throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
-                      precisionMinusScale + " and the max is 26");
-          }
-          final int scaleFactor = kDefaultScale - bd.scale();
-          BigInteger unscaledBI = bd.unscaledValue().multiply(scaleFactors[scaleFactor]);
-          boolean isNegative = false;
-          if (unscaledBI.signum() < 0) {
-              isNegative = true;
-          }
-          final byte unscaledValue[] = unscaledBI.toByteArray();
-          if (unscaledValue.length > 16) {
-              throw new RuntimeException("Precision of " + bd + " is >38 digits");
-          }
-          buf.put(expandToLength16(unscaledValue, isNegative));
+        if (bd == null) {
+            serializeNull(buf);
+            return;
+        }
+        int decimalScale = bd.scale();
+        if (decimalScale > kDefaultScale) {
+            bd = roundToScale(bd, kDefaultScale, getRoundingMode());
+            decimalScale = bd.scale();
+        }
+        int overallPrecision = bd.precision();
+        final int wholeNumberPrecision = overallPrecision - decimalScale;
+        if (wholeNumberPrecision > 26) {
+            throw new RuntimeException("Precision of " + bd + " to the left of the decimal point is " +
+                                  wholeNumberPrecision + " and the max is 26");
+        }
+        final int scalingFactor = kDefaultScale - decimalScale;
+        BigInteger scalableBI = bd.unscaledValue();
+        //* enable to debug */ System.out.println("DEBUG BigDecimal: " + bd);
+        //* enable to debug */ System.out.println("DEBUG unscaled: " + scalableBI);
+        scalableBI = scalableBI.multiply(scaleFactors[scalingFactor]);
+        //* enable to debug */ System.out.println("DEBUG scaled to picos: " + scalableBI);
+        final byte wholePicos[] = scalableBI.toByteArray();
+        if (wholePicos.length > 16) {
+            throw new RuntimeException("Precision of " + bd + " is > 38 digits");
+        }
+        boolean isNegative = (scalableBI.signum() < 0);
+        buf.put(expandToLength16(wholePicos, isNegative));
     }
 
     /**
@@ -301,7 +302,6 @@ public class VoltDecimalHelper {
     }
 
     public static BigDecimal setDefaultScale(BigDecimal bd) {
-        // TODO Auto-generated method stub
         return bd.setScale(kDefaultScale, getRoundingMode());
     }
 }
