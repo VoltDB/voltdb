@@ -40,8 +40,9 @@ struct DRCommittedInfo{
     int64_t seqNum;
     int64_t spUniqueId;
     int64_t mpUniqueId;
+    uint8_t drVersion;
 
-    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
+    DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID, uint8_t ver) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID), drVersion(ver) {}
 };
 
 class DRTupleStream : public voltdb::TupleStreamBase {
@@ -52,7 +53,7 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t DR_VERSION = 3;
+    static const uint8_t MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION = 3;
 
     DRTupleStream();
 
@@ -111,13 +112,15 @@ public:
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
-        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
+        return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId, m_drVersion);
     }
     void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
+    void setDRProtocolVersion(uint8_t drVersion);
+
     bool m_enabled;
 
-    static int32_t getTestDRBuffer(char *out);
+    static int32_t getTestDRBuffer(char *out, uint8_t version);
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
 
@@ -142,6 +145,7 @@ private:
     size_t m_txnRowCount;
     int64_t m_lastCommittedSpUniqueId;
     int64_t m_lastCommittedMpUniqueId;
+    uint8_t m_drVersion;
 };
 
 class MockDRTupleStream : public DRTupleStream {

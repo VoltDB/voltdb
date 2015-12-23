@@ -21,15 +21,17 @@ public class TupleStreamStateInfo {
     public final DRLogSegmentId partitionInfo;
     public final boolean containsReplicatedStreamInfo;
     public final DRLogSegmentId replicatedInfo;
+    public final byte drVersion;
 
-    public TupleStreamStateInfo(DRLogSegmentId partitionInfo) {
-        this(partitionInfo, new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE));
+    public TupleStreamStateInfo(DRLogSegmentId partitionInfo, byte drVersion) {
+        this(partitionInfo, new DRLogSegmentId(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE), drVersion);
     }
 
     public TupleStreamStateInfo(DRLogSegmentId partitionInfo,
-            DRLogSegmentId replicatedInfo) {
+            DRLogSegmentId replicatedInfo, byte drVersion) {
         this.partitionInfo = partitionInfo;
         this.replicatedInfo = replicatedInfo;
         this.containsReplicatedStreamInfo = (this.replicatedInfo.drId > Long.MIN_VALUE);
+        this.drVersion = drVersion;
     }
 }

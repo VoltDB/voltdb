@@ -1682,7 +1682,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
 }
 
 void VoltDBEngine::collectDRTupleStreamStateInfo() {
-    std::size_t size = 3 * sizeof(int64_t) + 1;
+    std::size_t size = 3 * sizeof(int64_t) + 1 + 1;
     if (m_drReplicatedStream) {
         size += 3 * sizeof(int64_t);
     }
@@ -1691,6 +1691,7 @@ void VoltDBEngine::collectDRTupleStreamStateInfo() {
     m_resultOutput.writeLong(drInfo.seqNum);
     m_resultOutput.writeLong(drInfo.spUniqueId);
     m_resultOutput.writeLong(drInfo.mpUniqueId);
+    m_resultOutput.writeByte(drInfo.drVersion);
     if (m_drReplicatedStream) {
         m_resultOutput.writeByte(static_cast<int8_t>(1));
         drInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueIds();
@@ -1717,7 +1718,13 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    uint8_t version;
+    int64_t rowCount = m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, &version);
+    m_drStream->setDRProtocolVersion(version);
+    if (m_drReplicatedStream) {
+        m_drReplicatedStream->setDRProtocolVersion(version);
+    }
+    return rowCount;
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
@@ -1737,6 +1744,15 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         }
         if (m_drReplicatedStream && mpSequenceNumber >= 0) {
             m_drReplicatedStream->setLastCommittedSequenceNumber(mpSequenceNumber);
+        }
+        break;
+    }
+    case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
+        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+        uint8_t drVersion = taskInfo.readByte();
+        m_drStream->setDRProtocolVersion(drVersion);
+        if (m_drReplicatedStream) {
+            m_drReplicatedStream->setDRProtocolVersion(drVersion);
         }
         break;
     }

@@ -203,4 +203,5 @@ public interface SiteProcedureConnection {
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
+    public void setDRProtocolVersion(byte drVersion);
 }
