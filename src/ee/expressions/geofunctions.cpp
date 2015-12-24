@@ -33,8 +33,8 @@ namespace voltdb {
 static const int POINT = FUNC_VOLT_POINTFROMTEXT;
 static const int POLY = FUNC_VOLT_POLYGONFROMTEXT;
 
-static const double EARTH_AREA_SQ_M = 510.072E12;
-static const double EARTH_RADIUS_METERS = 6371000;
+static const double SPHERICAL_EARTH_MEAN_RADIUS_M = 6371008.8; // mean radius in meteres
+static const double RADIUS_SQ_M = SPHERICAL_EARTH_MEAN_RADIUS_M * SPHERICAL_EARTH_MEAN_RADIUS_M;
 
 typedef boost::tokenizer<boost::char_separator<char> > Tokenizer;
 
@@ -362,9 +362,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
 
     NValue retVal(VALUE_TYPE_DOUBLE);
     // area is in steradians which is a solid angle. Earth in the calculation is treated as sphere
-    // and a complete sphere subtends 4π steradians (https://en.wikipedia.org/wiki/Steradian).
-    // Taking area of earth as 510.072*10^12 sq meters,area for the given steradians can be calculated as:
-    retVal.getDouble() = polygon.GetArea() * EARTH_AREA_SQ_M / (4 * M_PI);
+    // and area of sphere can be calculated as steradians * radius^2
+    retVal.getDouble() = polygon.GetArea() * RADIUS_SQ_M;
     return retVal;
 }
 
@@ -381,7 +380,7 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vect
     GeographyPointValue point = arguments[1].getPoint();
     NValue retVal(VALUE_TYPE_DOUBLE);
     // distance is in radians, so convert it to meters
-    retVal.getDouble() = polygon.getDistance(point) * EARTH_RADIUS_METERS;
+    retVal.getDouble() = polygon.getDistance(point) * SPHERICAL_EARTH_MEAN_RADIUS_M;
     return retVal;
 }
 
@@ -402,7 +401,7 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
     S1Angle distance = latLng1.GetDistance(latLng2);
     NValue retVal(VALUE_TYPE_DOUBLE);
     // distance is in radians, so convert it to meters
-    retVal.getDouble() = distance.radians() * EARTH_RADIUS_METERS;
+    retVal.getDouble() = distance.radians() * SPHERICAL_EARTH_MEAN_RADIUS_M;
     return retVal;
 }
 

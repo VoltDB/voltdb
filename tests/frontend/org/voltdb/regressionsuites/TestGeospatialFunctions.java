@@ -348,14 +348,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
         String sql = "select borders.name, Area(borders.region) "
                         + "from borders order by borders.pk";
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.out.println(vt.toString());
         // in the calculation below, areas of states are close to actual area of the state (vertices
         // used for polygon are close approximations, not exact, values of the state vertices).
         // Area for Colorado - 269601 sq km and Wyoming 253350 sq km
         assertApproximateContentOfTable(new Object[][]
-                {{ "Colorado",      2.6886542912139893E11},
-                 { "Wyoming",       2.5126863189309894E11},
+                {{ "Colorado",      2.6886220370448795E11},
+                 { "Wyoming",       2.512656175743851E11},
                  { "Colorado with a hole around Denver",
-                                    2.5206603914764166E11},
+                                    2.5206301526291238E11},
                  { "Wonderland",    Double.MIN_VALUE},
                 }, vt, AREA_EPSILON);
         // Test the centroids.  For centroid, the value in table is based on the answer provide by S2 for the given polygons
@@ -394,10 +395,16 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
+        client.callProcedure("places.Insert", 50, "San Jose",
+                GeographyPointValue.geographyPointFromText("POINT(-121.903692 37.325464)"));
+        client.callProcedure("places.Insert", 51, "Boston",
+                GeographyPointValue.geographyPointFromText("POINT(-71.069862 42.338100)"));
+
         VoltTable vt;
+        String sql;
 
         // distance of all points with respect to a specific polygon
-        String sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
+        sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
                 + "from borders, places where borders.pk = 1"
                 + "order by distance, places.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -408,15 +415,17 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Wyoming",    "Point on E Wyoming Border",            0.0},
                  {"Wyoming",    "Point On S Wyoming Border",            0.0},
                  {"Wyoming",    "Point On W Wyoming Border",            0.0},
-                 {"Wyoming",    "East Point Not On Wyoming Border",     1.9770281362922971E-10},
-                 {"Wyoming",    "West Point Not on Wyoming Border",     495.8113972117496},
-                 {"Wyoming",    "Point near N Colorado border",         2382.0692767400983},
-                 {"Wyoming",    "North Point Not On Colorado Border",   4045.111373096421},
-                 {"Wyoming",    "North Point Not On Wyoming Border",    12768.336788711755},
-                 {"Wyoming",    "Fort Collins",                         48820.44699386174},
-                 {"Wyoming",    "Denver",                               146450.36252816164},
-                 {"Wyoming",    "South Point Not On Colorado Border",   453545.4800250064},
-                 {"Wyoming",    "Albuquerque",                          659769.4012428687},
+                 {"Wyoming",    "East Point Not On Wyoming Border",     1.9770308670798656E-10},
+                 {"Wyoming",    "West Point Not on Wyoming Border",     495.81208205561956},
+                 {"Wyoming",    "Point near N Colorado border",         2382.072566994318},
+                 {"Wyoming",    "North Point Not On Colorado Border",   4045.11696044222},
+                 {"Wyoming",    "North Point Not On Wyoming Border",    12768.354425089678},
+                 {"Wyoming",    "Fort Collins",                         48820.514427535185},
+                 {"Wyoming",    "Denver",                               146450.5648140179},
+                 {"Wyoming",    "South Point Not On Colorado Border",   453546.1064887051},
+                 {"Wyoming",    "Albuquerque",                          659770.3125551793},
+                 {"Wyoming",    "San Jose",                             1020359.8369329285},
+                 {"Wyoming",    "Boston",                               2651698.17837178}
                 }, vt, DISTANCE_EPSILON);
 
         // Validate result set obtained using distance between point and polygon is same as
@@ -438,19 +447,26 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where contains(borders.region, places.loc) "
                 + "order by distance";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        //System.out.println(vt.toString());
         assertApproximateContentOfTable(new Object[][]
-                {{"Colorado",   "Denver",                               90126.31686125314},
-                 {"Colorado",   "Fort Collins",                         177132.44115469826},
-                 {"Colorado with a hole around Denver", "Fort Collins", 182956.3035588355},
-                 {"Colorado",   "Point near N Colorado border",         223103.69736948845},
+                {{"Colorado",   "Denver",                               90126.44134902404},
+                 {"Colorado",   "Fort Collins",                         177132.68582044652},
+                 {"Colorado with a hole around Denver", "Fort Collins", 182956.55626884513},
+                 {"Colorado",   "Point near N Colorado border",         223104.00553344024},
                  {"Colorado with a hole around Denver", "Point near N Colorado border",
-                                                                        228833.50418470264},
-                 {"Wyoming",    "Point On W Wyoming Border",            280063.8833833934},
-                 {"Wyoming",    "Point on E Wyoming Border",            282621.71798313083},
-                 {"Wyoming",    "Point on N Wyoming Border",            295383.69047235645},
-                 {"Wyoming",    "Cheyenne",                             308378.4910583776},
-                 {"Wyoming",    "Point On S Wyoming Border",            355573.95574694296}
+                                                                        228833.82026300067},
+                 {"Wyoming",    "Point On W Wyoming Border",            280064.27022410504},
+                 {"Wyoming",    "Point on E Wyoming Border",            282622.1083568741},
+                 {"Wyoming",    "Point on N Wyoming Border",            295384.0984736869},
+                 {"Wyoming",    "Cheyenne",                             308378.91700889106},
+                 {"Wyoming",    "Point On S Wyoming Border",            355574.4468866087}
                 }, vt, DISTANCE_EPSILON);
+
+        sql = "select distance(A.loc, B.loc) as distance "
+                + "from places A, places B where A.name = 'Boston' and B.name = 'San Jose' "
+                + "order by distance;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertApproximateContentOfTable(new Object[][] {{4311575.515808559}}, vt, DISTANCE_EPSILON);
 
         // distance between polygon and polygon - currently not supported and should generate
         // exception saying incompatible data type supplied
