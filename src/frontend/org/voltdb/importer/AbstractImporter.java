@@ -145,6 +145,15 @@ public abstract class AbstractImporter
         }
     }
 
+    /**
+     * Called to stop the importer from processing more data.
+     */
+    public void stopImporter()
+    {
+        m_stopping = true;
+        stop();
+    }
+
     private void reportStat(boolean result, String procName) {
         if (result) {
             m_importServerAdapter.reportQueued(getName(), procName);
