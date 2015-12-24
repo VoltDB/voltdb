@@ -18,14 +18,14 @@ INSERT INTO _table VALUES (202, pointFromText('POINT(-71.0 42.0)'),   null,     
 INSERT INTO _table VALUES (203, pointFromText('POINT(0.005 0.005)'),  null,                                 polygonFromText('POLYGON((0 0, 0.01 0, 0.01 0.01, 0 0.01, 0 0))') )
 INSERT INTO _table VALUES (204, pointFromText('POINT(  0.0  0.0 )'),  pointFromText('POINT(-71.06 42.36)'), polygonFromText('POLYGON((-1 -1, 1 -1, 1    1,   -1 1,  -1 -1))') )
 INSERT INTO _table VALUES (205, pointFromText('POINT( -4.0  2.5 )'),  pointFromText('POINT( -2.5   2.5 )'), polygonFromText('POLYGON((-3  2,-2  2,-2    3,   -3 3,  -3  2))') )
--- A simple ("square") polygon with a ("square", asymmetric) hole:
-INSERT INTO _table VALUES (206, pointFromText('POINT( -0.5 -0.5 )'),  pointFromText('POINT( -0.05 -0.1 )'), polygonFromText('POLYGON((-2 -2, 2 -2, 2 2, -2 2, -2 -2),(-1 -1, 0 -1, 0 0, -1 0, -1 -1))') )
--- A simple ("square") polygon with 2 ("square", asymmetric) holes:
-INSERT INTO _table VALUES (207, pointFromText('POINT(-0.05 -0.1 )'),  pointFromText('POINT( -0.5  -0.5 )'), polygonFromText('POLYGON((-2 -2, 2 -2, 2 2, -2 2, -2 -2),(-1 -1, 0 -1, 0 0, -1 0, -1 -1),(0 0, 0.3 0, 0.3 0.3, 0 0.3, 0 0))') )
--- A star-shaped polygon (approximately):
-INSERT INTO _table VALUES (208, pointFromText('POINT(-0.099 -0.044)'),pointFromText('POINT(-71.06 42.36)'), polygonFromText('POLYGON((-1.0 0.0, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.0 -1.0, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 1.0 0.0, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.0 1.0, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , -1.0 0.0))') )
--- A star-shaped polygon (approximately) with an (approximately) star-shaped (symmetric, half-sized) hole:
-INSERT INTO _table VALUES (209, pointFromText('POINT(  0.0  0.0 )'),  pointFromText('POINT(-71.06 42.36)'), polygonFromText('POLYGON((-1.0 0.0, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.0 -1.0, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 1.0 0.0, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.0 1.0, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , -1.0 0.0),(-0.5 0.0, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.0 -0.5, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.5 0.0, 0.045 0.02, 0.35 0.35, 0.02 0.045, 0.0 0.5, -0.045 0.02, -0.35 0.35, -0.02 0.045, -0.5 0.0))') )
+-- A simple ("square-ish") polygon, with a ("square", asymmetric) hole (polygon is slightly un-square, to reduce round-off errors):
+INSERT INTO _table VALUES (206, pointFromText('POINT( -0.5 -0.5 )'),  pointFromText('POINT( -0.05 -0.1 )'), polygonFromText('POLYGON((-2 -2, 2 -2, 2.02 2, -2 2, -2 -2),(-1 -1, 0 -1, 0 0, -1 0, -1 -1))') )
+-- A simple ("square-ish") polygon, with 2 ("square", asymmetric) holes (polygon is slightly un-square, to reduce round-off errors):
+INSERT INTO _table VALUES (207, pointFromText('POINT(-0.05 -0.1 )'),  pointFromText('POINT( -0.5  -0.5 )'), polygonFromText('POLYGON((-2 -2, 2 -2, 2.02 2, -2 2, -2 -2),(-1 -1, 0 -1, 0 0, -1 0, -1 -1),(0 0, 0.3 0, 0.3 0.3, 0 0.3, 0 0))') )
+-- A star-shaped polygon (approximately), with 8 points (16 vertices):
+INSERT INTO _table VALUES (208, pointFromText('POINT(-0.099 -0.044)'),pointFromText('POINT(-71.06 42.36)'), polygonFromText('POLYGON((-1.0 0.0, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.0 -1.0, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 1.02 0.0, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.0 1.0, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , -1.0 0.0))') )
+-- An 8-point (approximately) star-shaped polygon, with an (approximately) star-shaped (symmetric, half-sized) hole:
+INSERT INTO _table VALUES (209, pointFromText('POINT(  0.0  0.0 )'),  pointFromText('POINT(-71.06 42.36)'), polygonFromText('POLYGON((-1.0 0.0, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.0 -1.0, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 1.02 0.0, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.0 1.0, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , -1.0 0.0),(-0.5 0.0, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.0 -0.5, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.5 0.0, 0.045 0.02, 0.35 0.35, 0.02 0.045, 0.0 0.5, -0.045 0.02, -0.35 0.35, -0.02 0.045, -0.5 0.0))') )
 
 -- Test points and the asText, LONGITUDE & LATITUDE functions
 SELECT @star from _table G01
