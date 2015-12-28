@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="exportbenchmark"
+APPNAME="exportview"
 COUNT=10000
 
 # find voltdb binaries in either installation or distribution directory.
@@ -40,7 +40,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/exportview.jar"
 }
 
 # Grab the necessary command line arguments
@@ -130,12 +130,12 @@ function run_benchmark_help() {
 }
 
 function run_benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    # srccompile
+    echo java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
         --servers=localhost \
-	--statsfile=exportbench.csv
+        --statsfile=exportbench.csv
 }
 
 function help() {

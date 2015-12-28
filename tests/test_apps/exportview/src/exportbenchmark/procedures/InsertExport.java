@@ -26,16 +26,11 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo(
-        partitionInfo = "ALL_VALUES.rowid:0",
-        singlePartition = true
-    )
-
 public class InsertExport extends VoltProcedure {
-    public final SQLStmt export = new SQLStmt("INSERT INTO ALL_VALUES (VALUES (?, ?)");
-    public final SQLStmt shadow = new SQLStmt("INSERT INTO ALL_VALUES (VALUES (?, ?)");
+    public final SQLStmt export = new SQLStmt("INSERT INTO EXP VALUES (?, ?)");
+    public final SQLStmt shadow = new SQLStmt("INSERT INTO SHADOW VALUES (?, ?)");
 
-    public void run(long cid, long value)
+    public long run(long cid, long value)
     {
         voltQueueSQL(export, cid, value);
         voltQueueSQL(shadow, cid, value);
@@ -44,6 +39,6 @@ public class InsertExport extends VoltProcedure {
         voltExecuteSQL(true);
 
         // Return to caller
-        return;
+        return 0;
     }
 }

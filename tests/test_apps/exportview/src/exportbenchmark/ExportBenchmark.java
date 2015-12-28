@@ -147,14 +147,14 @@ public class ExportBenchmark {
         String csvfile = "";
 
         @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka)")
-        String target = "socket";
+        String target = "file";
 
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (!target.equals("socket") && !target.equals("kafka")) {
+            if (!target.equals("socket") && !target.equals("kafka") && !target.equals("file")) {
                 exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\"");
             }
         }
@@ -344,18 +344,27 @@ public class ExportBenchmark {
         System.out.println("Warming up...");
         long now = System.currentTimeMillis();
         AtomicLong rowId = new AtomicLong(0);
-        Random rand = null;
+        Random rand = new Random();
+        System.out.println("benchmarkWarmupEndTS: " + benchmarkWarmupEndTS + ", now: " + now);
         while (benchmarkWarmupEndTS > now) {
             try {
+                long randval = rand.nextInt(10);
+                long tval = System.currentTimeMillis();
+                //System.out.println("InsertExport: " + randval + ", " + tval);
                 client.callProcedure(
                         new NullCallback(),
                         "InsertExport",
-                        rand.nextInt(10), System.currentTimeMillis());
+                        randval, tval);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
+                    //System.out.println("InsertExport: " + randval + ", " + tval);
                     now = System.currentTimeMillis();
                 }
-            } catch (Exception ignore) {}
+            } catch (Exception ex) {
+            	System.out.println("Exception in doInserts" + ex.toString());
+            	ex.printStackTrace();
+            	System.exit(-1);
+            }
         }
         System.out.println("Warmup complete");
         rowId.set(0);
@@ -770,6 +779,7 @@ public class ExportBenchmark {
     public static void main(String[] args) {
         ExportBenchConfig config = new ExportBenchConfig();
         config.parse(ExportBenchmark.class.getName(), args);
+        System.out.println(config.getConfigDumpString());
 
         try {
             ExportBenchmark bench = new ExportBenchmark(config);

@@ -1,4 +1,6 @@
-load classes obj/ExportBenchmark.jar;
+load classes exportview.jar;
+
+file -inlinebatch END_OF_BATCH
 
 CREATE TABLE EXP (
  cid                     BIGINT        NOT NULL
@@ -45,3 +47,6 @@ FROM SHADOW group by cid;
 
 
 CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport;
+
+END_OF_BATCH
+
