@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- IMPORTANT: This file is an auto-generated default deployment configuration.
+                Changes to this file will be overwritten. Copy it elsewhere if you
+                want to use it as a starting point for a custom configuration. -->
+<deployment>
+   <cluster hostcount="1" />
+   <export enabled="true" target="file">
+     <configuration>
+       <property name="type">csv</property>
+       <property name="nonce">MyExport</property>
+       <property name="skipinternals">true</property>
+     </configuration>
+   </export>
+   <httpd enabled="true">
+      <jsonapi enabled="true" />
+   </httpd>
+</deployment>
