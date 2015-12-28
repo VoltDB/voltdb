@@ -525,10 +525,11 @@ public class FunctionForVoltDB extends FunctionSQL {
                 sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
             }
             else {
-                // regexp_position has an optional third parameter.
-                // No other VoltDB functions have optional params.
-                assert (ii == 2);
-                assert (m_def.getId() == FunctionId.FUNC_VOLT_REGEXP_POSITION);
+                // Some functions, like regexp_position, have optional parameters.
+                // The omitted optional parameters appear as a null in the function's
+                // node list.  This null-preserving behavior seems to be intentional in
+                // ParserSQL.readExpression, for reasons that are unclear to me.
+                //   --cwolff, December 2015.
             }
         }
         sb.append(Tokens.T_CLOSEBRACKET);
