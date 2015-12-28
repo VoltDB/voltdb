@@ -540,7 +540,16 @@ public class plannerTester {
                 }
 
                 if (m_reportDiffExplainedPlan) {
-                    m_reportWriter.write("\nExplained plan:\n" + pn1.toExplainPlanString() + "\n==>\n" + pn2.toExplainPlanString() + "\n");
+                    m_reportWriter.write("\nExplained plan:");
+                    String pn1Plan = pn1.toExplainPlanString();
+                    String pn2Plan = pn2.toExplainPlanString();
+                    if (pn1Plan.compareTo(pn2Plan) == 0) {
+                        m_reportWriter.write("  [contents of explained plans are identical]\n"
+                                + pn1Plan + "\n");
+                    }
+                    else {
+                        m_reportWriter.write("\n" + pn1.toExplainPlanString() + "\n==>\n" + pn2.toExplainPlanString() + "\n");
+                    }
                 }
 
                 m_reportWriter.write("Path to the config file :" + config + "\n" +
