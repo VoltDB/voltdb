@@ -2418,9 +2418,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         try {
             cr = client.callProcedure(trimProc, "", "", "", 1);
             fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("data exception"));
-            assertTrue(ex.getMessage().contains("trim error"));
+        }
+        catch (Exception ex) {
+            String exceptionMsg = ex.getMessage();
+            assertTrue(exceptionMsg.contains("data exception"));
+            assertTrue(exceptionMsg.contains("trim error"));
         }
 
         // Test TRIM with other character
@@ -3380,6 +3382,33 @@ public class TestFunctionsSuite extends RegressionSuite {
         client.callProcedure("NUMBER_TYPES.insert", pk, 1, 1, bignum, 1.0, 1.0);
         vt = client.callProcedure("BITWISE_AND_OR_XOR", null, null, null, pk).getResults()[0];
         validateRowOfLongs(vt, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE});
+    }
+
+    public void testPi() throws Exception {
+        System.out.println("STARTING testPi");
+
+        Client client = getClient();
+        /*
+         *      "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+         */
+        ClientResponse cr = null;
+        VoltTable vt = null;
+        double pi = 3.1415926535897932384;
+
+        cr = client.callProcedure("@AdHoc","INSERT INTO P1 (ID) VALUES(1)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = client.callProcedure("@AdHoc", "SELECT PI() * ID FROM P1 WHERE ID = 1;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertTrue(Math.abs(vt.getDouble(0) - pi) <= 1.0e-16);
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE P1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     //

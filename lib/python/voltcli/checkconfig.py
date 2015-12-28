@@ -29,10 +29,6 @@ import platform
 import subprocess
 import sys
 import os.path
-# Define HardRequirements (full name)
-# and possible SkippableleRequirements(fullname:init)
-hardRequirements = ['TransparentHugePage']
-skippableRequirements = {'TransparentHugePage':'thp'}
 
 # Helper functions
 
@@ -234,8 +230,16 @@ def test_hard_requirements():
     """ Returns any errors resulting from hard config requirement violations
     """
     output = {}
-    test_full_config(output)
-    return dict([(k,v) for k,v in output.items() if k in hardRequirements])
-    # return _check_thp_config()
+    for k in hardRequirements:
+        hardRequirements[k](output)
+    return output
 
-
+# (Moved to end since Python does not handle forward reference.)
+# Define HardRequirements (full name : checker method)
+# and possible SkippableleRequirements(fullname:init)
+hardRequirements = {
+        'TransparentHugePage' : test_thp_config,
+        "Java" : test_java_version,
+        "OS Release" : test_os_release,
+}
+skippableRequirements = {'TransparentHugePage':'thp'}

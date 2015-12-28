@@ -69,6 +69,7 @@ else:
     java = utility.find_in_path('java')
 if not java:
     utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
+java_version = utility.get_java_version()
 java_opts = []
 
 #If this is a large memory system commit the full heap
@@ -120,7 +121,10 @@ java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
 java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 java_opts.append('-XX:+CMSScavengeBeforeRemark')
 java_opts.append('-XX:+CMSClassUnloadingEnabled')
-java_opts.append('-XX:PermSize=64m')
+
+# skip PermSize in Java 8
+if "1.8" not in java_version:
+    java_opts.append('-XX:PermSize=64m')
 
 def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     """
