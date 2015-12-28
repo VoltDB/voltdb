@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.InternalConnectionContext;
+import org.voltdb.client.ProcedureCallback;
 
 
 /**
@@ -87,6 +88,18 @@ public abstract class AbstractImporter
      * @return returns true if the procedure execution went through successfully; false otherwise
      */
     protected final boolean callProcedure(Invocation invocation)
+    {
+        return callProcedure(invocation, null);
+    }
+
+    /**
+     * This should be used importer implementations to execute a stored procedure.
+     *
+     * @param invocation Invocation object with procedure name and parameter information
+     * @param callback the callback that will receive procedure invocation status
+     * @return returns true if the procedure execution went through successfully; false otherwise
+     */
+    protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
             boolean result = m_importServerAdapter.callProcedure(this, invocation.getProcedure(), invocation.getParams());
@@ -179,9 +192,9 @@ public abstract class AbstractImporter
      * @param message
      * @param t
      */
-    protected void debug(String message, Throwable t)
+    protected void debug(Throwable t, String msgFormat, Object... args)
     {
-        m_logger.debug(message, t);
+        m_logger.debug(String.format(msgFormat, args), t);
     }
 
     /**
@@ -190,9 +203,9 @@ public abstract class AbstractImporter
      * @param message
      * @param t
      */
-    protected void error(String message, Throwable t)
+    protected void error(Throwable t, String msgFormat, Object... args)
     {
-        m_logger.error(message, t);
+        m_logger.error(String.format(msgFormat, args), t);
     }
 
     /**
@@ -201,9 +214,9 @@ public abstract class AbstractImporter
      * @param message
      * @param t
      */
-    protected void info(String message, Throwable t)
+    protected void info(Throwable t, String msgFormat, Object... args)
     {
-        m_logger.info(message, t);
+        m_logger.info(String.format(msgFormat, args), t);
     }
 
     /**
@@ -212,9 +225,9 @@ public abstract class AbstractImporter
      * @param message
      * @param t
      */
-    protected void trace(String message, Throwable t)
+    protected void trace(Throwable t, String msgFormat, Object... args)
     {
-        m_logger.trace(message, t);
+        m_logger.trace(String.format(msgFormat, args), t);
     }
 
     /**
@@ -223,9 +236,9 @@ public abstract class AbstractImporter
      * @param message
      * @param t
      */
-    protected void warn(String message, Throwable t)
+    protected void warn(Throwable t, String msgFormat, Object... args)
     {
-        m_logger.warn(message, t);
+        m_logger.warn(String.format(msgFormat, args), t);
     }
 
     /**
