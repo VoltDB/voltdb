@@ -45,6 +45,9 @@
 
 #ifndef HSTORETABLE_H
 #define HSTORETABLE_H
+#ifndef BTREE_DEBUG
+#define BTREE_DEBUG
+#endif
 #include <string>
 #include <vector>
 #include <set>
@@ -438,4 +441,4 @@ protected:
 };
 
 }
-#endif // HSTORETABLE_H
+#endif

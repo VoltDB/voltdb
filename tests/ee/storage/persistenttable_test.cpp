@@ -33,25 +33,14 @@
 #include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 
 
-using voltdb::ExecutorContext;
-using voltdb::NValue;
-using voltdb::PersistentTable;
-using voltdb::Table;
-using voltdb::TableFactory;
-using voltdb::TableIterator;
-using voltdb::TableTuple;
-using voltdb::TupleSchemaBuilder;
-using voltdb::VALUE_TYPE_BIGINT;
-using voltdb::VALUE_TYPE_VARCHAR;
-using voltdb::ValueFactory;
-using voltdb::VoltDBEngine;
-
+using namespace voltdb;
 
 class PersistentTableTest : public Test {
 public:
@@ -187,6 +176,9 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     voltdb::StandAloneTupleStorage storage(schema);
     TableTuple &srcTuple = const_cast<TableTuple&>(storage.tuple());
 
+    // Keep a checksum of tuple keys to ensure that later iterations find
+    // all the tuples, even if found in a nondeterministic order.
+    int64_t checksum = 0;
     NValue bigintNValues[] = {
         ValueFactory::getBigIntValue(1900),
         ValueFactory::getBigIntValue(1901),
@@ -202,6 +194,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     // Let's do some inserts into the table.
     beginWork();
     for (int i = 0; i < 3; ++i) {
+        checksum += ValuePeeker::peekBigInt(bigintNValues[i]);
         srcTuple.setNValue(0, bigintNValues[i]);
         srcTuple.setNValue(1, stringNValues[i]);
         table->insertTuple(srcTuple);
@@ -215,70 +208,106 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     NValue drTimestampValueOrig = ValueFactory::getBigIntValue(drTimestampOrig);
 
     TableTuple tuple(schema);
-    TableIterator iterator = table->iteratorDeletingAsWeGo();
-    int i = 0;
+    TableIterator iterator = table->iterator();
     const int timestampColIndex = table->getDRTimestampColumnIndex();
+    int64_t sum = 0;
     while (iterator.next(tuple)) {
         // DR timestamp is set for each row.
+        if (tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig)) {
+            std::cout << "DEBUG mismatched timestamps, expected ("
+                      << tuple.getHiddenNValue(timestampColIndex).debug()
+                      << ") got (" << drTimestampValueOrig.debug() << ");"
+                      << std::endl;
+        }
         EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
 
-        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
-
-        ++i;
+        // Can't assume that iteration returns values in insert order, so check for any match
+        // and sum the matched bigint values and hope that the sum accounts for one match
+        // per original key value.
+        for (int ii = 0; ii < 3; ++ii) {
+            if (0 == tuple.getNValue(0).compare(bigintNValues[ii])) {
+                sum += ValuePeeker::peekBigInt(bigintNValues[ii]);
+                if (tuple.getNValue(1).compare(stringNValues[ii])) {
+                    std::cout << "DEBUG mismatched strings expected (" << tuple.getNValue(1).debug() << ") got (" << stringNValues[ii].debug() << ");" << std::endl;
+                }
+                EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[ii]));
+                break;
+            }
+        }
     }
+
+    EXPECT_EQ(checksum, sum);
 
     // Now let's update the middle tuple with a new value, and make
     // sure the DR timestamp changes.
     beginWork();
 
     NValue newStringData = ValueFactory::getTempStringValue("Nunavut Sannginivut");
-    iterator = table->iteratorDeletingAsWeGo();
-    ASSERT_TRUE(iterator.next(tuple));
-    ASSERT_TRUE(iterator.next(tuple));
-    srcTuple = table->getTempTupleInlined(tuple);
-    srcTuple.setNValue(1, newStringData);
+    iterator = table->iterator();
+    int tupleToAlter = 1;
+    sum = 0;
+    while (iterator.next(tuple)) {
+        sum += ValuePeeker::peekBigInt(tuple.getNValue(0));
+        if (0 == tuple.getNValue(0).compare(bigintNValues[tupleToAlter])) {
+            srcTuple = table->getTempTupleInlined(tuple);
+            srcTuple.setNValue(1, newStringData);
+            table->updateTupleWithSpecificIndexes(tuple,
+                                                  srcTuple,
+                                                  table->allIndexes(),
+                                                  true);
+            break;
+        }
+    }
 
-    table->updateTupleWithSpecificIndexes(tuple,
-                                          srcTuple,
-                                          table->allIndexes(),
-                                          true);
+    EXPECT_EQ(checksum, sum);
 
     // verify the updated tuple has the new timestamp.
     int64_t drTimestampNew = ExecutorContext::getExecutorContext()->currentDRTimestamp();
     ASSERT_NE(drTimestampNew, drTimestampOrig);
 
     NValue drTimestampValueNew = ValueFactory::getBigIntValue(drTimestampNew);
-    iterator = table->iteratorDeletingAsWeGo();
-    i = 0;
+    iterator = table->iterator();
+    sum = 0;
     while (iterator.next(tuple)) {
-        if (i == 1) {
+        sum += ValuePeeker::peekBigInt(tuple.getNValue(0));
+        if (0 == tuple.getNValue(0).compare(bigintNValues[tupleToAlter])) {
             EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueNew));
-            EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
             EXPECT_EQ(0, tuple.getNValue(1).compare(newStringData));
         }
         else {
             EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-            EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-            EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
         }
-
-        ++i;
     }
+
+    EXPECT_EQ(checksum, sum);
 
     // After rolling back, we should have all our original values,
     // including the DR timestamp.
     rollback();
 
-    i = 0;
-    iterator = table->iteratorDeletingAsWeGo();
+    sum = 0;
+    iterator = table->iterator();
     while (iterator.next(tuple)) {
-        EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
-        EXPECT_EQ(0, tuple.getNValue(0).compare(bigintNValues[i]));
-        EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[i]));
 
-        ++i;
+        EXPECT_EQ(0, tuple.getHiddenNValue(timestampColIndex).compare(drTimestampValueOrig));
+
+        // Can't assume that iteration returns values in insert order, so check for any match
+        // and sum the matched bigint values and hope that the sum accounts for one match
+        // per original key value.
+        for (int ii = 0; ii < 3; ++ii) {
+            if (0 == tuple.getNValue(0).compare(bigintNValues[ii])) {
+                sum += ValuePeeker::peekBigInt(bigintNValues[ii]);
+                if (tuple.getNValue(1).compare(stringNValues[ii])) {
+                    std::cout << "DEBUG mismatched strings expected (" << tuple.getNValue(1).debug() << ") got (" << stringNValues[ii].debug() << ");" << std::endl;
+                }
+                EXPECT_EQ(0, tuple.getNValue(1).compare(stringNValues[ii]));
+                break;
+            }
+        }
     }
+
+    EXPECT_EQ(checksum, sum);
+
 }
 
 int main() {
