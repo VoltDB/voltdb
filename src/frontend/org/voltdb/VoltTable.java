@@ -1326,104 +1326,115 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public String toFormattedString() {
 
         final int MAX_PRINTABLE_CHARS = 30;
-        final String ELIPSIS = "...";
+        final String ELLIPSIS = "...";
+        final String DECIMAL_FORMAT = "%01.12f";
 
         StringBuffer sb = new StringBuffer();
 
-        int columnCount = this.getColumnCount();
+        int columnCount = getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
         for (int i = 0; i < columnCount; i++) {
-            padding[i] = this.getColumnName(i).length(); // min value to be increased later
+            padding[i] = getColumnName(i).length(); // min value to be increased later
         }
-        this.resetRowPosition();
+        resetRowPosition();
 
-        // Compute the padding needed for each column of the table (note must
+        // Compute the padding needed for each column of the table (note: must
         // visit every row)
-        while (this.advanceRow()) {
+        while (advanceRow()) {
             for (int i = 0; i < columnCount; i++) {
-                Object v = this.get(i, this.getColumnType(i));
-                if (this.wasNull()) {
-                    v = "NULL";
+                VoltType colType = getColumnType(i);
+                Object value = get(i, colType);
+                int width;
+                if (wasNull()) {
+                    width = 4;
                 }
-                int len = 0; // length
-                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
-                    len = ((byte[]) v).length * 2;
-                } else {
-                    len = v.toString().length();
+                else if (colType == VoltType.DECIMAL) {
+                    BigDecimal bd = (BigDecimal) value;
+                    String valueStr = String.format(DECIMAL_FORMAT, bd.doubleValue());
+                    width = valueStr.length();
                 }
                 // crop long strings and such
-                if (len > MAX_PRINTABLE_CHARS) {
-                    len = MAX_PRINTABLE_CHARS;
+                else {
+                    if (colType == VoltType.VARBINARY) {
+                        width = ((byte[]) value).length * 2;
+                    }
+                    else {
+                        width = value.toString().length();
+                    }
+                    if (width > MAX_PRINTABLE_CHARS) {
+                        width = MAX_PRINTABLE_CHARS;
+                    }
                 }
 
-                // compute the max for each column
-                if (len > padding[i]) {
-                    padding[i] = len;
+                // Adjust the max width for each column
+                if (width > padding[i]) {
+                    padding[i] = width;
                 }
             }
         }
 
-        // Determine the formatting string for each column
+        String pad = ""; // no pad before first column header.
         for (int i = 0; i < columnCount; i++) {
-            padding[i] += 1;
-            fmt[i] = "%1$"
-                    + ((this.getColumnType(i) == VoltType.STRING
-                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
-                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                    + padding[i] + "s";
-        }
+            // Determine the formatting string for each column
+            VoltType colType = getColumnType(i);
+            String justification = (colType == VoltType.STRING ||
+                    colType == VoltType.TIMESTAMP ||
+                    colType == VoltType.VARBINARY) ? "-" : "";
+            fmt[i] = "%1$" + justification + padding[i] + "s";
 
-        // Create the column headers
-        for (int i = 0; i < columnCount; i++) {
-            sb.append(String.format("%1$-" + padding[i] + "s",
-                    this.getColumnName(i)));
-            if (i < columnCount - 1) {
-                sb.append(" ");
-            }
+            // Serialize the column headers
+            sb.append(pad).append(String.format("%1$-" + padding[i] + "s",
+                    getColumnName(i)));
+            pad = " ";
         }
         sb.append("\n");
 
-        // Create the separator between the column headers and the rows of data
+        // Serialize the separator between the column headers and the rows of data
+        pad = "";
         for (int i = 0; i < columnCount; i++) {
             char[] underline_array = new char[padding[i]];
             Arrays.fill(underline_array, '-');
-            sb.append(new String(underline_array));
-            if (i < columnCount - 1) {
-                sb.append(" ");
-            }
+            sb.append(pad).append(new String(underline_array));
+            pad = " ";
         }
         sb.append("\n");
 
-        // Now display each row of data.
-        this.resetRowPosition();
-        while (this.advanceRow()) {
+        // Serialize each formatted row of data.
+        resetRowPosition();
+        while (advanceRow()) {
+            pad = "";
             for (int i = 0; i < columnCount; i++) {
-                Object value = this.get(i, this.getColumnType(i));
+                VoltType colType = getColumnType(i);
+                Object value = get(i, colType);
                 String valueStr;
-                if (this.wasNull()) {
+                if (wasNull()) {
                     valueStr = "NULL";
                 }
-                else if (this.getColumnType(i) == VoltType.VARBINARY) {
-                    valueStr = Encoder.hexEncode((byte[]) value);
+                else if (colType == VoltType.DECIMAL) {
+                    BigDecimal bd = (BigDecimal) value;
+                    valueStr = String.format(DECIMAL_FORMAT, bd.doubleValue());
                 }
                 else {
-                    valueStr = value.toString();
+                    if (colType == VoltType.VARBINARY) {
+                        valueStr = Encoder.hexEncode((byte[]) value);
+                    }
+                    else {
+                        valueStr = value.toString();
+                    }
+                    // crop long strings and such
+                    if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                        valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
+                    }
                 }
-                // truncate long values
-                if ((this.getColumnType(i) == VoltType.VARBINARY) && (valueStr.length() > MAX_PRINTABLE_CHARS)) {
-                    valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELIPSIS.length()) + ELIPSIS;
-                }
-                sb.append(String.format(fmt[i], valueStr));
-                if (i < columnCount - 1) {
-                    sb.append(" ");
-                }
+                sb.append(pad).append(String.format(fmt[i], valueStr));
+                pad = " ";
             }
             sb.append("\n");
         }
 
         // Idempotent. Reset the row position for the next guy...
-        this.resetRowPosition();
+        resetRowPosition();
 
         return sb.toString();
     }

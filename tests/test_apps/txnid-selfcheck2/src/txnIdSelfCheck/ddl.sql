@@ -1,3 +1,9 @@
+LOAD CLASSES txnid.jar;
+
+-- Tell sqlcmd to batch the following commands together,
+-- so that the schema loads quickly.
+file -inlinebatch END_OF_BATCH
+
 -- partitioned table
 CREATE TABLE partitioned
 (
@@ -151,6 +157,20 @@ CREATE TABLE partitioned_export
 PARTITION TABLE partitioned_export ON COLUMN cid;
 EXPORT TABLE partitioned_export;
 
+CREATE VIEW export_partview (
+    cid,
+    entries,
+    maximum,
+    minimum,
+    summation
+) AS SELECT
+    cid,
+    COUNT(*),
+    MAX(cnt),
+    MIN(cnt),
+    SUM(cnt)
+FROM partitioned_export GROUP BY cid;
+
 CREATE TABLE replicated_export
 (
   txnid      bigint             NOT NULL
@@ -294,3 +314,5 @@ PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
 PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
+
+END_OF_BATCH
