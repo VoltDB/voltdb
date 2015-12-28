@@ -417,6 +417,7 @@ void JNITopend::pushExportBuffer(
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
             m_jniEnv->ExceptionDescribe();
+            m_jniEnv->DeleteLocalRef(signatureString);
             throw std::exception();
         }
         //std::cout << "Block is length " << block->rawLength() << std::endl;

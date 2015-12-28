@@ -1292,6 +1292,7 @@ SHAREDLIB_JNIEXPORT jobject JNICALL Java_org_voltcore_utils_DBBPool_nativeAlloca
     jobject buffer = jniEnv->NewDirectByteBuffer( memory, size);
     if (buffer == NULL) {
         jniEnv->ExceptionDescribe();
+        delete memory;
         throw std::exception();
     }
     return buffer;
