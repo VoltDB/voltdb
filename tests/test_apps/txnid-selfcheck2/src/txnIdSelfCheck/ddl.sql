@@ -20,6 +20,21 @@ CREATE TABLE partitioned
 PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
 
+
+CREATE VIEW partview (
+	cid, 
+	entries, 
+	maximum, 
+	minimum, 
+	summation
+) AS SELECT 
+	cid, 
+	COUNT(*), 
+	MAX(cnt), 
+	MIN(cnt), 
+	SUM(cnt)
+FROM partitioned GROUP BY cid;
+
 -- dimension table
 CREATE TABLE dimension
 (
@@ -53,6 +68,20 @@ CREATE TABLE replicated
 , UNIQUE ( cid, rid )
 );
 CREATE INDEX R_CIDINDEX ON replicated (cid);
+
+CREATE VIEW replview (
+	cid, 
+	entries, 
+	maximum, 
+	minimum, 
+	summation
+) AS SELECT 
+	cid, 
+	COUNT(*), 
+	MAX(cnt), 
+	MIN(cnt), 
+	SUM(cnt)
+FROM replicated GROUP BY cid;
 
 -- replicated table
 CREATE TABLE adhocr

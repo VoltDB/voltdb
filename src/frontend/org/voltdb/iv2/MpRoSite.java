@@ -134,6 +134,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public int getClusterId()
+        {
+            return getCorrespondingClusterId();
+        }
+
+        @Override
         public int getHostId() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -345,6 +351,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingHostId()
     {
         return CoreUtils.getHostIdFromHSId(m_siteId);
+    }
+
+    @Override
+    public int getCorrespondingClusterId()
+    {
+        return m_context.cluster.getDrclusterid();
     }
 
     @Override
