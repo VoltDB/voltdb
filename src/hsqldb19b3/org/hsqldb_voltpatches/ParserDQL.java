@@ -95,6 +95,7 @@ public class ParserDQL extends ParserBase {
      *
      * @param sql a new SQL character sequence to replace the current one
      */
+    @Override
     void reset(String sql) {
 
         super.reset(sql);
@@ -1374,9 +1375,11 @@ public class ParserDQL extends ParserBase {
 
                 case StatementTypes.UPDATE_WHERE :
                 case StatementTypes.DELETE_WHERE :
+                    /*
                     if (!table.isUpdatable()) {
                         throw Error.error(ErrorCode.X_42545);
                     }
+                    */
                     break;
             }
 

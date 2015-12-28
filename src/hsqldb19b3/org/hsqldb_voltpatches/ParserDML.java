@@ -357,9 +357,11 @@ public class ParserDML extends ParserDQL {
         Table table     = rangeVariables[0].getTable();
         Table baseTable = table.getBaseTable();
 
+        /*
         if (!table.isUpdatable()) {
             throw Error.error(ErrorCode.X_42000);
         }
+        */
 
         if (truncate) {
             switch (token.tokenType) {
