@@ -75,6 +75,10 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
+function recover() {
+    $VOLTDB recover -d deployment.xml -l $LICENSE -H $HOST
+}
+
 # run the client that drives the example
 function client() {
     benchmark
@@ -110,7 +114,7 @@ function async-benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|catalog|server|recover|async-benchmark|aysnc-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
