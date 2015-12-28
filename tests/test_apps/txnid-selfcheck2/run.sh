@@ -89,7 +89,7 @@ function aysnc-benchmark-help() {
 
 function async-benchmark() {
     srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    echo java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
         --duration=120 \
@@ -105,7 +105,7 @@ function async-benchmark() {
         --progresstimeout=120 \
         --usecompression=false \
         --allowinprocadhoc=false \
-        --disabledthreads=none
+        --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
 #ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
 }
 
