@@ -140,7 +140,6 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DATEADD_MILLISECOND    = 20039;
         static final int FUNC_VOLT_DATEADD_MICROSECOND    = 20040;
         static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
-
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
         static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
@@ -157,7 +156,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_ASTEXT                       = 21012;    // wrapper for asText function for all geo types
         static final int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT       = 21013;    // point to text
         static final int FUNC_VOLT_ASTEXT_GEOGRAPHY             = 21014;    // polygon to text
+        static final int FUNC_VOLT_VALIDATE_POLYGON             = 21015;    // Polygon validation.
+        static final int FUNC_VOLT_POLYGON_INVALID_REASON       = 21016;    // Reason a polygon may be invalid.
 
+
+        /*
+         * Note: The name must be all lower case.
+         */
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -311,9 +316,17 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
                                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
+            new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("isinvalidreason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
             new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
                     new Type[] { Type.SQL_ALL_TYPES },
-                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET })
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -549,6 +562,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 nodes[1] = tempNode;
             }
             break;
+
 
         case FunctionId.FUNC_VOLT_ASTEXT:
             if (nodes[0].dataType == null) {

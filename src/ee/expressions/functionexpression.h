@@ -272,6 +272,8 @@ static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 21011;     // distance 
 static const int FUNC_VOLT_ASTEXT                      = 21012;     // wrapper function id for converting geography types into wkt
 static const int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT      = 21013;     // asText(<point value>)
 static const int FUNC_VOLT_ASTEXT_GEOGRAPHY            = 21014;     // asText(<geography value>)
+static const int FUNC_VOLT_VALIDATE_POLYGON            = 21015;     // Validate a polygon.
+static const int FUNC_VOLT_POLYGON_INVALID_REASON      = 21016;     // Reason a polygon is invalid.
 
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
