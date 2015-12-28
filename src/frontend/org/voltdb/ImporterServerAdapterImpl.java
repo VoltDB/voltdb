@@ -45,9 +45,10 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
         return callProcedure(importer, null, proc, fieldList);
     }
 
-    private boolean callProcedure(InternalConnectionContext ic, ProcedureCallback procCallback, String proc, Object... fieldList) {
+    @Override
+    public boolean callProcedure(AbstractImporter importer, ProcedureCallback procCallback, String proc, Object... fieldList) {
         return getInternalConnectionHandler()
-                .callProcedure(ic, m_statsCollector, procCallback, proc, fieldList);
+                .callProcedure(importer, m_statsCollector, procCallback, proc, fieldList);
     }
 
     private InternalConnectionHandler getInternalConnectionHandler() {

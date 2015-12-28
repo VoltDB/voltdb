@@ -166,9 +166,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     // NULL tuple for outer join
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_out_table = m_indexNode->getOutputTable();
-        assert(inner_out_table);
-        m_null_tuple.init(inner_out_table->schema());
+        m_null_tuple.init(inner_table->schema());
     }
 
     //outer_table is the input table that have tuples to be iterated
@@ -244,10 +242,31 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     const TableTuple &null_tuple = m_null_tuple.tuple();
-    int num_of_inner_cols = (m_joinType == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
     ProgressMonitorProxy pmp(m_engine, this);
 
     TableTuple join_tuple;
+    // It's not immediately obvious here, so there's some subtlety to
+    // note with respect to the schema of the join_tuple.
+    //
+    // The inner_tuple is used to represent the values from the inner
+    // table in the case of the join predicate passing, and for left
+    // outer joins, the null_tuple is used if there is no match.  Both
+    // of these tuples include the complete schema of the table being
+    // scanned.  The inner table is being scanned via an inlined scan
+    // node, so there is no temp table corresponding to it.
+    //
+    // Predicates that are evaluated against the inner table should
+    // therefore use the complete schema of the table being scanned.
+    //
+    // The join_tuple is the tuple that contains the values that we
+    // actually want to put in the output of the join (or to aggregate
+    // if there is an inlined agg plan node).  This tuple needs to
+    // omit the unused columns from the inner table.  The inlined
+    // index scan itself has an inlined project node that defines the
+    // columns that should be output by the join, and omits those that
+    // are not needed.  So the join_tuple contains the columns we're
+    // using from the outer table, followed by the "projected" schema
+    // for the inlined scan of the inner table.
     if (m_aggExec != NULL) {
         VOLT_TRACE("Init inline aggregate...");
         const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
@@ -523,7 +542,19 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     continue;
                 }
                 ++tuple_ctr;
-                join_tuple.setNValues(num_of_outer_cols, m_null_tuple.tuple(), 0, num_of_inner_cols);
+
+                //
+                // Try to put the tuple into our output table
+                // Append the inner values to the end of our join tuple
+                //
+                for (int col_ctr = num_of_outer_cols;
+                     col_ctr < join_tuple.sizeInValues();
+                     ++col_ctr) {
+                    // For the sake of consistency, we don't try to do
+                    // output expressions here with columns from both tables.
+                    join_tuple.setNValue(col_ctr,
+                                         m_outputExpressions[col_ctr]->eval(&outer_tuple, &null_tuple));
+                }
 
                 if (m_aggExec != NULL) {
                     if (m_aggExec->p_execute_tuple(join_tuple)) {

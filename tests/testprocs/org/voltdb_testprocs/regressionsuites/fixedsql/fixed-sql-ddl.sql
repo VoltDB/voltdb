@@ -369,6 +369,11 @@ CREATE TABLE t3(
 create unique index t3_idx1 on t3 (a);
 create unique index t3_idx2 on t3 (d);
 
+CREATE TABLE t3_no_index (
+ a INTEGER,
+ x INTEGER,
+ d integer);
+
 -- ENG-9533
 CREATE TABLE test1_eng_9533 (
   id bigint not null,
