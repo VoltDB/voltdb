@@ -175,7 +175,7 @@ public class AdBrokerBenchmark {
      * @param config Parsed & validated CLI options.
      */
     public AdBrokerBenchmark(AdBrokerConfig config) {
-        this.m_config = config;
+        m_config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
@@ -274,7 +274,7 @@ public class AdBrokerBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        if(this.m_config.latencyreport) {
+        if(m_config.latencyreport) {
             System.out.printf(", Avg/95%% Latency %.2f/%.2fms", stats.getAverageLatency(),
                 stats.kPercentileLatencyAsDouble(0.95));
         }
@@ -327,7 +327,7 @@ public class AdBrokerBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        if(this.m_config.latencyreport) {
+        if(m_config.latencyreport) {
             System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
             System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
             System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
