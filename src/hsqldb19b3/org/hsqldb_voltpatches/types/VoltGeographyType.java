@@ -24,10 +24,17 @@ import org.hsqldb_voltpatches.Types;
 
 public class VoltGeographyType extends Type {
 
+    VoltGeographyType(long precision) {
+        super(Types.VOLT_GEOGRAPHY,    // comparison group
+                Types.VOLT_GEOGRAPHY,  // type id
+                precision,             // precision (i.e., length)
+                0);                    // scale
+    }
+
     VoltGeographyType() {
         super(Types.VOLT_GEOGRAPHY,    // comparison group
                 Types.VOLT_GEOGRAPHY,  // type id
-                0,                     // precision
+                0,                     // precision (use default length)
                 0);                    // scale
     }
 

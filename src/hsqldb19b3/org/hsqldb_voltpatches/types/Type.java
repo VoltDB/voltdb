@@ -945,7 +945,7 @@ public abstract class Type implements SchemaObject, Cloneable {
                 return VOLT_GEOGRAPHY_POINT;
 
             case Types.VOLT_GEOGRAPHY :
-                return VOLT_GEOGRAPHY;
+                return new VoltGeographyType(precision);
 
             case Types.OTHER :
                 return OTHER;

@@ -157,7 +157,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
                 + "1111, "
                 + "pointfromtext('point(0 0)'),"
                 + "pointfromtext('point(-2.5 0)'),"
-                + "polygonfromtext('polygon((0 1, -1 1, -1 0, 0 0, 0 1))'));");
+                + "polygonfromtext('polygon((0 1, -1 1, -1 0, 0 0, 0 1))'),"
+                + "polygonfromtext('polygon((0 2, -2 2, -2 0, 0 0, 0 2))')"
+                + ");");
 
         resp = m_client.callProcedure("@AdHoc", "select * from T4;");
         vt = resp.getResults()[0];
