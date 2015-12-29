@@ -752,6 +752,7 @@ public class Types {
             case Types.SQL_INTERVAL_MINUTE :
             case Types.SQL_INTERVAL_MINUTE_TO_SECOND :
             case Types.SQL_INTERVAL_SECOND :
+            case Types.VOLT_GEOGRAPHY :
                 return true;
 
             default :

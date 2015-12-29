@@ -1047,4 +1047,13 @@ public enum VoltType {
     private static final class NullGeographySigil{}
     /** Null value for <code>POINT</code>. */
     public static final NullGeographySigil NULL_GEOGRAPHY = new NullGeographySigil();
+
+    public int defaultLengthForVariableLengthType(int maxRowSize, int maxColumns) {
+        assert(isVariableLength());
+        if (this == GEOGRAPHY) {
+            return GeographyValue.DEFAULT_LENGTH;
+        }
+
+        return maxRowSize / maxColumns;
+    }
 }

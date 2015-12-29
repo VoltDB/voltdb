@@ -58,6 +58,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -2830,7 +2831,10 @@ public class TestVoltCompiler extends TestCase {
         String ddl =
                 "create table polygons ("
                 + "  id integer,"
-                + "  poly geography"
+                + "  poly geography, "
+                + "  sized_poly geography(1066), "
+                + "  sized_poly2 geography(1048576), "
+                + "  sized_poly3 geography(1) "
                 + ");";
         Database db = goodDDLAgainstSimpleSchema(ddl);
         assertNotNull(db);
@@ -2840,6 +2844,19 @@ public class TestVoltCompiler extends TestCase {
 
         Column geographyCol = polygonsTable.getColumns().getIgnoreCase("poly");
         assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(GeographyValue.DEFAULT_LENGTH, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(1066, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly2");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(1048576, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly3");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(1, geographyCol.getSize());
     }
 
     public void testGeographyNegative() throws Exception {
@@ -2850,6 +2867,18 @@ public class TestVoltCompiler extends TestCase {
                 + "  geog geography not null"
                 + ");"
                 + "partition table geogs on column geog;"
+                );
+
+        badDDLAgainstSimpleSchema(".*precision or scale out of range.*",
+                "create table geogs ("
+                + "  geog geography(0) not null"
+                + ");"
+                );
+
+        badDDLAgainstSimpleSchema(".*is > 1048576 char maximum.*",
+                "create table geogs ("
+                + "  geog geography(1048577) not null"
+                + ");"
                 );
 
         // GEOGRAPHY columns cannot yet be indexed

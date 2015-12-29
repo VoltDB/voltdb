@@ -590,6 +590,15 @@ public class TestGeographyValueQueries extends RegressionSuite {
         assertGeographyValueWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
     }
 
+    public void testGeographySize() throws Exception {
+        Client client = getClient();
+
+        GeographyValue gv = GeographyValue.fromText("polygon((1 1, -1 1, -1 -1, 1 -1, 1 1))");
+        assertEquals(179, gv.getLengthInBytes());
+        verifyProcFails(client, "The size 179 of the value exceeds the size of the GEOGRAPHY column \\(178 bytes\\)",
+                "@AdHoc", "insert into tiny_polygon values (?)", gv);
+    }
+
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
@@ -620,6 +629,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
                 + "  POLY GEOGRAPHY NOT NULL\n"
+                + ");\n"
+                + "CREATE TABLE TINY_POLYGON (\n"
+                + "  POLY GEOGRAPHY(178) NOT NULL\n"
                 + ");\n"
                 + "CREATE PROCEDURE select_in_t AS \n"
                 + "  SELECT pk FROM t WHERE poly IN ? ORDER BY pk ASC;\n"
