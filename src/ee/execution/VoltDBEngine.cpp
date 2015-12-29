@@ -113,7 +113,7 @@ const std::string DR_PARTITIONED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONF
 namespace voltdb {
 
 // These typedefs prevent confusion in the parsing of BOOST_FOREACH.
-typedef std::pair<std::string, CatalogDelegate*> LabeledCD;
+typedef std::pair<std::string, TableCatalogDelegate*> LabeledTCD;
 typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
@@ -259,7 +259,7 @@ VoltDBEngine::~VoltDBEngine() {
     // Delete table delegates and release any table reference counts.
     typedef std::pair<int64_t, Table*> TID;
 
-    BOOST_FOREACH (LabeledCD cd, m_catalogDelegates) {
+    BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
         delete cd.second;
     }
 
@@ -286,20 +286,19 @@ Table* VoltDBEngine::getTable(int32_t tableId) const
     return findInMapOrNull(tableId, m_tables);
 }
 
-Table* VoltDBEngine::getTable(std::string name) const
+Table* VoltDBEngine::getTable(const std::string& name) const
 {
     // Caller responsible for checking null return value.
     return findInMapOrNull(name, m_tablesByName);
 }
 
-TableCatalogDelegate* VoltDBEngine::getTableDelegate(std::string name) const
+TableCatalogDelegate* VoltDBEngine::getTableDelegate(const std::string& name) const
 {
     // Caller responsible for checking null return value.
-    CatalogDelegate * delegate = findInMapOrNull(name, m_delegatesByName);
-    return dynamic_cast<TableCatalogDelegate*>(delegate);
+    return findInMapOrNull(name, m_delegatesByName);
 }
 
-catalog::Table* VoltDBEngine::getCatalogTable(std::string name) const {
+catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *catalogTable = labeledTable.second;
@@ -609,9 +608,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     // delete any empty persistent tables, forcing them to be rebuilt
     // (Unless the are actually being deleted -- then this does nothing)
 
-    BOOST_FOREACH (LabeledCD delegatePair, m_catalogDelegates) {
-        CatalogDelegate *delegate = delegatePair.second;
-        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+    BOOST_FOREACH (LabeledTCD delegatePair, m_catalogDelegates) {
+        TableCatalogDelegate *tcd = delegatePair.second;
         Table* table = tcd->getTable();
 
         // skip export tables for now
@@ -630,12 +628,11 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     BOOST_FOREACH (std::string path, deletions) {
         VOLT_TRACE("delete path:");
 
-        std::map<std::string, CatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
+        std::map<std::string, TableCatalogDelegate*>::iterator pos = m_catalogDelegates.find(path);
         if (pos == m_catalogDelegates.end()) {
            continue;
         }
-        CatalogDelegate *delegate = pos->second;
-        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+        TableCatalogDelegate *tcd = pos->second;
         /*
          * Instruct the table to flush all export data
          * Then tell it about the new export generation/catalog txnid
@@ -651,8 +648,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
                 streamedtable->setSignatureAndGeneration(signature, timestamp);
                 m_exportingTables.erase(signature);
             }
+            delete tcd;
         }
-        delete delegate;
         m_catalogDelegates.erase(pos);
     }
 }
@@ -728,9 +725,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
         catalog::Table *catalogTable = labeledTable.second;
 
         // get the delegate for the table... add the table if it's null
-        CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
-        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
-
+        TableCatalogDelegate* tcd = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
         if (!tcd) {
             VOLT_TRACE("add a completely new table or rebuild an empty table...");
 
@@ -738,9 +733,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // add a completely new table
             //////////////////////////////////////////
 
-            tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
-                                           catalogTable->path(),
-                                           catalogTable->signature(),
+            tcd = new TableCatalogDelegate(catalogTable->signature(),
                                            m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
@@ -750,7 +743,8 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 return false;
             }
             m_catalogDelegates[catalogTable->path()] = tcd;
-            m_delegatesByName[tcd->getTable()->name()] = tcd;
+            Table* table = tcd->getTable();
+            m_delegatesByName[table->name()] = tcd;
 
             // set export info on the new table
             if (tcd->exportEnabled()) {
@@ -1003,9 +997,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
                 PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
                 // Use the now-current definiton of the target table, to be updated later, if needed.
-                TableCatalogDelegate* targetDelegate =
-                    dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                        m_delegatesByName));
+                TableCatalogDelegate* targetDelegate = getTableDelegate(oldTargetTable->name());
                 PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
                 if (targetDelegate) {
                     PersistentTable* newTargetTable =
@@ -1141,22 +1133,23 @@ void VoltDBEngine::rebuildTableCollections()
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
     // walk the table delegates and update local table collections
-    BOOST_FOREACH (LabeledCD cd, m_catalogDelegates) {
-        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(cd.second);
+    BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
+        TableCatalogDelegate *tcd = cd.second;
         if (tcd) {
-            catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
-            m_tables[catTable->relativeIndex()] = tcd->getTable();
-            m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
+            Table* localTable = tcd->getTable();
+            catalog::Table *catTable = m_database->tables().get(localTable->name());
+            m_tables[catTable->relativeIndex()] = localTable;
+            m_tablesByName[tcd->getTable()->name()] = localTable;
             if (!tcd->exportEnabled() && !tcd->materialized()) {
                 m_tablesBySignatureHash[*reinterpret_cast<const int64_t*>(tcd->signatureHash())] = tcd->getPersistentTable();
             }
 
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                   catTable->relativeIndex(),
-                                                  tcd->getTable()->getTableStats());
+                                                  localTable->getTableStats());
 
             // add all of the indexes to the stats source
-            const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
+            const std::vector<TableIndex*>& tindexes = localTable->allIndexes();
             BOOST_FOREACH (TableIndex *index, tindexes) {
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
                                                       catTable->relativeIndex(),

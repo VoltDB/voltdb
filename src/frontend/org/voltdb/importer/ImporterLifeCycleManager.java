@@ -93,6 +93,11 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             throw new RuntimeException("Importer has already been started and is running");
         }
 
+        if (m_configs.size()==0) {
+            s_logger.info("No configured importers of " + m_factory.getTypeName() + " are ready to be started at this time");
+            return;
+        }
+
         ThreadPoolExecutor tpe = new ThreadPoolExecutor(
                 m_configs.size(),
                 m_configs.size(),
@@ -225,7 +230,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     {
         for (AbstractImporter importer : m_importers.values()) {
             try {
-                importer.stop();
+                importer.stopImporter();
             } catch(Exception e) {
                 s_logger.warn("Error trying to stop importer resource ID " + importer.getResourceID(), e);
             }

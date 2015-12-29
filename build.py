@@ -401,6 +401,7 @@ if whichtests in ("${eetestsuite}", "common"):
      pool_test
      serializeio_test
      tabletuple_test
+     ThreadLocalPoolTest
      tupleschema_test
      undolog_test
      valuearray_test

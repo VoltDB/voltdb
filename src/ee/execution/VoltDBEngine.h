@@ -85,7 +85,6 @@ namespace voltdb {
 
 class AbstractExecutor;
 class AbstractPlanNode;
-class CatalogDelegate;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
 class ExecutorVector;
@@ -126,13 +125,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Catalog *getCatalog() const; // Only used in tests.
 
         Table* getTable(int32_t tableId) const;
-        Table* getTable(std::string name) const;
+        Table* getTable(const std::string& name) const;
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
 
-        TableCatalogDelegate* getTableDelegate(std::string name) const;
+        TableCatalogDelegate* getTableDelegate(const std::string& name) const;
         catalog::Database* getDatabase() const { return m_database; }
-        catalog::Table* getCatalogTable(std::string name) const;
+        catalog::Table* getCatalogTable(const std::string& name) const;
         virtual bool getIsActiveActiveDREnabled() const;
         // virtual keyword here is used to override the functions in test case
         virtual Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
@@ -472,8 +471,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Catalog delegates hashed by path.
          */
-        std::map<std::string, CatalogDelegate*> m_catalogDelegates;
-        std::map<std::string, CatalogDelegate*> m_delegatesByName;
+        std::map<std::string, TableCatalogDelegate*> m_catalogDelegates;
+        std::map<std::string, TableCatalogDelegate*> m_delegatesByName;
 
         // map catalog table id to table pointers
         std::map<CatalogId, Table*> m_tables;

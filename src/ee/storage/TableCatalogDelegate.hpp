@@ -18,7 +18,6 @@
 #ifndef TABLECATALOGDELEGATE_HPP
 #define TABLECATALOGDELEGATE_HPP
 
-#include "common/CatalogDelegate.hpp"
 #include "catalog/table.h"
 #include "catalog/index.h"
 #include "storage/persistenttable.h"
@@ -39,7 +38,7 @@ struct TableIndexScheme;
 class DRTupleStream;
 
 // There might be a better place for this, but current callers happen to have this header in common.
-template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
+template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map
 {
     typename std::map<K, V>::const_iterator lookup = the_map.find(key);
     if (lookup != the_map.end()) {
@@ -52,16 +51,19 @@ template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> 
  * Implementation of CatalogDelgate for Table
  */
 
-class TableCatalogDelegate : public CatalogDelegate {
+class TableCatalogDelegate {
   public:
-    TableCatalogDelegate(int32_t catalogId, std::string path, std::string signature, int32_t compactionThreshold);
-    virtual ~TableCatalogDelegate();
+    TableCatalogDelegate(const std::string& signature, int32_t compactionThreshold)
+        : m_table(NULL)
+        , m_exportEnabled(false)
+        , m_signature(signature)
+        , m_compactionThreshold(compactionThreshold)
+    {}
 
+    ~TableCatalogDelegate();
 
-    // Delegate interface
-    virtual void deleteCommand();
+    void deleteCommand();
 
-    // table specific
     int init(catalog::Database const &catalogDatabase,
              catalog::Table const &catalogTable);
     bool evaluateExport(catalog::Database const &catalogDatabase,
@@ -69,7 +71,7 @@ class TableCatalogDelegate : public CatalogDelegate {
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
-                             std::map<std::string, CatalogDelegate*> const &tablesByName);
+                             std::map<std::string, TableCatalogDelegate*> const &tablesByName);
 
     static void migrateChangedTuples(catalog::Table const &catalogTable,
                                      voltdb::PersistentTable* existingTable,
@@ -105,13 +107,10 @@ class TableCatalogDelegate : public CatalogDelegate {
                                     TableTuple& tbTuple,
                                     std::vector<int>& nowFields);
 
-    // ADXXX: should be const
-    Table *getTable() {
-        return m_table;
-    }
+    Table *getTable() const { return m_table; }
 
     PersistentTable *getPersistentTable() {
-        return dynamic_cast<PersistentTable *> (m_table);
+        return dynamic_cast<PersistentTable*>(m_table);
     }
 
     StreamedTable *getStreamedTable() {
@@ -122,35 +121,24 @@ class TableCatalogDelegate : public CatalogDelegate {
         m_table = tb;
     }
 
-    bool exportEnabled() {
-        return m_exportEnabled;
-    }
+    bool exportEnabled() { return m_exportEnabled; }
 
-    std::string signature() {
-        return m_signature;
-    }
+    const std::string& signature() { return m_signature; }
 
-    const char* signatureHash() {
-        return m_signatureHash;
-    }
+    const char* signatureHash() { return m_signatureHash; }
 
     /*
      * Returns true if this table is a materialized view
      */
-    bool materialized() {
-        return m_materialized;
-    }
+    bool materialized() { return m_materialized; }
   private:
-    static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                            catalog::Table const &catalogTable,
-                                            const int32_t compactionThreshold,
-                                            bool &materialized,
-                                            char *signatureHash);
+    Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
+                                     catalog::Table const &catalogTable);
 
     voltdb::Table *m_table;
     bool m_exportEnabled;
     bool m_materialized;
-    std::string m_signature;
+    const std::string m_signature;
     const int32_t m_compactionThreshold;
     char m_signatureHash[20];
 };

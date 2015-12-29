@@ -102,7 +102,7 @@ public abstract class AbstractImporter
     protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
-            boolean result = m_importServerAdapter.callProcedure(this, invocation.getProcedure(), invocation.getParams());
+            boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
             applyBackPressureAsNeeded();
             return result;
@@ -143,6 +143,15 @@ public abstract class AbstractImporter
         } else {
             m_backPressureCount.set(0);
         }
+    }
+
+    /**
+     * Called to stop the importer from processing more data.
+     */
+    public void stopImporter()
+    {
+        m_stopping = true;
+        stop();
     }
 
     private void reportStat(boolean result, String procName) {
