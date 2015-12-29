@@ -1711,12 +1711,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    uint8_t version;
-    int64_t rowCount = m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, &version);
-    m_drStream->setDRProtocolVersion(version);
-    if (m_drReplicatedStream) {
-        m_drReplicatedStream->setDRProtocolVersion(version);
-    }
+    int64_t rowCount = m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
     return rowCount;
 }
 
