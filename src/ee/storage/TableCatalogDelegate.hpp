@@ -38,7 +38,7 @@ struct TableIndexScheme;
 class DRTupleStream;
 
 // There might be a better place for this, but current callers happen to have this header in common.
-template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map
+template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
 {
     typename std::map<K, V>::const_iterator lookup = the_map.find(key);
     if (lookup != the_map.end()) {

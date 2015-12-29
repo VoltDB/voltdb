@@ -513,7 +513,7 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
 
 void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
                   StreamedTable *existingTable, StreamedTable *newTable,
-                  std::map<std::string, CatalogDelegate*> const &delegatesByName)
+                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
 {
 //    std::cout << "Migrating export views\n";
 //    std::cout.flush();
