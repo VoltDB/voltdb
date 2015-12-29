@@ -73,6 +73,10 @@ public class DRLogSegmentId implements Serializable {
         return (drId >>> 63) == 1L;
     }
 
+    public static boolean seqIsBeforeZero(long drId) {
+        return (getSequenceNumberFromDRId(-1L) == getSequenceNumberFromDRId(drId));
+    }
+
     public static int getClusterIdFromDRId(long drId) {
         return (int)((drId >> 55) & MAX_CLUSTER_ID);
     }
