@@ -53,6 +53,15 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_getViewData = new SQLStmt(
             "SELECT * FROM partview WHERE cid=? ORDER BY cid DESC;");
 
+    public final SQLStmt p_getExViewData = new SQLStmt(
+            "SELECT * FROM ex_partview WHERE cid=? ORDER BY cid DESC;");
+
+    public final SQLStmt p_getExViewShadowData = new SQLStmt(
+            "SELECT * FROM ex_partview_shadow WHERE cid=? ORDER BY cid DESC;");
+
+    public final SQLStmt p_upsertExViewShadowData = new SQLStmt(
+            "UPSERT INTO ex_partview_shadow VALUES(?, ?, ?, ?, ?);");
+
     // PLEASE SEE ReplicatedUpdateBaseProc for the replicated procs
     // that can't be listed here (or SP procs wouldn't compile)
 

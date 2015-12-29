@@ -157,7 +157,7 @@ CREATE TABLE partitioned_export
 PARTITION TABLE partitioned_export ON COLUMN cid;
 EXPORT TABLE partitioned_export;
 
-CREATE VIEW export_partview (
+CREATE VIEW ex_partview (
     cid,
     entries,
     maximum,
@@ -170,6 +170,16 @@ CREATE VIEW export_partview (
     MIN(cnt),
     SUM(cnt)
 FROM partitioned_export GROUP BY cid;
+
+CREATE TABLE ex_partview_shadow (
+    cid tinyint not null,
+    entries bigint,
+    maximum bigint,
+    minimum bigint,
+    summation bigint,
+    primary key(cid)
+);
+PARTITION TABLE ex_partview_shadow ON COLUMN cid;
 
 CREATE TABLE replicated_export
 (
