@@ -28,7 +28,7 @@ import org.voltdb.VoltTable;
 public class UpdateReplicatedMPInProcAdHoc extends UpdateReplicatedMP {
 
     @Override
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
+    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback, boolean useviews) {
         VoltTable[] results = doWorkInProcAdHoc(cid, rid, value, rollback);
 
         return doSummaryAndCombineResults(results);

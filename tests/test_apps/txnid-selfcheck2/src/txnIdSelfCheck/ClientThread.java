@@ -24,19 +24,18 @@
 package txnIdSelfCheck;
 
 import java.io.InterruptedIOException;
-
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.VoltProcedure.VoltAbortException;
 
 import txnIdSelfCheck.procedures.UpdateBaseProc;
 
@@ -53,6 +52,7 @@ public class ClientThread extends BenchmarkThread {
             if (rn.nextDouble() < mpRatio) {
                 int r = rn.nextInt(19);
                 if (allowInProcAdhoc && (r < 1)) return ADHOC_MP;  // 0% or ~5% of MP workload
+                // if (useviews && (r < 2)) return VIEW_MP;		   // 0% or 5% or 10% of MP workload
                 if (r < 7) return PARTITIONED_MP;                  // ~33% or 38%
                 if (r < 13) return REPLICATED;                     // ~33%
                 if (r < 19) return HYBRID;                         // ~33%
@@ -66,6 +66,7 @@ public class ClientThread extends BenchmarkThread {
     long m_nextRid;
     final Type m_type;
     final TxnId2PayloadProcessor m_processor;
+    // final boolean m_useviews;
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
     final AtomicLong m_txnsRun;
     static Random rn = new Random(31); // deterministic sequence
@@ -83,6 +84,7 @@ public class ClientThread extends BenchmarkThread {
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
+        // m_useviews = useviews;
         log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
@@ -144,6 +146,10 @@ public class ClientThread extends BenchmarkThread {
                 procName = "UpdateReplicatedMPInProcAdHoc";
                 expectedTables = 6;
                 break;
+//			case VIEW_MP:
+//				procName = "UpdateViews";
+//                expectedTables = 6; // how many tables am I expecting?
+//				break;
             }
 
             byte[] payload = m_processor.generateForStore().getStoreValue();
