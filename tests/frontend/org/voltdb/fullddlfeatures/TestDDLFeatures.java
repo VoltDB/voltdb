@@ -758,9 +758,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POINT"));
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POLYGON"));
         assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_LATITUDE"));
-        //assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
-        //assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POINT_POINT"));
-        //assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POINT_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
         // GEO has three index columns.  Two for IDX
         // and one for the primary key.
         assertEquals(3, indexedColumnCount("GEO"));
