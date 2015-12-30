@@ -27,7 +27,7 @@ import org.voltdb.VoltTable;
 
 public class UpdatePartitionedMP extends ReplicatedUpdateBaseProc {
 
-    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback, boolean useviews) {
+    public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
         VoltTable[] results = doWork(p_getCIDData, p_cleanUp, p_insert, p_export, p_getAdhocData, p_getViewData,
                 cid, rid, value, rollback, true);
 
