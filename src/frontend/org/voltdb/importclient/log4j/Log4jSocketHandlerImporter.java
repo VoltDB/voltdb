@@ -174,7 +174,7 @@ public class Log4jSocketHandlerImporter extends AbstractImporter
     /**
      * Class with invocation details for the stored procedure to insert a logging event into voltdb.
      */
-    private class SaveLog4jEventInvocation implements Invocation {
+    private class SaveLog4jEventInvocation extends Invocation {
 
         private final String m_hostName;
         private final LoggingEvent m_event;
@@ -192,7 +192,7 @@ public class Log4jSocketHandlerImporter extends AbstractImporter
         }
 
         @Override
-        public Object[] getParams() throws IOException
+        public Object[] getParams()
         {
             return new Object[] {
                     m_hostName,

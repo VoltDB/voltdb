@@ -39,6 +39,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
@@ -60,7 +61,7 @@ public class ImportManager implements ChannelChangeCallback {
     private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
-    private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
+    private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
@@ -108,6 +109,7 @@ public class ImportManager implements ChannelChangeCallback {
                 .add("org.voltcore.network")
                 .add("org.voltcore.logging")
                 .add("org.voltdb.importer")
+                .add("org.voltdb.importer.formatter")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")
                 .add("org.slf4j")

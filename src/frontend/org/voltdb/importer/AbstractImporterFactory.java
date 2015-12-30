@@ -23,6 +23,7 @@ import java.util.Properties;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.voltdb.importer.formatter.Formatter;
 
 
 /**
@@ -99,7 +100,7 @@ public abstract class AbstractImporterFactory implements BundleActivator
      * @param props importer configuration properties; typically defined in deployment file.
      * @return Map of resourceIDs to ImporterConfig as configured using the input properties
      */
-    public abstract Map<URI, ImporterConfig> createImporterConfigurations(Properties props);
+    public abstract Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Formatter formatter);
 
     /**
      * Returns true if an importer instance must be run on every site for every resource.

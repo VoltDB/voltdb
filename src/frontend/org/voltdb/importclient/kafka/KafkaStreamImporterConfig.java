@@ -37,6 +37,7 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import org.apache.log4j.Logger;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
@@ -50,8 +51,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     public static final String CLIENT_ID = "voltdb-importer";
     private static final String GROUP_ID = "voltdb";
     private static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
-    private static final String CSV_FORMATTER_NAME = "csv";
-    private static final String TSV_FORMATTER_NAME = "tsv";
 
     // We don't allow period in topic names because we construct URIs using it
     private static final Pattern legalTopicNamesPattern = Pattern.compile("[a-zA-Z0-9\\_-]+");
@@ -64,12 +63,12 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private final int m_fetchSize;
     private final int m_soTimeout;
     private final String m_procedure;
-    private final char m_separator;
+    private final Formatter m_formatter;
     private final int m_partition;
     private HostAndPort m_partitionLeader;
 
     private KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
-            String groupId, int fetchSize, int soTimeout, String procedure, String formatter)
+            String groupId, int fetchSize, int soTimeout, String procedure, Formatter formatter)
     {
         m_uri = uri;
         m_brokers = brokers;
@@ -80,7 +79,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
-        m_separator = CSV_FORMATTER_NAME.equals(formatter) ? CSVParser.DEFAULT_SEPARATOR : '\t';
+        m_formatter = formatter;
     }
 
 
@@ -120,9 +119,9 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
 
-    public char getSeparator()
+    public Formatter getFormatter()
     {
-        return m_separator;
+        return m_formatter;
     }
 
 
@@ -148,7 +147,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return m_uri;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props)
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Formatter formatter)
     {
        String brokers = props.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
@@ -171,11 +170,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         String procedure = props.getProperty("procedure", "").trim();
         if (procedure.isEmpty()) {
             throw new IllegalArgumentException("Missing procedure.");
-        }
-
-        String formatter = props.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
-        if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
-            throw new IllegalArgumentException("Invalid formatter: " + formatter);
         }
 
         //comma separated list of topics.
@@ -214,7 +208,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
-            String topic, String groupId, String procedure, String formatter, int soTimeout, int fetchSize)
+            String topic, String groupId, String procedure, Formatter formatter, int soTimeout, int fetchSize)
     {
         SimpleConsumer consumer = null;
         try {

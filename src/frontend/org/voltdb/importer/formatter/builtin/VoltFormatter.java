@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Properties;
 
 import org.voltdb.common.Constants;
+import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
@@ -29,11 +30,18 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 public class VoltFormatter implements Formatter<String> {
     final CSVParser m_parser;
 
-    VoltFormatter (String name, Properties prop) {
-        if (!("csv".equalsIgnoreCase(name) || "tsv".equalsIgnoreCase(name))) {
-            throw new IllegalArgumentException("Invalid format " + name + ", choices are either \"csv\" or \"tsv\".");
+    VoltFormatter (Properties prop) {
+        String type = prop.getProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE);
+        if (!("csv".equalsIgnoreCase(type) || "tsv".equalsIgnoreCase(type))) {
+            throw new IllegalArgumentException("Invalid format " + type + ", choices are either \"csv\" or \"tsv\".");
         }
-        m_parser = new CSVParser("csv".equalsIgnoreCase(name) ? ',' : '\t');
+        char separator = "csv".equalsIgnoreCase(type) ? ',' : '\t';
+
+        String separatorProp = prop.getProperty("separator", "");
+        if (!separatorProp.isEmpty() && separatorProp.length() == 1) {
+            separator = separatorProp.charAt(0);
+        }
+        m_parser = new CSVParser(separator);
     }
 
     @Override

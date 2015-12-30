@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.Level;
 import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.CSVInvocation;
+import org.voltdb.importer.Invocation;
 
 import com.google_voltpatches.common.base.Optional;
 
@@ -88,7 +88,7 @@ public class PullSocketImporter extends AbstractImporter {
                 BufferedReader br = reader.get();
                 String csv = null;
                 while ((csv=br.readLine()) != null) {
-                    CSVInvocation invocation = new CSVInvocation(m_config.getProcedure(), csv);
+                    Invocation invocation = new Invocation(m_config.getProcedure(), m_config.getFormatter().transform(csv));
                     if (!callProcedure(invocation)) {
                         if (isDebugEnabled()) {
                             debug(null, "Failed to process Invocation possibly bad data: " + csv);

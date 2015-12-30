@@ -103,7 +103,8 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        Formatter formatter = o.create("csv", prop);
+        prop.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, "csv");
+        Formatter formatter = o.create(prop);
         Object[] results = formatter.transform("12,10.05,test");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -117,7 +118,8 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        Formatter formatter = o.create("tsv", prop);
+        prop.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, "tsv");
+        Formatter formatter = o.create(prop);
         Object[] results = formatter.transform("12\t10.05\ttest");
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
@@ -131,8 +133,9 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
+        prop.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, "badformat");
         try {
-            o.create("badformat", prop);
+            o.create(prop);
             fail();
         } catch (RuntimeException e) {
         }
@@ -144,7 +147,8 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        Formatter formatter = o.create("csv", prop);
+        prop.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, "csv");
+        Formatter formatter = o.create(prop);
         Object[] results = formatter.transform(null);
         assertNull(results);
     }
@@ -155,7 +159,8 @@ public class TestVoltFormatter extends TestCase {
         ServiceReference<AbstractFormatterFactory> reference = refs[0];
         AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
         Properties prop = new Properties();
-        Formatter formatter = o.create("csv", prop);
+        prop.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, "csv");
+        Formatter formatter = o.create(prop);
         try {
             formatter.transform(12345);
             fail();

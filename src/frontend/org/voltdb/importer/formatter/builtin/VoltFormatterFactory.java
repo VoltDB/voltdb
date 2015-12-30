@@ -23,8 +23,8 @@ import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 public class VoltFormatterFactory extends AbstractFormatterFactory {
     @Override
-    public VoltFormatter create(String name, Properties prop) {
-        VoltFormatter formatter = new VoltFormatter(name, prop);
+    public VoltFormatter create(Properties prop) {
+        VoltFormatter formatter = new VoltFormatter(prop);
         return formatter;
     }
 }

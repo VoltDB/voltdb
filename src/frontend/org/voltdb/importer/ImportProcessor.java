@@ -37,6 +37,9 @@ import org.voltdb.CatalogContext;
 import org.voltdb.ImporterServerAdapterImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
+import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
@@ -46,6 +49,7 @@ public class ImportProcessor implements ImportDataProcessor {
     private static final VoltLogger m_logger = new VoltLogger("IMPORT");
     private final Map<String, BundleWrapper> m_bundles = new HashMap<String, BundleWrapper>();
     private final Map<String, BundleWrapper> m_bundlesByName = new HashMap<String, BundleWrapper>();
+    private final Map<String, AbstractFormatterFactory> m_formatters = new HashMap<String, AbstractFormatterFactory>();
     private final Framework m_framework;
     private final ChannelDistributer m_distributer;
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ImportProcessor");
@@ -75,8 +79,8 @@ public class ImportProcessor implements ImportDataProcessor {
             return m_importerFactory.getTypeName();
         }
 
-        public void configure(Properties props) {
-            m_importerTypeMgr.configure(props);
+        public void configure(Properties props, Formatter formatter) {
+            m_importerTypeMgr.configure(props, formatter);
         }
 
         public void stop() {
@@ -94,12 +98,56 @@ public class ImportProcessor implements ImportDataProcessor {
         }
     }
 
-    public void addProcessorConfig(Properties properties) {
-        String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
-        String moduleAttrs[] = module.split("\\|");
-        String bundleJar = moduleAttrs[1];
-        String moduleType = moduleAttrs[0];
+    public Formatter createFormatter(Properties prop) {
+        String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+        String attrs[] = module.split("\\|");
+        String bundleJar = attrs[1];
+        String moduleType = attrs[0];
 
+        try {
+            AbstractFormatterFactory formatter = m_formatters.get(bundleJar);
+            if (formatter == null) {
+                if (moduleType.equalsIgnoreCase("osgi")) {
+
+                    Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
+                    bundle.start();
+                    ServiceReference refs[] = bundle.getRegisteredServices();
+                    //Must have one service only.
+                    ServiceReference reference = refs[0];
+                    if (reference == null) {
+                        m_logger.error("Failed to initialize formatter from: " + bundleJar);
+                        bundle.stop();
+                        return null;
+                    }
+                    formatter = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
+                } else {
+                    //Class based importer.
+                    Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
+                    if (reference == null) {
+                        m_logger.error("Failed to initialize formatter from: " + bundleJar);
+                        return null;
+                    }
+
+                    formatter = (AbstractFormatterFactory)reference.newInstance();
+                }
+                m_formatters.put(bundleJar, formatter);
+            }
+            return formatter.create(prop);
+        } catch(Throwable t) {
+            m_logger.error("Failed to configure import handler for " + bundleJar, t);
+            Throwables.propagate(t);
+        }
+        return null;
+    }
+
+    public void addProcessorConfig(ImportConfiguration config) {
+        Properties properties = config.getmoduleProp();
+        String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
+        String attrs[] = module.split("\\|");
+        String bundleJar = attrs[1];
+        String moduleType = attrs[0];
+
+        Formatter formatter = createFormatter(config.getformatterProp());
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
             if (wrapper == null) {
@@ -132,11 +180,11 @@ public class ImportProcessor implements ImportDataProcessor {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                wrapper.configure(properties);
+                wrapper.configure(properties, formatter);
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             } else {
-                wrapper.configure(properties);
+                wrapper.configure(properties, formatter);
             }
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
@@ -202,10 +250,11 @@ public class ImportProcessor implements ImportDataProcessor {
     }
 
     @Override
-    public void setProcessorConfig(CatalogContext catalogContext, Map<String, Properties> config) {
+    public void setProcessorConfig(CatalogContext catalogContext, Map<String, ImportConfiguration> config) {
         List<String> configuredImporters = new ArrayList<String>();
         for (String cname : config.keySet()) {
-            Properties properties = config.get(cname);
+            ImportConfiguration iConfig = config.get(cname);
+            Properties properties = iConfig.getmoduleProp();
 
             String importBundleJar = properties.getProperty(IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar, "Import source is undefined or custom export plugin class missing.");
@@ -221,7 +270,7 @@ public class ImportProcessor implements ImportDataProcessor {
                 continue;
             }
             configuredImporters.add(cname);
-            addProcessorConfig(properties);
+            addProcessorConfig(iConfig);
         }
         m_logger.info("Import Processor is configured. Configured Importers: " + configuredImporters);
     }

@@ -24,6 +24,7 @@ import java.util.Properties;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.importer.formatter.Formatter;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -40,10 +41,10 @@ public class Log4jSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Formatter formatter)
     {
         System.out.println("***Creating log4j importer for " + props);
-        ImporterConfig config = new Log4jSocketImporterConfig(props);
+        ImporterConfig config = new Log4jSocketImporterConfig(props, formatter);
         return ImmutableMap.of(config.getResourceID(), config);
     }
 

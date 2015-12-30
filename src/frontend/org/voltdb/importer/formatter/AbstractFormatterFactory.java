@@ -51,5 +51,5 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
      * @param prop - formatter properties
      * @return formatter instance created with the given name and properties
      */
-    public abstract Formatter<?> create(String name, Properties prop);
+    public abstract Formatter<?> create(Properties prop);
 }
