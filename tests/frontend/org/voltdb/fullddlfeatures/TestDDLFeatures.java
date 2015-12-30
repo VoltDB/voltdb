@@ -156,7 +156,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
                 + "1000, "
                 + "1111, "
                 + "pointfromtext('point(0 0)'),"
-                + "polygonfromtext('polygon((0 0, 1 1, 2 2, 0 0))'));");
+                + "pointfromtext('point(-2.5 0)'),"
+                + "polygonfromtext('polygon((0 1, -1 1, -1 0, 0 0, 0 1))'));");
 
         resp = m_client.callProcedure("@AdHoc", "select * from T4;");
         vt = resp.getResults()[0];
@@ -751,8 +752,15 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     @Test
     public void testGEOIndex() throws Exception {
         assertTrue(findTableInSystemCatalogResults("GEO"));
-        // assertTrue(findIndexInSystemCatalogResults("GEOINDEX_ISVALID"));
+        assertTrue(findTableInSystemCatalogResults("T4"));
+        //assertTrue(findIndexInSystemCatalogResults("GEOINDEX_ISVALID"));
         assertTrue(findIndexInSystemCatalogResults("GEOINDEX_REASONS"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POLYGON"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_LATITUDE"));
+        //assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
+        //assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POINT_POINT"));
+        //assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
         // GEO has three index columns.  Two for IDX
         // and one for the primary key.
         assertEquals(3, indexedColumnCount("GEO"));
