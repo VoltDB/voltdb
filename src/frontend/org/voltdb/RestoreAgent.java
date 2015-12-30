@@ -22,6 +22,7 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -55,6 +57,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -171,6 +174,23 @@ SnapshotCompletionInterest, Promotable
                 // catalog plan.
                 findRestoreCatalog();
             }
+            // Retrieve DR version number from conversation logs.
+            byte drVersion = 0;
+            if (m_drOverflow != null) {
+                VoltFile drOverflowDir = new VoltFile(m_drOverflow.getAbsolutePath());
+                ConversationDetails detail = new ConversationDetails();
+                // ordinary dr log files look like [producerClusterId]_[consumerClusterId]_[drVersion]_[consumerNonce]_[partitionId].[seq#].pbd
+                Pattern pattern = Pattern.compile("(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)\\.\\d+\\.pbd");
+                LastConversationFinder lastConversation = new LastConversationFinder(pattern, detail);
+                try {
+                    scanPersistentFiles(drOverflowDir, lastConversation);
+                } catch (IOException e) {
+                    VoltDB.crashGlobalVoltDB("Failed to read attribute of DR conversation logs: " + e.getMessage(),
+                            true, e);
+                }
+                drVersion = detail.m_drVersion;
+            }
+            sendDRProtocolVersion(m_hostId.toString(), drVersion);
 
             try {
                 if (!m_isLeader) {
@@ -184,26 +204,16 @@ SnapshotCompletionInterest, Promotable
                     // will release the non-leaders waiting on VoltZK.restore_snapshot_id.
                     sendSnapshotTxnId(m_snapshotToRestore);
 
+
                     if (m_snapshotToRestore != null) {
                         LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
                                 " in " + m_snapshotToRestore.path);
-
-                        // Retrieve DR version number from conversation logs.
-                        byte drVersion = 0;
-                        if (m_drOverflow != null) {
-                            VoltFile drOverflowDir = new VoltFile(m_drOverflow.getAbsolutePath());
-                            ConversationDetails detail = new ConversationDetails();
-                            // ordinary dr log files look like [producerClusterId]_[consumerClusterId]_[drVersion]_[consumerNonce]_[partitionId].[seq#].pbd
-                            Pattern pattern = Pattern.compile("(\\d+)_(\\d+)_(\\d+)_(\\d+)_(\\d+)\\.\\d+\\.pbd");
-                            LastConversationFinder lastConversation = new LastConversationFinder(pattern, detail);
-                            scanPersistentFiles(drOverflowDir, lastConversation);
-                            drVersion = detail.m_drVersion;
-                        }
+                        byte agreedVersion = fetchDRProtocolVersionConcensusResult(drVersion);
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
-                        if (drVersion != 0) {
-                            jsObj.put("drVersion", drVersion);
+                        if (agreedVersion != 0) {
+                            jsObj.put("drVersion", agreedVersion);
                         }
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
@@ -979,6 +989,54 @@ SnapshotCompletionInterest, Promotable
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
                                      false, e);
         }
+    }
+
+    private void sendDRProtocolVersion(String hostIdStr, byte drVersion) {
+        ByteBuffer version = ByteBuffer.allocate(1);
+        version.put(drVersion);
+        try {
+            ZKUtil.addIfMissing(m_zk, VoltZK.restore_dr_version, CreateMode.PERSISTENT, null);
+            m_zk.create(ZKUtil.joinZKPath(VoltZK.restore_dr_version, hostIdStr),
+                        version.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        } catch (Exception e) {
+            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
+                                     false, e);
+        }
+    }
+
+    private byte fetchDRProtocolVersionConcensusResult(byte localVersion) throws KeeperException, InterruptedException {
+        List<String> dataNodes = m_zk.getChildren(VoltZK.restore_dr_version, false);
+        Map<Byte, Integer> drVersionMap = new HashMap<>();
+        for (String node : dataNodes) {
+            String path = ZKUtil.joinZKPath(VoltZK.restore_dr_version, node);
+            String currentPath = ZKUtil.joinZKPath(VoltZK.restore_dr_version, m_hostId.toString());
+            byte version;
+            if (path.equals(currentPath)) {
+                version = localVersion;
+            } else {
+                ByteBuffer versionBuffer = ByteBuffer.wrap(m_zk.getData(path, false, new Stat()));
+                version = versionBuffer.get();
+            }
+            // We need only non-zero nodes to attend the consensus
+            if (version != 0) {
+                if (!drVersionMap.containsKey(version)) {
+                    drVersionMap.put(version, 1);
+                } else {
+                    int oldValue = drVersionMap.get(version);
+                    drVersionMap.put(version, oldValue + 1);
+                }
+            }
+        }
+        // Count the vote
+        byte agreedDRVersion = 0;
+        int leadingVote = 0;
+        for (Entry<Byte, Integer> entry : drVersionMap.entrySet()) {
+            if (leadingVote < entry.getValue()) {
+                leadingVote = entry.getValue();
+                agreedDRVersion = entry.getKey();
+            }
+        }
+        return agreedDRVersion;
     }
 
     /**

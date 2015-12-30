@@ -87,6 +87,7 @@ public class VoltZK {
     public static final String restore_barrier = "/db/restore_barrier";
     public static final String restore_barrier2 = "/db/restore_barrier2";
     public static final String restore_snapshot_id = "/db/restore/snapshot_id";
+    public static final String restore_dr_version = "/db/restore/dr_version";
     public static final String request_truncation_snapshot = "/db/request_truncation_snapshot";
     public static final String snapshot_truncation_master = "/db/snapshot_truncation_master";
     public static final String test_scan_path = "/db/test_scan_path";   // (test only)
