@@ -49,26 +49,24 @@ function clean() {
          statement-plans procedures/geospatial/*.class \
          client/geospatial/*.class \
          geospatial-client.jar \
-         geospatial-procedures.jar
+         geospatial-procs.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    # javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/geospatial/*.java
     javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/geospatial/*.java
     # build procedure and client jars
-    # jar cf voter-procs.jar -C procedures voter
+    jar cf geospatial-procs.jar -C procedures geospatial
     jar cf geospatial-client.jar -C client geospatial
     # remove compiled .class files
-    #rm -rf procedures/voter/*.class client/voter/*.class
-    rm -rf client/voter/*.class
+    rm -rf procedures/geospatial/*.class client/geospatial/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    #if [ ! -e geospatial-procs.jar ] || [ ! -e voter-client.jar ]; then
-    if [ ! -e geospatial-client.jar ]; then
+    if [ ! -e geospatial-procs.jar ] || [ ! -e geospatial-client.jar ]; then
         jars;
     fi
 }
