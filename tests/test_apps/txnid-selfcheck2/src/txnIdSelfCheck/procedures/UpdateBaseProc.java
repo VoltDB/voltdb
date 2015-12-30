@@ -129,8 +129,8 @@ public class UpdateBaseProc extends VoltProcedure {
         validateCIDData(data, view, getClass().getName());
 
         if (usestreamviews)	{
-        	voltQueueSQL(p_getExViewData);
-        	voltQueueSQL(p_getExViewShadowData);
+        	voltQueueSQL(p_getExViewData, cid);
+        	voltQueueSQL(p_getExViewShadowData, cid);
         	VoltTable[] streamresults = voltExecuteSQL();
         	validateStreamData(streamresults[0], streamresults[1], cid, cnt);
         }
@@ -282,36 +282,35 @@ public class UpdateBaseProc extends VoltProcedure {
         long v_max = row0.getLong("maximum");
         long v_min = row0.getLong("minimum");
         long v_sum = row0.getLong("summation");
+        // if no cid row in shadow, skip check below and it will be inserted as an initial value
+        if (shadowview.getRowCount() == 1) {
+        	row0 = shadowview.fetchRow(0);
+        	long shadow_entries = row0.getLong("entries");
+        	long shadow_max = row0.getLong("maximum");
+        	long shadow_min = row0.getLong("minimum");
+        	long shadow_sum = row0.getLong("summation");
 
-        if (shadowview.getRowCount() != 1)
-            throw new VoltAbortException("Shadow of export view has "+shadowview.getRowCount()+" entries of the same cid, that should not happen.");
-        row0 = shadowview.fetchRow(0);
-        long shadow_entries = row0.getLong("entries");
-        long shadow_max = row0.getLong("maximum");
-        long shadow_min = row0.getLong("minimum");
-        long shadow_sum = row0.getLong("summation");
+        	// adjust the shadow values for updated cnt
+        	shadow_entries++;
+        	shadow_max = Math.max(shadow_max, v_max);
+        	shadow_min = Math.min(shadow_min, v_min);
+        	shadow_sum += cnt;
 
-        // adjust the shadow values for updated cnt
-        shadow_entries++;
-        shadow_max = Math.max(shadow_max, v_max);
-        shadow_min = Math.min(shadow_min, v_min);
-        shadow_sum += cnt;
-
-        if (v_entries != shadow_entries)
-            throw new VoltAbortException(
-                    "The count(*):"+v_entries+" materialized view aggregation does not match the number of shadow cnt entries:"+shadow_entries+" for cid:"+cid);
-        if (v_max != shadow_max)
-            throw new VoltAbortException(
-                    "The max(cnt):"+v_max+" materialized view aggregation does not match the shadow max:"+shadow_max+" for cid:"+cid);
-        if (v_min != shadow_min)
-            throw new VoltAbortException(
-                    "The min(cnt):"+v_min+" materialized view aggregation does not match the shadow min:"+shadow_min+" for cid:"+cid);
-        if (v_sum != shadow_sum)
-            throw new VoltAbortException(
-                    "The sum(cnt):"+v_sum+" materialized view aggregation does not match the shadow sum:"+shadow_sum+" for cid:"+cid);
-
+        	if (v_entries != shadow_entries)
+        		throw new VoltAbortException(
+        				"The count(*):"+v_entries+" materialized view aggregation does not match the number of shadow cnt entries:"+shadow_entries+" for cid:"+cid);
+        	if (v_max != shadow_max)
+        		throw new VoltAbortException(
+        				"The max(cnt):"+v_max+" materialized view aggregation does not match the shadow max:"+shadow_max+" for cid:"+cid);
+        	if (v_min != shadow_min)
+        		throw new VoltAbortException(
+        				"The min(cnt):"+v_min+" materialized view aggregation does not match the shadow min:"+shadow_min+" for cid:"+cid);
+        	if (v_sum != shadow_sum)
+        		throw new VoltAbortException(
+        				"The sum(cnt):"+v_sum+" materialized view aggregation does not match the shadow sum:"+shadow_sum+" for cid:"+cid);
+        }
         // update the shadow table with the new matching values and return
-        voltQueueSQL(p_upsertExViewShadowData, cid, cnt, shadow_max, shadow_min, shadow_sum);
+        voltQueueSQL(p_upsertExViewShadowData, cid, cnt, v_max, v_min, v_sum);
         voltExecuteSQL();
         return;
  	}
