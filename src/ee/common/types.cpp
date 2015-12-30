@@ -33,6 +33,7 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_BIGINT):
       case (VALUE_TYPE_DECIMAL):
       case (VALUE_TYPE_DOUBLE):
+      case (VALUE_TYPE_BOOLEAN):
         return true;
       break;
       case (VALUE_TYPE_VARCHAR):
@@ -57,6 +58,7 @@ bool isIntegralType(ValueType type) {
       case (VALUE_TYPE_SMALLINT):
       case (VALUE_TYPE_INTEGER):
       case (VALUE_TYPE_BIGINT):
+      case (VALUE_TYPE_BOOLEAN):
         return true;
       break;
       case (VALUE_TYPE_DOUBLE):
@@ -99,6 +101,8 @@ NValue getRandomValue(ValueType type, uint32_t maxLength) {
             return ValueFactory::getIntegerValue(rand() % (1 << 31));
         case VALUE_TYPE_BIGINT:
             return ValueFactory::getBigIntValue(rand());
+        case VALUE_TYPE_BOOLEAN:
+            return ValueFactory::getBooleanValue(static_cast<bool>(rand() % 2));
         case VALUE_TYPE_DECIMAL: {
             char characters[29];
             int i;
