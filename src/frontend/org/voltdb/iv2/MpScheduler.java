@@ -267,7 +267,8 @@ public class MpScheduler extends Scheduler
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
-                    message.isForReplay());
+                    message.isForReplay(),
+                    message.getSiteTaskerQueueId());
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
@@ -293,7 +294,8 @@ public class MpScheduler extends Scheduler
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
-                    message.isForReplay());
+                    message.isForReplay(),
+                    message.getSiteTaskerQueueId());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
         if (isNpTxn(message) && NpProcedureTaskConstructor != null) {
@@ -379,7 +381,8 @@ public class MpScheduler extends Scheduler
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
-                    message.isForReplay());
+                    message.isForReplay(),
+                    message.getSiteTaskerQueueId());
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;

@@ -26,7 +26,11 @@ package org.voltdb.iv2;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,10 +51,11 @@ import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.iv2.SiteTaskerQueue.DefaultSiteTaskerQueue;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class TestSpSchedulerSpHandle extends TestCase
 {
@@ -67,7 +72,7 @@ public class TestSpSchedulerSpHandle extends TestCase
 
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new DefaultSiteTaskerQueue();
         queue.setStarvationTracker(new StarvationTracker(0));
         return queue;
     }

@@ -259,6 +259,11 @@ public class InitiatorMailbox implements Mailbox
                         deliverInternal(message);
                     }
                 }
+
+                @Override
+                public int getQueueIdentifier() {
+                    return message.getSiteTaskerQueueId();
+                }
             });
         } else {
             synchronized (this) {

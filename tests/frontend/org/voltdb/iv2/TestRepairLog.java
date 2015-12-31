@@ -342,7 +342,7 @@ public class TestRepairLog
 
         Iv2InitiateTaskMessage msg =
                 new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,
-                        spi, 0l, 0l, false);
+                        spi, 0l, 0l, false, FairSiteTaskerQueue.DEFAULT_QUEUE);
         msg.setSpHandle(900l);
         RepairLog log = new RepairLog();
         log.deliver(msg);

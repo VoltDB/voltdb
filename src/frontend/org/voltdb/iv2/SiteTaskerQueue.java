@@ -23,43 +23,67 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.StarvationTracker;
 
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
-public class SiteTaskerQueue
-{
-    private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
-    private StarvationTracker m_starvationTracker;
+public abstract class SiteTaskerQueue {
+    private static final boolean USE_FAIR_SCHEDULING = Boolean.getBoolean("SITE_TASKER_USE_FAIR_SCHEDULING");
 
-    public boolean offer(SiteTasker task)
-    {
-        return m_tasks.offer(task);
+    public static SiteTaskerQueue create() {
+        if (USE_FAIR_SCHEDULING) {
+            return new FairSiteTaskerQueue();
+        }
+        return new DefaultSiteTaskerQueue();
     }
 
+
+    private StarvationTracker m_starvationTracker;
+
     // Block on the site tasker queue.
-    public SiteTasker take() throws InterruptedException
-    {
-        SiteTasker task = m_tasks.poll();
+    public SiteTasker take() throws InterruptedException {
+        SiteTasker task = poll();
         if (task == null) {
             m_starvationTracker.beginStarvation();
         } else {
             return task;
         }
         try {
-            return CoreUtils.queueSpinTake(m_tasks);
+            return takeImpl();
         } finally {
             m_starvationTracker.endStarvation();
         }
     }
 
-    // Non-blocking poll on the site tasker queue.
-    public SiteTasker poll()
-    {
-        return m_tasks.poll();
-    }
-
-    public boolean isEmpty() {
-        return m_tasks.isEmpty();
-    }
-
     public void setStarvationTracker(StarvationTracker tracker) {
         m_starvationTracker = tracker;
+    }
+
+    public abstract boolean offer(SiteTasker task);
+
+    public abstract SiteTasker poll();
+
+    public abstract boolean isEmpty();
+
+    protected abstract SiteTasker takeImpl() throws InterruptedException;
+
+    static class DefaultSiteTaskerQueue extends SiteTaskerQueue {
+        private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
+
+        @Override
+        public boolean offer(SiteTasker task) {
+            return m_tasks.offer(task);
+        }
+
+        @Override
+        public SiteTasker poll() {
+            return m_tasks.poll();
+        }
+
+        @Override
+        protected SiteTasker takeImpl() throws InterruptedException {
+            return CoreUtils.queueSpinTake(m_tasks);
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return m_tasks.isEmpty();
+        }
     }
 }

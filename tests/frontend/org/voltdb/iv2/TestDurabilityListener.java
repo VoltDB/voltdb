@@ -24,6 +24,7 @@
 package org.voltdb.iv2;
 
 import com.google_voltpatches.common.collect.Lists;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.StoredProcedureInvocation;
@@ -194,7 +195,7 @@ public class TestDurabilityListener {
     {
         final Iv2InitiateTaskMessage msg = new Iv2InitiateTaskMessage(0, 0, 0, 0, uniqId,
                                                                       false, isSp, new StoredProcedureInvocation(),
-                                                                      0, 0, false);
+                                                                      0, 0, false, FairSiteTaskerQueue.DEFAULT_QUEUE);
         return new SpProcedureTask(null, "Hello", m_taskQueue, msg, null);
     }
 }

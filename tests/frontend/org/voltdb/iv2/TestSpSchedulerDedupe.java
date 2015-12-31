@@ -55,6 +55,7 @@ import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.iv2.SiteTaskerQueue.DefaultSiteTaskerQueue;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -75,7 +76,7 @@ public class TestSpSchedulerDedupe extends TestCase
     static final long dut_hsid = 11223344l;
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new DefaultSiteTaskerQueue();
         queue.setStarvationTracker(new StarvationTracker(0));
         return queue;
     }
@@ -123,7 +124,8 @@ public class TestSpSchedulerDedupe extends TestCase
                                        spi, // invocation
                                        Long.MAX_VALUE, // client interface handle
                                        Long.MAX_VALUE, // connectionId
-                                       false); // isForReplay
+                                       false, // isForReplay
+                                       FairSiteTaskerQueue.DEFAULT_QUEUE);
         // sp: sphandle == txnid
         task.setTxnId(txnId);
         return task;
