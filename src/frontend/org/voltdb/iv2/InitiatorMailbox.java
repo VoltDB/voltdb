@@ -262,7 +262,10 @@ public class InitiatorMailbox implements Mailbox
 
                 @Override
                 public int getQueueIdentifier() {
-                    return message.getSiteTaskerQueueId();
+                    if (m_scheduler.m_isLeader) {
+                        return message.getSiteTaskerQueueId();
+                    }
+                    return super.getQueueIdentifier();
                 }
             });
         } else {
