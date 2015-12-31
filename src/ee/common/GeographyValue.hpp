@@ -522,7 +522,7 @@ inline void Loop::initFromBuffer(Deserializer& input)
 
     set_origin_inside(input.readByte());
     set_depth(input.readInt());
-    assert(depth() >= 0 && depth() < 2);
+    assert(depth() >= 0);
 
     S2LatLngRect bound;
     initBoundFromBuffer(&bound, input);
@@ -535,7 +535,7 @@ void Loop::saveToBuffer(Serializer& output) const {
     output.writeInt(num_vertices());
     output.writeBinaryString(vertices(), sizeof(*(vertices())) * num_vertices());
     output.writeBool(origin_inside());
-    assert(depth() >= 0 && depth() < 2);
+    assert(depth() >= 0);
     output.writeInt(depth());
 
     S2LatLngRect bound = GetRectBound();
