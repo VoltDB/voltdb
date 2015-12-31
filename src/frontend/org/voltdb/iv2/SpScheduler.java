@@ -481,7 +481,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay(),
-                    FairSiteTaskerQueue.DEFAULT_QUEUE);
+                    message.getSiteTaskerQueueId());
 
             msg.setSpHandle(newSpHandle);
 
