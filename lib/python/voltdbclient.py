@@ -124,7 +124,6 @@ class FastSerializer:
     NULL_INTEGER_INDICATOR = -2147483648
     NULL_BIGINT_INDICATOR = -9223372036854775808
     NULL_FLOAT_INDICATOR = -1.7E308
-    NULL_GEOGRAPHY_POINT_INDICATOR = 360
 
     # default decimal scale
     DEFAULT_DECIMAL_SCALE = 12
@@ -184,9 +183,7 @@ class FastSerializer:
                        self.VOLTTYPE_STRING: self.readString,
                        self.VOLTTYPE_VARBINARY: self.readVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.readDate,
-                       self.VOLTTYPE_DECIMAL: self.readDecimal,
-                       self.VOLTTYPE_GEOGRAPHY_POINT: self.readGeographyPoint,
-                       self.VOLTTYPE_GEOGRAPHY: self.readGeography}
+                       self.VOLTTYPE_DECIMAL: self.readDecimal}
         self.WRITER = {self.VOLTTYPE_NULL: self.writeNull,
                        self.VOLTTYPE_TINYINT: self.writeByte,
                        self.VOLTTYPE_SMALLINT: self.writeInt16,
@@ -196,9 +193,7 @@ class FastSerializer:
                        self.VOLTTYPE_STRING: self.writeString,
                        self.VOLTTYPE_VARBINARY: self.writeVarbinary,
                        self.VOLTTYPE_TIMESTAMP: self.writeDate,
-                       self.VOLTTYPE_DECIMAL: self.writeDecimal,
-                       self.VOLTTYPE_GEOGRAPHY_POINT: self.writeGeographyPoint,
-                       self.VOLTTYPE_GEOGRAPHY: self.readGeography}
+                       self.VOLTTYPE_DECIMAL: self.writeDecimal}
         self.ARRAY_READER = {self.VOLTTYPE_TINYINT: self.readByteArray,
                              self.VOLTTYPE_SMALLINT: self.readInt16Array,
                              self.VOLTTYPE_INTEGER: self.readInt32Array,
@@ -206,9 +201,7 @@ class FastSerializer:
                              self.VOLTTYPE_FLOAT: self.readFloat64Array,
                              self.VOLTTYPE_STRING: self.readStringArray,
                              self.VOLTTYPE_TIMESTAMP: self.readDateArray,
-                             self.VOLTTYPE_DECIMAL: self.readDecimalArray,
-                             self.VOLTTYPE_GEOGRAPHY_POINT: self.readGeographyPointArray,
-                             self.VOLTTYPE_GEOGRAPHY: self.readGeographyArray}
+                             self.VOLTTYPE_DECIMAL: self.readDecimalArray}
 
         self.__compileStructs()
 
@@ -750,58 +743,6 @@ class FastSerializer:
         if not isinstance(num, decimal.Decimal):
             raise TypeError("num must be of type decimal.Decimal")
         self.writeString(num.to_eng_string())
-
-    # point (GEOGRAPHYPOINT)
-    def readGeographyPoint(self):
-        # length preceded (4 byte value) string
-        length = self.readInt32()
-        if self.NullCheck[self.VOLTTYPE_GEOGRAPHY_POINT](length) == None:
-            return None
-        return self.readStringContent(length)
-
-    def readGeographyPointArray(self):
-        retval = []
-        cnt = self.readInt16()
-
-        for i in xrange(cnt):
-            retval.append(self.readGeographyPoint())
-
-        return tuple(retval)
-
-    def writeGeographyPoint(self, value):
-        if value is None:
-            self.writeInt32(self.NULL_GEOGRAPHY_POINT_INDICATOR)
-            return
-
-        encoded_value = value.encode("utf-8")
-        self.writeInt32(len(encoded_value))
-        self.wbuf.extend(encoded_value)
-
-    # polygon (GEOGRAPHY)
-    def readGeography(self):
-        # length preceded (4 byte value) string
-        length = self.readInt32()
-        if self.NullCheck[self.VOLTTYPE_GEOGRAPHY](length) == None:
-            return None
-        return self.readStringContent(length)
-
-    def readGeographyArray(self):
-        retval = []
-        cnt = self.readInt16()
-
-        for i in xrange(cnt):
-            retval.append(self.readGeography())
-
-        return tuple(retval)
-
-    def writeGeography(self, value):
-        if value is None:
-            self.writeInt32(self.NULL_GEOGRAPHY_INDICATOR)
-            return
-
-        encoded_value = value.encode("utf-8")
-        self.writeInt32(len(encoded_value))
-        self.wbuf.extend(encoded_value)
 
     # cash!
     def readMoney(self):

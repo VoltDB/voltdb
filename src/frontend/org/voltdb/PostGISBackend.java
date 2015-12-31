@@ -176,12 +176,13 @@ public class PostGISBackend extends PostgreSQLBackend {
     /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
      *  PostgreSQL/PostGIS with other, similar terms. */
     static public String transformDDL(String ddl) {
-        // TODO: make this more robust, using a regex Pattern(s)??
+        // 4326 is the standard, spheroidal SRIS/EPSG normally used by PostGIS;
+        // we may wish to change this to use a sphere, if we can find an
+        // appropriate SRIS to use, which PostGIS supports (possibly 3857?)
         String modified_ddl = PostgreSQLBackend.transformDDL(ddl)
+                // TODO: make these more robust, using regex Patterns??
                 .replace("GEOGRAPHY_POINT", "GEOGRAPHY(POINT,4326)")
                 .replace("GEOGRAPHY,",      "GEOGRAPHY(POLYGON,4326),");
-//        System.out.println("ddl         : " + ddl);
-//        System.out.println("modified_ddl: " + modified_ddl);
         return modified_ddl;
     }
 

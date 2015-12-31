@@ -332,7 +332,7 @@ class BaseGenerator:
         for ctor in generator_types:
             # TODO: temp kludge, until Python client works:
             substitute_for_geo_types = False
-            if str(ctor) == "SQLGenerator.ColumnGenerator" and statement.startswith("SELECT"):
+            if str(ctor) == "SQLGenerator.ColumnGenerator" and statement.startswith("SELECT") and ("WHERE" not in statement or "B9" in statement):
                 substitute_for_geo_types = True
             while True:
                 another_gen = ctor()
@@ -648,9 +648,8 @@ class Schema:
         "string":    ("string",    "nonnumeric", ""),
         "varbinary": ("varbinary", "nonnumeric", ""),
         "timestamp": ("timestamp", "nonnumeric", ""),
-        "point":     ("point",     "geo", "nonnumeric", ""),
-        "polygon":   ("polygon",   "geo", "nonnumeric", ""),
-#         "geography": ("geography", "geo", "nonnumeric", ""),
+        "point":     ("point",   "geo", "nonnumeric", ""),
+        "polygon":   ("polygon", "geo", "nonnumeric", ""),
     }
 
     TYPE_NAMES = {
@@ -664,8 +663,7 @@ class Schema:
         FastSerializer.VOLTTYPE_DECIMAL:   "decimal",
         FastSerializer.VOLTTYPE_TIMESTAMP: "timestamp",
         FastSerializer.VOLTTYPE_GEOGRAPHY_POINT: "point",
-        FastSerializer.VOLTTYPE_GEOGRAPHY:  "polygon",
-#         FastSerializer.VOLTTYPE_GEOGRAPHY:  "geography",
+        FastSerializer.VOLTTYPE_GEOGRAPHY: "polygon",
     }
 
     def __init__(self, **kwargs):

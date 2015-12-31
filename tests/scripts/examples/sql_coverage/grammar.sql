@@ -29,14 +29,16 @@
 {_distinctableagg |= "SUM"}
 --HSQL refuses to do AVG(DISTINCT) {_distinctableagg |= "AVG"}
 
-{_geofun1arg |= ""}
-{_geofun1arg |= "LATITUDE"}
-{_geofun1arg |= "LONGITUDE"}
-{_geofun1arg |= "AREA"}
---{_geofun1arg |= "CENTROID"}
-
-{_geofun2arg |= "DISTANCE"}
-{_geofun2arg |= "CONTAINS"}
+{_geofun |= ""}
+-- There are no unary point-to-point or polygon-to-polygon functions supported yet.
+{_point2numfun |= "LATITUDE"}
+{_point2numfun |= "LONGITUDE"}
+{_poly2numfun |= "AREA"}
+{_2geo2numfun |= "DISTANCE"}
+{_polypoint2boolfun |= "CONTAINS"}
+{_poly2boolfun |= "isValid"}
+{_poly2pointfun |= "CENTROID"}
+{_geo2stringfun |= "asText"}
 
 {_maybe |= ""}
 {_maybe |= " NOT "}
@@ -54,13 +56,15 @@
 {_math |= " / "}
 -- {_math |= " % "}
 
-{_cmp |= "="}
-{_cmp |= "<>"}
+{_eqne |= "="}
+{_eqne |= "<>"}
+{_eqne |= "!="} -- Apparently, an HSQL-supported alias for the standard <>
+
+{_cmp |= "_eqne"}
 {_cmp |= "<"}
 {_cmp |= ">"}
 {_cmp |= "<="}
 {_cmp |= ">="}
-{_cmp |= "!="} -- Apparently, an HSQL-supported alias for the standard <>
 
 {_jointype |= " "}
 {_jointype |= " INNER "}

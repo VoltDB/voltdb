@@ -59,14 +59,14 @@ SELECT COUNT(*) FROM @fromtables B10
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT @star FROM @fromtables A WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
+SELECT @star FROM @fromtables B11 WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
 --- test EXISTS/IN operators ()
-SELECT @star FROM @fromtables A WHERE EXISTS(SELECT @star FROM @fromtables B WHERE _maybe B.@idcol _cmp A.@idcol )
+SELECT @star FROM @fromtables A12 WHERE EXISTS(SELECT @star FROM @fromtables B WHERE _maybe B.@idcol _cmp A12.@idcol )
 
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT @star FROM @fromtables A WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
+SELECT @star FROM @fromtables B12 WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
-SELECT @star FROM @fromtables A WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
+SELECT @star FROM @fromtables B13 WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
 -- test GROUP BY
 SELECT _variable[#grouped @columntype] B14 FROM @fromtables A GROUP BY __[#grouped]
 
