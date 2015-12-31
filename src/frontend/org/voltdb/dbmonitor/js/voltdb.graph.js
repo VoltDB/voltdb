@@ -535,6 +535,110 @@
            }
         });
 
+
+        function Long(low, high) {
+            this.low_ = low | 0;  // force into 32 signed bits.
+            this.high_ = high | 0;  // force into 32 signed bits.
+        };
+
+        Long.TWO_PWR_16_DBL_ = 1 << 16;
+        Long.TWO_PWR_32_DBL_ = Long.TWO_PWR_16_DBL_ * Long.TWO_PWR_16_DBL_;
+        Long.TWO_PWR_64_DBL_ = Long.TWO_PWR_32_DBL_ * Long.TWO_PWR_32_DBL_;
+        Long.TWO_PWR_63_DBL_ = Long.TWO_PWR_64_DBL_ / 2;
+
+        Long.fromInt = function(value) {
+            var obj = new Long(value | 0, value < 0 ? -1 : 0);
+            return obj;
+        };
+
+        Long.fromNumber = function(value) {
+            if (isNaN(value) || !isFinite(value)) {
+                return Long.fromInt(0)
+            } else if (value <= -Long.TWO_PWR_63_DBL_) {
+                return Long.fromBits(0, 0x80000000 | 0);
+            } else if (value + 1 >= Long.TWO_PWR_63_DBL_) {
+                return Long.fromBits(0xFFFFFFFF | 0, 0x7FFFFFFF | 0);
+            } else if (value < 0) {
+                return Long.fromNumber(-value).negate();
+            } else {
+                return new Long(
+                        (value % Long.TWO_PWR_32_DBL_) | 0,
+                        (value / Long.TWO_PWR_32_DBL_) | 0);
+            }
+        };
+
+        Long.fromBits = function(lowBits, highBits) {
+          return new Long(lowBits, highBits);
+        };
+
+        Long.prototype.negate = function() {
+            return this.not().add(Long.fromInt(1));
+        };
+        Long.prototype.add = function(other) {
+            // Divide each number into 4 chunks of 16 bits, and then sum the chunks.
+            var a48 = this.high_ >>> 16;
+            var a32 = this.high_ & 0xFFFF;
+            var a16 = this.low_ >>> 16;
+            var a00 = this.low_ & 0xFFFF;
+
+            var b48 = other.high_ >>> 16;
+            var b32 = other.high_ & 0xFFFF;
+            var b16 = other.low_ >>> 16;
+            var b00 = other.low_ & 0xFFFF;
+
+            var c48 = 0, c32 = 0, c16 = 0, c00 = 0;
+            c00 += a00 + b00;
+            c16 += c00 >>> 16;
+            c00 &= 0xFFFF;
+            c16 += a16 + b16;
+            c32 += c16 >>> 16;
+            c16 &= 0xFFFF;
+            c32 += a32 + b32;
+            c48 += c32 >>> 16;
+            c32 &= 0xFFFF;
+            c48 += a48 + b48;
+            c48 &= 0xFFFF;
+            return Long.fromBits((c16 << 16) | c00, (c48 << 16) | c32);
+        };
+
+        Long.prototype.not = function() {
+            return Long.fromBits(~this.low_, ~this.high_);
+        };
+
+        Long.prototype.or = function(other) {
+            return Long.fromBits(this.low_ | other.low_,
+                    this.high_ | other.high_);
+        };
+
+        Long.prototype.shiftLeft = function(numBits) {
+            numBits &= 63;
+            if (numBits == 0) {
+                return this;
+            } else {
+                var low = this.low_;
+                if (numBits < 32) {
+                    var high = this.high_;
+                    return new Long(low << numBits,
+                            (high << numBits) | (low >>> (32 - numBits)));
+                } else {
+                    return new Long(0, low << (numBits - 32));
+                }
+            }
+        };
+
+        Long.prototype.numberOfLeadingZeros = function () {
+            var n = 1;
+            var x = this.high_;
+            if (x == 0) { n += 32; x = this.low_; }
+            if (x >>> 16 == 0) { n += 16; x <<= 16; }
+            if (x >>> 24 == 0) { n +=  8; x <<=  8; }
+            if (x >>> 28 == 0) { n +=  4; x <<=  4; }
+            if (x >>> 30 == 0) { n +=  2; x <<=  2; }
+            n -= x >>> 31;
+            return n;
+        };
+
+
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
             this.highestTrackableValue = highestTrackableValue;
@@ -551,7 +655,10 @@
             this.subBucketHalfCountMagnitude = ((subBucketCountMagnitude > 1) ? subBucketCountMagnitude : 1) - 1;
             this.subBucketCount = Math.pow(2, (this.subBucketHalfCountMagnitude + 1));
             this.subBucketHalfCount = this.subBucketCount / 2;
-            this.subBucketMask = (this.subBucketCount - 1) << this.unitMagnitude;
+            var subBucketMask = Long.fromInt(this.subBucketCount - 1);
+            this.subBucketMask = subBucketMask.shiftLeft(this.unitMagnitude);
+            // Establish leadingZeroCountBase, used in getBucketIndex() fast path:
+            this.leadingZeroCountBase = 64 - this.unitMagnitude - this.subBucketHalfCountMagnitude - 1;
             var trackableValue = (this.subBucketCount - 1) << this.unitMagnitude;
             var bucketsNeeded = 1;
             while (trackableValue < this.highestTrackableValue) {
@@ -578,23 +685,92 @@
             return this.count[countIndex];
         };
 
-        Histogram.prototype.valueFromIndex = function (bucketIndex, subBucketIndex) {
+        Histogram.prototype.normalizeIndex = function (index, normalizingIndexOffset, arrayLength) {
+            if (normalizingIndexOffset == 0) {
+                // Fastpath out of normalization. Keeps integer value histograms fast while allowing
+                // others (like DoubleHistogram) to use normalization at a cost...
+                return index;
+            }
+            if ((index > arrayLength) || (index < 0)) {
+                throw new ArrayIndexOutOfBoundsException("index out of covered value range");
+            }
+            var normalizedIndex = index - normalizingIndexOffset;
+            // The following is the same as an unsigned remainder operation, as long as no double wrapping happens
+            // (which shouldn't happen, as normalization is never supposed to wrap, since it would have overflowed
+            // or underflowed before it did). This (the + and - tests) seems to be faster than a % op with a
+            // correcting if < 0...:
+            if (normalizedIndex < 0) {
+                normalizedIndex += arrayLength;
+            } else if (normalizedIndex >= arrayLength) {
+                normalizedIndex -= arrayLength;
+            }
+            return normalizedIndex;
+        };
+
+        Histogram.prototype.getCountAtIndex = function (index) {
+            return this.count[this.normalizeIndex(index, 0, this.countsArrayLength)];
+        };
+
+        Histogram.prototype.valueFromIndex2 = function (bucketIndex, subBucketIndex) {
             return subBucketIndex * Math.pow(2, bucketIndex + this.unitMagnitude);
         };
 
+        Histogram.prototype.valueFromIndex = function (index) {
+            var bucketIndex = (index >> this.subBucketHalfCountMagnitude) - 1;
+            var subBucketIndex = (index & (this.subBucketHalfCount - 1)) + this.subBucketHalfCount;
+            if (bucketIndex < 0) {
+                subBucketIndex -= this.subBucketHalfCount;
+                bucketIndex = 0;
+            }
+            return this.valueFromIndex2(bucketIndex, subBucketIndex);
+        };
+
+        Histogram.prototype.lowestEquivalentValue = function (value) {
+            var bucketIndex = this.getBucketIndex(value);
+            var subBucketIndex = this.getSubBucketIndex(value, bucketIndex);
+            var thisValueBaseLevel = this.valueFromIndex2(bucketIndex, subBucketIndex);
+            return thisValueBaseLevel;
+        };
+
+        Histogram.prototype.highestEquivalentValue = function (value) {
+            return this.nextNonEquivalentValue(value) - 1;
+        };
+
+        Histogram.prototype.highestEquivalentValue = function (value) {
+            return this.lowestEquivalentValue(value) + this.sizeOfEquivalentValueRange(value);
+        };
+
+        Histogram.prototype.sizeOfEquivalentValueRange = function (value) {
+            var bucketIndex = this.getBucketIndex(value);
+            var subBucketIndex = this.getSubBucketIndex(value, bucketIndex);
+            var distanceToNextValue =
+                (1 << ( this.unitMagnitude + ((subBucketIndex >= this.subBucketCount) ? (bucketIndex + 1) : bucketIndex)));
+            return distanceToNextValue;
+        };
+
+        Histogram.prototype.getBucketIndex = function (value) {
+            return this.leadingZeroCountBase - (Long.fromNumber(value).or(this.subBucketMask)).numberOfLeadingZeros();
+        };
+
+        Histogram.prototype.getSubBucketIndex = function (value, bucketIndex) {
+            return  (value >>> (bucketIndex + this.unitMagnitude));
+        };
+
         Histogram.prototype.getValueAtPercentile = function (percentile) {
-            var totalToCurrentIJ = 0;
+            var requestedPercentile = Math.min(percentile, 100.0); // Truncate down to 100%
             var countAtPercentile = Math.floor(((percentile / 100.0) * this.totalCount) + 0.5); // round to nearest
-            for (var i = 0; i < this.bucketCount; i++) {
-                var j = (i == 0) ? 0 : (this.subBucketCount / 2);
-                for (; j < this.subBucketCount; j++) {
-                    totalToCurrentIJ += this.getCountAt(i, j);
-                    if (totalToCurrentIJ >= countAtPercentile) {
-                        var valueAtIndex = this.valueFromIndex(i, j);
-                        return valueAtIndex / 1000.0;
-                    }
+            countAtPercentile = Math.max(countAtPercentile, 1); // Make sure we at least reach the first recorded entry
+            var totalToCurrentIndex = 0;
+            for (var i = 0; i < this.countsArrayLength; i++) {
+                totalToCurrentIndex += this.getCountAtIndex(i);
+                if (totalToCurrentIndex >= countAtPercentile) {
+                    var valueAtIndex = this.valueFromIndex(i);
+                    return (percentile == 0.0) ?
+                        this.lowestEquivalentValue(valueAtIndex)/1000.0 :
+                        this.highestEquivalentValue(valueAtIndex)/1000.0;
                 }
             }
+            return 0;
         };
 
         function read32(str) {

@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
-import org.HdrHistogram_voltpatches.HistogramData;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -106,24 +105,26 @@ public class LatencyLogger {
                     }
                     Date now = new Date(table.getLong(0));
                     Histogram newHistogram = AbstractHistogram.fromCompressedBytes(table.getVarbinary(4), CompressionStrategySnappy.INSTANCE);
+                    newHistogram.subtract(m_histogramData);
+                    /*
                     Histogram diffHistogram;
                     if (m_histogramData == null)
                         diffHistogram = newHistogram;
                     else
                         diffHistogram = Histogram.diff(newHistogram, m_histogramData);
+                    */
 
-                    HistogramData histData = diffHistogram.getHistogramData();
-                    long totalCount = histData.getTotalCount();
+                    long totalCount = newHistogram.getTotalCount();
                     if (totalCount > 0)
                         System.out.printf("%12s, %10d, %10d, %8.2fms, %8.2fms, %8.2fms, %8.2fms, %8.2fms\n",
                                           sdf.format(now),
                                           totalCount,
                                           (totalCount / duration),
-                                          (histData.getValueAtPercentile(95.0D) / 1000.0D),
-                                          (histData.getValueAtPercentile(99) / 1000.0D),
-                                          (histData.getValueAtPercentile(99.9) / 1000.0D),
-                                          (histData.getValueAtPercentile(99.99) / 1000.0D),
-                                          (histData.getValueAtPercentile(99.999) / 1000.0D));
+                                          (newHistogram.getValueAtPercentile(95.0D) / 1000.0D),
+                                          (newHistogram.getValueAtPercentile(99) / 1000.0D),
+                                          (newHistogram.getValueAtPercentile(99.9) / 1000.0D),
+                                          (newHistogram.getValueAtPercentile(99.99) / 1000.0D),
+                                          (newHistogram.getValueAtPercentile(99.999) / 1000.0D));
                     else
                         System.out.printf("%12s, %10d, %10d, %8.2fms, %8.2fms, %8.2fms, %8.2fms, %8.2fms\n",
                                           sdf.format(now),
@@ -131,7 +132,7 @@ public class LatencyLogger {
                                           0,
                                           0D, 0D, 0D, 0D, 0D);
 
-                    m_histogramData = newHistogram;
+                    m_histogramData = AbstractHistogram.fromCompressedBytes(table.getVarbinary(4), CompressionStrategySnappy.INSTANCE);;
                 }
             }, 0, duration, TimeUnit.SECONDS);
     }
