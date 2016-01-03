@@ -37,6 +37,7 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -1109,7 +1110,12 @@ public class ProcedureRunner {
            msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
-           msg.append("HSQL-BACKEND ERROR\n");
+           String backendType = "HSQL";
+           if (getNonVoltDBBackendIfExists() instanceof PostgreSQLBackend) {
+               backendType = "PostgreSQL";
+           }
+           msg.append(backendType);
+           msg.append("-BACKEND ERROR\n");
            if (e.getCause() != null) {
                e = e.getCause();
            }

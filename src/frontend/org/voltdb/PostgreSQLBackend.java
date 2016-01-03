@@ -41,13 +41,11 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     @SuppressWarnings("unused")
     private static final VoltLogger log = new VoltLogger(PostgreSQLBackend.class.getName());
 
-    // TODO: these will need to match the values used on our Jenkins machines,
-    // once a PostgreSQL server is set up.
-    private static final String m_default_username = "postgres";
-    private static final String m_default_password = "voltdb";
-    private static final String m_permanent_database_name = "postgres";
-    private static final String m_database_name = "sqlcoveragetest";
-    private static PostgreSQLBackend m_permanent_db_backend = null;
+    protected static final String m_default_username = "postgres";
+    protected static final String m_default_password = "voltdb";
+    protected static final String m_permanent_database_name = "postgres";
+    protected static final String m_database_name = "sqlcoveragetest";
+    protected static PostgreSQLBackend m_permanent_db_backend = null;
     // PostgreSQL column type names that are not found in VoltDB or HSQL,
     // mapped to their VoltDB/HSQL equivalents
     private static final Map<String,String> m_PostgreSQLTypeNames;
@@ -172,7 +170,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
     }
 
     /** Creates a new PostgreSQLBackend wrapping dbconn. This is (was?) used for testing only. */
-    private PostgreSQLBackend(Connection dbconn) {
+    protected PostgreSQLBackend(Connection dbconn) {
         super(dbconn);
     }
 
@@ -300,7 +298,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
     @SuppressWarnings("unused")
-    static private String transformQuery(String query, Pattern queryPattern, String initText,
+    static protected String transformQuery(String query, Pattern queryPattern, String initText,
             String prefix, String suffix, String altEnding, String altText,
             boolean useWhole, boolean intOnly, Double multiplier, Integer minimum,
             String ... groups) {
@@ -402,7 +400,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
-    static private String transformQuery(String query, Pattern queryPattern,
+    static protected String transformQuery(String query, Pattern queryPattern,
             String initText, String prefix, String suffix, String altText,
             boolean useWhole, boolean intOnly, String ... groups) {
         return transformQuery(query, queryPattern, initText,
@@ -448,7 +446,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * @throws NullPointerException if <i>query</i>, <i>queryPattern</i>,
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
-    static private String transformQuery(String query, Pattern queryPattern,
+    static protected String transformQuery(String query, Pattern queryPattern,
             String initText, String prefix, String suffix,
             boolean useWhole, Double multiplier, Integer minimum,
             String ... groups) {
@@ -531,8 +529,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                 "BIT VARYING(", ")", false, 8.0, 8, "numBytes");
     }
 
-    /** For a SQL DDL statement, replace keywords not supported by PostgreSQL
-     *  with other, similar terms. */
+    /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
+     *  PostgreSQL with other, similar terms. */
     static public String transformDDL(String ddl) {
         return transformVarcharOfBytes(transformVarbinary(ddl))
                 .replace("TINYINT", "SMALLINT")
@@ -551,12 +549,19 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
                                 transformOrderByQuery(dml) )))));
     }
 
+    /** Optionally, modifies DDL statements in such a way that PostgreSQL
+     *  results will match VoltDB results; and then passes the remaining
+     *  work to the base class version. */
+    protected void runDDL(String ddl, boolean transformDdl) {
+        super.runDDL((transformDdl ? transformDDL(ddl) : ddl));
+    }
+
     /** Modifies DDL statements in such a way that PostgreSQL results will
      *  match VoltDB results, and then passes the remaining work to the base
      *  class version. */
     @Override
     public void runDDL(String ddl) {
-        super.runDDL(transformDDL(ddl));
+        runDDL(ddl, true);
     }
 
     /**
@@ -572,14 +577,21 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
         return super.getColumnInfo(equivalentTypeName, colName);
     }
 
+    /** Optionally, modifies queries in such a way that PostgreSQL results will
+     *  match VoltDB results; and then passes the remaining work to the base
+     *  class version. */
+    protected VoltTable runDML(String dml, boolean transformDml) {
+        return super.runDML((transformDml ? transformDML(dml) : dml));
+    }
+
     /** Modifies queries in such a way that PostgreSQL results will match VoltDB
      *  results, and then passes the remaining work to the base class version. */
     @Override
     public VoltTable runDML(String dml) {
-        return super.runDML(transformDML(dml));
+        return runDML(dml, true);
     }
 
-    private Connection getConnection() {
+    protected Connection getConnection() {
         return dbconn;
     }
 

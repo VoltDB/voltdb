@@ -51,13 +51,13 @@ public abstract class NonVoltDBBackend {
     protected static final Object backendLock = new Object();
     protected static NonVoltDBBackend m_backend = null;
 
-    private String m_database_type = null;
+    protected String m_database_type = null;
     protected Connection dbconn;
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
     public NonVoltDBBackend(String databaseType, String driverClassName,
-                          String connectionURL, String username, String password) {
+                            String connectionURL, String username, String password) {
         m_database_type = databaseType;
         try {
             Class.forName(driverClassName);
