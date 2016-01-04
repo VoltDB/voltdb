@@ -38,6 +38,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
         super(name);
     }
 
+    private static final double EPSILON = 1.0e-12;
     private static final GeographyPointValue BEDFORD_PT = new GeographyPointValue(-71.2767, 42.4906);
     private static final GeographyPointValue SANTA_CLARA_PT = new GeographyPointValue(-121.9692, 37.3544);
     private static final GeographyPointValue LOWELL_PT = new GeographyPointValue(-71.3273, 42.6200);
@@ -374,6 +375,4 @@ public class TestGeograpyPointValue extends RegressionSuite {
 
         return builder;
     }
-
-    private final double EPSILON = 1.0e-12;
 }
