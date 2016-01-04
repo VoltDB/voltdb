@@ -40,8 +40,35 @@ public class VoltFormatter implements Formatter<String> {
         String separatorProp = prop.getProperty("separator", "");
         if (!separatorProp.isEmpty() && separatorProp.length() == 1) {
             separator = separatorProp.charAt(0);
+        } else if ("\t".equals(separatorProp)) {
+            separator = '\t';
         }
-        m_parser = new CSVParser(separator);
+
+        char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
+        String quoteCharProp = prop.getProperty("quotechar", "");
+        if (!quoteCharProp.isEmpty() && quoteCharProp.length() == 1) {
+            quotechar = quoteCharProp.charAt(0);
+        }
+
+        char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
+        String escapeProp = prop.getProperty("escape", "");
+        if (!escapeProp.isEmpty() && escapeProp.length() == 1) {
+            escape = escapeProp.charAt(0);
+        }
+
+        boolean strictQuotes = CSVParser.DEFAULT_STRICT_QUOTES;
+        String strictQuotesProp = prop.getProperty("strictquotes", "");
+        if (!strictQuotesProp.isEmpty()) {
+            strictQuotes = Boolean.parseBoolean(strictQuotesProp);
+        }
+
+        boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+        String ignoreLeadingWhiteSpaceProp = prop.getProperty("ignoreleadingwhitespace", "");
+        if (!ignoreLeadingWhiteSpaceProp.isEmpty()) {
+            ignoreLeadingWhiteSpace = Boolean.parseBoolean(ignoreLeadingWhiteSpaceProp);
+        }
+
+        m_parser = new CSVParser(separator, quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace);
     }
 
     @Override
