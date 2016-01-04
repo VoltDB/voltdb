@@ -50,7 +50,7 @@ public enum ProcedureInvocationType {
         case -128:
             return REPLICATED;
         default:
-            throw new RuntimeException("Unkonwn ProcedureInvocationType " + b);
+            throw new RuntimeException("Unknown ProcedureInvocationType " + b);
         }
     }
 
