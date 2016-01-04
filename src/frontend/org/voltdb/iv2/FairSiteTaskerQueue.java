@@ -77,7 +77,8 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
             double nextVirtualTime;
             do {
                 lastVirtualTime = m_lastVirtualTime.get();
-                double virtualStart = Math.max((double)System.currentTimeMillis(), lastVirtualTime);
+                double clockTime = System.currentTimeMillis() - UniqueIdGenerator.VOLT_EPOCH;
+                double virtualStart = Math.max(clockTime, lastVirtualTime);
                 nextVirtualTime = virtualStart + m_weightInverse;
             } while (!m_lastVirtualTime.compareAndSet(lastVirtualTime, nextVirtualTime));
             return nextVirtualTime;
