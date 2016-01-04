@@ -38,6 +38,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
         super(name);
     }
 
+    private static final double EPSILON = 1.0e-12;
     private static final GeographyPointValue BEDFORD_PT = new GeographyPointValue(-71.2767, 42.4906);
     private static final GeographyPointValue SANTA_CLARA_PT = new GeographyPointValue(-121.9692, 37.3544);
     private static final GeographyPointValue LOWELL_PT = new GeographyPointValue(-71.3273, 42.6200);
@@ -97,7 +98,6 @@ public class TestGeograpyPointValue extends RegressionSuite {
     }
 
     public void testPointFromText() throws Exception {
-        final double EPSILON = 1.0e-14;
         Client client = getClient();
 
         validateTableOfScalarLongs(client,
@@ -126,10 +126,10 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt = t2.pt "
                 + "order by t1.pk;").getResults()[0];
 
-        assertContentOfTable(new Object[][] {
+        assertApproximateContentOfTable(new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
                 {1, "Santa Clara", SANTA_CLARA_PT}},
-                vt);
+                vt, EPSILON);
 
         // Self join to test not equals operator
         vt = client.callProcedure("@AdHoc",
@@ -138,10 +138,10 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt <> t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
-                vt);
+                vt, EPSILON);
 
         // Self join to test < operator
         vt = client.callProcedure("@AdHoc",
@@ -150,9 +150,9 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt < t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
-                vt);
+                vt, EPSILON);
 
         // Self join to test <= operator
         vt = client.callProcedure("@AdHoc",
@@ -161,11 +161,11 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt <= t2.pt "
                 + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, BEDFORD_PT},
                 {1, SANTA_CLARA_PT, SANTA_CLARA_PT},
                 {1, SANTA_CLARA_PT, BEDFORD_PT}},
-                vt);
+                vt, EPSILON);
 
         // Self join to test > operator
         vt = client.callProcedure("@AdHoc",
@@ -174,9 +174,9 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt > t2.pt "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT}},
-                vt);
+                vt, EPSILON);
 
         // Self join to test >= operator
         vt = client.callProcedure("@AdHoc",
@@ -185,11 +185,11 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt >= t2.pt "
                 + "order by t1.pk, t1.pt, t2.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, BEDFORD_PT, SANTA_CLARA_PT},
                 {0, BEDFORD_PT, BEDFORD_PT},
                 {1, SANTA_CLARA_PT, SANTA_CLARA_PT}},
-                vt);
+                vt, EPSILON);
 
         // Test IS NULL
         vt = client.callProcedure("@AdHoc",
@@ -198,9 +198,9 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt is null "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {2, "Atlantis", null}},
-                vt);
+                vt, EPSILON);
 
         // Test IS NOT NULL
         vt = client.callProcedure("@AdHoc",
@@ -209,10 +209,10 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "where t1.pt is not null "
                 + "order by t1.pk, t1.pt;").getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, "Bedford", BEDFORD_PT},
                 {1, "Santa Clara", SANTA_CLARA_PT}},
-                vt);
+                vt, EPSILON);
     }
 
     public void testPointGroupBy() throws Exception {
@@ -230,11 +230,11 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 + "order by pt asc")
                 .getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {null, 3},
                 {SANTA_CLARA_PT, 3},
                 {BEDFORD_PT, 3}},
-                vt);
+                vt, EPSILON);
     }
 
     public void testPointUpdate() throws Exception {
@@ -263,11 +263,11 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 "select pk, name, pt from t order by pk")
                 .getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, "Cambridge", CAMBRIDGE_PT},
                 {1, "San Jose", SAN_JOSE_PT},
                 {2, "Atlantis", null}},
-                vt);
+                vt, EPSILON);
     }
 
     public void testPointArithmetic() throws Exception {
@@ -303,9 +303,9 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 "select pk, name, pt from t_not_null order by pk")
                 .getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {0, "Singapore", new GeographyPointValue(103.8521, 1.2905)}},
-                vt);
+                vt, EPSILON);
     }
 
     public void testPointIn() throws Exception {
@@ -317,9 +317,9 @@ public class TestGeograpyPointValue extends RegressionSuite {
         VoltTable vt = client.callProcedure("sel_in", listParam)
                 .getResults()[0];
 
-        assertContentOfTable (new Object[][] {
+        assertApproximateContentOfTable (new Object[][] {
                 {1, SANTA_CLARA_PT}},
-                vt);
+                vt, EPSILON);
 
         try {
             vt = client.callProcedure("sel_in",
