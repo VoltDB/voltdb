@@ -1376,6 +1376,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
         String pad = ""; // no pad before first column header.
         for (int i = 0; i < columnCount; i++) {
+            padding[i] += 1;
             // Determine the formatting string for each column
             VoltType colType = getColumnType(i);
             String justification = (colType == VoltType.STRING ||
@@ -1418,13 +1419,13 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 else {
                     if (colType == VoltType.VARBINARY) {
                         valueStr = Encoder.hexEncode((byte[]) value);
+                        // crop long varbinaries
+                        if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                            valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
+                        }
                     }
                     else {
                         valueStr = value.toString();
-                    }
-                    // crop long strings and such
-                    if (valueStr.length() > MAX_PRINTABLE_CHARS) {
-                        valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
                     }
                 }
                 sb.append(pad).append(String.format(fmt[i], valueStr));

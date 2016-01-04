@@ -495,11 +495,10 @@ public:
         // deserialize the hyperloglog and merge it with the
         // agg's HLL instance.
 
-        int32_t len = ValuePeeker::peekObjectLength_withoutNull(val);
-        char* data = static_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(val));
-        assert (len > 0);
-
-        std::istringstream iss(std::string(data, static_cast<size_t>(len)));
+        int32_t length;
+        const char* buf = ValuePeeker::peekObject_withoutNull(val, &length);
+        assert (length > 0);
+        std::istringstream iss(std::string(buf, length));
         hll::HyperLogLog distHll(registerBitWidth());
         distHll.restore(iss);
         hyperLogLog().merge(distHll);

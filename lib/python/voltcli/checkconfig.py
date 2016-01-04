@@ -88,24 +88,32 @@ def _check_segmentation_offload():
 # Configuration tests
 
 def test_os_release(output):
+    supported = False
+    distInfo = ""
+    formatString = "{0} release {1} {2}"
     if platform.system() == "Linux":
         output['OS'] = ["PASS", "Linux"]
-        distInfo = platform.linux_distribution()
-        distName = distInfo[0].replace(' ', '').lower()
+        distInfo = platform.dist()
         supported = False
-        if "centos" == distName or "redhat" == distName or "rhel" == distName:
-            if float(distInfo[1]) >= 6.3:
+        if distInfo[0] in ("centos", "redhat", "rhel"):
+            releaseNum = ".".join(distInfo[1].split(".")[0:2]) # release goes to 3 parts in Centos/Redhat 7.x(.y)
+            if releaseNum >= "6.3":
                 supported = True
-        elif "ubuntu" == distName:
-            if '10.04' == distInfo[1] or '12.04' == distInfo[1] or '14.04' == distInfo[1]:
+        elif "ubuntu" in distInfo[0].lower():
+            if distInfo[1] in ("10.04", "12.04", "14.04"):
                 supported = True
-        formatString = "{0} release {1} {2}"
-        if not supported:
-            formatString = "Unsupported release: " + formatString
-        output['OS release'] = ["PASS" if supported else "WARN", formatString.format(*distInfo)]
+    elif platform.system() == "Darwin":
+        output["OS"] = ["PASS", "MacOS X"]
+        version = platform.uname()[2]
+        distInfo = ("MacOS X", version, "") # on Mac, platform.dist() is empty
+        if version >= "10.8.0":
+            supported = True
     else:
         output['OS'] = ["WARN", "Only supports Linux based platforms"]
         output['OS release'] = ["WARN", "Supported distributions are Ubuntu 10.04/12.04/14.04 and RedHat/CentOS 6.3 or later"]
+    if not supported:
+        formatString = "Unsupported release: " + formatString
+    output['OS release'] = ["PASS" if supported else "WARN", formatString.format(*distInfo)]
 
 def test_64bit_os(output):
     if platform.machine().endswith('64'):
