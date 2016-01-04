@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 
@@ -46,7 +47,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     //Flag to indicate the the replica applying the write transaction
     //doesn't need to send back the result tables
     boolean m_shouldReturnResultTables = true;
-    int m_siteTaskerQueueId;
+    SiteTaskerQueueType m_siteTaskerQueueType;
     StoredProcedureInvocation m_invocation;
 
     // not serialized.
@@ -69,7 +70,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long clientInterfaceHandle,
                         long connectionId,
                         boolean isForReplay,
-                        int siteTaskerQueueId)
+                        SiteTaskerQueueType siteTaskerQueueType)
     {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         super.setOriginalTxnId(invocation.getOriginalTxnId());
@@ -79,7 +80,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
-        m_siteTaskerQueueId = siteTaskerQueueId;
+        m_siteTaskerQueueType = siteTaskerQueueType;
     }
 
     /** Copy constructor for repair. */
@@ -91,7 +92,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
-        m_siteTaskerQueueId = rhs.m_siteTaskerQueueId;
+        m_siteTaskerQueueType = SiteTaskerQueueType.DEFAULT_QUEUE;
     }
 
     @Override
@@ -154,8 +155,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     }
 
     @Override
-    public int getSiteTaskerQueueId() {
-        return m_siteTaskerQueueId;
+    public SiteTaskerQueueType getSiteTaskerQueueType() {
+        return m_siteTaskerQueueType;
     }
 
     @Override
@@ -180,7 +181,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
         buf.put((byte)0);//Should never generate a response if we have to forward to a replica
-        buf.putInt(m_siteTaskerQueueId);
+        buf.putInt(m_siteTaskerQueueType.ordinal());
         m_invocation.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());
@@ -194,7 +195,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
         m_shouldReturnResultTables = buf.get() != 0;
-        m_siteTaskerQueueId = buf.getInt();
+        m_siteTaskerQueueType = SiteTaskerQueueType.values()[buf.getInt()];
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }

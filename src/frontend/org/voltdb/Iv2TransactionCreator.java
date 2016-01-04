@@ -19,7 +19,7 @@ package org.voltdb;
 
 import org.voltcore.network.Connection;
 import org.voltdb.dtxn.TransactionCreator;
-import org.voltdb.iv2.FairSiteTaskerQueue;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 
 /**
  * Provide the Iv2 transaction routing/creation required by
@@ -67,7 +67,7 @@ public class Iv2TransactionCreator implements TransactionCreator
                 messageSize,
                 nowNanos,
                 true,
-                FairSiteTaskerQueue.DEFAULT_QUEUE);
+                SiteTaskerQueueType.DEFAULT_QUEUE);
     }
 
     @Override

@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.rejoin.TaskLog;
 
 public abstract class SiteTasker {
@@ -53,7 +54,7 @@ public abstract class SiteTasker {
     /**
      * @return a parameter used for routing if using a fair queueing strategy
      */
-    public int getQueueIdentifier() {
-        return FairSiteTaskerQueue.DEFAULT_QUEUE;
+    public SiteTaskerQueueType getQueueIdentifier() {
+        return SiteTaskerQueueType.DEFAULT_QUEUE;
     }
 }

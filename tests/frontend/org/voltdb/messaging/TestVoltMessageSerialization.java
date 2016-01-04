@@ -40,7 +40,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.iv2.FairSiteTaskerQueue;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 
 import com.google_voltpatches.common.collect.Sets;
 
@@ -90,7 +90,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true,
-                FairSiteTaskerQueue.DEFAULT_QUEUE);
+                SiteTaskerQueueType.DEFAULT_QUEUE);
         itask.setSpHandle(31337);
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
 
@@ -141,7 +141,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "wrascallywabbit");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true,
-                FairSiteTaskerQueue.DEFAULT_QUEUE);
+                SiteTaskerQueueType.DEFAULT_QUEUE);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("foobar", VoltType.STRING)
@@ -166,7 +166,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "wrascallywabbit");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true,
-                FairSiteTaskerQueue.DEFAULT_QUEUE);
+                SiteTaskerQueueType.DEFAULT_QUEUE);
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
         iresponse.setMispartitioned(true, spi, Pair.of(3l, new byte[] {1, 2, 3}));
@@ -270,7 +270,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setParams(57, "gooniestoo", "dudemandude");
 
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true,
-                FairSiteTaskerQueue.DEFAULT_QUEUE);
+                SiteTaskerQueueType.DEFAULT_QUEUE);
         itask.setSpHandle(31337);
 
         // this is the important part.
@@ -418,7 +418,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         Iv2InitiateTaskMessage itask =
                 new Iv2InitiateTaskMessage(23, 8, 100044, 100045, 99, true, false, spi, 2101, 3101, false,
-                        FairSiteTaskerQueue.DEFAULT_QUEUE);
+                        SiteTaskerQueueType.DEFAULT_QUEUE);
         itask.setSpHandle(31337);
 
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, 3L, itask);

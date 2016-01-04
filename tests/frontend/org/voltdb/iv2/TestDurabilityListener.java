@@ -23,19 +23,20 @@
 
 package org.voltdb.iv2;
 
-import com.google_voltpatches.common.collect.Lists;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
-
-import java.util.List;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+
+import java.util.List;
+
+import org.junit.Before;
+import org.junit.Test;
+import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google_voltpatches.common.collect.Lists;
 
 public class TestDurabilityListener {
     private SpScheduler m_sched;
@@ -195,7 +196,7 @@ public class TestDurabilityListener {
     {
         final Iv2InitiateTaskMessage msg = new Iv2InitiateTaskMessage(0, 0, 0, 0, uniqId,
                                                                       false, isSp, new StoredProcedureInvocation(),
-                                                                      0, 0, false, FairSiteTaskerQueue.DEFAULT_QUEUE);
+                                                                      0, 0, false, SiteTaskerQueueType.DEFAULT_QUEUE);
         return new SpProcedureTask(null, "Hello", m_taskQueue, msg, null);
     }
 }

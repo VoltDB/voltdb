@@ -20,7 +20,7 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltdb.iv2.FairSiteTaskerQueue;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 
 public abstract class VoltMessage
 {
@@ -50,7 +50,7 @@ public abstract class VoltMessage
         return m_subject;
     }
 
-    public int getSiteTaskerQueueId() {
-        return FairSiteTaskerQueue.DEFAULT_QUEUE;
+    public SiteTaskerQueueType getSiteTaskerQueueType() {
+        return SiteTaskerQueueType.DEFAULT_QUEUE;
     }
 }

@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.PriorityBlockingQueue;
 
@@ -24,47 +25,74 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.AtomicDouble;
 
+/**
+ * This {@link SiteTaskerQueue} implements weighted fair queueing. In particular,
+ * tasks can be assigned to different logical queues, and those logical queues
+ * in turn can be assigned weights (integer percentage values, summing to less
+ * than 100). These weights will be used to fairly interleave incoming tasks.
+ *
+ * Note that transactional work must be assigned to {@link #DEFAULT_QUEUE},
+ * except on its initial arrival at the {@link InitiatorMailbox} of its partition
+ * leader.
+ *
+ */
 public class FairSiteTaskerQueue extends SiteTaskerQueue {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public static final int DEFAULT_QUEUE = Integer.MIN_VALUE;
-    public static final int REPLICATION_WORK = 1;
-    private static final ImmutableMap<Integer, Double> QUEUE_INVERSE_WEIGHTS;
+    /**
+     * The queue identifiers below can be assigned to a {@link SiteTasker},
+     * which will cause it to be routed to the corresponding logical queue.
+     * Its weight may be specified using -DSITE_TASKER_$QUEUENAME_WEIGHT=[1,99].
+     * All configured weights must add to no more than 99, and 100 minus this
+     * sum will be the weight of the default queue.
+     */
+    public static enum SiteTaskerQueueType {
+        DEFAULT_QUEUE,
+        REPLICATION_WORK
+    }
+    private static final ImmutableMap<SiteTaskerQueueType, Double> QUEUE_INVERSE_WEIGHTS;
 
     static {
-        ImmutableMap.Builder<Integer, Double> b = ImmutableMap.builder();
-        int defaultWeight = 100;
-        int w = loadWeight("SITE_TASKER_REPLICATION_WORK_WEIGHT", defaultWeight);
-        if (w > 0) {
-            b.put(REPLICATION_WORK, weightInv(w));
-            defaultWeight -= w;
-        }
-        b.put(DEFAULT_QUEUE, weightInv(defaultWeight));
-        QUEUE_INVERSE_WEIGHTS = b.build();
-    }
-
-    private static int loadWeight(String propName, int defaultWeight) {
-        Integer w = Integer.getInteger(propName);
-        if (w != null) {
-            if (w <= 0) {
-                hostLog.warn(propName + " must be greater than 0");
-            } else if ((defaultWeight - w) <= 0) {
-                hostLog.warn("Cannot accomodate " + propName + " value " + w +
-                        "; all weights must sum to no more than 99");
-            } else {
-                return w;
+        EnumMap<SiteTaskerQueueType, Double> inverseWeights = new EnumMap<>(SiteTaskerQueueType.class);
+        int weightOfDefault = 100;
+        for (SiteTaskerQueueType q : SiteTaskerQueueType.values()) {
+            if (q == SiteTaskerQueueType.DEFAULT_QUEUE) {
+                continue;
+            }
+            String propName = "SITE_TASKER_" + q.name() + "_WEIGHT";
+            Integer w = Integer.getInteger(propName);
+            if (w != null) {
+                if (w <= 0) {
+                    hostLog.warn(propName + " must be greater than 0");
+                } else if ((weightOfDefault - w) <= 0) {
+                    hostLog.warn("Cannot accomodate " + propName + " value " + w +
+                            "; all weights must sum to no more than 99");
+                } else {
+                    inverseWeights.put(q, weightInv(w));
+                    weightOfDefault -= w;
+                }
             }
         }
-        return -1;
+        inverseWeights.put(SiteTaskerQueueType.DEFAULT_QUEUE, weightInv(weightOfDefault));
+        QUEUE_INVERSE_WEIGHTS = Maps.immutableEnumMap(inverseWeights);
     }
 
     private static double weightInv(int weight) {
         return 1.0 / (weight / 100.0);
     }
 
-    private static class VirtualTimer {
+    /**
+     * A logical, weighted clock for a single logical work queue. Each new task
+     * finishes weight^-1 time units after the maximum of the last finish for
+     * this queue, and the minimum currently enqueued finish across all queues.
+     * ("Finish" here is used to denote a logical priority ordering between
+     * tasks, rather than a wall clock time.) So, for example, if I have queue
+     * with weight 20%, then every task costs 1/.2=5 time units.
+     */
+    private class VirtualTimer {
         final double m_weightInverse;
         final AtomicDouble m_lastVirtualTime = new AtomicDouble();
 
@@ -77,8 +105,13 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
             double nextVirtualTime;
             do {
                 lastVirtualTime = m_lastVirtualTime.get();
-                double clockTime = System.currentTimeMillis() - UniqueIdGenerator.VOLT_EPOCH;
-                double virtualStart = Math.max(clockTime, lastVirtualTime);
+                double virtualStart = lastVirtualTime;
+                // If no tasks have arrived in this queue for a while, don't
+                // let it push a bunch of work all at once
+                TaskWrapper w = m_tasks.peek();
+                if (w != null) {
+                    virtualStart = Math.max(w.m_virtualTime, virtualStart);
+                }
                 nextVirtualTime = virtualStart + m_weightInverse;
             } while (!m_lastVirtualTime.compareAndSet(lastVirtualTime, nextVirtualTime));
             return nextVirtualTime;
@@ -100,22 +133,24 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
         }
     }
 
-    private final ImmutableMap<Integer, VirtualTimer> m_queueTimers;
+    private final ImmutableMap<SiteTaskerQueueType, VirtualTimer> m_queueTimers;
     private final PriorityBlockingQueue<TaskWrapper> m_tasks = new PriorityBlockingQueue<>();
 
     public FairSiteTaskerQueue() {
-        ImmutableMap.Builder<Integer, VirtualTimer> b = ImmutableMap.builder();
-        for (Map.Entry<Integer, Double> e : QUEUE_INVERSE_WEIGHTS.entrySet()) {
-            b.put(e.getKey(), new VirtualTimer(e.getValue()));
+        EnumMap<SiteTaskerQueueType, VirtualTimer> queueTimers = new EnumMap<>(SiteTaskerQueueType.class);
+        for (Map.Entry<SiteTaskerQueueType, Double> e : QUEUE_INVERSE_WEIGHTS.entrySet()) {
+            queueTimers.put(e.getKey(), new VirtualTimer(e.getValue()));
         }
-        m_queueTimers = b.build();
+        m_queueTimers = Maps.immutableEnumMap(queueTimers);
     }
 
     @Override
     public boolean offer(SiteTasker task) {
         VirtualTimer t = m_queueTimers.get(task.getQueueIdentifier());
         if (t == null) {
-            t = m_queueTimers.get(DEFAULT_QUEUE);
+            // There is no weight mapped for this virtual queue; funnel the task
+            // into the default queue
+            t = m_queueTimers.get(SiteTaskerQueueType.DEFAULT_QUEUE);
             assert t != null;
         }
         return m_tasks.offer(new TaskWrapper(t.nextVirtualTime(), task));

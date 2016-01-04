@@ -55,6 +55,7 @@ import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.iv2.SiteTaskerQueue.DefaultSiteTaskerQueue;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -125,7 +126,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                        Long.MAX_VALUE, // client interface handle
                                        Long.MAX_VALUE, // connectionId
                                        false, // isForReplay
-                                       FairSiteTaskerQueue.DEFAULT_QUEUE);
+                                       SiteTaskerQueueType.DEFAULT_QUEUE);
         // sp: sphandle == txnid
         task.setTxnId(txnId);
         return task;
