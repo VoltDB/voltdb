@@ -17,6 +17,8 @@
 {@insertvals = "_id, _value[string], _value[int16 null30], _value[float]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
+{@star = "*"}
+{@lhsstar = "*"}
 {@updatecolumn = "NUM"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[int:0,100]"}

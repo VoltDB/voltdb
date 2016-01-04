@@ -45,12 +45,16 @@ public class TestGeospatialFunctions extends RegressionSuite {
      * We want to store the borders table once and for all, and insert and test
      * without repeating ourselves. This class holds geometry values for us for
      * inserting and for testing later on.
+     *
+     * The message is for holding error messages.  It is inserted into the
+     * table.
      */
-    private static class Borders {
-        Borders(long pk, String name, GeographyValue region) {
+    private static class Border {
+        Border(long pk, String name, String message, GeographyValue region) {
             m_pk = pk;
             m_name = name;
             m_region = region;
+            m_message = message;
         }
 
         public final long getPk() {
@@ -65,29 +69,36 @@ public class TestGeospatialFunctions extends RegressionSuite {
             return m_region;
         }
 
+        public final String getMessage() {
+            return m_message;
+        }
+
         private final long m_pk;
         private final String m_name;
         private final GeographyValue m_region;
+        private final String m_message;
     }
 
     /*
      * This is the array of borders we know about. We will insert these
      * borders and then extract them.
      */
-    private static Borders borders[] = {
-        new Borders(0, "Colorado", new GeographyValue("POLYGON(("
-                                                  + "-102.052 41.002, "
-                                                  + "-109.045 41.002,"
-                                                  + "-109.045 36.999,"
-                                                  + "-102.052 36.999,"
-                                                  + "-102.052 41.002))")),
-        new Borders(1, "Wyoming", new GeographyValue("POLYGON(("
-                                                + "-104.061 44.978, "
-                                                + "-111.046 44.978, "
-                                                + "-111.046 40.998, "
-                                                + "-104.061 40.998, "
-                                                + "-104.061 44.978))")),
-       new Borders(2, "Colorado with a hole around Denver",
+    private static Border borders[] = {
+        new Border(0, "Colorado", null,
+                   new GeographyValue("POLYGON(("
+                                      + "-102.052 41.002, "
+                                      + "-109.045 41.002,"
+                                      + "-109.045 36.999,"
+                                      + "-102.052 36.999,"
+                                      + "-102.052 41.002))")),
+        new Border(1, "Wyoming", null,
+                   new GeographyValue("POLYGON(("
+                                      + "-104.061 44.978, "
+                                      + "-111.046 44.978, "
+                                      + "-111.046 40.998, "
+                                      + "-104.061 40.998, "
+                                      + "-104.061 44.978))")),
+       new Border(2, "Colorado with a hole around Denver", null,
                new GeographyValue("POLYGON("
                                   + "(-102.052 41.002, "
                                   + "-109.045 41.002,"
@@ -95,12 +106,23 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                   + "-102.052 36.999,"
                                   + "-102.052 41.002), "
                                   + "(-104.035 40.240, "
-                                  + "-105.714 40.240, "
-                                  + "-105.714 39.188, "
                                   + "-104.035 39.188,"
+                                  + "-105.714 39.188, "
+                                  + "-105.714 40.240, "
                                   + "-104.035 40.240))")),
-       new Borders(3, "Wonderland", null)
+       new Border(3, "Wonderland", null, null)
     };
+
+    private static void populateBorders(Client client, Border borders[]) throws Exception {
+        for (Border b : borders) {
+            client.callProcedure("borders.Insert",
+                                 b.getPk(),
+                                 b.getName(),
+                                 b.getMessage(),
+                                 b.getRegion());
+        }
+    }
+
     private static void populateTables(Client client) throws Exception {
         // Note: These are all WellKnownText strings.  So they should
         //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
@@ -136,13 +158,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // A null-valued point
         client.callProcedure("places.Insert", 99, "Neverwhere", null);
 
-        for (int idx = 0; idx < borders.length; idx += 1) {
-            Borders b = borders[idx];
-            client.callProcedure("borders.Insert",
-                                 b.getPk(),
-                                 b.getName(),
-                                 b.getRegion());
-        }
+        populateBorders(client, borders);
     }
 
     public void testContains() throws Exception {
@@ -332,14 +348,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
         String sql = "select borders.name, Area(borders.region) "
                         + "from borders order by borders.pk";
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.out.println(vt.toString());
         // in the calculation below, areas of states are close to actual area of the state (vertices
         // used for polygon are close approximations, not exact, values of the state vertices).
         // Area for Colorado - 269601 sq km and Wyoming 253350 sq km
         assertApproximateContentOfTable(new Object[][]
-                {{ "Colorado",      2.6886542912139893E11},
-                 { "Wyoming",       2.5126863189309894E11},
+                {{ "Colorado",      2.6886220370448795E11},
+                 { "Wyoming",       2.512656175743851E11},
                  { "Colorado with a hole around Denver",
-                                    2.5206603914764166E11},
+                                    2.5206301526291238E11},
                  { "Wonderland",    Double.MIN_VALUE},
                 }, vt, AREA_EPSILON);
         // Test the centroids.  For centroid, the value in table is based on the answer provide by S2 for the given polygons
@@ -378,10 +395,16 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
+        client.callProcedure("places.Insert", 50, "San Jose",
+                GeographyPointValue.geographyPointFromText("POINT(-121.903692 37.325464)"));
+        client.callProcedure("places.Insert", 51, "Boston",
+                GeographyPointValue.geographyPointFromText("POINT(-71.069862 42.338100)"));
+
         VoltTable vt;
+        String sql;
 
         // distance of all points with respect to a specific polygon
-        String sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
+        sql = "select borders.name, places.name, distance(borders.region, places.loc) as distance "
                 + "from borders, places where borders.pk = 1"
                 + "order by distance, places.pk";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
@@ -392,15 +415,17 @@ public class TestGeospatialFunctions extends RegressionSuite {
                  {"Wyoming",    "Point on E Wyoming Border",            0.0},
                  {"Wyoming",    "Point On S Wyoming Border",            0.0},
                  {"Wyoming",    "Point On W Wyoming Border",            0.0},
-                 {"Wyoming",    "East Point Not On Wyoming Border",     1.9770281362922971E-10},
-                 {"Wyoming",    "West Point Not on Wyoming Border",     495.8113972117496},
-                 {"Wyoming",    "Point near N Colorado border",         2382.0692767400983},
-                 {"Wyoming",    "North Point Not On Colorado Border",   4045.111373096421},
-                 {"Wyoming",    "North Point Not On Wyoming Border",    12768.336788711755},
-                 {"Wyoming",    "Fort Collins",                         48820.44699386174},
-                 {"Wyoming",    "Denver",                               146450.36252816164},
-                 {"Wyoming",    "South Point Not On Colorado Border",   453545.4800250064},
-                 {"Wyoming",    "Albuquerque",                          659769.4012428687},
+                 {"Wyoming",    "East Point Not On Wyoming Border",     1.9770308670798656E-10},
+                 {"Wyoming",    "West Point Not on Wyoming Border",     495.81208205561956},
+                 {"Wyoming",    "Point near N Colorado border",         2382.072566994318},
+                 {"Wyoming",    "North Point Not On Colorado Border",   4045.11696044222},
+                 {"Wyoming",    "North Point Not On Wyoming Border",    12768.354425089678},
+                 {"Wyoming",    "Fort Collins",                         48820.514427535185},
+                 {"Wyoming",    "Denver",                               146450.5648140179},
+                 {"Wyoming",    "South Point Not On Colorado Border",   453546.1064887051},
+                 {"Wyoming",    "Albuquerque",                          659770.3125551793},
+                 {"Wyoming",    "San Jose",                             1020359.8369329285},
+                 {"Wyoming",    "Boston",                               2651698.17837178}
                 }, vt, DISTANCE_EPSILON);
 
         // Validate result set obtained using distance between point and polygon is same as
@@ -422,19 +447,26 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where contains(borders.region, places.loc) "
                 + "order by distance";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        //System.out.println(vt.toString());
         assertApproximateContentOfTable(new Object[][]
-                {{"Colorado",   "Denver",                               90126.31686125314},
-                 {"Colorado",   "Fort Collins",                         177132.44115469826},
-                 {"Colorado with a hole around Denver", "Fort Collins", 182956.3035588355},
-                 {"Colorado",   "Point near N Colorado border",         223103.69736948845},
+                {{"Colorado",   "Denver",                               90126.44134902404},
+                 {"Colorado",   "Fort Collins",                         177132.68582044652},
+                 {"Colorado with a hole around Denver", "Fort Collins", 182956.55626884513},
+                 {"Colorado",   "Point near N Colorado border",         223104.00553344024},
                  {"Colorado with a hole around Denver", "Point near N Colorado border",
-                                                                        228833.50418470264},
-                 {"Wyoming",    "Point On W Wyoming Border",            280063.8833833934},
-                 {"Wyoming",    "Point on E Wyoming Border",            282621.71798313083},
-                 {"Wyoming",    "Point on N Wyoming Border",            295383.69047235645},
-                 {"Wyoming",    "Cheyenne",                             308378.4910583776},
-                 {"Wyoming",    "Point On S Wyoming Border",            355573.95574694296}
+                                                                        228833.82026300067},
+                 {"Wyoming",    "Point On W Wyoming Border",            280064.27022410504},
+                 {"Wyoming",    "Point on E Wyoming Border",            282622.1083568741},
+                 {"Wyoming",    "Point on N Wyoming Border",            295384.0984736869},
+                 {"Wyoming",    "Cheyenne",                             308378.91700889106},
+                 {"Wyoming",    "Point On S Wyoming Border",            355574.4468866087}
                 }, vt, DISTANCE_EPSILON);
+
+        sql = "select distance(A.loc, B.loc) as distance "
+                + "from places A, places B where A.name = 'Boston' and B.name = 'San Jose' "
+                + "order by distance;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertApproximateContentOfTable(new Object[][] {{4311575.515808559}}, vt, DISTANCE_EPSILON);
 
         // distance between polygon and polygon - currently not supported and should generate
         // exception saying incompatible data type supplied
@@ -470,6 +502,220 @@ public class TestGeospatialFunctions extends RegressionSuite {
         }
     }
 
+    /*
+     *   X      X
+     *   |\    /|
+     *   | \  / |
+     *   |  \/  |
+     *   |  /\  |
+     *   | /  \ |
+     *   |/    \|
+     *   X      X
+     */
+    private static String CROSSED_EDGES
+      = "POLYGON((0 0, 0 1, 1 0, 1 1, 0 0))";
+
+    /*
+     *  X----------->X
+     *  ^            |
+     *  |            |
+     *  |            |
+     *  |            |
+     *  |            V
+     *  X<-----------X
+     */
+    private static String CW_EDGES
+      = "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))";
+    /*
+     *             X----------X
+     *             |          |
+     *             |          |
+     *  X----------X----------X
+     *  |          |
+     *  |          |
+     *  X----------X
+     *
+     */
+    private static String MULTI_POLYGON
+      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, -1 0, -1 -1, 0 -1, 0 0))";
+    /*
+     *
+     *  X------------------------------X
+     *  | X------------X--------------X|
+     *  | |            |              ||
+     *  | |            |              ||
+     *  | |            |              ||
+     *  | X------------X--------------X|
+     *  X------------------------------X
+     */
+    private static String SHARED_INNER_VERTICES
+        = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .9 .1, .1 .1), (.5 .1, .5 .9, .9 .9, .9 .1, .5 .1))";
+    /*
+     *
+     *  X------------------------------X
+     *  | X-----------X                |
+     *  | |           X---------------X|
+     *  | |           |               ||
+     *  | |           X---------------X|
+     *  | X-----------X                |
+     *  X------------------------------X
+     */
+    private static String SHARED_INNER_EDGES
+      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (.1 .1, .1 .9, .5 .9, .5 .1, .1 .1), (.5 .2, .5 .8, .9 .8, .9 .2, .5 .2))";
+    // The collinear polygons are currently legal.  But they should not be.
+    // So we are going to leave them here until we can figure out what to do
+    // with them.
+    /*
+     * X-----X-----X
+     */
+    private static String COLLINEAR3
+      = "POLYGON((0 0, 1 0 , 2 0 , 0 0))";
+    /*
+     * X-----X-----X-----X
+     */
+    private static String COLLINEAR4
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 0 0))";
+    /*
+     * X-----X-----X-----X----X
+     */
+    private static String COLLINEAR5
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 0 0))";
+    /*
+     * X-----X-----X-----X----X----X
+     */
+    @SuppressWarnings("unused")
+    private static String COLLINEAR6
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 0 0))";
+    /*
+     * X-----X-----X-----X----X----X----X
+     */
+    @SuppressWarnings("unused")
+    private static String COLLINEAR7
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 0 0))";
+    /*
+     * X-----X-----X-----X----X----X----X----X
+     */
+    @SuppressWarnings("unused")
+    private static String COLLINEAR8
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 0 0))";
+    /*
+     * X-----X-----X-----X----X----X----X----X----X
+     */
+    @SuppressWarnings("unused")
+    private static String COLLINEAR9
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 8 0, 0 0))";
+    /*
+     * X-----X-----X-----X----X----X----X----X----X----X
+     */
+    @SuppressWarnings("unused")
+    private static String COLLINEAR10
+      = "POLYGON((0 0, 1 0, 2 0, 3 0, 4 0, 5 0, 6 0, 7 0, 8 0, 9 0, 0 0))";
+    /*
+     * It's hard to draw this with ascii art, but the outer shell
+     * is a rectangle, and the would-be holes are triangles.  The
+     * first one, (33 67, 67 67, 50 33, 33 67), points down, and
+     * the second one, (33, 50 67, 67 33, 33 33), points up.  These
+     * two intersect, which is why this is not valid.
+     */
+    private static String INTERSECTING_HOLES
+        = "POLYGON((0 0, 80 0, 80 80, 0 80, 0 0),"
+               +  "(33 67, 67 67, 50 33, 33 67),"
+               +  "(33 33, 50 67, 67 33, 33 33))";
+    /*
+     * It's not easy to see this in ascii art, but the hole
+     * here leaks out of the shell to the top and right.
+     */
+    private static String OUTER_INNER_INTERSECT
+       = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0),"
+              +  "(.1 .1, .1 1.1, 1.1 1.1, 1.1 .1, .1 .1)"
+              + ")";
+
+    /*
+     * These are two nested Clockwise (Sunwise) rectangles.
+     */
+    private static String TWO_NESTED_SUNWISE
+       = "POLYGON((0.0 0.0, 0.0 1.0, 1.0 1.0, 1.0 0.0, 0.0 0.0),"
+              +  "(0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1)"
+              + ")";
+
+    /*
+     * These are two nested CCW (Widdershins) rectangles.
+     */
+    private static String TWO_NESTED_WIDDERSHINS
+    = "POLYGON((0.0 0.0, 1.0 0.0, 1.0 1.0, 0.0 1.0, 0.0 0.0),"
+           +  "(0.1 0.1, 0.9 0.1, 0.9 0.9, 0.1 0.9, 0.1 0.1)"
+           + ")";
+
+    private static String ISLAND_IN_A_LAKE
+    = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"
+            + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CCW.
+            + "(2 2,  8 2,  8  8, 2  8, 2 2)"  // This is CW.
+            + ")";
+
+
+   private static Border invalidBorders[] = {
+       new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
+                  GeographyValue.fromText(CROSSED_EDGES)),
+       new Border(101, "Sunwise", "Loop 0 encloses more than half the sphere",
+                  GeographyValue.fromText(CW_EDGES)),
+       new Border(102, "MultiPolygon", "Polygons can have only one shell",
+                  GeographyValue.fromText(MULTI_POLYGON)),
+       new Border(103, "SharedInnerVertices", "Loop 1 crosses loop 2",
+                  GeographyValue.fromText(SHARED_INNER_VERTICES)),
+       new Border(104, "SharedInnerEdges", "Loop 1 crosses loop 2",
+                  GeographyValue.fromText(SHARED_INNER_EDGES)),
+       new Border(105, "IntersectingHoles", "Loop 1 crosses loop 2",
+                  GeographyValue.fromText(INTERSECTING_HOLES)),
+       new Border(106, "OuterInnerIntersect", "Loop 1 crosses loop 2",
+                  GeographyValue.fromText(OUTER_INNER_INTERSECT)),
+       new Border(108, "TwoNestedSunwise", "Loop 0 encloses more than half the sphere",
+                  GeographyValue.fromText(TWO_NESTED_SUNWISE)),
+       new Border(109, "TwoNestedWiddershins", "Loop 0 encloses more than half the sphere",
+                  GeographyValue.fromText(TWO_NESTED_WIDDERSHINS)),
+       new Border(110, "IslandInALake", "Polygons can have only one shell.",
+                  GeographyValue.fromText(ISLAND_IN_A_LAKE)),
+      /*
+       * These are apparently legal. Should they be?
+       */
+    // new Border(205, "Collinear3", null,          GeographyValue.geographyValueFromText(COLLINEAR3)),
+    // new Border(206, "Collinear4", null,          GeographyValue.geographyValueFromText(COLLINEAR4)),
+    // new Border(207, "Collinear5", null,          GeographyValue.geographyValueFromText(COLLINEAR5)),
+    // new Border(208, "Collinear6", null,          GeographyValue.geographyValueFromText(COLLINEAR6)),
+    // new Border(209, "Collinear7", null,          GeographyValue.geographyValueFromText(COLLINEAR7)),
+    // new Border(210, "Collinear8", null,          GeographyValue.geographyValueFromText(COLLINEAR8)),
+    // new Border(211, "Collinear9", null,          GeographyValue.geographyValueFromText(COLLINEAR9)),
+    // new Border(212, "Collinear10", null,         GeographyValue.geographyValueFromText(COLLINEAR10)),
+    };
+
+    public void testInvalidPolygons() throws Exception {
+        Client client = getClient();
+        populateBorders(client, invalidBorders);
+
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name from borders where isValid(region)").getResults()[0];
+        StringBuffer sb = new StringBuffer("Expected no polygons in the invalid polygons table, found: ");
+        long rowCount = vt.getRowCount();
+
+        String sep = "";
+        while (vt.advanceRow()) {
+            sb.append(sep).append(vt.getString(1));
+            sep = ", ";
+        }
+        assertEquals(sb.toString(), 0, rowCount);
+    }
+
+    public void testInvalidPolygonReasons() throws Exception {
+        Client client = getClient();
+        populateBorders(client, invalidBorders);
+
+        VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message from borders").getResults()[0];
+        while (vt.advanceRow()) {
+            assertTrue(String.format("Expected error message containing \"%s\" but got \"%s\"",
+                                       vt.getString(3),
+                                       vt.getString(2)),
+                         vt.getString(2).contains(vt.getString(2)));
+        }
+    }
+
     public void testPointAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
@@ -499,7 +745,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
         // polygon whose co-ordinates are mix of decimal and whole numbers
-        Borders someWhere = new Borders(50, "someWhere",
+        Border someWhere = new Border(50, "someWhere", "someWhere",
                 new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
                                              "-14.1234567891264 10.1234567891234, " +
                                              "-14.0 4.1234567891235, " +
@@ -507,25 +753,25 @@ public class TestGeospatialFunctions extends RegressionSuite {
                                              "-11.0 4.4999999999996, " +
                                              "-10.1234567891234 10.1234567891234))"));
         VoltTable vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+                someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
         // polygon with hole whose co-ordinates are whole numbers
-        someWhere = new Borders(51, "someWhereWithHoles",
+        someWhere = new Border(51, "someWhereWithHoles", "someWhereWithHoles",
                 new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
-                                            "(-8 9, -9 9, -9 8, -8 8, -8 9)," +
-                                            "(9 9, 9 8, 8 8, 9 8, 9 9))"));
+                                            "(-8 9, -8 8, -9 8, -9 9, -8 9)," +
+                                            "(9 9,  9 8, 8 8, 8 9, 9 9))"));
         vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+                someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
 
         // polygon with hole whose co-ordinates are whole numbers
-        someWhere = new Borders(52, "someWhereWithHoles",
+        someWhere = new Border(52, "someWhereWithHoles", "someWhereWithHoles",
                 new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
-                                            "(9 9, 9 8, 8 8, 9 8, 9 9)," +
-                                            "(-8 9, -9 9, -9 8, -8 8, -8 9))"));
+                                            "(9 9, 9 8, 8 8, 8 9, 9 9)," +
+                                            "(-8 9, -8 8, -9 8, -9 9, -8 9))"));
         vt = client.callProcedure("BORDERS.Insert",
-                someWhere.getPk(), someWhere.getName(), someWhere.getRegion()).getResults()[0];
+                someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
         vt = client.callProcedure("@AdHoc",
@@ -577,6 +823,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "CREATE TABLE borders (\n"
                 + "  pk INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  name VARCHAR(64),\n"
+                + "  message VARCHAR(64),\n"
                 + "  region GEOGRAPHY\n"
                 + ");\n"
                 + "\n"

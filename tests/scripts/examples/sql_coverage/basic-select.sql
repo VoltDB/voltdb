@@ -29,8 +29,8 @@ SELECT _variable[#arg @comparabletype] B1 FROM @fromtables
 SELECT _variable[#arg @comparabletype], _variable B2 FROM @fromtables
 --- test column alias
 SELECT _variable[#arg @columntype] AS B3 FROM @fromtables A
---- test *
-SELECT * FROM @fromtables B4
+--- test * (@star normally is "*", except for Geo tests, where that does not yet work, from the Python client)
+SELECT @star FROM @fromtables B4
 --- test simple arithmetic expressions (+, -, *, /) with constant
 SELECT _variable[#arg @columntype] @aftermath AS B5LITTLEMATH FROM @fromtables A
 
@@ -59,14 +59,14 @@ SELECT COUNT(*) FROM @fromtables B10
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @fromtables A WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
+SELECT @star FROM @fromtables B11 WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
 --- test EXISTS/IN operators ()
-SELECT * FROM @fromtables A WHERE EXISTS(SELECT * FROM @fromtables B WHERE _maybe B.@idcol _cmp A.@idcol )
+SELECT @star FROM @fromtables A12 WHERE EXISTS(SELECT @star FROM @fromtables B WHERE _maybe B.@idcol _cmp A12.@idcol )
 
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
+SELECT @star FROM @fromtables B12 WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
-SELECT * FROM @fromtables A WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
+SELECT @star FROM @fromtables B13 WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
 -- test GROUP BY
 SELECT _variable[#grouped @columntype] B14 FROM @fromtables A GROUP BY __[#grouped]
 
@@ -88,18 +88,18 @@ SELECT _variable[#grouped], COUNT(*) AS B17 FROM @fromtables A GROUP BY __[#grou
 SELECT _variable[#grouped], COUNT(*) AS B18 FROM @fromtables A GROUP BY __[#grouped] ORDER BY 2, 1 _optionallimitoffset
 
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
-SELECT * FROM @fromtables LHS INNER JOIN @fromtables B19RHS ON LHS.@idcol = B19RHS.@idcol
+SELECT @lhsstar FROM @fromtables LHS INNER JOIN @fromtables B19RHS ON LHS.@idcol = B19RHS.@idcol
 -- TODO: If the intent is to support a schema with multiple id-partitioned tables,
 -- this statement is looking for trouble -- might want to migrate it to its own template/suite.
-SELECT * FROM @fromtables LHS INNER JOIN @fromtables B20RHS ON LHS._variable[@columntype] = B20RHS._variable[@comparabletype]
+SELECT @lhsstar FROM @fromtables LHS INNER JOIN @fromtables B20RHS ON LHS._variable[@columntype] = B20RHS._variable[@comparabletype]
 
 
 --- test IN/EXISTS predicate
 --- Use @columntype instead of @comparabletype because Hsql sometimes return wrong answers between integer and decimal comparison for IN.
-SELECT * FROM @fromtables A WHERE EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
-SELECT * FROM @fromtables A WHERE _variable[@columntype] IN ( SELECT _variable[@columntype] FROM @fromtables B )
-SELECT * FROM @fromtables A WHERE _variable[@comparabletype] _cmp @comparableconstant AND EXISTS ( SELECT * FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
+SELECT @star FROM @fromtables A WHERE EXISTS ( SELECT @star FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
+SELECT @star FROM @fromtables A WHERE _variable[@columntype] IN ( SELECT _variable[@columntype] FROM @fromtables B )
+SELECT @star FROM @fromtables A WHERE _variable[@comparabletype] _cmp @comparableconstant AND EXISTS ( SELECT @star FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
 
 --- test scalar subqueries (ENG-7959)
-SELECT *, (SELECT COUNT(*) FROM @fromtables WHERE _variable[@comparabletype] _cmp B24._variable[@comparabletype]) FROM @fromtables AS B24
-SELECT * FROM @fromtables AS B25 WHERE _variable[numeric] _cmp (SELECT COUNT(*) FROM @fromtables)
+SELECT @star, (SELECT COUNT(*) FROM @fromtables WHERE _variable[@comparabletype] _cmp B24._variable[@comparabletype]) FROM @fromtables AS B24
+SELECT @star FROM @fromtables AS B25 WHERE _variable[numeric] _cmp (SELECT COUNT(*) FROM @fromtables)

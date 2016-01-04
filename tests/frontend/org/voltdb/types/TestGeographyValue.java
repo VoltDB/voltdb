@@ -60,6 +60,7 @@ public class TestGeographyValue extends TestCase {
                 + "(-68.874 28.066, -68.855 25.361, -73.381 28.376, -68.874 28.066))",
                 geog.toString());
 
+        // serialize this.
         ByteBuffer buf = ByteBuffer.allocate(geog.getLengthInBytes());
         geog.flattenToBuffer(buf);
         assertEquals(270, buf.position());
@@ -72,6 +73,7 @@ public class TestGeographyValue extends TestCase {
         assertEquals(270, buf.position());
 
         // Try the absolute version of unflattening
+        // Note that the hole's coordinates have been reversed again.
         buf.position(77);
         newGeog = GeographyValue.unflattenFromBuffer(buf, 0);
         assertEquals("POLYGON ((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), "

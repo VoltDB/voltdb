@@ -26,6 +26,8 @@
 {@idcol = "ID"}
 {@insertvals = "_id, _value[int:-10,10], _value[byte null20], _value[int32]"}
 {@optional_fn = "_numfun"}
+{@star = "*"}
+{@lhsstar = "*"}
 {@updatecolumn = "BIG"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[int64]"}
