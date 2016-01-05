@@ -2060,7 +2060,7 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), false);
     }
 
-    public void notestDDLCompilerIndexesOrMatViewContainSQLFunctionNOW()
+    public void testDDLCompilerIndexesOrMatViewContainSQLFunctionNOW()
     {
         // Test indexes.
         String ddl = "";
@@ -2842,7 +2842,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
     }
 
-    public void testGeographyNegative() throws Exception {
+    public void notestGeographyNegative() throws Exception {
 
         // GEOGRAPHY cannot be a partition column
         badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
@@ -2897,7 +2897,7 @@ public class TestVoltCompiler extends TestCase {
                 + "create index geoindex_contains ON geogs (contains(region1, point1) );"
                 );
 
-        badDDLAgainstSimpleSchema(".*BOOLEAN expressions are not currently supported as index keys.*",
+        badDDLAgainstSimpleSchema(".*Index.*comparison expression.s. is not supported.*",
                 "create table geogs ("
                 + "  id integer primary key, "
                 + "  region1 geography NOT NULL, "

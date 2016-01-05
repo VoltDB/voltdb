@@ -216,4 +216,10 @@ public class ComparisonExpression extends AbstractExpression {
             m_right.explain(impliedTableName) + ")";
     }
 
+    @Override
+    protected boolean isIndexableExpression(StringBuffer msg) {
+        msg.append("with comparison expression(s) is not supported.");
+        return false;
+    }
+
 }
