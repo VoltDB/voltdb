@@ -131,7 +131,7 @@ function run_benchmark_help() {
 
 function run_benchmark() {
     # srccompile
-    echo java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath exportview.jar:$APPCLASSPATH: -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --duration=30 \
         --servers=localhost \

@@ -88,13 +88,13 @@ function aysnc-benchmark-help() {
 }
 
 function async-benchmark() {
-    srccompile
-    echo java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+    # srccompile
+    java -ea -classpath txnid.jar:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
         --displayinterval=1 \
-        --duration=120 \
+        --duration=20 \
         --servers=localhost \
-        --threads=20 \
+        --threads=1 \
         --threadoffset=0 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
@@ -102,7 +102,7 @@ function async-benchmark() {
         --fillerrowsize=10240 \
         --replfillerrowmb=32 \
         --partfillerrowmb=128 \
-        --progresstimeout=120 \
+        --progresstimeout=20 \
         --usecompression=false \
         --allowinprocadhoc=false \
         --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt

@@ -1,14 +1,20 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl" />
+    <cluster hostcount="1" sitesperhost="1" kfactor="0" schema="ddl" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
 
-    <export enabled="true" target="file">
-        <configuration>
+    <export>
+        <configuration enabled="true" type="file" stream="partstream">
             <property name="type">csv</property>
-            <property name="nonce">MyExport</property>
+            <property name="nonce">PartStream</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" stream="replstream">
+            <property name="type">csv</property>
+            <property name="nonce">ReplStream</property>
+            <property name="skipinternals">true</property>
         </configuration>
     </export>
 </deployment>
