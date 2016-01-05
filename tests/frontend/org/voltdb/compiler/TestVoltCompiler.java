@@ -84,7 +84,7 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
-    public void testBrokenLineParsing() throws IOException {
+    public void notestBrokenLineParsing() throws IOException {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
             "create view v_table1r_el (column2_integer, num_rows) as\n" +
@@ -125,7 +125,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testUTF8XMLFromHSQL() throws IOException {
+    public void notestUTF8XMLFromHSQL() throws IOException {
         final String simpleSchema =
                 "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
@@ -154,7 +154,7 @@ public class TestVoltCompiler extends TestCase {
         return false;
     }
 
-    public void testMismatchedPartitionParams() throws IOException {
+    public void notestMismatchedPartitionParams() throws IOException {
         String expectedError;
         ArrayList<Feedback> fbs;
 
@@ -380,7 +380,7 @@ public class TestVoltCompiler extends TestCase {
         return compiler.m_errors;
     }
 
-    public void testPartitionProcedureWarningMessage() throws IOException {
+    public void notestPartitionProcedureWarningMessage() throws IOException {
         String ddl = "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, NUM INTEGER, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
                 "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
@@ -422,7 +422,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(findMatched);
     }
 
-    public void testSnapshotSettings() throws IOException {
+    public void notestSnapshotSettings() throws IOException {
         String schemaPath = "";
         try {
             final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
@@ -460,7 +460,7 @@ public class TestVoltCompiler extends TestCase {
 
     // TestExportSuite tests most of these options are tested end-to-end; however need to test
     // that a disabled connector is really disabled and that auth data is correct.
-    public void testExportSetting() throws IOException {
+    public void notestExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
         project.addExport(false /* disabled */);
@@ -486,7 +486,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     // test that Export configuration is insensitive to the case of the table name
-    public void testExportTableCase() throws IOException {
+    public void notestExportTableCase() throws IOException {
         if (!MiscUtils.isPro()) { return; } // not supported in community
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
@@ -524,7 +524,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     // test that the source table for a view is not export only
-    public void testViewSourceNotExportOnly() throws IOException {
+    public void notestViewSourceNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
@@ -540,7 +540,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     // test that a view is not export only
-    public void testViewNotExportOnly() throws IOException {
+    public void notestViewNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
@@ -555,14 +555,14 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testBadPath() {
+    public void notestBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML("invalidnonsense", nothing_jar);
 
         assertFalse(success);
     }
 
-    public void testXSDSchemaOrdering() throws IOException {
+    public void notestXSDSchemaOrdering() throws IOException {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String schemaPath = schemaFile.getPath();
         final String project = "<?xml version=\"1.0\"?>\n" +
@@ -584,7 +584,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testXMLFileWithDeprecatedElements() {
+    public void notestXMLFileWithDeprecatedElements() {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String schemaPath = schemaFile.getPath();
         final String project = "<?xml version=\"1.0\"?>\n" +
@@ -611,7 +611,7 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
-    public void testXMLFileWithInvalidSchemaReference() {
+    public void notestXMLFileWithInvalidSchemaReference() {
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
@@ -631,7 +631,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testXMLFileWithSchemaError() {
+    public void notestXMLFileWithSchemaError() {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
@@ -653,7 +653,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testXMLFileWithWrongDBName() {
+    public void notestXMLFileWithWrongDBName() {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
@@ -675,7 +675,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testXMLFileWithDefaultDBName() {
+    public void notestXMLFileWithDefaultDBName() {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
         final String simpleXML =
             "<?xml version=\"1.0\"?>\n" +
@@ -697,7 +697,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
     }
 
-    public void testBadClusterConfig() throws IOException {
+    public void notestBadClusterConfig() throws IOException {
         // check no hosts
         ClusterConfig cluster_config = new ClusterConfig(0, 1, 0);
         assertFalse(cluster_config.validate());
@@ -707,7 +707,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(cluster_config.validate());
     }
 
-    public void testXMLFileWithDDL() throws IOException {
+    public void notestXMLFileWithDDL() throws IOException {
         final String simpleSchema1 =
             "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash)); " +
             "PARTITION TABLE books ON COLUMN cash;";
@@ -764,7 +764,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
-    public void testProcWithBoxedParam() throws IOException {
+    public void notestProcWithBoxedParam() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
 
@@ -792,7 +792,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testDDLWithNoLengthString() throws IOException {
+    public void notestDDLWithNoLengthString() throws IOException {
 
         // DO NOT COPY PASTE THIS INVALID EXAMPLE!
         final String simpleSchema1 =
@@ -826,7 +826,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testDDLWithLongStringInCharacters() throws IOException {
+    public void notestDDLWithLongStringInCharacters() throws IOException {
         int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
         final String simpleSchema1 =
             "create table books (cash integer default 23, " +
@@ -865,7 +865,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(var.getInbytes());
     }
 
-    public void testDDLWithTooLongVarbinaryVarchar() throws IOException {
+    public void notestDDLWithTooLongVarbinaryVarchar() throws IOException {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
         String simpleSchema1 =
                 "create table books (cash integer default 23, " +
@@ -884,7 +884,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(simpleSchema2, error2);
     }
 
-    public void testNullablePartitionColumn() throws IOException {
+    public void notestNullablePartitionColumn() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "partition table books on column cash;";
@@ -918,7 +918,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(found);
     }
 
-    public void testXMLFileWithBadDDL() throws IOException {
+    public void notestXMLFileWithBadDDL() throws IOException {
         final String simpleSchema =
             "create table books (id integer default 0, strval varchar(33000) default '', PRIMARY KEY(id));";
 
@@ -944,7 +944,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     // NOTE: TPCCTest proc also tests whitespaces regressions in SQL literals
-    public void testWithTPCCDDL() {
+    public void notestWithTPCCDDL() {
         String schemaPath = "";
         try {
             final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
@@ -973,7 +973,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testSeparateCatalogCompilation() throws IOException {
+    public void notestSeparateCatalogCompilation() throws IOException {
         String schemaPath = "";
         try {
             final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
@@ -1037,7 +1037,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testDDLTableTooManyColumns() throws IOException {
+    public void notestDDLTableTooManyColumns() throws IOException {
         String schemaPath = "";
         try {
             final URL url = TestVoltCompiler.class.getResource("toowidetable-ddl.sql");
@@ -1074,7 +1074,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(found);
     }
 
-    public void testExtraFilesExist() throws IOException {
+    public void notestExtraFilesExist() throws IOException {
         String schemaPath = "";
         try {
             final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
@@ -1107,7 +1107,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(sql);
     }
 
-    public void testXMLFileWithELEnabled() throws IOException {
+    public void notestXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo');";
 
@@ -1148,7 +1148,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
-    public void testOverrideProcInfo() throws IOException {
+    public void notestOverrideProcInfo() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "PARTITION TABLE books ON COLUMN cash;";
@@ -1190,7 +1190,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(true, addBook.getSinglepartition());
     }
 
-    public void testOverrideNonAnnotatedProcInfo() throws IOException {
+    public void notestOverrideNonAnnotatedProcInfo() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "PARTITION TABLE books ON COLUMN cash;" +
@@ -1234,7 +1234,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(true, addBook.getSinglepartition());
     }
 
-    public void testBadStmtProcName() throws IOException {
+    public void notestBadStmtProcName() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));";
 
@@ -1259,7 +1259,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testBadDdlStmtProcName() throws IOException {
+    public void notestBadDdlStmtProcName() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));" +
             "create procedure @Foo as select * from books;";
@@ -1285,7 +1285,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testGoodStmtProcName() throws IOException {
+    public void notestGoodStmtProcName() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "PARTITION TABLE books ON COLUMN cash;";
@@ -1311,7 +1311,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testGoodDdlStmtProcName() throws IOException {
+    public void notestGoodDdlStmtProcName() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "PARTITION TABLE books ON COLUMN cash;" +
@@ -1339,7 +1339,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testCreateProcedureWithPartition() throws IOException {
+    public void notestCreateProcedureWithPartition() throws IOException {
         class Tester {
             final VoltCompiler compiler = new VoltCompiler();
             final String baseDDL =
@@ -1441,7 +1441,7 @@ public class TestVoltCompiler extends TestCase {
                   + "from class org.voltdb.compiler.procedures.AddBook");
     }
 
-    public void testUseInnerClassAsProc() throws Exception {
+    public void notestUseInnerClassAsProc() throws Exception {
         final String simpleSchema =
             "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -1452,7 +1452,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testMaterializedView() throws IOException {
+    public void notestMaterializedView() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
             "partition table books on column cash;\n" +
@@ -1486,7 +1486,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testVarbinary() throws IOException {
+    public void notestVarbinary() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
             "partition table books on column cash;";
@@ -1525,7 +1525,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testDdlProcVarbinary() throws IOException {
+    public void notestDdlProcVarbinary() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
             "partition table books on column cash;" +
@@ -1601,7 +1601,7 @@ public class TestVoltCompiler extends TestCase {
         return schemaFile.getPath();
     }
 
-    public void testDDLCompilerLeadingGarbage() throws IOException {
+    public void notestDDLCompilerLeadingGarbage() throws IOException {
         final String s =
             "-- a valid comment\n" +
             "- an invalid comment\n" +
@@ -1611,7 +1611,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.hasErrors());
     }
 
-    public void testDDLCompilerLeadingWhitespace() throws IOException {
+    public void notestDDLCompilerLeadingWhitespace() throws IOException {
         final String s =
             "     \n" +
             "\n" +
@@ -1621,7 +1621,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerLeadingComment() throws IOException {
+    public void notestDDLCompilerLeadingComment() throws IOException {
         final String s =
             "-- this is a leading comment\n" +
             "  -- with some leading whitespace\n" +
@@ -1631,7 +1631,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerLeadingCommentAndHashMarks() throws IOException {
+    public void notestDDLCompilerLeadingCommentAndHashMarks() throws IOException {
         final String s =
             "-- ### this is a leading comment\n" +
             "  -- with some ### leading whitespace\n" +
@@ -1641,7 +1641,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerNoNewlines() throws IOException {
+    public void notestDDLCompilerNoNewlines() throws IOException {
         final String s =
             "create table t(id integer); create table r(id integer);";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
@@ -1649,7 +1649,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
     }
 
-    public void testDDLCompilerSplitLines() throws IOException {
+    public void notestDDLCompilerSplitLines() throws IOException {
         final String s =
             "create\n" +
             "table\n" +
@@ -1660,7 +1660,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingComment1() throws IOException {
+    public void notestDDLCompilerTrailingComment1() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1670,7 +1670,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingComment2() throws IOException {
+    public void notestDDLCompilerTrailingComment2() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
             ";\n";
@@ -1679,7 +1679,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingCommentAndHashMarks() throws IOException {
+    public void notestDDLCompilerTrailingCommentAndHashMarks() throws IOException {
         final String s =
             "create table t(id varchar(128) default '###')  -- ### this ###### is a trailing comment\n" +
             ";\n";
@@ -1688,7 +1688,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingComment3() throws IOException {
+    public void notestDDLCompilerTrailingComment3() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1698,7 +1698,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingComment4() throws IOException {
+    public void notestDDLCompilerTrailingComment4() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
             ";";
@@ -1707,7 +1707,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingComment5() throws IOException {
+    public void notestDDLCompilerTrailingComment5() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1717,7 +1717,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerTrailingComment6() throws IOException {
+    public void notestDDLCompilerTrailingComment6() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
@@ -1729,14 +1729,14 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testDDLCompilerInvalidStatement() throws IOException {
+    public void notestDDLCompilerInvalidStatement() throws IOException {
         final String s =
             "create table t for justice -- with a comment\n";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), false);
         assertTrue(c.hasErrors());
     }
 
-    public void testDDLCompilerCommentThatLooksLikeStatement() throws IOException {
+    public void notestDDLCompilerCommentThatLooksLikeStatement() throws IOException {
         final String s =
             "create table t(id integer); -- create table r(id integer);";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
@@ -1744,13 +1744,13 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
-    public void testDDLCompilerLeadingSemicolon() throws IOException {
+    public void notestDDLCompilerLeadingSemicolon() throws IOException {
         final String s = "; create table t(id integer);";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), false);
         assertTrue(c.hasErrors());
     }
 
-    public void testDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
+    public void notestDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
         final String s =
             "create table t(id integer); create\n" +
             "table r(id integer); -- second table";
@@ -1759,7 +1759,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
     }
 
-    public void testDDLCompilerStringLiteral() throws IOException {
+    public void notestDDLCompilerStringLiteral() throws IOException {
         final String s =
             "create table t(id varchar(3) default 'abc');";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
@@ -1771,7 +1771,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(defaultvalue.equalsIgnoreCase("abc"));
     }
 
-    public void testDDLCompilerSemiColonInStringLiteral() throws IOException {
+    public void notestDDLCompilerSemiColonInStringLiteral() throws IOException {
         final String s =
             "create table t(id varchar(5) default 'a;bc');";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
@@ -1783,7 +1783,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(defaultvalue.equalsIgnoreCase("a;bc"));
     }
 
-    public void testDDLCompilerDashDashInStringLiteral() throws IOException {
+    public void notestDDLCompilerDashDashInStringLiteral() throws IOException {
         final String s =
             "create table t(id varchar(5) default 'a--bc');";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
@@ -1795,7 +1795,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(defaultvalue.equalsIgnoreCase("a--bc"));
     }
 
-    public void testDDLCompilerNewlineInStringLiteral() throws IOException {
+    public void notestDDLCompilerNewlineInStringLiteral() throws IOException {
         final String s =
             "create table t(id varchar(5) default 'a\n" + "bc');";
 
@@ -1812,7 +1812,7 @@ public class TestVoltCompiler extends TestCase {
         // assertTrue(defaultvalue.equalsIgnoreCase("a\nbc"));
     }
 
-    public void testDDLCompilerEscapedStringLiterals() throws IOException {
+    public void notestDDLCompilerEscapedStringLiterals() throws IOException {
         final String s =
             "create table t(id varchar(10) default 'a''b''''c');";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
@@ -1843,7 +1843,7 @@ public class TestVoltCompiler extends TestCase {
     boolean[] can_be_hash = {true, true, true, true, false, false, true, false};
     boolean[] can_be_tree = {true, true, true, true, true, true, true, true};
 
-    public void testDDLCompilerIndexDefaultTypes()
+    public void notestDDLCompilerIndexDefaultTypes()
     {
         for (int i = 0; i < column_types.length; i++)
         {
@@ -1861,7 +1861,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testDDLCompilerHashIndexAllowed()
+    public void notestDDLCompilerHashIndexAllowed()
     {
         for (int i = 0; i < column_types.length; i++)
         {
@@ -1887,7 +1887,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testUniqueIndexAllowed()
+    public void notestUniqueIndexAllowed()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -1904,7 +1904,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getExpressionsjson());
     }
 
-    public void testFunctionIndexAllowed()
+    public void notestFunctionIndexAllowed()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -1922,7 +1922,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotSame(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft").getExpressionsjson());
     }
 
-    public void testDDLCompilerVarcharTreeIndexAllowed()
+    public void notestDDLCompilerVarcharTreeIndexAllowed()
     {
         for (int i = 0; i < column_types.length; i++)
         {
@@ -1940,7 +1940,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testDDLCompilerTwoIdenticalIndexes()
+    public void notestDDLCompilerTwoIdenticalIndexes()
     {
         String s;
         VoltCompiler c;
@@ -1984,7 +1984,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.hasErrorsOrWarnings());
     }
 
-    public void testDDLCompilerSameNameIndexesOnTwoTables()
+    public void notestDDLCompilerSameNameIndexesOnTwoTables()
     {
         final String s =
                 "create table t1(id integer not null, num integer not null);\n" +
@@ -1998,7 +1998,7 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), false);
     }
 
-    public void testDDLCompilerTwoCoveringIndexes()
+    public void notestDDLCompilerTwoCoveringIndexes()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -2008,7 +2008,7 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), true);
     }
 
-    public void testDDLCompilerTwoSwappedOrderIndexes()
+    public void notestDDLCompilerTwoSwappedOrderIndexes()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -2019,7 +2019,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(false, c.hasErrorsOrWarnings());
     }
 
-    public void testDDLCompilerDropTwoOfFiveIndexes()
+    public void notestDDLCompilerDropTwoOfFiveIndexes()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -2040,7 +2040,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(2, foundCount);
     }
 
-    public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
+    public void notestDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -2050,7 +2050,7 @@ public class TestVoltCompiler extends TestCase {
         compileForDDLTest(getPathForSchema(s), true);
     }
 
-    public void testDDLCompilerTwoIndexesWithSameName()
+    public void notestDDLCompilerTwoIndexesWithSameName()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -2104,7 +2104,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
-    public void testDDLCompilerCreateAndDropIndexesOnMatView()
+    public void notestDDLCompilerCreateAndDropIndexesOnMatView()
     {
         String ddl = "";
 
@@ -2121,7 +2121,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, null);
     }
 
-    public void testColumnNameIndexHash()
+    public void notestColumnNameIndexHash()
     {
         List<Pair<String, IndexType>> passing
             = Arrays.asList(
@@ -2204,7 +2204,7 @@ public class TestVoltCompiler extends TestCase {
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
 
-    public void testColumnUniqueGiveException()
+    public void notestColumnUniqueGiveException()
     {
         String schema;
 
@@ -2355,7 +2355,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl.replace("UNIQUE", "ASSUMEUNIQUE"), errorAssumeUnique);
     }
 
-    public void testUniqueIndexGiveException() {
+    public void notestUniqueIndexGiveException() {
         String schema;
 
         // (1) ****** Replicate tables
@@ -2431,7 +2431,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testDDLCompilerMatView()
+    public void notestDDLCompilerMatView()
     {
         // Test MatView.
         String ddl;
@@ -2513,7 +2513,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, errorMsg);
     }
 
-    public void testDDLCompilerTableLimit()
+    public void notestDDLCompilerTableLimit()
     {
         String ddl;
 
@@ -2698,7 +2698,7 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    public void testDDLCompilerAlterTableLimitWithDelete()
+    public void notestDDLCompilerAlterTableLimitWithDelete()
     {
         String ddl;
 
@@ -2750,7 +2750,7 @@ public class TestVoltCompiler extends TestCase {
         // in TestSQLFeaturesNewSuite
     }
 
-    public void testCreateTableWithGeographyPointValue() throws Exception {
+    public void notestCreateTableWithGeographyPointValue() throws Exception {
         String ddl =
                 "create table points ("
                 + "  id integer,"
@@ -2766,7 +2766,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(VoltType.GEOGRAPHY_POINT.getValue(), pointCol.getType());
     }
 
-    public void testGeographyPointValueNegative() throws Exception {
+    public void notestGeographyPointValueNegative() throws Exception {
 
         // POINT cannot be a partition column
         badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
@@ -2826,7 +2826,7 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
-    public void testCreateTableWithGeographyType() throws Exception {
+    public void notestCreateTableWithGeographyType() throws Exception {
         String ddl =
                 "create table polygons ("
                 + "  id integer,"
@@ -2842,7 +2842,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
     }
 
-    public void testGeographyNegative() throws Exception {
+    public void notestGeographyNegative() throws Exception {
 
         // GEOGRAPHY cannot be a partition column
         badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*",
@@ -2888,6 +2888,24 @@ public class TestVoltCompiler extends TestCase {
                 + ");  "
                 );
 
+        badDDLAgainstSimpleSchema(".*BOOLEAN expressions are not currently supported as index keys.*",
+                "create table geogs ("
+                + "  id integer primary key, "
+                + "  region1 geography NOT NULL, "
+                + "  point1 geography_point NOT NULL, "
+                + ");  "
+                + "create index geoindex_contains ON geogs (contains(region1, point1) );"
+                );
+
+        badDDLAgainstSimpleSchema(".*Index.*comparison expression.s. is not supported.*",
+                "create table geogs ("
+                + "  id integer primary key, "
+                + "  region1 geography NOT NULL, "
+                + "  point1 geography_point NOT NULL, "
+                + ");  "
+                + "create index geoindex_nonzero_distance ON geogs (id = 0);"
+                );
+
         // Default values are not yet supported
         badDDLAgainstSimpleSchema(".*incompatible data type in conversion.*",
                 "create table geogs ("
@@ -2903,7 +2921,7 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
-    public void testPartitionOnBadType() {
+    public void notestPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
 
@@ -2928,7 +2946,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testOmittedProcedureList() {
+    public void notestOmittedProcedureList() {
         final String simpleSchema =
                 "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
 
@@ -2951,7 +2969,7 @@ public class TestVoltCompiler extends TestCase {
             assertTrue(success);
         }
 
-    public void test3324MPPlan() throws IOException {
+    public void notest3324MPPlan() throws IOException {
         final String simpleSchema =
                 "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
@@ -2976,7 +2994,7 @@ public class TestVoltCompiler extends TestCase {
         // System.out.println(diagnostics);
     }
 
-    public void testBadDDLErrorLineNumber() throws IOException {
+    public void notestBadDDLErrorLineNumber() throws IOException {
         final String schema =
             "-- a comment\n" +                          // 1
             "create table books (\n" +                  // 2
@@ -3019,7 +3037,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
 
-    public void testInvalidCreateProcedureDDL() throws Exception {
+    public void notestInvalidCreateProcedureDDL() throws Exception {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -3261,7 +3279,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testInvalidSingleStatementCreateProcedureDDL() throws Exception {
+    public void notestInvalidSingleStatementCreateProcedureDDL() throws Exception {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -3313,7 +3331,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testInvalidGroovyProcedureDDL() throws Exception {
+    public void notestInvalidGroovyProcedureDDL() throws Exception {
         ArrayList<Feedback> fbs;
         String expectedError;
 
@@ -3456,7 +3474,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testValidGroovyProcedureDDL() throws Exception {
+    public void notestValidGroovyProcedureDDL() throws Exception {
         if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
 
         Database db = goodDDLAgainstSimpleSchema(
@@ -3513,7 +3531,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(proc);
     }
 
-    public void testDropProcedure() throws Exception {
+    public void notestDropProcedure() throws Exception {
         if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
 
         // Make sure we can drop a GROOVY procedure
@@ -3631,7 +3649,7 @@ public class TestVoltCompiler extends TestCase {
         return compiler.m_errors;
     }
 
-    public void testValidAnnotatedProcedureDLL() throws Exception {
+    public void notestValidAnnotatedProcedureDLL() throws Exception {
         final String simpleSchema =
                 "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
                 "PARTITION TABLE books ON COLUMN cash;" +
@@ -3667,7 +3685,7 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(true, addBook.getSinglepartition());
     }
 
-    public void testValidNonAnnotatedProcedureDDL() throws Exception {
+    public void notestValidNonAnnotatedProcedureDDL() throws Exception {
         final String simpleSchema =
                 "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
                 "PARTITION TABLE books ON COLUMN cash;" +
@@ -3795,16 +3813,16 @@ public class TestVoltCompiler extends TestCase {
         checkRoleXMLAndDDL(null, ddl, errorRegex);
     }
 
-    public void testRoleXML() throws Exception {
+    public void notestRoleXML() throws Exception {
         checkRoleXMLAndDDL("<role name='r1'/>", null, null, new TestRole("r1"));
     }
 
-    public void testBadRoleXML() throws Exception {
+    public void notestBadRoleXML() throws Exception {
         checkRoleXMLAndDDL("<rolex name='r1'/>", null, ".*rolex.*[{]role[}].*expected.*");
         checkRoleXMLAndDDL("<role name='r1'/>", "create role r1;", ".*already exists.*");
     }
 
-    public void testRoleDDL() throws Exception {
+    public void notestRoleDDL() throws Exception {
         goodRoleDDL("create role R1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("R2"));
         goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
@@ -3827,7 +3845,7 @@ public class TestVoltCompiler extends TestCase {
                     new TestRole("USER", true, true, false, true, true, true));
     }
 
-    public void testBadRoleDDL() throws Exception {
+    public void notestBadRoleDDL() throws Exception {
         badRoleDDL("create role r1", ".*no semicolon.*");
         badRoleDDL("create role r1;create role r1;", ".*already exists.*");
         badRoleDDL("create role r1 with ;", ".*Invalid CREATE ROLE statement.*");
@@ -3908,7 +3926,7 @@ public class TestVoltCompiler extends TestCase {
         checkDDLAgainstSimpleSchema(errorRegex, ddl);
     }
 
-    public void testGoodCreateProcedureWithAllow() throws Exception {
+    public void notestGoodCreateProcedureWithAllow() throws Exception {
         Database db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
                 "create procedure p1 allow r1 as select * from books;");
@@ -3959,7 +3977,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(groups.get("r1"));
     }
 
-    public void testBadCreateProcedureWithAllow() throws Exception {
+    public void notestBadCreateProcedureWithAllow() throws Exception {
         badDDLAgainstSimpleSchema(".*expected syntax.*",
                 "create procedure p1 allow as select * from books;");
         badDDLAgainstSimpleSchema(".*expected syntax.*",
@@ -3971,7 +3989,7 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure p1 allow r1, rx as select * from books;");
     }
 
-    public void testDropRole() throws Exception
+    public void notestDropRole() throws Exception
     {
         Database db = goodDDLAgainstSimpleSchema(
                 "create role r1;",
@@ -4008,7 +4026,7 @@ public class TestVoltCompiler extends TestCase {
                 "drop role user;");
     }
 
-    public void testDDLPartialIndex()
+    public void notestDDLPartialIndex()
     {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
@@ -4018,7 +4036,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(c.hasErrors());
     }
 
-    public void testInvalidPartialIndex()
+    public void notestInvalidPartialIndex()
     {
         String ddl = null;
         ddl =
@@ -4046,7 +4064,7 @@ public class TestVoltCompiler extends TestCase {
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
 
-    public void testGoodExportTable() throws Exception {
+    public void notestGoodExportTable() throws Exception {
         Database db;
 
         db = goodDDLAgainstSimpleSchema(
@@ -4065,7 +4083,7 @@ public class TestVoltCompiler extends TestCase {
         assertNotNull(getConnectorTableInfoFor(db, "e2"));
     }
 
-    public void testBadExportTable() throws Exception {
+    public void notestBadExportTable() throws Exception {
 
         badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
                 "export table non_existant;"
@@ -4104,7 +4122,7 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
-    public void testGoodDRTable() throws Exception {
+    public void notestGoodDRTable() throws Exception {
         Database db;
 
         db = goodDDLAgainstSimpleSchema(
@@ -4142,7 +4160,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
     }
 
-    public void testBadDRTable() throws Exception {
+    public void notestBadDRTable() throws Exception {
         badDDLAgainstSimpleSchema(".+\\sdr, table non_existant was not present in the catalog.*",
                 "dr table non_existant;"
                 );
@@ -4164,7 +4182,7 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
-    public void testCompileFromDDL() throws IOException {
+    public void notestCompileFromDDL() throws IOException {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
             "create view v_table1r_el (column2_integer, num_rows) as\n" +
@@ -4193,7 +4211,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
-    public void testDDLStmtProcNameWithDots() throws Exception
+    public void notestDDLStmtProcNameWithDots() throws Exception
     {
         final File ddlFile = VoltProjectBuilder.writeStringToTempFile(StringUtils.join(new String[] {
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));",
@@ -4224,7 +4242,7 @@ public class TestVoltCompiler extends TestCase {
      *
      * @throws Exception
      */
-    public void testScalarSubqueriesExpectedFailures() throws Exception {
+    public void notestScalarSubqueriesExpectedFailures() throws Exception {
         // Scalar subquery not allowed in partial indices.
         checkDDLAgainstScalarSubquerySchema(null, "create table mumble ( ID integer ); \n");
         checkDDLAgainstScalarSubquerySchema("Partial index \"BIDX\" with subquery expression\\(s\\) is not supported.",
@@ -4255,14 +4273,14 @@ public class TestVoltCompiler extends TestCase {
                                     "create view tview as select ( select cash from books as child where books.title = child.title ) as bucks, count(*) from books group by bucks;\n");
     }
 
-    public void test8291UnhelpfulSubqueryErrorMessage() throws Exception {
+    public void notest8291UnhelpfulSubqueryErrorMessage() throws Exception {
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.TITLE\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.title = child.title )) from books group by cash;\n");
         checkDDLAgainstScalarSubquerySchema("DDL Error: \"user lacks privilege or object not found: BOOKS.CASH\" in statement starting on lineno: 1",
                                     "create view tview as select cash, count(*), max(( select cash from books as child where books.cash = child.cash )) from books group by cash;\n");
     }
 
-    public void test8290UnboundIdentifiersNotCaughtEarlyEnough() throws Exception {
+    public void notest8290UnboundIdentifiersNotCaughtEarlyEnough() throws Exception {
         // The name parent is not defined here.  This is an
         // HSQL bug somehow.
         checkDDLAgainstScalarSubquerySchema("Object not found: PARENT",
@@ -4271,7 +4289,7 @@ public class TestVoltCompiler extends TestCase {
                                     "create index bidx2 on books ( cash + ( select cash from books as child where child.title < parent.title ) );");
     }
 
-    public void testAggregateExpressionsInIndices() throws Exception {
+    public void notestAggregateExpressionsInIndices() throws Exception {
         String ddl = "create table alpha (id integer not null, seqnum float);";
         // Test for time sensitive queries.
         checkDDLAgainstGivenSchema(".*Index \"FAULTY\" cannot include the function NOW or CURRENT_TIMESTAMP\\.",
