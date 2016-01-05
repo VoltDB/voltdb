@@ -19,7 +19,9 @@ package org.voltdb.iv2;
 
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.PriorityQueue;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -125,9 +127,12 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
     }
 
     private final ImmutableMap<SiteTaskerQueueType, VirtualTimer> m_queueTimers;
-    private final PriorityBlockingQueue<TaskWrapper> m_tasks = new PriorityBlockingQueue<>();
+    private final PriorityQueue<TaskWrapper> m_tasks = new PriorityQueue<>();
+    private final ReentrantLock m_lock = new ReentrantLock();
+    private final Condition m_notEmpty;
 
     public FairSiteTaskerQueue() {
+        m_notEmpty = m_lock.newCondition();
         EnumMap<SiteTaskerQueueType, VirtualTimer> queueTimers = new EnumMap<>(SiteTaskerQueueType.class);
         for (Map.Entry<SiteTaskerQueueType, Double> e : QUEUE_INVERSE_WEIGHTS.entrySet()) {
             queueTimers.put(e.getKey(), new VirtualTimer(e.getValue()));
@@ -144,28 +149,65 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
             t = m_queueTimers.get(SiteTaskerQueueType.DEFAULT_QUEUE);
             assert t != null;
         }
-        synchronized (t) {
-            return m_tasks.offer(new TaskWrapper(t.nextVirtualTime(), task));
+        m_lock.lock();
+        try {
+            if (m_tasks.offer(new TaskWrapper(t.nextVirtualTime(), task))) {
+                m_notEmpty.signal();
+                return true;
+            }
+            assert false;
+            return false;
+        } finally {
+            m_lock.unlock();
         }
     }
 
     @Override
     public SiteTasker poll() {
-        TaskWrapper wrapper = m_tasks.poll();
-        if (wrapper != null) {
-            return wrapper.m_task;
+        m_lock.lock();
+        try {
+            TaskWrapper wrapper = m_tasks.poll();
+            if (wrapper != null) {
+                return wrapper.m_task;
+            }
+            return null;
+        } finally {
+            m_lock.unlock();
         }
-        return null;
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return m_tasks.isEmpty();
     }
 
     @Override
     protected SiteTasker takeImpl() throws InterruptedException {
-        return CoreUtils.queueSpinTake(m_tasks).m_task;
+        m_lock.lockInterruptibly();
+        try {
+            // "LOCK_SPIN_MICROSECONDS" is, in fact, measured in nanoseconds
+            long nanos = -1;
+            long elapsedNanos = 0;
+            TaskWrapper wrapper;
+            while ((wrapper = m_tasks.poll()) == null) {
+                if (elapsedNanos < CoreUtils.LOCK_SPIN_MICROSECONDS) {
+                    if (nanos < 0) {
+                        nanos = System.nanoTime();
+                    } else {
+                        elapsedNanos = System.nanoTime() - nanos;
+                    }
+                } else {
+                    m_notEmpty.await();
+                }
+            }
+            return wrapper.m_task;
+        } finally {
+            m_lock.unlock();
+        }
     }
 
+    @Override
+    public boolean isEmpty() {
+        m_lock.lock();
+        try {
+            return m_tasks.isEmpty();
+        } finally {
+            m_lock.unlock();
+        }
+    }
 }
