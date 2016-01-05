@@ -26,7 +26,6 @@ import org.voltcore.utils.CoreUtils;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.util.concurrent.AtomicDouble;
 
 /**
  * This {@link SiteTaskerQueue} implements weighted fair queueing. In particular,
@@ -94,27 +93,19 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
      */
     private class VirtualTimer {
         final double m_weightInverse;
-        final AtomicDouble m_lastVirtualTime = new AtomicDouble();
+        private double m_lastVirtualTime;
 
         VirtualTimer(double weightInverse) {
             m_weightInverse = weightInverse;
         }
 
         double nextVirtualTime() {
-            double lastVirtualTime;
-            double nextVirtualTime;
-            do {
-                lastVirtualTime = m_lastVirtualTime.get();
-                double virtualStart = lastVirtualTime;
-                // If no tasks have arrived in this queue for a while, don't
-                // let it push a bunch of work all at once
-                TaskWrapper w = m_tasks.peek();
-                if (w != null) {
-                    virtualStart = Math.max(w.m_virtualTime, virtualStart);
-                }
-                nextVirtualTime = virtualStart + m_weightInverse;
-            } while (!m_lastVirtualTime.compareAndSet(lastVirtualTime, nextVirtualTime));
-            return nextVirtualTime;
+            double virtualStart = m_lastVirtualTime;
+            TaskWrapper w = m_tasks.peek();
+            if (w != null) {
+                virtualStart = Math.max(w.m_virtualTime, virtualStart);
+            }
+            return (m_lastVirtualTime = virtualStart + m_weightInverse);
         }
     }
 
@@ -153,7 +144,9 @@ public class FairSiteTaskerQueue extends SiteTaskerQueue {
             t = m_queueTimers.get(SiteTaskerQueueType.DEFAULT_QUEUE);
             assert t != null;
         }
-        return m_tasks.offer(new TaskWrapper(t.nextVirtualTime(), task));
+        synchronized (t) {
+            return m_tasks.offer(new TaskWrapper(t.nextVirtualTime(), task));
+        }
     }
 
     @Override
