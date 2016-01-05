@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyValue;
@@ -593,10 +594,26 @@ public class TestGeographyValueQueries extends RegressionSuite {
     public void testGeographySize() throws Exception {
         Client client = getClient();
 
-        GeographyValue gv = GeographyValue.fromText("polygon((1 1, -1 1, -1 -1, 1 -1, 1 1))");
+        String wkt = "POLYGON ((1.0 1.0, -1.0 1.0, -1.0 -1.0, 1.0 -1.0, 1.0 1.0))";
+        GeographyValue gv = GeographyValue.fromText(wkt);
         assertEquals(179, gv.getLengthInBytes());
+
+        String insertStatement = "insert into tiny_polygon values (?)";
         verifyProcFails(client, "The size 179 of the value exceeds the size of the GEOGRAPHY column \\(178 bytes\\)",
-                "@AdHoc", "insert into tiny_polygon values (?)", gv);
+                "@AdHoc", insertStatement, gv);
+
+        ClientResponse cr = client.callProcedure("@AdHoc",
+                "alter table tiny_polygon alter column poly geography(179);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc",
+                insertStatement, gv);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertContentOfTable(new Object[][] {{1}}, cr.getResults()[0]);
+
+        validateTableColumnOfScalarVarchar(client,
+                "select asText(poly) from tiny_polygon",
+                new String[] {wkt});
     }
 
     static public junit.framework.Test suite() {
@@ -645,6 +662,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
         catch (Exception e) {
             fail();
         }
+
+        project.setUseDDLSchema(true);
 
         config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
