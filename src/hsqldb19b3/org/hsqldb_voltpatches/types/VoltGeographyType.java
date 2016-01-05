@@ -27,7 +27,7 @@ public class VoltGeographyType extends Type {
     VoltGeographyType(long precision) {
         super(Types.VOLT_GEOGRAPHY,    // comparison group
                 Types.VOLT_GEOGRAPHY,  // type id
-                precision,             // precision
+                precision,             // precision (i.e., length)
                 0);                    // scale
     }
 

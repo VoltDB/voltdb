@@ -612,7 +612,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
-                + "  POLY GEOGRAPHY\n"
+                + "  POLY GEOGRAPHY(2048)\n"
                 + ");\n"
                 + "CREATE TABLE PT (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
