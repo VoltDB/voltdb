@@ -24,6 +24,14 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -31,6 +39,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 
 public class TestGeographyValueQueries extends RegressionSuite {
@@ -108,7 +117,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         return startPk;
     }
 
-    public void testNullValues() throws Exception {
+    public void notestNullValues() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -179,7 +188,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void testInsertAndSimpleSelect() throws IOException, ProcCallException {
+    public void notestInsertAndSimpleSelect() throws IOException, ProcCallException {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -221,7 +230,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     }
 
-    public void testParams() throws IOException, ProcCallException {
+    public void notestParams() throws IOException, ProcCallException {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -230,7 +239,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void testComparison() throws Exception {
+    public void notestComparison() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -366,7 +375,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void testArithmetic() throws Exception {
+    public void notestArithmetic() throws Exception {
         Client client = getClient();
 
         fillTable(client, "t", 0);
@@ -378,7 +387,191 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 "incompatible data type in conversion");
     }
 
-    public void testGroupBy() throws Exception {
+    // The shell is 5 fixed but arbitrarily selected points.
+    // However, the holes are carefully selected to be symmetric
+    // around the origin.  This means that the area of each
+    // hole is equal, and the area of the cheese is
+    // almost exactly equal to the area of the area of the
+    // shell minus the sum of the areas of the holes.
+    //
+    // If the areas were not symmetric in this way, more generally
+    // northern holes would have less area than more more
+    // generally southern holes in the same equatorial hemisphere.
+    private final String cheesyWKT = "POLYGON ((-5.0 46.0, -50.0 10.0, -40.0 -35.0, 25.0 -45.0, 30.0 20.0, -5.0 46.0), "
+            + "(  1.0   1.0,  1.0   21.0,  21.0  21.0, 21.0   1.0,   1.0   1.0), "
+            + "(  1.0 -21.0,  1.0   -1.0,  21.0  -1.0, 21.0 -21.0,   1.0 -21.0), "
+            + "(-21.0 -21.0,-21.0   -1.0,  -1.0  -1.0, -1.0 -21.0, -21.0 -21.0), "
+            + "(-21.0   1.0,-21.0   21.0,  -1.0  21.0, -1.0   1.0, -21.0   1.0))";
+    private final String cheesyShellWKT = "POLYGON ((-5.0 46.0, -50.0 10.0, -40.0 -35.0, 25.0 -45.0, 30.0 20.0, -5.0 46.0))";
+
+    private void fillCheesyTable(Client client) throws Exception {
+        GeographyValue cheesyPolygon = GeographyValue.fromText(cheesyWKT);
+        GeographyValue cheesyShellPolygon = GeographyValue.fromText(cheesyShellWKT);
+        //
+        // Get the holes from the cheesy polygon, and make them
+        // into polygons in their own right.  This means we need
+        // to reverse them.
+        //
+        List<GeographyValue> cheesyHoles = new ArrayList<GeographyValue>();
+        List<List<GeographyPointValue>> loops = cheesyPolygon.getLoops();
+        for (int idx = 1; idx < loops.size(); idx += 1) {
+            List<GeographyPointValue> oneHole = loops.get(idx);
+            List<GeographyPointValue> rev = new ArrayList<GeographyPointValue>();
+            rev.addAll(oneHole);
+            Collections.reverse(rev);
+            List<List<GeographyPointValue>> holeLoops = new ArrayList<List<GeographyPointValue>>();
+            holeLoops.add(rev);
+            cheesyHoles.add(new GeographyValue(holeLoops));
+        }
+        String cheesyOrigin = "POINT(0.0 0.0)";
+        String cheesyInHole = "POINT(15  15)";
+        List<String> exteriorPoints = Arrays.asList("POINT( 60  60)",
+                                                    "POINT( 60 -60)",
+                                                    "POINT(-60 -60)",
+                                                    "POINT(-60  60)");
+        List<String> centers = Arrays.asList("POINT( 11  11)",
+                                             "POINT( 11 -11)",
+                                             "POINT(-11 -11)",
+                                             "POINT(-11  11)");
+        client.callProcedure("T.INSERT", 0, "SHELL", cheesyShellPolygon);
+        client.callProcedure("T.INSERT", 1, "Formaggio", cheesyPolygon);
+        for (int idx = 0; idx < cheesyHoles.size(); idx += 1) {
+            GeographyValue hole = cheesyHoles.get(idx);
+            client.callProcedure("T.INSERT", idx + 100, hole.toString(), hole);
+        }
+        client.callProcedure("LOCATION.INSERT", 0, "ORIGIN", GeographyPointValue.geographyPointFromText(cheesyOrigin));
+        client.callProcedure("LOCATION.INSERT", 1, "INHOLE", GeographyPointValue.geographyPointFromText(cheesyInHole));
+        for (int idx = 0; idx < exteriorPoints.size(); idx += 1) {
+            String exPt = exteriorPoints.get(idx);
+            client.callProcedure("LOCATION.INSERT", idx + 200, exPt, GeographyPointValue.geographyPointFromText(exPt));
+            idx += 1;
+        }
+        for (int idx = 0; idx < centers.size(); idx += 1) {
+            String ctrPt = centers.get(idx);
+            client.callProcedure("LOCATION.INSERT", idx + 300, ctrPt, GeographyPointValue.geographyPointFromText(ctrPt));
+        }
+        // Make sure that all the polygons
+        // are valid.
+        VoltTable vt = client.callProcedure("@AdHoc", "select t.pk from t where not isValid(t.poly) order by t.pk").getResults()[0];
+        assertTrue("fillCheesyTable: " + vt.getRowCount() + " invalid polygons.", vt.getRowCount() == 0);
+    }
+
+    public void testLoopOrderInCheesyPolygon() throws Exception {
+        final double EPSILON = 1.0e-13;
+        Client client = getClient();
+        fillCheesyTable(client);
+        GeographyValue cheesyPolygon = GeographyValue.fromText(cheesyWKT);
+        VoltTable vt = client.callProcedure("@AdHoc", "select t.poly from t where t.pk = 1 order by t.pk;").getResults()[0];
+        assertEquals("Expected only one row.", 1, vt.getRowCount());
+        assertTrue(vt.advanceRow());
+        GeographyValue cheesyRoundTripper = vt.getGeographyValue(0);
+        assertApproximatelyEquals("Expected Equivalent Round Trip Polygons", cheesyPolygon, cheesyRoundTripper, EPSILON);
+    }
+
+    public void notestContainsInCheesyPolygon() throws Exception {
+        Client client = getClient();
+        fillCheesyTable(client);
+        // Everything is in the shell (t.pk == 0).
+        // Only the origin is in the cheesy polygon (t.pk == 1)
+        // Nothing in in t.pk == 2, which is a hole sized shell.
+        //    This latter fact is just because the hole-shaped shell
+        //    is carefully chosen to not contain the test point.
+        //
+        // Also, none of the exterior points are contained in
+        // the shell or cheesy polygon.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "select t.pk, location.pk "
+                + "from t, location "
+                + "  where location.pk < 300 and t.pk < 100 "
+                + "        and contains(t.poly, location.loc_point) "
+                + "  order by t.pk, location.pk;").getResults()[0];
+        Object [][] expectedQ1 = new Object[][] {
+            {0, 0},
+            {0, 1},
+            {1, 0},
+        };
+        assertContentOfTable(expectedQ1, vt);
+    }
+
+    public void notestAreasInCheesyPolygon() throws Exception {
+        Client client = getClient();
+        fillCheesyTable(client);
+        VoltTable vt = client.callProcedure("@AdHoc", "select t.pk, area(t.poly), t.name from t order by t.pk;").getResults()[0];
+        double resmap[] = new double[2];
+        double holeArea = 0;
+        while (vt.advanceRow()) {
+            int key = (int)vt.getLong(0);
+            double value = vt.getDouble(1);
+            if (100 <= key && key < 200) {
+                holeArea += value;
+            } else if (0 <= key && key <= 1) {
+                resmap[key] = value;
+            }
+        }
+        double shellArea = resmap[0];
+        double cheeseArea = resmap[1];
+        // Require that the relative error be
+        // less than 1% in absolute value.
+        final double AREA_EPSILON = 1.0e-14;
+        double relerror = Math.abs((shellArea  - (cheeseArea + holeArea))/shellArea);
+        assertTrue("AreaCalculation is incorrect.  ", relerror < AREA_EPSILON);
+    }
+
+    public void notestDistancesInCheesyPolygons() throws Exception {
+        Client client = getClient();
+        fillCheesyTable(client);
+        // Check that distances from exterior points are not affected
+        // by holes.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                                  "select t.pk, l.pk, distance(t.poly, l.loc_point) "
+                                + "  from t, location as l "
+                                + "  where 200 <= l.pk and t.pk < 2 order by t.pk, l.pk;").getResults()[0];
+        // shellMap.get(n) is the distance between the shell and exterior point pk == n.
+        // cheeseMap.get(n) is the distance between the cheese and exterior point with pk == n.
+        // indices has all the indices, so that we can iterate over them.
+        Map<Long, Double> shellMap = new HashMap<Long, Double>();
+        Map<Long, Double> cheeseMap = new HashMap<Long, Double>();
+        Set<Long> indices = new HashSet<Long>();
+        while (vt.advanceRow()) {
+            Long polyKey = vt.getLong(0);
+            Long ptKey = vt.getLong(1);
+            Double distance = vt.getDouble(2);
+            if (polyKey == 0) {
+                shellMap.put(ptKey, distance);
+            } else if (polyKey == 1) {
+                cheeseMap.put(ptKey, distance);
+            } else {
+                assertTrue("Unexpected polygon : " + polyKey, false);
+            }
+            indices.add(ptKey);
+        }
+        for (Long index: indices) {
+            Double shellDist = shellMap.get(index);
+            Double cheeseDist = shellMap.get(index);
+            assertNotNull("Index " + index + " not found in shell.", shellDist);
+            assertNotNull("Index " + index + " not found in cheese.", cheeseDist);
+            assertEquals("Expected shell and cheese distance to be equal", shellDist, cheeseDist);
+        }
+        // Check that the distances inside holes are
+        // what we would expect.  We have four square holes,
+        // each 20degrees on a side, and all symmetric around
+        // the origin (longitude = latitude = 0.0).
+        vt = client.callProcedure("@AdHoc",
+                "select l.pk, distance(l.loc_point, t.poly) "
+                + "from t, location as l "
+                + "  where t.pk = 1 and 300 <= l.pk "
+                + "  order by l.pk;").getResults()[0];
+        double dist = -1;
+        while (vt.advanceRow()) {
+            if (dist < 0) {
+                dist = vt.getDouble(1);
+            } else {
+                assertEquals("Distances are not equal", dist, vt.getDouble(1));
+            }
+        }
+    }
+
+    public void notestGroupBy() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -403,7 +596,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void testUpdate() throws Exception {
+    public void notestUpdate() throws Exception {
         Client client = getClient();
 
         String santaCruzWkt = "POLYGON("
@@ -448,7 +641,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void testNotNullConstraint() throws Exception {
+    public void notestNotNullConstraint() throws Exception {
         Client client = getClient();
 
         for (String tbl : NOT_NULL_TABLES) {
@@ -475,7 +668,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void testIn() throws Exception {
+    public void notestIn() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -513,7 +706,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         return vt.getGeographyValue(0).toString();
     }
 
-    public void testPolygonFromAdHocTextPositive() throws Exception {
+    public void notestPolygonFromAdHocTextPositive() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
@@ -558,13 +751,13 @@ public class TestGeographyValueQueries extends RegressionSuite {
         verifyStmtFails(client, stmt, expectedMsg);
     }
 
-    public void testPointFromTextNegative() throws Exception {
+    public void notestPointFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
         assertGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
     }
 
-    public void testPolygonFromTextNegative() throws Exception {
+    public void notestPolygonFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
@@ -602,8 +795,13 @@ public class TestGeographyValueQueries extends RegressionSuite {
         String literalSchema =
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
-                + "  NAME VARCHAR(32),\n"
+                + "  NAME VARCHAR(128),\n"
                 + "  POLY GEOGRAPHY\n"
+                + ");\n"
+                + "CREATE TABLE LOCATION (\n"
+                + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
+                + "  NAME VARCHAR(32),\n"
+                + "  LOC_POINT GEOGRAPHY_POINT,\n"
                 + ");\n"
                 + "CREATE TABLE PT (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"

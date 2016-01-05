@@ -218,6 +218,46 @@ public class TestGeographyValue extends TestCase {
     }
 
     /**
+     * Return all the points in the given list, but offset by the
+     * given point.
+     */
+    private List<GeographyPointValue> offsetList(List<GeographyPointValue> hole,
+                                                 GeographyPointValue       offset) {
+        List<GeographyPointValue> answer = new ArrayList<GeographyPointValue>();
+        for (GeographyPointValue pt : hole) {
+            answer.add(pt.add(offset));
+        }
+        return answer;
+    }
+
+    /**
+     * Test polygons which looks like swiss cheese.
+     *
+     * Test polygons which have many holes.
+     *
+     * @throws Exception
+     */
+    public void testCheesyPolygons() throws Exception {
+       List<GeographyPointValue> shell = Arrays.asList(new GeographyPointValue( -5, 46),
+                                                       new GeographyPointValue(-50, 10),
+                                                       new GeographyPointValue(-40, -35),
+                                                       new GeographyPointValue( 25, -45),
+                                                       new GeographyPointValue( 30, 20),
+                                                       new GeographyPointValue( -5, 46));
+       List<GeographyPointValue> hole = Arrays.asList(new GeographyPointValue(-10,  10),
+                                                      new GeographyPointValue( 10,  10),
+                                                      new GeographyPointValue( 10, -10),
+                                                      new GeographyPointValue(-10, -10),
+                                                      new GeographyPointValue(-10,  10));
+       GeographyValue geog = new GeographyValue(Arrays.asList(shell,
+                                                              offsetList(hole, new GeographyPointValue(-30, 5)),
+                                                              offsetList(hole, new GeographyPointValue(-30, -20)),
+                                                              offsetList(hole, new GeographyPointValue(10, 12)),
+                                                              offsetList(hole, new GeographyPointValue(10, -15))));
+       System.out.println(geog.toString());
+    }
+
+    /**
      * This tests that the maximum error when we transform a latitude/longitude pair to an
      * S2, 3-dimensinal point and then back again is less than 1.0e-13.
      *
