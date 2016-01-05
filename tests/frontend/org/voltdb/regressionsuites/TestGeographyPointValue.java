@@ -32,9 +32,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
 
-public class TestGeograpyPointValue extends RegressionSuite {
+public class TestGeographyPointValue extends RegressionSuite {
 
-    public TestGeograpyPointValue(String name) {
+    public TestGeographyPointValue(String name) {
         super(name);
     }
 
@@ -98,6 +98,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
     }
 
     public void testPointFromText() throws Exception {
+        final double EPSILON = 1.0e-14;
         Client client = getClient();
 
         validateTableOfScalarLongs(client,
@@ -231,10 +232,10 @@ public class TestGeograpyPointValue extends RegressionSuite {
                 .getResults()[0];
 
         assertApproximateContentOfTable (new Object[][] {
-                {null, 3},
-                {SANTA_CLARA_PT, 3},
-                {BEDFORD_PT, 3}},
-                vt, EPSILON);
+            {null, 3},
+            {SANTA_CLARA_PT, 3},
+            {BEDFORD_PT, 3}},
+            vt, EPSILON);
     }
 
     public void testPointUpdate() throws Exception {
@@ -339,7 +340,7 @@ public class TestGeograpyPointValue extends RegressionSuite {
 
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGeograpyPointValue.class);
+            new MultiConfigSuiteBuilder(TestGeographyPointValue.class);
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
