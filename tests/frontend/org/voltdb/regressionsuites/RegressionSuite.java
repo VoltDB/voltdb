@@ -799,7 +799,7 @@ public class RegressionSuite extends TestCase {
         Iterator<List<GeographyPointValue>> expectedLoopIt = expectedLoops.iterator();
         for (List<GeographyPointValue> actualLoop : actualLoops) {
             List<GeographyPointValue> expectedLoop = expectedLoopIt.next();
-            assertEquals(msg + loopCtr + "th loop should have " + expectedLoop.size()
+            assertEquals(msg + loopCtr + "the loop should have " + expectedLoop.size()
                     + " vertices, but has " + actualLoop.size(),
                     expectedLoop.size(), actualLoop.size());
 
@@ -833,10 +833,10 @@ public class RegressionSuite extends TestCase {
                 assertTrue(msg, actualRow.wasNull());
             }
             else if (expectedObj instanceof GeographyPointValue) {
-                assertEquals(msg, expectedObj, actualRow.getPoint(i));
+                assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getPoint(i), epsilon);
             }
             else if (expectedObj instanceof GeographyValue) {
-                assertApproximatelyEquals(msg, (GeographyValue)expectedObj, actualRow.getGeographyValue(i), epsilon);
+                assertApproximatelyEquals(msg, (GeographyValue) expectedObj, actualRow.getGeographyValue(i), epsilon);
             }
             else if (expectedObj instanceof Long) {
                 long val = ((Long)expectedObj).longValue();

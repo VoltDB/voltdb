@@ -19,7 +19,8 @@
 {@dmlcolumnpredicate = "_variable[int] _cmp _value[int]"}
 {@idcol = "V_G1"}
 {@numcol = "V_SUM_AGE"}
+{@star = "*"}
+{@lhsstar = "*"}
 
 {@dmltable = "_basetables"}
 {@fromtables = "_subqueryform"}
-

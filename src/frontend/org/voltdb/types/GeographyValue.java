@@ -137,24 +137,48 @@ public class GeographyValue {
     }
 
     /**
-     * Gets the loops that make up the polygon, with the outer loop first.
-     * @return  The loops in the polygon as a list of a list of points
+     * Return the list of loops of a polygon.  The list has the same
+     * values as the list of loops used to construct the polygon, or
+     * the sequence of WKT loops used to construct the polygon.
+     *
+     * @return A list of loops.
      */
     public List<List<GeographyPointValue>> getLoops() {
+        /*
+         * Gets the loops that make up the polygon, with the outer loop first.
+         * Note that we need to convert from XYZPoint to GeographyPointValue.
+         *
+         * Include the loop back to the first vertex.  Also, since WKT wants
+         * holes oriented Clockwise and S2 wants everything oriented CounterClockWise,
+         * reverse the order of holes.  We take care to leave the first vertex
+         * the same.
+         */
         List<List<GeographyPointValue>> llLoops = new ArrayList<List<GeographyPointValue>>();
 
+        boolean isShell = true;
         for (List<XYZPoint> xyzLoop : m_loops) {
             List<GeographyPointValue> llLoop = new ArrayList<GeographyPointValue>();
-            for (XYZPoint xyz : xyzLoop) {
+            // Add the first of xyzLoop first.
+            llLoop.add(xyzLoop.get(0).toGeographyPointValue());
+            // Add shells left to right, and holes right to left.  Make sure
+            // not to add the first element we just added.
+            int startIdx = (isShell ? 1              : xyzLoop.size()-1);
+            int endIdx   = (isShell ? xyzLoop.size() : 0);
+            int delta    = (isShell ? 1              : -1);
+            for (int idx = startIdx; idx != endIdx; idx += delta) {
+                XYZPoint xyz = xyzLoop.get(idx);
                 llLoop.add(xyz.toGeographyPointValue());
             }
+            // Close the loop.
+            llLoop.add(xyzLoop.get(0).toGeographyPointValue());
             llLoops.add(llLoop);
+            isShell = false;
         }
         return llLoops;
     }
 
     /**
-     * Print out this polygon in WKT format.
+     * Print out this polygon in WKT format.  Use 12 digits of precision.
      */
     @Override
     public String toString() {
@@ -368,7 +392,7 @@ public class GeographyValue {
 
         @Override
         public String toString() {
-            return String.format(toGeographyPointValue().toString());
+            return toGeographyPointValue().toString();
         }
     }
 
@@ -485,7 +509,12 @@ public class GeographyValue {
 
         // check if the end points of the loop are equal
         if (loop.get(0).equals(loop.get(loop.size() - 1)) == false) {
-            throw new IllegalArgumentException(excpMsgPrf + "closing points of ring are not equal");
+            throw new IllegalArgumentException(excpMsgPrf
+                                                + "closing points of ring are not equal: \""
+                                                + loop.get(0).toString()
+                                                + "\" != \""
+                                                + loop.get(loop.size()-1).toString()
+                                                + "\"");
         }
     }
 
@@ -609,4 +638,25 @@ public class GeographyValue {
         return loops;
     }
 
+    /**
+     * Create a new GeographyValue which is offset from this one
+     * by the given point.  The latitude and longitude values
+     * stay in range because we are using the normalizing operations
+     * in GeographyPointValue.
+     *
+     * @param offset
+     * @return
+     */
+    public GeographyValue add(GeographyPointValue offset) {
+        List<List<GeographyPointValue>> newLoops = new ArrayList<List<GeographyPointValue>>();
+        for (List<XYZPoint> oneLoop : m_loops) {
+            List<GeographyPointValue> loop = new ArrayList<GeographyPointValue>();
+            for (XYZPoint p : oneLoop) {
+                loop.add(p.toGeographyPointValue().add(offset));
+            }
+            loop.add(oneLoop.get(0).toGeographyPointValue().add(offset));
+            newLoops.add(loop);
+        }
+        return new GeographyValue(newLoops);
+    }
 }

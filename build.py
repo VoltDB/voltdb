@@ -61,6 +61,9 @@ if CTX.compilerName() == 'gcc':
         elif (CTX.compilerMinorVersion() == 8):
 	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
 
+    if (CTX.compilerMajorVersion() == 5):
+        CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
+
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
