@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <deployment>
    <cluster hostcount="1" />
-   <export enabled="true" target="file">
-     <configuration>
+   <export>
+     <configuration enabled="true" type="file" stream="exportstream">
        <property name="type">csv</property>
        <property name="nonce">MyExport</property>
        <property name="skipinternals">true</property>

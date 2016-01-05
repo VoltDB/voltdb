@@ -27,6 +27,28 @@ PARTITION TABLE partitioned ON COLUMN cid;
 CREATE INDEX P_CIDINDEX ON partitioned (cid);
 
 
+-- persistpartitioned table
+CREATE TABLE persistpartitioned
+(
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_p_persist PRIMARY KEY
+  (
+    cid, txnid
+  )
+, UNIQUE ( cid, rid )
+);
+PARTITION TABLE persistpartitioned ON COLUMN cid;
+CREATE INDEX PERSIST_CIDINDEX ON persistpartitioned (cid);
+
 CREATE VIEW partview (
 	cid, 
 	entries, 
@@ -155,7 +177,7 @@ CREATE TABLE partitioned_export
 , value      varbinary(1048576) NOT NULL
 );
 PARTITION TABLE partitioned_export ON COLUMN cid;
-EXPORT TABLE partitioned_export;
+EXPORT TABLE partitioned_export to stream partstream;
 
 CREATE VIEW ex_partview (
     cid,
@@ -194,7 +216,7 @@ CREATE TABLE replicated_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
-EXPORT TABLE replicated_export;
+EXPORT TABLE replicated_export to stream replstream;
 
 -- For loadsinglepartition
 CREATE TABLE loadp

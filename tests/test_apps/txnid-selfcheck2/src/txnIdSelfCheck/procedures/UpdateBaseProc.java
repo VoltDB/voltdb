@@ -47,6 +47,9 @@ public class UpdateBaseProc extends VoltProcedure {
     public final SQLStmt p_insert = new SQLStmt(
             "INSERT INTO partitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    //public final SQLStmt persist_insert = new SQLStmt(
+    //        "INSERT INTO persistpartitioned VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
     public final SQLStmt p_export = new SQLStmt(
             "INSERT INTO partitioned_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
@@ -133,6 +136,9 @@ public class UpdateBaseProc extends VoltProcedure {
         	voltQueueSQL(p_getExViewShadowData, cid);
         	VoltTable[] streamresults = voltExecuteSQL();
         	validateStreamData(streamresults[0], streamresults[1], cid, cnt);
+            // temp -- persist table for later inspection
+            // voltQueueSQL(persist_insert, txnid, prevtxnid, ts, cid, cidallhash, rid, cnt, adhocInc, adhocJmp, value);
+            // retval = voltExecuteSQL();
         }
 
         VoltTableRow row = data.fetchRow(0);
@@ -273,8 +279,7 @@ public class UpdateBaseProc extends VoltProcedure {
         }
     }
 
-    private void validateStreamData(VoltTable exview, VoltTable shadowview,
- 			byte cid, long cnt) {
+    private void validateStreamData(VoltTable exview, VoltTable shadowview, byte cid, long cnt) {
         if (exview.getRowCount() != 1)
             throw new VoltAbortException("Export view has "+exview.getRowCount()+" entries of the same cid, that should not happen.");
         VoltTableRow row0 = exview.fetchRow(0);
