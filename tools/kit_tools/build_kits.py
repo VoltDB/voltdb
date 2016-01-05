@@ -285,7 +285,7 @@ versionMac = "unknown"
 releaseDir = "unknown"
 
 # get ssh config [key_filename, hostname]
-CentosSSHInfo = getSSHInfoForHost("volt5f")
+CentosSSHInfo = getSSHInfoForHost("volt15a")
 MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
