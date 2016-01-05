@@ -594,26 +594,39 @@ public class TestGeographyValueQueries extends RegressionSuite {
     public void testGeographySize() throws Exception {
         Client client = getClient();
 
-        String wkt = "POLYGON ((1.0 1.0, -1.0 1.0, -1.0 -1.0, 1.0 -1.0, 1.0 1.0))";
-        GeographyValue gv = GeographyValue.fromText(wkt);
+        // Make sure that we can resize a GEOGRAPHY column in a populated table if
+        // we decide that we want to insert a polygon that is larger
+        // than the column's current size.
+
+        String wktFourVerts = "POLYGON ((1.0 1.0, -1.0 1.0, -1.0 -1.0, 1.0 -1.0, 1.0 1.0))";
+        GeographyValue gv = GeographyValue.fromText(wktFourVerts);
         assertEquals(179, gv.getLengthInBytes());
 
-        String insertStatement = "insert into tiny_polygon values (?)";
-        verifyProcFails(client, "The size 179 of the value exceeds the size of the GEOGRAPHY column \\(178 bytes\\)",
-                "@AdHoc", insertStatement, gv);
+        VoltTable vt = client.callProcedure("tiny_polygon.Insert", 0, gv).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        String wktFiveVerts = "POLYGON (("
+                + "1.0 1.0, "
+                + "-1.0 1.0, "
+                + "-1.0 -1.0, "
+                + "1.0 -1.0, "
+                + "0.0 0.0, "
+                + "1.0 1.0))";
+        gv = GeographyValue.fromText(wktFiveVerts);
+        assertEquals(203, gv.getLengthInBytes());
+        verifyProcFails(client, "The size 203 of the value exceeds the size of the GEOGRAPHY column \\(179 bytes\\)",
+                "tiny_polygon.Insert", 1, gv);
 
         ClientResponse cr = client.callProcedure("@AdHoc",
-                "alter table tiny_polygon alter column poly geography(179);");
+                "alter table tiny_polygon alter column poly geography(203);");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("@AdHoc",
-                insertStatement, gv);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        assertContentOfTable(new Object[][] {{1}}, cr.getResults()[0]);
+        vt = client.callProcedure("tiny_polygon.Insert", 1, gv).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         validateTableColumnOfScalarVarchar(client,
-                "select asText(poly) from tiny_polygon",
-                new String[] {wkt});
+                "select asText(poly) from tiny_polygon order by id",
+                new String[] {wktFourVerts, wktFiveVerts});
     }
 
     static public junit.framework.Test suite() {
@@ -648,7 +661,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 + "  POLY GEOGRAPHY NOT NULL\n"
                 + ");\n"
                 + "CREATE TABLE TINY_POLYGON (\n"
-                + "  POLY GEOGRAPHY(178) NOT NULL\n"
+                + "  ID INTEGER PRIMARY KEY,\n"
+                + "  POLY GEOGRAPHY(179) NOT NULL\n"
                 + ");\n"
                 + "CREATE PROCEDURE select_in_t AS \n"
                 + "  SELECT pk FROM t WHERE poly IN ? ORDER BY pk ASC;\n"
