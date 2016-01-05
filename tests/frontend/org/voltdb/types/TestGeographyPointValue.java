@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 
 public class TestGeographyPointValue extends TestCase {
     // Points should have this much precision.
-    private final double EPSILON = 1.0e-15;
+    private final double EPSILON = 1.0e-14;
 
     private void assertConstructorThrows(String expectedMessage, double lng, double lat) {
         try {
@@ -159,5 +159,84 @@ public class TestGeographyPointValue extends TestCase {
                                 0.0,
                                 EPSILON,
                                 "Cannot construct GeographyPointValue value from \"point\\(0[.]0, 0[.]0\\)\"");
+    }
+
+    public void checkGeographyPointAdd(double lng1,   double lat1,
+                                       double scale,
+                                       double lng2,   double lat2,
+                                       double lngans, double latans,
+                                       double epsilon) {
+        GeographyPointValue p1 = GeographyPointValue.normalizeLngLat(lng1, lat1);
+        GeographyPointValue p2 = GeographyPointValue.normalizeLngLat(lng2, lat2);
+        GeographyPointValue p3 = p1.add(p2, scale);
+        assertEquals(lngans, p3.getLongitude(), epsilon);
+        assertEquals(latans, p3.getLatitude(), epsilon);
+    }
+
+    public void checkGeographyPointSub(double lng1,   double lat1,
+                                       double scale,
+                                       double lng2,   double lat2,
+                                       double lngans, double latans,
+                                       double epsilon) {
+        GeographyPointValue p1 = GeographyPointValue.normalizeLngLat(lng1, lat1);
+        GeographyPointValue p2 = GeographyPointValue.normalizeLngLat(lng2, lat2);
+        GeographyPointValue p3 = p1.sub(p2, scale);
+        assertEquals(lngans, p3.getLongitude(), epsilon);
+        assertEquals(latans, p3.getLatitude(), epsilon);
+    }
+
+    public void checkGeographyPointMul(double lng1,   double lat1,
+                                       double scale,
+                                       double lngans, double latans,
+                                       double epsilon) {
+        GeographyPointValue p1 = GeographyPointValue.normalizeLngLat(lng1, lat1);
+        GeographyPointValue p2 = p1.mul(scale);
+        assertEquals(lngans, p2.getLongitude(), epsilon);
+        assertEquals(latans, p2.getLatitude(), epsilon);
+    }
+
+    public void checkGeographyPointRotate(double lng1, double lat1,
+                                          double phi,
+                                          double ctrlng, double ctrlat,
+                                          double explng, double explat,
+                                          double epsilon) {
+        GeographyPointValue p1 = GeographyPointValue.normalizeLngLat(lng1, lat1);
+        GeographyPointValue ctr = GeographyPointValue.normalizeLngLat(ctrlng, ctrlat);
+        GeographyPointValue ans = p1.rotate(phi, ctr);
+        assertEquals(explng, ans.getLongitude(), epsilon);
+        assertEquals(explat, ans.getLatitude(), epsilon);
+    }
+    public void testGeographyPointAdd() throws Exception {
+        checkGeographyPointAdd(0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, EPSILON);
+        checkGeographyPointAdd(0.0, 1.0, 2.0, 2.0, 4.0, 4.0, 9.0, EPSILON);
+    }
+
+    public void testGeographyPointSub() throws Exception {
+        checkGeographyPointSub(2.0,  4.0,
+                               1.0,
+                               0.0,  2.0,
+                               2.0,  2.0,
+                               EPSILON);
+        checkGeographyPointSub(10.0,  20.0,
+                                2.0,
+                                2.0,  40.0,
+                                6.0, -60.0, EPSILON);
+    }
+
+    public void testGeographyPointMul() throws Exception {
+        checkGeographyPointMul( 10.0, 20.0,
+                                 4.0,
+                                40.0, 80.0,
+                                EPSILON);
+        checkGeographyPointMul( 20.0,  80.0,
+                                 4.0,
+                                80.0, -40.0, EPSILON);
+        checkGeographyPointMul( 20.0,   70.0,
+                                 4.0,
+                                80.0,  -80.0, EPSILON);
+    }
+
+    public void testGeographyPointRotate() throws Exception {
+        checkGeographyPointRotate(10.0, 20.0, 90, 0.0, 0.0, -20.0, 10.0, EPSILON);
     }
 }

@@ -799,7 +799,7 @@ public class RegressionSuite extends TestCase {
         Iterator<List<GeographyPointValue>> expectedLoopIt = expectedLoops.iterator();
         for (List<GeographyPointValue> actualLoop : actualLoops) {
             List<GeographyPointValue> expectedLoop = expectedLoopIt.next();
-            assertEquals(msg + loopCtr + "th loop should have " + expectedLoop.size()
+            assertEquals(msg + loopCtr + "the loop should have " + expectedLoop.size()
                     + " vertices, but has " + actualLoop.size(),
                     expectedLoop.size(), actualLoop.size());
 
