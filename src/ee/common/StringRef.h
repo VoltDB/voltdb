@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ public:
     /// allocated, intended for temporary strings.  If no Pool
     /// object is provided, the StringRef and the string memory will be
     /// allocated out of the ThreadLocalPool's persistent storage.
-    static StringRef* create(int32_t size, Pool* dataPool);
+    static StringRef* create(int32_t size, const char* bytes, Pool* tempPool);
 
     /// Destroy the given StringRef object and free any memory
     /// allocated from persistent pools to store the object.
@@ -60,14 +60,18 @@ public:
     /// specifically as persistent StringRef memory.
     static void destroy(StringRef* sref);
 
-    char* get() { return m_stringPtr; }
-    const char* get() const { return m_stringPtr; }
+    char* getObjectValue();
+    const char* getObjectValue() const;
+
+    int32_t getObjectLength() const;
+
+    const char* getObject(int32_t* lengthOut) const;
 
 private:
     // Signature used internally for persistent strings
     StringRef(int32_t size);
     // Signature used internally for temporary strings
-    StringRef();
+    StringRef(Pool* tempPool, int32_t size);
     // Only called from destroy and only for persistent strings.
     ~StringRef();
 

@@ -650,7 +650,16 @@ public class FunctionForVoltDB extends FunctionSQL {
             break;
         }
         for (int ii = 1; ii < nodes.length; ii++) {
-            sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+            if (nodes[ii] != null) {
+                sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+            }
+            else {
+                // Some functions, like regexp_position, have optional parameters.
+                // The omitted optional parameters appear as a null in the function's
+                // node list.  This null-preserving behavior seems to be intentional in
+                // ParserSQL.readExpression, for reasons that are unclear to me.
+                //   --cwolff, December 2015.
+            }
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();

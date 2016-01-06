@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,7 +36,7 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
         NValue defaultResult = arguments[size-1];
         // See the comment above about the reason for un-inlining, here.
         if ( defaultResult.m_sourceInlined ) {
-            defaultResult.allocateObjectFromInlinedValue();
+            defaultResult.allocateObjectFromInlinedValue(getTempStringPool());
         }
         return defaultResult;
     }

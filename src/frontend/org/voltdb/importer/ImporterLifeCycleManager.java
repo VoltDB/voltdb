@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,6 +91,11 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         if (m_executorService != null) { // Should be caused by coding error. Generic RuntimeException is OK
             throw new RuntimeException("Importer has already been started and is running");
+        }
+
+        if (m_configs.size()==0) {
+            s_logger.info("No configured importers of " + m_factory.getTypeName() + " are ready to be started at this time");
+            return;
         }
 
         ThreadPoolExecutor tpe = new ThreadPoolExecutor(
@@ -225,7 +230,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     {
         for (AbstractImporter importer : m_importers.values()) {
             try {
-                importer.stop();
+                importer.stopImporter();
             } catch(Exception e) {
                 s_logger.warn("Error trying to stop importer resource ID " + importer.getResourceID(), e);
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,13 +48,8 @@
 #include <map>
 
 using namespace std;
-namespace voltdb {
 
-TableCatalogDelegate::TableCatalogDelegate(int32_t catalogId, string path, string signature, int32_t compactionThreshold) :
-    CatalogDelegate(catalogId, path), m_table(NULL), m_exportEnabled(false),
-    m_signature(signature), m_compactionThreshold(compactionThreshold)
-{
-}
+namespace voltdb {
 
 TableCatalogDelegate::~TableCatalogDelegate()
 {
@@ -264,10 +259,7 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                                       catalog::Table const &catalogTable,
-                                                       const int32_t compactionThreshold,
-                                                       bool &materialized,
-                                                       char *signatureHash)
+                                                       catalog::Table const &catalogTable)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -395,16 +387,16 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
     bool drEnabled = catalogTable.isDRed();
-    materialized = isTableMaterialized(catalogTable);
+    m_materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
     SHA1_CTX shaCTX;
     SHA1Init(&shaCTX);
     SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
-    SHA1Final(reinterpret_cast<unsigned char *>(signatureHash), &shaCTX);
+    SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
     // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
     int tableAllocationTargetSize = 0;
-    if (materialized) {
+    if (m_materialized) {
       catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
       if (mvInfo->groupbycols().size() == 0) {
         // ENG-8490: If the materialized view came with no group by, set table block size to 64KB
@@ -414,13 +406,13 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
       }
     }
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, signatureHash,
-                                                    materialized,
+                                                    schema, columnNames, m_signatureHash,
+                                                    m_materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
-                                                    compactionThreshold,
+                                                    m_compactionThreshold,
                                                     drEnabled);
 
     // add a pkey index if one exists
@@ -446,10 +438,7 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
-                                        catalogTable,
-                                        m_compactionThreshold,
-                                        m_materialized,
-                                        m_signatureHash);
+                                        catalogTable);
     if (!m_table) {
         return false; // mixing ints and booleans here :(
     }
@@ -476,7 +465,7 @@ bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDataba
 
 void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
                   PersistentTable *existingTable, PersistentTable *newTable,
-                  std::map<std::string, CatalogDelegate*> const &delegatesByName)
+                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
@@ -525,7 +514,7 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
 void
 TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
                                            catalog::Table const &catalogTable,
-                                           std::map<std::string, CatalogDelegate*> const &delegatesByName)
+                                           std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
 {
     DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream(),
             ExecutorContext::getExecutorContext()->drReplicatedStream());
@@ -535,7 +524,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     ///////////////////////////////////////////////
 
     PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold, m_materialized, m_signatureHash));
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
     assert(newTable);
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 
@@ -655,7 +644,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocateObjectFromInlinedValue();
+                        value.allocateObjectFromInlinedValue(NULL);
                     }
                     tupleToInsert.setNValue(i, value);
                 }

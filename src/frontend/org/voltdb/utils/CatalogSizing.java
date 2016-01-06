@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -224,27 +224,30 @@ public abstract class CatalogSizing {
         }
         // Larger capacities use pooled buffers sized in powers of 2 or values halfway
         // between powers of 2.
-        // The rounded buffer size includes an object length, typically 4 bytes.
-        int content = 4 + dataSize;
+        // The rounded buffer size includes an object length of 4 bytes and
+        // an 8-byte backpointer used in compaction.
+        int content = 4 + 8 + dataSize;
         int bufferSize = roundedAllocationSize(64, content);
-        // The rounded buffer size has an additional 4-byte allocation size and
-        // 8-byte back pointer overhead. There is also has an 8-byte pointer
-        // in the tuple and an 8-byte StringRef indirection pointer.
-        return bufferSize + 4 + 8 + 8 + 8;
+        // There is also has an 8-byte pointer in the tuple
+        // and an 8-byte StringRef indirection pointer.
+        return bufferSize + 8 + 8;
     }
 
-    public static int testOnlyAllocationSizeForObject(int requestSize) {
-        if (requestSize <= 48) {
-            // Short-cut calculations for sizes that are not used in the catalog sizing.
-            if (requestSize <= 2) {
-                return 2;
-            }
-            return roundedAllocationSize(4, requestSize);
+    public static int testOnlyAllocationSizeForObject(int dataSize) {
+        // See the comments in getVariableColumnSize for the significance of
+        // these adjustments.
+        int content = 4 + 8 + dataSize;
+        if (content <= 48) {
+            // Short-cut calculations for sizes that are not used in the
+            // catalog sizing.
+            return roundedAllocationSize(16, content);
         }
-        // Otherwise exercise as much of the common catalog sizing code path as possible
-        // but strip out any adjustments that are not directly a result of allocation rounding.
-        // See the comments in getVariableColumnSize for the significance of these adjustments.
-        return getVariableColumnSize(64, requestSize - 4, false) - 4 - 8 - 8 - 8;
+        // Otherwise exercise as much of the catalog sizing code path as
+        // possible but strip out any adjustments that are not directly a
+        // result of allocation rounding.
+        // See the comments in getVariableColumnSize for the significance of
+        // these adjustments.
+        return getVariableColumnSize(64, dataSize, false) - 8 - 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {

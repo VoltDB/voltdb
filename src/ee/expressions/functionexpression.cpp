@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,9 +33,9 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
              throw SQLException(SQLException::dynamic_sql_error,
                                 "Must not ask  for object length on sql null object.");
         }
-        const int32_t valueLength = getObjectLength_withoutNull();
-        const char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
-        std::string valueStr(valueChars, valueLength);
+        int32_t length;
+        const char* buf = getObject_withoutNull(&length);
+        std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
         msgtext = msg_format_buffer;
@@ -77,9 +77,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-        const int32_t valueLength = strValue.getObjectLength_withoutNull();
-        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
-        std::string valueStr(valueChars, valueLength);
+        int32_t length;
+        const char* buf = strValue.getObject_withoutNull(&length);
+        std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
     throw SQLException(sqlstatecode, msg_format_buffer);

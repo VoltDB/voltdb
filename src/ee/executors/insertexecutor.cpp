@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -197,9 +197,12 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     TableTuple inputTuple(m_inputTable->schema());
     assert (inputTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
+    Pool* tempPool = ExecutorContext::getTempStringPool();
+    const std::vector<int>& fieldMap = m_node->getFieldMap();
+    std::size_t mapSize = fieldMap.size();
     while (iterator.next(inputTuple)) {
 
-        for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
+        for (int i = 0; i < mapSize; ++i) {
             // Most executors will just call setNValue instead of
             // setNValueAllocateForObjectCopies.
             //
@@ -209,9 +212,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             // it's being assigned to the target table's outlined
             // string field.  In this case we need to tell the NValue
             // where to allocate the string data.
-            templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
+            templateTuple.setNValueAllocateForObjectCopies(fieldMap[i],
                                                            inputTuple.getNValue(i),
-                                                           ExecutorContext::getTempStringPool());
+                                                           tempPool);
         }
 
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",

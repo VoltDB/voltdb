@@ -83,8 +83,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
         return NValue::getNullValue(VALUE_TYPE_POINT);
     }
 
-    std::string wkt(reinterpret_cast<char*>(getObjectValue_withoutNull()),
-                          getObjectLength_withoutNull());
+    int32_t textLength;
+    const char* textData = getObject_withoutNull(&textLength);
+    std::string wkt(textData, textLength);
 
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
@@ -224,8 +225,9 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
         return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
     }
 
-    const std::string wkt(reinterpret_cast<char*>(getObjectValue_withoutNull()),
-                          getObjectLength_withoutNull());
+    int32_t textLength;
+    const char* textData = getObject_withoutNull(&textLength);
+    const std::string wkt(textData, textLength);
 
     // Discard whitespace, but return commas or parentheses as tokens
     Tokenizer tokens(wkt, boost::char_separator<char>(" \f\n\r\t\v", ",()"));
@@ -268,7 +270,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     }
 
     NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
-    char* storage = static_cast<char*>(ValuePeeker::peekObjectValue_withoutNull(nval));
+    char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
     poly.init(&loops); // polygon takes ownership of loops here.

@@ -115,8 +115,8 @@ public:
     {
     }
 
-    GeographyValue(void* data, int32_t length)
-        : m_data(static_cast<char*>(data))
+    GeographyValue(const char* data, int32_t length)
+        : m_data(data)
         , m_length(length)
     {
     }
@@ -126,7 +126,7 @@ public:
         return m_data == NULL;
     }
 
-    char* data() const
+    const char* data() const
     {
         return m_data;
     }
@@ -173,7 +173,7 @@ public:
     std::string toWKT() const;
 
 private:
-    char* m_data;
+    const char* m_data;
     int32_t m_length;
 };
 
