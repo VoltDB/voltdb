@@ -53,7 +53,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     private final AbstractImporterFactory m_factory;
     private ListeningExecutorService m_executorService;
     private ImmutableMap<URI, ImporterConfig> m_configs = ImmutableMap.of();
-    private AtomicReference<ImmutableMap<URI, AbstractImporter>> m_importers = new AtomicReference<>();
+    private AtomicReference<ImmutableMap<URI, AbstractImporter>> m_importers = new AtomicReference<>(ImmutableMap.<URI, AbstractImporter> of());
     private volatile boolean m_stopping;
 
     public ImporterLifeCycleManager(AbstractImporterFactory factory)
@@ -144,9 +144,6 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         if (m_stopping) return;
 
         ImmutableMap<URI, AbstractImporter> oldReference = m_importers.get();
-        if (oldReference == null) { // Can only happen if stop was called after we passed if (m_stopping) check in this method
-            return;
-        }
 
         ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         builder.putAll(Maps.filterKeys(oldReference, notUriIn(assignment.getRemoved())));
@@ -173,7 +170,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         ImmutableMap<URI, AbstractImporter> newReference = builder.build();
         boolean success = m_importers.compareAndSet(oldReference, newReference);
-        if (success) { // Could fail if stop was called after we entered inside this method
+        if (!m_stopping && success) { // Could fail if stop was called after we entered inside this method
             stopImporters(toStop);
             startImporters(newImporters);
         }
@@ -224,15 +221,13 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         m_stopping = true;
 
         ImmutableMap<URI, AbstractImporter> oldReference;
-        boolean setToNull = false;
+        boolean success = false;
         do { // onChange also could set m_importers. Use while loop to pick up latest ref
             oldReference = m_importers.get();
-            setToNull = m_importers.compareAndSet(oldReference, null);
-        } while (!setToNull);
+            success = m_importers.compareAndSet(oldReference, ImmutableMap.<URI, AbstractImporter> of());
+        } while (!success);
 
-        if (oldReference != null) {
-            stopImporters(oldReference.values());
-        }
+        stopImporters(oldReference.values());
         if (!m_factory.isImporterRunEveryWhere()) {
             distributer.registerChannels(m_factory.getTypeName(), Collections.<URI> emptySet());
         }
