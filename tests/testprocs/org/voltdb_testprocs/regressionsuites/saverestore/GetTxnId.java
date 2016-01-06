@@ -23,7 +23,11 @@
 
 package org.voltdb_testprocs.regressionsuites.saverestore;
 
-import org.voltdb.*;
+import org.voltdb.DeprecatedProcedureAPIAccess;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "PARTITION_TESTER.PT_ID: 0",
@@ -35,7 +39,7 @@ public class GetTxnId extends VoltProcedure {
         new SQLStmt("INSERT INTO PARTITION_TESTER VALUES (?, ?, ?, ?);");
 
     public VoltTable[] run(int partitioning) {
-        this.setAppStatusString(Long.toString(this.getVoltPrivateRealTransactionIdDontUseMe()));
+        this.setAppStatusString(Long.toString(DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)));
         return null;
     }
 }

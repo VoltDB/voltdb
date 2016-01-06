@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import java.lang.Class;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +32,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.StatsSelector;
@@ -51,7 +51,6 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
@@ -278,7 +277,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
-                        getVoltPrivateRealTransactionIdDontUseMe(),
+                        DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
@@ -388,6 +387,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * @param expectedCatalogVersion
      * @return Standard STATUS table.
      */
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String catalogDiffCommands,
                            byte[] catalogHash,
@@ -452,7 +452,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         CatalogUtil.updateCatalogToZK(
                 zk,
                 expectedCatalogVersion + 1,
-                getVoltPrivateRealTransactionIdDontUseMe(),
+                DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
                 getUniqueId(),
                 catalogBytes,
                 deploymentBytes);
