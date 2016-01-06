@@ -3002,7 +3002,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
     }
     case VALUE_TYPE_POINT: {
         getPoint() = GeographyPointValue::deserializeFrom(input);
-        break;
+        return;
     }
     case VALUE_TYPE_NULL: {
         setNull();
@@ -3015,9 +3015,10 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
     default:
         break;
     }
-        throwDynamicSQLException("NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
-                                 getTypeName(type).c_str());
-    }
+
+    throwDynamicSQLException("NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
+                             getTypeName(type).c_str());
+}
 
 /**
  * Serialize this NValue to the provided SerializeOutput
