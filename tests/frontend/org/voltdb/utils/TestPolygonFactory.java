@@ -58,8 +58,6 @@ public class TestPolygonFactory extends TestCase {
 
     public void testRegularConvexPolygon() throws Exception {
         // Test a triangle.
-        // Note that we use 9 digits of precision here,
-        // for no good reason.
         GeographyValue pt3 = PolygonFactory.CreateRegularConvex(origin, y.mul(20.0), 3, 0);
         String triangle = "POLYGON ((0.0 20.0, -17.320508075689 -10.0, 17.320508075689 -10.0, 0.0 20.0))";
         assertEquals(triangle, pt3.toString());
@@ -106,9 +104,11 @@ public class TestPolygonFactory extends TestCase {
     }
 
     /**
-     * Create 60 regular convex polygons.  In returnValue.get(n).get(k) we put an
-     * n-sided polygon with the given center and start vertex, with hole size
-     * equal to k*0.2.  If k == 0 there is no hole.
+     * Create many regular convex polygons.  In returnValue.get(n).get(k) we put an
+     * (n+3)-sided polygon with the given center and start vertex, with hole size
+     * equal to k/numHoleSizes.  If k == 0 there is no hole.  Note that k ranges between
+     * 0 and 4, so k/NumHoleSizes ranges between 0 and (1-1/numHoleSizes).  If k == 0
+     * there is no hole.
      *
      * @return
      */

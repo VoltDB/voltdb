@@ -117,7 +117,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         return startPk;
     }
 
-    public void notestNullValues() throws Exception {
+    public void testNullValues() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -188,7 +188,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestInsertAndSimpleSelect() throws IOException, ProcCallException {
+    public void testInsertAndSimpleSelect() throws IOException, ProcCallException {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -230,7 +230,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     }
 
-    public void notestParams() throws IOException, ProcCallException {
+    public void testParams() throws IOException, ProcCallException {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -239,7 +239,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestComparison() throws Exception {
+    public void testComparison() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -375,7 +375,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestArithmetic() throws Exception {
+    public void testArithmetic() throws Exception {
         Client client = getClient();
 
         fillTable(client, "t", 0);
@@ -468,7 +468,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         assertApproximatelyEquals("Expected Equivalent Round Trip Polygons", cheesyPolygon, cheesyRoundTripper, EPSILON);
     }
 
-    public void notestContainsInCheesyPolygon() throws Exception {
+    public void testContainsInCheesyPolygon() throws Exception {
         Client client = getClient();
         fillCheesyTable(client);
         // Everything is in the shell (t.pk == 0).
@@ -493,7 +493,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         assertContentOfTable(expectedQ1, vt);
     }
 
-    public void notestAreasInCheesyPolygon() throws Exception {
+    public void testAreasInCheesyPolygon() throws Exception {
         Client client = getClient();
         fillCheesyTable(client);
         VoltTable vt = client.callProcedure("@AdHoc", "select t.pk, area(t.poly), t.name from t order by t.pk;").getResults()[0];
@@ -517,7 +517,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         assertTrue("AreaCalculation is incorrect.  ", relerror < AREA_EPSILON);
     }
 
-    public void notestDistancesInCheesyPolygons() throws Exception {
+    public void testDistancesInCheesyPolygons() throws Exception {
         Client client = getClient();
         fillCheesyTable(client);
         // Check that distances from exterior points are not affected
@@ -571,7 +571,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestGroupBy() throws Exception {
+    public void testGroupBy() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -596,7 +596,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestUpdate() throws Exception {
+    public void testUpdate() throws Exception {
         Client client = getClient();
 
         String santaCruzWkt = "POLYGON("
@@ -641,7 +641,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestNotNullConstraint() throws Exception {
+    public void testNotNullConstraint() throws Exception {
         Client client = getClient();
 
         for (String tbl : NOT_NULL_TABLES) {
@@ -668,7 +668,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         }
     }
 
-    public void notestIn() throws Exception {
+    public void testIn() throws Exception {
         Client client = getClient();
 
         for (String tbl : TABLES) {
@@ -706,7 +706,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         return vt.getGeographyValue(0).toString();
     }
 
-    public void notestPolygonFromAdHocTextPositive() throws Exception {
+    public void testPolygonFromAdHocTextPositive() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
@@ -751,13 +751,13 @@ public class TestGeographyValueQueries extends RegressionSuite {
         verifyStmtFails(client, stmt, expectedMsg);
     }
 
-    public void notestPointFromTextNegative() throws Exception {
+    public void testPointFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
         assertGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
     }
 
-    public void notestPolygonFromTextNegative() throws Exception {
+    public void testPolygonFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
 
