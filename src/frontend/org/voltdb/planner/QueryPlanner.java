@@ -180,6 +180,8 @@ public class QueryPlanner {
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
+        Thread.dumpStack();
+        System.out.println("After parsing [" + m_sql + "]. xmlSQL is\n" + m_xmlSQL.toMinString());
     }
 
     /**

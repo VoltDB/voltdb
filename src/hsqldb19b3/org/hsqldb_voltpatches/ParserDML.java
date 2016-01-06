@@ -390,9 +390,11 @@ public class ParserDML extends ParserDQL {
             }
         }
 
+        /*
         if (truncate && table != baseTable) {
             throw Error.error(ErrorCode.X_42000);
         }
+        */
 
         if (!truncate && token.tokenType == Tokens.WHERE) {
             read();
