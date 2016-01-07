@@ -458,7 +458,7 @@ class ServerAPI(MethodView):
         if server_id is None:
             return jsonify({'servers': [make_public_server(x) for x in SERVERS]})
         else:
-            server = [server for server in SERVERS if server.id == server_id]
+            server = [server for server in SERVERS if server['id'] == server_id]
             if len(server) == 0:
                 abort(404)
             return jsonify({'server': make_public_server(server[0])})
