@@ -154,25 +154,19 @@ std::string NValue::debug() const {
         buffer << getDouble();
         break;
     case VALUE_TYPE_VARCHAR:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
-    }
     case VALUE_TYPE_VARBINARY:
-    {
-        int32_t length;
-        ptr = getObject_withoutNull(&length);
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, length);
-        buffer << "[" << length << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "-bin[@" << addr << "]";
         break;
-    }
     case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
@@ -389,7 +383,7 @@ bool NValue::inList(const NValue& rhs) const
     if (rhsType != VALUE_TYPE_ARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
-    const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(rhs.getObjectValue_withoutNull());
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue_withoutNull();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
     // such as binary search would likely require some kind of sorting/re-org of values
@@ -422,8 +416,7 @@ void NValue::allocateANewNValueList(size_t length, ValueType elementType)
 void NValue::setArrayElements(std::vector<NValue> &args) const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
-    NValueList* listOfNValues = const_cast<NValueList*>(
-        reinterpret_cast<const NValueList*>(getObjectValue_withoutNull()));
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
     // Assign each of the elements.
     int ii = (int)args.size();
     assert(ii == listOfNValues->m_length);
@@ -437,14 +430,14 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
 int NValue::arrayLength() const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
-    const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
     return static_cast<int>(listOfNValues->m_length);
 }
 
-const NValue& NValue::itemAtIndex(int index) const
+NValue NValue::itemAtIndex(int index) const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
-    const NValueList* listOfNValues = reinterpret_cast<const NValueList*>(getObjectValue_withoutNull());
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
     assert(index >= 0);
     assert(index < listOfNValues->m_length);
     return listOfNValues->m_values[index];
@@ -461,12 +454,13 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
     // values that don't overflow or violate unique constaints
     // (n.b. sorted set means dups are removed)
     for (int i = 0; i < size; i++) {
-        const NValue& value = itemAtIndex(i);
+        NValue value = itemAtIndex(i);
         // cast the value to the right type and catch overflow/cast problems
         try {
             StlFriendlyNValue stlValue;
             stlValue = value.castAs(outputType);
-            uniques.insert(stlValue);
+            std::pair<std::set<StlFriendlyNValue>::iterator, bool> ret;
+            ret = uniques.insert(stlValue);
         }
         // cast exceptions mean the in-list test is redundant
         // don't include these values in the materialized table
