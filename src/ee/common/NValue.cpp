@@ -130,6 +130,7 @@ std::string NValue::debug() const {
     }
     std::ostringstream buffer;
     std::string out_val;
+    int32_t length;
     const char* ptr;
     int64_t addr;
     buffer << getTypeName(type) << "::";
@@ -154,21 +155,16 @@ std::string NValue::debug() const {
         buffer << getDouble();
         break;
     case VALUE_TYPE_VARCHAR:
-    {
-        int32_t length;
         ptr = getObject_withoutNull(&length);
         addr = reinterpret_cast<int64_t>(ptr);
         out_val = std::string(ptr, length);
         buffer << "[" << length << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
-    }
     case VALUE_TYPE_VARBINARY:
     {
-        int32_t length;
         ptr = getObject_withoutNull(&length);
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, length);
         buffer << "[" << length << "]";
         buffer << "-bin[@" << addr << "]";
         break;

@@ -222,18 +222,16 @@ public:
         setNValue(columnInfo, value, false, NULL);
     }
 
+    /*
+     * Like the above method except for "hidden" fields, not
+     * accessible in the normal codepath.
+     */
     void setHiddenNValue(const int idx, voltdb::NValue value) const
     {
         assert(m_schema);
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
         setNValue(columnInfo, value, false, NULL);
     }
-
-    /*
-     * Like the above method except for "hidden" fields, not
-     * accessible in the normal codepath.
-     */
-
 
     /*
      * Copies range of NValues from one tuple to another.
@@ -475,43 +473,43 @@ private:
         }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
-          case VALUE_TYPE_TINYINT:
-              return sizeof (int8_t);
-          case VALUE_TYPE_SMALLINT:
-              return sizeof (int16_t);
-          case VALUE_TYPE_INTEGER:
-              return sizeof (int32_t);
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP:
-          case VALUE_TYPE_DOUBLE:
-              return sizeof (int64_t);
-          case VALUE_TYPE_DECIMAL:
-              //1-byte scale, 1-byte precision, 16 bytes all the time right now
-              return 18;
-          case VALUE_TYPE_VARCHAR:
-          case VALUE_TYPE_VARBINARY:
-          case VALUE_TYPE_GEOGRAPHY:
+        case VALUE_TYPE_TINYINT:
+            return sizeof (int8_t);
+        case VALUE_TYPE_SMALLINT:
+            return sizeof (int16_t);
+        case VALUE_TYPE_INTEGER:
+            return sizeof (int32_t);
+        case VALUE_TYPE_BIGINT:
+        case VALUE_TYPE_TIMESTAMP:
+        case VALUE_TYPE_DOUBLE:
+            return sizeof (int64_t);
+        case VALUE_TYPE_DECIMAL:
+            //1-byte scale, 1-byte precision, 16 bytes all the time right now
+            return 18;
+        case VALUE_TYPE_POINT:
+            return sizeof (GeographyPointValue);
+        case VALUE_TYPE_VARCHAR:
+        case VALUE_TYPE_VARBINARY:
+        case VALUE_TYPE_GEOGRAPHY:
         {
-            bool isNullCol = isHidden ? isHiddenNull(colIndex) : isNull(colIndex);
-            if (isNullCol) {
-                return (size_t)0;
-              }
-              // 32 bit length preceding value and
-              // actual character data without null string terminator.
-                  const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
-            int32_t length;
-            ValuePeeker::peekObject_withoutNull(value, &length);
+            const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+            if (value.isNull()) {
+                return 0;
+            }
+            // 32 bit length preceding value and
+            // actual character data without null string terminator.
+            int32_t length = ValuePeeker::peekObjectLength_withoutNull(value);
             return sizeof(int32_t) + length;
-              }
-          case VALUE_TYPE_POINT:
-              return sizeof (GeographyPointValue);
-          default:
-            // let caller handle this error
-            throwDynamicSQLException(
-                    "Unknown ValueType %s found during Export serialization.",
-                    valueToString(columnType).c_str() );
-            return (size_t)0;
         }
+        default:
+            break;
+        }
+        // let caller handle this error
+        throwDynamicSQLException(
+                "Unknown ValueType %s found during Export serialization.",
+                valueToString(columnType).c_str() );
+        assert(false); // NOT REACHED
+        return 0;
     }
 
     inline size_t maxSerializedColumnSize(int colIndex) const {

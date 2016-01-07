@@ -947,7 +947,7 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
-            voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
+            TableStreamType tableStreamType = static_cast<TableStreamType>(streamType);
             bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
@@ -1029,7 +1029,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
     ReferenceSerializeInputBE serialize_in(bytes, length);
     try {
         try {
-            voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
+            TableStreamType tst = static_cast<TableStreamType>(streamType);
             jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in);
             env->ReleaseByteArrayElements(serialized_buffers, bytes, JNI_ABORT);
             return tuplesRemaining;
@@ -1181,9 +1181,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
+        HashinatorType hashinatorType = static_cast<HashinatorType>(ValuePeeker::peekAsInteger(params[1]));
         boost::scoped_ptr<TheHashinator> hashinator;
-        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[2]);
+        const char *configValue = ValuePeeker::peekObjectValue(params[2]);
         switch (hashinatorType) {
         case HASHINATOR_LEGACY:
             hashinator.reset(LegacyHashinator::newInstance(configValue));
@@ -1227,7 +1227,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[0]);
+        const char *configValue = ValuePeeker::peekObjectValue(params[0]);
         engine->updateHashinator(hashinatorType, configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
         stringPool->purge();
     } catch (const FatalException &e) {
