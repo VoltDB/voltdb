@@ -307,7 +307,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
         // find a place to put the new node
         TreeNode *y = &NIL;
         TreeNode *x = m_root;
-        boolean sortsLeftOfParent = false;
+        bool sortsLeftOfParent = false;
         while (x != &NIL) {
             y = x;
             int cmp = m_comper(key, x->key());
