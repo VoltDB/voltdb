@@ -74,11 +74,11 @@ function build_deployment_file() {
 function srccompile() {
     mkdir -p obj
     javac -classpath $APPCLASSPATH -d obj \
-        src/exportbenchmark/*.java \
-        src/exportbenchmark/procedures/*.java
+        src/exportview/*.java \
+        src/exportview/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    (cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
+    (cd obj && jar cvf ExportView.jar exportview/*)
 
     cp ./obj/*.jar "$VOLTDB_LIB/"
 }
@@ -86,7 +86,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    echo "Compiling the export-benchmark application catalog."
+    echo "Compiling the export-view application catalog."
     echo "To perform this action manually, use the command line: "
     echo
     echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
@@ -126,16 +126,16 @@ function client() {
 
 function run_benchmark_help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj exportbenchmark.ExportBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj exportview.ExportView --help
 }
 
 function run_benchmark() {
     # srccompile
     java -classpath exportview.jar:$APPCLASSPATH: -Dlog4j.configuration=file://$LOG4J \
-        exportbenchmark.ExportBenchmark \
+        exportview.ExportView \
         --duration=30 \
         --servers=localhost \
-        --statsfile=exportbench.csv
+        --statsfile=exportview.csv
 }
 
 function help() {

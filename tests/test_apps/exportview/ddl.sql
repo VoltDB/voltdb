@@ -46,7 +46,7 @@ CREATE VIEW SHADOWVIEW (
 FROM SHADOW group by cid;
 
 
-CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport;
+CREATE PROCEDURE FROM CLASS exportview.procedures.InsertExport;
 
 END_OF_BATCH
 

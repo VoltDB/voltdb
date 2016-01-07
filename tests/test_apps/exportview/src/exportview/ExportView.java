@@ -32,7 +32,7 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package exportbenchmark;
+package exportview;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -71,7 +71,7 @@ import org.voltdb.client.ProcedureCallback;
 /**
  * Asychronously sends data to an export table to test VoltDB export performance.
  */
-public class ExportBenchmark {
+public class ExportView {
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -190,7 +190,7 @@ public class ExportBenchmark {
      * Establishes a client connection to a voltdb server, which should already be running
      * @param args The arguments passed to the program
      */
-    public ExportBenchmark(ExportBenchConfig config) {
+    public ExportView(ExportBenchConfig config) {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
@@ -350,11 +350,12 @@ public class ExportBenchmark {
             try {
                 long randval = rand.nextInt(10);
                 long tval = System.currentTimeMillis();
-                //System.out.println("InsertExport: " + randval + ", " + tval);
+                int rollback = (rand.nextInt(10) == 0) ? 1 : 0;
+				//System.out.println("InsertExport: " + randval + ", " + tval);
                 client.callProcedure(
                         new NullCallback(),
                         "InsertExport",
-                        randval, tval);
+                        randval, tval, rollback);
                 // Check the time every 50 transactions to avoid invoking System.currentTimeMillis() too much
                 if (++totalInserts % 50 == 0) {
                     //System.out.println("InsertExport: " + randval + ", " + tval);
@@ -778,11 +779,11 @@ public class ExportBenchmark {
      */
     public static void main(String[] args) {
         ExportBenchConfig config = new ExportBenchConfig();
-        config.parse(ExportBenchmark.class.getName(), args);
+        config.parse(ExportView.class.getName(), args);
         System.out.println(config.getConfigDumpString());
 
         try {
-            ExportBenchmark bench = new ExportBenchmark(config);
+            ExportView bench = new ExportView(config);
             bench.runTest();
         } catch (InterruptedException e) {
             e.printStackTrace();

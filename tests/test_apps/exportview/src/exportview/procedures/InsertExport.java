@@ -20,9 +20,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package exportbenchmark.procedures;
+package exportview.procedures;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
@@ -30,7 +29,7 @@ public class InsertExport extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO EXP VALUES (?, ?)");
     public final SQLStmt shadow = new SQLStmt("INSERT INTO SHADOW VALUES (?, ?)");
 
-    public long run(long cid, long value)
+    public long run(long cid, long value, int rollback)
     {
         voltQueueSQL(export, cid, value);
         voltQueueSQL(shadow, cid, value);
@@ -38,6 +37,9 @@ public class InsertExport extends VoltProcedure {
         // Execute last statement batch
         voltExecuteSQL(true);
 
+        if (rollback == 1) {
+        	throw new VoltAbortException("EXPECTED ROLLBACK");
+        }
         // Return to caller
         return 0;
     }
