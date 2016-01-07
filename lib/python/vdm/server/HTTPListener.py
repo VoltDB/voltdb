@@ -654,7 +654,7 @@ class DatabaseAPI(MethodView):
 
         # Create new deployment
 
-        with open("deployment.json") as json_file:
+        with open("server/deployment.json") as json_file:
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
 
