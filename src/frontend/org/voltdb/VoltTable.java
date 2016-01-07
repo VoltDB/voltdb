@@ -1415,7 +1415,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             // Determine the formatting string for each column
             VoltType colType = getColumnType(i);
             String justification = (colType.isVariableLength() ||
-                    colType == VoltType.TIMESTAMP) ? "-" : "";
+                    colType == VoltType.TIMESTAMP ||
+                    colType == VoltType.GEOGRAPHY_POINT) ? "-" : "";
             fmt[i] = "%1$" + justification + padding[i] + "s";
 
             // Serialize the column headers
