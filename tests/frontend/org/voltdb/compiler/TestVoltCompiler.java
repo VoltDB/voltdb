@@ -2832,9 +2832,9 @@ public class TestVoltCompiler extends TestCase {
                 "create table polygons ("
                 + "  id integer,"
                 + "  poly geography, "
-                + "  sized_poly geography(1066), "
-                + "  sized_poly2 geography(1048576), "
-                + "  sized_poly3 geography(1) "
+                + "  sized_poly0 geography(1066), "
+                + "  sized_poly1 geography(155), "    // min allowed length
+                + "  sized_poly2 geography(1048576) " // max allowed length
                 + ");";
         Database db = goodDDLAgainstSimpleSchema(ddl);
         assertNotNull(db);
@@ -2846,17 +2846,17 @@ public class TestVoltCompiler extends TestCase {
         assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
         assertEquals(GeographyValue.DEFAULT_LENGTH, geographyCol.getSize());
 
-        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly");
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly0");
         assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
         assertEquals(1066, geographyCol.getSize());
+
+        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly1");
+        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
+        assertEquals(155, geographyCol.getSize());
 
         geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly2");
         assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
         assertEquals(1048576, geographyCol.getSize());
-
-        geographyCol = polygonsTable.getColumns().getIgnoreCase("sized_poly3");
-        assertEquals(VoltType.GEOGRAPHY.getValue(), geographyCol.getType());
-        assertEquals(1, geographyCol.getSize());
     }
 
     public void testGeographyNegative() throws Exception {
@@ -2872,6 +2872,15 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".*precision or scale out of range.*",
                 "create table geogs ("
                 + "  geog geography(0) not null"
+                + ");"
+                );
+
+        // Minimum length for a GEOGRAPHY column is 155.
+        badDDLAgainstSimpleSchema(".*GEOGRAPHY column GEOG in table GEOGS "
+                + "has length of 154 which is shorter than "
+                + "155, the minimum allowed length for the type.*",
+                "create table geogs ("
+                + "  geog geography(154) not null"
                 + ");"
                 );
 

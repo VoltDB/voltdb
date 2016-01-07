@@ -573,6 +573,22 @@ public enum VoltType {
         return m_lengthInBytes;
     }
 
+    /**
+     * Get the minimum number of bytes required to store the type
+     * @return An integer value representing a number of bytes.
+     */
+    public int getMinLengthInBytes() {
+        if (m_lengthInBytes != -1) {
+            return getLengthInBytesForFixedTypes();
+        }
+
+        if (this == GEOGRAPHY) {
+            return GeographyValue.MIN_SERIALIZED_LENGTH;
+        }
+
+        return 1;
+    }
+
     /** JDBC getTypeInfo() accessors */
 
     /**

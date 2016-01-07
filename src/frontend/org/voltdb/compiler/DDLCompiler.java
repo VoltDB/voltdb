@@ -1637,34 +1637,44 @@ public class DDLCompiler {
                 userSpecifiedSize = Integer.parseInt(sizeString);
             }
 
-            if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
-                String msg = type.toSQLString() + " column " + name +
-                        " in table " + table.getTypeName() + " has unsupported length " + sizeString;
-                throw compiler.new VoltCompilerException(msg);
-            }
-
-            if (!inBytes && type == VoltType.STRING) {
-                if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
-                    String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
-                            "will be enforced as byte counts rather than UTF8 character counts. " +
-                            "To eliminate this warning, specify \"VARCHAR(%d BYTES)\"",
-                            name, table.getTypeName(),
-                            VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
-                    compiler.addWarn(msg);
-                    inBytes = true;
-                }
-            }
-
-            if (userSpecifiedSize > 0) {
-                size = userSpecifiedSize;
-            } else {
-                // Either:
+            if (userSpecifiedSize == 0) {
+                // So size specified in the column definition.  Either:
                 // - the user-specified size is zero (unclear how this would happen---
                 //   if someone types VARCHAR(0) HSQL will complain)
                 // - or the sizeString was null, meaning that the size specifier was
                 //   omitted.
                 // Choose an appropriate default for the type.
                 size = type.defaultLengthForVariableLengthType();
+            }
+            else {
+                if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
+                    String msg = type.toSQLString() + " column " + name +
+                            " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                    throw compiler.new VoltCompilerException(msg);
+                }
+
+                if (!inBytes && type == VoltType.STRING) {
+                    if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
+                        String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
+                                "will be enforced as byte counts rather than UTF8 character counts. " +
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)\"",
+                                name, table.getTypeName(),
+                                VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
+                        compiler.addWarn(msg);
+                        inBytes = true;
+                    }
+                }
+
+                if (userSpecifiedSize < type.getMinLengthInBytes()) {
+                    String msg = type.toSQLString() + " column " + name +
+                            " in table " + table.getTypeName() + " has length of " + sizeString
+                            + " which is shorter than " + type.getMinLengthInBytes() + ", "
+                            + "the minimum allowed length for the type.";
+                    throw compiler.new VoltCompilerException(msg);
+                }
+
+
+                size = userSpecifiedSize;
             }
         }
 

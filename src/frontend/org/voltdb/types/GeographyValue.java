@@ -241,6 +241,7 @@ public class GeographyValue {
     private static final byte INCOMPLETE_ENCODING_FROM_JAVA = 0;
     private static final byte COMPLETE_ENCODING = 1;
     public static final int DEFAULT_LENGTH = 32768;
+    public static final int MIN_SERIALIZED_LENGTH = 155; // number of bytes need to store a triangle
 
     /**
      * Return the number of bytes in the serialization for this polygon
