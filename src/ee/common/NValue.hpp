@@ -1652,7 +1652,7 @@ private:
             if (objLength > maxLength) {
                 std::ostringstream oss;
                 oss <<  "The size " << objLength << " of the value exceeds the size of ";
-        if (type == VALUE_TYPE_VARBINARY) {
+                if (type == VALUE_TYPE_VARBINARY) {
                     oss << "the VARBINARY(" << maxLength << ") column.";
                 }
                 else {
@@ -2770,10 +2770,10 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
             serializeInlineObjectToTupleStorage(static_cast<char*>(storage), maxLength, isInBytes);
             return;
         }
-            if (isNull()) {
-                *reinterpret_cast<void**>(storage) = NULL;
+        if (isNull()) {
+            *reinterpret_cast<void**>(storage) = NULL;
             return;
-            }
+        }
         int32_t length;
         const char* buf = getObject_withoutNull(&length);
         checkTooWideForVariableLengthType(m_valueType, buf, length, maxLength, isInBytes);
@@ -2788,19 +2788,19 @@ inline void NValue::serializeToTupleStorage(void *storage, bool isInlined,
         }
         else {
             sref = getObjectPointer();
-    }
+        }
         *reinterpret_cast<const StringRef**>(storage) = sref;
         return;
     }
     default:
         break;
-            }
-        char message[128];
-        snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
-                getTypeName(type).c_str());
-        throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                message);
     }
+    char message[128];
+    snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
+             getTypeName(type).c_str());
+    throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                       message);
+}
 
 
 /**
@@ -2861,25 +2861,28 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
             ::memcpy(storage + SHORT_OBJECT_LENGTHLENGTH, data, length);
             return;
         }
-            if (length == OBJECTLENGTH_NULL) {
-                *reinterpret_cast<void**>(storage) = NULL;
-                return;
-            }
+        if (length == OBJECTLENGTH_NULL) {
+            *reinterpret_cast<void**>(storage) = NULL;
+            return;
+        }
 
-            const char* data;
-            if (type != VALUE_TYPE_GEOGRAPHY) {
-                // This advances input past the end of the string
-                data = reinterpret_cast<const char*>(input.getRawPointer(length));
-            }
-            else {
-                // This gets a pointer to the start of data without advancing
-                // input stream, so we can read loops and vertices.
-                data = reinterpret_cast<const char*>(input.getRawPointer());
-            }
-
+        StringRef* sref = NULL;
+        if (type != VALUE_TYPE_GEOGRAPHY) {
+            // This advances input past the end of the string
+            const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
+            sref = StringRef::create(length, data, tempPool);
             checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
-        StringRef* sref = StringRef::create(length, data, tempPool);
-            *reinterpret_cast<StringRef**>(storage) = sref;
+        }
+        else {
+            // This gets a pointer to the start of data without advancing
+            // input stream, so we can read loops and vertices.
+            const char* data = reinterpret_cast<const char*>(input.getRawPointer());
+            checkTooWideForVariableLengthType(type, data, length, maxLength, isInBytes);
+            sref = StringRef::create(length, NULL, tempPool);
+            GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
+        }
+
+        *reinterpret_cast<StringRef**>(storage) = sref;
         return;
     }
     case VALUE_TYPE_DECIMAL: {
@@ -2913,7 +2916,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
                 getTypeName(type).c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                 message);
-    }
+}
 
 /**
  * Deserialize a scalar value of the specified type from the
@@ -2980,8 +2983,9 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
             return;
         }
 
-        const char *str = (const char*) input.getRawPointer(length);
+
         if (type != VALUE_TYPE_GEOGRAPHY) {
+            const char *str = (const char*) input.getRawPointer(length);
             createObjectPointer(length, str, tempPool);
         }
         else {
@@ -3041,15 +3045,15 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         output.writeInt(static_cast<int32_t>(length));
 
         if (type != VALUE_TYPE_GEOGRAPHY) {
-        // Not a null string: write it out
-        output.writeBytes(buf, length);
-        return;
+            // Not a null string: write it out
+            output.writeBytes(buf, length);
         }
         else {
             // geography gets its own serialization to deal with
             // byteswapping and endianness
             getGeography().serializeTo(output);
         }
+        return;
     }
     case VALUE_TYPE_TINYINT:
         output.writeByte(getTinyInt());
