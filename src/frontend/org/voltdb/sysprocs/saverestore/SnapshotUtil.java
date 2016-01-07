@@ -37,8 +37,10 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -175,6 +177,10 @@ public class SnapshotUtil {
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.key("newPartitionCount").value(newPartitionCount);
+                Iterator<Entry<Integer, TupleStreamStateInfo>> iter = drTupleStreamInfo.entrySet().iterator();
+                if (iter.hasNext()) {
+                    stringer.key("drVersion").value(iter.next().getValue().drVersion);
+                }
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -240,7 +246,6 @@ public class SnapshotUtil {
                         stringer.key("spUniqueId").value(e.getValue().replicatedInfo.spUniqueId);
                         stringer.key("mpUniqueId").value(e.getValue().replicatedInfo.mpUniqueId);
                     }
-                    stringer.key("drVersion").value(e.getValue().drVersion);
                     stringer.endObject();
                 }
                 stringer.endObject();

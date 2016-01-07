@@ -199,11 +199,11 @@ public class SnapshotCompletionMonitor {
             Map<Integer, Long> drSequenceNumbers = new HashMap<>();
             JSONObject drTupleStreamJSON = jsonObj.getJSONObject("drTupleStreamStateInfo");
             Iterator<String> partitionKeys = drTupleStreamJSON.keys();
-            byte drVersion = 0;
+            int drVersion = 0;
             while (partitionKeys.hasNext()) {
                 String partitionIdString = partitionKeys.next();
                 JSONObject stateInfo = drTupleStreamJSON.getJSONObject(partitionIdString);
-                drVersion = (byte)stateInfo.getLong("drVersion");
+                drVersion = (int)stateInfo.getLong("drVersion");
                 drSequenceNumbers.put(Integer.valueOf(partitionIdString), stateInfo.getLong("sequenceNumber"));
             }
 

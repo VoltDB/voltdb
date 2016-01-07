@@ -127,7 +127,6 @@ SnapshotCompletionInterest, Promotable
     private final String m_snapshotPath;
     private final String m_voltdbrootPath;
     private final Set<Integer> m_liveHosts;
-    private final File m_drOverflow;
 
     private boolean m_planned = false;
 
@@ -448,7 +447,7 @@ SnapshotCompletionInterest, Promotable
                         Callback callback, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        String voltdbrootPath, File drOverflow)
+                        String voltdbrootPath)
     throws IOException {
         m_hostId = hostMessenger.getHostId();
         m_initiator = null;
@@ -462,7 +461,6 @@ SnapshotCompletionInterest, Promotable
         m_snapshotPath = snapshotPath;
         m_liveHosts = ImmutableSet.copyOf(hostMessenger.getLiveHostIds());
         m_voltdbrootPath = voltdbrootPath;
-        m_drOverflow = drOverflow;
 
         initialize(hostMessenger);
     }

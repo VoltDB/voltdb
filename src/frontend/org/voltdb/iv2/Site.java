@@ -1377,6 +1377,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4);
         paramBuffer.putInt(drVersion);
         m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
-        hostLog.warn("DR protocol version has been set to " + drVersion);
+        hostLog.debug("DR protocol version has been set to " + drVersion);
     }
 }

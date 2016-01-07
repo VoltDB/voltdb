@@ -36,7 +36,7 @@ public interface SnapshotCompletionInterest {
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
         public final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds;
-        public final byte drVersion;
+        public final int drVersion;
 
         public SnapshotCompletionEvent(
                 String path,
@@ -49,7 +49,7 @@ public interface SnapshotCompletionInterest {
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
                 final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
-                final byte drVersion) {
+                final int drVersion) {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
@@ -70,10 +70,11 @@ public interface SnapshotCompletionInterest {
                 String nonce,
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,
-                boolean truncationSnapshot) {
+                boolean truncationSnapshot,
+                int drVersion) {
             return new SnapshotCompletionEvent(
                     path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, null, (byte)3);
+                    true, "", null, null, null, drVersion);
         }
     }
 
