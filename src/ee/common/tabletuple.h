@@ -216,25 +216,13 @@ public:
      * the temp string pool.  So, don't use this to update a tuple in
      * a persistent table!
      */
-    void setNValue(const int idx, voltdb::NValue value) const
-    {
-        assert(m_schema);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
-    }
-
-    void setHiddenNValue(const int idx, voltdb::NValue value) const
-    {
-        assert(m_schema);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
-        setNValue(columnInfo, value, false, NULL);
-    }
+    void setNValue(const int idx, voltdb::NValue value) const;
 
     /*
      * Like the above method except for "hidden" fields, not
      * accessible in the normal codepath.
      */
-
+    void setHiddenNValue(const int idx, voltdb::NValue value) const;
 
     /*
      * Copies range of NValues from one tuple to another.
@@ -250,12 +238,7 @@ public:
      * be allocated on the heap.
      */
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                          Pool *dataPool) const {
-        assert(m_schema);
-        const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
-        setNValue(columnInfo, value, true, dataPool);
-    }
-
+                                             Pool *dataPool) const;
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -476,34 +459,37 @@ private:
         }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
-        case VALUE_TYPE_TINYINT:
-            return sizeof (int8_t);
-        case VALUE_TYPE_SMALLINT:
-            return sizeof (int16_t);
-        case VALUE_TYPE_INTEGER:
-            return sizeof (int32_t);
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_DOUBLE:
-            return sizeof (int64_t);
-        case VALUE_TYPE_DECIMAL:
-            //1-byte scale, 1-byte precision, 16 bytes all the time right now
-            return 18;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
-        {
-            bool isNullCol = isHidden ? isHiddenNull(colIndex) : isNull(colIndex);
-            if (isNullCol) {
-                return (size_t)0;
-            }
-            // 32 bit length preceding value and
-            // actual character data without null string terminator.
-            const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
-            int32_t length;
-            ValuePeeker::peekObject_withoutNull(value, &length);
-            return sizeof(int32_t) + length;
-        }
-        default:
+          case VALUE_TYPE_TINYINT:
+              return sizeof (int8_t);
+          case VALUE_TYPE_SMALLINT:
+              return sizeof (int16_t);
+          case VALUE_TYPE_INTEGER:
+              return sizeof (int32_t);
+          case VALUE_TYPE_BIGINT:
+          case VALUE_TYPE_TIMESTAMP:
+          case VALUE_TYPE_DOUBLE:
+              return sizeof (int64_t);
+          case VALUE_TYPE_DECIMAL:
+              //1-byte scale, 1-byte precision, 16 bytes all the time right now
+              return 18;
+          case VALUE_TYPE_VARCHAR:
+          case VALUE_TYPE_VARBINARY:
+              bool isNullCol;
+              if (isHidden) {
+                  isNullCol = isHiddenNull(colIndex);
+              } else {
+                  isNullCol = isNull(colIndex);
+              }
+
+              // 32 bit length preceding value and
+              // actual character data without null string terminator.
+              if (!isNullCol)
+              {
+                  const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+                  return (sizeof (int32_t) + ValuePeeker::peekObjectLength_withoutNull(value));
+              }
+              return (size_t)0;
+          default:
             // let caller handle this error
             throwDynamicSQLException(
                     "Unknown ValueType %s found during Export serialization.",
@@ -529,20 +515,6 @@ private:
             return 16;
         }
         return maxExportSerializedColumnSize(colIndex);
-    }
-
-    void setNValue(const TupleSchema::ColumnInfo *columnInfo, voltdb::NValue& value,
-                   bool allocateObjects, Pool* tempPool) const
-    {
-        assert(m_data);
-        voltdb::ValueType columnType = columnInfo->getVoltType();
-        value = value.castAs(columnType);
-        bool isInlined = columnInfo->inlined;
-        bool isInBytes = columnInfo->inBytes;
-        char *dataPtr = getWritableDataPtr(columnInfo);
-        int32_t columnLength = columnInfo->length;
-        value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes,
-                                      allocateObjects, tempPool);
     }
 };
 
@@ -668,6 +640,36 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
     return *this;
 }
 
+/** Copy scalars by value and non-scalars (non-inlined strings, decimals) by
+    reference from a slim value in to this tuple. */
+inline void TableTuple::setNValue(const int idx, voltdb::NValue value) const
+{
+    assert(m_schema);
+    assert(m_data);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    value = value.castAs(columnInfo->getVoltType());
+    const bool isInlined = columnInfo->inlined;
+    const bool isInBytes = columnInfo->inBytes;
+    char *dataPtr = getWritableDataPtr(columnInfo);
+    const int32_t columnLength = columnInfo->length;
+    value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes);
+}
+
+inline void TableTuple::setHiddenNValue(const int idx, voltdb::NValue value) const
+{
+    assert(m_schema);
+    assert(m_data);
+
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getHiddenColumnInfo(idx);
+    value = value.castAs(columnInfo->getVoltType());
+    const bool isInlined = columnInfo->inlined;
+    const bool isInBytes = columnInfo->inBytes;
+    char *dataPtr = getWritableDataPtr(columnInfo);
+    const int32_t columnLength = columnInfo->length;
+    value.serializeToTupleStorage(dataPtr, isInlined, columnLength, isInBytes);
+}
+
 /** Multi column version. */
 inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) const
 {
@@ -677,6 +679,25 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
     while (begin != end) {
         setNValue(beginIdx++, lhs.getNValue(begin++));
     }
+}
+
+/* Copy strictly by value from slimvalue into this tuple */
+inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
+                                                            voltdb::NValue value,
+                                                            Pool *dataPool) const
+{
+    assert(m_schema);
+    assert(m_data);
+    const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
+    voltdb::ValueType columnType = columnInfo->getVoltType();
+    value = value.castAs(columnType);
+    bool isInlined = columnInfo->inlined;
+    bool isInBytes = columnInfo->inBytes;
+    char *dataPtr = getWritableDataPtr(columnInfo);
+    const int32_t columnLength = columnInfo->length;
+
+    value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
+                                                    columnLength, isInBytes, dataPool);
 }
 
 /*
