@@ -2014,7 +2014,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
-                // After sites are terminated, shutdown the InvocationBufferServer.
+                // After sites are terminated, shutdown the DRProducer.
                 // The DRProducer is shared by all sites; don't kill it while any site is active.
                 if (m_producerDRGateway != null) {
                     try {
