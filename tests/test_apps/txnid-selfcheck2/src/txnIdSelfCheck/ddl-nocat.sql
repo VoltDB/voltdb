@@ -1,3 +1,5 @@
+LOAD CLASSES txnid.jar;
+
 -- Tell sqlcmd to batch the following commands together,
 -- so that the schema loads quickly.
 file -inlinebatch END_OF_BATCH

@@ -149,6 +149,9 @@ public class ExportView {
         @Option(desc = "Export to socket or export to Kafka cluster (socket|kafka)")
         String target = "file";
 
+        @Option(desc = "Percentage of transactions to rollback: 0 <= percentage <= 100")
+        int rollbackpercent = 0;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -156,6 +159,10 @@ public class ExportView {
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (!target.equals("socket") && !target.equals("kafka") && !target.equals("file")) {
                 exitWithMessageAndUsage("target must be either \"socket\" or \"kafka\"");
+            }
+            if (rollbackpercent< 0 || rollbackpercent > 100) {
+                System.out.println("Rollbackpercent, " + rollbackpercent + " out of range. Set to 0");
+                rollbackpercent = 0;
             }
         }
     }
@@ -350,8 +357,7 @@ public class ExportView {
             try {
                 long randval = rand.nextInt(10);
                 long tval = System.currentTimeMillis();
-                int rollback = (rand.nextInt(10) == 0) ? 1 : 0;
-				//System.out.println("InsertExport: " + randval + ", " + tval);
+                int rollback = (rand.nextInt(100) < config.rollbackpercent) ? 1 : 0;
                 client.callProcedure(
                         new NullCallback(),
                         "InsertExport",
@@ -362,9 +368,9 @@ public class ExportView {
                     now = System.currentTimeMillis();
                 }
             } catch (Exception ex) {
-            	System.out.println("Exception in doInserts" + ex.toString());
-            	ex.printStackTrace();
-            	System.exit(-1);
+                System.out.println("Exception in doInserts" + ex.toString());
+                ex.printStackTrace();
+                System.exit(-1);
             }
         }
         System.out.println("Warmup complete");

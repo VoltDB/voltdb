@@ -38,7 +38,7 @@ public class InsertExport extends VoltProcedure {
         voltExecuteSQL(true);
 
         if (rollback == 1) {
-        	throw new VoltAbortException("EXPECTED ROLLBACK");
+            throw new VoltAbortException("EXPECTED ROLLBACK");
         }
         // Return to caller
         return 0;
