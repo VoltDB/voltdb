@@ -799,6 +799,7 @@ public enum VoltType {
         switch(this) {
         case GEOGRAPHY_POINT:
         case GEOGRAPHY:
+        case BOOLEAN:
             return false;
         default:
             return true;

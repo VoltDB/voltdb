@@ -359,4 +359,13 @@ public class FunctionExpression extends AbstractExpression {
         return result;
     }
 
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        StringBuffer dummyMsg = new StringBuffer();
+        if (!super.isValueTypeIndexable(dummyMsg)) {
+            msg.append("function '"+ m_name.toUpperCase() + "()'");
+            return false;
+        }
+        return true;
+    }
+
 }

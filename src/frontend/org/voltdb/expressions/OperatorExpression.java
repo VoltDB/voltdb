@@ -181,4 +181,18 @@ public class OperatorExpression extends AbstractExpression {
             m_right.explain(impliedTableName) + ")";
     }
 
+    @Override
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        ExpressionType type = getExpressionType();
+        switch(type) {
+        case OPERATOR_NOT:
+        case OPERATOR_IS_NULL:
+        case OPERATOR_EXISTS:
+            msg.append("operator '" + getExpressionType().symbol() +"'");
+            return false;
+        default:
+            return true;
+        }
+    }
+
 }

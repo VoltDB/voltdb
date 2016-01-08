@@ -1776,9 +1776,10 @@ public class DDLCompiler {
         List<AbstractExpression> exprs = null;
         // "parse" the WHERE expression for partial index if any
         AbstractExpression predicate = null;
-        // Some expressions have special validation in indices.  We
-        // gather all these up into the list checkExpressions.  We
-        // will check them all at once.
+        // Some expressions have special validation in indices.  Not all the expression
+        // can be indexed. We scan for result type at first here and block those which
+        // can't be indexed like boolean, geo ... We gather rest of expression into
+        // checkExpressions list.  We will check on them all at once.
         List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
@@ -1787,7 +1788,15 @@ public class DDLCompiler {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
-                    // We will check this for validity later.
+                    // string will will be populated expression details whose value
+                    // type are not indexable
+                    StringBuffer exprMsg = new StringBuffer();
+                    if (!expr.isValueTypeIndexable(exprMsg)) {
+                        // indexing on expression with boolean result is not supported.
+                        msg.append("can't include " + exprMsg + ".");
+                        throw compiler.new VoltCompilerException(msg.toString());
+                    }
+                    // rest of the validity gaurds will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
                     exprs.add(expr);
                 }
@@ -1802,7 +1811,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+        if (!AbstractExpression.validateIndexingMVsGaurds(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -1837,11 +1846,6 @@ public class DDLCompiler {
         else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
-
-                if (! colType.isIndexable()) {
-                    String emsg = colType.getName() + " expressions are not currently supported as index keys.";
-                    throw compiler.new VoltCompilerException(emsg);
-                }
 
                 if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
@@ -2672,11 +2676,27 @@ public class DDLCompiler {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw compiler.new VoltCompilerException(msg.toString());
             }
+            // check if the expression return type is not indexable
+            StringBuffer exprMsg = new StringBuffer();
+            if (!outcol.expression.isValueTypeIndexable(exprMsg)) {
+                msg.append("with " + exprMsg + " in GROUP BY clause not supported.");
+                throw compiler.new VoltCompilerException(msg.toString());
+            }
+            // collect all the expressions and we will check
+            // for other gaurds on all of them together
             checkExpressions.add(outcol.expression);
         }
-        // Now, the display list must have a count(*).
-        AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
-        if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
+
+        // check for count star in the display list
+        boolean countStarFound = false;
+        if (i < displayColCount) {
+            AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
+            if (coli.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
+                countStarFound = true;
+            }
+        }
+
+        if (countStarFound == false) {
             msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -2713,7 +2733,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+        if (!AbstractExpression.validateIndexingMVsGaurds(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }

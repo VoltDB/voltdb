@@ -329,7 +329,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     private void toStringHelper(String linePrefix, StringBuilder sb) {
-        String nodeName = getExpressionNodeNameForToString();
         String header = getExpressionNodeNameForToString() + "[" + getExpressionType().toString() + "] : ";
         if (m_valueType != null) {
             header += m_valueType.toSQLString();
@@ -1185,15 +1184,16 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Return true iff the given expression usable as part of an index expression.
-     * If false, put the tail of an error message in the string buffer.  The
+     * Return true if the given expression usable as part of an index or MV's
+     * group by and where clause expression.
+     * If false, put the tail of an error message in the string buffer. The
      * string buffer will be initialized with the name of the index.
      *
      * @param expr The expression to check
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    private boolean isIndexableExpression(StringBuffer msg) {
+    private boolean validateIndexingMVsGaurds(StringBuffer msg) {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
@@ -1212,18 +1212,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Return true iff the all of the expressions in the list can be part
-     * of an index expression.  As with isIndexableExpression, the StringBuffer
-     * parameter, msg, contains the name of the index.  Error messages
-     * should be appended to it.
+     * Return true if the all of the expressions in the list can be part of
+     * an index expression or in group by and where clause of MV.  As with
+     * validateIndexingMVsGaurds for individual expression, the StringBuffer
+     * parameter, msg, contains the name of the index.  Error messages should
+     * be appended to it.
      *
      * @param checkList
      * @param msg
      * @return
      */
-    public static boolean areIndexableExpressions(List<AbstractExpression> checkList, StringBuffer msg) {
+    public static boolean validateIndexingMVsGaurds(List<AbstractExpression> checkList, StringBuffer msg) {
         for (AbstractExpression expr : checkList) {
-            if (!expr.isIndexableExpression(msg)) {
+            if (!expr.validateIndexingMVsGaurds(msg)) {
                 return false;
             }
         }
@@ -1252,5 +1253,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return false;
+    }
+
+
+    /**
+     * Servicer function for expression which returns true if the expression return
+     * is indexable else false. If expression is not indexable, expression information
+     * gets populated in msg string buffer passed in.
+     * @param msg
+     * @return
+     */
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        if(!m_valueType.isIndexable()) {
+            msg.append("expression of type " + getValueType().getName());
+            return false;
+        }
+        return true;
     }
 }
