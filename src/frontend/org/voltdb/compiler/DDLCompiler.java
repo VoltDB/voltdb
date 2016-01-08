@@ -1811,7 +1811,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateIndexingMVsGaurds(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -2733,7 +2733,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.validateIndexingMVsGaurds(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }

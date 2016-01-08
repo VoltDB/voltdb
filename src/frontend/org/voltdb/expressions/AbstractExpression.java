@@ -1193,7 +1193,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg  The StringBuffer to pack with the error message tail.
      * @return true iff the expression can be part of an index.
      */
-    private boolean validateIndexingMVsGaurds(StringBuffer msg) {
+    private boolean validateExprForIndexesAndMVs(StringBuffer msg) {
         if (containsFunctionById(FunctionSQL.voltGetCurrentTimestampId())) {
             msg.append("cannot include the function NOW or CURRENT_TIMESTAMP.");
             return false;
@@ -1222,9 +1222,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param msg
      * @return
      */
-    public static boolean validateIndexingMVsGaurds(List<AbstractExpression> checkList, StringBuffer msg) {
+    public static boolean validateExprsForIndexesAndMVs(List<AbstractExpression> checkList, StringBuffer msg) {
         for (AbstractExpression expr : checkList) {
-            if (!expr.validateIndexingMVsGaurds(msg)) {
+            if (!expr.validateExprForIndexesAndMVs(msg)) {
                 return false;
             }
         }
