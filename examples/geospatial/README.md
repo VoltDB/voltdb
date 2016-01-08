@@ -26,7 +26,7 @@ VoltDB 6.0.
 On another thread, we simulate users accessing a browser or
 social media on their device.  When this happens, the device makes a
 request to the database for an ad.  The stored procedure invoked here
-is `GetHighestBidForLocation`, which invokes this SQL statment:
+is `GetHighestBidForLocation`, which invokes this SQL statement:
 
 ```SQL
     select id, advertiser_id, bid_amount
