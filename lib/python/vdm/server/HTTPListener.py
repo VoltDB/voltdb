@@ -33,6 +33,8 @@ from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs
 import socket
 import os
 import json
+import dicttoxml
+from xml.dom.minidom import parseString
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 
@@ -438,6 +440,20 @@ def map_deployment_users(request, user):
     return deployment_user[0]
 
 
+def make_configuration_file():
+    merged_dict ={'databases': [make_public_database(x) for x in DATABASES],
+                  'deployments': [make_public_deployment(x) for x in DEPLOYMENT],
+                  'servers': [make_public_server(x) for x in SERVERS]}
+
+    xml = dicttoxml.dicttoxml(merged_dict, attr_type=False, custom_root='vdm', ids= False)
+    xml = parseString(xml).toprettyxml()
+    try:
+        f = open('.vdm/vdm.xml','w')
+        f.write(xml)
+        f.close()
+    except Exception, err:
+        print str(err)
+
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 
@@ -515,7 +531,7 @@ class ServerAPI(MethodView):
         if not request.json:
             abort(400)
         current_database[0]['members'].append(server_id)
-
+        make_configuration_file()
         return jsonify({'server': server, 'status': 1,
                         'members': current_database[0]['members']}), 201
 
@@ -548,6 +564,7 @@ class ServerAPI(MethodView):
                                            " it is referred by database."})
 
         SERVERS.remove(server[0])
+        make_configuration_file()
         return jsonify({'result': True})
 
     @staticmethod
@@ -596,7 +613,7 @@ class ServerAPI(MethodView):
             request.json.get('public-interface', current_server[0]['public-interface'])
         current_server[0]['placement-group'] = \
             request.json.get('placement-group', current_server[0]['placement-group'])
-
+        make_configuration_file()
         return jsonify({'server': current_server[0], 'status': 1})
 
 
@@ -632,6 +649,7 @@ class DatabaseAPI(MethodView):
         Returns:
             Information and the status of database if it is saved otherwise the error message.
         """
+        make_configuration_file()
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -659,6 +677,7 @@ class DatabaseAPI(MethodView):
             deployment['databaseid'] = database_id
 
         DEPLOYMENT.append(deployment)
+        make_configuration_file()
         return jsonify({'database': database, 'status': 1}), 201
 
     @staticmethod
@@ -681,6 +700,7 @@ class DatabaseAPI(MethodView):
         current_database[0]['name'] = request.json.get('name', current_database[0]['name'])
         current_database[0]['deployment'] = \
             request.json.get('deployment', current_database[0]['deployment'])
+        make_configuration_file()
         return jsonify({'database': current_database[0], 'status': 1})
 
     @staticmethod
@@ -719,7 +739,7 @@ class DatabaseAPI(MethodView):
         deployment = [deployment for deployment in DEPLOYMENT if deployment['databaseid'] == database_id]
 
         DEPLOYMENT.remove(deployment[0])
-
+        make_configuration_file()
         return jsonify({'result': True})
 
 
@@ -766,7 +786,7 @@ class DatabaseMemberAPI(MethodView):
 
             if member_id not in current_database[0]['members']:
                 current_database[0]['members'].append(member_id)
-
+        make_configuration_file()
         return jsonify({'members': current_database[0]['members'], 'status': 1})
 
 
@@ -859,7 +879,7 @@ class deploymentAPI(MethodView):
         #             prev_username = user['name']
 
         deployment = map_deployment(request, database_id)
-
+        make_configuration_file()
         return jsonify({'deployment': deployment, 'status': 1})
 
 
@@ -902,6 +922,7 @@ class deploymentUserAPI(MethodView):
                                              , 'success': False}), 404)
 
         deployment_user = map_deployment_users(request, username)
+        make_configuration_file()
         return jsonify({'user': deployment_user, 'status': 1, 'statusstring': 'User Created'})
 
     @staticmethod
@@ -925,7 +946,7 @@ class deploymentUserAPI(MethodView):
         current_user[0]['password'] = request.json.get('password', current_user[0]['password'])
         current_user[0]['roles'] = request.json.get('roles', current_user[0]['roles'])
         current_user[0]['plaintext'] = request.json.get('plaintext', current_user[0]['plaintext'])
-
+        make_configuration_file()
         return jsonify({'user': current_user[0], 'status': 1, 'statusstring': "User Updated"})
 
     @staticmethod
@@ -950,7 +971,6 @@ def main(runner, amodule, aport):
     depjson = path + "/deployment.json"
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
-
     DEPLOYMENT.append(deployment)
 
     __host_name__ = socket.gethostname()
@@ -961,6 +981,8 @@ def main(runner, amodule, aport):
                     'admin-listener': "", 'http-listener': "", 'replication-listener': "",
                     'zookeeper-listener': "", 'placement-group': ""})
     DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
+    make_configuration_file()
+
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
     DATABASE_MEMBER_VIEW = DatabaseMemberAPI.as_view('database_member_api')
