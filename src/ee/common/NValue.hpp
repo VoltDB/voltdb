@@ -1766,11 +1766,11 @@ private:
             lhsValue *= kMaxScaleFactor;
             return compareValue<TTInt>(lhsValue, rhsValue);
         }
-            int64_t lhsValue, rhsValue;
-            lhsValue = static_cast<int64_t>(getSmallInt());
-            rhsValue = rhs.castAsBigIntAndGetValue();
-            return compareValue<int64_t>(lhsValue, rhsValue);
-        }
+        int64_t lhsValue, rhsValue;
+        lhsValue = static_cast<int64_t>(getSmallInt());
+        rhsValue = rhs.castAsBigIntAndGetValue();
+        return compareValue<int64_t>(lhsValue, rhsValue);
+    }
 
     int compareInteger (const NValue& rhs) const {
         assert(m_valueType == VALUE_TYPE_INTEGER);
@@ -2005,7 +2005,7 @@ private:
                 message);
     }
 
-    int comparePointValue (const NValue rhs) const {
+    int comparePointValue (const NValue &rhs) const {
         assert(m_valueType == VALUE_TYPE_POINT);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_POINT:
@@ -2022,7 +2022,7 @@ private:
         }
     }
 
-    int compareGeographyValue (const NValue rhs) const {
+    int compareGeographyValue (const NValue &rhs) const {
         assert(m_valueType == VALUE_TYPE_GEOGRAPHY);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_GEOGRAPHY:
@@ -2333,12 +2333,6 @@ private:
                                     size_t size, Pool* stringPool) {
         NValue retval(type);
         retval.createObjectPointer((int32_t)size, value, stringPool);
-        return retval;
-    }
-
-    static NValue getUninitializedAllocatedValue(ValueType type, size_t size, Pool* stringPool) {
-        NValue retval(type);
-        retval.allocateValueStorage((int32_t)size, stringPool);
         return retval;
     }
 
@@ -2989,14 +2983,8 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
             createObjectPointer(length, str, tempPool);
         }
         else {
-            // Allocate a StringRef, but pass a null pointer so we don't
-            // copy data into it yet.
-            createObjectPointer(length, NULL, tempPool);
-
-            int32_t storageLength;
-            const char* storage = getObject_withoutNull(&storageLength);
-            // Deserialize into the allocated buffer, byte swapping as necessary.
-            GeographyValue::deserializeFrom(input, const_cast<char*>(storage), storageLength);
+            StringRef* sref = createObjectPointer(length, NULL, tempPool);
+            GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
         }
 
         return;
@@ -3357,7 +3345,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
     }
     case VALUE_TYPE_DECIMAL:
         getDecimal().hash(seed);
-        return;        getDecimal().hash(seed); break;
+        return;
     case VALUE_TYPE_POINT:
         getPoint().hashCombine(seed);
         return;

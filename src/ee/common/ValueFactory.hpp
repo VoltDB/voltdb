@@ -117,7 +117,9 @@ public:
 
     /// Returns an NValue of type Geography that points to an uninitialized temp buffer of the given size
     static inline NValue getUninitializedTempGeographyValue(int32_t length) {
-        return NValue::getUninitializedAllocatedValue(VALUE_TYPE_GEOGRAPHY, (size_t)length, NValue::getTempStringPool());
+        NValue retval(VALUE_TYPE_GEOGRAPHY);
+        retval.allocateValueStorage(length, NValue::getTempStringPool());
+        return retval;
     }
 
     /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */
