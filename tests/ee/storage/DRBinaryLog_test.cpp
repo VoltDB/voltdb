@@ -138,13 +138,13 @@ public:
         m_engineReplica (new MockVoltDBEngine(false, CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
     {
         m_drStream.m_enabled = true;
-        m_drStream.setDRProtocolVersion(DRTupleStream::MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION);
+        m_drStream.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
         m_drReplicatedStream.m_enabled = true;
-        m_drReplicatedStream.setDRProtocolVersion(DRTupleStream::MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION);
+        m_drReplicatedStream.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
         m_drStreamReplica.m_enabled = false;
-        m_drStreamReplica.setDRProtocolVersion(DRTupleStream::MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION);
+        m_drStreamReplica.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
         m_drReplicatedStreamReplica.m_enabled = false;
-        m_drReplicatedStreamReplica.setDRProtocolVersion(DRTupleStream::MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION);
+        m_drReplicatedStreamReplica.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
 
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
         *reinterpret_cast<int64_t*>(replicatedTableHandle) = 24;

@@ -38,26 +38,14 @@ public class ExecuteTask extends VoltSystemProcedure {
     private static final int DEP_executeTaskAggregate = (int) SysProcFragmentId.PF_executeTaskAggregate;
 
 
-    static VoltTable createPartitionDRTupleStreamStateResultTable()
+    static VoltTable createDRTupleStreamStateResultTable()
     {
         return new VoltTable(new VoltTable.ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
                              new VoltTable.ColumnInfo(CNAME_PARTITION_ID, CTYPE_ID),
-                             new VoltTable.ColumnInfo("PARTITION_SEQUENCE_NUMBER", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("PARTITION_SP_UNIQUEID", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("PARTITION_MP_UNIUQEID", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("DR_VERSION", VoltType.INTEGER));
-    }
-
-    static VoltTable createReplicatedDRTupleStreamStateResultTable()
-    {
-        return new VoltTable(new VoltTable.ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
-                             new VoltTable.ColumnInfo(CNAME_PARTITION_ID, CTYPE_ID),
-                             new VoltTable.ColumnInfo("PARTITION_SEQUENCE_NUMBER", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("PARTITION_SP_UNIQUEID", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("PARTITION_MP_UNIUQEID", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("REPLICATED_SEQUENCE_NUMBER", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("REPLICATED_SP_UNIQUEID", VoltType.BIGINT),
-                             new VoltTable.ColumnInfo("REPLICATED_MP_UNIUQEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("REPLICATED", VoltType.TINYINT),
+                             new VoltTable.ColumnInfo("SEQUENCE_NUMBER", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("SP_UNIQUEID", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("MP_UNIUQEID", VoltType.BIGINT),
                              new VoltTable.ColumnInfo("DR_VERSION", VoltType.INTEGER));
     }
 
@@ -83,16 +71,13 @@ public class ExecuteTask extends VoltSystemProcedure {
             case GET_DR_TUPLESTREAM_STATE:
             {
                 TupleStreamStateInfo stateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
+                result = createDRTupleStreamStateResultTable();
+                result.addRow(context.getHostId(), context.getPartitionId(), 0,
+                        stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
+                        stateInfo.drVersion);
                 if (stateInfo.containsReplicatedStreamInfo) {
-                    result = createReplicatedDRTupleStreamStateResultTable();
-                    result.addRow(context.getHostId(), context.getPartitionId(),
-                            stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
+                    result.addRow(context.getHostId(), context.getPartitionId(), 1,
                             stateInfo.replicatedInfo.drId, stateInfo.replicatedInfo.spUniqueId, stateInfo.replicatedInfo.mpUniqueId,
-                            stateInfo.drVersion);
-                } else {
-                    result = createPartitionDRTupleStreamStateResultTable();
-                    result.addRow(context.getHostId(), context.getPartitionId(),
-                            stateInfo.partitionInfo.drId, stateInfo.partitionInfo.spUniqueId, stateInfo.partitionInfo.mpUniqueId,
                             stateInfo.drVersion);
                 }
                 break;

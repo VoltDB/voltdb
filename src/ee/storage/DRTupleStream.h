@@ -53,7 +53,10 @@ public:
     static const size_t END_RECORD_SIZE = 1 + 1 + 8 + 4;
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
-    static const uint8_t MINIMUM_COMPATIBLE_DR_PROTOCOL_VERSION = 3;
+
+    // Also update DRProducerProtocol.java if version changes
+    static const uint8_t PROTOCOL_VERSION = 3;
+    static const uint8_t MINIMUM_COMPATIBLE_PROTOCOL_VERSION = 3;
 
     DRTupleStream();
 

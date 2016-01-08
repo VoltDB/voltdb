@@ -107,7 +107,7 @@ public class SystemProcedureCatalog {
             return className;
         }
 
-        public Procedure asCatalogProcedure() {
+        Procedure asCatalogProcedure() {
             Column partitionCol = new Column();
             partitionCol.setType(partitionParamType.getValue());
 
