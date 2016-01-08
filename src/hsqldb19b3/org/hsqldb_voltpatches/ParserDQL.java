@@ -1375,11 +1375,14 @@ public class ParserDQL extends ParserBase {
 
                 case StatementTypes.UPDATE_WHERE :
                 case StatementTypes.DELETE_WHERE :
-                    /*
+                    /* A VoltDB Extension.
+                     * Views from Streams are now updatable.
+                     * Comment out this guard and check if it is a view
+                     * from Stream or PersistentTable in planner.
                     if (!table.isUpdatable()) {
                         throw Error.error(ErrorCode.X_42545);
                     }
-                    */
+                    A VoltDB Extension */
                     break;
             }
 

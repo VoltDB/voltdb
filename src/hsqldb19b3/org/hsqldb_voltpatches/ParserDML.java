@@ -357,11 +357,14 @@ public class ParserDML extends ParserDQL {
         Table table     = rangeVariables[0].getTable();
         Table baseTable = table.getBaseTable();
 
-        /*
+        /* A VoltDB Extension.
+         * Views from Streams are now updatable.
+         * Comment out this guard and check if it is a view
+         * from Stream or PersistentTable in planner.
         if (!table.isUpdatable()) {
             throw Error.error(ErrorCode.X_42000);
         }
-        */
+        A VoltDB Extension */
 
         if (truncate) {
             switch (token.tokenType) {
@@ -419,7 +422,9 @@ public class ParserDML extends ParserDQL {
             }
         }
 
-        if (table != baseTable) {
+        // VoltDB Extension:
+        // baseTable could be null for stream views.
+        if (baseTable != null && table != baseTable) {
             QuerySpecification select =
                 ((TableDerived) table).getQueryExpression().getMainSelect();
 

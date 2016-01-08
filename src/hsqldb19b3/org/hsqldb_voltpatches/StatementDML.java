@@ -208,6 +208,9 @@ public class StatementDML extends StatementDMQL {
     @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
+        /* A VoltDB Extension.
+         * Base table could be null for views.
+         */
         if (baseTable != null && !baseTable.isTemp()) {
             for (int i = 0; i < baseTable.fkConstraints.length; i++) {
                 set.add(baseTable.fkConstraints[i].getMain().getName());
@@ -242,6 +245,9 @@ public class StatementDML extends StatementDMQL {
     @Override
     void getTableNamesForWrite(OrderedHashSet set) {
 
+        /* A VoltDB Extension.
+         * Base table could be null for views.
+         */
         if (baseTable==null || baseTable.isTemp()) {
             return;
         }
