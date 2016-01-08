@@ -1214,7 +1214,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     /**
      * Return true if the all of the expressions in the list can be part of
      * an index expression or in group by and where clause of MV.  As with
-     * validateIndexingMVsGaurds for individual expression, the StringBuffer
+     * validateExprForIndexesAndMVs for individual expression, the StringBuffer
      * parameter, msg, contains the name of the index.  Error messages should
      * be appended to it.
      *
