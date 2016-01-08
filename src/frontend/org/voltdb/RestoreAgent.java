@@ -693,7 +693,8 @@ SnapshotCompletionInterest, Promotable
                 // The expected partition count could be determined by the new partition count recorded
                 // in the truncation snapshot. Truncation snapshot taken at the end of the join process
                 // actually records the new partition count in the digest.
-                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader);
+                m_replayAgent.generateReplayPlan(infoWithMinHostId.instanceId.getTimestamp(),
+                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader);
             }
         }
 
