@@ -179,5 +179,4 @@ public class PolygonFactory {
         }
         return new GeographyValue(loops);
     }
-
 }
