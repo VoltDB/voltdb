@@ -443,7 +443,7 @@ def map_deployment_users(request, user):
 def make_configuration_file():
     merged_dict ={'databases': [make_public_database(x) for x in DATABASES],
                   'deployments': [make_public_deployment(x) for x in DEPLOYMENT],
-                  'servers': [make_public_server(x) for x in SERVERS]}
+                  'members': [make_public_server(x) for x in SERVERS]}
 
     xml = dicttoxml.dicttoxml(merged_dict, attr_type=False, custom_root='vdm', ids= False)
     xml = parseString(xml).toprettyxml()
