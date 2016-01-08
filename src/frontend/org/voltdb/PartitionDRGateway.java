@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,7 @@ import org.voltdb.licensetool.LicenseApi;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
- * Stub class that provides a gateway to the InvocationBufferServer when
+ * Stub class that provides a gateway to the DRProducer when
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */

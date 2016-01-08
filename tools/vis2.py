@@ -385,9 +385,10 @@ def main():
         fns.append(flags)
         filenames.append(tuple(fns))
 
-    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    #filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    #filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
     filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-kvm-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl-kvm/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

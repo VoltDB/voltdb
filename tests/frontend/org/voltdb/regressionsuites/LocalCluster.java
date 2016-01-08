@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -914,6 +914,7 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
 
             rejoinCmdLn.startCommand(startAction);
+            rejoinCmdLn.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
 
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.
