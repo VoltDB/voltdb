@@ -573,6 +573,22 @@ public enum VoltType {
         return m_lengthInBytes;
     }
 
+    /**
+     * Get the minimum number of bytes required to store the type
+     * @return An integer value representing a number of bytes.
+     */
+    public int getMinLengthInBytes() {
+        if (m_lengthInBytes != -1) {
+            return getLengthInBytesForFixedTypes();
+        }
+
+        if (this == GEOGRAPHY) {
+            return GeographyValue.MIN_SERIALIZED_LENGTH;
+        }
+
+        return 1;
+    }
+
     /** JDBC getTypeInfo() accessors */
 
     /**
@@ -1047,4 +1063,25 @@ public enum VoltType {
     private static final class NullGeographySigil{}
     /** Null value for <code>POINT</code>. */
     public static final NullGeographySigil NULL_GEOGRAPHY = new NullGeographySigil();
+
+    /**
+     * The size specifier for columns with a variable-length type is optional in a
+     * CREATE TABLE or ALTER TABLE statement.  If no size is specified, VoltDB chooses
+     * a default size.
+     *
+     * @return the default size for the given type
+     */
+    public int defaultLengthForVariableLengthType() {
+        assert(isVariableLength());
+        if (this == GEOGRAPHY) {
+            return GeographyValue.DEFAULT_LENGTH;
+        }
+
+        // These constants should be kept up-to-date with those in DDLCompiler.
+        // We can't reference DDLCompiler here since this class is used in the client.
+        final int MAX_COLUMNS = 1024;
+        final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+
+        return MAX_ROW_SIZE / MAX_COLUMNS;
+    }
 }

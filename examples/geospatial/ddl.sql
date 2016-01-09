@@ -17,7 +17,9 @@ CREATE TABLE advertisers
 
 -- This table has one row for each bid made by an advertiser.  A bid
 -- is valid for the duration of time between ts_start and ts_end and
--- the region indictated.
+-- the region indictated.  The region is represented in the GEOGRAPHY
+-- field which will contain polygon values.  Each polygon can take
+-- up to 16K of storage.
 --
 -- When a user logs in from a place and time where more than one bid
 -- applies, an ad from the highest bidder (largest bid_amount) will be
@@ -29,7 +31,7 @@ CREATE TABLE bids
 (
   id bigint not null
 , advertiser_id bigint not null
-, region geography not null
+, region geography(16384) not null
 , ts_start timestamp not null
 , ts_end timestamp not null
 , bid_amount float not null

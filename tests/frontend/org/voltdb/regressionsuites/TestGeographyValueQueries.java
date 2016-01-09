@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyValue;
@@ -590,6 +591,44 @@ public class TestGeographyValueQueries extends RegressionSuite {
         assertGeographyValueWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
     }
 
+    public void testGeographySize() throws Exception {
+        Client client = getClient();
+
+        // Make sure that we can resize a GEOGRAPHY column in a populated table if
+        // we decide that we want to insert a polygon that is larger
+        // than the column's current size.
+
+        String wktFourVerts = "POLYGON ((1.0 1.0, -1.0 1.0, -1.0 -1.0, 1.0 -1.0, 1.0 1.0))";
+        GeographyValue gv = GeographyValue.fromText(wktFourVerts);
+        assertEquals(179, gv.getLengthInBytes());
+
+        VoltTable vt = client.callProcedure("tiny_polygon.Insert", 0, gv).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        String wktFiveVerts = "POLYGON (("
+                + "1.0 1.0, "
+                + "-1.0 1.0, "
+                + "-1.0 -1.0, "
+                + "1.0 -1.0, "
+                + "0.0 0.0, "
+                + "1.0 1.0))";
+        gv = GeographyValue.fromText(wktFiveVerts);
+        assertEquals(203, gv.getLengthInBytes());
+        verifyProcFails(client, "The size 203 of the value exceeds the size of the GEOGRAPHY column \\(179 bytes\\)",
+                "tiny_polygon.Insert", 1, gv);
+
+        ClientResponse cr = client.callProcedure("@AdHoc",
+                "alter table tiny_polygon alter column poly geography(203);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("tiny_polygon.Insert", 1, gv).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        validateTableColumnOfScalarVarchar(client,
+                "select asText(poly) from tiny_polygon order by id",
+                new String[] {wktFourVerts, wktFiveVerts});
+    }
+
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
@@ -603,7 +642,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 "CREATE TABLE T (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
                 + "  NAME VARCHAR(32),\n"
-                + "  POLY GEOGRAPHY\n"
+                + "  POLY GEOGRAPHY(2048)\n"
                 + ");\n"
                 + "CREATE TABLE PT (\n"
                 + "  PK INTEGER NOT NULL PRIMARY KEY,\n"
@@ -621,6 +660,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 + "  NAME VARCHAR(32),\n"
                 + "  POLY GEOGRAPHY NOT NULL\n"
                 + ");\n"
+                + "CREATE TABLE TINY_POLYGON (\n"
+                + "  ID INTEGER PRIMARY KEY,\n"
+                + "  POLY GEOGRAPHY(179) NOT NULL\n"
+                + ");\n"
                 + "CREATE PROCEDURE select_in_t AS \n"
                 + "  SELECT pk FROM t WHERE poly IN ? ORDER BY pk ASC;\n"
                 + "CREATE PROCEDURE select_in_pt AS \n"
@@ -633,6 +676,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
         catch (Exception e) {
             fail();
         }
+
+        project.setUseDDLSchema(true);
 
         config = new LocalCluster("geography-value-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
