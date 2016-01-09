@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -63,8 +65,6 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -2881,26 +2881,19 @@ public class TestVoltCompiler extends TestCase {
         // GEOGRAPHY cannot be a partition column
         badDDLAgainstSimpleSchema(".*Partition columns must be an integer or varchar type.*", ddl);
 
-        badDDLAgainstSimpleSchema(".*precision or scale out of range.*",
-                "create table geogs ("
-                + "  geog geography(0) not null"
-                + ");"
-                );
+        ddl = "create table geogs ( geog geography(0) not null );";
+        badDDLAgainstSimpleSchema(".*precision or scale out of range.*", ddl);
 
         // Minimum length for a GEOGRAPHY column is 155.
+        ddl = "create table geogs ( geog geography(154) not null );";
         badDDLAgainstSimpleSchema(".*GEOGRAPHY column GEOG in table GEOGS "
                 + "has length of 154 which is shorter than "
                 + "155, the minimum allowed length for the type.*",
-                "create table geogs ("
-                + "  geog geography(154) not null"
-                + ");"
+                ddl
                 );
 
-        badDDLAgainstSimpleSchema(".*is > 1048576 char maximum.*",
-                "create table geogs ("
-                + "  geog geography(1048577) not null"
-                + ");"
-                );
+        ddl = "create table geogs ( geog geography(1048577) not null );";
+        badDDLAgainstSimpleSchema(".*is > 1048576 char maximum.*", ddl);
 
         // GEOGRAPHY columns cannot yet be indexed
         ddl = "create table geogs ( geog geography not null );\n" +
@@ -2928,14 +2921,18 @@ public class TestVoltCompiler extends TestCase {
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL );\n" +
               "create index geoindex_contains ON geogs (contains(region1, point1) );\n";
-        badDDLAgainstSimpleSchema(".*Index \"GEOINDEX_CONTAINS\" can't include function 'CONTAINS..'.*", ddl);
+        // error msg: Cannot create index "GEOINDEX_CONTAINS" because it contains function 'CONTAINS(), which is not supported.
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_CONTAINS\" because it contains function 'CONTAINS..', " +
+                                  "which is not supported.*", ddl);
 
         // indexing on comparison expression not supported
         ddl = "create table geogs ( id integer primary key, " +
                                   " region1 geography NOT NULL, " +
                                   " point1 geography_point NOT NULL);\n " +
               "create index geoindex_nonzero_distance ON geogs ( distance(region1, point1) = 0 );\n";
-        badDDLAgainstSimpleSchema(".*Index \"GEOINDEX_NONZERO_DISTANCE\" can't include comparison expression '='.*", ddl);
+        //error msg: Cannot create index "GEOINDEX_NONZERO_DISTANCE" because it contains comparison expression '=', which is not supported.
+        badDDLAgainstSimpleSchema(".*Cannot create index \"GEOINDEX_NONZERO_DISTANCE\" because it contains " +
+                                  "comparison expression '=', which is not supported.*", ddl);
 
         // Default values are not yet supported
         ddl = "create table geogs ( geog geography default 'polygon((3.0 9.0, 3.0 0.0, 0.0 9.0, 3.0 9.0)');\n";
@@ -4406,7 +4403,8 @@ public class TestVoltCompiler extends TestCase {
                                    ddl,
                                    "create index faulty on alpha(id, 100 + sum(id));");
         // Test for subqueries.
-        checkDDLAgainstGivenSchema(".*Index \"FAULTY\" can't include comparison expression '='.*",
+        checkDDLAgainstGivenSchema(".*Cannot create index \"FAULTY\" because it contains comparison expression '=', " +
+                                   "which is not supported.*",
                                    ddl,
                                    "create index faulty on alpha(id = (select id + id from alpha));");
     }

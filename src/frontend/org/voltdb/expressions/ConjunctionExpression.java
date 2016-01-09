@@ -68,9 +68,9 @@ public class ConjunctionExpression extends AbstractExpression {
 
     @Override
     public boolean isValueTypeIndexable(StringBuffer msg) {
-        // conjuction expression include and and or expression that results in boolean result
+        // Conjunction expression include and and or expression that results in boolean result
         // boolean result are not indexable
-        msg.append("conjuction expression: '" + getExpressionType().symbol() + "'");
+        msg.append("logical expression: '" + getExpressionType().symbol() + "'");
         return false;
     }
 

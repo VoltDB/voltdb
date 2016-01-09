@@ -1793,8 +1793,8 @@ public class DDLCompiler {
                     StringBuffer exprMsg = new StringBuffer();
                     if (!expr.isValueTypeIndexable(exprMsg)) {
                         // indexing on expression with boolean result is not supported.
-                        msg.append("can't include " + exprMsg + ".");
-                        throw compiler.new VoltCompilerException(msg.toString());
+                        throw compiler.new VoltCompilerException("Cannot create index \""+ name +
+                                "\" because it contains " + exprMsg + ", which is not supported.");
                     }
                     // rest of the validity gaurds will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
