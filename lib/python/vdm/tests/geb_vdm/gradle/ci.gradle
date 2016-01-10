@@ -1,0 +1,11 @@
+if (System.getenv('SNAP_CI')) {
+    chromeTest {
+        systemProperty "webdriver.chrome.driver", "/usr/local/bin/chromedriver"
+    }
+
+    tasks.withType(Test) {
+        testLogging {
+            exceptionFormat = 'full'
+        }
+    }
+}
