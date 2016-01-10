@@ -348,7 +348,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         String sql = "select borders.name, Area(borders.region) "
                         + "from borders order by borders.pk";
         VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        System.out.println(vt.toString());
         // in the calculation below, areas of states are close to actual area of the state (vertices
         // used for polygon are close approximations, not exact, values of the state vertices).
         // Area for Colorado - 269601 sq km and Wyoming 253350 sq km
@@ -447,7 +446,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 + "from borders, places where contains(borders.region, places.loc) "
                 + "order by distance";
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-        //System.out.println(vt.toString());
         assertApproximateContentOfTable(new Object[][]
                 {{"Colorado",   "Denver",                               90126.44134902404},
                  {"Colorado",   "Fort Collins",                         177132.68582044652},

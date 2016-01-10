@@ -98,7 +98,6 @@ public class TestGeographyPointValue extends RegressionSuite {
     }
 
     public void testPointFromText() throws Exception {
-        final double EPSILON = 1.0e-14;
         Client client = getClient();
 
         validateTableOfScalarLongs(client,
