@@ -216,4 +216,11 @@ public class ComparisonExpression extends AbstractExpression {
             m_right.explain(impliedTableName) + ")";
     }
 
+    @Override
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        // comparison expression result in boolean result type, which is not indexable
+        msg.append("comparison expression '" + getExpressionType().symbol() +"'");
+        return false;
+    }
+
 }
