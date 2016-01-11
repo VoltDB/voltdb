@@ -33,6 +33,7 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
@@ -278,6 +279,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
         else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
             m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+        }
+        else if (m_backend == BackendTarget.POSTGIS_BACKEND) {
+            m_non_voltdb_backend = PostGISBackend.initializePostGISBackend(m_context);
         }
         else {
             m_non_voltdb_backend = null;

@@ -655,6 +655,9 @@ if __name__ == "__main__":
     parser.add_option("-P", "--postgresql", action="store_true",
                       dest="postgresql", default=False,
                       help="compare VoltDB results to PostgreSQL, rather than HSqlDB")
+    parser.add_option("-G", "--postgis", action="store_true",
+                      dest="postgis", default=False,
+                      help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -690,6 +693,8 @@ if __name__ == "__main__":
     comparison_database = "HSqlDB"  # default value
     if options.postgresql:
         comparison_database = 'PostgreSQL'
+    if options.postgis:
+        comparison_database = 'PostGIS'
 
     testConfigKits = {}
     defaultHost = "localhost"
@@ -774,6 +779,7 @@ if __name__ == "__main__":
         print "Total number of mismatched statements (i.e., test failures): %d" % mismatched_statements
     if total_num_crashes > 0:
         print "Total number of (VoltDB, " + comparison_database + ", or compare results) crashes: %d" % total_num_crashes
+        success = False
 
     if not success:
         sys.stdout.flush()

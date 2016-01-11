@@ -18,7 +18,8 @@
 -- There are no unary string-to-string functions supported yet.
 {@onefun = ""}
 {@optionalfn = ""}
-
+{@star = "*"}
+{@lhsstar = "*"}
 {@updatecolumn = "_value[varbinary]"}
 {@updatesource = "_value[varbinary]"}
 {@updatevalue = "_value[varbinary]"}
