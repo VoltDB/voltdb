@@ -194,7 +194,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
                     textcoords='offset points', ha='left')
 
-                pl.ax.annotate('ma: %.2f median: %.2f (%+.2f) cv: %.2f (%+.2f%%)' % (ma[-1], median, q, cv, p)),
+                pl.ax.annotate('ma: %.2f median: %.2f (%+.2f) cv: %.2f (%+.2f%%)' % (ma[-1], median, q, cv, p),
                     xy=(.07, .06), xycoords='figure fraction', horizontalalignment='left', verticalalignment='top')
 
             """
