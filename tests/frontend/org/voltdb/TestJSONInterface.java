@@ -74,6 +74,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import junit.framework.TestCase;
+
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -81,7 +83,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -104,8 +106,6 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestJSONInterface extends TestCase {
 
@@ -171,7 +171,7 @@ public class TestJSONInterface extends TestCase {
             }
         }
         if (in == null) {
-            throw new Exception("Unable to read response from server");
+            throw new Exception("Unable to read response from server, response code: " + conn.getResponseCode());
         }
 
         StringBuilder decodedString = new StringBuilder();
@@ -303,12 +303,12 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getHashedPasswordForHTTPVar(String password, ClientAuthHashScheme scheme) {
+    public static String getHashedPasswordForHTTPVar(String password, ClientAuthScheme scheme) {
         assert (password != null);
 
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
+            md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
         } catch (NoSuchAlgorithmException e) {
             fail();
         }
@@ -320,23 +320,23 @@ public class TestJSONInterface extends TestCase {
         }
 
         String retval = Encoder.hexEncode(hashedPassword);
-        assertEquals(ClientAuthHashScheme.getHexencodedDigestLength(scheme), retval.length());
+        assertEquals(ClientAuthScheme.getHexencodedDigestLength(scheme), retval.length());
         return retval;
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */, ClientAuthHashScheme.HASH_SHA256);
+        return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */, ClientAuthScheme.HASH_SHA256);
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */, ClientAuthHashScheme.HASH_SHA256);
+        return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */, ClientAuthScheme.HASH_SHA256);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme) throws Exception {
         return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthHashScheme scheme, int procCallTimeout) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -367,7 +367,7 @@ public class TestJSONInterface extends TestCase {
         String ret = callProcOverJSONRaw(varString, expectedCode);
         if (preHash) {
             //If prehash make same call with SHA1 to check expected code.
-            params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthHashScheme.HASH_SHA1));
+            params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
             varString = getHTTPVarString(params);
 
             varString = getHTTPVarString(params);
@@ -1210,7 +1210,7 @@ public class TestJSONInterface extends TestCase {
             // test not enabled
             ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
             try {
-                callProcOverJSON("Insert", pset, null, null, false, false, 403, ClientAuthHashScheme.HASH_SHA256); // HTTP_FORBIDDEN
+                callProcOverJSON("Insert", pset, null, null, false, false, 403, ClientAuthScheme.HASH_SHA256); // HTTP_FORBIDDEN
             } catch (Exception e) {
                 // make sure failed due to permissions on http
                 assertTrue(e.getMessage().contains("403"));
@@ -1289,13 +1289,13 @@ public class TestJSONInterface extends TestCase {
             int batchSize = 10000;
             for (int i=0; i<10; i++) {
                 pset = ParameterSet.fromArrayNoCopy(i*batchSize, batchSize);
-                String response = callProcOverJSON("TestJSONInterface$InsertProc", pset, null, null, false, false, 200, ClientAuthHashScheme.HASH_SHA256);
+                String response = callProcOverJSON("TestJSONInterface$InsertProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256);
                 Response r = responseFromJSON(response);
                 assertEquals(ClientResponse.SUCCESS, r.status);
             }
 
             pset = ParameterSet.fromArrayNoCopy(100000);
-            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthHashScheme.HASH_SHA256, 1);
+            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
             assertTrue(r.statusString.contains("Transaction Interrupted"));

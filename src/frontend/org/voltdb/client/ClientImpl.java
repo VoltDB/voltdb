@@ -68,7 +68,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     private final String m_username;
     private final byte m_passwordHash[];
-    private final ClientAuthHashScheme m_hashScheme;
+    private final ClientAuthScheme m_hashScheme;
 
     /**
      * These threads belong to the network thread pool
@@ -106,7 +106,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {
-            username = config.m_subject.getPrincipals().iterator().next().getName();
+            username = ClientConfig.getUserNameFromSubject(config.m_subject);
         }
         m_username = username;
 
