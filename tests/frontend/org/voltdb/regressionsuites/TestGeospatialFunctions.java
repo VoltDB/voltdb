@@ -386,7 +386,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
     }
 
     public void testPolygonPointDistance() throws Exception {
-        // The distances we consider are all in the thousands of square
+        // The distances we consider are all in the thousands of
         // meters.  We expect 1.0e-12 precision, so that's 1.0e-8 relative
         // precision.  Note that we have determined empirically that
         // 1.0e-9 fails.
