@@ -330,12 +330,16 @@ CTX.INPUT['storage'] = """
  TupleStreamBase.cpp
  ExportTupleStream.cpp
  DRTupleStream.cpp
+ BinaryLogSinkWrapper.cpp
  BinaryLogSink.cpp
+ CompatibleBinaryLogSink.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
  ElasticIndex.cpp
  ElasticIndexReadContext.cpp
+ DRTupleStreamBase.cpp
+ CompatibleDRTupleStream.cpp
 """
 
 CTX.INPUT['stats'] = """

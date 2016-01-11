@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BINARYLOGSINK_H
-#define BINARYLOGSINK_H
+#ifndef COMPATIBLEBINARYLOGSINK_H
+#define COMPATIBLEBINARYLOGSINK_H
 
 #include "common/serializeio.h"
 
@@ -32,9 +32,9 @@ class VoltDBEngine;
 /*
  * Responsible for applying binary logs to table data
  */
-class BinaryLogSink {
+class CompatibleBinaryLogSink {
 public:
-    BinaryLogSink();
+    CompatibleBinaryLogSink() {}
 
     int64_t apply(ReferenceSerializeInputLE *taskInfo,
                   boost::unordered_map<int64_t, PersistentTable*> &tables,

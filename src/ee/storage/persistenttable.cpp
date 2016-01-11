@@ -81,6 +81,8 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
+#include "storage/DRTupleStreamBase.h"
+#include "storage/CompatibleDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 
 namespace voltdb {
@@ -394,7 +396,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     engine->rebuildTableCollections();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    DRTupleStreamBase *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -522,7 +524,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         setDRTimestampForTuple(ec, target, false);
     }
 
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    DRTupleStreamBase *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -673,7 +675,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    DRTupleStreamBase *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -838,7 +840,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    DRTupleStreamBase *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -1568,8 +1570,6 @@ bool PersistentTable::doForcedCompaction() {
         }
         if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
             //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
-            hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
-            notPendingCompactions++;
         }
         if (!m_blocksPendingSnapshot.empty() && hadWork2) {
             //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;

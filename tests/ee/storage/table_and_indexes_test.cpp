@@ -33,7 +33,7 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
-#include "storage/BinaryLogSink.h"
+#include "storage/BinaryLogSinkWrapper.h"
 #include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
 #include "storage/table.h"
@@ -71,7 +71,6 @@ class TableAndIndexTest : public Test {
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
-            drStream.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
 
             engine->setupForPlanFragments( NULL, 44, 44, 44, 44);
 
@@ -321,7 +320,7 @@ class TableAndIndexTest : public Test {
         DRTupleStream drReplicatedStream;
         DummyTopend topend;
         Pool pool;
-        BinaryLogSink sink;
+        BinaryLogSinkWrapper sinkWrapper;
 
         TupleSchema      *districtTupleSchema;
         TupleSchema      *districtReplicaTupleSchema;
@@ -418,7 +417,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -461,7 +460,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -497,7 +496,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -561,7 +560,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -600,7 +599,7 @@ TEST_F(TableAndIndexTest, DrTestNoPK) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -679,7 +678,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     customerTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     customerTable->setDR(true);
 
@@ -718,7 +717,7 @@ TEST_F(TableAndIndexTest, DrTestNoPKUninlinedColumn) {
     *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     customerTable->setDR(false);
-    sink.apply(&data[startPos], tables, &pool, mockEngine, 1);
+    sinkWrapper.apply(&data[startPos], tables, &pool, mockEngine, 1);
     drStream.m_enabled = true;
     customerTable->setDR(true);
 

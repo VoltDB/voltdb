@@ -32,7 +32,7 @@ namespace voltdb {
 extern const int64_t VOLT_EPOCH;
 
 class AbstractExecutor;
-class DRTupleStream;
+class DRTupleStreamBase;
 class VoltDBEngine;
 
 /*
@@ -57,8 +57,8 @@ class ExecutorContext {
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStream *drTupleStream,
-                    DRTupleStream *drReplicatedStream,
+                    DRTupleStreamBase *drTupleStream,
+                    DRTupleStreamBase *drReplicatedStream,
                     CatalogId drClusterId);
 
     ~ExecutorContext();
@@ -224,11 +224,11 @@ class ExecutorContext {
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
-    DRTupleStream* drStream() {
+    DRTupleStreamBase* drStream() {
         return m_drStream;
     }
 
-    DRTupleStream* drReplicatedStream() {
+    DRTupleStreamBase* drReplicatedStream() {
         return m_drReplicatedStream;
     }
 
@@ -241,8 +241,12 @@ class ExecutorContext {
         return singleton->m_tempStringPool;
     }
 
-    void setDrStreamForTest(DRTupleStream *drStream) {
+    void setDrStream(DRTupleStreamBase *drStream) {
         m_drStream = drStream;
+    }
+
+    void setDrReplicatedStream(DRTupleStreamBase *drReplicatedStream) {
+        m_drReplicatedStream = drReplicatedStream;
     }
 
     bool allOutputTempTablesAreEmpty() const;
@@ -259,8 +263,8 @@ class ExecutorContext {
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
-    DRTupleStream *m_drStream;
-    DRTupleStream *m_drReplicatedStream;
+    DRTupleStreamBase *m_drStream;
+    DRTupleStreamBase *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;

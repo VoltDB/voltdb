@@ -15,8 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DRTUPLESTREAM_H_
-#define DRTUPLESTREAM_H_
+#ifndef COMPATIBLEDRTUPLESTREAM_H_
+#define COMPATIBLEDRTUPLESTREAM_H_
 
 #include "storage/DRTupleStreamBase.h"
 
@@ -24,7 +24,7 @@ namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
-class DRTupleStream : public voltdb::DRTupleStreamBase {
+class CompatibleDRTupleStream : public voltdb::DRTupleStreamBase {
 public:
     //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
@@ -33,13 +33,11 @@ public:
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
 
-    // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 3;
+    static const uint8_t MINIMUM_COMPATIBLE_PROTOCOL_VERSION = 3;
 
-    DRTupleStream();
+    CompatibleDRTupleStream();
 
-    virtual ~DRTupleStream() {
-    }
+    virtual ~CompatibleDRTupleStream() {}
 
     /**
      * write an insert or delete record to the stream
@@ -84,7 +82,6 @@ public:
     virtual DRCommittedInfo getLastCommittedSequenceNumberAndUniqueIds() {
         return DRCommittedInfo(m_committedSequenceNumber, m_lastCommittedSpUniqueId, m_lastCommittedMpUniqueId);
     }
-
     static int32_t getTestDRBuffer(char *out);
 private:
     void transactionChecks(int64_t lastCommittedSpHandle, int64_t txnId, int64_t spHandle, int64_t uniqueId);
@@ -107,34 +104,5 @@ private:
     int64_t m_lastCommittedMpUniqueId;
 };
 
-class MockDRTupleStream : public DRTupleStream {
-public:
-    MockDRTupleStream() : DRTupleStream() {}
-    size_t appendTuple(int64_t lastCommittedSpHandle,
-                           char *tableHandle,
-                           int64_t txnId,
-                           int64_t spHandle,
-                           int64_t uniqueId,
-                           TableTuple &tuple,
-                           DRRecordType type,
-                           const std::pair<const TableIndex*, uint32_t>& indexPair) {
-        return 0;
-    }
-
-    void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
-
-    void rollbackTo(size_t mark, size_t drRowCost) {}
-
-    size_t truncateTable(int64_t lastCommittedSpHandle,
-                       char *tableHandle,
-                       std::string tableName,
-                       int64_t txnId,
-                       int64_t spHandle,
-                       int64_t uniqueId) {
-        return 0;
-    }
-};
-
 }
-
 #endif

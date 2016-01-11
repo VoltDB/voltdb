@@ -15,21 +15,19 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BINARYLOGSINK_H_
-#define BINARYLOGSINK_H_
+#include "CompatibleBinaryLogSink.h"
 
-#include "storage/BinaryLogSink.h"
-
+#include <string>
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "common/UniqueId.hpp"
 #include "storage/persistenttable.h"
-#include "storage/ConstraintFailureException.h"
 #include "storage/tablefactory.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
+#include "storage/ConstraintFailureException.h"
 #include "indexes/tableindex.h"
 
 #include "catalog/database.h"
@@ -37,7 +35,6 @@
 #include<boost/unordered_map.hpp>
 #include<boost/unordered_set.hpp>
 #include<crc/crc32c.h>
-#include <string>
 
 namespace voltdb {
 
@@ -134,6 +131,36 @@ static inline std::string DRDivergenceStr(DRDivergence type) {
     }
 }
 
+static bool isApplyNewRow(int32_t retval) {
+    return (retval & DECISION_BIT) == DECISION_BIT;
+}
+
+static bool isResolved(int32_t retval) {
+    return (retval & RESOLVED_BIT) == RESOLVED_BIT;
+}
+
+static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
+    TableTuple tuple(metadataTable->schema());
+    TableIterator iter = metadataTable->iterator();
+    while (iter.next(tuple)) {
+        tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
+        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
+    }
+}
+
+static void exportTuples(Table *exportTable, Table *metaTable, Table *tupleTable) {
+    TableTuple tempMetaTuple(exportTable->schema());
+    TableTuple tempTupleTuple(tupleTable->schema());
+    TableIterator metaIter = metaTable->iterator();
+    TableIterator tupleIter = tupleTable->iterator();
+    while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
+        tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
+        exportTable->insertTuple(tempMetaTuple);
+    }
+}
+
 class CachedIndexKeyTuple {
 public:
     CachedIndexKeyTuple() : m_tuple(), m_cachedIndexCrc(0), m_storageSize(0), m_tupleStorage() {}
@@ -165,35 +192,7 @@ private:
     boost::scoped_array<char> m_tupleStorage;
 };
 
-static bool isApplyNewRow(int32_t retval) {
-    return (retval & DECISION_BIT) == DECISION_BIT;
-}
 
-static bool isResolved(int32_t retval) {
-    return (retval & RESOLVED_BIT) == RESOLVED_BIT;
-}
-
-static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
-    TableTuple tuple(metadataTable->schema());
-    TableIterator iter = metadataTable->iterator();
-    while (iter.next(tuple)) {
-        tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
-                        ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
-        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
-                        ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
-    }
-}
-
-static void exportTuples(Table *exportTable, Table *metaTable, Table *tupleTable) {
-    TableTuple tempMetaTuple(exportTable->schema());
-    TableTuple tempTupleTuple(tupleTable->schema());
-    TableIterator metaIter = metaTable->iterator();
-    TableIterator tupleIter = tupleTable->iterator();
-    while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-        tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
-        exportTable->insertTuple(tempMetaTuple);
-    }
-}
 
 typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
 
@@ -454,15 +453,13 @@ static bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool 
     return true;
 }
 
-BinaryLogSink::BinaryLogSink() {}
-
-int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unordered_map<int64_t,
-                             PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-                             int32_t remoteClusterId, const char *recordStart, int64_t *uniqueId,
-                             int64_t *sequenceNumber) {
-    std::cout << "BinaryLogSink::apply" << std::endl;
+int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
+                                       boost::unordered_map<int64_t, PersistentTable*> &tables,
+                                       Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                                       const char *recordStart, int64_t *uniqueId,
+                                       int64_t *sequenceNumber) {
+    std::cout << "CompatibleBinaryLogSink::apply" << std::endl;
     CachedIndexKeyTuple indexKeyTuple;
-
     const DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
     size_t rowCount = rowCostForDRRecord(type);
 
@@ -489,9 +486,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             table->insertPersistentTuple(tempTuple, true);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()),
-                                   *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT,
-                                   CONFLICT_CONSTRAINT_VIOLATION)) {
+                if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()), *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                     break;
                 }
             }
@@ -579,10 +574,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
         if (oldTuple.isNullTuple()) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, &expectedTuple,
-                                   &tempTuple, *uniqueId, remoteClusterId,
-                                   DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING,
-                                   NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, NULL, &expectedTuple, &tempTuple,
+                                   *uniqueId, remoteClusterId, DR_RECORD_UPDATE,
+                                   CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                     break;
                 }
             }
@@ -749,4 +743,3 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
 }
 
-#endif

@@ -786,7 +786,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
-                    m_producerDRGateway.setClientInterface(m_clientInterface);
                     m_producerDRGateway.start();
                     m_producerDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {

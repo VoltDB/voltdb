@@ -35,7 +35,7 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
-#include "storage/BinaryLogSink.h"
+#include "storage/BinaryLogSinkWrapper.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/tableiterator.h"
@@ -138,13 +138,9 @@ public:
         m_engineReplica (new MockVoltDBEngine(false, CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
     {
         m_drStream.m_enabled = true;
-        m_drStream.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
         m_drReplicatedStream.m_enabled = true;
-        m_drReplicatedStream.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
         m_drStreamReplica.m_enabled = false;
-        m_drStreamReplica.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
         m_drReplicatedStreamReplica.m_enabled = false;
-        m_drReplicatedStreamReplica.setDRProtocolVersion(DRTupleStream::PROTOCOL_VERSION);
 
         *reinterpret_cast<int64_t*>(tableHandle) = 42;
         *reinterpret_cast<int64_t*>(replicatedTableHandle) = 24;
@@ -396,7 +392,7 @@ public:
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[startPos], tables, &m_pool, m_engineReplica, 1);
+            m_sinkWrapper.apply(&data[startPos], tables, &m_pool, m_engineReplica, 1);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -649,7 +645,7 @@ protected:
 
     DummyTopend m_topend;
     Pool m_pool;
-    BinaryLogSink m_sink;
+    BinaryLogSinkWrapper m_sinkWrapper;
     MockVoltDBEngine* m_engine;
     MockVoltDBEngine* m_engineReplica;
     char tableHandle[20];

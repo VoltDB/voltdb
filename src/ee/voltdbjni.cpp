@@ -110,6 +110,8 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
+#include "storage/DRTupleStream.h"
+#include "storage/CompatibleDRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
@@ -1420,10 +1422,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
  * Signature: ()[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz, jbyte version) {
+  (JNIEnv *env, jclass clazz, jboolean compatible) {
     try {
         char *output = new char[1024 * 256];
-        int32_t length = DRTupleStream::getTestDRBuffer(output, version);
+        int32_t length;
+        if (compatible) {
+            length = CompatibleDRTupleStream::getTestDRBuffer(output);
+        } else {
+            length = DRTupleStream::getTestDRBuffer(output);
+        }
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);
         ::memcpy(arrayBytes, output, length);
