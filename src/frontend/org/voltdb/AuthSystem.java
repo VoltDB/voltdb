@@ -404,7 +404,7 @@ public class AuthSystem {
             }
         }
         m_loginCtx = loginContext;
-        m_principalName = principal.getBytes(StandardCharsets.UTF_8);
+        m_principalName = principal != null ? principal.getBytes(StandardCharsets.UTF_8) : null;
         m_gssManager = gssManager;
         /*
          * First associate all users with groups and vice versa
