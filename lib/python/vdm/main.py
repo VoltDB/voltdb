@@ -69,4 +69,4 @@ try:
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
-HTTPListener.main(None, HTTPListener, 8000)
+HTTPListener.main(None, HTTPListener, 8000, '/tmp')

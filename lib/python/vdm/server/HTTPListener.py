@@ -177,11 +177,11 @@ def map_deployment(request, database_id):
     if 'cluster' in request.json and 'kfactor' in request.json['cluster']:
         deployment[0]['cluster']['kfactor'] = request.json['cluster']['kfactor']
 
-    if 'adminMode' in request.json and 'adminstartup' in request.json['adminMode']:
-        deployment[0]['adminMode']['adminstartup'] = request.json['adminMode']['adminstartup']
+    if 'admin-mode' in request.json and 'adminstartup' in request.json['admin-mode']:
+        deployment[0]['admin-mode']['adminstartup'] = request.json['admin-mode']['adminstartup']
 
-    if 'adminMode' in request.json and 'port' in request.json['adminMode']:
-        deployment[0]['adminMode']['port'] = request.json['adminMode']['port']
+    if 'admin-mode' in request.json and 'port' in request.json['admin-mode']:
+        deployment[0]['admin-mode']['port'] = request.json['admin-mode']['port']
 
     if 'commandlog' in request.json and 'adminstartup' in request.json['commandlog']:
         deployment[0]['commandlog']['adminstartup'] = request.json['commandlog']['adminstartup']
@@ -217,13 +217,13 @@ def map_deployment(request, database_id):
     if 'httpd' in request.json and 'port' in request.json['httpd']:
         deployment[0]['httpd']['port'] = request.json['httpd']['port']
 
-    if 'partitionDetection' in request.json and 'enabled' in request.json['partitionDetection']:
-        deployment[0]['partitionDetection']['enabled'] = request.json['partitionDetection']['enabled']
+    if 'partition-detection' in request.json and 'enabled' in request.json['partition-detection']:
+        deployment[0]['partition-detection']['enabled'] = request.json['partition-detection']['enabled']
 
-    if 'partitionDetection' in request.json and 'snapshot' in request.json['partitionDetection'] \
-            and 'prefix' in request.json['partitionDetection']['snapshot']:
-        deployment[0]['partitionDetection']['snapshot']['prefix'] = \
-            request.json['partitionDetection']['snapshot']['prefix']
+    if 'partition-detection' in request.json and 'snapshot' in request.json['partition-detection'] \
+            and 'prefix' in request.json['partition-detection']['snapshot']:
+        deployment[0]['partition-detection']['snapshot']['prefix'] = \
+            request.json['partition-detection']['snapshot']['prefix']
 
     if 'paths' in request.json and 'commandlog' in request.json['paths'] and \
                     'path' in request.json['paths']['commandlog']:
@@ -368,9 +368,6 @@ def map_deployment(request, database_id):
                     )
                 i += 1
 
-    if 'heap' in request.json and 'maxjavaheap' in request.json['heap']:
-        deployment[0]['heap']['maxjavaheap'] = request.json['heap']['maxjavaheap']
-
     if 'users' in request.json and 'user' in request.json['users']:
         deployment[0]['users'] = {}
         deployment[0]['users']['user'] = []
@@ -442,23 +439,54 @@ def map_deployment_users(request, user):
     return deployment_user[0]
 
 
+def get_database_deployment(key):
+    deployment_top = Element('deployment')
+    i = 0
+    value = DEPLOYMENT[key-1]
+    if type(value) is dict:
+        handle_deployment_dict(deployment_top, key, value, True)
+    else:
+        if isinstance(value, bool):
+            if value == False:
+                deployment_top.attrib[key] = "false"
+            else:
+                deployment_top.attrib[key] = "true"
+        else:
+            deployment_top.attrib[key] = str(value)
+
+    return tostring(deployment_top,encoding='UTF-8')
+
 def make_configuration_file():
     main_header = Element('vdm')
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'servers')
     deployment_top = SubElement(main_header, 'deployments')
+    db1 = get_database_deployment(1)
+    print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
         for key, value in DATABASES[i].iteritems():
-            db_elem.attrib[key] = str(value)
+            if isinstance(value, bool):
+                if value == False:
+                    db_elem.attrib[key] = "false"
+                else:
+                    db_elem.attrib[key] = "true"
+            else:
+                db_elem.attrib[key] = str(value)
         i += 1
 
     i = 0
     while i < len(SERVERS):
         server_elem = SubElement(server_top, 'server')
         for key, value in SERVERS[i].iteritems():
-            server_elem.attrib[key] = str(value)
+            if isinstance(value, bool):
+                if value == False:
+                    server_elem.attrib[key] = "false"
+                else:
+                    server_elem.attrib[key] = "true"
+            else:
+                server_elem.attrib[key] = str(value)
         i += 1
 
     i = 0
@@ -466,7 +494,7 @@ def make_configuration_file():
         deployment_elem = SubElement(deployment_top, 'deployment')
         for key, value in DEPLOYMENT[i].iteritems():
             if type(value) is dict:
-                handle_deployment_dict(deployment_elem, key, value)
+                handle_deployment_dict(deployment_elem, key, value, False)
             else:
                 deployment_elem.attrib[key] = str(value)
         i += 1
@@ -480,22 +508,41 @@ def make_configuration_file():
 
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
+IGNORETOP = { "databaseid" : True, "users" : True, "dr" : True}
 
 
-def handle_deployment_dict(deployment_elem, key, value):
-    deployment_sub_element = SubElement(deployment_elem, str(key))
+def handle_deployment_dict(deployment_elem, key, value, istop):
+
+    if istop == True:
+        deployment_sub_element = deployment_elem
+    else:
+        deployment_sub_element = SubElement(deployment_elem, str(key))
     for key1, value1 in value.iteritems():
         if type(value1) is dict:
-            handle_deployment_dict(deployment_sub_element, key1, value1)
+            handle_deployment_dict(deployment_sub_element, key1, value1, False)
         elif type(value1) is list:
             handle_deployment_list(deployment_sub_element, key1, value1)
         else:
-            deployment_sub_element.attrib[key1] = str(value1)
+            if isinstance(value1, bool):
+                if value1 == False:
+                    deployment_sub_element.attrib[key1] = "false"
+                else:
+                    deployment_sub_element.attrib[key1] = "true"
+            else:
+                if key == "property":
+                    deployment_sub_element.attrib["name"] = value["name"];
+                    deployment_sub_element.text = str(value1)
+                else:
+                    if istop == False:
+                        deployment_sub_element.attrib[key1] = str(value1)
+                    elif IGNORETOP[key1] != True:
+                        deployment_sub_element.attrib[key1] = str(value1)
+
 
 
 def handle_deployment_list(deployment_elem, key, value):
     for items in value:
-        handle_deployment_dict(deployment_elem, key, items)
+        handle_deployment_dict(deployment_elem, key, items, False)
 
 
 
