@@ -16,6 +16,7 @@
  */
 
 #include "expressions/functionexpression.h"
+#include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
 
 namespace voltdb {
@@ -339,11 +340,47 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_BIN:
             ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
             break;
+        case FUNC_VOLT_POINTFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINTFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGONFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGONFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_POINTS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_POINTS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LATITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LATITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LONGITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LONGITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_CENTROID:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_CENTROID>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_AREA:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_AREA>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_ASTEXT_GEOGRAPHY:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ASTEXT_GEOGRAPHY>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
             break;
         case FUNC_LN:
             ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_VALIDATE_POLYGON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_INVALID_REASON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
             break;
         default:
             return NULL;
@@ -456,6 +493,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_CONTAINS:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_CONTAINS>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POINT_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POINT_POINT>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POLYGON_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POLYGON_POINT>(*arguments);
             break;
         default:
             return NULL;

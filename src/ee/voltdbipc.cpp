@@ -44,8 +44,6 @@
 // if IPC and JNI are matched.
 #define MAX_MSG_SZ (1024*1024*10)
 
-using namespace std;
-
 namespace voltdb {
 class Pool;
 class StreamBlock;
