@@ -137,10 +137,9 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        and: 'Create new database that returns'
+        and: 'Create new database'
         indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Site Per Host'
@@ -160,10 +159,7 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Choose the database with index 1'
         openDatabase()
         chooseDatabase(indexOfLocal, "local")
-        then: ''
-        println()
-
-        when: 'Click delete for the required database'
+        and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
@@ -197,19 +193,17 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        and: 'Create new database that returns'
+        and: 'Create new database'
         indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
-        when: 'Provide Value for Site Per Host'
+        when: 'Provide Value for K-Safety'
         overview.ksafetyField.value("1")
         overview.ksafetyText.click()
-        report "new"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in K-Safety has changed'
         if(overview.ksafetyField.value() == "1") {
             println("Test Pass: The change is displayed")
         }
@@ -221,10 +215,7 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Choose the database with index 1'
         openDatabase()
         chooseDatabase(indexOfLocal, "local")
-        then: ''
-        println()
-
-        when: 'Click delete for the required database'
+        and: 'Click delete for the required database'
         openDatabase()
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
@@ -336,15 +327,16 @@ class ClusterConfigurationTest extends TestBase {
         }
         println()
     }
-
+    //  EDIT
     def verifySecurity() {
         boolean result = overview.CheckIfSecurityChkExist()
+        println("Test: verifySecurity")
+        when:
         if(result) {
-            println("Test: verifySecurity")
             String initialStatus = overview.securityStatus.text()
             println("Initially " + initialStatus)
 
-            when: 'Verify if text and field are displayed'
+            //when: 'Verify if text and field are displayed'
             for (count = 0; count < numberOfTrials; count++) {
                 try {
                     if (overview.securityText.text() == security) {
@@ -362,8 +354,7 @@ class ClusterConfigurationTest extends TestBase {
                 }
             }
             overview.securityCheckbox.isDisplayed()
-            then: 'Verify Elements of Security are displayed'
-
+            //then: 'Verify Elements of Security are displayed'
             overview.securityText.click()
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -386,7 +377,7 @@ class ClusterConfigurationTest extends TestBase {
             }
 
             // Change the checkbox status
-            when: 'Click the Checkbox'
+            //when: 'Click the Checkbox'
             statusOfTest = false
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -412,7 +403,7 @@ class ClusterConfigurationTest extends TestBase {
                     println("Waiting error - Retrying")
                 }
             }
-            then: 'Check the status of test'
+            //then: 'Check the status of test'
             if (statusOfTest == true) {
                 println("Test Pass: The change is displayed")
             } else {
@@ -421,7 +412,7 @@ class ClusterConfigurationTest extends TestBase {
             }
 
             // Restore the checkbox status
-            when: 'Click the Checkbox'
+            //when: 'Click the Checkbox'
             statusOfTest = false
             for (count = 0; count < numberOfTrials; count++) {
                 try {
@@ -446,19 +437,19 @@ class ClusterConfigurationTest extends TestBase {
                     println("Waiting error - Retrying")
                 }
             }
-            then: 'Check the status of test'
+           // then: 'Check the status of test'
             if (statusOfTest == true) {
                 println("Test Pass: The restore is displayed")
             } else {
                 println("Test Fail: The restore isn't displayed")
                 assert false
             }
-            println()
         }
         else {
             println("Security is not enabled.")
-
         }
+        then:
+        println()
     }
 
     def verifyHttpAccess() {
@@ -655,19 +646,17 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Create new database that returns'
+        when: 'Create new database'
         indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
-        when: 'Provide Value for Site Per Host'
+        when: 'Provide Value for File Prefix Field in Auto Snapshot'
         overview.filePrefixField.value("At_Least")
         overview.filePrefixText.click()
-        report "hello"
         and: 'Check Save Message'
         checkSaveMessage()
-        then: 'Check if Value in Site Per Host has changed'
+        then: 'Check if Value in File Prefix Field in Auto Snapshot has changed'
         if(overview.filePrefixField.value() == "At_Least") {
             println("Test Pass: The change is displayed")
         }
@@ -679,7 +668,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Frequency in Auto Snapshot'
         overview.frequencyField.value("10")
         overview.frequencyText.click()
-        report "hello1"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Site Per Host has changed'
@@ -694,7 +682,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Retained in Auto Snapshot'
         overview.retainedField.value("10")
         overview.retainedText.click()
-        report "hello2"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Site Per Host has changed'
@@ -793,13 +780,11 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Create new database that returns'
         indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Log Frequency Time in Command Logging'
         overview.logFrequencyTimeField.value("10")
         overview.logFrequencyTimeText.click()
-        report "hello"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Log Frequency Time in Command Logging has changed'
@@ -814,7 +799,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Frequency in Auto Snapshot'
         overview.logFrequencyTransactionsField.value("10")
         overview.logFrequencyTransactionsText.click()
-        report "hello1"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Site Per Host has changed'
@@ -829,7 +813,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Log Segment Size in Auto Snapshot'
         overview.logSegmentSizeField.value("10")
         overview.logSegmentSizeText.click()
-        report "hello2"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Log Segment Size has changed'
@@ -1028,13 +1011,11 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Create new database that returns'
         indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
         then: 'Choose the new database'
-        println(indexOfNewDatabase)
         chooseDatabase(indexOfNewDatabase, "name_src")
 
         when: 'Provide Value for Max Java Heap in Advanced'
         overview.maxJavaHeapField.value("10")
         overview.maxJavaHeapText.click()
-        report "hello"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Max Java Heap in Advanced has changed'
@@ -1049,7 +1030,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Heartbeat Timeout in Advanced'
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
-        report "hello1"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Heartbeat Timeout in Advanced has changed'
@@ -1064,7 +1044,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Query Timeout in Advanced'
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
-        report "hello2"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Query Timeout in Advanced has changed'
@@ -1079,7 +1058,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Max Temp Table Memory in Advanced'
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
-        report "hello3"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Max Temp Table Memory in Advanced has changed'
@@ -1094,7 +1072,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Snapshot Priority in Advanced'
         overview.snapshotPriorityField.value("10")
         overview.snapshotPriorityText.click()
-        report "hello4"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Snapshot Priority in Advanced has changed'
@@ -1109,7 +1086,6 @@ class ClusterConfigurationTest extends TestBase {
         when: 'Provide Value for Memory Limit in Advanced'
         overview.memoryLimitField.value("10")
         overview.memoryLimitText.click()
-        report "hello5"
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Memory Limit in Advanced has changed'
@@ -1173,20 +1149,19 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        when: 'Provide the value in field'
-        directories.rootDestinationField.value("something")
-        overview.sitePerHostText.click()
-        directories.rootDestinationField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.rootDestinationField.value() == "checkout") {
+        when: 'Create new database'
+        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Provide Value for Root in Directories'
+        directories.rootDestinationField.value("new_value")
+        directories.rootDestinationText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Root in Directories has changed'
+        if(directories.rootDestinationField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1194,25 +1169,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.rootDestinationField.value(oldVariablesRootDestination)
-        directories.rootDestinationText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.rootDestinationField.value() == oldVariablesRootDestination) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1258,20 +1221,19 @@ class ClusterConfigurationTest extends TestBase {
                 println("Stale Element Exception - Retrying")
             }
         }
-        when: 'Provide the value in field'
-        directories.snapshotField.value("something")
-        overview.sitePerHostText.click()
-        directories.snapshotField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.snapshotField.value() == "checkout") {
+        when: 'Create new database'
+        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
+
+        when: 'Provide Value for Snapshots in Directories'
+        directories.snapshotField.value("new_value")
+        directories.snapshotText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Snapshots has changed'
+        if(directories.snapshotField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1279,25 +1241,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.snapshotField.value(oldVariablesSnapshot)
-        directories.snapshotText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.snapshotField.value() == oldVariablesSnapshot) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1344,47 +1294,32 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Provide the value in field'
-        directories.exportOverflowField.value("something")
-        overview.sitePerHostText.click()
-        directories.exportOverflowField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Create new database'
+        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.exportOverflowField.value() == "checkout") {
+        when: 'Provide Value for Export Overflow in Directories'
+        directories.exportOverflowField.value("new_value")
+        directories.exportOverflowText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Export Overflow has changed'
+        if(directories.exportOverflowField.value() == "new_value") {
             println("Test Pass: The change is displayed")
-            report "hello"
         }
         else {
             println("Test Fail: The change isn't displayed")
             assert false
         }
 
-        when: 'Restore old value'
-        directories.exportOverflowField.value(oldVariablesExportOverflow)
-        directories.exportOverflowText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.exportOverflowField.value() == oldVariablesExportOverflow) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1431,20 +1366,18 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Provide the value in field'
-        directories.commandLogField.value("something")
-        overview.sitePerHostText.click()
-        directories.commandLogField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Create new database'
+        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.commandLogField.value() == "checkout") {
+        when: 'Provide Value for Command Log Field in Directories'
+        directories.commandLogField.value("new_value")
+        directories.commandLogText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Command Log Field has changed'
+        if(directories.commandLogField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1452,25 +1385,13 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.commandLogField.value(oldVariablesCommandLog)
-        directories.commandLogText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.commandLogField.value() == oldVariablesCommandLog) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
     }
 
@@ -1517,20 +1438,18 @@ class ClusterConfigurationTest extends TestBase {
             }
         }
 
-        when: 'Provide the value in field'
-        directories.commandLogSnapshotsField.value("command_log_snapshot")
-        overview.sitePerHostText.click()
-        directories.commandLogSnapshotsField.value("checkout")
-        overview.sitePerHostText.click()
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
+        when: 'Create new database'
+        indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+        then: 'Choose the new database'
+        chooseDatabase(indexOfNewDatabase, "name_src")
 
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Verify the value in field'
-        if(directories.commandLogSnapshotsField.value() == "checkout") {
+        when: 'Provide Value for Command Log Snapshots in Directories'
+        directories.commandLogSnapshotsField.value("new_value")
+        directories.commandLogSnapshotsText.click()
+        and: 'Check Save Message'
+        checkSaveMessage()
+        then: 'Check if Value in Command Log Snapshots has changed'
+        if(directories.commandLogSnapshotsField.value() == "new_value") {
             println("Test Pass: The change is displayed")
         }
         else {
@@ -1538,25 +1457,63 @@ class ClusterConfigurationTest extends TestBase {
             assert false
         }
 
-        when: 'Restore old value'
-        directories.commandLogSnapshotsField.value(oldVariablesCommandLogSnapshots)
-        directories.commandLogSnapshotsText.click()
-        and: 'Check the Save message'
-        if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
-
-        }
-        else {
-            println("Test Fail: The required text is not displayed")
-            assert false
-        }
-        then: 'Check if the old value is restored'
-        if(directories.commandLogSnapshotsField.value() == oldVariablesCommandLogSnapshots) {
-            println("Test Pass: Value Restored")
-        }
-        else {
-            println("Test Fail: Value wasn't Restored")
-            assert false
-        }
+        when: 'Choose the database with index 1'
+        openDatabase()
+        chooseDatabase(indexOfLocal, "local")
+        and: 'Click delete for the required database'
+        openDatabase()
+        then: 'Delete the database'
+        deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
+    }
+
+    def cleanup() { // called after each test
+        count = 0
+
+        while (count < numberOfTrials) {
+            count++
+            try {
+                setup: 'Open Cluster Settings page'
+                to ClusterSettingsPage
+                expect: 'to be on Cluster Settings page'
+                at ClusterSettingsPage
+
+                break
+            } catch (org.openqa.selenium.ElementNotVisibleException e) {
+                println("ElementNotVisibleException: Unable to Start the test")
+                println("Retrying")
+            }
+        }
+
+        String databaseName = nameOfDatabaseInCSV(create_DatabaseTest_File)
+        int numberOfDatabases =  $('.btnDbList').size()
+        buttonDatabase.click()
+        int indexOfDatabaseToDelete = returnTheDatabaseIndexToDelete(numberOfDatabases, databaseName)
+
+        if(indexOfDatabaseToDelete==0) {
+            println("Cleanup: Database wasn't found")
+        }
+        else {
+            for(count=0; count<numberOfTrials; count++) {
+                try {
+                    $(returnCssPathOfDatabaseDelete(indexOfDatabaseToDelete)).click()
+                    waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+
+                }
+            }
+            for(count=0; count<numberOfTrials; count++) {
+                try {
+                    popupDeleteDatabaseButtonOk.click()
+                    if(checkIfDatabaseExists(numberOfDatabases, databaseName, false)==false) {
+                        println("Cleanup: Database was deleted")
+                    }
+                } catch(Exception e) {
+
+                }
+            }
+            println()
+        }
     }
 }

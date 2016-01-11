@@ -95,6 +95,9 @@ class ClusterSettingsPage extends Page {
         overview        { module OverviewModule }
         directories     { module DirectoriesModule }
         dr              { module DatabaseReplicationModule }
+
+        // trial
+        trialerror      { $("#tblDatabaseList > tbody > tr:nth-child(1) > td:nth-child(1)") }
     }
 
     static at = {
@@ -174,7 +177,6 @@ class ClusterSettingsPage extends Page {
         newValueDatabase = count
 
         println("The count is " + newValueDatabase)
-
         for (count = 0; count < numberOfTrials; count++) {
             try {
                 buttonAddDatabase.click()
@@ -369,5 +371,78 @@ class ClusterSettingsPage extends Page {
                 }
             }
         }
+    }
+
+    String nameOfDatabaseInCSV(String create_DatabaseTest_File) {
+        try {
+            br = new BufferedReader(new FileReader(create_DatabaseTest_File))
+            for (count = 0; (line = br.readLine()) != null; count++) {
+                String[] extractedValues = line.split(cvsSplitBy)
+                extractedValue[count] = extractedValues[1]
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace()
+        } catch (IOException e) {
+            e.printStackTrace()
+        } finally {
+            if (br != null) {
+                try {
+                    br.close()
+                } catch (IOException e) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        return (extractedValue[0].substring(1, extractedValue[0].length() - 1))
+    }
+
+    /*
+     *  Return the CSS path of database delete button with index as input
+     */
+    String returnCssPathOfDatabaseDelete(int index) {
+        return "#tblDatabaseList > tbody > tr:nth-child(" + index + ") > td:nth-child(3) > a"
+    }
+
+    /*
+     *  Return the CSS path of database with index as input
+     */
+    String returnCssPathOfDatabase(int index) {
+        return "#tblDatabaseList > tbody > tr:nth-child(" + index + ") > td:nth-child(1) > a"
+    }
+
+    /*
+     *  Return the index of the databaseName
+     */
+    int returnTheDatabaseIndexToDelete(int numberOfDatabases, String databaseName) {
+        if(checkIfDatabaseExists(numberOfDatabases, databaseName, false)==false) {
+            return 0
+        }
+        else {
+            for(count=0; count<numberOfDatabases; count++) {
+                if($(".btnDbList", count).text().equals(databaseName)) {
+                    break
+                }
+            }
+            return (count+1)
+        }
+    }
+
+    /*
+     *  Check if the name of Database provided exists
+     *  The status of displayMessage decides if the message is to be displayed or not
+     */
+    boolean checkIfDatabaseExists(int numberOfDatabases, String databaseName, boolean displayMessage) {
+        for(count=0; count<numberOfDatabases; count++) {
+            if($(".btnDbList", count).text().equals(databaseName)) {
+                if(displayMessage==true) {
+                    println("The database to delete was found")
+                }
+                return true
+            }
+        }
+        if(displayMessage==true) {
+            println("The database to delete wasn't found")
+        }
+        return false
     }
 }
