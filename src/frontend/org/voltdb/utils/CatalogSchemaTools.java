@@ -114,7 +114,7 @@ public abstract class CatalogSchemaTools {
             }
 
             table_sb.append(add + spacer + catalog_col.getTypeName() + " " + col_type.toSQLString() +
-                    ((col_type == VoltType.STRING || col_type == VoltType.VARBINARY) &&
+                    (col_type.isVariableLength() &&
                     catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() +
                     (catalog_col.getInbytes() ? " BYTES" : "") + ")" : "") );
 

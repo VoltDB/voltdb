@@ -283,6 +283,9 @@ public class VoltDB {
                 else if (arg.equals("postgresql")) {
                     m_backend = BackendTarget.POSTGRESQL_BACKEND;
                 }
+                else if (arg.equals("postgis")) {
+                    m_backend = BackendTarget.POSTGIS_BACKEND;
+                }
                 else if (arg.equals("valgrind")) {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
                 }

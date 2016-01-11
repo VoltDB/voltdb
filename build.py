@@ -61,6 +61,9 @@ if CTX.compilerName() == 'gcc':
         elif (CTX.compilerMinorVersion() == 8):
 	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
 
+    if (CTX.compilerMajorVersion() == 5):
+        CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
+
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
@@ -73,6 +76,27 @@ if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.com
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
+
+# Set the compiler version and C++ standard flag.
+# GCC before 4.3 is too old.
+# GCC 4.4 up to but not including 4.7 use -std=c++0x
+# GCC 4.7 and later use -std=c++11
+# Clang uses -std=c++11
+# This should match the calculation in CMakeLists.txt
+if CTX.compilerName() == 'gcc':
+    if (CTX.compilerMajorVersion() < 4) or (CTX.compilerMajorVersion() == 4) and (CTX.compilerMinorVersion() < 4):
+	print("GCC Version %d.%d.%d is too old\n"
+	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()));
+	sys.exit(-1);
+    if 4 <= CTX.compilerMinorVersion() <= 6:
+	CTX.CXX_VERSION_FLAG = "--std=c++0x"
+	print("Building with C++ 0x\n")
+    else:
+	CTX.CXX_VERSION_FLAG ="--std=c++11"
+	print("Building with C++11")
+elif CTX.compilerName() == 'clang':
+    CTX.CXX_VERSION_FLAG="--std=c++11"
+CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -159,7 +183,7 @@ if CTX.PLATFORM == "Darwin":
     CTX.JNIFLAGS = "-framework JavaVM,1.7"
 
 if CTX.PLATFORM == "Linux":
-    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
+    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
 
 ###############################################################################
@@ -261,13 +285,14 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
- vectorexpression.cpp
  functionexpression.cpp
- tupleaddressexpression.cpp
+ geofunctions.cpp
  operatorexpression.cpp
  parametervalueexpression.cpp
- subqueryexpression.cpp
  scalarvalueexpression.cpp
+ subqueryexpression.cpp
+ tupleaddressexpression.cpp
+ vectorexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """
@@ -367,6 +392,16 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
  sha1.cpp
 """
 
+###############################################################################
+# Some special handling for S2.
+###############################################################################
+CTX.S2GEO_LIBS += "-ls2geo -lcrypto"
+CTX.LASTLDFLAGS += CTX.S2GEO_LIBS
+
+###############################################################################
+# Some special handling for OpenSSL
+###############################################################################
+CTX.OPENSSL_VERSION="1.0.2d"
 
 ###############################################################################
 # SPECIFY THE TESTS
@@ -474,6 +509,7 @@ if whichtests in ("${eetestsuite}", "plannodes"):
 #
 ###############################################################################
 print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
+print("OpenSSL: version %s, config %s\n" % (CTX.getOpenSSLVersion(), CTX.getOpenSSLToken()))
 
 ###############################################################################
 # BUILD THE MAKEFILE
