@@ -35,6 +35,9 @@
 # description should also be changed if re-used for another base command.
 import sys
 import os
+from optparse import OptionParser
+
+
 try:
     # ensure version 2.6+ of python
     if sys.version_info[0] == 2 and sys.version_info[1] < 6:
@@ -67,8 +70,23 @@ try:
     sys.path.insert(0, os.path.join(base_dir, 'lib/python', 'vdm'))
     from voltcli import runner
     from server import HTTPListener
+
 # Be selective about exceptions to avoid masking load-time library exceptions.
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
-HTTPListener.main(runner, HTTPListener, 8000)
+
+def main():
+    parser = OptionParser(usage="usage: %prog [options] filepath",
+                          version="%prog 1.0")
+    parser.add_option("-p", "--path",
+                  action="store", type="string", dest="filepath")
+    (options, args) = parser.parse_args()
+
+    return options.filepath
+
+
+if __name__ == '__main__':
+  path = main()
+
+HTTPListener.main(runner, HTTPListener, 8000, path)

@@ -44,6 +44,8 @@ DEPLOYMENT = []
 
 DEPLOYMENT_USERS = []
 
+PATH = ""
+
 
 @APP.errorhandler(400)
 def not_found(error):
@@ -937,7 +939,7 @@ class deploymentUserAPI(MethodView):
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
 
 
-def main(runner, amodule, aport):
+def main(runner, amodule, aport, apath):
     try:
         F_DEBUG = os.environ['DEBUG']
     except KeyError:
@@ -950,6 +952,10 @@ def main(runner, amodule, aport):
     depjson = path + "/deployment.json"
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
+
+    PATH = apath
+
+    print PATH
 
     DEPLOYMENT.append(deployment)
 
