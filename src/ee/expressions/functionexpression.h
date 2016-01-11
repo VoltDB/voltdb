@@ -256,6 +256,25 @@ static const int FUNC_VOLT_DATEADD_MILLISECOND         = 20039;
 static const int FUNC_VOLT_DATEADD_MICROSECOND         = 20040;
 static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
 
+// Geospatial functions
+static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
+static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;
+static const int FUNC_VOLT_CONTAINS                    = 21002;
+static const int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS  = 21003;
+static const int FUNC_VOLT_POLYGON_NUM_POINTS          = 21004;
+static const int FUNC_VOLT_POINT_LATITUDE              = 21005;
+static const int FUNC_VOLT_POINT_LONGITUDE             = 21006;
+static const int FUNC_VOLT_POLYGON_CENTROID            = 21007;
+static const int FUNC_VOLT_POLYGON_AREA                = 21008;
+static const int FUNC_VOLT_DISTANCE                    = 21009;     // wrapper id for distance between all geo types
+static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 21010;     // distance between point and point
+static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 21011;     // distance between polygon and point
+static const int FUNC_VOLT_ASTEXT                      = 21012;     // wrapper function id for converting geography types into wkt
+static const int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT      = 21013;     // asText(<point value>)
+static const int FUNC_VOLT_ASTEXT_GEOGRAPHY            = 21014;     // asText(<geography value>)
+static const int FUNC_VOLT_VALIDATE_POLYGON            = 21015;     // Validate a polygon.
+static const int FUNC_VOLT_POLYGON_INVALID_REASON      = 21016;     // Reason a polygon is invalid.
+
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
 static const int SQL_TRIM_TRAILING                    = 284;

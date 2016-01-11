@@ -36,7 +36,7 @@ import org.voltdb.VoltTable;
 public class GetTxnId extends VoltProcedure {
 
     public final SQLStmt insertPartitioned =
-        new SQLStmt("INSERT INTO PARTITION_TESTER VALUES (?, ?, ?, ?);");
+        new SQLStmt("INSERT INTO PARTITION_TESTER VALUES (?, ?, ?, ?, ?, ?);");
 
     public VoltTable[] run(int partitioning) {
         this.setAppStatusString(Long.toString(DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)));

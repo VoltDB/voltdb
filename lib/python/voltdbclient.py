@@ -113,6 +113,8 @@ class FastSerializer:
     VOLTTYPE_MONEY = 20     # 8 byte long
     VOLTTYPE_VOLTTABLE = 21
     VOLTTYPE_VARBINARY = 25
+    VOLTTYPE_GEOGRAPHY_POINT = 26
+    VOLTTYPE_GEOGRAPHY = 27
 
     # SQL NULL indicator for object type serializations (string, decimal)
     NULL_STRING_INDICATOR = -1

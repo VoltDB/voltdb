@@ -255,29 +255,23 @@ public abstract class CatalogSizing {
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
             VoltType ctype = VoltType.get((byte)column.getType());
-            switch(ctype) {
-            case STRING: {
-                boolean inBytes = column.getInbytes();
+            if (ctype.isVariableLength()) {
                 int capacity = column.getSize();
-                if (!inBytes) capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
+
+                if (ctype == VoltType.STRING && !column.getInbytes()) {
+                    capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
+                }
 
                 csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
                 csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
-                break;
             }
-            case VARBINARY: {
-                int capacity = column.getSize();
-                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
-                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
-                break;
-            }
-            default: {
+            else {
                 // Fixed type - use the fixed size.
                 csize.widthMin += ctype.getLengthInBytesForFixedTypes();
                 csize.widthMax += ctype.getLengthInBytesForFixedTypes();
             }
-            }
         }
+
         //For DR active active enabled account for additional timestamp column for conflict detection.
         if (bAdjustForDrAA) {
             csize.widthMin += 8;

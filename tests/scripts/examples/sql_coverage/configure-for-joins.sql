@@ -18,6 +18,8 @@
 {@numcol = "NUM"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
+{@star = "*"}
+{@lhsstar = "*"}
 {@updatecolumn = "NUM"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[int:0,100]"}

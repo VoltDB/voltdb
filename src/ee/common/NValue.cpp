@@ -176,6 +176,12 @@ std::string NValue::debug() const {
     case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
+    case VALUE_TYPE_POINT:
+        buffer << getPoint().toString();
+        break;
+    case VALUE_TYPE_GEOGRAPHY:
+        buffer << getGeography().toString();
+        break;
     default:
         buffer << "(no details)";
         break;
