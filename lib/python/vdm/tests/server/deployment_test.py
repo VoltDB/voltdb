@@ -223,35 +223,6 @@ class UpdateDeployment(Deployment):
                                                                   "than the maximum of 4000")
         self.assertEqual(response.status_code, 200)
 
-    def test_validate_max_java_heap_empty(self):
-        """ensure max java heap is not empty"""
-        response = requests.put(__url__,
-                                json={'cluster': {'kfactor': '', 'sitesperhost': 1},
-                                      'heap': {'maxjavaheap': ''}})
-        value = response.json()
-        self.assertEqual(value['errors'][0], "u'' is not of type 'integer'")
-        self.assertEqual(response.status_code, 200)
-
-    def test_validate_max_java_heap_negative(self):
-        """ensure max java heap is not negative"""
-        response = requests.put(__url__,
-                                json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
-                                      'heap': {'maxjavaheap': -1}})
-        value = response.json()
-        self.assertEqual(value['errors'][0], "-1 is less than the minimum of 1")
-        self.assertEqual(response.status_code, 200)
-
-    def test_validate_max_java_heap_maximum(self):
-        """ensure max java heap is not greater than 35"""
-        maximum_value = 35
-        response = requests.put(__url__,
-                                json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
-                                      'heap': {'maxjavaheap': maximum_value}})
-        value = response.json()
-        self.assertEqual(value['errors'][0], str(maximum_value) + " is greater than "
-                                                                  "the maximum of 32")
-        self.assertEqual(response.status_code, 200)
-
     def test_validate_heart_beat_timeout_empty(self):
         """ensure heart beat timeout is not empty"""
         response = requests.put(__url__,
@@ -358,7 +329,7 @@ class UpdateDeployment(Deployment):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_memory_limit_empty(self):
-        """ensure max java heap is not empty"""
+        """ensure max java memory limit is not empty"""
         response = requests.put(__url__,
                                 json={'cluster': {'kfactor': '', 'sitesperhost': 1},
                                       'systemsettings': {'resourcemonitor': {'memorylimit': {'size': ''}}}})
@@ -367,7 +338,7 @@ class UpdateDeployment(Deployment):
         self.assertEqual(response.status_code, 200)
 
     def test_validate_memory_limit_negative(self):
-        """ensure max java heap is not negative"""
+        """ensure max java memory limit is not negative"""
         response = requests.put(__url__,
                                 json={'cluster': {'kfactor': 2, 'sitesperhost': 1},
                                       'systemsettings': {'resourcemonitor': {'memorylimit': {'size': -1}}}})
@@ -468,7 +439,6 @@ class UpdateDeployment(Deployment):
     def test_update_deployment(self):
         """ensure update deployment is working properly"""
         json_data = {
-            "heap": {"maxjavaheap": 1},
             "cluster": {"hostcount": 1, "sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
             "paths": {"voltdbroot": {"path": "voltdbroot"}, "snapshots": {"path": "snapshots"},
