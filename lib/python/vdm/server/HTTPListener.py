@@ -33,8 +33,8 @@ from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs
 import socket
 import os
 import json
-import dicttoxml
-from xml.dom.minidom import parseString
+from xml.etree.ElementTree import Element, SubElement, Comment, tostring
+
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 
@@ -441,21 +441,60 @@ def map_deployment_users(request, user):
 
 
 def make_configuration_file():
-    merged_dict ={'databases': [make_public_database(x) for x in DATABASES],
-                  'deployments': [make_public_deployment(x) for x in DEPLOYMENT],
-                  'members': [make_public_server(x) for x in SERVERS]}
+    main_header = Element('vdm')
+    db_top = SubElement(main_header, 'databases')
+    server_top = SubElement(main_header, 'servers')
+    deployment_top = SubElement(main_header, 'deployments')
+    i = 0
+    while i < len(DATABASES):
+        db_elem = SubElement(db_top, 'database')
+        for key, value in DATABASES[i].iteritems():
+            db_elem.attrib[key] = str(value)
+        i += 1
 
-    xml = dicttoxml.dicttoxml(merged_dict, attr_type=False, custom_root='vdm', ids= False)
-    xml = parseString(xml).toprettyxml()
+    i = 0
+    while i < len(SERVERS):
+        server_elem = SubElement(server_top, 'server')
+        for key, value in SERVERS[i].iteritems():
+            server_elem.attrib[key] = str(value)
+        i += 1
+
+    i = 0
+    while i < len(DEPLOYMENT):
+        deployment_elem = SubElement(deployment_top, 'deployment')
+        for key, value in DEPLOYMENT[i].iteritems():
+            if type(value) is dict:
+                handle_deployment_dict(deployment_elem, key, value)
+            else:
+                deployment_elem.attrib[key] = str(value)
+        i += 1
+
     try:
         f = open('.vdm/vdm.xml','w')
-        f.write(xml)
+        f.write(tostring(main_header,encoding='UTF-8'))
         f.close()
     except Exception, err:
         print str(err)
 
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
+
+
+def handle_deployment_dict(deployment_elem, key, value):
+    deployment_sub_element = SubElement(deployment_elem, str(key))
+    for key1, value1 in value.iteritems():
+        if type(value1) is dict:
+            handle_deployment_dict(deployment_sub_element, key1, value1)
+        elif type(value1) is list:
+            handle_deployment_list(deployment_sub_element, key1, value1)
+        else:
+            deployment_sub_element.attrib[key1] = str(value1)
+
+
+def handle_deployment_list(deployment_elem, key, value):
+    for items in value:
+        handle_deployment_dict(deployment_elem, key, items)
+
 
 
 class ServerAPI(MethodView):
