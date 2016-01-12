@@ -89,4 +89,21 @@ def main():
 if __name__ == '__main__':
   path = main()
 
-HTTPListener.main(runner, HTTPListener, 8000, path)
+app_root = os.path.dirname(os.path.abspath(__file__))
+os.chdir(os.path.normpath(app_root + os.sep + os.pardir) + '/lib/python/vdm')
+os.getcwd()
+
+if path is None:
+    path = '.vdm'
+if os.path.isdir(str(path)):
+    if os.access(str(path), os.W_OK):
+        HTTPListener.main(runner, HTTPListener, 8000, path)
+    else:
+        print 'Error: There is no permission to create file in this folder. ' \
+              'Unable to start VDM.'
+else:
+    try:
+        os.makedirs(path)
+        HTTPListener.main(runner, HTTPListener, 8000, path)
+    except Exception, err:
+        print str(err) + '. Unable to start VDM.'

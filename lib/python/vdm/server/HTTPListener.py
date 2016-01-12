@@ -34,6 +34,7 @@ import socket
 import os
 import json
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring
+import sys
 
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
@@ -46,7 +47,7 @@ DEPLOYMENT = []
 
 DEPLOYMENT_USERS = []
 
-PATH = ""
+__PATH__ = ""
 
 
 @APP.errorhandler(400)
@@ -445,7 +446,7 @@ def map_deployment_users(request, user):
 def make_configuration_file():
     main_header = Element('vdm')
     db_top = SubElement(main_header, 'databases')
-    server_top = SubElement(main_header, 'servers')
+    server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
     i = 0
     while i < len(DATABASES):
@@ -456,7 +457,7 @@ def make_configuration_file():
 
     i = 0
     while i < len(SERVERS):
-        server_elem = SubElement(server_top, 'server')
+        server_elem = SubElement(server_top, 'member')
         for key, value in SERVERS[i].iteritems():
             server_elem.attrib[key] = str(value)
         i += 1
@@ -472,7 +473,7 @@ def make_configuration_file():
         i += 1
 
     try:
-        f = open('.vdm/vdm.xml','w')
+        f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
         f.write(tostring(main_header,encoding='UTF-8'))
         f.close()
     except Exception, err:
@@ -712,8 +713,9 @@ class DatabaseAPI(MethodView):
         DATABASES.append(database)
 
         # Create new deployment
+        app_root = os.path.dirname(os.path.abspath(__file__))
 
-        with open("server/deployment.json") as json_file:
+        with open(app_root +"/deployment.json") as json_file:
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
 
@@ -1012,6 +1014,7 @@ def main(runner, amodule, aport, apath):
     depjson = path + "/deployment.json"
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
+    global PATH
     PATH = apath
     DEPLOYMENT.append(deployment)
 
