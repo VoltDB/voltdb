@@ -406,8 +406,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
     private final String cheesyShellWKT = "POLYGON ((-5.0 46.0, -50.0 10.0, -40.0 -35.0, 25.0 -45.0, 30.0 20.0, -5.0 46.0))";
 
     private void fillCheesyTable(Client client) throws Exception {
-        GeographyValue cheesyPolygon = GeographyValue.fromText(cheesyWKT);
-        GeographyValue cheesyShellPolygon = GeographyValue.fromText(cheesyShellWKT);
+        GeographyValue cheesyPolygon = GeographyValue.fromWKT(cheesyWKT);
+        GeographyValue cheesyShellPolygon = GeographyValue.fromWKT(cheesyShellWKT);
         //
         // Get the holes from the cheesy polygon, and make them
         // into polygons in their own right.  This means we need
@@ -440,16 +440,16 @@ public class TestGeographyValueQueries extends RegressionSuite {
             GeographyValue hole = cheesyHoles.get(idx);
             client.callProcedure("T.INSERT", idx + 100, "hole"+ idx + 100, hole);
         }
-        client.callProcedure("LOCATION.INSERT", 0, "ORIGIN", GeographyPointValue.geographyPointFromText(cheesyOrigin));
-        client.callProcedure("LOCATION.INSERT", 1, "INHOLE", GeographyPointValue.geographyPointFromText(cheesyInHole));
+        client.callProcedure("LOCATION.INSERT", 0, "ORIGIN", GeographyPointValue.fromWKT(cheesyOrigin));
+        client.callProcedure("LOCATION.INSERT", 1, "INHOLE", GeographyPointValue.fromWKT(cheesyInHole));
         for (int idx = 0; idx < exteriorPoints.size(); idx += 1) {
             String exPt = exteriorPoints.get(idx);
-            client.callProcedure("LOCATION.INSERT", idx + 200, exPt, GeographyPointValue.geographyPointFromText(exPt));
+            client.callProcedure("LOCATION.INSERT", idx + 200, exPt, GeographyPointValue.fromWKT(exPt));
             idx += 1;
         }
         for (int idx = 0; idx < centers.size(); idx += 1) {
             String ctrPt = centers.get(idx);
-            client.callProcedure("LOCATION.INSERT", idx + 300, ctrPt, GeographyPointValue.geographyPointFromText(ctrPt));
+            client.callProcedure("LOCATION.INSERT", idx + 300, ctrPt, GeographyPointValue.fromWKT(ctrPt));
         }
         // Make sure that all the polygons
         // are valid.
@@ -461,7 +461,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         final double EPSILON = 1.0e-13;
         Client client = getClient();
         fillCheesyTable(client);
-        GeographyValue cheesyPolygon = GeographyValue.fromText(cheesyWKT);
+        GeographyValue cheesyPolygon = GeographyValue.fromWKT(cheesyWKT);
         VoltTable vt = client.callProcedure("@AdHoc", "select t.poly from t where t.pk = 1 order by t.pk;").getResults()[0];
         assertEquals("Expected only one row.", 1, vt.getRowCount());
         assertTrue(vt.advanceRow());
@@ -792,7 +792,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // than the column's current size.
 
         String wktFourVerts = "POLYGON ((1.0 1.0, -1.0 1.0, -1.0 -1.0, 1.0 -1.0, 1.0 1.0))";
-        GeographyValue gv = GeographyValue.fromText(wktFourVerts);
+        GeographyValue gv = GeographyValue.fromWKT(wktFourVerts);
         assertEquals(179, gv.getLengthInBytes());
 
         VoltTable vt = client.callProcedure("tiny_polygon.Insert", 0, gv).getResults()[0];
@@ -805,7 +805,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
                 + "1.0 -1.0, "
                 + "0.0 0.0, "
                 + "1.0 1.0))";
-        gv = GeographyValue.fromText(wktFiveVerts);
+        gv = GeographyValue.fromWKT(wktFiveVerts);
         assertEquals(203, gv.getLengthInBytes());
         verifyProcFails(client, "The size 203 of the value exceeds the size of the GEOGRAPHY column \\(179 bytes\\)",
                 "tiny_polygon.Insert", 1, gv);

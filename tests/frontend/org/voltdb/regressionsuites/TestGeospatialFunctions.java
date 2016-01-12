@@ -127,33 +127,33 @@ public class TestGeospatialFunctions extends RegressionSuite {
         // Note: These are all WellKnownText strings.  So they should
         //       be "POINT(...)" and not "GEOGRAPHY_POINT(...)".
         client.callProcedure("places.Insert", 0, "Denver",
-                GeographyPointValue.geographyPointFromText("POINT(-104.959 39.704)"));
+                GeographyPointValue.fromWKT("POINT(-104.959 39.704)"));
         client.callProcedure("places.Insert", 1, "Albuquerque",
-                GeographyPointValue.geographyPointFromText("POINT(-106.599 35.113)"));
+                GeographyPointValue.fromWKT("POINT(-106.599 35.113)"));
         client.callProcedure("places.Insert", 2, "Cheyenne",
-                GeographyPointValue.geographyPointFromText("POINT(-104.813 41.134)"));
+                GeographyPointValue.fromWKT("POINT(-104.813 41.134)"));
         client.callProcedure("places.Insert", 3, "Fort Collins",
-                GeographyPointValue.geographyPointFromText("POINT(-105.077 40.585)"));
+                GeographyPointValue.fromWKT("POINT(-105.077 40.585)"));
         client.callProcedure("places.Insert", 4, "Point near N Colorado border",
-                GeographyPointValue.geographyPointFromText("POINT(-105.04 41.002)"));
+                GeographyPointValue.fromWKT("POINT(-105.04 41.002)"));
         client.callProcedure("places.Insert", 5, "North Point Not On Colorado Border",
-                GeographyPointValue.geographyPointFromText("POINT(-109.025 41.005)"));
+                GeographyPointValue.fromWKT("POINT(-109.025 41.005)"));
         client.callProcedure("places.Insert", 6, "Point on N Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-105.058 44.978)"));
+                GeographyPointValue.fromWKT("POINT(-105.058 44.978)"));
         client.callProcedure("places.Insert", 7, "North Point Not On Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-105.060 45.119)"));
+                GeographyPointValue.fromWKT("POINT(-105.060 45.119)"));
         client.callProcedure("places.Insert", 8, "Point on E Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-104.078 42.988)"));
+                GeographyPointValue.fromWKT("POINT(-104.078 42.988)"));
         client.callProcedure("places.Insert", 9, "East Point Not On Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-104.061 42.986)"));
+                GeographyPointValue.fromWKT("POINT(-104.061 42.986)"));
         client.callProcedure("places.Insert", 10, "Point On S Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-110.998 41.099)"));
+                GeographyPointValue.fromWKT("POINT(-110.998 41.099)"));
         client.callProcedure("places.Insert", 11, "South Point Not On Colorado Border",
-                GeographyPointValue.geographyPointFromText("POINT(-103.008 37.002)"));
+                GeographyPointValue.fromWKT("POINT(-103.008 37.002)"));
         client.callProcedure("places.Insert", 12, "Point On W Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-110.998 42.999)"));
+                GeographyPointValue.fromWKT("POINT(-110.998 42.999)"));
         client.callProcedure("places.Insert", 13, "West Point Not on Wyoming Border",
-                GeographyPointValue.geographyPointFromText("POINT(-111.052 41.999)"));
+                GeographyPointValue.fromWKT("POINT(-111.052 41.999)"));
 
         // A null-valued point
         client.callProcedure("places.Insert", 99, "Neverwhere", null);
@@ -395,9 +395,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
         populateTables(client);
 
         client.callProcedure("places.Insert", 50, "San Jose",
-                GeographyPointValue.geographyPointFromText("POINT(-121.903692 37.325464)"));
+                GeographyPointValue.fromWKT("POINT(-121.903692 37.325464)"));
         client.callProcedure("places.Insert", 51, "Boston",
-                GeographyPointValue.geographyPointFromText("POINT(-71.069862 42.338100)"));
+                GeographyPointValue.fromWKT("POINT(-71.069862 42.338100)"));
 
         VoltTable vt;
         String sql;
@@ -653,25 +653,25 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
    private static Border invalidBorders[] = {
        new Border(100, "CrossedEdges", "Edges 1 and 3 cross",
-                  GeographyValue.fromText(CROSSED_EDGES)),
+                  GeographyValue.fromWKT(CROSSED_EDGES)),
        new Border(101, "Sunwise", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.fromText(CW_EDGES)),
+                  GeographyValue.fromWKT(CW_EDGES)),
        new Border(102, "MultiPolygon", "Polygons can have only one shell",
-                  GeographyValue.fromText(MULTI_POLYGON)),
+                  GeographyValue.fromWKT(MULTI_POLYGON)),
        new Border(103, "SharedInnerVertices", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(SHARED_INNER_VERTICES)),
+                  GeographyValue.fromWKT(SHARED_INNER_VERTICES)),
        new Border(104, "SharedInnerEdges", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(SHARED_INNER_EDGES)),
+                  GeographyValue.fromWKT(SHARED_INNER_EDGES)),
        new Border(105, "IntersectingHoles", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(INTERSECTING_HOLES)),
+                  GeographyValue.fromWKT(INTERSECTING_HOLES)),
        new Border(106, "OuterInnerIntersect", "Loop 1 crosses loop 2",
-                  GeographyValue.fromText(OUTER_INNER_INTERSECT)),
+                  GeographyValue.fromWKT(OUTER_INNER_INTERSECT)),
        new Border(108, "TwoNestedSunwise", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.fromText(TWO_NESTED_SUNWISE)),
+                  GeographyValue.fromWKT(TWO_NESTED_SUNWISE)),
        new Border(109, "TwoNestedWiddershins", "Loop 0 encloses more than half the sphere",
-                  GeographyValue.fromText(TWO_NESTED_WIDDERSHINS)),
+                  GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS)),
        new Border(110, "IslandInALake", "Polygons can have only one shell.",
-                  GeographyValue.fromText(ISLAND_IN_A_LAKE)),
+                  GeographyValue.fromWKT(ISLAND_IN_A_LAKE)),
       /*
        * These are apparently legal. Should they be?
        */
@@ -720,10 +720,10 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         // test for border case of rounding up the deciaml number
         client.callProcedure("places.Insert", 50, "Someplace1",
-                GeographyPointValue.geographyPointFromText("POINT(13.4999999999995 17)"));
+                GeographyPointValue.fromWKT("POINT(13.4999999999995 17)"));
         // test for border case of rounding up the deciaml number
         client.callProcedure("places.Insert", 51, "Someplace2",
-                GeographyPointValue.geographyPointFromText("POINT(-13.499999999999999995 -17)"));
+                GeographyPointValue.fromWKT("POINT(-13.499999999999999995 -17)"));
 
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select loc, asText(loc) from places order by pk").getResults()[0];
