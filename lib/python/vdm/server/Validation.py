@@ -293,7 +293,7 @@ schema = {
             },
             "additionalProperties": False
         },
-        "partitionDetection": {
+        "partition-detection": {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
@@ -315,8 +315,8 @@ schema = {
             },
             "additionalProperties": False
         },
-        "adminMode": {
-            "id": "adminMode",
+        "admin-mode": {
+            "id": "admin-mode",
             "type": "object",
             "properties": {
                 "port": {

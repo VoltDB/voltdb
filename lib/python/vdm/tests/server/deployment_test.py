@@ -438,6 +438,7 @@ class UpdateDeployment(Deployment):
 
     def test_update_deployment(self):
         """ensure update deployment is working properly"""
+
         json_data = {
             "cluster": {"hostcount": 1, "sitesperhost": 8, "kfactor": 0, "elastic": "enabled",
                         "schema": "DDL"},
@@ -445,9 +446,9 @@ class UpdateDeployment(Deployment):
                       "exportoverflow":
                           {"path": "export_overflow"}, "commandlog": {"path": "command_log"},
                       "commandlogsnapshot": {"path": "command_log_snapshot"}},
-            "partitionDetection": {"snapshot": {"prefix": "voltdb_partition_detection"},
+            "partition-detection": {"snapshot": {"prefix": "voltdb_partition_detection"},
                                    "enabled": True},
-            "adminMode": {"port": 21211, "adminstartup": False}, "heartbeat": {"timeout": 90},
+            "admin-mode": {"port": 21211, "adminstartup": False}, "heartbeat": {"timeout": 90},
             "httpd": {"jsonapi": {"enabled": True}, "port": 8080, "enabled": True},
             "snapshot": {"frequency": "24h", "retain": 2,
                          "prefix": "AUTOSNAP", "enabled": False},
@@ -469,7 +470,7 @@ class UpdateDeployment(Deployment):
                                                                        "value": "test"}]}]},
             "import": {"configuration": [{"enabled":False,"type":"KAFKA", "module": "test",
                                                                   "property":[{"name":"test","value":"test"}]}]},
-            "dr": {"id": 33, "type": "Master", "enabled": True, "connection": {"source": "testttt", "servers": [1000000]}}
+            "dr": {"id": 33, "type": "Master", "enabled": True, "connection": {"source": "testttt", "servers": []}}
         }
 
         response = requests.put(__url__,
