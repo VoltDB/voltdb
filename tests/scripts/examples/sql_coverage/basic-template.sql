@@ -5,6 +5,7 @@
 -- Required preprocessor template:
 -- {@aftermath = " _math _value[int:1,3]"}
 -- {@agg = "_numagg"}
+-- {@cmp = "_cmp"} -- all comparison operators (=, <>, !=, <, >, <=, >=)
 -- {@columntype = "decimal"}
 -- {@columnpredicate = "_numericcolumnpredicate"}
 -- {@comparableconstant = "42.42"}

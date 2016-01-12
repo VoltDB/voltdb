@@ -32,9 +32,9 @@ UPDATE _table SET @updatecolumn = @updatevalue
 --- test comparison ops (<, <=, =, >=, >)
 UPDATE _table SET @updatecolumn = @updatevalue WHERE @columnpredicate
 --- test logic operators (AND) with comparison ops
-UPDATE _table SET @updatecolumn = @updatevalue WHERE (@updatecolumn _cmp @comparablevalue) _logicop @columnpredicate
+UPDATE _table SET @updatecolumn = @updatevalue WHERE (@updatecolumn @cmp @comparablevalue) _logicop @columnpredicate
 --- test arithmetic operators (+, -, *, /) with comparison ops
-UPDATE _table SET @updatecolumn = @updatevalue WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
+UPDATE _table SET @updatecolumn = @updatevalue WHERE (_variable[@comparabletype] @aftermath) @cmp @comparableconstant
 -- test set expression
 --- test arithmetic (+, -, *, /) ops
 UPDATE _table SET @updatecolumn = @updatesource @aftermath

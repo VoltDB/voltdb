@@ -31,10 +31,10 @@ INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 --- test logic operators (AND) with comparison ops
-DELETE FROM @dmltable WHERE (_variable[@columntype] _cmp @comparableconstant) _logicop @columnpredicate
+DELETE FROM @dmltable WHERE (_variable[@columntype] @cmp @comparableconstant) _logicop @columnpredicate
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 --- test arithmetic operators (+, -, *, /) with comparison ops
-DELETE FROM @dmltable WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
+DELETE FROM @dmltable WHERE (_variable[@comparabletype] @aftermath) @cmp @comparableconstant
 

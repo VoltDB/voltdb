@@ -51,7 +51,7 @@ SELECT ALL _variable[#arg @comparabletype] B7 FROM @fromtables A
 SELECT _countormax(_variable[#arg @comparabletype]) B8 FROM @fromtables A
 
 
-SELECT @agg(_variable[#arg @comparabletype]) B9 FROM @fromtables A WHERE _maybe A._variable[#arg @comparabletype] _cmp @comparableconstant
+SELECT @agg(_variable[#arg @comparabletype]) B9 FROM @fromtables A WHERE _maybe A._variable[#arg @comparabletype] @cmp @comparableconstant
 
 --- count(*), baby
 -- TODO: migrate cases like this that are not columntype/comparabletype-specific to their own template/suite
@@ -59,14 +59,14 @@ SELECT COUNT(*) FROM @fromtables B10
 
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT @star FROM @fromtables B11 WHERE _maybe _variable[#arg @comparabletype] _cmp @comparableconstant
+SELECT @star FROM @fromtables B11 WHERE _maybe _variable[#arg @comparabletype] @cmp @comparableconstant
 --- test EXISTS/IN operators ()
-SELECT @star FROM @fromtables A12 WHERE EXISTS(SELECT @star FROM @fromtables B WHERE _maybe B.@idcol _cmp A12.@idcol )
+SELECT @star FROM @fromtables A12 WHERE EXISTS(SELECT @star FROM @fromtables B WHERE _maybe B.@idcol @cmp A12.@idcol )
 
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT @star FROM @fromtables B12 WHERE (_variable[#arg @comparabletype] @aftermath) _cmp @comparableconstant
+SELECT @star FROM @fromtables B12 WHERE (_variable[#arg @comparabletype] @aftermath) @cmp @comparableconstant
 --- test logic operators (AND) with comparison ops
-SELECT @star FROM @fromtables B13 WHERE (_variable[#arg @comparabletype] _cmp @comparableconstant) _logicop @columnpredicate
+SELECT @star FROM @fromtables B13 WHERE (_variable[#arg @comparabletype] @cmp @comparableconstant) _logicop @columnpredicate
 -- test GROUP BY
 SELECT _variable[#grouped @columntype] B14 FROM @fromtables A GROUP BY __[#grouped]
 
@@ -96,10 +96,10 @@ SELECT @lhsstar FROM @fromtables LHS INNER JOIN @fromtables B20RHS ON LHS._varia
 
 --- test IN/EXISTS predicate
 --- Use @columntype instead of @comparabletype because Hsql sometimes return wrong answers between integer and decimal comparison for IN.
-SELECT @star FROM @fromtables A WHERE EXISTS ( SELECT @star FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
+SELECT @star FROM @fromtables A WHERE EXISTS ( SELECT @star FROM @fromtables B WHERE B._variable[@columntype] @cmp A._variable[@columntype] )
 SELECT @star FROM @fromtables A WHERE _variable[@columntype] IN ( SELECT _variable[@columntype] FROM @fromtables B )
-SELECT @star FROM @fromtables A WHERE _variable[@comparabletype] _cmp @comparableconstant AND EXISTS ( SELECT @star FROM @fromtables B WHERE B._variable[@columntype] _cmp A._variable[@columntype] )
+SELECT @star FROM @fromtables A WHERE _variable[@comparabletype] @cmp @comparableconstant AND EXISTS ( SELECT @star FROM @fromtables B WHERE B._variable[@columntype] @cmp A._variable[@columntype] )
 
 --- test scalar subqueries (ENG-7959)
-SELECT @star, (SELECT COUNT(*) FROM @fromtables WHERE _variable[@comparabletype] _cmp B24._variable[@comparabletype]) FROM @fromtables AS B24
-SELECT @star FROM @fromtables AS B25 WHERE _variable[numeric] _cmp (SELECT COUNT(*) FROM @fromtables)
+SELECT @star, (SELECT COUNT(*) FROM @fromtables WHERE _variable[@comparabletype] @cmp B24._variable[@comparabletype]) FROM @fromtables AS B24
+SELECT @star FROM @fromtables AS B25 WHERE _variable[numeric] @cmp (SELECT COUNT(*) FROM @fromtables)

@@ -66,6 +66,12 @@
 {_cmp |= "<="}
 {_cmp |= ">="}
 
+-- A smaller list of comparison operators, used to reduce the
+-- explosion of generated queries that result from 7 _cmp values
+{_somecmp |= " = "}
+{_somecmp |= " < "}
+{_somecmp |= " >= "}
+
 {_jointype |= " "}
 {_jointype |= " INNER "}
 {_jointype |= " LEFT "}
