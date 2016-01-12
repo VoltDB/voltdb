@@ -481,7 +481,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "exportconnectorclass": {
                                         "id": "exportconnectorclass",
@@ -543,7 +543,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
