@@ -853,12 +853,18 @@ public:
     // the caller has to make sure the key has already contained the value
     // the signatures are to be consist with the general template
     PointerKeyValuePair() {}
+    // TODO: For safety, post-assert that (value == k.getValue()).
     PointerKeyValuePair(const first_type &key, const second_type &value) : k(key) {}
 
     const first_type& getKey() const { return k; }
     const second_type& getValue() const { return k.getValue(); }
     void setKey(const first_type &key) { k = key; }
     void setValue(const second_type &value) { k.setValue(value); }
+    // TODO: Optimize to take advantage of how k/key contain both
+    //       the "key proper" AND the value, so k.setValue should be redundant?
+    //       For safety, post-assert that (value == k.getValue()).
+    void setKeyValuePair(const first_type &key, const second_type &value)
+    { k = key; k.setValue(value); }
 
     // set the tuple pointer to the new value, and return the old value
     const void *setPointerValue(const void *value) {
