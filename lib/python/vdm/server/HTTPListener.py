@@ -494,7 +494,8 @@ def make_configuration_file():
             if type(value) is dict:
                 handle_deployment_dict(deployment_elem, key, value, False)
             else:
-                deployment_elem.attrib[key] = str(value)
+                if value is not None:
+                    deployment_elem.attrib[key] = str(value)
         i += 1
 
     try:
