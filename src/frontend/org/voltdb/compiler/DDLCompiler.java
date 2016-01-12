@@ -181,6 +181,32 @@ public class DDLCompiler {
         m_classLoader = classLoader;
     }
 
+    private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType, StringBuffer msg) {
+        assert tableNode.name.equals("table");
+
+        String valueTypeStr;
+        VoltType type;
+        String columnName;
+
+        for (VoltXMLElement subNode : tableNode.children) {
+            if (subNode.name.equals("columns")) {
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column")) {
+                        valueTypeStr = columnNode.attributes.get("valuetype");
+                        columnName = columnNode.attributes.get("name");
+                        type = VoltType.typeFromString(valueTypeStr);
+                        if (lookupType == type) {
+                            msg.append("column name: '" + columnName + "', type: '" + valueTypeStr + "'");
+                            return true;
+                        }
+                    }
+                }
+            } // if (subNode.name.equals("columns"))
+        }
+
+        return false;
+    }
+
     /**
      * Compile a DDL schema from an abstract reader
      * @param reader  abstract DDL reader
@@ -850,6 +876,7 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is EXPORT TABLE
         statementMatcher = SQLParser.matchExportTable(statement);
         if (statementMatcher.matches()) {
 
@@ -862,7 +889,15 @@ public class DDLCompiler {
                     Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+
             if (tableXML != null) {
+                StringBuffer msg = new StringBuffer();
+                msg.append("Can't EXPORT table '" + tableName.toUpperCase() + "' containing geo type column(s) - ");
+                if (isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, msg) ||
+                    isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, msg)) {
+                    throw m_compiler.new VoltCompilerException(String.format(msg + "."));
+                }
+
                 if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid EXPORT statement: table %s is a DR table.", tableName));
@@ -894,8 +929,18 @@ public class DDLCompiler {
                 tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             }
 
+            //System.out.println("\n\n" + m_schema.toString());
+
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
+                StringBuffer msg = new StringBuffer();
+
+                msg.append("Can't DR table '" + tableName.toUpperCase() + "' containing geo type column(s) - ");
+                if (isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, msg) ||
+                    isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, msg)) {
+                    throw m_compiler.new VoltCompilerException(String.format(msg + "."));
+                }
+
                 if (tableXML.attributes.containsKey("export")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid DR statement: table %s is an export table", tableName));
