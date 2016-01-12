@@ -293,7 +293,7 @@ schema = {
             },
             "additionalProperties": False
         },
-        "partitionDetection": {
+        "partition-detection": {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
@@ -315,8 +315,8 @@ schema = {
             },
             "additionalProperties": False
         },
-        "adminMode": {
-            "id": "adminMode",
+        "admin-mode": {
+            "id": "admin-mode",
             "type": "object",
             "properties": {
                 "port": {
@@ -481,7 +481,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "exportconnectorclass": {
                                         "id": "exportconnectorclass",
@@ -543,7 +543,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
