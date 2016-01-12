@@ -68,6 +68,7 @@ public class ClientConfig {
             principal = piter.next();
             if (principal instanceof DelegatePrincipal) {
                 username = principal.getName();
+                break;
             }
         }
         return username;

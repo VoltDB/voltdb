@@ -763,8 +763,8 @@ public class AuthSystem {
                             bb.flip();
 
                             int msgSize = bb.getInt();
-                            if (msgSize > bb.capacity()) {
-                                authLogger.warn("Authentication packet exceeded alloted size");
+                            if (msgSize > bb.capacity() || msgSize <= 0) {
+                                authLogger.warn("Authentication packet not within alloted size");
                                 return null;
                             }
                             // read the initiator (client) context token
@@ -825,8 +825,8 @@ public class AuthSystem {
 
                             bb.flip();
                             int msgSize = bb.getInt();
-                            if (msgSize > bb.capacity()) {
-                                authLogger.warn("Authentication packet exceeded alloted size");
+                            if (msgSize > bb.capacity() || msgSize <= 0) {
+                                authLogger.warn("Authentication packet not within alloted size");
                                 return null;
                             }
                             // read the initiator (client) context token
@@ -874,6 +874,8 @@ public class AuthSystem {
                 }
                 m_authenticatedUser = authenticatedUser;
                 logAuthSuccess(m_authenticatedUser);
+            } else {
+                return false;
             }
 
             return true;

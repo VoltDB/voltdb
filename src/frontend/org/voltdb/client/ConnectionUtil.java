@@ -409,6 +409,7 @@ public class ConnectionUtil {
             throw new IOException("Cannot transmit delegate user name securely");
         }
 
+        // encrypt and transmit the delegate principal if it is present
         if (delegate.isPresent()) {
             MessageProp mprop = new MessageProp(0, true);
 

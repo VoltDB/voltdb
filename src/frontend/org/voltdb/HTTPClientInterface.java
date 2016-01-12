@@ -336,7 +336,7 @@ public class HTTPClientInterface {
         if (auth != null) {
             String schemeAndHandle[] = auth.split(" ");
             if (auth.startsWith(HttpHeader.NEGOTIATE.asString())) {
-                token = auth.substring(10);
+                token = (auth.length() >= 10 ? auth.substring(10) : "");
                 validAuthHeader = true;
             } else if (schemeAndHandle.length == 2) {
                 if (schemeAndHandle[0].equalsIgnoreCase("hashed")) {
@@ -370,7 +370,7 @@ public class HTTPClientInterface {
             if (m_oldCache!=null) {
                 closeAllAsync(m_oldCache);
             }
-            Configuration config = getVoltDBConfig();
+            final Configuration config = getVoltDBConfig();
             int port = config.m_port;
             int adminPort = config.m_adminPort;
             String externalInterface = config.m_externalInterface;
@@ -407,7 +407,7 @@ public class HTTPClientInterface {
                 MessageDigest md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(ClientAuthScheme.HASH_SHA256));
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
-                return new AuthenticationResult(null, null, null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
+                return new AuthenticationResult(null, null, null, adminMode, username, "JVM doesn't support SHA-256 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority

@@ -886,7 +886,6 @@ public class HTTPAdminListener {
             // the default is 200k which well short of out 2M row size limit
             apiRequestHandler.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             apiRequestHandler.setHandler(new APIRequestHandler());
-            // apiRequestHandler.setProtectedTargets(new String[]{"/api/1.0"});
 
             ///catalog
             ContextHandler catalogRequestHandler = new ContextHandler("/catalog");

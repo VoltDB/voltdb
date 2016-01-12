@@ -21,7 +21,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
 import java.security.Principal;
 
-public class DelegatePrincipal implements Principal {
+public final class DelegatePrincipal implements Principal {
     private final String m_name;
 
     public DelegatePrincipal(String name) {
