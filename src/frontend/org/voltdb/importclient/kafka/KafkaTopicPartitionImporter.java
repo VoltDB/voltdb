@@ -409,7 +409,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     ByteBuffer payload = messageAndOffset.message().payload();
 
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    Invocation invocation = new Invocation(m_config.getProcedure(), m_config.getFormatter().transform(line));
+                    Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(line));
                     TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                             messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                             invocation);

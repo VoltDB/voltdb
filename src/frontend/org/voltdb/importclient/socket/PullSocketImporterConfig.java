@@ -27,7 +27,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.Formatter;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -46,13 +45,11 @@ public class PullSocketImporterConfig implements ImporterConfig
 
     private final URI m_resourceID;
     private final String m_procedure;
-    private final Formatter m_formatter;
 
-    public PullSocketImporterConfig(URI resourceID, String procedure, Formatter formatter)
+    public PullSocketImporterConfig(URI resourceID, String procedure)
     {
         m_resourceID = resourceID;
         m_procedure = procedure;
-        m_formatter = formatter;
     }
 
     @Override
@@ -65,11 +62,7 @@ public class PullSocketImporterConfig implements ImporterConfig
         return m_procedure;
     }
 
-    public Formatter getFormatter() {
-        return m_formatter;
-    }
-
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Formatter formatter)
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props)
     {
         String hosts = props.getProperty("addresses", "").trim();
         if (hosts.isEmpty()) {
@@ -82,7 +75,7 @@ public class PullSocketImporterConfig implements ImporterConfig
 
         ImmutableMap.Builder<URI, ImporterConfig> sbldr = ImmutableMap.builder();
         for (String host: COMMA_SPLITTER.split(hosts)) {
-            checkHostAndAddConfig(host, procedure, sbldr, formatter);
+            checkHostAndAddConfig(host, procedure, sbldr);
         }
         try {
             return sbldr.build();
@@ -92,8 +85,7 @@ public class PullSocketImporterConfig implements ImporterConfig
         }
     }
 
-    private static void checkHostAndAddConfig(String hspec, String procedure, ImmutableMap.Builder<URI, ImporterConfig> builder,
-            Formatter formatter) {
+    private static void checkHostAndAddConfig(String hspec, String procedure, ImmutableMap.Builder<URI, ImporterConfig> builder) {
         Matcher mtc = HOST_RE.matcher(hspec);
         if (!mtc.matches()) {
             throw new IllegalArgumentException(String.format("Address spec %s is malformed", hspec));
@@ -116,8 +108,7 @@ public class PullSocketImporterConfig implements ImporterConfig
             }
             InetSocketAddress sa = new InetSocketAddress(a, p);
             PullSocketImporterConfig config =
-                    new PullSocketImporterConfig(URI.create("tcp://" + sa.getHostString() + ":" + sa.getPort() + "/"), procedure,
-                            formatter);
+                    new PullSocketImporterConfig(URI.create("tcp://" + sa.getHostString() + ":" + sa.getPort() + "/"), procedure);
             builder.put(config.getResourceID(), config);
         }
     }

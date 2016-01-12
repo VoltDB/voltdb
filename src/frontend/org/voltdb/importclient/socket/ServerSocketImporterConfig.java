@@ -23,11 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
 
-import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.Formatter;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
 /**
  * ImporterConfig for server socket importer.
@@ -39,10 +35,9 @@ public class ServerSocketImporterConfig implements ImporterConfig
     private final URI m_resourceID;
     private final String m_procedure;
     private final int m_port;
-    private final Formatter m_formatter;
     private final ServerSocket m_serverSocket;
 
-    public ServerSocketImporterConfig(Properties props, Formatter formatter)
+    public ServerSocketImporterConfig(Properties props)
     {
         Properties propsCopy = (Properties) props.clone();
 
@@ -72,8 +67,6 @@ public class ServerSocketImporterConfig implements ImporterConfig
         } catch(URISyntaxException e) { // Will not happen
             throw new RuntimeException(e);
         }
-
-        m_formatter = formatter;
     }
 
     @Override
@@ -90,11 +83,6 @@ public class ServerSocketImporterConfig implements ImporterConfig
     public int getPort()
     {
         return m_port;
-    }
-
-    public Formatter getFormatter()
-    {
-        return m_formatter;
     }
 
     public ServerSocket getServerSocket()

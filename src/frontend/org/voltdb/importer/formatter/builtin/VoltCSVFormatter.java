@@ -27,10 +27,10 @@ import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
-public class VoltFormatter implements Formatter<String> {
+public class VoltCSVFormatter implements Formatter<String> {
     final CSVParser m_parser;
 
-    VoltFormatter (Properties prop) {
+    VoltCSVFormatter (Properties prop) {
         String type = prop.getProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE);
         if (!("csv".equalsIgnoreCase(type) || "tsv".equalsIgnoreCase(type))) {
             throw new IllegalArgumentException("Invalid format " + type + ", choices are either \"csv\" or \"tsv\".");

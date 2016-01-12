@@ -183,7 +183,7 @@ public class TestImportSuite extends RegressionSuite {
     private void pushDataToImporters(int count, int loops) throws Exception {
         CountDownLatch latch = new CountDownLatch(2*loops);
         for (int i=0; i<loops; i++) {
-            (new SocketDataPusher("localhost", 7001, count, latch, '\t')).start();
+            (new SocketDataPusher("localhost", 7002, count, latch, '\t')).start();
             (new Log4jDataPusher(count, latch, ',')).start();
         }
         latch.await();
@@ -322,6 +322,8 @@ public class TestImportSuite extends RegressionSuite {
         client.close();
     }
 
+
+
     /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
@@ -369,7 +371,7 @@ public class TestImportSuite extends RegressionSuite {
         // configure socket importer
         Properties props = new Properties();
         props.putAll(ImmutableMap.<String, String>of(
-                "port", "7001",
+                "port", "7002",
                 "decode", "true",
                 "procedure", "importTable.insert"));
         project.addImport(true, "custom", "tsv", "socketstream.jar", props);
@@ -383,6 +385,14 @@ public class TestImportSuite extends RegressionSuite {
                 "log-event-table", "log_events"));
         project.addImport(true, "custom", null, "log4jsocketimporter.jar", props);
 
+        // bad formatter spec
+/*        props = new Properties();
+        props.putAll(ImmutableMap.<String, String>of(
+                "port", "7005",
+                "decode", "true",
+                "procedure", "importTable.insert"));
+        project.addImport(true, "custom", "badimporter.jar/fake", "socketstream.jar", props);
+*/
         /*
          * compile the catalog all tests start with
          */

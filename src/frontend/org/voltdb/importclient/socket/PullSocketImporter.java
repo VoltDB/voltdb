@@ -88,7 +88,7 @@ public class PullSocketImporter extends AbstractImporter {
                 BufferedReader br = reader.get();
                 String csv = null;
                 while ((csv=br.readLine()) != null) {
-                    Invocation invocation = new Invocation(m_config.getProcedure(), m_config.getFormatter().transform(csv));
+                    Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(csv));
                     if (!callProcedure(invocation)) {
                         if (isDebugEnabled()) {
                             debug(null, "Failed to process Invocation possibly bad data: " + csv);

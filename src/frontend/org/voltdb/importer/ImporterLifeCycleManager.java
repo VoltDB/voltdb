@@ -67,10 +67,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      *
      * @param props Properties defined in a configuration section for this importer
      */
-    public final void configure(Properties props, Formatter formatter)
+    public final void configure(Properties props)
     {
         ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
-        builder.putAll(m_factory.createImporterConfigurations(props, formatter));
+        builder.putAll(m_factory.createImporterConfigurations(props));
         m_configs = builder.build();
     }
 
@@ -86,7 +86,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      * @param distributer ChannelDistributer that is responsible for allocating resources to nodes.
      * This will be used only if the importer must not be run on every site.
      */
-    public final void readyForData(ChannelDistributer distributer)
+    public final void readyForData(ChannelDistributer distributer, Formatter formatter)
     {
         if (m_stopping) return;
 
@@ -115,6 +115,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         if (m_factory.isImporterRunEveryWhere()) {
             for (final ImporterConfig config : m_configs.values()) {
                 AbstractImporter importer = m_factory.createImporter(config);
+                importer.setFormatter(formatter);
                 builder.put(importer.getResourceID(), importer);
             }
             m_importers = builder.build();

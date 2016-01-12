@@ -122,6 +122,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
+import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -1173,6 +1174,8 @@ public abstract class CatalogUtil {
         private final Properties m_moduleProp;
         private final Properties m_formatterProp;
 
+        private Formatter m_formatter = null;
+
         public ImportConfiguration(Properties moduleProp, Properties formatterProp) {
             m_moduleProp = moduleProp;
             m_formatterProp = formatterProp;
@@ -1185,9 +1188,17 @@ public abstract class CatalogUtil {
         public Properties getformatterProp() {
             return m_formatterProp;
         }
+
+        public void setFormatter(Formatter formatter) {
+            m_formatter = formatter;
+        }
+
+        public Formatter getFormatter() {
+            return m_formatter;
+        }
     }
 
-    private static String buildBundleURL(String bundle) {
+    private static String buildBundleURL(String bundle, boolean alwaysBundle) {
         String modulePrefix = "osgi|";
         InputStream is;
         try {
@@ -1220,7 +1231,7 @@ public abstract class CatalogUtil {
                 is.close();
             } catch (IOException ex) {
             }
-        } else {
+        } else if (!alwaysBundle) {
             //Not a URL try as a class
             try {
                 CatalogUtil.class.getClassLoader().loadClass(bundleUrl);
@@ -1233,8 +1244,14 @@ public abstract class CatalogUtil {
                 hostLog.error(msg);
                 throw new DeploymentCheckException(msg);
             }
+        } else {
+            String msg =
+                    "Import failed to configure, failed to load module by URL or classname provided" +
+                    " format module: " + bundleUrl;
+            hostLog.error(msg);
+            throw new DeploymentCheckException(msg);
         }
-        return modulePrefix + bundleUrl;
+        return (alwaysBundle ? bundleUrl : modulePrefix + bundleUrl);
     }
 
     private static ImportConfiguration checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
@@ -1260,21 +1277,19 @@ public abstract class CatalogUtil {
         if (formatBundle != null && formatBundle.trim().length() > 0) {
             if (formatBundle.equalsIgnoreCase("csv") || formatBundle.equalsIgnoreCase("tsv")) {
                 formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, formatBundle);
-                formatBundle = "volt-formatter.jar";
-            } else if (formatBundle.matches("*.jar/*")) {
-                String[] formatSplit = formatBundle.split("/");
-                if (formatSplit.length != 2)
-                    throw new DeploymentCheckException("Import format " + formatBundle + " not valid.");
-                formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, formatSplit[1]);
-                formatBundle = formatSplit[0];
+                formatBundle = "voltcsvformatter.jar";
+            } else if (formatBundle.matches("(.*)[.]jar/(.*)")) {
+                int typeIndex = formatBundle.lastIndexOf("/");
+                formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, formatBundle.substring(typeIndex + 1));
+                formatBundle = formatBundle.substring(0, typeIndex);
             } else {
                 throw new DeploymentCheckException("Import format " + formatBundle + " not valid.");
             }
-            formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMATTER, buildBundleURL(formatBundle));
+            formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMATTER, buildBundleURL(formatBundle, true));
         }
 
         if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
-            moduleProp.setProperty(ImportDataProcessor.IMPORT_MODULE, buildBundleURL(importBundleUrl));
+            moduleProp.setProperty(ImportDataProcessor.IMPORT_MODULE, buildBundleURL(importBundleUrl, false));
         }
 
         List<PropertyType> importProperties = importConfiguration.getProperty();

@@ -65,22 +65,28 @@ public class ImportProcessor implements ImportDataProcessor {
     //This abstracts OSGi based and class based importers.
     public class BundleWrapper {
         private final Bundle m_bundle;
+        private final Formatter m_formatter;
         private AbstractImporterFactory m_importerFactory;
         private ImporterLifeCycleManager m_importerTypeMgr;
 
-        public BundleWrapper(Object o, Bundle bundle) {
+        public BundleWrapper(Object o, Bundle bundle, Formatter formatter) {
             m_bundle = bundle;
+            m_formatter = formatter;
             m_importerFactory = (AbstractImporterFactory) o;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
             m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory);
+        }
+
+        public Formatter getFormatter() {
+            return m_formatter;
         }
 
         public String getImporterType() {
             return m_importerFactory.getTypeName();
         }
 
-        public void configure(Properties props, Formatter formatter) {
-            m_importerTypeMgr.configure(props, formatter);
+        public void configure(Properties props) {
+            m_importerTypeMgr.configure(props);
         }
 
         public void stop() {
@@ -98,48 +104,6 @@ public class ImportProcessor implements ImportDataProcessor {
         }
     }
 
-    public Formatter createFormatter(Properties prop) {
-        String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
-        String attrs[] = module.split("\\|");
-        String bundleJar = attrs[1];
-        String moduleType = attrs[0];
-
-        try {
-            AbstractFormatterFactory formatter = m_formatters.get(bundleJar);
-            if (formatter == null) {
-                if (moduleType.equalsIgnoreCase("osgi")) {
-
-                    Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
-                    bundle.start();
-                    ServiceReference refs[] = bundle.getRegisteredServices();
-                    //Must have one service only.
-                    ServiceReference reference = refs[0];
-                    if (reference == null) {
-                        m_logger.error("Failed to initialize formatter from: " + bundleJar);
-                        bundle.stop();
-                        return null;
-                    }
-                    formatter = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
-                } else {
-                    //Class based importer.
-                    Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
-                    if (reference == null) {
-                        m_logger.error("Failed to initialize formatter from: " + bundleJar);
-                        return null;
-                    }
-
-                    formatter = (AbstractFormatterFactory)reference.newInstance();
-                }
-                m_formatters.put(bundleJar, formatter);
-            }
-            return formatter.create(prop);
-        } catch(Throwable t) {
-            m_logger.error("Failed to configure import handler for " + bundleJar, t);
-            Throwables.propagate(t);
-        }
-        return null;
-    }
-
     public void addProcessorConfig(ImportConfiguration config) {
         Properties properties = config.getmoduleProp();
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
@@ -147,7 +111,7 @@ public class ImportProcessor implements ImportDataProcessor {
         String bundleJar = attrs[1];
         String moduleType = attrs[0];
 
-        Formatter formatter = createFormatter(config.getformatterProp());
+        Formatter formatter = config.getFormatter();
         try {
             BundleWrapper wrapper = m_bundles.get(bundleJar);
             if (wrapper == null) {
@@ -164,7 +128,7 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
                     Object o = bundle.getBundleContext().getService(reference);
-                    wrapper = new BundleWrapper(o, bundle);
+                    wrapper = new BundleWrapper(o, bundle, formatter);
                 } else {
                     //Class based importer.
                     Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
@@ -173,18 +137,18 @@ public class ImportProcessor implements ImportDataProcessor {
                         return;
                     }
 
-                     wrapper = new BundleWrapper(reference.newInstance(), null);
+                     wrapper = new BundleWrapper(reference.newInstance(), null, formatter);
                 }
                 String name = wrapper.getImporterType();
                 if (name == null || name.trim().length() == 0) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");
                 }
                 Preconditions.checkState(!m_bundlesByName.containsKey(name), "Importer must implement and return a valid unique name: " + name);
-                wrapper.configure(properties, formatter);
+                wrapper.configure(properties);
                 m_bundlesByName.put(name, wrapper);
                 m_bundles.put(bundleJar, wrapper);
             } else {
-                wrapper.configure(properties, formatter);
+                wrapper.configure(properties);
             }
         } catch(Throwable t) {
             m_logger.error("Failed to configure import handler for " + bundleJar, t);
@@ -200,7 +164,7 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        bw.m_importerTypeMgr.readyForData(m_distributer);
+                        bw.m_importerTypeMgr.readyForData(m_distributer, bw.getFormatter());
                     } catch (Exception ex) {
                         //Should never fail. crash.
                         VoltDB.crashLocalVoltDB("Import failed to set Handler", true, ex);

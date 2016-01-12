@@ -21,10 +21,10 @@ import java.util.Properties;
 
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
-public class VoltFormatterFactory extends AbstractFormatterFactory {
+public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
     @Override
-    public VoltFormatter create(Properties prop) {
-        VoltFormatter formatter = new VoltFormatter(prop);
+    public VoltCSVFormatter create(Properties prop) {
+        VoltCSVFormatter formatter = new VoltCSVFormatter(prop);
         return formatter;
     }
 }
