@@ -1387,7 +1387,7 @@ public class SQLParser extends SQLPatternFactory
         if (epos < 0) {
             epos = param.length();
         }
-        return GeographyPointValue.geographyPointFromText(param.substring(spos+1, epos));
+        return GeographyPointValue.fromWKT(param.substring(spos+1, epos));
     }
 
     public static GeographyValue parseGeography(String param) {
@@ -1399,7 +1399,7 @@ public class SQLParser extends SQLPatternFactory
         if (epos < 0) {
             epos = param.length();
         }
-        return GeographyValue.fromText(param.substring(spos+1, epos));
+        return GeographyValue.fromWKT(param.substring(spos+1, epos));
     }
 
 
