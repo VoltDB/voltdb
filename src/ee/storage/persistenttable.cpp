@@ -82,8 +82,6 @@
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/DRTupleStreamBase.h"
-#include "storage/CompatibleDRTupleStream.h"
-#include "storage/DRTupleStream.h"
 
 namespace voltdb {
 
@@ -1570,6 +1568,8 @@ bool PersistentTable::doForcedCompaction() {
         }
         if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
             //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
+            hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+            notPendingCompactions++;
         }
         if (!m_blocksPendingSnapshot.empty() && hadWork2) {
             //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
