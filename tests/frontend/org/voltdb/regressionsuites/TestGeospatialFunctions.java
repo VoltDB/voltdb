@@ -718,31 +718,40 @@ public class TestGeospatialFunctions extends RegressionSuite {
         Client client = getClient();
         populateTables(client);
 
-        // test for border case of rounding up the deciaml number
+        // test for border case of rounding up the decimal number
         client.callProcedure("places.Insert", 50, "Someplace1",
                 GeographyPointValue.geographyPointFromText("POINT(13.4999999999995 17)"));
-        // test for border case of rounding up the deciaml number
+        // test for border case of rounding up the decimal number
         client.callProcedure("places.Insert", 51, "Someplace2",
                 GeographyPointValue.geographyPointFromText("POINT(-13.499999999999999995 -17)"));
 
-        VoltTable vt = client.callProcedure("@AdHoc",
+        // get WKT representation using asText()
+        VoltTable asTextVT = client.callProcedure("@AdHoc",
                 "select loc, asText(loc) from places order by pk").getResults()[0];
 
-        while (vt.advanceRow()) {
-            GeographyPointValue gpv = vt.getPoint(0);
+        // get WKT representation using cast(point as varchar)
+        VoltTable castVT =  client.callProcedure("@AdHoc",
+                "select loc, cast(loc as VARCHAR) from places order by pk").getResults()[0];
+
+        // verify results of asText from EE matches WKT format defined in frontend/java
+        while (asTextVT.advanceRow()) {
+            GeographyPointValue gpv = asTextVT.getPoint(0);
             if (gpv == null) {
-                assertEquals(null, vt.getString(1));
+                assertEquals(null, asTextVT.getString(1));
             }
             else {
-                assertEquals(gpv.toString(), vt.getString(1));
+                assertEquals(gpv.toString(), asTextVT.getString(1));
             }
         }
+        // verify WKT from asText and cast(point as varchar) results in same result WKT.
+        assertEquals(asTextVT, castVT);
     }
 
     public void testPolygonAsText() throws Exception {
         Client client = getClient();
         populateTables(client);
-        // polygon whose co-ordinates are mix of decimal and whole numbers
+        // polygon whose co-ordinates are mix of decimal and whole numbers - test
+        // decimal rounding border cases
         Border someWhere = new Border(50, "someWhere", "someWhere",
                 new GeographyValue("POLYGON ((-10.1234567891234 10.1234567891234, " +
                                              "-14.1234567891264 10.1234567891234, " +
@@ -753,7 +762,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
         VoltTable vt = client.callProcedure("BORDERS.Insert",
                 someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-        // polygon with hole whose co-ordinates are whole numbers
+        // polygon with 2 holes and whose vertices are whole numbers - test for whole number rounding
         someWhere = new Border(51, "someWhereWithHoles", "someWhereWithHoles",
                 new GeographyValue("POLYGON ((10 10, -10 10, -10 1, 10 1, 10 10)," +
                                             "(-8 9, -8 8, -9 8, -9 9, -8 9)," +
@@ -761,7 +770,6 @@ public class TestGeospatialFunctions extends RegressionSuite {
         vt = client.callProcedure("BORDERS.Insert",
                 someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
-
 
         // polygon with hole whose co-ordinates are whole numbers
         someWhere = new Border(52, "someWhereWithHoles", "someWhereWithHoles",
@@ -772,9 +780,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
                 someWhere.getPk(), someWhere.getName(), someWhere.getMessage(), someWhere.getRegion()).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
+        // get WKT representation using asText()
         vt = client.callProcedure("@AdHoc",
                 "select region, asText(region) from borders order by pk").getResults()[0];
 
+        // get WKT representation using cast(polygon as varchar)
+        VoltTable castVT = client.callProcedure("@AdHoc",
+                "select region, cast(region as VARCHAR) from borders order by pk").getResults()[0];
+
+        // verify results of asText from EE matches WKT format defined in frontend/java
         GeographyValue gv;
         while (vt.advanceRow()) {
             gv = vt.getGeographyValue(0);
@@ -786,6 +800,8 @@ public class TestGeospatialFunctions extends RegressionSuite {
             }
         }
 
+        // verify WKT from asText and cast(polygon as varchar) results are same.
+        assertEquals(vt, castVT);
     }
 
     public void testPointPlygonAsTextNegative() throws Exception {
