@@ -1036,6 +1036,7 @@ DISTRIBUTION
             <fileset dir="${base.dir}/lib">
                 <include name="python/**" />
                 <exclude name="**/*.pyc" />
+                <exclude name="**/tests/**" />
             </fileset>
         </copy>
         <chmod perm="ugo+rx">
