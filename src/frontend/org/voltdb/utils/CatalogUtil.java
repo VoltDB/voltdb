@@ -92,7 +92,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
@@ -1700,10 +1700,10 @@ public abstract class CatalogUtil {
             String sha1hex = user.getPassword();
             String sha256hex = user.getPassword();
             if (user.isPlaintext()) {
-                sha1hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA1);
-                sha256hex = extractPassword(user.getPassword(), ClientAuthHashScheme.HASH_SHA256);
+                sha1hex = extractPassword(user.getPassword(), ClientAuthScheme.HASH_SHA1);
+                sha256hex = extractPassword(user.getPassword(), ClientAuthScheme.HASH_SHA256);
             } else if (user.getPassword().length() == 104) {
-                int sha1len = ClientAuthHashScheme.getHexencodedDigestLength(ClientAuthHashScheme.HASH_SHA1);
+                int sha1len = ClientAuthScheme.getHexencodedDigestLength(ClientAuthScheme.HASH_SHA1);
                 sha1hex = sha1hex.substring(0, sha1len);
                 sha256hex = sha256hex.substring(sha1len);
             } else {
@@ -1815,10 +1815,10 @@ public abstract class CatalogUtil {
      *  SHA* hash it once to match what we will get from the wire protocol
      *  and then hex encode it
      * */
-    private static String extractPassword(String password, ClientAuthHashScheme scheme) {
+    private static String extractPassword(String password, ClientAuthScheme scheme) {
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
+            md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
         } catch (final NoSuchAlgorithmException e) {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);

@@ -40,7 +40,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
@@ -157,14 +157,14 @@ public class RegressionSuite extends TestCase {
     }
 
     public Client getAdminClient() throws IOException {
-        return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256, true); // 10 minute default
+        return getClient(1000 * 60 * 10, ClientAuthScheme.HASH_SHA256, true); // 10 minute default
     }
 
     public Client getClient() throws IOException {
-        return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256); // 10 minute default
+        return getClient(1000 * 60 * 10, ClientAuthScheme.HASH_SHA256); // 10 minute default
     }
 
-    public Client getClient(ClientAuthHashScheme scheme) throws IOException {
+    public Client getClient(ClientAuthScheme scheme) throws IOException {
         return getClient(1000 * 60 * 10, scheme); // 10 minute default
     }
 
@@ -187,7 +187,7 @@ public class RegressionSuite extends TestCase {
      * VoltServerConfig instance.
      */
     public Client getClient(long timeout) throws IOException {
-        return getClient(timeout, ClientAuthHashScheme.HASH_SHA256);
+        return getClient(timeout, ClientAuthScheme.HASH_SHA256);
     }
 
     /**
@@ -200,11 +200,11 @@ public class RegressionSuite extends TestCase {
      * @return A VoltClient instance connected to the server driven by the
      * VoltServerConfig instance.
      */
-    public Client getClient(long timeout, ClientAuthHashScheme scheme) throws IOException {
+    public Client getClient(long timeout, ClientAuthScheme scheme) throws IOException {
         return getClient(timeout, scheme, false);
     }
 
-    public Client getClient(long timeout, ClientAuthHashScheme scheme, boolean useAdmin) throws IOException {
+    public Client getClient(long timeout, ClientAuthScheme scheme, boolean useAdmin) throws IOException {
         final Random r = new Random();
         String listener = null;
         if (useAdmin) {
@@ -247,7 +247,7 @@ public class RegressionSuite extends TestCase {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         String listener = listeners.get(r.nextInt(listeners.size()));
-        ClientConfig config = new ClientConfigForTest(m_username, m_password, ClientAuthHashScheme.HASH_SHA1);
+        ClientConfig config = new ClientConfigForTest(m_username, m_password, ClientAuthScheme.HASH_SHA1);
         config.setConnectionResponseTimeout(timeout);
         config.setProcedureCallTimeout(timeout);
         final Client client = ClientFactory.createClient(config);
@@ -341,7 +341,7 @@ public class RegressionSuite extends TestCase {
         }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, port, null, ClientAuthHashScheme.getByUnencodedLength(hashedPassword.length))[0];
+                    hNp.getHostText(), m_username, hashedPassword, port, null, ClientAuthScheme.getByUnencodedLength(hashedPassword.length))[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
