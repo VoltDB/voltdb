@@ -447,30 +447,38 @@ def map_deployment_users(request, user):
     return deployment_user[0]
 
 
-def get_database_deployment(key):
+def get_database_deployment(dbid):
     deployment_top = Element('deployment')
-    i = 0
-    value = DEPLOYMENT[key-1]
-    if type(value) is dict:
-        handle_deployment_dict(deployment_top, key, value, True)
-    else:
-        if isinstance(value, bool):
-            if value == False:
-                deployment_top.attrib[key] = "false"
+    value = DEPLOYMENT[dbid-1]
+
+    # Add users
+    addTop = False
+    for duser in DEPLOYMENT_USERS:
+        if duser['databaseid'] == dbid:
+            # Only create subelement if users have anything in this database.
+            if addTop != True:
+                users_top = SubElement(deployment_top, 'users')
+                addTop = True
+            uelem = SubElement(users_top, "user")
+            uelem.attrib["name"] = duser["name"]
+            uelem.attrib["password"] = duser["password"]
+            uelem.attrib["roles"] = duser["roles"]
+            if duser['plaintext'] == True:
+                uelem.attrib["plaintext"] = "true"
             else:
-                deployment_top.attrib[key] = "true"
-        else:
-            deployment_top.attrib[key] = str(value)
+                uelem.attrib["plaintext"] = "false"
 
-    return tostring(deployment_top,encoding='UTF-8')
+    handle_deployment_dict(deployment_top, dbid, value, True)
 
+    xmlstr = tostring(deployment_top,encoding='UTF-8')
+    return xmlstr
+
+#Where are the users in this config file.
 def make_configuration_file():
     main_header = Element('vdm')
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    db1 = get_database_deployment(1)
-    print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
