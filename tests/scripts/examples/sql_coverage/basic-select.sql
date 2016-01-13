@@ -12,6 +12,7 @@
 -- Required preprocessor macros (with example values):
 -- {@aftermath = " _math _value[int:1,3]"}
 -- {@agg = "_numagg"}
+-- {@cmp = "_cmp"} -- all comparison operators (=, <>, !=, <, >, <=, >=)
 -- {@columntype = "decimal"}
 -- {@columnpredicate = "_numericcolumnpredicate"}
 -- {@comparableconstant = "42.42"}
@@ -20,6 +21,8 @@
 -- {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
 -- {@idcol = "ID"}
 -- {@optionalfn = "_numfun"}
+-- {@star = "*"}
+-- {@lhsstar = "*"}
 
 
 --SELECT
@@ -29,7 +32,7 @@ SELECT _variable[#arg @comparabletype] B1 FROM @fromtables
 SELECT _variable[#arg @comparabletype], _variable B2 FROM @fromtables
 --- test column alias
 SELECT _variable[#arg @columntype] AS B3 FROM @fromtables A
---- test * (@star normally is "*", except for Geo tests, where that does not yet work, from the Python client)
+--- test * (@star normally is "*", except for Geo tests, where that does not work (yet?), from the Python client)
 SELECT @star FROM @fromtables B4
 --- test simple arithmetic expressions (+, -, *, /) with constant
 SELECT _variable[#arg @columntype] @aftermath AS B5LITTLEMATH FROM @fromtables A

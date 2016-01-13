@@ -10,6 +10,7 @@
 -- {@columnpredicate = "_numericcolumnpredicate"}
 -- {@comparableconstant = "42.42"}
 -- {@comparabletype = "numeric"}
+-- {@comparablevalue = "_numericvalue"}
 -- {@dmlcolumnpredicate = "_numericcolumnpredicate"}
 -- {@dmltable = "_table"}
 -- {@fromtables = "_table"}
@@ -19,6 +20,7 @@
 -- {@star = "*"}
 -- {@lhsstar = "*"}
 -- {@updatecolumn = "CASH"}
+-- {@updatesource = "ID"}
 -- {@updatevalue = "_value[decimal]"}
 
 -- DML, purge and regenerate random data first.
