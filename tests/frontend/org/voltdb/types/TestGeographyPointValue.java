@@ -106,7 +106,7 @@ public class TestGeographyPointValue extends TestCase {
      */
     private void testOnePointFromFactory(String aWKT, double aLatitude, double aLongitude, double aEpsilon, String aErrMsg) {
         try {
-            GeographyPointValue point = GeographyPointValue.geographyPointFromText(aWKT);
+            GeographyPointValue point = GeographyPointValue.fromWKT(aWKT);
             assertEquals(aLatitude, point.getLatitude(), aEpsilon);
             if (aErrMsg != null) {
                 assertTrue(String.format("Expected error message matching \"%s\", but got no error.", aErrMsg), aErrMsg == null);
