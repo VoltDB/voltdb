@@ -145,7 +145,7 @@ label.ccErrorMsg {
   height: auto!important;
 
 }
-.clusterIcon, .plus, .stop, .stopServer, .deleteServer,.editServerDatabase,.deleteDatabaseServer,.deleteDisableDS,.editServer, .uploadIcon, .downloadIcon, .drArrow, .popup_close, .popup_close:hover, .clusterConfigIcon, .serverIcon, .plusIcon, .secCrossIcon, .popDelete, .onIcon, .offIcon,.editIcon, .offIconSecurity {
+.clusterIcon, .plus, .stop, .stopServer, .deleteServer,.editServerDatabase,.deleteDatabaseServer,.deleteDisableDS,.editServer, .uploadIcon, .downloadIcon, .drArrow, .popup_close, .popup_close:hover, .clusterConfigIcon, .serverIcon, .plusIcon, .secCrossIcon, .popDelete, .onIcon, .offIcon,.editIcon, .offIconSecurity, .deleteDiskLimit {
 	background-image: url(../images/icons.png);
 	background-repeat: no-repeat;
 }
@@ -196,6 +196,13 @@ label.ccErrorMsg {
     height: 26px;
     background-position: -6px -95px;
     cursor: pointer;
+}
+.deleteDiskLimit {
+    height: 26px;
+    background-position: -6px -95px;
+    cursor: pointer;
+	position:relative;
+	top:10px;
 }
 .deleteDisableDS{
     height: 26px;
@@ -1105,6 +1112,7 @@ table.tblPopup {
     font-weight: bold;
     background: #FBFBFB;
 	}
+.featureTbl { overflow:auto; height:180px;}
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}

@@ -325,8 +325,27 @@
                     <label id="errorMemoryLimit" for="txtMemoryLimit" class="error ccErrorMsg" style="display: none;">This field is required</label>
                       </form>
                     </td>
-                    <td>GB</td>
+                    <td><select id="selMemoryLimitUnit">
+                    <option val="GB">GB</option>
+                    <option val="%">%</option>
+                    </select></td>
                     <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow parentprop " id="row-51">
+                   <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Disk Limit</span></a></td>
+
+                    <td id="DiskLimit" align="right"> </td>
+                    <td>&nbsp;</td>
+                    <td><a data-target="#diskLimit" data-toggle="modal" href="javascript:void(0);" id="btnUpdateSource" class="">
+                      <span class="editIcon"></span></a></td>
+
+                  </tr>
+                   <tr class="childprop-row-51 subLabelRow">
+                    <td class="configLabel-sub">SNAPSHOTS</td>
+                    <td id="" align="right"> </td>
+                    <td>34 GB</td>
+                    <td>&nbsp;</td>
+
                   </tr>
                 </table>
               </div>
@@ -1124,6 +1143,168 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Connection Source End -->
+<!-- Disk Limit -->
+<div id="diskLimit" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Edit Disk Limit</h4>
+      </div>
+      <div class="modal-body">
+       <div class="featureAlign">
+  <div class="proLeft ">Feature</div>
+  <div class="editBtn addProBtn"> <a class="btnEd" id="" href="javascript:void(0)"> <span class="userPlus">+</span> Add Feature</a> </div>
+  <div class="clear"> </div>
+</div>
+<div class="featureTbl" >
+<table id="tblAddNewFeature" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">
+  <tbody>
+    <tr class="headerFeature">
+      <th width="53%">Name</th>
+      <th align="right" width="37%">Value</th>
+      <th align="right" width="14%">Unit</th>
+      <th width="5%">Delete</th>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+    <tr>
+      <td><select id="" name="" class="newFeatureName newFeature">
+          <option>SNAPSHOTS</option>
+          <option>COMMANDLOG</option>
+          <option>EXPORTOVERFLOW</option>
+          <option>DROVERFLOW</option>
+          <option>COMMANDLOGSNAPSHOT</option>
+        </select>
+        <label id="" class="error" style="display: none;"></label></td>
+      <td><input size="15" id="" name="" class="newFeatureValue newFeature" type="text">
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><select id="" name="" class="newFeatureUnit newFeature">
+          <option>GB</option>
+          <option>%</option>
+        </select>
+        <label id="" for="" class="error" style="display: none;"></label></td>
+      <td><div class="deleteDiskLimit"></div></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnDeleteDatabaseOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Disk Limit End-->
 
 <div class="loader" ></div>
 </div>

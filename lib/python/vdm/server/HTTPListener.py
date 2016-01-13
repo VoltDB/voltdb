@@ -300,29 +300,29 @@ def map_deployment(request, database_id):
             and 'priority' in request.json['systemsettings']['snapshot']:
         deployment[0]['systemsettings']['snapshot']['priority'] = request.json['systemsettings']['snapshot']['priority']
 
-    if 'resourcemonitor' in request.json['systemsettings']:
+    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
         if deployment[0]['systemsettings']['resourcemonitor'] is None:
             deployment[0]['systemsettings']['resourcemonitor'] = {}
+        print request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
+            deployment[0]['systemsettings']['resourcemonitor']['memorylimit'] = {}
+            if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
+                and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
+                and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
+                deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
+                request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
 
-    if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
-        deployment[0]['systemsettings']['resourcemonitor']['memorylimit'] = {}
-        if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
-            and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
-            and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
-            deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
-            request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
-
-    if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
-        deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
-        if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
-            deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
-            for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'].append(
-                    {
-                        'name': feature['name'],
-                        'size': feature['size']
-                    }
-                )
+        if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
+            deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
+            if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
+                for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                    deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'].append(
+                        {
+                            'name': feature['name'],
+                            'size': feature['size']
+                        }
+                    )
 
     if 'import' in request.json:
         if deployment[0]['import'] is None:
