@@ -111,7 +111,6 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   DRRecordType type,
                                   const std::pair<const TableIndex*, uint32_t>& indexPair)
 {
-    std::cout << "DRTupleStream::appendTuple" << std::endl;
     size_t startingUso = m_uso;
 
     //Drop the row, don't move the USO

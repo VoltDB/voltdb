@@ -224,6 +224,9 @@ class ExecutorContext {
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
+    void setDrStream(DRTupleStreamBase *drStream);
+    void setDrReplicatedStream(DRTupleStreamBase *drReplicatedStream);
+
     DRTupleStreamBase* drStream() {
         return m_drStream;
     }
@@ -239,14 +242,6 @@ class ExecutorContext {
         assert(singleton != NULL);
         assert(singleton->m_tempStringPool != NULL);
         return singleton->m_tempStringPool;
-    }
-
-    void setDrStream(DRTupleStreamBase *drStream) {
-        m_drStream = drStream;
-    }
-
-    void setDrReplicatedStream(DRTupleStreamBase *drReplicatedStream) {
-        m_drReplicatedStream = drReplicatedStream;
     }
 
     bool allOutputTempTablesAreEmpty() const;

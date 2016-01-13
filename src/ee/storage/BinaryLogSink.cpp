@@ -460,7 +460,6 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
                              PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
                              int32_t remoteClusterId, const char *recordStart, int64_t *uniqueId,
                              int64_t *sequenceNumber) {
-    std::cout << "BinaryLogSink::apply" << std::endl;
     CachedIndexKeyTuple indexKeyTuple;
 
     const DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());

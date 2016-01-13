@@ -458,7 +458,6 @@ int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
                                        Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
                                        const char *recordStart, int64_t *uniqueId,
                                        int64_t *sequenceNumber) {
-    std::cout << "CompatibleBinaryLogSink::apply" << std::endl;
     CachedIndexKeyTuple indexKeyTuple;
     const DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
     size_t rowCount = rowCostForDRRecord(type);

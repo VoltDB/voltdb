@@ -18,6 +18,7 @@
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
+#include "storage/DRTupleStreamBase.h"
 
 #include "boost/foreach.hpp"
 
@@ -239,6 +240,22 @@ bool ExecutorContext::allOutputTempTablesAreEmpty() const {
         }
     }
     return true;
+}
+
+void ExecutorContext::setDrStream(DRTupleStreamBase *drStream) {
+    assert (m_drStream != NULL);
+    assert (drStream != NULL);
+    int64_t oldSeqNum = m_drStream->getLastCommittedSequenceNumberAndUniqueIds().seqNum;
+    m_drStream = drStream;
+    m_drStream->setLastCommittedSequenceNumber(oldSeqNum);
+}
+
+void ExecutorContext::setDrReplicatedStream(DRTupleStreamBase *drReplicatedStream) {
+    assert (m_drReplicatedStream != NULL);
+    assert (drReplicatedStream != NULL);
+    int64_t oldSeqNum = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueIds().seqNum;
+    m_drReplicatedStream = drReplicatedStream;
+    m_drReplicatedStream->setLastCommittedSequenceNumber(oldSeqNum);
 }
 
 } // end namespace voltdb
