@@ -19,7 +19,7 @@ package org.voltdb;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 
 //This is returned after authentication for convenience the client and other information is built and returned.
 public class AuthenticationResult {
@@ -30,11 +30,11 @@ public class AuthenticationResult {
     final private boolean m_authenticated;
     final public String[] m_perms;
     final public AuthUser m_authUser;
-    final public ClientAuthHashScheme m_scheme;
+    final public ClientAuthScheme m_scheme;
     final public AuthenticatedConnectionCache m_connectionCache;
 
     //Is user authenticated or not depends on client connection there or not.
-    public AuthenticationResult(Client client, AuthenticatedConnectionCache connectionCache, ClientAuthHashScheme scheme, boolean adminMode, String user, String message) {
+    public AuthenticationResult(Client client, AuthenticatedConnectionCache connectionCache, ClientAuthScheme scheme, boolean adminMode, String user, String message) {
         m_adminMode = adminMode;
         m_client = client;
         m_connectionCache = connectionCache;

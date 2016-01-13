@@ -103,7 +103,7 @@ public class TestClientFeatures extends TestCase {
     public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
-        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthHashScheme.HASH_SHA1);
+        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthScheme.HASH_SHA1);
         config.setProcedureCallTimeout(500);
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
@@ -422,7 +422,7 @@ public class TestClientFeatures extends TestCase {
 
     public void testDefaultConfigValues() {
         final ClientConfig dut = new ClientConfig();
-        assertEquals(ClientAuthHashScheme.HASH_SHA256, dut.m_hashScheme);
+        assertEquals(ClientAuthScheme.HASH_SHA256, dut.m_hashScheme);
         assertTrue(dut.m_username.isEmpty());
         assertTrue(dut.m_password.isEmpty());
         assertTrue(dut.m_cleartext);
