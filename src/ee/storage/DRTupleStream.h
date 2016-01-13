@@ -18,13 +18,13 @@
 #ifndef DRTUPLESTREAM_H_
 #define DRTUPLESTREAM_H_
 
-#include "storage/DRTupleStreamBase.h"
+#include "storage/AbstractDRTupleStream.h"
 
 namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
-class DRTupleStream : public voltdb::DRTupleStreamBase {
+class DRTupleStream : public voltdb::AbstractDRTupleStream {
 public:
     //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;

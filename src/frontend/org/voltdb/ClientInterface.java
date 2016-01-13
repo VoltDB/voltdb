@@ -3099,7 +3099,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @throws IOException
      * @throws InterruptedException
      */
-    public ClientResponse callExecuteTask(long timeoutMS, byte[] params) throws IOException, InterruptedException {
+    public ClientResponse callExecuteTask(long timeoutMS, byte[] params ) throws IOException, InterruptedException {
         final String procedureName = "@ExecuteTask";
         Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
         Procedure proc = procedureConfig.asCatalogProcedure();

@@ -32,7 +32,7 @@ namespace voltdb {
 extern const int64_t VOLT_EPOCH;
 
 class AbstractExecutor;
-class DRTupleStreamBase;
+class AbstractDRTupleStream;
 class VoltDBEngine;
 
 /*
@@ -57,8 +57,8 @@ class ExecutorContext {
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStreamBase *drTupleStream,
-                    DRTupleStreamBase *drReplicatedStream,
+                    AbstractDRTupleStream *drTupleStream,
+                    AbstractDRTupleStream *drReplicatedStream,
                     CatalogId drClusterId);
 
     ~ExecutorContext();
@@ -224,14 +224,14 @@ class ExecutorContext {
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
-    void setDrStream(DRTupleStreamBase *drStream);
-    void setDrReplicatedStream(DRTupleStreamBase *drReplicatedStream);
+    void setDrStream(AbstractDRTupleStream *drStream);
+    void setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream);
 
-    DRTupleStreamBase* drStream() {
+    AbstractDRTupleStream* drStream() {
         return m_drStream;
     }
 
-    DRTupleStreamBase* drReplicatedStream() {
+    AbstractDRTupleStream* drReplicatedStream() {
         return m_drReplicatedStream;
     }
 
@@ -258,8 +258,8 @@ class ExecutorContext {
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
-    DRTupleStreamBase *m_drStream;
-    DRTupleStreamBase *m_drReplicatedStream;
+    AbstractDRTupleStream *m_drStream;
+    AbstractDRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;

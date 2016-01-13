@@ -18,13 +18,15 @@
 #ifndef COMPATIBLEDRTUPLESTREAM_H_
 #define COMPATIBLEDRTUPLESTREAM_H_
 
-#include "storage/DRTupleStreamBase.h"
+#include "storage/AbstractDRTupleStream.h"
+
+// IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
 
 namespace voltdb {
 class StreamBlock;
 class TableIndex;
 
-class CompatibleDRTupleStream : public voltdb::DRTupleStreamBase {
+class CompatibleDRTupleStream : public AbstractDRTupleStream {
 public:
     //Version(1), type(1), drId(8), uniqueId(8), checksum(4)
     static const size_t BEGIN_RECORD_SIZE = 1 + 1 + 8 + 8 + 4;
@@ -33,7 +35,7 @@ public:
     //Version(1), type(1), table signature(8), checksum(4)
     static const size_t TXN_RECORD_HEADER_SIZE = 1 + 1 + 4 + 8;
 
-    static const uint8_t MINIMUM_COMPATIBLE_PROTOCOL_VERSION = 3;
+    static const uint8_t COMPATIBLE_PROTOCOL_VERSION = 3;
 
     CompatibleDRTupleStream();
 

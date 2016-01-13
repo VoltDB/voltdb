@@ -37,11 +37,13 @@
 #include <utility>
 #include <math.h>
 
+// IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
+
 using namespace std;
 using namespace voltdb;
 
 CompatibleDRTupleStream::CompatibleDRTupleStream()
-    : DRTupleStreamBase(),
+    : AbstractDRTupleStream(),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
@@ -72,7 +74,7 @@ size_t CompatibleDRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
 
-    io.writeByte(static_cast<uint8_t>(MINIMUM_COMPATIBLE_PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
     io.writeInt(static_cast<int32_t>(tableName.size()));
@@ -137,7 +139,7 @@ size_t CompatibleDRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(MINIMUM_COMPATIBLE_PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -201,7 +203,7 @@ size_t CompatibleDRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                                  m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(MINIMUM_COMPATIBLE_PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -338,7 +340,7 @@ void CompatibleDRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t u
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
-     io.writeByte(static_cast<uint8_t>(MINIMUM_COMPATIBLE_PROTOCOL_VERSION));
+     io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
@@ -401,7 +403,7 @@ void CompatibleDRTupleStream::endTransaction(int64_t uniqueId) {
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(static_cast<uint8_t>(MINIMUM_COMPATIBLE_PROTOCOL_VERSION));
+    io.writeByte(static_cast<uint8_t>(COMPATIBLE_PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
     uint32_t crc = vdbcrc::crc32cInit();

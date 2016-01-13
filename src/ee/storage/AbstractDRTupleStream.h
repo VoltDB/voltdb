@@ -23,7 +23,6 @@
 #include "common/FatalException.hpp"
 #include "storage/TupleStreamBase.h"
 #include <deque>
-#include <cassert>
 
 namespace voltdb {
 class TableIndex;
@@ -42,11 +41,11 @@ struct DRCommittedInfo{
     DRCommittedInfo(int64_t seq, int64_t spUID, int64_t mpUID) : seqNum(seq), spUniqueId(spUID), mpUniqueId(mpUID) {}
 };
 
-class DRTupleStreamBase : public voltdb::TupleStreamBase {
+class AbstractDRTupleStream : public TupleStreamBase {
 public:
-    DRTupleStreamBase();
+    AbstractDRTupleStream();
 
-    virtual ~DRTupleStreamBase() {}
+    virtual ~AbstractDRTupleStream() {}
 
     virtual void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream);
     /** truncate stream back to mark */
@@ -110,16 +109,16 @@ protected:
 
 class DRTupleStreamDisableGuard {
 public:
-    DRTupleStreamDisableGuard(DRTupleStreamBase *drStream, DRTupleStreamBase *drReplicatedStream, bool ignore) :
-            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_drStreamOldValue(drStream->m_enabled),
+    DRTupleStreamDisableGuard(ExecutorContext *ec, bool ignore) :
+            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_enabled),
             m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
     {
         if (!ignore) {
             setGuard();
         }
     }
-    DRTupleStreamDisableGuard(DRTupleStreamBase *drStream, DRTupleStreamBase *drReplicatedStream) :
-            m_drStream(drStream), m_drReplicatedStream(drReplicatedStream), m_drStreamOldValue(drStream->m_enabled),
+    DRTupleStreamDisableGuard(ExecutorContext *ec) :
+            m_drStream(ec->drStream()), m_drReplicatedStream(ec->drReplicatedStream()), m_drStreamOldValue(ec->drStream()->m_enabled),
             m_drReplicatedStreamOldValue(m_drReplicatedStream?m_drReplicatedStream->m_enabled:false)
     {
         setGuard();
@@ -139,8 +138,8 @@ private:
         }
     }
 
-    DRTupleStreamBase *m_drStream;
-    DRTupleStreamBase *m_drReplicatedStream;
+    AbstractDRTupleStream *m_drStream;
+    AbstractDRTupleStream *m_drReplicatedStream;
     const bool m_drStreamOldValue;
     const bool m_drReplicatedStreamOldValue;
 };

@@ -61,5 +61,4 @@ public interface ProducerDRGateway {
     public void resetDRProducer();
 
     public void blockOnSyncSnapshotGeneration();
-
 }

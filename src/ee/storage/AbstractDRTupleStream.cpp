@@ -15,11 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "DRTupleStreamBase.h"
+#include "AbstractDRTupleStream.h"
+#include <cassert>
+
 using namespace std;
 using namespace voltdb;
 
-DRTupleStreamBase::DRTupleStreamBase()
+AbstractDRTupleStream::AbstractDRTupleStream()
         : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
           m_enabled(true),
           m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
@@ -30,7 +32,7 @@ DRTupleStreamBase::DRTupleStreamBase()
 }
 
 // for test purpose
-void DRTupleStreamBase::setSecondaryCapacity(size_t capacity) {
+void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity) {
     assert (capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
         m_openTransactionUso != 0 || m_committedSpHandle != 0)
@@ -41,7 +43,7 @@ void DRTupleStreamBase::setSecondaryCapacity(size_t capacity) {
     m_secondaryCapacity = capacity;
 }
 
-void DRTupleStreamBase::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
+void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
     int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
     if (rowTarget >= 0) {
@@ -51,7 +53,7 @@ void DRTupleStreamBase::pushExportBuffer(StreamBlock *block, bool sync, bool end
 
 // Set m_opened = false first otherwise checkOpenTransaction() may
 // consider the transaction being rolled back as open.
-void DRTupleStreamBase::rollbackTo(size_t mark, size_t drRowCost) {
+void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
     if (mark == INVALID_DR_MARK) {
         return;
     }
@@ -69,7 +71,7 @@ void DRTupleStreamBase::rollbackTo(size_t mark, size_t drRowCost) {
     TupleStreamBase::rollbackTo(mark, drRowCost);
 }
 
-void DRTupleStreamBase::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
+void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
     assert(m_committedSequenceNumber == -1);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;

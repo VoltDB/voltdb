@@ -213,21 +213,18 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
 
-    // configure DR stream
+    // configure DR stream and DR compatible stream
     m_drStream = new DRTupleStream();
     m_drStream->configure(partitionId);
-    if (createDrReplicatedStream) {
-        m_drReplicatedStream = new DRTupleStream();
-        m_drReplicatedStream->configure(16383);
-    }
-
-    // configure DR stream for compatibility mode
     m_compatibleDRStream = new CompatibleDRTupleStream();
     m_compatibleDRStream->configure(partitionId);
     if (createDrReplicatedStream) {
+        m_drReplicatedStream = new DRTupleStream();
+        m_drReplicatedStream->configure(16383);
         m_compatibleDRReplicatedStream = new CompatibleDRTupleStream();
         m_compatibleDRReplicatedStream->configure(16383);
     }
+
     // set the DR version
     m_drVersion = DRTupleStream::PROTOCOL_VERSION;
 
@@ -1720,7 +1717,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int32_t remoteClusterId,
                                   int64_t undoToken,
                                   const char *log) {
-    DRTupleStreamDisableGuard guard(m_executorContext->drStream(), m_executorContext->drReplicatedStream(), !m_database->isActiveActiveDRed());
+    DRTupleStreamDisableGuard guard(m_executorContext, !m_database->isActiveActiveDRed());
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,

@@ -18,7 +18,7 @@
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
-#include "storage/DRTupleStreamBase.h"
+#include "storage/AbstractDRTupleStream.h"
 
 #include "boost/foreach.hpp"
 
@@ -81,8 +81,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 VoltDBEngine* engine,
                 std::string hostname,
                 CatalogId hostId,
-                DRTupleStreamBase *drStream,
-                DRTupleStreamBase *drReplicatedStream,
+                AbstractDRTupleStream *drStream,
+                AbstractDRTupleStream *drReplicatedStream,
                 CatalogId drClusterId) :
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
@@ -242,18 +242,20 @@ bool ExecutorContext::allOutputTempTablesAreEmpty() const {
     return true;
 }
 
-void ExecutorContext::setDrStream(DRTupleStreamBase *drStream) {
+void ExecutorContext::setDrStream(AbstractDRTupleStream *drStream) {
     assert (m_drStream != NULL);
     assert (drStream != NULL);
-    int64_t oldSeqNum = m_drStream->getLastCommittedSequenceNumberAndUniqueIds().seqNum;
+    assert (m_drStream->m_committedSequenceNumber >= drStream->m_committedSequenceNumber);
+    int64_t oldSeqNum = m_drStream->m_committedSequenceNumber;
     m_drStream = drStream;
     m_drStream->setLastCommittedSequenceNumber(oldSeqNum);
 }
 
-void ExecutorContext::setDrReplicatedStream(DRTupleStreamBase *drReplicatedStream) {
+void ExecutorContext::setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream) {
     assert (m_drReplicatedStream != NULL);
     assert (drReplicatedStream != NULL);
-    int64_t oldSeqNum = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueIds().seqNum;
+    assert (m_drReplicatedStream->m_committedSequenceNumber >= drReplicatedStream->m_committedSequenceNumber);
+    int64_t oldSeqNum = m_drReplicatedStream->m_committedSequenceNumber;
     m_drReplicatedStream = drReplicatedStream;
     m_drReplicatedStream->setLastCommittedSequenceNumber(oldSeqNum);
 }

@@ -338,7 +338,7 @@ CTX.INPUT['storage'] = """
  TableStreamerContext.cpp
  ElasticIndex.cpp
  ElasticIndexReadContext.cpp
- DRTupleStreamBase.cpp
+ AbstractDRTupleStream.cpp
  CompatibleDRTupleStream.cpp
 """
 

@@ -41,7 +41,7 @@ using namespace std;
 using namespace voltdb;
 
 DRTupleStream::DRTupleStream()
-    : DRTupleStreamBase(),
+    : AbstractDRTupleStream(),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}

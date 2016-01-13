@@ -616,7 +616,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     TBPtr allocateNextBlock();
 
-    inline DRTupleStreamBase *getDRTupleStream(ExecutorContext *ec) {
+    inline AbstractDRTupleStream *getDRTupleStream(ExecutorContext *ec) {
         if (isReplicatedTable()) {
             return ec->drReplicatedStream();
         } else {

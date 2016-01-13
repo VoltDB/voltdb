@@ -36,6 +36,8 @@
 #include<boost/unordered_set.hpp>
 #include<crc/crc32c.h>
 
+// IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
+
 namespace voltdb {
 
 const static std::string EXISTING_TABLE = "existing_table";
@@ -56,110 +58,6 @@ const static int DR_TUPLE_COLUMN_INDEX = 9;
 
 const static int DECISION_BIT = 1;
 const static int RESOLVED_BIT = 1 << 1;
-
-// Utility functions to convert types to strings. Each type string has a fixed
-// length. Check the schema of the conflict export table for the limits.
-// 3 letters
-static inline std::string DRConflictRowTypeStr(DRConflictRowType type) {
-    switch (type) {
-    case EXISTING_ROW:
-        return "EXT";
-    case EXPECTED_ROW:
-        return "EXP";
-    case NEW_ROW:
-        return "NEW";
-    default:
-        return "";
-    }
-}
-
-// 1 letter
-static inline std::string DRRecordTypeStr(DRRecordType type) {
-    switch (type) {
-    case DR_RECORD_INSERT:
-        return "I";
-    case DR_RECORD_DELETE:
-    case DR_RECORD_DELETE_BY_INDEX:
-        return "D";
-    case DR_RECORD_UPDATE:
-    case DR_RECORD_UPDATE_BY_INDEX:
-        return "U";
-    case DR_RECORD_TRUNCATE_TABLE:
-        return "T";
-    default:
-        return "";
-    }
-}
-
-// 4 letters
-static inline std::string DRConflictTypeStr(DRConflictType type) {
-    switch (type) {
-    case NO_CONFLICT:
-        return "NONE";
-    case CONFLICT_CONSTRAINT_VIOLATION:
-        return "CNST";
-    case CONFLICT_EXPECTED_ROW_MISSING:
-        return "MISS";
-    case CONFLICT_EXPECTED_ROW_MISMATCH:
-        return "MSMT";
-    default:
-        return "";
-    }
-}
-
-// 1 letter
-static inline std::string DRDecisionStr(DRRowDecision type) {
-    switch (type) {
-    case ACCEPT:
-        return "A";
-    case REJECT:
-        return "R";
-    default:
-        return "";
-    }
-}
-
-// 1 letter
-static inline std::string DRDivergenceStr(DRDivergence type) {
-    switch (type) {
-    case NOT_DIVERGE:
-        return "C";
-    case DIVERGE:
-        return "D";
-    default:
-        return "";
-    }
-}
-
-static bool isApplyNewRow(int32_t retval) {
-    return (retval & DECISION_BIT) == DECISION_BIT;
-}
-
-static bool isResolved(int32_t retval) {
-    return (retval & RESOLVED_BIT) == RESOLVED_BIT;
-}
-
-static void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
-    TableTuple tuple(metadataTable->schema());
-    TableIterator iter = metadataTable->iterator();
-    while (iter.next(tuple)) {
-        tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
-                        ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
-        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
-                        ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
-    }
-}
-
-static void exportTuples(Table *exportTable, Table *metaTable, Table *tupleTable) {
-    TableTuple tempMetaTuple(exportTable->schema());
-    TableTuple tempTupleTuple(tupleTable->schema());
-    TableIterator metaIter = metaTable->iterator();
-    TableIterator tupleIter = tupleTable->iterator();
-    while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
-        tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
-        exportTable->insertTuple(tempMetaTuple);
-    }
-}
 
 class CachedIndexKeyTuple {
 public:
@@ -192,7 +90,112 @@ private:
     boost::scoped_array<char> m_tupleStorage;
 };
 
+// a c++ style way to limit access from outside this file
+namespace {
 
+// Utility functions to convert types to strings. Each type string has a fixed
+// length. Check the schema of the conflict export table for the limits.
+// 3 letters
+inline std::string DRConflictRowTypeStr(DRConflictRowType type) {
+    switch (type) {
+    case EXISTING_ROW:
+        return "EXT";
+    case EXPECTED_ROW:
+        return "EXP";
+    case NEW_ROW:
+        return "NEW";
+    default:
+        return "";
+    }
+}
+
+// 1 letter
+inline std::string DRRecordTypeStr(DRRecordType type) {
+    switch (type) {
+    case DR_RECORD_INSERT:
+        return "I";
+    case DR_RECORD_DELETE:
+    case DR_RECORD_DELETE_BY_INDEX:
+        return "D";
+    case DR_RECORD_UPDATE:
+    case DR_RECORD_UPDATE_BY_INDEX:
+        return "U";
+    case DR_RECORD_TRUNCATE_TABLE:
+        return "T";
+    default:
+        return "";
+    }
+}
+
+// 4 letters
+inline std::string DRConflictTypeStr(DRConflictType type) {
+    switch (type) {
+    case NO_CONFLICT:
+        return "NONE";
+    case CONFLICT_CONSTRAINT_VIOLATION:
+        return "CNST";
+    case CONFLICT_EXPECTED_ROW_MISSING:
+        return "MISS";
+    case CONFLICT_EXPECTED_ROW_MISMATCH:
+        return "MSMT";
+    default:
+        return "";
+    }
+}
+
+// 1 letter
+inline std::string DRDecisionStr(DRRowDecision type) {
+    switch (type) {
+    case ACCEPT:
+        return "A";
+    case REJECT:
+        return "R";
+    default:
+        return "";
+    }
+}
+
+// 1 letter
+inline std::string DRDivergenceStr(DRDivergence type) {
+    switch (type) {
+    case NOT_DIVERGE:
+        return "C";
+    case DIVERGE:
+        return "D";
+    default:
+        return "";
+    }
+}
+
+bool isApplyNewRow(int32_t retval) {
+    return (retval & DECISION_BIT) == DECISION_BIT;
+}
+
+bool isResolved(int32_t retval) {
+    return (retval & RESOLVED_BIT) == RESOLVED_BIT;
+}
+
+void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
+    TableTuple tuple(metadataTable->schema());
+    TableIterator iter = metadataTable->iterator();
+    while (iter.next(tuple)) {
+        tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
+        tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
+                        ValueFactory::getTempStringValue(DRDivergenceStr(convergent ? NOT_DIVERGE : DIVERGE)));
+    }
+}
+
+void exportTuples(Table *exportTable, Table *metaTable, Table *tupleTable) {
+    TableTuple tempMetaTuple(exportTable->schema());
+    TableTuple tempTupleTuple(tupleTable->schema());
+    TableIterator metaIter = metaTable->iterator();
+    TableIterator tupleIter = tupleTable->iterator();
+    while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
+        tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX, ValueFactory::getTempStringValue(tempTupleTuple.toJsonArray()));
+        exportTable->insertTuple(tempMetaTuple);
+    }
+}
 
 typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
 
@@ -200,7 +203,7 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
    * All conflicting rows are put into @conflictRows.
    */
-static void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
     boost::unordered_set<char*> redundancyFilter;
     BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
         if (index->isUniqueIndex()) {
@@ -232,7 +235,7 @@ static void findConflictTuple(Table *table, const TableTuple *existingTuple, con
 /**
  * create conflict export tuple from the conflict tuple
  */
-static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
+void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
         DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
     TableTuple tempMetaTuple = outputMetaTable->tempTuple();
     NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
@@ -253,7 +256,7 @@ static void createConflictExportTuple(TempTable *outputMetaTable, TempTable *out
 }
 
 // iterate all tables and push them into export table
-static void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool resolved,
+void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool resolved,
         TempTable *existingMetaTableForDelete, TempTable *existingTupleTableForDelete,
         TempTable *expectedMetaTableForDelete, TempTable *expectedTupleTableForDelete,
         TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
@@ -286,7 +289,7 @@ static void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool re
     }
 }
 
-static void validateChecksum(uint32_t checksum, const char *start, const char *end) {
+void validateChecksum(uint32_t checksum, const char *start, const char *end) {
     uint32_t recalculatedCRC = vdbcrc::crc32cInit();
     recalculatedCRC = vdbcrc::crc32c( recalculatedCRC, start, (end - 4) - start);
     recalculatedCRC = vdbcrc::crc32cFinish(recalculatedCRC);
@@ -296,7 +299,7 @@ static void validateChecksum(uint32_t checksum, const char *start, const char *e
     }
 }
 
-static bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, const TableTuple *expectedTuple, TableTuple *newTuple,
+bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, const TableTuple *expectedTuple, TableTuple *newTuple,
         int64_t uniqueId, int32_t remoteClusterId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
     if (!engine) {
         return false;
@@ -452,6 +455,7 @@ static bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool 
 
     return true;
 }
+} // end of anonymous namespace
 
 int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
                                        boost::unordered_map<int64_t, PersistentTable*> &tables,

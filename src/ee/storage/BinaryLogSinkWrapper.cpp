@@ -40,7 +40,7 @@ int64_t BinaryLogSinkWrapper::apply(const char* taskParams, boost::unordered_map
         if (drVersion == DRTupleStream::PROTOCOL_VERSION) {
             rowCount += m_sink.apply(&taskInfo, tables, pool, engine, remoteClusterId,
                                      recordStart, &uniqueId, &sequenceNumber);
-        } else if (drVersion == CompatibleDRTupleStream::MINIMUM_COMPATIBLE_PROTOCOL_VERSION) {
+        } else if (drVersion == CompatibleDRTupleStream::COMPATIBLE_PROTOCOL_VERSION) {
             rowCount += m_compatibleSink.apply(&taskInfo, tables, pool, engine, remoteClusterId,
                                                recordStart, &uniqueId, &sequenceNumber);
         } else {

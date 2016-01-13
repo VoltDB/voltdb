@@ -84,8 +84,8 @@ struct FunctionTest : public Test {
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,
-                                  (DRTupleStreamBase *)0,
-                                  (DRTupleStreamBase *)0,
+                                  (AbstractDRTupleStream *)0,
+                                  (AbstractDRTupleStream *)0,
                                   0) {}
         /**
          * A template for calling unary function call expressions.  For any C++

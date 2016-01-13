@@ -23,6 +23,8 @@
 #include <boost/unordered_map.hpp>
 #include <boost/shared_ptr.hpp>
 
+// IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
+
 namespace voltdb {
 
 class PersistentTable;
