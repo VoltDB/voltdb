@@ -191,7 +191,8 @@ SELECT A.ID AID, B.ID BID, DISTANCE(A.PT1  ,B.POLY1) G23DIST FROM _table A JOIN 
 SELECT ID, DISTANCE(POLY1,PT1  ) from _table G24
 SELECT ID, DISTANCE(POLY1,PT1  ) from _table G25 WHERE DISTANCE(POLY1,PT1  ) > 200000
 SELECT A.ID AID, B.ID BID, DISTANCE(A.POLY1,B.PT1  ) G26DIST FROM _table A JOIN _table B ON A.ID <= B.ID
--- DISTANCE between two polygons is not yet supported
+-- DISTANCE between two polygons is not yet supported; so this fails in the (VoltDB)
+-- planner (even when running against the PostGIS backend, which does call the planner)
 SELECT ID, DISTANCE(POLY1,POLY1) from _table G27
 SELECT ID, DISTANCE(POLY1,POLY1) from _table G28 WHERE DISTANCE(POLY1,POLY1) < 200000
 SELECT A.ID AID, B.ID BID, DISTANCE(A.POLY1,B.POLY1) G29DIST FROM _table A JOIN _table B ON A.ID <= B.ID

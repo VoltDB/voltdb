@@ -319,6 +319,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
      * <i>initText</i>, <i>prefix</i>, or <i>suffix</i> is <b>null</b>.
      */
     @SuppressWarnings("unused")
+    // TODO: improve this method (& overloaded versions), and its large,
+    // confusing argument list, probably using the builder pattern
     static protected String transformQuery(String query, Pattern queryPattern, String initText,
             String prefix, String suffix, String altEnding, String altText,
             boolean useWhole, ColumnType columnType, Double multiplier, Integer minimum,
@@ -364,8 +366,8 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             }
             if (useWhole) {
                 if (columnType != null && (
-                           (columnType.equals(ColumnType.INTEGER) && !isIntegerColumn(group))
-                        || (columnType.equals(ColumnType.GEO)     && !isGeoColumn(group)) )) {
+                           (columnType == ColumnType.INTEGER && !isIntegerColumn(group))
+                        || (columnType == ColumnType.GEO     && !isGeoColumn(group)) )) {
                     // Make no changes to query
                     replaceText.append(wholeMatch);
                 } else {
