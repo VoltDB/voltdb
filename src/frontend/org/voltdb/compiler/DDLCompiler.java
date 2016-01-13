@@ -182,7 +182,7 @@ public class DDLCompiler {
     }
 
     private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType, StringBuffer msg) {
-        assert (tableNode.name.equals("table"));
+        assert(tableNode.name.equals("table"));
 
         String valueTypeStr;
         VoltType type;
@@ -221,7 +221,7 @@ public class DDLCompiler {
     // found in table wrapped in exception message
     private void guardForGeoColumns(VoltXMLElement tableXML, String tableName, String tableVerb)
             throws VoltCompilerException {
-        assert (tableXML.name.equals("table"));
+        assert(tableXML.name.equals("table"));
         assert(tableVerb != null);
         assert(tableName != null);
 
