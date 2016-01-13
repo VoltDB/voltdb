@@ -406,9 +406,6 @@ def map_deployment(request, database_id):
     if 'dr' in request.json and 'type' in request.json['dr']:
         deployment[0]['dr']['type'] = request.json['dr']['type']
 
-    if 'dr' in request.json and 'enabled' in request.json['dr']:
-        deployment[0]['dr']['enabled'] = request.json['dr']['enabled']
-
     if 'dr' in request.json and 'connection' in request.json['dr'] \
             and 'source' in request.json['dr']['connection']:
         deployment[0]['dr']['connection']['source'] = request.json['dr']['connection']['source']
@@ -472,8 +469,8 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
- #   db1 = get_database_deployment(1)
- #   print db1
+    db1 = get_database_deployment(1)
+    print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
@@ -546,7 +543,8 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
                     deployment_sub_element.text = str(value1)
                 else:
                     if istop == False:
-                        deployment_sub_element.attrib[key1] = str(value1)
+                        if value1 != None:
+                            deployment_sub_element.attrib[key1] = str(value1)
                     elif key1 not in IGNORETOP:
                         if value1 != None:
                             deployment_sub_element.attrib[key1] = str(value1)
