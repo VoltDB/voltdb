@@ -56,9 +56,7 @@
         "prefix": "AUTOSNAP",
         "enabled": false
     },
-    "export": {
-        "configuration": []
-    },
+    "export": null,
     "users": null,
     "commandlog": {
         "frequency": {
@@ -83,42 +81,12 @@
         "query": {
             "timeout": 0
         },
-        "resourcemonitor": {
-            "memorylimit": {
-                "size": "1"
-            },
-            "disklimit": {
-                "feature": [{
-                        "name": "snapshots",
-                        "size": "2"
-                    },
-                    {
-                        "name": "commandlog",
-                        "size": "2"
-                    }]
-            },
-            "frequency": 5
-        }
+        "resourcemonitor": null
     },
     "security": {
         "enabled": false,
         "provider": "hash"
     },
     "dr": null,
-    "import": {
-        "configuration": [
-            {
-                "property": [{
-                        "value": "7001",
-                        "name": "port"
-                    }, {
-                        "value": "importTable.insert",
-                        "name": "procedure"
-                    }],
-                "module": "socketstream.jar",
-                "type": "custom",
-                "enabled": true,
-                "format": ""
-            }]
-    }
+    "import":null
 }
