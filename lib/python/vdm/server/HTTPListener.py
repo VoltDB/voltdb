@@ -460,7 +460,7 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    db1 = get_database_deployment(1)
+    #db1 = get_database_deployment(1)
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
@@ -1046,6 +1046,14 @@ class deploymentUserAPI(MethodView):
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
 
 
+class VdmStatus(MethodView):
+    """
+    Class to get VDM status for peers to check.
+    """
+    @staticmethod
+    def get():
+        return jsonify({'vdm': {"running": "true"}})
+
 def main(runner, amodule, aport, apath):
     try:
         F_DEBUG = os.environ['DEBUG']
@@ -1078,6 +1086,7 @@ def main(runner, amodule, aport, apath):
     DATABASE_MEMBER_VIEW = DatabaseMemberAPI.as_view('database_member_api')
     DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
     DEPLOYMENT_USER_VIEW = deploymentUserAPI.as_view('deployment_user_api')
+    VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1100,5 +1109,6 @@ def main(runner, amodule, aport, apath):
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'POST', 'DELETE'])
-
+    APP.add_url_rule('/api/1.0/vdm/status',
+                     view_func=VDM_STATUS_VIEW, methods=['GET'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)
