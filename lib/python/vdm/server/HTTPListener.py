@@ -320,6 +320,10 @@ def map_deployment(request, database_id):
         deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
             request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
 
+    if 'import' in request.json:
+        if deployment[0]['import'] is None:
+            deployment[0]['import'] = {}
+
     if 'import' in request.json and 'configuration' in request.json['import']:
         deployment[0]['import']['configuration'] = []
         i = 0
@@ -342,6 +346,10 @@ def map_deployment(request, database_id):
                         }
                     )
                 i += 1
+
+    if 'export' in request.json:
+        if deployment[0]['export'] is None:
+            deployment[0]['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
         deployment[0]['export']['configuration'] = []
@@ -460,7 +468,7 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    #db1 = get_database_deployment(1)
+    # db1 = get_database_deployment(1)
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
