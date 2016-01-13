@@ -735,7 +735,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         // verify results of asText from EE matches WKT format defined in frontend/java
         while (asTextVT.advanceRow()) {
-            GeographyPointValue gpv = asTextVT.getPoint(0);
+            GeographyPointValue gpv = asTextVT.getGeographyPointValue(0);
             if (gpv == null) {
                 assertEquals(null, asTextVT.getString(1));
             }

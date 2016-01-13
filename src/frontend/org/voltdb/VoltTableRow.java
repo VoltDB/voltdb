@@ -297,7 +297,7 @@ public abstract class VoltTableRow {
             ret = getDecimalAsBigDecimal(columnIndex);
             break;
         case GEOGRAPHY_POINT:
-            ret = getPoint(columnIndex);
+            ret = getGeographyPointValue(columnIndex);
             break;
         case GEOGRAPHY:
             ret = getGeographyValue(columnIndex);
@@ -620,18 +620,45 @@ public abstract class VoltTableRow {
         return getVarbinary(colIndex);
     }
 
-    public final GeographyPointValue getPoint(int columnIndex) {
+    /**
+     * Retrieve the GeographyPointValue value stored in the column specified by index.
+     * Looking at the return value is not a reliable way to check if the value is
+     * <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnIndex Index of the column
+     * @return GeographyPointValue value stored in the specified column
+     * @see #wasNull()
+     */
+    public final GeographyPointValue getGeographyPointValue(int columnIndex) {
         validateColumnType(columnIndex, VoltType.GEOGRAPHY_POINT);
         GeographyPointValue pt = GeographyPointValue.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
         m_wasNull = (pt == null);
         return pt;
     }
 
-    public final GeographyPointValue getPoint(String columnName) {
+    /**
+     * Retrieve the GeographyPointValue value stored in the column specified by name.
+     * Avoid retrieving via this method as it is slower than specifying the column
+     * by index. Use {@link #getGeographyPointValue(int)} instead.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnName Name of the column
+     * @return GeographyPointValue value stored in the specified column
+     * @see #wasNull()
+     * @see #getGeographyPointValue(int)
+     */
+    public final GeographyPointValue getGeographyPointValue(String columnName) {
         final int colIndex = getColumnIndex(columnName);
-        return getPoint(colIndex);
+        return getGeographyPointValue(colIndex);
     }
 
+    /**
+     * Retrieve the GeographyValue value stored in the column specified by index.
+     * Looking at the return value is not a reliable way to check if the value is
+     * <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnIndex Index of the column
+     * @return GeographyValue value stored in the specified column
+     * @see #wasNull()
+     */
     public final GeographyValue getGeographyValue(int columnIndex) {
         validateColumnType(columnIndex, VoltType.GEOGRAPHY);
         int offset = getOffset(columnIndex);
@@ -646,6 +673,17 @@ public abstract class VoltTableRow {
         return gv;
     }
 
+    /**
+     * Retrieve the GeographyValue value stored in the column specified by name.
+     * Avoid retrieving via this method as it is slower than specifying the column
+     * by index. Use {@link #getGeographyValue(int)} instead.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnName Name of the column
+     * @return GeographyValue value stored in the specified column
+     * @see #wasNull()
+     * @see #getGeographyPointValue(int)
+     */
     public final GeographyValue getGeographyValue(String columnName) {
         final int colIndex = getColumnIndex(columnName);
         return getGeographyValue(colIndex);
@@ -874,7 +912,7 @@ public abstract class VoltTableRow {
             }
             break;
         case GEOGRAPHY_POINT:
-            GeographyPointValue pt = getPoint(columnIndex);
+            GeographyPointValue pt = getGeographyPointValue(columnIndex);
             if (wasNull()) {
                 js.value(null);
             }

@@ -119,7 +119,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
     }
 
     NValue returnValue(VALUE_TYPE_POINT);
-    returnValue.getPoint() = GeographyPointValue(lng, lat);
+    returnValue.getGeographyPointValue() = GeographyPointValue(lng, lat);
 
     return returnValue;
 }
@@ -284,8 +284,8 @@ template<> NValue NValue::call<FUNC_VOLT_CONTAINS>(const std::vector<NValue>& ar
         return NValue::getNullValue(VALUE_TYPE_BOOLEAN);
 
     Polygon poly;
-    poly.initFromGeography(arguments[0].getGeography());
-    S2Point pt = arguments[1].getPoint().toS2Point();
+    poly.initFromGeography(arguments[0].getGeographyValue());
+    S2Point pt = arguments[1].getGeographyPointValue().toS2Point();
     return ValueFactory::getBooleanValue(poly.Contains(pt));
 }
 
@@ -295,7 +295,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>() cons
     }
 
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
 
     NValue retVal(VALUE_TYPE_INTEGER);
     // exclude exterior ring
@@ -309,7 +309,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_NUM_POINTS>() const {
     }
 
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
 
     // the OGC spec suggests that the number of vertices should
     // include the repeated closing vertex which is implicit in S2's
@@ -325,7 +325,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LATITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
-    const GeographyPointValue point = getPoint();
+    const GeographyPointValue point = getGeographyPointValue();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLatitude();
     return retVal;
@@ -335,7 +335,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINT_LONGITUDE>() const {
     if (isNull()) {
         return NValue::getNullValue(VALUE_TYPE_DOUBLE);
     }
-    const GeographyPointValue point = getPoint();
+    const GeographyPointValue point = getGeographyPointValue();
     NValue retVal(VALUE_TYPE_DOUBLE);
     retVal.getDouble() = point.getLongitude();
     return retVal;
@@ -347,10 +347,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_CENTROID>() const {
     }
 
     Polygon polygon;
-    polygon.initFromGeography(getGeography());
+    polygon.initFromGeography(getGeographyValue());
     const GeographyPointValue point(polygon.GetCentroid());
     NValue retVal(VALUE_TYPE_POINT);
-    retVal.getPoint() = point;
+    retVal.getGeographyPointValue() = point;
     return retVal;
 }
 
@@ -360,7 +360,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_AREA>() const {
     }
 
     Polygon polygon;
-    polygon.initFromGeography(getGeography());
+    polygon.initFromGeography(getGeographyValue());
 
     NValue retVal(VALUE_TYPE_DOUBLE);
     // area is in steradians which is a solid angle. Earth in the calculation is treated as sphere
@@ -378,8 +378,8 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POLYGON_POINT>(const std::vect
     }
 
     Polygon polygon;
-    polygon.initFromGeography(arguments[0].getGeography());
-    GeographyPointValue point = arguments[1].getPoint();
+    polygon.initFromGeography(arguments[0].getGeographyValue());
+    GeographyPointValue point = arguments[1].getGeographyPointValue();
     NValue retVal(VALUE_TYPE_DOUBLE);
     // distance is in radians, so convert it to meters
     retVal.getDouble() = polygon.getDistance(point) * SPHERICAL_EARTH_MEAN_RADIUS_M;
@@ -398,8 +398,8 @@ template<> NValue NValue::call<FUNC_VOLT_DISTANCE_POINT_POINT>(const std::vector
     // alternate to this is just obtain 2 s2points and compute S1Angle between them
     // and use that as distance.
     // S2 test uses S2LatLng for computing distances
-    const S2LatLng latLng1 = S2LatLng(arguments[0].getPoint().toS2Point()).Normalized();
-    const S2LatLng latLng2 = S2LatLng(arguments[1].getPoint().toS2Point()).Normalized();
+    const S2LatLng latLng1 = S2LatLng(arguments[0].getGeographyPointValue().toS2Point()).Normalized();
+    const S2LatLng latLng2 = S2LatLng(arguments[1].getGeographyPointValue().toS2Point()).Normalized();
     S1Angle distance = latLng1.GetDistance(latLng2);
     NValue retVal(VALUE_TYPE_DOUBLE);
     // distance is in radians, so convert it to meters
@@ -413,7 +413,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>() const {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
 
-    const std::string pointAsText = getPoint().toWKT();
+    const std::string pointAsText = getGeographyPointValue().toWKT();
     return getTempStringValue(pointAsText.c_str(), pointAsText.length());
 }
 
@@ -423,7 +423,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_ASTEXT_GEOGRAPHY>() const {
         return NValue::getNullValue(VALUE_TYPE_VARCHAR);
     }
 
-    const std::string polygonAsText = getGeography().toWKT();
+    const std::string polygonAsText = getGeographyValue().toWKT();
     return getTempStringValue(polygonAsText.c_str(), polygonAsText.length());
 }
 
@@ -466,7 +466,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     bool returnval = true;
     // Extract the polygon and check its validity.
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
     if (!poly.IsValid()
             || isMultiPolygon(poly)) {
         returnval = false;
@@ -482,7 +482,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
     // Extract the polygon and check its validity.
     std::stringstream msg;
     Polygon poly;
-    poly.initFromGeography(getGeography());
+    poly.initFromGeography(getGeographyValue());
     if (poly.IsValid(&msg)) {
         isMultiPolygon(poly, &msg);
     }
