@@ -77,7 +77,7 @@ public class GeographyPointValue {
      * Create a GeographyPointValue from a WellKnownText string.
      * @param param
      */
-    public static GeographyPointValue geographyPointFromText(String param) {
+    public static GeographyPointValue fromWKT(String param) {
         if (param == null) {
             throw new IllegalArgumentException("Null well known text argument to GeographyPointValue constructor.");
         }
@@ -122,8 +122,15 @@ public class GeographyPointValue {
         return df.format(lng) + " " + df.format(lat);
     }
 
+    /**
+     * Print this point as a string.  We currently use WKT.
+     */
     @Override
     public String toString() {
+        return toWKT();
+    }
+
+    public String toWKT() {
         // This is not GEOGRAPHY_POINT.  This is wkt syntax.
         return "POINT (" + formatLngLat() + ")";
     }
