@@ -237,7 +237,7 @@ def map_deployment(request, database_id):
             request.json['paths']['commandlogsnapshot']['path']
 
     if 'paths' in request.json and 'droverflow' in request.json['paths'] and \
-                    'path' in request['paths']['droverflow']:
+                    'path' in request.json['paths']['droverflow']:
         deployment[0]['paths']['droverflow']['path'] = \
             request.json['paths']['droverflow']['path']
 
