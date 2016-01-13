@@ -182,11 +182,13 @@ public class DDLCompiler {
     }
 
     private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType, StringBuffer msg) {
-        assert tableNode.name.equals("table");
+        assert (tableNode.name.equals("table"));
 
         String valueTypeStr;
         VoltType type;
         String columnName;
+        boolean typeDetected = false;
+        String separatorStr;
 
         for (VoltXMLElement subNode : tableNode.children) {
             if (subNode.name.equals("columns")) {
@@ -196,15 +198,46 @@ public class DDLCompiler {
                         columnName = columnNode.attributes.get("name");
                         type = VoltType.typeFromString(valueTypeStr);
                         if (lookupType == type) {
-                            msg.append("column name: '" + columnName + "', type: '" + valueTypeStr + "'");
-                            return true;
+                            if (msg != null) {
+                                separatorStr = (typeDetected == true)? ", " : " ";
+                                msg.append(separatorStr + "column name: '" + columnName + "' type: '" + valueTypeStr + "'");
+                            }
+                            typeDetected = true;
                         }
                     }
                 }
             } // if (subNode.name.equals("columns"))
         }
 
-        return false;
+        return typeDetected;
+    }
+
+    private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType) {
+        return isVoltTypePresent(tableNode, lookupType, null);
+    }
+
+    // Function to check if the table - TableXML, supplied as VoltXMLElement, does not contain geo types.
+    // If table does contain geo types, VoltCompilerException is generated with information about geo columns
+    // found in table wrapped in exception message
+    private void guardForGeoColumns(VoltXMLElement tableXML, String tableName, String tableVerb)
+            throws VoltCompilerException {
+        assert (tableXML.name.equals("table"));
+        assert(tableVerb != null);
+        assert(tableName != null);
+
+        boolean pointColDetected = false;
+        StringBuffer pointMsg = new StringBuffer();
+        pointColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, pointMsg);
+
+        boolean polygonColDetected = false;
+        StringBuffer polygonMsg = new StringBuffer();
+        polygonColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, polygonMsg);
+        //
+        if (pointColDetected || polygonColDetected) {
+            String separatorStr = (pointColDetected && polygonColDetected) ? "," : "";
+            throw m_compiler.new VoltCompilerException("Can't " + tableVerb + " table '" + tableName.toUpperCase() + "' containing geo type column(s) -" +
+                    pointMsg + separatorStr + polygonMsg + ".");
+        }
     }
 
     /**
@@ -891,12 +924,7 @@ public class DDLCompiler {
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
 
             if (tableXML != null) {
-                StringBuffer msg = new StringBuffer();
-                msg.append("Can't EXPORT table '" + tableName.toUpperCase() + "' containing geo type column(s) - ");
-                if (isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, msg) ||
-                    isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, msg)) {
-                    throw m_compiler.new VoltCompilerException(String.format(msg + "."));
-                }
+                guardForGeoColumns(tableXML, tableName, EXPORT);
 
                 if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -933,13 +961,7 @@ public class DDLCompiler {
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
-                StringBuffer msg = new StringBuffer();
-
-                msg.append("Can't DR table '" + tableName.toUpperCase() + "' containing geo type column(s) - ");
-                if (isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, msg) ||
-                    isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, msg)) {
-                    throw m_compiler.new VoltCompilerException(String.format(msg + "."));
-                }
+                guardForGeoColumns(tableXML, tableName, DR);
 
                 if (tableXML.attributes.containsKey("export")) {
                     throw m_compiler.new VoltCompilerException(String.format(

@@ -4209,14 +4209,25 @@ public class TestVoltCompiler extends TestCase {
         String ddl = "create table geogs ( id integer primary key, " +
                                          " region1 geography NOT NULL);\n" +
                      "export table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'REGION1', type: 'GEOGRAPHY'.*",
+        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'REGION1' type: 'GEOGRAPHY'.*",
                                   ddl);
 
         ddl = "create table geogs ( id integer primary key, " +
                                   " point1 geography_point NOT NULL );\n" +
               "export table geogs to stream geog_stream;\n";
-        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1', type: 'GEOGRAPHY_POINT'.*",
+        badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
                                   ddl);
+
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL, " +
+                                  " point2 geography_point NOT NULL);\n" +
+              "dr table geogs;\n";
+        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - " +
+                                      "column name: 'POINT1' type: 'GEOGRAPHY_POINT', " +
+                                      "column name: 'POINT2' type: 'GEOGRAPHY_POINT', " +
+                                      "column name: 'REGION1' type: 'GEOGRAPHY'.*",
+                              ddl);
     }
 
     public void testGoodDRTable() throws Exception {
@@ -4278,17 +4289,31 @@ public class TestVoltCompiler extends TestCase {
                 "dr table table one;"
                 );
 
+        // geography point
         String ddl = "create table geogs ( id integer primary key, " +
                                          " region1 geography NOT NULL);\n" +
                 "dr table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - column name: 'REGION1', type: 'GEOGRAPHY'.*",
+        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - column name: 'REGION1' type: 'GEOGRAPHY'.*",
                                    ddl);
 
+        // geography value
         ddl = "create table geogs ( id integer primary key, " +
                                   " point1 geography_point NOT NULL );\n" +
               "dr table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - column name: 'POINT1', type: 'GEOGRAPHY_POINT'.*",
+        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
                 ddl);
+
+        // mutiple geo columns
+        ddl = "create table geogs ( id integer primary key, " +
+                                  " region1 geography NOT NULL, " +
+                                  " point1 geography_point NOT NULL, " +
+                                  " point2 geography_point NOT NULL);\n" +
+                     "dr table geogs;\n";
+        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - " +
+                                                "column name: 'POINT1' type: 'GEOGRAPHY_POINT', " +
+                                                "column name: 'POINT2' type: 'GEOGRAPHY_POINT', " +
+                                                "column name: 'REGION1' type: 'GEOGRAPHY'.*",
+                                  ddl);
     }
 
     public void testCompileFromDDL() throws IOException {
