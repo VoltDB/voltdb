@@ -506,7 +506,9 @@ public class HTTPClientInterface {
         }
         ImmutableSet.Builder<Principal> sbld = ImmutableSet.builder();
         Subject svc = getAuthSystem().getLoginContext().getSubject();
-        sbld.addAll(svc.getPrincipals()).add(new DelegatePrincipal(forDelegate));
+        sbld.addAll(svc.getPrincipals())
+            .add(new DelegatePrincipal(forDelegate, System.identityHashCode(getAuthSystem())))
+            ;
         return new Subject(true, sbld.build(), svc.getPublicCredentials(), svc.getPrivateCredentials());
     }
 

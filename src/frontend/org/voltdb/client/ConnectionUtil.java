@@ -19,9 +19,7 @@ package org.voltdb.client;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -29,7 +27,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,7 +53,6 @@ import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicates;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.FluentIterable;
-import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well
@@ -97,25 +93,6 @@ public class ConnectionUtil {
     private static final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
     private static final GSSManager m_gssManager = GSSManager.getInstance();
-
-    private static final Set<InetAddress> localhostSet;
-    static {
-        ImmutableSet.Builder<InetAddress> sb = ImmutableSet.builder();
-        try {
-            sb.add(InetAddress.getByName("127.0.0.1"))
-               .add(InetAddress.getByName("::1"));
-        } catch (IOException e) {
-            Throwables.propagate(e);
-        }
-        localhostSet = sb.build();
-    }
-
-    public static final boolean isLocalhostConnection(SocketChannel channel) throws IOException {
-        if (channel == null) return false;
-        Socket skt = channel.socket();
-        return localhostSet.contains(skt.getLocalAddress())
-            && localhostSet.contains(skt.getInetAddress());
-    }
 
     /**
      * Get a hashed password using SHA-1 in a consistent way.
@@ -413,8 +390,11 @@ public class ConnectionUtil {
         if (delegate.isPresent()) {
             MessageProp mprop = new MessageProp(0, true);
 
-            byte [] delegateBytes = delegate.get().getName().getBytes(Constants.UTF8ENCODING);
-            token = context.wrap(delegateBytes, 0, delegateBytes.length, mprop);
+            bb.clear().limit(delegate.get().wrappedSize());
+            delegate.get().wrap(bb);
+            bb.flip();
+
+            token = context.wrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop);
 
             msgSize = 4 + 1 + 1 + token.length;
             bb.clear().limit(msgSize);
@@ -434,7 +414,7 @@ public class ConnectionUtil {
         try {
             String subjectPrincipal = subject.getPrincipals().iterator().next().getName();
             final Optional<DelegatePrincipal> delegate = getDelegate(subject);
-            if (delegate.isPresent() && !(isLocalhostConnection(channel) && subjectPrincipal.equals(serviceName))) {
+            if (delegate.isPresent() && !subjectPrincipal.equals(serviceName)) {
                 throw new IOException("Delegate authentication is not allowed for user " + delegate.get().getName());
             }
 
