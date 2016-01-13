@@ -1064,7 +1064,10 @@ class VdmStatus(MethodView):
     """
     @staticmethod
     def get():
-        return jsonify({'vdm': {"running": "true"}})
+        if  request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
+            return str(request.args['jsonp']) + '(' + '{\'vdm\': {"running": "true"}}'+')'
+        else:
+            return jsonify({'vdm': {"running": "true"}})
 
 def main(runner, amodule, aport, apath):
     try:
