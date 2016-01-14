@@ -303,7 +303,7 @@ def map_deployment(request, database_id):
     if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
         if deployment[0]['systemsettings']['resourcemonitor'] is None:
             deployment[0]['systemsettings']['resourcemonitor'] = {}
-        print request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+
         if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
             deployment[0]['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
@@ -311,6 +311,10 @@ def map_deployment(request, database_id):
                 and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
                 deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
                 request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+
+    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
+        if deployment[0]['systemsettings']['resourcemonitor'] is None:
+            deployment[0]['systemsettings']['resourcemonitor'] = {}
 
         if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
             deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
