@@ -790,3 +790,15 @@ class DatabaseInputs(Inputs):
             Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ]
     }
+
+
+class ConfigValidation(Inputs):
+    """
+    Validation class for ip address used to sync cluster.
+    """
+    json = {
+        'ip_address': [
+            DataRequired('IP address is required.'),
+            IPAddress('Invalid IP address.')
+        ]
+    }

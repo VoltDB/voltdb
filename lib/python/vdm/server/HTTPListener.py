@@ -29,15 +29,19 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 from flask import Flask, render_template, jsonify, abort, make_response, request
 from flask.views import MethodView
-from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs
+from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import socket
 import os
 import json
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring
 import sys
+import requests
+from flask import Flask
+from flask.ext.cors import CORS
 
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
+CORS(APP)
 
 SERVERS = []
 
@@ -463,6 +467,18 @@ def get_database_deployment(key):
 
     return tostring(deployment_top,encoding='UTF-8')
 
+
+def get_configuration():
+    deployment_json = {
+        'vdm': {
+            'databases': DATABASES,
+            'members': SERVERS,
+            'deployments': DEPLOYMENT
+        }
+    }
+    return jsonify(deployment_json)
+
+
 def make_configuration_file():
     main_header = Element('vdm')
     db_top = SubElement(main_header, 'databases')
@@ -566,6 +582,7 @@ class ServerAPI(MethodView):
         Returns:
             server or list of servers.
         """
+        get_configuration()
         if server_id is None:
             return jsonify({'servers': [make_public_server(x) for x in SERVERS]})
         else:
@@ -1060,10 +1077,64 @@ class VdmStatus(MethodView):
     """
     @staticmethod
     def get():
-        if  request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
+        if request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
             return str(request.args['jsonp']) + '(' + '{\'vdm\': {"running": "true"}}'+')'
         else:
             return jsonify({'vdm': {"running": "true"}})
+
+
+class SyncVdmConfiguration(MethodView):
+    """
+    Class to sync configuration between two servers.
+    """
+
+    @staticmethod
+    def get():
+        try:
+            r = requests.get('http://192.168.2.33:8000/api/1.0/vdm/configuration/')
+            r.status_code
+        except Exception, err:
+            print str(err)
+        return jsonify(json.loads(r.text))
+
+    @staticmethod
+    def post():
+        ip_address = ''
+        inputs = ConfigValidation(request)
+        if not inputs.validate():
+            return jsonify(success=False, errors=inputs.errors)
+        else:
+            ip_address = request.json['ip_address']
+        try:
+            request_url = 'http://' + ip_address + ':8000/api/1.0/vdm/configuration/'
+            r = requests.get(request_url)
+        except Exception, err:
+            print str(err)
+        result = json.loads(r.text)
+        databases = result['vdm']['databases']
+        servers = result['vdm']['members']
+        deployments = result['vdm']['deployments']
+        try:
+            global DATABASES
+            DATABASES = databases
+            global SERVERS
+            SERVERS = servers
+            global DEPLOYMENT
+            DEPLOYMENT = deployments
+        except Exception, errs:
+            print str(errs)
+
+        return jsonify({'status':'success'})
+
+
+class VdmConfiguration(MethodView):
+    """
+    Class related to the vdm configuration
+    """
+    @staticmethod
+    def get():
+        return get_configuration()
+
 
 def main(runner, amodule, aport, apath):
     try:
@@ -1098,6 +1169,8 @@ def main(runner, amodule, aport, apath):
     DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
     DEPLOYMENT_USER_VIEW = deploymentUserAPI.as_view('deployment_user_api')
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
+    VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
+    SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1120,6 +1193,12 @@ def main(runner, amodule, aport, apath):
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'POST', 'DELETE'])
-    APP.add_url_rule('/api/1.0/vdm/status',
+    APP.add_url_rule('/api/1.0/vdm/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/vdm/configuration/',
+                     view_func=VDM_CONFIGURATION_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
+                     view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['GET','POST'])
+    # APP.add_url_rule('/api/1.0/vdm/configuration_sync/<string:ip_address>', view_func=SYNC_VDM_CONFIGURATION_VIEW,
+    #                  methods=['POST'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)
