@@ -241,7 +241,7 @@ def map_deployment(request, database_id):
             request.json['paths']['commandlogsnapshot']['path']
 
     if 'paths' in request.json and 'droverflow' in request.json['paths'] and \
-                    'path' in request['paths']['droverflow']:
+                    'path' in request.json['paths']['droverflow']:
         deployment[0]['paths']['droverflow']['path'] = \
             request.json['paths']['droverflow']['path']
 
@@ -304,25 +304,29 @@ def map_deployment(request, database_id):
             and 'priority' in request.json['systemsettings']['snapshot']:
         deployment[0]['systemsettings']['snapshot']['priority'] = request.json['systemsettings']['snapshot']['priority']
 
-    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
-            and 'disklimit' in request.json['systemsettings']['resourcemonitor'] \
-            and 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit'] \
-            and 'name' in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-        deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature']['name'] = \
-            request.json['systemsettings']['resourcemonitor']['disklimit']['feature']['name']
+    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
+        if deployment[0]['systemsettings']['resourcemonitor'] is None:
+            deployment[0]['systemsettings']['resourcemonitor'] = {}
+        print request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+        if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
+            deployment[0]['systemsettings']['resourcemonitor']['memorylimit'] = {}
+            if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
+                and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
+                and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
+                deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
+                request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
 
-    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
-            and 'disklimit' in request.json['systemsettings']['resourcemonitor'] \
-            and 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit'] \
-            and 'size' in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-        deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature']['size'] = \
-            request.json['systemsettings']['resourcemonitor']['disklimit']['feature']['size']
-
-    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
-            and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
-            and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
-        deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
-            request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+        if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
+            deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
+            if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
+                deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
+                for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                    deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'].append(
+                        {
+                            'name': feature['name'],
+                            'size': feature['size']
+                        }
+                    )
 
     if 'import' in request.json:
         if deployment[0]['import'] is None:
