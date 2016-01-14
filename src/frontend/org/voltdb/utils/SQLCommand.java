@@ -45,10 +45,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.console.CursorBuffer;
-import jline.console.KeyMap;
-import jline.console.history.FileHistory;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -64,6 +60,10 @@ import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import jline.console.CursorBuffer;
+import jline.console.KeyMap;
+import jline.console.history.FileHistory;
 
 public class SQLCommand
 {
