@@ -25,15 +25,18 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.AccountExpiredException;
@@ -46,26 +49,25 @@ import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSCredential;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.MessageProp;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientAuthScheme;
+import org.voltdb.client.DelegatePrincipal;
+import org.voltdb.common.Permission;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
-import java.util.EnumSet;
-import java.util.concurrent.TimeUnit;
-import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.client.ClientAuthHashScheme;
-import org.voltdb.common.Permission;
 
 
 /**
@@ -349,7 +351,7 @@ public class AuthSystem {
         AuthProvider ap = null;
         LoginContext loginContext = null;
         GSSManager gssManager = null;
-        byte [] principal = null;
+        String principal = null;
 
         //Build static list of perms auth system knows.
         m_perm_list =  new String[Permission.values().length];
@@ -362,7 +364,7 @@ public class AuthSystem {
         if (!m_enabled) {
             m_authProvider = ap;
             m_loginCtx = loginContext;
-            m_principalName = principal;
+            m_principalName = null;
             m_gssManager = null;
             return;
         }
@@ -380,9 +382,7 @@ public class AuthSystem {
                         .getSubject()
                         .getPrincipals()
                         .iterator().next()
-                        .getName()
-                        .getBytes(Charsets.UTF_8)
-                        ;
+                        .getName();
                 gssManager = GSSManager.getInstance();
             } catch (AccountExpiredException ex) {
                 VoltDB.crashGlobalVoltDB(
@@ -404,7 +404,7 @@ public class AuthSystem {
             }
         }
         m_loginCtx = loginContext;
-        m_principalName = principal;
+        m_principalName = principal != null ? principal.getBytes(StandardCharsets.UTF_8) : null;
         m_gssManager = gssManager;
         /*
          * First associate all users with groups and vice versa
@@ -503,11 +503,23 @@ public class AuthSystem {
         for (AuthGroup group : m_groups.values()) {
             group.finish();
         }
+
+        if (principal != null && m_users.containsKey(principal)) {
+            VoltDB.crashGlobalVoltDB("Kerberos service principal " + principal + " must not correspond to a database user", true, null);
+        }
     }
 
     //Is security enabled?
     public boolean isSecurityEnabled() {
         return m_enabled;
+    }
+
+    public LoginContext getLoginContext() {
+        return m_loginCtx;
+    }
+
+    public String getServicePrincipal() {
+        return m_principalName == null ? null : new String(m_principalName, StandardCharsets.UTF_8);
     }
 
     /**
@@ -518,7 +530,7 @@ public class AuthSystem {
      * @param password SHA-1 single hashed version of the users clear text password
      * @return The permission set for the user if authentication succeeds or null if authentication fails.
      */
-    boolean authenticate(String username, byte[] password, ClientAuthHashScheme scheme) {
+    boolean authenticate(String username, byte[] password, ClientAuthScheme scheme) {
         if (!m_enabled) {
             return true;
         }
@@ -532,7 +544,7 @@ public class AuthSystem {
         if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
             MessageDigest md = null;
             try {
-                md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
+                md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
             } catch (NoSuchAlgorithmException e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -547,7 +559,7 @@ public class AuthSystem {
                 }
             }
         } else {
-            String pwToCheck = (scheme == ClientAuthHashScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
+            String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
             matched = BCrypt.checkpw(Encoder.hexEncode(password), pwToCheck);
         }
 
@@ -633,7 +645,7 @@ public class AuthSystem {
         }
 
         @Override
-        protected boolean authenticateImpl(ClientAuthHashScheme scheme) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = m_user;
                 return true;
@@ -651,7 +663,7 @@ public class AuthSystem {
             if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
                 MessageDigest md = null;
                 try {
-                    md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(scheme));
+                    md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
                 } catch (NoSuchAlgorithmException e) {
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
@@ -660,14 +672,14 @@ public class AuthSystem {
                 /*
                  * A n00bs attempt at constant time comparison
                  */
-                byte shaShadowPassword[] = (scheme == ClientAuthHashScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
+                byte shaShadowPassword[] = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_sha1ShadowPassword : user.m_sha2ShadowPassword);
                 for (int ii = 0; ii < passwordHash.length; ii++) {
                     if (passwordHash[ii] != shaShadowPassword[ii]){
                         matched = false;
                     }
                 }
             } else {
-                String pwToCheck = (scheme == ClientAuthHashScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
+                String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
                 matched = BCrypt.checkpw(Encoder.hexEncode(m_password), pwToCheck);
             }
 
@@ -696,7 +708,7 @@ public class AuthSystem {
             m_socket = socket;
         }
         @Override
-        protected boolean authenticateImpl(ClientAuthHashScheme scheme) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = "_^_pinco_pallo_^_";
                 return true;
@@ -751,8 +763,8 @@ public class AuthSystem {
                             bb.flip();
 
                             int msgSize = bb.getInt();
-                            if (msgSize > bb.capacity()) {
-                                authLogger.warn("Authentication packet exceeded alloted size");
+                            if (msgSize > bb.capacity() || msgSize <= 0) {
+                                authLogger.warn("Authentication packet not within alloted size");
                                 return null;
                             }
                             // read the initiator (client) context token
@@ -797,6 +809,51 @@ public class AuthSystem {
                         if (!context.getMutualAuthState()) {
                             return null;
                         }
+
+                        // read the delegate user if the Volt's accepting service principal is the
+                        // same as the one that initiated,
+                        if (   context.getTargName() != null
+                            && context.getSrcName().equals(context.getTargName())
+                            ) {
+                            // read in the next packet size
+                            bb.clear().limit(4);
+                            while (bb.hasRemaining()) {
+                                if (m_socket.read(bb) == -1) throw new EOFException();
+                            }
+
+                            bb.flip();
+                            int msgSize = bb.getInt();
+                            if (msgSize > bb.capacity() || msgSize <= 0) {
+                                authLogger.warn("Authentication packet not within alloted size");
+                                return null;
+                            }
+                            // read the initiator (client) context token
+                            bb.clear().limit(msgSize);
+                            while (bb.hasRemaining()) {
+                                if (m_socket.read(bb) == -1) throw new EOFException();
+                            }
+                            bb.flip();
+
+                            byte version = bb.get();
+                            if (version != AUTH_HANDSHAKE_VERSION) {
+                                authLogger.warn("Encountered unexpected authentication protocol version " + version);
+                                return null;
+                            }
+
+                            byte tag = bb.get();
+                            if (tag != AUTH_HANDSHAKE) {
+                                authLogger.warn("Encountered unexpected authentication protocol tag " + tag);
+                                return null;
+                            }
+                            MessageProp mprop = new MessageProp(0, true);
+                            DelegatePrincipal delegate = new DelegatePrincipal(
+                                    context.unwrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop)
+                                );
+                            if (delegate.getId() != System.identityHashCode(AuthSystem.this)) {
+                                return null;
+                            }
+                            authenticateUserName = delegate.getName();
+                        }
                         context.dispose();
                         context = null;
 
@@ -819,6 +876,8 @@ public class AuthSystem {
                 }
                 m_authenticatedUser = authenticatedUser;
                 logAuthSuccess(m_authenticatedUser);
+            } else {
+                return false;
             }
 
             return true;

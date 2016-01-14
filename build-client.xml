@@ -127,6 +127,8 @@
                   org/voltdb/PrivateVoltTableFactory.java
                   org/voltdb/parser/JDBCParser.java
                   org/voltdb/parser/SQL*.java
+                  org/voltdb/types/GeographyValue.java
+                  org/voltdb/types/GeographyPointValue.java
                   org/voltdb/types/TimestampType.java
                   org/voltdb/types/VoltDecimalHelper.java
                   org/voltdb/utils/Base64.java

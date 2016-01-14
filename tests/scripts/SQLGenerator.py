@@ -330,11 +330,19 @@ class BaseGenerator:
         # no table generator yet
         prior_generators = {}
         for ctor in generator_types:
+            # TODO: temp kludge, until Python client works:
+            substitute_for_geo_types = False
+            if str(ctor) == "SQLGenerator.ColumnGenerator" and statement.startswith("SELECT") and ("WHERE" not in statement or "B9" in statement):
+                substitute_for_geo_types = True
             while True:
                 another_gen = ctor()
                 rewrite, field_name = another_gen.prepare_fields(statement)
                 if rewrite:
-                    prior_generators = another_gen.configure_from_schema(schema, prior_generators)
+                    # TODO: temp kludge, until Python client works:
+                    if substitute_for_geo_types:
+                        prior_generators = another_gen.configure_from_schema(schema, prior_generators, True)
+                    else:
+                        prior_generators = another_gen.configure_from_schema(schema, prior_generators)
                     field_map[field_name] = another_gen
                     ### print "DEBUG field_map[" + field_name + "] got " + another_gen.debug_gen_to_string()
                     new_generators.append(another_gen)
@@ -474,10 +482,17 @@ class ColumnGenerator(BaseGenerator):
         if not self.__supertype:
             self.__supertype = ""
 
-    def configure_from_schema(self, schema, prior_generators):
+    def configure_from_schema(self, schema, prior_generators, substitute_for_geo_types=False):
         """ Get matching column values from schema
         """
         self.values = schema.get_typed_columns(self.__supertype)
+        # TODO: temp kludge, to avoid crash (until Python client works):
+        if substitute_for_geo_types:
+            for i, val in enumerate(self.values):
+                if val == 'PT1' or val == 'PT2' or val == 'PT3':
+                    self.values[i] = 'LONGITUDE(' + val + ')'
+                elif val == 'POLY1' or val == 'POLY2' or val == 'POLY3':
+                    self.values[i] = 'AREA(' + val + ')'
         self.prior_generator = prior_generators.get("variable")
         prior_generators["variable"] = self # new variable generator at the head of the chain
         return prior_generators
@@ -633,6 +648,8 @@ class Schema:
         "string":    ("string",    "nonnumeric", ""),
         "varbinary": ("varbinary", "nonnumeric", ""),
         "timestamp": ("timestamp", "nonnumeric", ""),
+        "point":     ("point",   "geo", "nonnumeric", ""),
+        "polygon":   ("polygon", "geo", "nonnumeric", ""),
     }
 
     TYPE_NAMES = {
@@ -645,6 +662,8 @@ class Schema:
         FastSerializer.VOLTTYPE_VARBINARY: "varbinary",
         FastSerializer.VOLTTYPE_DECIMAL:   "decimal",
         FastSerializer.VOLTTYPE_TIMESTAMP: "timestamp",
+        FastSerializer.VOLTTYPE_GEOGRAPHY_POINT: "point",
+        FastSerializer.VOLTTYPE_GEOGRAPHY: "polygon",
     }
 
     def __init__(self, **kwargs):
@@ -657,6 +676,7 @@ class Schema:
         self.__col_by_type = {}
         self.__col_by_type[""] = {}
         self.__col_by_type["int"] = {}
+        self.__col_by_type["geo"] = {}
         self.__col_by_type["numeric"] = {}
         self.__col_by_type["nonnumeric"] = {}
         for code, supertype in Schema.TYPE_NAMES.iteritems():

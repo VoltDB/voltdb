@@ -221,18 +221,8 @@ void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
     typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-
-    // if we're recovering from an error, the executors map may never
-    // have been initialized.
-    if (m_executorsMap == NULL) {
-        // if there's no executors, there's no temp tables to check,
-        // so return true.
-        return true;
-    }
-
     BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
         BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
-            assert(executor != NULL);
             if (! executor->outputTempTableIsEmpty()) {
                 return false;
             }

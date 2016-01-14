@@ -3,12 +3,14 @@
 -- Keep the value scaled down here to prevent internal precision issues when dividing by constants > 20?
 {@aftermath = " _math _value[int:1,3]"}
 {@agg = "_numagg"}
+{@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
+{@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_integercolumnpredicate"}
 {@columntype = "int"}
 {@comparableconstant = "42"}
 {@comparabletype = "numeric"}
 {@comparablevalue = "_numericvalue"}
-{@dmlcolumnpredicate = "_variable[int] _cmp _value[int]"}
+{@dmlcolumnpredicate = "_variable[int] @cmp _value[int]"}
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
@@ -17,6 +19,8 @@
 {@insertvals = "_id, _value[int:-10,10], _value[byte null30], _value[byte]"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
+{@star = "*"}
+{@lhsstar = "*"}
 {@updatecolumn = "BIG"}
 {@updatesource = "ID"}
 {@updatevalue = "_value[byte]"}

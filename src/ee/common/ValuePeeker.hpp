@@ -77,8 +77,7 @@ public:
     }
 
     static const char* peekObjectValue(const NValue& value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        assert(isVariableLengthType(value.getValueType()));
         if (value.isNull()) {
             return NULL;
         }
@@ -86,8 +85,7 @@ public:
     }
 
     static const char* peekObject_withoutNull(const NValue& value, int32_t* lengthOut) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        assert(isVariableLengthType(value.getValueType()));
         // NEEDS WORK
         return value.getObject_withoutNull(lengthOut);
     }
@@ -141,6 +139,7 @@ public:
         }
     }
 };
-}
+
+} // end namespace voltdb
 
 #endif /* VALUEPEEKER_HPP_ */

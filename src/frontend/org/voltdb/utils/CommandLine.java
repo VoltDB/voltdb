@@ -459,6 +459,11 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
         cmdline.add("-Djava.library.path=" + java_library_path);
+        /*
+         * Facilitate SPNEGO (Kerberos HTTP) authentication
+         */
+        cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
+
         if (rmi_host_name != null)
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
         cmdline.add("-Dlog4j.configuration=" + log4j);

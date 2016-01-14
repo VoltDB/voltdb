@@ -1036,6 +1036,7 @@ DISTRIBUTION
             <fileset dir="${base.dir}/lib">
                 <include name="python/**" />
                 <exclude name="**/*.pyc" />
+                <exclude name="**/tests/**" />
             </fileset>
         </copy>
         <chmod perm="ugo+rx">
@@ -1446,6 +1447,7 @@ NATIVE EE STUFF
   </exec>
 </target>
 
+<!-- Build the jni library. -->
 <target name='jnicompile'
     depends='compile, jnicompile_temp, uptodate_jni_h.check'
     description="Build C++ JNI library."
@@ -2305,6 +2307,9 @@ TEST CASES
     <condition property="config_postgresql" value="-P" else="">
         <isset property="postgresql"/>
     </condition>
+    <condition property="config_postgis" value="-G" else="">
+        <isset property="postgis"/>
+    </condition>
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
@@ -2366,6 +2371,7 @@ TEST CASES
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
         <arg line="${config_postgresql}" />
+        <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />

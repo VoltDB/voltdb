@@ -89,7 +89,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.client.SyncCallback;
@@ -632,11 +632,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             message.flip();
             int aversion = message.get(); //Get version
-            ClientAuthHashScheme hashScheme = ClientAuthHashScheme.HASH_SHA1;
+            ClientAuthScheme hashScheme = ClientAuthScheme.HASH_SHA1;
             //If auth version is more than zero we read auth hashing scheme.
             if (aversion > 0) {
                 try {
-                    hashScheme = ClientAuthHashScheme.get(message.get());
+                    hashScheme = ClientAuthScheme.get(message.get());
                 } catch (IllegalArgumentException ex) {
                     authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
                     //Send negative response
@@ -649,7 +649,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
             final String username = fds.readString();
-            final int digestLen = ClientAuthHashScheme.getDigestLength(hashScheme);
+            final int digestLen = ClientAuthScheme.getDigestLength(hashScheme);
             final byte password[] = new byte[digestLen];
             //We should be left with SHA bytes only which varies based on scheme.
             if (message.remaining() != digestLen) {
@@ -1215,7 +1215,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_siteId = m_mailbox.getHSId();
         BackendTarget backendTargetType = VoltDB.instance().getBackendTargetType();
         m_isConfiguredForNonVoltDBBackend = (backendTargetType == BackendTarget.HSQLDB_BACKEND ||
-                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND);
+                                             backendTargetType == BackendTarget.POSTGRESQL_BACKEND ||
+                                             backendTargetType == BackendTarget.POSTGIS_BACKEND);
 
         InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID, "Internal");
         bindAdapter(internalAdapter, null, true);
