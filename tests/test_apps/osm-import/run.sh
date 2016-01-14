@@ -57,7 +57,7 @@ function clean() {
 function jars() {
     # compile java source
     # javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/osmimport/*.java
+    javac -target 1.8 -source 1.8 -classpath $CLIENTCLASSPATH client/osmimport/*.java
     # build procedure and client jars
     # jar cf voter-procs.jar -C procedures voter
     jar cf osm-import-client.jar -C client osmimport
