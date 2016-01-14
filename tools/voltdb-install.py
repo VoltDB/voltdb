@@ -331,6 +331,10 @@ chmod +x %%{__perl_requires}
 %%build
 
 %%install
+#if [ "/tmp/installtree" != "%%{buildroot}" ] ; then
+#    mv /tmp/installtree/* %%{buildroot}/
+#fi
+mv "%%{buildroot}"/../../INSTALLTREE/%%{name}-%%{version}-%%{release}.%%{_arch}/* "%%{buildroot}"/
 
 %%clean
 
@@ -595,7 +599,7 @@ def rpm():
             shutil.rmtree(meta.build_root)
 
     # setup the rpmbuild working tree
-    for D in ["BUILD","SOURCES","RPMS","SPECS","SRPMS", "BUILDROOT"]:
+    for D in ["BUILD","SOURCES","RPMS","SPECS","SRPMS", "BUILDROOT, INSTALLTREE"]:
         p = os.path.join(blddir, D)
         if not os.path.exists(p):
             os.makedirs(os.path.join(blddir, D))
@@ -615,7 +619,7 @@ def rpm():
     voltdb_build = voltdb_dist + "-%(pkgrelease)d.%(arch)s" % syms
 
     # stage the voltdb distribution files where rpmbuild needs them
-    buildroot = os.path.join(blddir, "BUILDROOT", voltdb_build)
+    buildroot = os.path.join(blddir, "INSTALLTREE", voltdb_build)
     meta.options.prefix = buildroot
     install()
 
