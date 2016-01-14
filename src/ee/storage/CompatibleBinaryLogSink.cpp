@@ -15,21 +15,19 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BINARYLOGSINK_H_
-#define BINARYLOGSINK_H_
+#include "CompatibleBinaryLogSink.h"
 
-#include "storage/BinaryLogSink.h"
-
+#include <string>
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "common/UniqueId.hpp"
 #include "storage/persistenttable.h"
-#include "storage/ConstraintFailureException.h"
 #include "storage/tablefactory.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
+#include "storage/ConstraintFailureException.h"
 #include "indexes/tableindex.h"
 
 #include "catalog/database.h"
@@ -37,7 +35,8 @@
 #include<boost/unordered_map.hpp>
 #include<boost/unordered_set.hpp>
 #include<crc/crc32c.h>
-#include <string>
+
+// IMPORTANT: DON'T CHANGE THIS FILE, THIS IS A FIXED VERSION OF DR STREAM ONLY FOR COMPATIBILITY MODE.
 
 namespace voltdb {
 
@@ -456,17 +455,14 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
 
     return true;
 }
+} // end of anonymous namespace
 
-} //end of anonymous namespace
-
-BinaryLogSink::BinaryLogSink() {}
-
-int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unordered_map<int64_t,
-                             PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
-                             int32_t remoteClusterId, const char *recordStart, int64_t *uniqueId,
-                             int64_t *sequenceNumber) {
+int64_t CompatibleBinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo,
+                                       boost::unordered_map<int64_t, PersistentTable*> &tables,
+                                       Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                                       const char *recordStart, int64_t *uniqueId,
+                                       int64_t *sequenceNumber) {
     CachedIndexKeyTuple indexKeyTuple;
-
     const DRRecordType type = static_cast<DRRecordType>(taskInfo->readByte());
     size_t rowCount = rowCostForDRRecord(type);
 
@@ -493,9 +489,7 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             table->insertPersistentTuple(tempTuple, true);
         } catch (ConstraintFailureException &e) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()),
-                                   *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT,
-                                   CONFLICT_CONSTRAINT_VIOLATION)) {
+                if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()), *uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
                     break;
                 }
             }
@@ -583,10 +577,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         TableTuple oldTuple = table->lookupTupleForDR(expectedTuple);
         if (oldTuple.isNullTuple()) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, &expectedTuple,
-                                   &tempTuple, *uniqueId, remoteClusterId,
-                                   DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING,
-                                   NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, NULL, &expectedTuple, &tempTuple,
+                                   *uniqueId, remoteClusterId, DR_RECORD_UPDATE,
+                                   CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                     break;
                 }
             }
@@ -753,4 +746,3 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
 }
 
-#endif

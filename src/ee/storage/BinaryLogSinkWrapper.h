@@ -14,11 +14,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef BINARYLOGSINKWRAPPER_H
+#define BINARYLOGSINKWRAPPER_H
 
-#ifndef BINARYLOGSINK_H
-#define BINARYLOGSINK_H
-
-#include "common/serializeio.h"
+#include "storage/BinaryLogSink.h"
+#include "storage/CompatibleBinaryLogSink.h"
 
 #include <boost/unordered_map.hpp>
 #include <boost/shared_ptr.hpp>
@@ -32,15 +32,15 @@ class VoltDBEngine;
 /*
  * Responsible for applying binary logs to table data
  */
-class BinaryLogSink {
+class BinaryLogSinkWrapper {
 public:
-    BinaryLogSink();
+    BinaryLogSinkWrapper() {}
 
-    int64_t apply(ReferenceSerializeInputLE *taskInfo,
-                  boost::unordered_map<int64_t, PersistentTable*> &tables,
-                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
-                  const char *recordStart, int64_t *uniqueId,
-                  int64_t *sequenceNumber);
+    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables,
+                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
+private:
+    BinaryLogSink m_sink;
+    CompatibleBinaryLogSink m_compatibleSink;
 };
 
 
