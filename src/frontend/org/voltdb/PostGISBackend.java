@@ -69,6 +69,32 @@ public class PostGISBackend extends PostgreSQLBackend {
     private static final Pattern containsQuery = Pattern.compile(
             "CONTAINS\\s*\\((?<columns>"+COLUMN_PATTERN+","+COLUMN_PATTERN+"\\))",
             Pattern.CASE_INSENSITIVE);
+    // Captures the use of NumPoints(columnName), which PostgreSQL/PostGIS
+    // does not support
+    private static final Pattern numPointsQuery = Pattern.compile(
+            "NumPoints\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Captures the use of NumPoints(columnName), which PostgreSQL/PostGIS
+    // does not support
+    private static final Pattern numInteriorRingsQuery = Pattern.compile(
+            "NumInteriorRings\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Captures the use of IsValid(columnName), which PostgreSQL/PostGIS
+    // does not support
+    private static final Pattern isValidQuery = Pattern.compile(
+            "IsValid\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Captures the use of IsInvalidReason(columnName), which PostgreSQL/PostGIS
+    // does not support
+    private static final Pattern isInvalidReasonQuery = Pattern.compile(
+            "IsInvalidReason\\s*\\((?<column>"+COLUMN_PATTERN+"\\))",
+            Pattern.CASE_INSENSITIVE);
+    // Captures the use of CAST(columnName AS VARCHAR), which PostgreSQL/PostGIS
+    // handles differently, when the columnName is of type GEOGRAPHY_POINT or
+    // GEOGRAPHY
+    private static final Pattern castGeoAsVarcharQuery = Pattern.compile(
+            "CAST\\s*\\((?<column>"+COLUMN_PATTERN+")\\s*AS\\s*VARCHAR\\)",
+            Pattern.CASE_INSENSITIVE);
 
     static public PostGISBackend initializePostGISBackend(CatalogContext context)
     {
@@ -125,7 +151,7 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  does support. */
     static private String transformLongitudeQuery(String dml) {
         return transformQuery(dml, longitudeQuery, "",
-                "ST_X(", "::geometry", null, false, false, "column");
+                "ST_X(", "::geometry", null, false, null, "column");
     }
 
     /** Modify a query containing a LATITUDE(columnName) function, which
@@ -134,7 +160,7 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  does support. */
     static private String transformLatitudeQuery(String dml) {
         return transformQuery(dml, latitudeQuery, "",
-                "ST_Y(", "::geometry", null, false, false, "column");
+                "ST_Y(", "::geometry", null, false, null, "column");
     }
 
     /** Modify a query containing a CENTROID(columnName) function, which
@@ -143,7 +169,7 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  does support. */
     static private String transformCentroidQuery(String dml) {
         return transformQuery(dml, centroidQuery, "",
-                "ST_CENTROID(", "::geometry", null, false, false, "column");
+                "ST_CENTROID(", "::geometry", null, false, null, "column");
     }
 
     /** Modify a query containing an AREA(columnName) function, which
@@ -152,7 +178,7 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  that PostGIS does support. */
     static private String transformAreaQuery(String dml) {
         return transformQuery(dml, areaQuery, "",
-                "ST_AREA(", ",FALSE", null, false, false, "column");
+                "ST_AREA(", ",FALSE", null, false, null, "column");
     }
 
     /** Modify a query containing a DISTANCE(column1,column2) function, which
@@ -161,7 +187,7 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  equivalent that PostGIS does support. */
     static private String transformDistanceQuery(String dml) {
         return transformQuery(dml, distanceQuery, "",
-                "ST_DISTANCE(", ",FALSE", null, false, false, "columns");
+                "ST_DISTANCE(", ",FALSE", null, false, null, "columns");
     }
 
     /** Modify a query containing a CONTAINS(column1,column2) function, which
@@ -170,7 +196,53 @@ public class PostGISBackend extends PostgreSQLBackend {
      *  equivalent that PostGIS does support. */
     static private String transformContainsQuery(String dml) {
         return transformQuery(dml, containsQuery, "",
-                "ST_COVERS(", "", null, false, false, "columns");
+                "ST_COVERS(", "", null, false, null, "columns");
+    }
+
+    /** Modify a query containing an NumPoints(columnName) function, which
+     *  PostgreSQL/PostGIS does not support, and replace it with
+     *  ST_NPoints(columnName::geometry), which is an equivalent that PostGIS
+     *  does support. */
+    static private String transformNumPointsQuery(String dml) {
+        return transformQuery(dml, numPointsQuery, "",
+                "ST_NPoints(", "::geometry", null, false, null, "column");
+    }
+
+    /** Modify a query containing an NumInteriorRings(columnName) function,
+     *  which PostgreSQL/PostGIS does not support, and replace it with
+     *  ST_NumInteriorRings(columnName::geometry), which is an equivalent that
+     *  PostGIS does support. */
+    static private String transformNumInteriorRingsQuery(String dml) {
+        return transformQuery(dml, numInteriorRingsQuery, "",
+                "ST_NumInteriorRings(", "::geometry", null, false, null, "column");
+    }
+
+    /** Modify a query containing an IsValid(columnName) function, which
+     *  PostgreSQL/PostGIS does not support, and replace it with
+     *  ST_IsValid(columnName::geometry), which is an equivalent that PostGIS
+     *  does support. */
+    static private String transformIsValidQuery(String dml) {
+        return transformQuery(dml, isValidQuery, "",
+                "ST_IsValid(", "::geometry", null, false, null, "column");
+    }
+
+    /** Modify a query containing an IsInvalidReason(columnName) function,
+     *  which PostgreSQL/PostGIS does not support, and replace it with
+     *  ST_IsValidReason(columnName::geometry), which is an equivalent that
+     *  PostGIS does support. */
+    static private String transformIsInvalidReasonQuery(String dml) {
+        return transformQuery(dml, isInvalidReasonQuery, "",
+                "ST_IsValidReason(", "::geometry", null, false, null, "column");
+    }
+
+    /** Modify a query containing a CAST(columnName AS VARCHAR), where
+     *  <i>columnName</i> is of a Geo type (GEOGRAPHY_POINT or GEOGRAPHY),
+     *  for which PostgreSQL returns the WKB (well-known binary) format for
+     *  that column value, unlike VoltDB, which returns the WKT (well-known
+     *  text) format; so change it to: ST_AsText(columnName). */
+    static private String transformCastGeoAsVarcharQuery(String dml) {
+        return transformQuery(dml, castGeoAsVarcharQuery, "",
+                "AsText(", ")", null, false, null, "column");
     }
 
     /** For a SQL DDL statement, replace (VoltDB) keywords not supported by
@@ -196,10 +268,17 @@ public class PostGISBackend extends PostgreSQLBackend {
                         transformContainsQuery(
                             transformLongitudeQuery(
                                 transformLatitudeQuery(
-                                    PostgreSQLBackend.transformDML(dml) ))))))
+                                    transformNumPointsQuery(
+                                        transformNumInteriorRingsQuery(
+                                            transformIsValidQuery(
+                                                transformIsInvalidReasonQuery(
+                                                    transformCastGeoAsVarcharQuery(
+                                                        PostgreSQLBackend.transformDML(dml)
+               ))   )   )   )   )   )   )   )   )   )
                 // TODO: make these more robust, using regex Patterns?
                 .replace("pointFromText('POINT",     "ST_GeographyFromText('POINT")
                 .replace("polygonFromText('POLYGON", "ST_GeographyFromText('POLYGON")
+                .replace("AsText",    "ST_AsText")
                 .replace("asText",    "ST_AsText");
     }
 

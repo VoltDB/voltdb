@@ -3,12 +3,14 @@
 
 {@aftermath = " "}
 {@agg = "_genericagg"} -- varbinary don't do SUM or AVG
-{@columnpredicate = "_cmp"}
+{@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
+{@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=) [not used here?]
+{@columnpredicate = "@cmp"}
 {@columntype = "varbinary"}
 {@comparableconstant = "X'AB'"}  -- HEX literal string
 {@comparabletype = "varbinary"}
 {@comparablevalue = "_value[varbinary]"}
-{@dmlcolumnpredicate = "_variable[varbinary] _cmp _value[varbinary]"}
+{@dmlcolumnpredicate = "_variable[varbinary] @cmp _value[varbinary]"}
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
