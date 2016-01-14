@@ -499,8 +499,8 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    db1 = get_database_deployment(1)
-    print db1
+    # db1 = get_database_deployment(1)
+    # print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
