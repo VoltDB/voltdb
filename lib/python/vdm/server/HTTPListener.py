@@ -29,15 +29,21 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 from flask import Flask, render_template, jsonify, abort, make_response, request
 from flask.views import MethodView
-from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs
+from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import socket
 import os
 import json
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring
 import sys
+import requests
+from flask import Flask
+from flask.ext.cors import CORS
+import fcntl
+import struct
 
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
+CORS(APP)
 
 SERVERS = []
 
@@ -151,6 +157,7 @@ def map_deployment_without_database_id(deployment):
             'name': user['name'],
             'roles': user['roles'],
             'plaintext': user['plaintext']
+
         })
     return new_deployment
 
@@ -303,7 +310,7 @@ def map_deployment(request, database_id):
     if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
         if deployment[0]['systemsettings']['resourcemonitor'] is None:
             deployment[0]['systemsettings']['resourcemonitor'] = {}
-        print request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+
         if 'memorylimit' in request.json['systemsettings']['resourcemonitor']:
             deployment[0]['systemsettings']['resourcemonitor']['memorylimit'] = {}
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
@@ -311,6 +318,10 @@ def map_deployment(request, database_id):
                 and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
                 deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
                 request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+
+    if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
+        if deployment[0]['systemsettings']['resourcemonitor'] is None:
+            deployment[0]['systemsettings']['resourcemonitor'] = {}
 
         if 'disklimit' in request.json['systemsettings']['resourcemonitor']:
             deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
@@ -479,6 +490,7 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
+    # db1 = get_database_deployment(1)
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
@@ -506,11 +518,27 @@ def make_configuration_file():
         i += 1
 
     i = 0
+
     while i < len(DEPLOYMENT):
+        DEPLOYMENT[i]['users'] = {}
+        DEPLOYMENT[i]['users']['user'] = []
+        deployment_user = filter(lambda t: t['databaseid'] == DEPLOYMENT[i]['databaseid'], DEPLOYMENT_USERS)
+        if len(deployment_user) == 0:
+            DEPLOYMENT[i]['users'] = None
+        for user in deployment_user:
+            DEPLOYMENT[i]['users']['user'].append({
+                'name': user['name'],
+                'roles': user['roles'],
+                'plaintext': user['plaintext'],
+                'password': user['password']
+            })
+
         deployment_elem = SubElement(deployment_top, 'deployment')
         for key, value in DEPLOYMENT[i].iteritems():
             if type(value) is dict:
                 handle_deployment_dict(deployment_elem, key, value, False)
+            elif type(value) is list:
+                handle_deployment_list(deployment_elem, key, value)
             else:
                 if value is not None:
                     deployment_elem.attrib[key] = str(value)
@@ -522,6 +550,15 @@ def make_configuration_file():
         f.close()
     except Exception, err:
         print str(err)
+
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
 
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
@@ -558,7 +595,6 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
                             deployment_sub_element.attrib[key1] = str(value1)
 
 
-
 def handle_deployment_list(deployment_elem, key, value):
     for items in value:
         handle_deployment_dict(deployment_elem, key, items, False)
@@ -578,6 +614,7 @@ class ServerAPI(MethodView):
         Returns:
             server or list of servers.
         """
+        get_configuration()
         if server_id is None:
             return jsonify({'servers': [make_public_server(x) for x in SERVERS]})
         else:
@@ -1072,10 +1109,73 @@ class VdmStatus(MethodView):
     """
     @staticmethod
     def get():
-        if  request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
+        if request.args is not None and 'jsonp' in request.args and request.args['jsonp'] is not None:
             return str(request.args['jsonp']) + '(' + '{\'vdm\': {"running": "true"}}'+')'
         else:
             return jsonify({'vdm': {"running": "true"}})
+
+
+class SyncVdmConfiguration(MethodView):
+    """
+    Class to sync configuration between two servers.
+    """
+
+    @staticmethod
+    def get():
+        try:
+            r = requests.get('http://192.168.2.33:8000/api/1.0/vdm/configuration/')
+            r.status_code
+        except Exception, err:
+            print str(err)
+        return jsonify(json.loads(r.text))
+
+    @staticmethod
+    def post():
+        ip_address = ''
+        inputs = ConfigValidation(request)
+        if not inputs.validate():
+            return jsonify(success=False, errors=inputs.errors)
+        else:
+            ip_address = request.json['ip_address']
+        try:
+            request_url = 'http://' + ip_address + ':8000/api/1.0/vdm/configuration/'
+            r = requests.get(request_url)
+        except Exception, err:
+            print str(err)
+        result = json.loads(r.text)
+        databases = result['vdm']['databases']
+        servers = result['vdm']['members']
+        deployments = result['vdm']['deployments']
+        try:
+            global DATABASES
+            DATABASES = databases
+            global SERVERS
+            SERVERS = servers
+            global DEPLOYMENT
+            DEPLOYMENT = deployments
+        except Exception, errs:
+            print str(errs)
+
+        return jsonify({'status':'success'})
+
+
+class VdmConfiguration(MethodView):
+    """
+    Class related to the vdm configuration
+    """
+    @staticmethod
+    def get():
+        return get_configuration()
+
+
+class VdmGetServerIP(MethodView):
+    """
+    Class to get the IP address of the server
+    """
+    @staticmethod
+    def get():
+        return jsonify({'ip_address': get_ip_address('eth0')})
+
 
 def main(runner, amodule, aport, apath):
     try:
@@ -1110,6 +1210,9 @@ def main(runner, amodule, aport, apath):
     DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
     DEPLOYMENT_USER_VIEW = deploymentUserAPI.as_view('deployment_user_api')
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
+    VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
+    SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
+    VDM_SERVER_IP = VdmGetServerIP.as_view('vdm_server_view_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1132,6 +1235,14 @@ def main(runner, amodule, aport, apath):
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['PUT', 'POST', 'DELETE'])
-    APP.add_url_rule('/api/1.0/vdm/status',
+    APP.add_url_rule('/api/1.0/vdm/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/vdm/configuration/',
+                     view_func=VDM_CONFIGURATION_VIEW, methods=['GET'])
+    APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
+                     view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['GET','POST'])
+    APP.add_url_rule('/api/1.0/ServerIP/',
+                     view_func=VDM_SERVER_IP, methods=['GET'])
+    # APP.add_url_rule('/api/1.0/vdm/configuration_sync/<string:ip_address>', view_func=SYNC_VDM_CONFIGURATION_VIEW,
+    #                  methods=['POST'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)
