@@ -545,8 +545,8 @@ def make_configuration_file():
             elif type(value) is list:
                 handle_deployment_list(deployment_elem, key, value)
             else:
-                # if value is not None:
-                deployment_elem.attrib[key] = str(value)
+                if value is not None:
+                    deployment_elem.attrib[key] = str(value)
         i += 1
 
     try:
