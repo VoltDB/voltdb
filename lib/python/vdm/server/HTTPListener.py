@@ -157,6 +157,7 @@ def map_deployment_without_database_id(deployment):
             'name': user['name'],
             'roles': user['roles'],
             'plaintext': user['plaintext']
+
         })
     return new_deployment
 
@@ -522,11 +523,27 @@ def make_configuration_file():
         i += 1
 
     i = 0
+
     while i < len(DEPLOYMENT):
+        DEPLOYMENT[i]['users'] = {}
+        DEPLOYMENT[i]['users']['user'] = []
+        deployment_user = filter(lambda t: t['databaseid'] == DEPLOYMENT[i]['databaseid'], DEPLOYMENT_USERS)
+        if len(deployment_user) == 0:
+            DEPLOYMENT[i]['users'] = None
+        for user in deployment_user:
+            DEPLOYMENT[i]['users']['user'].append({
+                'name': user['name'],
+                'roles': user['roles'],
+                'plaintext': user['plaintext'],
+                'password': user['password']
+            })
+
         deployment_elem = SubElement(deployment_top, 'deployment')
         for key, value in DEPLOYMENT[i].iteritems():
             if type(value) is dict:
                 handle_deployment_dict(deployment_elem, key, value, False)
+            elif type(value) is list:
+                handle_deployment_list(deployment_elem, key, value)
             else:
                 if value is not None:
                     deployment_elem.attrib[key] = str(value)
@@ -579,7 +596,6 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
                         deployment_sub_element.attrib[key1] = str(value1)
                     elif IGNORETOP[key1] != True:
                         deployment_sub_element.attrib[key1] = str(value1)
-
 
 
 def handle_deployment_list(deployment_elem, key, value):
