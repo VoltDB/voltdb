@@ -328,6 +328,9 @@ chmod +x %%{__perl_requires}
 %%build
 
 %%install
+if [ "%%{_tmppath}/%%{name}-%%{version}-%%{release}" != "%%{buildroot}" ] ; then
+    mv %%{_tmppath}/%%{name}-%%{version}-%%{release}/* %%{buildroot}/
+fi
 
 %%clean
 
