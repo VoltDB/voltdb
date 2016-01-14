@@ -484,13 +484,23 @@ def get_database_deployment(dbid):
     xmlstr = tostring(deployment_top,encoding='UTF-8')
     return xmlstr
 
-#Where are the users in this config file.
+def get_configuration():
+    deployment_json = {
+        'vdm': {
+            'databases': DATABASES,
+            'members': SERVERS,
+            'deployments': DEPLOYMENT
+        }
+    }
+    return jsonify(deployment_json)
+
 def make_configuration_file():
     main_header = Element('vdm')
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    # db1 = get_database_deployment(1)
+    db1 = get_database_deployment(1)
+    print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
@@ -563,7 +573,6 @@ def get_ip_address(ifname):
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = { "databaseid" : True, "users" : True, "dr" : True}
-
 
 def handle_deployment_dict(deployment_elem, key, value, istop):
 
