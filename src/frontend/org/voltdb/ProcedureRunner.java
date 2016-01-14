@@ -1143,9 +1143,13 @@ public class ProcedureRunner {
                int originalTimeout = VoltDB.instance().getCatalogContext().getCluster().getDeployment().get("deployment").getSystemsettings().get("systemsettings").getQuerytimeout();
                int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
                if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
+                   msg.append(" query-specific timeout period.");
                    msg.append(" The query-specific timeout is currently " +  individualTimeout/1000.0 + " seconds.");
                }
-               msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file. ");
+               else {
+                   msg.append(" default query timeout period.");
+                   msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file. ");
+               }
            }
        }
 

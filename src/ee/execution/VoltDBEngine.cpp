@@ -1778,9 +1778,9 @@ void VoltDBEngine::reportProgressToTopend() {
 
     if (tupleReportThreshold < 0) {
         VOLT_DEBUG("Interrupt query.");
-        char buff[113];
-        snprintf(buff, 113,
-                "A SQL query was terminated after %.03f seconds because it exceeded the default or query-specific timeout.",
+        char buff[100];
+        snprintf(buff, 100,
+                "A SQL query was terminated after %.03f seconds because it exceeded the",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
 
         throw InterruptException(std::string(buff));
