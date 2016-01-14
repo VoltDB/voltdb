@@ -28,6 +28,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 
 @ProcInfo(
     singlePartition = false
@@ -42,7 +43,7 @@ public class JiggleMultiPartition extends VoltProcedure {
     public VoltTable[] run(long rowid, long ignore)
     {
         @SuppressWarnings("deprecation")
-        long txid = getVoltPrivateRealTransactionIdDontUseMe();
+        long txid = DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this);
 
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = new Random(txid);
