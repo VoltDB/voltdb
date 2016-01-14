@@ -1148,8 +1148,8 @@ public class ProcedureRunner {
                }
                else {
                    msg.append(" default query timeout period.");
-                   msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file. ");
                }
+               msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file. ");
            }
        }
 
