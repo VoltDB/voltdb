@@ -212,10 +212,6 @@ public class DDLCompiler {
         return typeDetected;
     }
 
-    private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType) {
-        return isVoltTypePresent(tableNode, lookupType, null);
-    }
-
     // Function to check if the table - TableXML, supplied as VoltXMLElement, does not contain geo types.
     // If table does contain geo types, VoltCompilerException is generated with information about geo columns
     // found in table wrapped in exception message
