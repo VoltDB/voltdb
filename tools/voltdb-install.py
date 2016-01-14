@@ -220,7 +220,10 @@ class Metadata:
             provides    = 'voltdb',
             conflicts   = 'voltdb',
             replaces    = 'voltdb',
-            depends     = 'openjdk-7-jdk,libc6',
+            #depends     = 'openjdk-8-jdk,libc6',
+            # nb. at release time java 8 not yet available from apt or backports
+            # see voltdb installation instructions
+            depends     = 'libc6,libstdc++-6 (>= 4.4.0),libgcc (>= 4.4.0), python (>= 2.5)',
             priority    = 'extra',
             section     = 'database',
             maintainer  = 'VoltDB',
@@ -290,9 +293,9 @@ Vendor: %(maintainer)s
 URL: http://www.voltdb.com
 Provides: %(provides)s
 Conflicts: %(conflicts)s
-Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
-Requires: java-1.7.0-openjdk
-Requires: java-1.7.0-openjdk-devel
+Requires: libgcc >= 4.4.0, libstdc++ >= 4.4.0, python >= 2.5
+Requires: java-1.8.0-openjdk
+Requires: java-1.8.0-openjdk-devel
 Summary: VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
 Prefix: %(prefix)s
 
@@ -347,6 +350,8 @@ if [ -n "%%{name}" ]; then
 fi
 
 %%changelog
+* Thu Jan 14 2016  Phil Rosegay <support@voltdb.com> 6.0-1
+- GA-6.0
 * Mon Nov 11 2013  Phil Rosegay <support@voltdb.com> 4.0-1
 - GA-4.0
 * Fri Jan 14 2013  Phil Rosegay <support@voltdb.com> 3.0-1
