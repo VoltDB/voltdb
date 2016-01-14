@@ -1113,6 +1113,10 @@ table.tblPopup {
     background: #FBFBFB;
 	}
 .featureTbl { overflow:auto; height:180px;}
+.addConfigProperTbl tr td label.error {
+    line-height: 12px;
+    height: auto;
+}
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
@@ -1394,6 +1398,4 @@ ul.drList {
     width: 67%;
 }
 }
-
-
 
