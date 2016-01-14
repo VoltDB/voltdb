@@ -61,296 +61,296 @@ import org.voltdb.types.TimestampType;
 
 public class VoltDBOsmSink extends VoltProcedure implements Sink, EntityProcessor {
 
-	public static final String INS_NODE_PROC = "insertNodes";
-	public static final String INS_NODE_TAG_PROC = "insertNodeTags";
-	public static final String INS_RELATIONS_PROC = "insertRelations";
-	public static final String INS_RELATIONS_MEMBER_PROC = "insertRelationsMembers";
+    public static final String INS_NODE_PROC = "insertNodes";
+    public static final String INS_NODE_TAG_PROC = "insertNodeTags";
+    public static final String INS_RELATIONS_PROC = "insertRelations";
+    public static final String INS_RELATIONS_MEMBER_PROC = "insertRelationsMembers";
 
-	public static final String INS_RELATION_TAGS_PROC = "insertRelationTags";
-	public static final String INS_USERS_PROC = "insertUsers";
-	public static final String INS_WAYS_PROC = "insertWays";
-	public static final String INS_WAYS_NODES_PROC = "insertWaysNodes";
-	public static final String INS_WAY_TAGS_PROC = "insertWayTags";
+    public static final String INS_RELATION_TAGS_PROC = "insertRelationTags";
+    public static final String INS_USERS_PROC = "insertUsers";
+    public static final String INS_WAYS_PROC = "insertWays";
+    public static final String INS_WAYS_NODES_PROC = "insertWaysNodes";
+    public static final String INS_WAY_TAGS_PROC = "insertWayTags";
 
-	private boolean enableLinestringBuilder = false;
-	private boolean enableBboxBuilder = true;
-	private boolean keepInvalidWays = false;
-	private WayPolygonGeometryBuilder wayGeometryBuilder;
+    private boolean enableLinestringBuilder = false;
+    private boolean enableBboxBuilder = true;
+    private boolean keepInvalidWays = false;
+    private WayPolygonGeometryBuilder wayGeometryBuilder;
 
-	// Reference to the database connection we will use
-	private String server;
-	private ClientStatsContext periodicStatsContext;
-	private ClientStatsContext fullStatsContext;
+    // Reference to the database connection we will use
+    private String server;
+    private ClientStatsContext periodicStatsContext;
+    private ClientStatsContext fullStatsContext;
 
-	private Client client;
+    private Client client;
 
-	public VoltDBOsmSink(String server) {
-		this.server = server;
-		NodeLocationStoreType storeType = NodeLocationStoreType.TempFile;
-		wayGeometryBuilder = new WayPolygonGeometryBuilder(storeType);
-	}
+    public VoltDBOsmSink(String server) {
+        this.server = server;
+        NodeLocationStoreType storeType = NodeLocationStoreType.TempFile;
+        wayGeometryBuilder = new WayPolygonGeometryBuilder(storeType);
+    }
 
-	@Override
-	public void initialize(Map<String, Object> arg0) {
-		try {
-			connect(server);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
+    @Override
+    public void initialize(Map<String, Object> arg0) {
+        try {
+            connect(server);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
 
-	}
+    }
 
-	private void connect(String servers) throws InterruptedException, ClassNotFoundException, SQLException {
-		System.out.println("Connecting to VoltDB...");
+    private void connect(String servers) throws InterruptedException, ClassNotFoundException, SQLException {
+        System.out.println("Connecting to VoltDB...");
 
-		ClientConfig clientConfig = new ClientConfig("", "", new VoltDBOsmSink.StatusListener());
-		clientConfig.setMaxTransactionsPerSecond(10000);
+        ClientConfig clientConfig = new ClientConfig("", "", new VoltDBOsmSink.StatusListener());
+        clientConfig.setMaxTransactionsPerSecond(10000);
 
-		client = ClientFactory.createClient(clientConfig);
+        client = ClientFactory.createClient(clientConfig);
 
-		try {
-			// if we have more then one server, we would connect to each one
-			// individually inside a loop.
-			client.createConnection(servers);
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+        try {
+            // if we have more then one server, we would connect to each one
+            // individually inside a loop.
+            client.createConnection(servers);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-		periodicStatsContext = client.createStatsContext();
-		fullStatsContext = client.createStatsContext();
+        periodicStatsContext = client.createStatsContext();
+        fullStatsContext = client.createStatsContext();
 
-	}
+    }
 
-	@Override
-	public void complete() {
+    @Override
+    public void complete() {
 
-	}
+    }
 
-	@Override
-	public void release() {
-		try {
-			client.drain();
-		} catch (NoConnectionsException | InterruptedException e) {
-			e.printStackTrace();
-		}
+    @Override
+    public void release() {
+        try {
+            client.drain();
+        } catch (NoConnectionsException | InterruptedException e) {
+            e.printStackTrace();
+        }
 
-		try {
-			client.close();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+        try {
+            client.close();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-	}
+    }
 
-	@Override
-	public void process(EntityContainer entity) {
-		entity.process(this);
-	}
+    @Override
+    public void process(EntityContainer entity) {
+        entity.process(this);
+    }
 
-	public void process(BoundContainer boundContainer) {
-		// Do nothing.
-	}
+    public void process(BoundContainer boundContainer) {
+        // Do nothing.
+    }
 
-	public void process(NodeContainer nodeContainer) {
-		Node node;
+    public void process(NodeContainer nodeContainer) {
+        Node node;
 
-		node = nodeContainer.getEntity();
-		double lat = node.getLatitude();
-		double lng = node.getLongitude();
-		String pointText = "POINT(" + lng + " " + lat + ")";
+        node = nodeContainer.getEntity();
+        double lat = node.getLatitude();
+        double lng = node.getLongitude();
+        String pointText = "POINT(" + lng + " " + lat + ")";
 
-		// keep track of the nodes so we can build polygons later
-		if (enableBboxBuilder || enableLinestringBuilder) {
-			wayGeometryBuilder.addNodeLocation(node);
-		}
+        // keep track of the nodes so we can build polygons later
+        if (enableBboxBuilder || enableLinestringBuilder) {
+            wayGeometryBuilder.addNodeLocation(node);
+        }
 
-		// client.callProcedure(callback, procName, parameters)
+        // client.callProcedure(callback, procName, parameters)
 
-		try {
-			client.callProcedure(new InsertCallback(), INS_NODE_PROC, node.getId(), node.getVersion(),
-					node.getUser().getId(), new TimestampType(node.getTimestamp().getTime()), node.getChangesetId(),
-					pointText);
-		} catch (NoConnectionsException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+        try {
+            client.callProcedure(new InsertCallback(), INS_NODE_PROC, node.getId(), node.getVersion(),
+                    node.getUser().getId(), new TimestampType(node.getTimestamp().getTime()), node.getChangesetId(),
+                    pointText);
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-		Collection<Tag> tags = node.getTags();
-		for (Tag tag : tags) {
+        Collection<Tag> tags = node.getTags();
+        for (Tag tag : tags) {
 
-			// System.out.println(INS_NODE_TAG_PROC+","+node.getId()+","+tag.getKey()+","+tag.getValue());
-			try {
-				client.callProcedure(new InsertCallback(), INS_NODE_TAG_PROC, node.getId(), tag.getKey(),
-						tag.getValue());
-			} catch (NoConnectionsException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+            // System.out.println(INS_NODE_TAG_PROC+","+node.getId()+","+tag.getKey()+","+tag.getValue());
+            try {
+                client.callProcedure(new InsertCallback(), INS_NODE_TAG_PROC, node.getId(), tag.getKey(),
+                        tag.getValue());
+            } catch (NoConnectionsException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
-	}
+    }
 
-	public void process(WayContainer wayContainer) {
-		Way way;
-		List<Long> nodeIds;
+    public void process(WayContainer wayContainer) {
+        Way way;
+        List<Long> nodeIds;
 
-		way = wayContainer.getEntity();
+        way = wayContainer.getEntity();
 
-		nodeIds = new ArrayList<Long>(way.getWayNodes().size());
+        nodeIds = new ArrayList<Long>(way.getWayNodes().size());
 
-		for (WayNode wayNode : way.getWayNodes()) {
-			nodeIds.add(wayNode.getNodeId());
-		}
+        for (WayNode wayNode : way.getWayNodes()) {
+            nodeIds.add(wayNode.getNodeId());
+        }
 
-		// Keep invalid ways out of the database if desired by the user
-		if (way.getWayNodes().size() > 1 || keepInvalidWays) {
+        // Keep invalid ways out of the database if desired by the user
+        if (way.getWayNodes().size() > 1 || keepInvalidWays) {
 
-			for (Tag tag : way.getTags()) {
-				try {
-					client.callProcedure(new InsertCallback(), INS_WAY_TAGS_PROC, way.getId(), tag.getKey(),
-							tag.getValue());
-				} catch (NoConnectionsException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+            for (Tag tag : way.getTags()) {
+                try {
+                    client.callProcedure(new InsertCallback(), INS_WAY_TAGS_PROC, way.getId(), tag.getKey(),
+                            tag.getValue());
+                } catch (NoConnectionsException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
 
-				/*
-				 * if ("area".equals(tag.getKey())) { System.out.print("key:" +
-				 * tag.getKey() + " val:" + tag.getValue()); }
-				 */
-			}
+                /*
+                 * if ("area".equals(tag.getKey())) { System.out.print("key:" +
+                 * tag.getKey() + " val:" + tag.getValue()); }
+                 */
+            }
 
-			// Add these to the ways_nodes_table;
-			int sequence = 0;
-			for (Long nodeId : nodeIds) {
-				try {
-					client.callProcedure(new InsertCallback(), INS_WAYS_NODES_PROC, way.getId(), nodeId, sequence);
-				} catch (NoConnectionsException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				sequence++;
+            // Add these to the ways_nodes_table;
+            int sequence = 0;
+            for (Long nodeId : nodeIds) {
+                try {
+                    client.callProcedure(new InsertCallback(), INS_WAYS_NODES_PROC, way.getId(), nodeId, sequence);
+                } catch (NoConnectionsException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                sequence++;
 
-			}
+            }
 
-			StringBuffer sb = new StringBuffer();
+            StringBuffer sb = new StringBuffer();
 
-			// if the first node id == the last nodeId, we know that this is a
-			// closed loop.
-			long n0 = nodeIds.get(0);
-			long nn = nodeIds.get(nodeIds.size() - 1);
-			if (n0 == nn) {
+            // if the first node id == the last nodeId, we know that this is a
+            // closed loop.
+            long n0 = nodeIds.get(0);
+            long nn = nodeIds.get(nodeIds.size() - 1);
+            if (n0 == nn) {
 
-				if (enableBboxBuilder) {
-					Polygon pg = wayGeometryBuilder.createPolygon(way);
-					pg.outerWKT(sb);
-				}
+                if (enableBboxBuilder) {
+                    Polygon pg = wayGeometryBuilder.createPolygon(way);
+                    pg.outerWKT(sb);
+                }
 
-			} else {
-				// it's a lineString, but we don't support it yet.
-				if (enableLinestringBuilder) {
-					LineString lineString = wayGeometryBuilder.createWayLinestring(way);
-					lineString.outerWKT(sb);
-				} else {
-					System.out.println("ignoring LineString geometries");
-					return;
-				}
-			}
+            } else {
+                // it's a lineString, but we don't support it yet.
+                if (enableLinestringBuilder) {
+                    LineString lineString = wayGeometryBuilder.createWayLinestring(way);
+                    lineString.outerWKT(sb);
+                } else {
+                    System.out.println("ignoring LineString geometries");
+                    return;
+                }
+            }
 
-			String bbox = sb.toString();
+            String bbox = sb.toString();
 
-			try {
-				client.callProcedure(new InsertCallback(), INS_WAYS_PROC, way.getId(), way.getVersion(),
-						way.getUser().getId(), way.getTimestamp(), way.getChangesetId(), bbox);
-			} catch (NoConnectionsException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+            try {
+                client.callProcedure(new InsertCallback(), INS_WAYS_PROC, way.getId(), way.getVersion(),
+                        way.getUser().getId(), way.getTimestamp(), way.getChangesetId(), bbox);
+            } catch (NoConnectionsException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-		}
+        }
 
-	}
+    }
 
-	/**
-	 * {@inheritDoc}
-	 */
-	public void process(RelationContainer relationContainer) {
+    /**
+     * {@inheritDoc}
+     */
+    public void process(RelationContainer relationContainer) {
 
-		Relation relation;
-		int memberSequenceId;
+        Relation relation;
+        int memberSequenceId;
 
-		relation = relationContainer.getEntity();
+        relation = relationContainer.getEntity();
 
-		try {
-			client.callProcedure(new InsertCallback(), INS_RELATIONS_PROC, relation.getId(), relation.getVersion(),
-					relation.getUser().getId(), relation.getTimestamp(), relation.getChangesetId());
-		} catch (NoConnectionsException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+        try {
+            client.callProcedure(new InsertCallback(), INS_RELATIONS_PROC, relation.getId(), relation.getVersion(),
+                    relation.getUser().getId(), relation.getTimestamp(), relation.getChangesetId());
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-		memberSequenceId = 0;
-		for (RelationMember member : relation.getMembers()) {
-			try {
-				client.callProcedure(new InsertCallback(), INS_RELATIONS_MEMBER_PROC, relation.getId(),
-						member.getMemberId(), member.getMemberType().ordinal(), member.getMemberRole(),
-						memberSequenceId);
-			} catch (NoConnectionsException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			memberSequenceId++;
-		}
+        memberSequenceId = 0;
+        for (RelationMember member : relation.getMembers()) {
+            try {
+                client.callProcedure(new InsertCallback(), INS_RELATIONS_MEMBER_PROC, relation.getId(),
+                        member.getMemberId(), member.getMemberType().ordinal(), member.getMemberRole(),
+                        memberSequenceId);
+            } catch (NoConnectionsException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            memberSequenceId++;
+        }
 
-		for (Tag tag : relation.getTags()) {
-			try {
-				client.callProcedure(new InsertCallback(), INS_RELATION_TAGS_PROC, relation.getId(), tag.getKey(),
-						tag.getValue());
-			} catch (NoConnectionsException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-	}
+        for (Tag tag : relation.getTags()) {
+            try {
+                client.callProcedure(new InsertCallback(), INS_RELATION_TAGS_PROC, relation.getId(), tag.getKey(),
+                        tag.getValue());
+            } catch (NoConnectionsException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
-	/**
-	 * Provides a callback to be notified on node failure. This example only
-	 * logs the event.
-	 */
-	public static class StatusListener extends ClientStatusListenerExt {
-		@Override
-		public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-			System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-		}
+    /**
+     * Provides a callback to be notified on node failure. This example only
+     * logs the event.
+     */
+    public static class StatusListener extends ClientStatusListenerExt {
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
+        }
 
-		public void backpressure(boolean status) {
+        public void backpressure(boolean status) {
 
-		}
-	}
+        }
+    }
 
-	public static class InsertCallback implements ProcedureCallback {
+    public static class InsertCallback implements ProcedureCallback {
 
-		@Override
-		public void clientCallback(ClientResponse response) throws Exception {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
 
-			if (response.getStatus() != ClientResponse.SUCCESS) {
-				System.err.println(response.getStatusString());
-				return;
-			}
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                System.err.println(response.getStatusString());
+                return;
+            }
 
-		}
+        }
 
-	}
+    }
 
 }
