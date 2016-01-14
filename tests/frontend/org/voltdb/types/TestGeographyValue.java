@@ -114,7 +114,7 @@ public class TestGeographyValue extends TestCase {
     //
     public void testGeographyValueOverDiscontinuities() {
         String geoWKT = "POLYGON ((160.0 40.0, -160.0 40.0, -160.0 60.0, 160.0 60.0, 160.0 40.0))";
-        GeographyValue disPoly = GeographyValue.fromText(geoWKT);
+        GeographyValue disPoly = GeographyValue.fromWKT(geoWKT);
         assertEquals(geoWKT, disPoly.toString());
         GeographyPointValue offset = new GeographyPointValue(10.0, -10.0);
         GeographyValue disPolyOver = disPoly.add(offset);

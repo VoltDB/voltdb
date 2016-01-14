@@ -489,9 +489,9 @@ class ColumnGenerator(BaseGenerator):
         # TODO: temp kludge, to avoid crash (until Python client works):
         if substitute_for_geo_types:
             for i, val in enumerate(self.values):
-                if val == 'PT1' or val == 'PT2':
+                if val == 'PT1' or val == 'PT2' or val == 'PT3':
                     self.values[i] = 'LONGITUDE(' + val + ')'
-                elif val == 'POLY1':
+                elif val == 'POLY1' or val == 'POLY2' or val == 'POLY3':
                     self.values[i] = 'AREA(' + val + ')'
         self.prior_generator = prior_generators.get("variable")
         prior_generators["variable"] = self # new variable generator at the head of the chain

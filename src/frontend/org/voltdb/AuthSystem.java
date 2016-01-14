@@ -58,7 +58,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientAuthScheme;
-import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.DelegatePrincipal;
 import org.voltdb.common.Permission;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Encoder;
@@ -811,11 +811,9 @@ public class AuthSystem {
                         }
 
                         // read the delegate user if the Volt's accepting service principal is the
-                        // same as the one that initiated, and the connection endpoints are both in
-                        // localhost
+                        // same as the one that initiated,
                         if (   context.getTargName() != null
                             && context.getSrcName().equals(context.getTargName())
-                            && ConnectionUtil.isLocalhostConnection(m_socket)
                             ) {
                             // read in the next packet size
                             bb.clear().limit(4);
@@ -847,10 +845,14 @@ public class AuthSystem {
                                 authLogger.warn("Encountered unexpected authentication protocol tag " + tag);
                                 return null;
                             }
-
                             MessageProp mprop = new MessageProp(0, true);
-                            byte [] delegateBytes = context.unwrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop);
-                            authenticateUserName = new String(delegateBytes, StandardCharsets.UTF_8);
+                            DelegatePrincipal delegate = new DelegatePrincipal(
+                                    context.unwrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop)
+                                );
+                            if (delegate.getId() != System.identityHashCode(AuthSystem.this)) {
+                                return null;
+                            }
+                            authenticateUserName = delegate.getName();
                         }
                         context.dispose();
                         context = null;

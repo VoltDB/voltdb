@@ -1321,7 +1321,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     }
                     break;
                 case GEOGRAPHY_POINT:
-                    GeographyPointValue pt = r.getPoint(i);
+                    GeographyPointValue pt = r.getGeographyPointValue(i);
                     if (r.wasNull()) {
                         buffer.append("NULL");
                     }

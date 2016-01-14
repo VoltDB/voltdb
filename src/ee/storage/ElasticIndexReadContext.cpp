@@ -231,8 +231,7 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     // Delete the indexed tuples that were streamed.
     // Undo token release will cause the index to delete the corresponding items
     // via notifications.
-    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream(),
-            ExecutorContext::getExecutorContext()->drReplicatedStream());
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {

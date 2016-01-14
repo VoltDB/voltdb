@@ -505,7 +505,7 @@ public class ParameterConverter {
             // If so, return the newly constructed point.
             if (inputClz == String.class) {
                 try {
-                    GeographyPointValue pt = GeographyPointValue.geographyPointFromText((String)param);
+                    GeographyPointValue pt = GeographyPointValue.fromWKT((String)param);
                     return pt;
                 } catch (IllegalArgumentException e) {
                     throw new VoltTypeException(String.format("deserialize GeographyPointValue from string failed (string %s)",
@@ -519,7 +519,7 @@ public class ParameterConverter {
             if (inputClz == String.class) {
                 String paramStr = (String)param;
                 try {
-                    GeographyValue gv = GeographyValue.fromText(paramStr);
+                    GeographyValue gv = GeographyValue.fromWKT(paramStr);
                     return gv;
                 } catch (IllegalArgumentException e) {
                     throw new VoltTypeException(String.format("deserialize GeographyValue from string failed (string %s)",

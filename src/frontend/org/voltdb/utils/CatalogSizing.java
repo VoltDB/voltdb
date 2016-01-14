@@ -211,7 +211,7 @@ public abstract class CatalogSizing {
         return bufferSize;
     }
 
-    private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex) {
+    private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex, boolean isNullable) {
         assert(capacity >= 0);
         assert(dataSize >= 0);
         // Smaller capacities get fully consumed (plus 1 byte).
@@ -222,12 +222,18 @@ public abstract class CatalogSizing {
         if (forIndex) {
             return 8;
         }
+
+        // For Nullable
+        if (isNullable) {
+            return 8;
+        }
+
         // Larger capacities use pooled buffers sized in powers of 2 or values halfway
         // between powers of 2.
         // The rounded buffer size includes an object length of 4 bytes and
         // an 8-byte backpointer used in compaction.
         int content = 4 + 8 + dataSize;
-        int bufferSize = roundedAllocationSize(64, content);
+        int bufferSize = roundedAllocationSize(8, content);
         // There is also has an 8-byte pointer in the tuple
         // and an 8-byte StringRef indirection pointer.
         return bufferSize + 8 + 8;
@@ -247,7 +253,7 @@ public abstract class CatalogSizing {
         // result of allocation rounding.
         // See the comments in getVariableColumnSize for the significance of
         // these adjustments.
-        return getVariableColumnSize(64, dataSize, false) - 8 - 8;
+        return getVariableColumnSize(64, dataSize, false, false) - 8 - 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {
@@ -255,6 +261,7 @@ public abstract class CatalogSizing {
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
             VoltType ctype = VoltType.get((byte)column.getType());
+            boolean isNullable = column.getNullable();
             if (ctype.isVariableLength()) {
                 int capacity = column.getSize();
 
@@ -262,8 +269,8 @@ public abstract class CatalogSizing {
                     capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
                 }
 
-                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
-                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
+                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex, isNullable);
+                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex, false);
             }
             else {
                 // Fixed type - use the fixed size.

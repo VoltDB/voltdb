@@ -183,6 +183,7 @@ SnapshotCompletionInterest, Promotable
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
+                        jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
@@ -190,9 +191,6 @@ SnapshotCompletionInterest, Promotable
                             TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
-                        }
-                        if (m_action == StartAction.RECOVER) {
-                            jsObj.put(SnapshotUtil.JSON_CHECK_CLUSTER_ID, true);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(params);
@@ -693,7 +691,8 @@ SnapshotCompletionInterest, Promotable
                 // The expected partition count could be determined by the new partition count recorded
                 // in the truncation snapshot. Truncation snapshot taken at the end of the join process
                 // actually records the new partition count in the digest.
-                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader);
+                m_replayAgent.generateReplayPlan(infoWithMinHostId.instanceId.getTimestamp(),
+                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader);
             }
         }
 
