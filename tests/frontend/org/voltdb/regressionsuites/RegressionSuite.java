@@ -833,7 +833,7 @@ public class RegressionSuite extends TestCase {
                 assertTrue(msg, actualRow.wasNull());
             }
             else if (expectedObj instanceof GeographyPointValue) {
-                assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getPoint(i), epsilon);
+                assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getGeographyPointValue(i), epsilon);
             }
             else if (expectedObj instanceof GeographyValue) {
                 assertApproximatelyEquals(msg, (GeographyValue) expectedObj, actualRow.getGeographyValue(i), epsilon);
