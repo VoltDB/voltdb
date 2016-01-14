@@ -132,7 +132,7 @@ public class GeographyValue {
      * @param text
      * @return
      */
-    public static GeographyValue fromText(String text) {
+    public static GeographyValue fromWKT(String text) {
         return new GeographyValue(text);
     }
 
@@ -178,10 +178,17 @@ public class GeographyValue {
     }
 
     /**
-     * Print out this polygon in WKT format.  Use 12 digits of precision.
+     * Print out this polygon as text.  We currently use WKT.
      */
     @Override
     public String toString() {
+        return toWKT();
+    }
+
+    /**
+     * Print out this polygon in WKT format.  Use 12 digits of precision.
+     */
+    public String toWKT() {
         StringBuffer sb = new StringBuffer();
         sb.append("POLYGON (");
 

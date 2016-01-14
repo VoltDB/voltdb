@@ -54,6 +54,7 @@ public class TestPolygonFactory extends TestCase {
     static final GeographyPointValue origin = new GeographyPointValue(0.0, 0.0);
     static final GeographyPointValue x = new GeographyPointValue(1.0, 0.0);
     static final GeographyPointValue y = new GeographyPointValue(0.0, 1.0);
+    static final double CENTER_SHRINK = 0.3;
 
     public void testRegularConvexPolygon() throws Exception {
         // Test a triangle.
@@ -105,22 +106,31 @@ public class TestPolygonFactory extends TestCase {
     /**
      * Create many regular convex polygons.  In returnValue.get(n).get(k) we put an
      * (n+3)-sided polygon with the given center and start vertex, with hole size
-     * equal to k*0.2.  If k == 0 there is no hole.  Note that k ranges between
-     * 0 and 4, so k*0.2 ranges between 0 and 0.8.
+     * equal to k/numHoleSizes.  If k == 0 there is no hole.  Note that k ranges between
+     * 0 and 4, so k/NumHoleSizes ranges between 0 and (1-1/numHoleSizes).  If k == 0
+     * there is no hole.
      *
      * @return
      */
     private static List<List<GeographyValue>> makeRegularConvexPolygons(GeographyPointValue firstCenter,
-                                                                        GeographyPointValue firstFirstVertex,
-                                                                        double xmul,
-                                                                        double ymul) {
+                                                                 GeographyPointValue firstFirstVertex,
+                                                                 int minNumberVertices,
+                                                                 int maxNumberVertices,
+                                                                 int numHoleSizes,
+                                                                 double xmul,
+                                                                 double ymul) {
         List<List<GeographyValue>> answer = new ArrayList<List<GeographyValue>>();
-        for (int idx = 0; idx < 10; idx += 1) {
+        for (int numVertices = minNumberVertices; numVertices <= maxNumberVertices; numVertices += 1) {
+            int idx = numVertices - minNumberVertices;
             List<GeographyValue> oneSize = new ArrayList<GeographyValue>();
-            for (int hidx = 0; hidx < 5; hidx += 1) {
-                GeographyPointValue center = firstCenter.add(x.mul(xmul*idx).add(y.mul(ymul*hidx)));
-                GeographyPointValue firstVertex = firstFirstVertex.add(x.mul(xmul*idx).add(y.mul(ymul*hidx)));
-                oneSize.add(PolygonFactory.CreateRegularConvex(center, firstVertex, idx + 3, hidx*0.2));
+            // The x coordinate is humHoleSizes*idx.
+            GeographyPointValue sCenter = firstCenter.add(x.mul(numHoleSizes*idx));
+            for (int hidx = 0; hidx < numHoleSizes; hidx += 1) {
+                // The y coordinate is ymul * hidx.
+                GeographyPointValue offset = sCenter.add(y.mul(ymul*hidx));
+                GeographyPointValue center = firstCenter.add(offset);
+                GeographyPointValue firstVertex = firstFirstVertex.add(offset);
+                oneSize.add(PolygonFactory.CreateRegularConvex(center, firstVertex, numVertices, (hidx+0.0)/numHoleSizes));
             }
             answer.add(oneSize);
         }
@@ -128,17 +138,17 @@ public class TestPolygonFactory extends TestCase {
     }
 
     /**
-     * Create many star-like polygons.  In returnValue.get(n-minNumPoints).get(s).get(k) we put an
+     * Create many star-like polygons.  In returnValue.get(n).get(s).get(k) we put an
      * n-pointed polygon with the given center and start vertex.  The inner radius is
-     * (numIRLevels-1-s)/numIRLevels.  The hole size is k/numHoleSizeLevels.
+     * (numIrLevels-s+1)/numIrLevels.  The hole size is k/numHoleSizeLevels.
      * If k == 0, there is no hole.
      *
-     * Note that n ranges between minNumPoints and maxNumPoints, s between 0 and numIRLevels-1
-     * and k between 0 and numHoleSizeLevels-1.  So, the hole size and inner radius must
-     * both be less than 1, and the inner radius must be greater than zero.  The hole size
-     * can be zero.
+     * Note that n ranges between minNumPoints and maxNumPoints inclusive,
+     * s between 0 numIrLevels-1, k between 0 and numHoleSizeLevels-1.  Since
+     * the hole size and inner radius must both be less than 1, and the inner radius
+     * must be greater than zero.  The hole size can be zero.
      *
-     * @return
+     * @return A 3-dimensional list list of polygons.
      */
     private static List<List<List<GeographyValue>>> makeStarPolygons(GeographyPointValue firstCenter,
                                                                      GeographyPointValue firstFirstVertex,
@@ -149,18 +159,19 @@ public class TestPolygonFactory extends TestCase {
                                                                      double xmul,
                                                                      double ymul) {
         List<List<List<GeographyValue>>> answer = new ArrayList<List<List<GeographyValue>>>();
-        int npoints = maxNumPoints - minNumPoints + 1;
-        for (int idx = 0; idx < npoints; idx += 1) {
+        for (int numSides = minNumPoints; numSides <= maxNumPoints; numSides += 1) {
+            int idx = numSides - minNumPoints;
+            // The x coordinate is xmul * idx
             GeographyPointValue column = x.mul(xmul*idx);
             List<List<GeographyValue>> oneSize = new ArrayList<List<GeographyValue>>();
-            for (int irdx = 0; irdx < numIRLevels; irdx += 1) {
-                GeographyPointValue irCenter = y.mul(numIRLevels*ymul*irdx);
+            for (int ratioLevel = 0; ratioLevel < numIRLevels; ratioLevel += 1) {
+                GeographyPointValue irCenter = column.add(y.mul(numHoleSizeLevels*ymul*ratioLevel));
                 List<GeographyValue> oneRadius = new ArrayList<GeographyValue>();
-                for (int hidx = 0; hidx < numHoleSizeLevels; hidx += 1) {
-                    GeographyPointValue hCenter = irCenter.add(y.mul(ymul*hidx));
-                    GeographyPointValue center = firstCenter.add(column.add(hCenter));
-                    GeographyPointValue firstVertex = firstFirstVertex.add(center);
-                    oneRadius.add(PolygonFactory.CreateStar(center, firstVertex, idx + minNumPoints, (irdx + 1)*0.2, hidx*0.2));
+                for (int holeNumber = 0; holeNumber < numHoleSizeLevels; holeNumber += 1) {
+                    GeographyPointValue offset = irCenter.add(y.mul(ymul*holeNumber));
+                    GeographyPointValue center = firstCenter.add(offset);
+                    GeographyPointValue firstVertex = firstFirstVertex.add(offset);
+                    oneRadius.add(PolygonFactory.CreateStar(center, firstVertex, numSides, (ratioLevel + 1.0)/numIRLevels, (holeNumber+0.0)/numHoleSizeLevels));
                 }
                 oneSize.add(oneRadius);
             }
@@ -173,40 +184,98 @@ public class TestPolygonFactory extends TestCase {
         return wkt.replaceAll("([0-9]), ", "$1,\n         ").replaceAll("[)], [(]", "),\n        (");
     }
 
+    private static int getIntArg(String args[], int arg, String msg) {
+        int ans = -1;
+        if (args.length <= arg) {
+            System.err.printf("%s\n", msg);
+            System.exit(100);
+        } else {
+            try {
+                ans = Integer.parseInt(args[arg]);
+            } catch (IllegalArgumentException ex) {
+                System.err.printf("%s\n", msg);
+                System.exit(100);
+            }
+        }
+        return ans;
+    }
+    private static double getDoubleArg(String args[], int arg, String msg) {
+        double ans = -1;
+        if (args.length <= arg) {
+            System.err.printf("%s\n", msg);
+            System.exit(100);
+        } else {
+            try {
+                ans = Double.parseDouble(args[arg]);
+            } catch (IllegalArgumentException ex) {
+                System.err.printf("%s\n", msg);
+                System.exit(100);
+            }
+        }
+        return ans;
+    }
+
     /**
      * This main routine is useful for manual testing.  The idea is that one
      * runs this routine and WKT polygons are printed.  These can be displayed
-     * with qgis.
-     *
-     * It's unfortunate that there are no command line parameters to govern how
-     * this is to be run.
+     * with qgis or some other display tool.
      *
      * @param arg
      */
-    public static void main(String arg[]) {
-        GeographyPointValue center = origin;
-        GeographyPointValue firstVertex = x.mul(0.1).add(y.mul(0.1));
-        List<List<GeographyValue>> polys = makeRegularConvexPolygons(center, firstVertex, 1.0, 1.0);
-        System.out.printf(":-------------------------------:\n");
-        System.out.printf(":------- Regular Convex --------:\n");
-        System.out.printf(":-------------------------------:\n");
-        for (int nsides = 0; nsides < polys.size(); nsides += 1) {
-            for (int holeSize = 0; holeSize < 5; holeSize += 1) {
-                System.out.printf("%s\n",
-                                  formatWKT(polys.get(nsides).get(holeSize).toString()));
+    public static void main(String args[]) {
+        boolean doStars = false;
+        boolean doRegs = false;
+        int minVerts = 3;
+        int maxVerts = 12;
+        int numIRs = 5;
+        int numHoles = 5;
+        double xmul = 3.0;
+        double ymul = 3.0;
+        for (int arg = 0; arg < args.length; arg += 1) {
+            if (args[arg].equals("--stars")) {
+                doStars = true;
+            } else if (args[arg].equals("--reg")) {
+                doRegs = true;
+            } else if (args[arg].equals("--minVerts")) {
+                minVerts = getIntArg(args, ++arg, "--minVerts expects one integer parameters");
+            } else if (args[arg].equals("--maxVerts")) {
+                maxVerts = getIntArg(args, ++arg, "--maxVerts expects one integer parameters");
+            } else if (args[arg].equals("--numHoles")) {
+                numHoles = getIntArg(args, ++arg, "--numHoles expects one integer parameter");
+            } else if (args[arg].equals("--numIRs")) {
+                numIRs = getIntArg(args, ++arg, "--numIRs expects one integer parameter");
+            } else if (args[arg].equals("--xmul")) {
+                xmul = getDoubleArg(args, ++arg, "--xmul expects one double parameter");
+            } else if (args[arg].equals("--ymul")) {
+                ymul = getDoubleArg(args, ++arg, "--ymul expects one double parameter");
+            } else {
+                System.err.printf("Unknown command line parameter \"%s\"\n", args[arg]);
+                System.exit(100);
             }
         }
-        System.out.printf(":-------------------------------:\n");
-        System.out.printf(":----------- Stars -------------:\n");
-        System.out.printf(":-------------------------------:\n");
-        List<List<List<GeographyValue>>> stars = makeStarPolygons(center, firstVertex, 11, 11, 1, 5, 1.0, 1.0);
-        for (int nsides = 0; nsides < stars.size(); nsides += 1) {
-            List<List<GeographyValue>> oneSize = stars.get(nsides);
-            for (int innerRadiusIdx = 0; innerRadiusIdx < oneSize.size(); innerRadiusIdx += 1) {
-                List<GeographyValue> oneInnerRadius = oneSize.get(innerRadiusIdx);
-                for (int holeSizeIdx = 0; holeSizeIdx < oneInnerRadius.size(); holeSizeIdx += 1) {
-                    GeographyValue oneStar = oneInnerRadius.get(holeSizeIdx);
-                    System.out.printf("%s\n", formatWKT(oneStar.toString()));
+        GeographyPointValue center = origin.add(x.mul(10).add(y.mul(10)));
+        GeographyPointValue firstVertex = center.add(x.mul(CENTER_SHRINK*xmul).add(y.mul(CENTER_SHRINK*ymul)));
+        if (doRegs) {
+            List<List<GeographyValue>> polys = makeRegularConvexPolygons(center, firstVertex, minVerts, maxVerts, numHoles, xmul, ymul);
+            for (int nsides = 0; nsides < polys.size(); nsides += 1) {
+                for (int holeSize = 0; holeSize < 5; holeSize += 1) {
+                    System.out.printf("%s\n",
+                                      formatWKT(polys.get(nsides).get(holeSize).toString()));
+                }
+            }
+        }
+        if (doStars) {
+            GeographyPointValue scenter = center;
+            GeographyPointValue sfirstVertex = firstVertex;
+            List<List<List<GeographyValue>>> stars = makeStarPolygons(scenter, sfirstVertex, minVerts, maxVerts, numIRs, numHoles, xmul, ymul);
+            for (int nsides = 0; nsides < stars.size(); nsides += 1) {
+                List<List<GeographyValue>> oneSize = stars.get(nsides);
+                for (int innerRadiusIdx = 0; innerRadiusIdx < oneSize.size(); innerRadiusIdx += 1) {
+                    List<GeographyValue> oneInnerRadius = oneSize.get(innerRadiusIdx);
+                    for (int holeSizeIdx = 0; holeSizeIdx < oneInnerRadius.size(); holeSizeIdx += 1) {
+                        GeographyValue oneStar = oneInnerRadius.get(holeSizeIdx);
+                        System.out.printf("%s\n", formatWKT(oneStar.toString()));
+                    }
                 }
             }
         }

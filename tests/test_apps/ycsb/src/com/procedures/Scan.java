@@ -22,11 +22,15 @@
  */
 package com.procedures;
 
+import java.nio.charset.CharSet;
+
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 public class Scan extends VoltProcedure {
+    public final static CharSet CHARSET = new CharSet("UTF-8");
+
     public final SQLStmt getBddStmt = new SQLStmt("SELECT value FROM Store WHERE keyspace = ? AND key >= ? LIMIT ?");
     public final SQLStmt getUnbddStmt = new SQLStmt("SELECT value FROM Store WHERE keyspace = ? LIMIT ?");
 
@@ -34,7 +38,7 @@ public class Scan extends VoltProcedure {
     {
         if (rangeMin != null)
         {
-            voltQueueSQL(getBddStmt, keyspace, rangeMin, count);
+            voltQueueSQL(getBddStmt, keyspace, new String(rangeMin, CHARSET), count);
         }
         else
         {

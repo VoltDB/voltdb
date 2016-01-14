@@ -17,60 +17,67 @@
 
 package org.voltdb.client;
 
+import java.util.EnumSet;
+
 /**
  * This is enum for Hash schemes we support.
- * @author akhanzode
  */
-public enum ClientAuthHashScheme {
-    HASH_SHA1(0), HASH_SHA256(1);
+public enum ClientAuthScheme {
+    HASH_SHA1, HASH_SHA256, SPNEGO;
+
+    private final static EnumSet<ClientAuthScheme> hashedOnes =
+            EnumSet.of(HASH_SHA1, HASH_SHA256);
 
     //Modify this if you add a new scheme.
-    private static final ClientAuthHashScheme theList[] = { ClientAuthHashScheme.HASH_SHA1, ClientAuthHashScheme.HASH_SHA256 };
-    private final int value;
-
-    private ClientAuthHashScheme(int v) {
-        this.value = v;
-    }
+    private static final ClientAuthScheme theList[] = values();
 
     public int getValue() {
-        return value;
+        return ordinal();
     }
 
-    public final static ClientAuthHashScheme get(int i) {
-        if (i >= theList.length) {
+    public boolean isHashed() {
+        return hashedOnes.contains(this);
+    }
+
+    public final static ClientAuthScheme get(int i) {
+        if (i < 0 || i >= theList.length) {
             throw new IllegalArgumentException("Invalid Hash Scheme");
         }
         return theList[i];
     }
 
-    public final static ClientAuthHashScheme getByUnencodedLength(int i) {
+    public final static ClientAuthScheme getByUnencodedLength(int i) {
         switch (i) {
             case 20: return HASH_SHA1;
             case 32: return HASH_SHA256;
+            case 0: return SPNEGO;
             default: throw new IllegalArgumentException("Invalid Hash Scheme for given length: " + i);
         }
     }
 
-    public final static int getDigestLength(ClientAuthHashScheme scheme) {
+    public final static int getDigestLength(ClientAuthScheme scheme) {
         switch (scheme) {
             case HASH_SHA1 : return 20;
             case HASH_SHA256 : return 32;
+            case SPNEGO : return 0;
             default : throw new IllegalArgumentException("Invalid Hash Scheme for Authentication.");
         }
     }
 
-    public final static int getHexencodedDigestLength(ClientAuthHashScheme scheme) {
+    public final static int getHexencodedDigestLength(ClientAuthScheme scheme) {
         switch (scheme) {
             case HASH_SHA1 : return 40;
             case HASH_SHA256 : return 64;
+            case SPNEGO : return 0;
             default : throw new IllegalArgumentException("Invalid Hash Scheme for Authentication.");
         }
     }
 
-    public final static String getDigestScheme(ClientAuthHashScheme scheme) {
+    public final static String getDigestScheme(ClientAuthScheme scheme) {
         switch (scheme) {
             case HASH_SHA1 : return "SHA-1";
             case HASH_SHA256 : return "SHA-256";
+            case SPNEGO : return "NONE";
             default : throw new IllegalArgumentException("Invalid Hash Digest Scheme for Authentication.");
         }
     }

@@ -3,12 +3,14 @@
 -- strings don't do math
 {@aftermath = " "}
 {@agg = "_genericagg"} -- strings don't do SUM or AVG
+{@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
+{@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_stringcolumnpredicate"}
 {@columntype = "string"}
 {@comparableconstant = "'42'"}
 {@comparabletype = "string"}
 {@comparablevalue = "_value[string]"}
-{@dmlcolumnpredicate = "_variable[string] _cmp _value[string]"}
+{@dmlcolumnpredicate = "_variable[string] @cmp _value[string]"}
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}

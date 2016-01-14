@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
@@ -58,6 +59,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         registerPlanFragment(SysProcFragmentId.PF_aggregate);
     }
 
+
+    @SuppressWarnings("deprecation")
     @Override
     public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
@@ -81,7 +84,9 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             result.addRow(currentPartition);
             try {
                 // voltLoadTable is void. Assume success or exception.
-                voltLoadTable(context.getCluster().getTypeName(),
+                DeprecatedProcedureAPIAccess.voltLoadTable(
+                                    this,
+                                    context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
                                     tableName,
                                     toInsert, false, false);
