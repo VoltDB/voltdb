@@ -1,4 +1,8 @@
--- Database creation script for the simple VoltDB schema, ported from the original PostgreSQL schema.
+-- Database creation script for the simple VoltDB schema, ported from the original PostgreSQL schema "pgsimple_schema_0.6"
+-- found here: https://github.com/openstreetmap/osmosis/blob/master/package/script/pgsimple_schema_0.6.sql
+-- the schema is translated as literally as possible to highlight the similiarities between the implementations.
+-- This can be enhanced with several VoltDB optimizations, such as creating the geometry columns inside the initial
+-- create table statements, but has been kept as similiar as possible for easy comparison purposes.
 
 DROP PROCEDURE insertNodes IF EXISTS;
 DROP PROCEDURE insertNodeTags IF EXISTS;
@@ -84,7 +88,7 @@ PARTITION TABLE way_nodes ON COLUMN way_id;
 CREATE TABLE way_tags (
     way_id bigint NOT NULL,
     k varchar(128) NOT NULL,
-    v varchar(256) 
+    v varchar(256)
 );
 
 PARTITION TABLE way_tags ON COLUMN way_id;
@@ -151,13 +155,30 @@ CREATE INDEX idx_way_nodes_node_id ON way_nodes (node_id);
 CREATE INDEX idx_relation_tags_relation_id ON relation_tags (relation_id);
 
 -- create the procedures
-CREATE PROCEDURE insertNodes PARTITION ON TABLE nodes COLUMN id PARAMETER 0 AS INSERT INTO nodes (id,version,user_id,tstamp,changeset_id,geom) values(?,?,?,?,?,?);
-CREATE PROCEDURE insertNodeTags PARTITION ON TABLE node_tags COLUMN node_id PARAMETER 0 AS INSERT INTO node_tags (node_id,k,v) values(?,?,?);
-CREATE PROCEDURE insertRelations PARTITION ON TABLE relations  COLUMN id PARAMETER 0 AS INSERT INTO relations (id,version,user_id,tstamp,changeset_id) values(?,?,?,?,?);
-CREATE PROCEDURE insertRelationsMembers	PARTITION ON TABLE relation_members COLUMN relation_id PARAMETER 0 AS INSERT INTO relation_members (relation_id,member_id,member_type,member_role,sequence_id) values(?,?,?,?,?);
-CREATE PROCEDURE insertRelationTags PARTITION ON TABLE relation_tags COLUMN relation_id PARAMETER 0 AS INSERT INTO relation_tags (relation_id,k,v) values(?,?,?);
-CREATE PROCEDURE insertUsers PARTITION ON TABLE users COLUMN id PARAMETER 0 AS INSERT INTO users (id,name) values(?,?);
-CREATE PROCEDURE insertWays PARTITION ON TABLE ways COLUMN id PARAMETER 0 AS INSERT INTO ways (id,version,user_id,tstamp,changeset_id,bbox) values(?,?,?,?,?,?);
-CREATE PROCEDURE insertWaysNodes PARTITION ON TABLE way_nodes COLUMN way_id PARAMETER 0 AS INSERT INTO way_nodes (way_id,node_id,sequence_id) values(?,?,?);
-CREATE PROCEDURE insertWayTags PARTITION ON TABLE way_tags COLUMN way_id  PARAMETER 0 AS INSERT INTO way_tags (WAY_ID,K,V) values(?,?,?);
+CREATE PROCEDURE insertNodes PARTITION ON TABLE nodes COLUMN id PARAMETER 0
+    AS INSERT INTO nodes (id, version, user_id, tstamp, changeset_id, geom) values(?, ?, ?, ?, ?, ?);
+
+CREATE PROCEDURE insertNodeTags PARTITION ON TABLE node_tags COLUMN node_id PARAMETER 0
+    AS INSERT INTO node_tags (node_id, k, v) values(?, ?, ?);
+
+CREATE PROCEDURE insertRelations PARTITION ON TABLE relations  COLUMN id PARAMETER 0
+    AS INSERT INTO relations (id, version, user_id, tstamp, changeset_id) values(?, ?, ?, ?, ?);
+
+CREATE PROCEDURE insertRelationsMembers	PARTITION ON TABLE relation_members COLUMN relation_id PARAMETER 0
+    AS INSERT INTO relation_members (relation_id, member_id, member_type, member_role, sequence_id) values(?, ?, ?, ?, ?);
+
+CREATE PROCEDURE insertRelationTags PARTITION ON TABLE relation_tags COLUMN relation_id PARAMETER 0
+    AS INSERT INTO relation_tags (relation_id, k, v) values(?, ?, ?);
+
+CREATE PROCEDURE insertUsers PARTITION ON TABLE users COLUMN id PARAMETER 0
+    AS INSERT INTO users (id, name) values(?, ?);
+
+CREATE PROCEDURE insertWays PARTITION ON TABLE ways COLUMN id PARAMETER 0
+    AS INSERT INTO ways (id, version, user_id, tstamp, changeset_id, bbox) values(?, ?, ?, ?, ?, ?);
+
+CREATE PROCEDURE insertWaysNodes PARTITION ON TABLE way_nodes COLUMN way_id PARAMETER 0
+    AS INSERT INTO way_nodes (way_id, node_id, sequence_id) values(?, ?, ?);
+
+CREATE PROCEDURE insertWayTags PARTITION ON TABLE way_tags COLUMN way_id  PARAMETER 0
+    AS INSERT INTO way_tags (WAY_ID, K, V) values(?, ?, ?);
 
