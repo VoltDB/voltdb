@@ -38,6 +38,8 @@ import sys
 import requests
 from flask import Flask
 from flask.ext.cors import CORS
+import fcntl
+import struct
 
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
@@ -532,6 +534,15 @@ def make_configuration_file():
         f.close()
     except Exception, err:
         print str(err)
+
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
 
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
@@ -1140,6 +1151,15 @@ class VdmConfiguration(MethodView):
         return get_configuration()
 
 
+class VdmGetServerIP(MethodView):
+    """
+    Class to get the IP address of the server
+    """
+    @staticmethod
+    def get():
+        return jsonify({'ip_address': get_ip_address('eth0')})
+
+
 def main(runner, amodule, aport, apath):
     try:
         F_DEBUG = os.environ['DEBUG']
@@ -1175,6 +1195,7 @@ def main(runner, amodule, aport, apath):
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
     SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
+    VDM_SERVER_IP = VdmGetServerIP.as_view('vdm_server_view_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1203,6 +1224,8 @@ def main(runner, amodule, aport, apath):
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['GET','POST'])
+    APP.add_url_rule('/api/1.0/ServerIP/',
+                     view_func=VDM_SERVER_IP, methods=['GET'])
     # APP.add_url_rule('/api/1.0/vdm/configuration_sync/<string:ip_address>', view_func=SYNC_VDM_CONFIGURATION_VIEW,
     #                  methods=['POST'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)
