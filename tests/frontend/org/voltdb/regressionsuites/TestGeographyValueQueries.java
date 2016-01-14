@@ -747,15 +747,30 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     // This is really misplaced.  But we don't have a regression
     // suite test for testing points.  We ought to, but we don't.
-    private void assertGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+    private void assertSelectGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
         String stmt = "select pointfromtext('" + wkt + "') from t";
+        verifyStmtFails(client, stmt, expectedMsg);
+    }
+
+    private void assertInsertGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt, long pk) throws Exception {
+        String stmt = String.format("insert into location (pk, loc_point) values (%d, pointfromtext('%s'));", pk, wkt);
         verifyStmtFails(client, stmt, expectedMsg);
     }
 
     public void testPointFromTextNegative() throws Exception {
         Client client = getClient();
         validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
-        assertGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
+        assertSelectGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
+        // Try a couple of bad latitudes.
+        assertSelectGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(10 100)");
+        assertInsertGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(10 100)", 100);
+        assertSelectGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(20 -100)");
+        assertInsertGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(20 -100)", 101);
+        // Try a couple of bad longitudes.
+        assertSelectGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(200 20)");
+        assertInsertGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(200 20)", 200);
+        assertSelectGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(-200 20)");
+        assertInsertGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(-200 20)", 201);
     }
 
     public void testPolygonFromTextNegative() throws Exception {
