@@ -36,46 +36,46 @@ import org.postgis.Polygon;
 
 public class WayPolygonGeometryBuilder extends WayGeometryBuilder {
 
-  public WayPolygonGeometryBuilder(NodeLocationStoreType storeType) {
-    super(storeType);
+	public WayPolygonGeometryBuilder(NodeLocationStoreType storeType) {
+		super(storeType);
 
-  }
+	}
 
-  /**
-   * OSM stores each ring of a polygon independently, the rings of a polygon need to
-   * be combined through relationships.  This method only returns a single ring of a Polygon,
-   *
-   * @param way
-   * @return
-   */
-  public Polygon createPolygon(Way way) {
-    LinearRing[] rings = new LinearRing[1];
-    rings[0] = createRing(way);
+	/**
+	 * OSM stores each ring of a polygon independently, the rings of a polygon
+	 * need to be combined through relationships. This method only returns a
+	 * single ring of a Polygon,
+	 *
+	 * @param way
+	 * @return
+	 */
+	public Polygon createPolygon(Way way) {
+		LinearRing[] rings = new LinearRing[1];
+		rings[0] = createRing(way);
 
-    Polygon pg = new Polygon(rings);
+		Polygon pg = new Polygon(rings);
 
-    return pg;
-  }
+		return pg;
+	}
 
-  public LinearRing createRing(Way way) {
-    List<Point> points = new ArrayList<Point>();
+	public LinearRing createRing(Way way) {
+		List<Point> points = new ArrayList<Point>();
 
-    for (WayNode wayNode : way.getWayNodes()) {
-      NodeLocation nodeLocation;
-      double longitude;
-      double latitude;
+		for (WayNode wayNode : way.getWayNodes()) {
+			NodeLocation nodeLocation;
+			double longitude;
+			double latitude;
 
-      nodeLocation = locationStore.getNodeLocation(wayNode.getNodeId());
-      longitude = nodeLocation.getLongitude();
-      latitude = nodeLocation.getLatitude();
+			nodeLocation = locationStore.getNodeLocation(wayNode.getNodeId());
+			longitude = nodeLocation.getLongitude();
+			latitude = nodeLocation.getLatitude();
 
-
-      if (nodeLocation.isValid()) {
-        Point point = new Point(longitude,latitude);
-        points.add(point);
-      }
-    }
-    return new LinearRing(points.toArray(new Point[0]));
-  }
+			if (nodeLocation.isValid()) {
+				Point point = new Point(longitude, latitude);
+				points.add(point);
+			}
+		}
+		return new LinearRing(points.toArray(new Point[0]));
+	}
 
 }
