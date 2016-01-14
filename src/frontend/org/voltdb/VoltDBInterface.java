@@ -258,4 +258,6 @@ public interface VoltDBInterface
 
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
+
+    public int getQuerytimeout();
 }

@@ -284,6 +284,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private volatile boolean m_isRunning = false;
 
+    private int m_queryTimeout = 0;
+
     @Override
     public boolean rejoining() { return m_rejoining; }
 
@@ -1285,6 +1287,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
+
+
     /**
      * Schedule all the periodic works
      */
@@ -1510,6 +1514,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 }
                 if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
                     hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                    m_queryTimeout = sysType.getQuery().getTimeout();
                 }
             }
 
@@ -1908,6 +1913,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         if (sysSettings.getQuerytimeout() > 0) {
             hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");
+            m_queryTimeout = sysSettings.getQuerytimeout();
         }
     }
 
@@ -2987,5 +2993,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         PathsType paths = catalogContext.getDeployment().getPaths();
         File voltDbRoot = CatalogUtil.getVoltDbRoot(paths);
         return CatalogUtil.getSnapshot(paths.getSnapshots(), voltDbRoot);
+    }
+
+    @Override
+    public int getQuerytimeout() {
+        return m_queryTimeout;
     }
 }

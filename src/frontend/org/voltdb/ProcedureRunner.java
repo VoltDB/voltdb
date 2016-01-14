@@ -1140,7 +1140,7 @@ public class ProcedureRunner {
        if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
            if (e instanceof org.voltdb.exceptions.InterruptException) {
-               int originalTimeout = VoltDB.instance().getCatalogContext().getCluster().getDeployment().get("deployment").getSystemsettings().get("systemsettings").getQuerytimeout();
+               int originalTimeout = VoltDB.instance().getQuerytimeout();
                int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
                if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
                    msg.append(" query-specific timeout period.");

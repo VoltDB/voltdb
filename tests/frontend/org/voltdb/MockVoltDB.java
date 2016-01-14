@@ -685,4 +685,9 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void onSyncSnapshotCompletion() {
     }
+
+    @Override
+    public int getQuerytimeout() {
+        return 0;
+    }
 }
