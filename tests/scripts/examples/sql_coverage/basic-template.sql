@@ -5,10 +5,12 @@
 -- Required preprocessor template:
 -- {@aftermath = " _math _value[int:1,3]"}
 -- {@agg = "_numagg"}
+-- {@cmp = "_cmp"} -- all comparison operators (=, <>, !=, <, >, <=, >=)
 -- {@columntype = "decimal"}
 -- {@columnpredicate = "_numericcolumnpredicate"}
 -- {@comparableconstant = "42.42"}
 -- {@comparabletype = "numeric"}
+-- {@comparablevalue = "_numericvalue"}
 -- {@dmlcolumnpredicate = "_numericcolumnpredicate"}
 -- {@dmltable = "_table"}
 -- {@fromtables = "_table"}
@@ -18,6 +20,7 @@
 -- {@star = "*"}
 -- {@lhsstar = "*"}
 -- {@updatecolumn = "CASH"}
+-- {@updatesource = "ID"}
 -- {@updatevalue = "_value[decimal]"}
 
 -- DML, purge and regenerate random data first.

@@ -3,6 +3,8 @@
 -- timestamps don't do math
 {@aftermath = " "}
 {@agg = "_genericagg"} -- timestamps don't do SUM or AVG
+{@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
+{@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_timestampcolumnpredicate"}
 {@columntype = "timestamp"}
 {@comparableconstant = "'1967-10-01 15:25:26.123457'"}

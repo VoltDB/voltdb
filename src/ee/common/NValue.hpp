@@ -1508,7 +1508,12 @@ private:
             break;
         }
         case VALUE_TYPE_POINT: {
-            value << getPoint().toString(); break;
+            value << getPoint().toWKT();
+            break;
+        }
+        case VALUE_TYPE_GEOGRAPHY: {
+            value << getGeography().toWKT();
+            break;
         }
         default:
             throwCastSQLException(type, VALUE_TYPE_VARCHAR);
