@@ -59,23 +59,24 @@ import org.voltdb.types.TimestampType;
 
 //import SyncBenchmark.StatusListener;
 
-public class VoltDBOsmSink extends VoltProcedure implements Sink, EntityProcessor {
+public class VoltDBOsmSink implements Sink, EntityProcessor {
 
-    public static final String INS_NODE_PROC = "insertNodes";
-    public static final String INS_NODE_TAG_PROC = "insertNodeTags";
-    public static final String INS_RELATIONS_PROC = "insertRelations";
-    public static final String INS_RELATIONS_MEMBER_PROC = "insertRelationsMembers";
+    
+    public static final String INS_NODE_PROC = "NODES.insert";
+    public static final String INS_NODE_TAG_PROC = "NODE_TAGS.insert";
+    public static final String INS_RELATIONS_PROC = "RELATIONS.insert";
+    public static final String INS_RELATIONS_MEMBER_PROC = "RELATION_MEMBERS.insert";
 
-    public static final String INS_RELATION_TAGS_PROC = "insertRelationTags";
-    public static final String INS_USERS_PROC = "insertUsers";
-    public static final String INS_WAYS_PROC = "insertWays";
-    public static final String INS_WAYS_NODES_PROC = "insertWaysNodes";
-    public static final String INS_WAY_TAGS_PROC = "insertWayTags";
-
+    public static final String INS_RELATION_TAGS_PROC = "RELATION_TAGS.insert";
+    public static final String INS_USERS_PROC = "USERS.insert";
+    public static final String INS_WAYS_PROC = "WAYS.insert";
+    public static final String INS_WAYS_NODES_PROC = "WAY_NODES.insert";
+    public static final String INS_WAY_TAGS_PROC = "WAY_TAGS.insert";
+    
     private boolean enableLinestringBuilder = false;
     private boolean enableBboxBuilder = true;
     private boolean keepInvalidWays = false;
-    private WayPolygonGeometryBuilder wayGeometryBuilder;
+    private final WayPolygonGeometryBuilder wayGeometryBuilder = new WayPolygonGeometryBuilder(NodeLocationStoreType.TempFile);
 
     // Reference to the database connection we will use
     private String server;
@@ -86,8 +87,6 @@ public class VoltDBOsmSink extends VoltProcedure implements Sink, EntityProcesso
 
     public VoltDBOsmSink(String server) {
         this.server = server;
-        NodeLocationStoreType storeType = NodeLocationStoreType.TempFile;
-        wayGeometryBuilder = new WayPolygonGeometryBuilder(storeType);
     }
 
     @Override
@@ -220,10 +219,6 @@ public class VoltDBOsmSink extends VoltProcedure implements Sink, EntityProcesso
                     e.printStackTrace();
                 }
 
-                /*
-                 * if ("area".equals(tag.getKey())) { System.out.print("key:" +
-                 * tag.getKey() + " val:" + tag.getValue()); }
-                 */
             }
 
             // Add these to the ways_nodes_table;

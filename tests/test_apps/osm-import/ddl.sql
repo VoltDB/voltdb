@@ -4,16 +4,6 @@
 -- This can be enhanced with several VoltDB optimizations, such as creating the geometry columns inside the initial
 -- create table statements, but has been kept as similiar as possible for easy comparison purposes.
 
-DROP PROCEDURE insertNodes IF EXISTS;
-DROP PROCEDURE insertNodeTags IF EXISTS;
-DROP PROCEDURE insertRelations IF EXISTS;
-DROP PROCEDURE insertRelationsMembers IF EXISTS;
-DROP PROCEDURE insertRelationTags IF EXISTS;
-DROP PROCEDURE insertUsers IF EXISTS;
-DROP PROCEDURE insertWays IF EXISTS;
-DROP PROCEDURE insertWaysNodes IF EXISTS;
-DROP PROCEDURE insertWayTags IF EXISTS;
-
 -- Drop all tables if they exist.
 DROP TABLE actions IF EXISTS;
 DROP TABLE users IF EXISTS;
@@ -153,32 +143,4 @@ CREATE INDEX idx_way_tags_way_id ON way_tags (way_id);
 CREATE INDEX idx_way_nodes_node_id ON way_nodes (node_id);
 
 CREATE INDEX idx_relation_tags_relation_id ON relation_tags (relation_id);
-
--- create the procedures
-CREATE PROCEDURE insertNodes PARTITION ON TABLE nodes COLUMN id PARAMETER 0
-    AS INSERT INTO nodes (id, version, user_id, tstamp, changeset_id, geom) values(?, ?, ?, ?, ?, ?);
-
-CREATE PROCEDURE insertNodeTags PARTITION ON TABLE node_tags COLUMN node_id PARAMETER 0
-    AS INSERT INTO node_tags (node_id, k, v) values(?, ?, ?);
-
-CREATE PROCEDURE insertRelations PARTITION ON TABLE relations  COLUMN id PARAMETER 0
-    AS INSERT INTO relations (id, version, user_id, tstamp, changeset_id) values(?, ?, ?, ?, ?);
-
-CREATE PROCEDURE insertRelationsMembers	PARTITION ON TABLE relation_members COLUMN relation_id PARAMETER 0
-    AS INSERT INTO relation_members (relation_id, member_id, member_type, member_role, sequence_id) values(?, ?, ?, ?, ?);
-
-CREATE PROCEDURE insertRelationTags PARTITION ON TABLE relation_tags COLUMN relation_id PARAMETER 0
-    AS INSERT INTO relation_tags (relation_id, k, v) values(?, ?, ?);
-
-CREATE PROCEDURE insertUsers PARTITION ON TABLE users COLUMN id PARAMETER 0
-    AS INSERT INTO users (id, name) values(?, ?);
-
-CREATE PROCEDURE insertWays PARTITION ON TABLE ways COLUMN id PARAMETER 0
-    AS INSERT INTO ways (id, version, user_id, tstamp, changeset_id, bbox) values(?, ?, ?, ?, ?, ?);
-
-CREATE PROCEDURE insertWaysNodes PARTITION ON TABLE way_nodes COLUMN way_id PARAMETER 0
-    AS INSERT INTO way_nodes (way_id, node_id, sequence_id) values(?, ?, ?);
-
-CREATE PROCEDURE insertWayTags PARTITION ON TABLE way_tags COLUMN way_id  PARAMETER 0
-    AS INSERT INTO way_tags (WAY_ID, K, V) values(?, ?, ?);
 
