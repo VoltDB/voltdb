@@ -49,7 +49,7 @@ function clean() {
 function srccompile() {
     if [ -d src ]; then
         mkdir -p obj
-        javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj src/com/$APPNAME/*.java
+        javac -classpath $APPCLASSPATH -d obj src/com/$APPNAME/*.java
         # stop if compilation fails
         if [ $? != 0 ]; then exit; fi
     fi

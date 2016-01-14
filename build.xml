@@ -20,8 +20,6 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.7"
-            source="1.7"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -142,7 +140,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
-        <exclude name='classes-java1.6.jar' />
+        <exclude name='classes-java1.7.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -833,7 +831,6 @@ DISTRIBUTION
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
-            <include name="Click Here to Start.html"/>
             <include name="bin/**"/>
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>

@@ -160,7 +160,7 @@ compile_application()
     local OUTPUT_DIRECTORY=$RUN_OUTPUT_ROOT/$TEST_NAME
     local BASE_CLASSPATH=".:$DEVELOPMENT_ROOT/lib/*:$DEVELOPMENT_ROOT/voltdb/*"
     echo "Compiling source files..."
-    javac -target 1.7 -source 1.7 -classpath $BASE_CLASSPATH:$APPLICATION_CLASSPATH -d obj \
+    javac -classpath $BASE_CLASSPATH:$APPLICATION_CLASSPATH -d obj \
         src/$APPLICATION_NAME/*.java src/$APPLICATION_NAME/procedures/*.java \
             > $OUTPUT_DIRECTORY/srccompile.txt || exit 1
 }
