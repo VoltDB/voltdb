@@ -81,11 +81,11 @@ public class TestGeographyPointValue extends RegressionSuite {
         assertTrue(vt.advanceRow());
         long id = vt.getLong(0);
         assertEquals(1, id);
-        GeographyPointValue ptByIndex = vt.getPoint(1);
+        GeographyPointValue ptByIndex = vt.getGeographyPointValue(1);
         assertTrue(vt.wasNull());
         assertNull(ptByIndex);
 
-        GeographyPointValue ptByColumnName = vt.getPoint("pt");
+        GeographyPointValue ptByColumnName = vt.getGeographyPointValue("pt");
         assertTrue(vt.wasNull());
         assertNull(ptByColumnName);
 
@@ -93,7 +93,7 @@ public class TestGeographyPointValue extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", "select pt from t where pt is null;").getResults()[0];
         assertTrue(vt.advanceRow());
-        ptByIndex = vt.getPoint(0);
+        ptByIndex = vt.getGeographyPointValue(0);
         assert(vt.wasNull());
     }
 
@@ -107,7 +107,7 @@ public class TestGeographyPointValue extends RegressionSuite {
         VoltTable vt = client.callProcedure("@AdHoc",
                 "select pointfromtext('point (-71.2767 42.4906)') from t;").getResults()[0];
         assertTrue(vt.advanceRow());
-        GeographyPointValue pt = vt.getPoint(0);
+        GeographyPointValue pt = vt.getGeographyPointValue(0);
         assertFalse(vt.wasNull());
         assertEquals(42.4906, pt.getLatitude(), EPSILON);
         assertEquals(-71.2767, pt.getLongitude(), EPSILON);

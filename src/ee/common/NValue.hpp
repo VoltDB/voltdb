@@ -955,12 +955,12 @@ private:
         return *reinterpret_cast<bool*>(m_data);
     }
 
-    GeographyPointValue& getPoint() {
+    GeographyPointValue& getGeographyPointValue() {
         assert(getValueType() == VALUE_TYPE_POINT);
         return *reinterpret_cast<GeographyPointValue*>(m_data);
     }
 
-    const GeographyPointValue& getPoint() const {
+    const GeographyPointValue& getGeographyPointValue() const {
 
         BOOST_STATIC_ASSERT_MSG(sizeof(GeographyPointValue) <= sizeof(m_data),
                                 "Size of Point is too large for NValue m_data");
@@ -969,7 +969,7 @@ private:
         return *reinterpret_cast<const GeographyPointValue*>(m_data);
     }
 
-    const GeographyValue getGeography() const {
+    const GeographyValue getGeographyValue() const {
         assert(getValueType() == VALUE_TYPE_GEOGRAPHY);
 
         if (isNull()) {
@@ -1508,11 +1508,11 @@ private:
             break;
         }
         case VALUE_TYPE_POINT: {
-            value << getPoint().toWKT();
+            value << getGeographyPointValue().toWKT();
             break;
         }
         case VALUE_TYPE_GEOGRAPHY: {
-            value << getGeography().toWKT();
+            value << getGeographyValue().toWKT();
             break;
         }
         default:
@@ -2014,7 +2014,7 @@ private:
         assert(m_valueType == VALUE_TYPE_POINT);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_POINT:
-            return getPoint().compareWith(rhs.getPoint());
+            return getGeographyPointValue().compareWith(rhs.getGeographyPointValue());
         default:
             std::ostringstream oss;
             oss << "Type " << valueToString(rhs.getValueType())
@@ -2031,7 +2031,7 @@ private:
         assert(m_valueType == VALUE_TYPE_GEOGRAPHY);
         switch (rhs.getValueType()) {
         case VALUE_TYPE_GEOGRAPHY:
-            return getGeography().compareWith(rhs.getGeography());
+            return getGeographyValue().compareWith(rhs.getGeographyValue());
         default:
             std::ostringstream oss;
             oss << "Type " << valueToString(rhs.getValueType())
@@ -2634,7 +2634,7 @@ inline void NValue::setNull() {
         getDecimal().SetMin();
         break;
     case VALUE_TYPE_POINT:
-        getPoint() = GeographyPointValue();
+        getGeographyPointValue() = GeographyPointValue();
         break;
     default: {
         throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
@@ -2718,7 +2718,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
         break;
     case VALUE_TYPE_POINT:
     {
-        retval.getPoint() = *reinterpret_cast<const GeographyPointValue*>(storage);
+        retval.getGeographyPointValue() = *reinterpret_cast<const GeographyPointValue*>(storage);
         break;
     }
     default:
@@ -3000,7 +3000,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         return;
     }
     case VALUE_TYPE_POINT: {
-        getPoint() = GeographyPointValue::deserializeFrom(input);
+        getGeographyPointValue() = GeographyPointValue::deserializeFrom(input);
         return;
     }
     case VALUE_TYPE_NULL: {
@@ -3046,7 +3046,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         else {
             // geography gets its own serialization to deal with
             // byteswapping and endianness
-            getGeography().serializeTo(output);
+            getGeographyValue().serializeTo(output);
         }
         return;
     }
@@ -3080,7 +3080,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         return;
 
     case VALUE_TYPE_POINT:
-        getPoint().serializeTo(output);
+        getGeographyPointValue().serializeTo(output);
         return;
 
     default:
@@ -3129,7 +3129,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
         io.writeLong(htonll(getDecimal().table[0]));
         return;
     case VALUE_TYPE_POINT: {
-        getPoint().serializeTo(io);
+        getGeographyPointValue().serializeTo(io);
         return;
     }
     case VALUE_TYPE_GEOGRAPHY:
@@ -3222,7 +3222,7 @@ inline bool NValue::isNull() const {
         return getDecimal() == min;
     }
     else if (getValueType() == VALUE_TYPE_POINT) {
-        return getPoint().isNull();
+        return getGeographyPointValue().isNull();
     }
 
     return m_data[13] == OBJECT_NULL_BIT;
@@ -3352,10 +3352,10 @@ inline void NValue::hashCombine(std::size_t &seed) const {
         getDecimal().hash(seed);
         return;
     case VALUE_TYPE_POINT:
-        getPoint().hashCombine(seed);
+        getGeographyPointValue().hashCombine(seed);
         return;
     case VALUE_TYPE_GEOGRAPHY:
-        getGeography().hashCombine(seed);
+        getGeographyValue().hashCombine(seed);
         return;
     default:
         break;
