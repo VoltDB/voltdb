@@ -585,24 +585,20 @@ def convert_xml_to_json():
     member_json = ''
     db_json = ''
     deployment_json = ''
-    try:
-        if type(xml_final['vdm']['members']['member']) is dict:
-            member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'dict')
-        else:
-            member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'list')
+    if type(xml_final['vdm']['members']['member']) is dict:
+        member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'dict')
+    else:
+        member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'list')
 
-        if type(xml_final['vdm']['databases']['database']) is dict:
-            db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'dict')
-        else:
-            db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'list')
+    if type(xml_final['vdm']['databases']['database']) is dict:
+        db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'dict')
+    else:
+        db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'list')
 
-        print xml_final['vdm']
-        if type(xml_final['vdm']['deployments']['deployment']) is dict:
-            deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
-        else:
-            deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
-    except Exception,err:
-        print 'dfdf' +str(err)
+    if type(xml_final['vdm']['deployments']['deployment']) is dict:
+        deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+    else:
+        deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
 
     global DATABASES
     DATABASES = db_json
@@ -669,6 +665,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
     deployments = []
     if is_list is 'list':
         for deployment in deployment_xml:
+            print deployment
             new_deployment = {}
             for field in deployment:
                 if field == 'export':
@@ -681,7 +678,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
                     else:
                         new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
-                elif field == 'admin-mode':
+                if field == 'admin-mode':
                     try:
                         new_deployment[field] = {}
                         new_deployment[field]['adminstartup'] = bool(deployment[field]['adminstartup'])
@@ -732,23 +729,6 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['snapshot']['prefix'] = bool(deployment[field]['snapshot']['prefix'])
                     except Exception, err:
                         print str(err)
-                # elif field == 'paths':
-                #     try:
-                #         new_deployment[field] = {}
-                #         new_deployment[field]['commandlog'] = {}
-                #         new_deployment[field]['commandlog']['path'] = str(deployment_xml[field]['commandlog']['path'])
-                #         new_deployment[field]['commandlogsnapshot'] = {}
-                #         new_deployment[field]['commandlogsnapshot']['path'] = str(deployment_xml[field]['commandlogsnapshot']['path'])
-                #         new_deployment[field]['droverflow'] = {}
-                #         new_deployment[field]['droverflow']['path'] = str(deployment_xml[field]['droverflow']['path'])
-                #         new_deployment[field]['exportoverflow'] = {}
-                #         new_deployment[field]['exportoverflow']['path'] = str(deployment_xml[field]['exportoverflow']['path'])
-                #         new_deployment[field]['snapshots'] = {}
-                #         new_deployment[field]['snapshots']['path'] = str(deployment_xml[field]['snapshots']['path'])
-                #         new_deployment[field]['voltdbroot'] = {}
-                #         new_deployment[field]['voltdbroot']['path'] = str(deployment_xml[field]['voltdbroot']['path'])
-                #     except Exception, err:
-                #         print str(err)
                 elif field == 'security':
                     try:
                         new_deployment[field] = {}
@@ -804,7 +784,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     except Exception, err:
                         print str(err)
                 else:
-                    new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
+                    new_deployment[field] = convert_deployment_field_required_format(deployment, field)
 
 
             deployments.append(new_deployment)
