@@ -61,7 +61,7 @@ import org.voltdb.types.TimestampType;
 
 public class VoltDBOsmSink implements Sink, EntityProcessor {
 
-    
+
     public static final String INS_NODE_PROC = "NODES.insert";
     public static final String INS_NODE_TAG_PROC = "NODE_TAGS.insert";
     public static final String INS_RELATIONS_PROC = "RELATIONS.insert";
@@ -72,7 +72,7 @@ public class VoltDBOsmSink implements Sink, EntityProcessor {
     public static final String INS_WAYS_PROC = "WAYS.insert";
     public static final String INS_WAYS_NODES_PROC = "WAY_NODES.insert";
     public static final String INS_WAY_TAGS_PROC = "WAY_TAGS.insert";
-    
+
     private boolean enableLinestringBuilder = false;
     private boolean enableBboxBuilder = true;
     private boolean keepInvalidWays = false;
@@ -254,7 +254,6 @@ public class VoltDBOsmSink implements Sink, EntityProcessor {
                     LineString lineString = wayGeometryBuilder.createWayLinestring(way);
                     lineString.outerWKT(sb);
                 } else {
-                    System.out.println("ignoring LineString geometries");
                     return;
                 }
             }
