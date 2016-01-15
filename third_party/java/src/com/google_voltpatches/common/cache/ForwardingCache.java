@@ -16,7 +16,6 @@
 
 package com.google_voltpatches.common.cache;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ForwardingObject;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -36,7 +35,6 @@ import javax.annotation_voltpatches.Nullable;
  * @author Charles Fry
  * @since 10.0
  */
-@Beta
 public abstract class ForwardingCache<K, V> extends ForwardingObject implements Cache<K, V> {
 
   /** Constructor for use by subclasses. */
@@ -126,11 +124,10 @@ public abstract class ForwardingCache<K, V> extends ForwardingObject implements 
 
   /**
    * A simplified version of {@link ForwardingCache} where subclasses can pass in an already
-   * constructed {@link Cache} as the delegete.
+   * constructed {@link Cache} as the delegate.
    *
    * @since 10.0
    */
-  @Beta
   public abstract static class SimpleForwardingCache<K, V> extends ForwardingCache<K, V> {
     private final Cache<K, V> delegate;
 

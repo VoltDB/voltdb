@@ -16,9 +16,12 @@ package com.google_voltpatches.common.primitives;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 
+import javax.annotation_voltpatches.CheckReturnValue;
+
 /**
  * A string to be parsed as a number and the radix to interpret it in.
  */
+@CheckReturnValue
 @GwtCompatible
 final class ParseRequest {
   final String rawValue;
