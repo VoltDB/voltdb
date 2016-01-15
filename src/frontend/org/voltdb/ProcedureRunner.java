@@ -1139,17 +1139,21 @@ public class ProcedureRunner {
        // ensure the message is returned if we're not going to hit the verbose condition below
        if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
-           if (e instanceof org.voltdb.exceptions.InterruptException) {
-               int originalTimeout = VoltDB.instance().getQuerytimeout();
+           if (e instanceof org.voltdb.exceptions.InterruptException && m_isReadOnly) {
+               int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
                int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
-               if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
+               if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
                    msg.append(" query-specific timeout period.");
                    msg.append(" The query-specific timeout is currently " +  individualTimeout/1000.0 + " seconds.");
                }
                else {
                    msg.append(" default query timeout period.");
                }
-               msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file. ");
+               if (originalTimeout > 0 ) {
+                   msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file. ");
+               } else if (originalTimeout == 0) {
+                   msg.append(" The default query timeout is currently set to no timeout and can be changed in the systemsettings section of the deployment file. ");
+               }
            }
        }
 
