@@ -7,7 +7,14 @@ set -o errexit #exit on any single command fail
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+    # check if voltdb is found relative to where this script was placed,if it's moved out of
+    # test_apps and voltdb is not in the path, this will fail.
+    VOLTDB_BIN="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../../bin" && pwd )"
+    if [ ! -x "$VOLTDB_BIN/voltdb" ]; then
+            echo "Can't find the 'voltdb' executable in the local file hierarchy or path "
+            echo "Add it to your path to continue"
+            exit 1;
+    fi
     echo "The VoltDB scripts are not in your PATH."
     echo "For ease of use, add the VoltDB bin directory: "
     echo
