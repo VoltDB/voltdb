@@ -420,9 +420,6 @@ def map_deployment(request, database_id):
     if 'dr' in request.json and 'type' in request.json['dr']:
         deployment[0]['dr']['type'] = request.json['dr']['type']
 
-    if 'dr' in request.json and 'enabled' in request.json['dr']:
-        deployment[0]['dr']['enabled'] = request.json['dr']['enabled']
-
     if 'dr' in request.json and 'connection' in request.json['dr'] \
             and 'source' in request.json['dr']['connection']:
         deployment[0]['dr']['connection']['source'] = request.json['dr']['connection']['source']
@@ -464,34 +461,42 @@ def map_deployment_users(request, user):
     return deployment_user[0]
 
 
-def get_database_deployment(key):
+def get_database_deployment(dbid):
     deployment_top = Element('deployment')
-    i = 0
-    value = DEPLOYMENT[key-1]
-    if type(value) is dict:
-        handle_deployment_dict(deployment_top, key, value, True)
-    else:
-        if isinstance(value, bool):
-            if value == False:
-                deployment_top.attrib[key] = "false"
+    value = DEPLOYMENT[dbid-1]
+
+    # Add users
+    addTop = False
+    for duser in DEPLOYMENT_USERS:
+        if duser['databaseid'] == dbid:
+            # Only create subelement if users have anything in this database.
+            if addTop != True:
+                users_top = SubElement(deployment_top, 'users')
+                addTop = True
+            uelem = SubElement(users_top, "user")
+            uelem.attrib["name"] = duser["name"]
+            uelem.attrib["password"] = duser["password"]
+            uelem.attrib["roles"] = duser["roles"]
+            if duser['plaintext'] == True:
+                uelem.attrib["plaintext"] = "true"
             else:
-                deployment_top.attrib[key] = "true"
-        else:
-            deployment_top.attrib[key] = str(value)
+                uelem.attrib["plaintext"] = "false"
 
-    return tostring(deployment_top,encoding='UTF-8')
+    handle_deployment_dict(deployment_top, dbid, value, True)
 
+    xmlstr = tostring(deployment_top,encoding='UTF-8')
+    return xmlstr
 
 def get_configuration():
     deployment_json = {
         'vdm': {
             'databases': DATABASES,
             'members': SERVERS,
-            'deployments': DEPLOYMENT
+            'deployments': DEPLOYMENT,
+            'deployment_users': DEPLOYMENT_USERS
         }
     }
-    return jsonify(deployment_json)
-
+    return deployment_json
 
 def make_configuration_file():
     main_header = Element('vdm')
@@ -499,6 +504,7 @@ def make_configuration_file():
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
     # db1 = get_database_deployment(1)
+    # print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
@@ -561,6 +567,12 @@ def make_configuration_file():
 
     except Exception, err:
         print str(err)
+
+def sync_configuration():
+     headers = {'content-type': 'application/json'}
+     url = 'http://localhost:8000/api/1.0/vdm/configuration/'
+     response = requests.post(url,headers = headers)
+     return response
 
 
 def convert_xml_to_json():
@@ -1029,7 +1041,6 @@ def etree_to_dict(t):
             d[t.tag] = text
     return d
 
-
 def handle_deployment_dict(deployment_elem, key, value, istop):
 
     if istop == True:
@@ -1053,9 +1064,11 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
                     deployment_sub_element.text = str(value1)
                 else:
                     if istop == False:
-                        deployment_sub_element.attrib[key1] = str(value1)
-                    elif IGNORETOP[key1] != True:
-                        deployment_sub_element.attrib[key1] = str(value1)
+                        if value1 != None:
+                            deployment_sub_element.attrib[key1] = str(value1)
+                    elif key1 not in IGNORETOP:
+                        if value1 != None:
+                            deployment_sub_element.attrib[key1] = str(value1)
 
 
 def handle_deployment_list(deployment_elem, key, value):
@@ -1094,7 +1107,7 @@ class ServerAPI(MethodView):
         if server_id is None:
             return jsonify({'servers': [make_public_server(x) for x in SERVERS]})
         else:
-            server = [server for server in SERVERS if server.id == server_id]
+            server = [server for server in SERVERS if server['id'] == server_id]
             if len(server) == 0:
                 abort(404)
             return jsonify({'server': make_public_server(server[0])})
@@ -1151,6 +1164,8 @@ class ServerAPI(MethodView):
         if not request.json:
             abort(400)
         current_database[0]['members'].append(server_id)
+
+        sync_configuration()
         make_configuration_file()
         return jsonify({'server': server, 'status': 1,
                         'members': current_database[0]['members']}), 201
@@ -1184,6 +1199,7 @@ class ServerAPI(MethodView):
                                            " it is referred by database."})
 
         SERVERS.remove(server[0])
+        sync_configuration()
         make_configuration_file()
         return jsonify({'result': True})
 
@@ -1233,6 +1249,7 @@ class ServerAPI(MethodView):
             request.json.get('public-interface', current_server[0]['public-interface'])
         current_server[0]['placement-group'] = \
             request.json.get('placement-group', current_server[0]['placement-group'])
+        sync_configuration()
         make_configuration_file()
         return jsonify({'server': current_server[0], 'status': 1})
 
@@ -1269,6 +1286,7 @@ class DatabaseAPI(MethodView):
         Returns:
             Information and the status of database if it is saved otherwise the error message.
         """
+        sync_configuration()
         make_configuration_file()
         inputs = DatabaseInputs(request)
         if not inputs.validate():
@@ -1298,6 +1316,9 @@ class DatabaseAPI(MethodView):
             deployment['databaseid'] = database_id
 
         DEPLOYMENT.append(deployment)
+
+        sync_configuration()
+
         make_configuration_file()
         return jsonify({'database': database, 'status': 1}), 201
 
@@ -1321,6 +1342,7 @@ class DatabaseAPI(MethodView):
         current_database[0]['name'] = request.json.get('name', current_database[0]['name'])
         current_database[0]['deployment'] = \
             request.json.get('deployment', current_database[0]['deployment'])
+        sync_configuration()
         make_configuration_file()
         return jsonify({'database': current_database[0], 'status': 1})
 
@@ -1360,6 +1382,7 @@ class DatabaseAPI(MethodView):
         deployment = [deployment for deployment in DEPLOYMENT if deployment['databaseid'] == database_id]
 
         DEPLOYMENT.remove(deployment[0])
+        sync_configuration()
         make_configuration_file()
         return jsonify({'result': True})
 
@@ -1407,6 +1430,7 @@ class DatabaseMemberAPI(MethodView):
 
             if member_id not in current_database[0]['members']:
                 current_database[0]['members'].append(member_id)
+        sync_configuration()
         make_configuration_file()
         return jsonify({'members': current_database[0]['members'], 'status': 1})
 
@@ -1500,6 +1524,7 @@ class deploymentAPI(MethodView):
         #             prev_username = user['name']
 
         deployment = map_deployment(request, database_id)
+        sync_configuration()
         make_configuration_file()
         return jsonify({'deployment': deployment, 'status': 1})
 
@@ -1543,6 +1568,19 @@ class deploymentUserAPI(MethodView):
                                              , 'success': False}), 404)
 
         deployment_user = map_deployment_users(request, username)
+
+        if DEPLOYMENT[0]['users'] is None:
+            DEPLOYMENT[0]['users'] = {}
+            DEPLOYMENT[0]['users']['user'] = []
+
+        DEPLOYMENT[0]['users']['user'].append({
+            'name': deployment_user['name'],
+            'roles': deployment_user['roles'],
+            'plaintext': deployment_user['plaintext']
+        })
+
+
+        sync_configuration()
         make_configuration_file()
         return jsonify({'user': deployment_user, 'status': 1, 'statusstring': 'User Created'})
 
@@ -1567,6 +1605,7 @@ class deploymentUserAPI(MethodView):
         current_user[0]['password'] = request.json.get('password', current_user[0]['password'])
         current_user[0]['roles'] = request.json.get('roles', current_user[0]['roles'])
         current_user[0]['plaintext'] = request.json.get('plaintext', current_user[0]['plaintext'])
+        sync_configuration()
         make_configuration_file()
         return jsonify({'user': current_user[0], 'status': 1, 'statusstring': "User Updated"})
 
@@ -1607,30 +1646,29 @@ class SyncVdmConfiguration(MethodView):
 
     @staticmethod
     def post():
-        ip_address = ''
-        inputs = ConfigValidation(request)
-        if not inputs.validate():
-            return jsonify(success=False, errors=inputs.errors)
-        else:
-            ip_address = request.json['ip_address']
         try:
-            request_url = 'http://' + ip_address + ':8000/api/1.0/vdm/configuration/'
-            r = requests.get(request_url)
-        except Exception, err:
-            print str(err)
-        result = json.loads(r.text)
-        databases = result['vdm']['databases']
-        servers = result['vdm']['members']
-        deployments = result['vdm']['deployments']
-        try:
-            global DATABASES
-            DATABASES = databases
-            global SERVERS
-            SERVERS = servers
-            global DEPLOYMENT
-            DEPLOYMENT = deployments
+            result = request.json
+
+            databases = result['vdm']['databases']
+            servers = result['vdm']['members']
+            deployments = result['vdm']['deployments']
+            deployment_users = result['vdm']['deployment_users']
+
         except Exception, errs:
-            print str(errs)
+            return jsonify({'status':'success', 'error': str(errs)})
+
+        # try:
+        global DATABASES
+        DATABASES = databases
+        global SERVERS
+        SERVERS = servers
+        global DEPLOYMENT
+        DEPLOYMENT = deployments
+        global DEPLOYMENT_USERS
+        DEPLOYMENT_USERS = deployment_users
+
+        # except Exception, errs:
+        #     print str(errs)
 
         return jsonify({'status':'success'})
 
@@ -1642,6 +1680,20 @@ class VdmConfiguration(MethodView):
     @staticmethod
     def get():
         return get_configuration()
+
+    @staticmethod
+    def post():
+
+        result = get_configuration()
+
+        for member in result['vdm']['members']:
+            # print result
+            headers = {'content-type': 'application/json'}
+            url = 'http://'+member['hostname']+':8000/api/1.0/vdm/sync_configuration/'
+            data = result
+            response = requests.post(url,data=json.dumps(data),headers = headers)
+        return jsonify({'deployment': response.status_code})
+
 
 
 class VdmGetServerIP(MethodView):
@@ -1692,6 +1744,7 @@ def main(runner, amodule, aport, apath):
     #                 'admin-listener': "", 'http-listener': "", 'replication-listener': "",
     #                 'zookeeper-listener': "", 'placement-group': ""})
     # DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
+
     make_configuration_file()
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
@@ -1728,7 +1781,7 @@ def main(runner, amodule, aport, apath):
     APP.add_url_rule('/api/1.0/vdm/status/',
                      view_func=VDM_STATUS_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/vdm/configuration/',
-                     view_func=VDM_CONFIGURATION_VIEW, methods=['GET'])
+                     view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['GET','POST'])
     APP.add_url_rule('/api/1.0/ServerIP/',

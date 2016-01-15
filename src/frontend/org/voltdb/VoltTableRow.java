@@ -23,6 +23,8 @@ import java.nio.charset.Charset;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -142,7 +144,7 @@ public abstract class VoltTableRow {
         for (int i = 1; i < getColumnCount(); i++) {
             final VoltType type = getColumnType(i - 1);
             // handle variable length types specially
-            if ((type == VoltType.STRING) || (type == VoltType.VARBINARY)) {
+            if (type.isVariableLength()) {
                 final int len = m_buffer.getInt(m_offsets[i - 1]);
                 if (len == VoltTable.NULL_STRING_INDICATOR) {
                     m_offsets[i] = m_offsets[i - 1] + STRING_LEN_SIZE;
@@ -294,6 +296,12 @@ public abstract class VoltTableRow {
         case DECIMAL:
             ret = getDecimalAsBigDecimal(columnIndex);
             break;
+        case GEOGRAPHY_POINT:
+            ret = getGeographyPointValue(columnIndex);
+            break;
+        case GEOGRAPHY:
+            ret = getGeographyValue(columnIndex);
+            break;
         default:
             throw new IllegalArgumentException("Invalid type '" + type + "'");
         }
@@ -434,6 +442,7 @@ public abstract class VoltTableRow {
             return retval;
         case STRING:
         case VARBINARY:
+        case GEOGRAPHY:
             // all of these types are variable length with a prefix
             length = m_buffer.getInt(offset);
             if (length == VoltTable.NULL_STRING_INDICATOR) {
@@ -612,6 +621,76 @@ public abstract class VoltTableRow {
     }
 
     /**
+     * Retrieve the GeographyPointValue value stored in the column specified by index.
+     * Looking at the return value is not a reliable way to check if the value is
+     * <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnIndex Index of the column
+     * @return GeographyPointValue value stored in the specified column
+     * @see #wasNull()
+     */
+    public final GeographyPointValue getGeographyPointValue(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.GEOGRAPHY_POINT);
+        GeographyPointValue pt = GeographyPointValue.unflattenFromBuffer(m_buffer, getOffset(columnIndex));
+        m_wasNull = (pt == null);
+        return pt;
+    }
+
+    /**
+     * Retrieve the GeographyPointValue value stored in the column specified by name.
+     * Avoid retrieving via this method as it is slower than specifying the column
+     * by index. Use {@link #getGeographyPointValue(int)} instead.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnName Name of the column
+     * @return GeographyPointValue value stored in the specified column
+     * @see #wasNull()
+     * @see #getGeographyPointValue(int)
+     */
+    public final GeographyPointValue getGeographyPointValue(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getGeographyPointValue(colIndex);
+    }
+
+    /**
+     * Retrieve the GeographyValue value stored in the column specified by index.
+     * Looking at the return value is not a reliable way to check if the value is
+     * <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnIndex Index of the column
+     * @return GeographyValue value stored in the specified column
+     * @see #wasNull()
+     */
+    public final GeographyValue getGeographyValue(int columnIndex) {
+        validateColumnType(columnIndex, VoltType.GEOGRAPHY);
+        int offset = getOffset(columnIndex);
+        int len = m_buffer.getInt(offset);
+        if (len == VoltTable.NULL_STRING_INDICATOR) {
+            m_wasNull = true;
+            return null;
+        }
+
+        offset += 4;
+        GeographyValue gv = GeographyValue.unflattenFromBuffer(m_buffer, offset);
+        return gv;
+    }
+
+    /**
+     * Retrieve the GeographyValue value stored in the column specified by name.
+     * Avoid retrieving via this method as it is slower than specifying the column
+     * by index. Use {@link #getGeographyValue(int)} instead.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
+     * @param columnName Name of the column
+     * @return GeographyValue value stored in the specified column
+     * @see #wasNull()
+     * @see #getGeographyPointValue(int)
+     */
+    public final GeographyValue getGeographyValue(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getGeographyValue(colIndex);
+    }
+
+
+    /**
      * Retrieve the <tt>long</tt> timestamp stored in the column specified by index.
      * Note that VoltDB uses GMT universally within its process space. Date objects sent over
      * the wire from clients may seem to be different times because of this, but it is just
@@ -746,6 +825,11 @@ public abstract class VoltTableRow {
         return getDecimalAsBigDecimal(colIndex);
     }
 
+    static final String GEOJSON_TYPE_KEY           = "type";
+    static final String GEOJSON_COORDS_KEY         = "coordinates";
+    // This is not "GeographyPoint".  This is used in geojson syntax.
+    static final String GEOJSON_POINT_TYPE_SIGIL   = "Point";
+    static final String GEOJSON_POLYGON_TYPE_SIGIL = "Polygon";
     /**
      *
      * @param columnIndex
@@ -759,45 +843,57 @@ public abstract class VoltTableRow {
         switch (columnType) {
         case TINYINT:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case SMALLINT:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case INTEGER:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case BIGINT:
             value = getLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case TIMESTAMP:
             value = getTimestampAsLong(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(value);
+            }
             break;
         case FLOAT:
             dvalue = getDouble(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(dvalue);
+            }
             break;
         case STRING:
             js.value(getString(columnIndex));
@@ -808,10 +904,30 @@ public abstract class VoltTableRow {
             break;
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);
-            if (wasNull())
+            if (wasNull()) {
                 js.value(null);
-            else
+            }
+            else {
                 js.value(dec.toString());
+            }
+            break;
+        case GEOGRAPHY_POINT:
+            GeographyPointValue pt = getGeographyPointValue(columnIndex);
+            if (wasNull()) {
+                js.value(null);
+            }
+            else {
+                js.value(pt.toString());
+            }
+            break;
+        case GEOGRAPHY:
+            GeographyValue gv = getGeographyValue(columnIndex);
+            if (wasNull()) {
+                js.value(null);
+            }
+            else {
+                js.value(gv.toString());
+            }
             break;
         // VoltType includes a few values that aren't valid column value types
         case INVALID:
@@ -826,6 +942,57 @@ public abstract class VoltTableRow {
             break;
         }
     }
+
+    /**
+     * This converts a GeographyValue to GEOJSON. We currently don't use it
+     * because the VMC does not know what to do with GEOJSON. But it's left here
+     * in the hope that it will be useful in the future.
+     *
+     * @param gv
+     * @param js
+     * @throws JSONException
+    @SuppressWarnings("unused")
+    static private void geographyValueToJSON(GeographyValue gv, JSONStringer js) throws JSONException {
+        js.object()
+          .key(GEOJSON_TYPE_KEY)
+          .value(GEOJSON_POLYGON_TYPE_SIGIL)
+          .key(GEOJSON_COORDS_KEY)
+          .array();
+        for (List<GeographyPointValue> loops : gv.getLoops()) {
+            js.array();
+            for (GeographyPointValue pt : loops) {
+                js.array();
+                js.value(pt.getLatitude())
+                  .value(pt.getLongitude());
+                js.endArray();
+            }
+            js.endArray();
+        }
+        js.endArray();
+    }
+     */
+
+    /**
+     * This converts a GeographyValue to GEOJSON. We currently don't use it
+     * because the VMC does not know what to do with GEOJSON. But it's left here
+     * in the hope that it will be useful in the future.
+     *
+     * @param gv
+     * @param js
+     * @throws JSONException
+    @SuppressWarnings("unused")
+    static private void pointToJSON(GeographyPointValue pt, JSONStringer js) throws JSONException {
+        js.object()
+          .key(GEOJSON_TYPE_KEY)
+          .value(GEOJSON_POINT_TYPE_SIGIL)
+          .key(GEOJSON_COORDS_KEY)
+          .array()
+          .value(pt.getLatitude())
+          .value(pt.getLongitude())
+          .endArray()
+          .endObject();
+    }
+     */
 
     /** Validates that type and columnIndex match and are valid. */
     final void validateColumnType(int columnIndex, VoltType... types) {

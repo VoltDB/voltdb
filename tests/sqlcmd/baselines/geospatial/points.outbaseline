@@ -1,0 +1,68 @@
+
+FILE scripts/geospatial/points.sql
+
+drop procedure make_point if exists;
+Command succeeded.
+
+drop table points if exists;
+Command succeeded.
+
+create table points (
+  id         integer primary key not null,
+  location   geography_point
+);
+Command succeeded.
+
+create procedure make_point as
+  insert into points values (?, ?);
+Command succeeded.
+
+exec make_point 101 'point(20.666 10.333)';
+(Returned 1 rows in #.##s)
+
+exec make_point 102 '  point  (20.666 10.333)    ';
+(Returned 1 rows in #.##s)
+
+exec make_point 103 'point(-20.666 -10.333      )';
+(Returned 1 rows in #.##s)
+
+exec make_point 104 '  point  (-20.666     -10.333)    ';
+(Returned 1 rows in #.##s)
+
+exec make_point 105 'point(10 10)';
+(Returned 1 rows in #.##s)
+
+exec make_point 106 'point( 100.0   100.0)';
+
+exec make_point 107 'point( 360.0   45.0)';
+
+exec make_point 108 'point( 270.0   45.0)';
+
+exec make_point 109 'point(-100.0  -100.0)';
+
+exec make_point 110 'point(-360.0  -45.0)';
+
+exec make_point 111 'point(-270.0  -45.0)';
+
+exec make_point 112 'point(0.0, 0.0)';
+
+exec make_point 200 null;
+(Returned 1 rows in #.##s)
+
+select * from points;
+ID   LOCATION                
+---- ------------------------
+ 101 POINT (20.666 10.333)   
+ 102 POINT (20.666 10.333)   
+ 103 POINT (-20.666 -10.333) 
+ 104 POINT (-20.666 -10.333) 
+ 105 POINT (10.0 10.0)       
+ 200 NULL                    
+
+(Returned 6 rows in #.##s)
+
+drop procedure make_point;
+Command succeeded.
+
+drop table points;
+Command succeeded.

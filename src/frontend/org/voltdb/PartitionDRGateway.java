@@ -30,7 +30,7 @@ import org.voltdb.licensetool.LicenseApi;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
- * Stub class that provides a gateway to the InvocationBufferServer when
+ * Stub class that provides a gateway to the DRProducer when
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */

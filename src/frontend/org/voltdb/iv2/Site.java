@@ -48,6 +48,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
@@ -477,6 +478,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
             m_ee = new MockExecutionEngine();
         }
+        else if (m_backend == BackendTarget.POSTGIS_BACKEND) {
+            m_non_voltdb_backend = PostGISBackend.initializePostGISBackend(m_context);
+            m_ee = new MockExecutionEngine();
+        }
         else {
             m_non_voltdb_backend = null;
             m_ee = initializeEE();
@@ -778,7 +783,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
                                         exportSequenceNumbers, drTupleStreamInfo,
@@ -969,6 +974,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         long partitionSequenceNumber = resultBuffer.getLong();
         long partitionSpUniqueId = resultBuffer.getLong();
         long partitionMpUniqueId = resultBuffer.getLong();
+        int drVersion = resultBuffer.getInt();
         DRLogSegmentId partitionInfo = new DRLogSegmentId(partitionSequenceNumber, partitionSpUniqueId, partitionMpUniqueId);
         byte hasReplicatedStateInfo = resultBuffer.get();
         TupleStreamStateInfo info = null;
@@ -977,10 +983,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long replicatedSpUniqueId = resultBuffer.getLong();
             long replicatedMpUniqueId = resultBuffer.getLong();
             DRLogSegmentId replicatedInfo = new DRLogSegmentId(replicatedSequenceNumber, replicatedSpUniqueId, replicatedMpUniqueId);
-
-            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo);
+            info = new TupleStreamStateInfo(partitionInfo, replicatedInfo, drVersion);
         } else {
-            info = new TupleStreamStateInfo(partitionInfo);
+            info = new TupleStreamStateInfo(partitionInfo, drVersion);
         }
         return info;
     }
@@ -1370,5 +1375,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public int getBatchTimeout() {
         return m_ee.getBatchTimeout();
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4);
+        paramBuffer.putInt(drVersion);
+        m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
+        hostLog.info("DR protocol version has been set to " + drVersion);
     }
 }

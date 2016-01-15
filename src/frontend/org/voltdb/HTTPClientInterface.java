@@ -20,15 +20,24 @@ package org.voltdb;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.Principal;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.security.auth.Subject;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
+import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.util.B64Code;
+import org.ietf.jgss.GSSContext;
+import org.ietf.jgss.GSSException;
+import org.ietf.jgss.GSSManager;
+import org.ietf.jgss.GSSName;
+import org.ietf.jgss.Oid;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -36,18 +45,35 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.AuthenticatedConnectionCache;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.DelegatePrincipal;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableSet;
+
 public class HTTPClientInterface {
 
     public static final String QUERY_TIMEOUT_PARAM = "Querytimeout";
+    private static final VoltLogger m_log;
 
-    private static final VoltLogger m_log = new VoltLogger("HOST");
+    final static Oid KRB5OID;
+    static {
+        m_log = new VoltLogger("HOST");
+        Oid krb5oid = null;
+        try {
+            krb5oid = new Oid("1.3.6.1.5.5.2");
+        } catch (GSSException e) {
+            m_log.fatal("failed to initialize security primitive for kerberos OID", e);
+            Throwables.propagate(e);
+        }
+        KRB5OID = krb5oid;
+    }
+
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
     AtomicReference<AuthenticatedConnectionCache> m_connections = new AtomicReference<AuthenticatedConnectionCache>();
@@ -59,6 +85,10 @@ public class HTTPClientInterface {
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
     int m_timeout = 0;
+
+    final boolean m_spnegoEnabled;
+    final String m_servicePrincipal;
+
     final String m_timeoutResponse;
     private final ExecutorService m_closeAllExecutor;
 
@@ -95,7 +125,7 @@ public class HTTPClientInterface {
             }
 
             m_request.setAttribute("result", msg);
-            if (!m_continuation.isInitial()) try {
+            try {
                 m_continuation.resume();
             } catch (IllegalStateException e) {
                 // Thrown when we shut down the server via the JSON/HTTP (web studio) API
@@ -110,6 +140,8 @@ public class HTTPClientInterface {
                 new VoltTable[0], "Request Timeout");
         m_timeoutResponse = r.toJSONString();
         m_closeAllExecutor = CoreUtils.getSingleThreadExecutor("HttpClientInterface-closeAll");
+        m_servicePrincipal = getAuthSystem().getServicePrincipal();
+        m_spnegoEnabled = m_servicePrincipal != null && !m_servicePrincipal.isEmpty();
     }
 
     public void stop() {
@@ -122,8 +154,20 @@ public class HTTPClientInterface {
         AuthenticationResult authResult = null;
         boolean suspended = false;
         boolean forceClose = false;
+
+        String authHeader = request.getHeader(HttpHeader.AUTHORIZATION.asString());
+        if (m_spnegoEnabled && (authHeader == null || !authHeader.startsWith(HttpHeader.NEGOTIATE.asString()))) {
+            m_log.debug("SpengoAuthenticator: sending challenge");
+            response.setHeader(HttpHeader.WWW_AUTHENTICATE.asString(), HttpHeader.NEGOTIATE.asString());
+            try {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            } catch (IOException ignoreItAsTheBrowserMustHaveClosed) {
+            }
+            return;
+        }
+
         Continuation continuation = ContinuationSupport.getContinuation(request);
-        if (m_timeout > 0) {
+        if (m_timeout > 0 && continuation.isInitial()) {
             continuation.setTimeout(m_timeout);
         }
         String result = (String )request.getAttribute("result");
@@ -275,18 +319,26 @@ public class HTTPClientInterface {
         }
     }
 
+    Configuration getVoltDBConfig() {
+        return VoltDB.instance().getConfig();
+    }
+
     private AuthenticationResult getAuthenticationResult(Request request) {
         boolean adminMode = false;
 
         String username = null;
         String hashedPassword = null;
         String password = null;
+        String token = null;
         //Check authorization header
-        String auth = request.getHeader("Authorization");
+        String auth = request.getHeader(HttpHeader.AUTHORIZATION.asString());
         boolean validAuthHeader = false;
         if (auth != null) {
             String schemeAndHandle[] = auth.split(" ");
-            if (schemeAndHandle.length == 2) {
+            if (auth.startsWith(HttpHeader.NEGOTIATE.asString())) {
+                token = (auth.length() >= 10 ? auth.substring(10) : "");
+                validAuthHeader = true;
+            } else if (schemeAndHandle.length == 2) {
                 if (schemeAndHandle[0].equalsIgnoreCase("hashed")) {
                     String up[] = schemeAndHandle[1].split(":");
                     if (up.length == 2) {
@@ -318,7 +370,7 @@ public class HTTPClientInterface {
             if (m_oldCache!=null) {
                 closeAllAsync(m_oldCache);
             }
-            Configuration config = VoltDB.instance().getConfig();
+            final Configuration config = getVoltDBConfig();
             int port = config.m_port;
             int adminPort = config.m_adminPort;
             String externalInterface = config.m_externalInterface;
@@ -344,12 +396,7 @@ public class HTTPClientInterface {
             }
         }
 
-        // check for admin mode
-        if (admin != null) {
-            if (admin.compareToIgnoreCase("true") == 0) {
-                adminMode = true;
-            }
-        }
+        adminMode = "true".equalsIgnoreCase(admin);
 
         // The SHA-1 hash of the password
         byte[] hashedPasswordBytes = null;
@@ -357,10 +404,10 @@ public class HTTPClientInterface {
         if (password != null) {
             try {
                 // Create a MessageDigest every time because MessageDigest is not thread safe (ENG-5438)
-                MessageDigest md = MessageDigest.getInstance(ClientAuthHashScheme.getDigestScheme(ClientAuthHashScheme.HASH_SHA256));
+                MessageDigest md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(ClientAuthScheme.HASH_SHA256));
                 hashedPasswordBytes = md.digest(password.getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
-                return new AuthenticationResult(null, null, null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
+                return new AuthenticationResult(null, null, null, adminMode, username, "JVM doesn't support SHA-256 hashing. Please use a supported JVM" + e);
             }
         }
         // note that HTTP Var "Hashedpassword" has a higher priority
@@ -383,18 +430,90 @@ public class HTTPClientInterface {
 
         assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20) || (hashedPasswordBytes.length == 32));
 
+        AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme;
         try {
             // get a connection to localhost from the pool
-            AuthenticatedConnectionCache.ClientWithHashScheme clientWithScheme =
-                    connection_cache.getClient(username, password, hashedPasswordBytes, adminMode);
-            if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
+            if (m_spnegoEnabled) {
+                clientWithScheme = connection_cache.getClient(spnegoLogin(token), adminMode);
+                if (clientWithScheme == null) {
+                    return new AuthenticationResult(null, null, null, adminMode, username, "Failed to get SPNEGO authenticated client.");
+                }
                 return new AuthenticationResult(clientWithScheme.m_client, connection_cache, clientWithScheme.m_scheme,
                         adminMode, username, "");
+            } else {
+                clientWithScheme = connection_cache.getClient(username, password, hashedPasswordBytes, adminMode);
+                if (clientWithScheme != null && clientWithScheme.m_client != null && clientWithScheme.m_scheme != null) {
+                    return new AuthenticationResult(clientWithScheme.m_client, connection_cache, clientWithScheme.m_scheme,
+                            adminMode, username, "");
+                }
+                return new AuthenticationResult(null, null, null, adminMode, username, "Failed to get client.");
             }
-            return new AuthenticationResult(null, null, null, adminMode, username, "Failed to get client.");
         } catch (IOException ex) {
             return new AuthenticationResult(null, null, null, adminMode, username, ex.getMessage());
         }
+    }
+
+    private Subject spnegoLogin(String encodedToken) {
+        byte[] token = B64Code.decode(encodedToken);
+        try {
+            if (encodedToken == null || encodedToken.isEmpty()) {
+                return null;
+            }
+            final Oid spnegoOid = new Oid("1.3.6.1.5.5.2");
+
+            GSSManager manager = GSSManager.getInstance();
+            GSSName name = manager.createName(m_servicePrincipal, null);
+            GSSContext ctx = manager.createContext(
+                    name.canonicalize(spnegoOid), spnegoOid,
+                    null, GSSContext.INDEFINITE_LIFETIME
+                    );
+            if (ctx == null) {
+                m_rate_limited_log.log(
+                        EstTime.currentTimeMillis(),
+                        Level.ERROR, null,
+                        "Failed to establish security context for SPNEGO authentication"
+                        );
+                return null;
+            }
+            while (!ctx.isEstablished()) {
+                token = ctx.acceptSecContext(token, 0, token.length);
+            }
+            if (ctx.isEstablished()) {
+                if (ctx.getSrcName() == null) {
+                    m_rate_limited_log.log(
+                            EstTime.currentTimeMillis(),
+                            Level.ERROR, null,
+                            "Failed to read source name from established SPNEGO security context"
+                            );
+                    return null;
+                }
+                String user = ctx.getSrcName().toString();
+                if (m_log.isDebugEnabled()) {
+                    m_log.debug("established SPNEGO security context for " + user);
+                }
+                return makeDelegateSubject(user);
+            }
+            return null;
+        } catch (GSSException e) {
+            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.ERROR, e, "failed SPNEGO authentication");
+            return null;
+        }
+    }
+
+    private Subject makeDelegateSubject(String forDelegate) {
+        if (!m_spnegoEnabled || forDelegate == null || forDelegate.isEmpty()) {
+            return null;
+        }
+        ImmutableSet.Builder<Principal> sbld = ImmutableSet.builder();
+        Subject svc = getAuthSystem().getLoginContext().getSubject();
+        sbld.addAll(svc.getPrincipals())
+            .add(new DelegatePrincipal(forDelegate, System.identityHashCode(getAuthSystem())))
+            ;
+        return new Subject(true, sbld.build(), svc.getPublicCredentials(), svc.getPrivateCredentials());
+    }
+
+    AuthSystem getAuthSystem() {
+        return VoltDB.instance().getCatalogContext().authSystem;
     }
 
     private void closeAllAsync(final AuthenticatedConnectionCache cache) {

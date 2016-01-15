@@ -25,8 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.DefaultSnapshotDataTarget;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 
 
 public class SaveRestoreBase extends RegressionSuite {
@@ -120,5 +124,36 @@ public class SaveRestoreBase extends RegressionSuite {
         {
             deleteRecursively(tmp_file);
         }
+    }
+
+    static protected GeographyPointValue getGeographyPointValue(int index) {
+        double lat = index % 90;
+        double lng = (index * 2) % 180;
+        if ((index & 0x1) != 0) {
+            lat *= -1.0;
+        }
+
+        if ((index & 0x2) != 0) {
+            lng *= -1.0;
+        }
+
+        return new GeographyPointValue(lng, lat);
+    }
+
+    static protected GeographyValue getGeographyValue(int index) {
+        List<GeographyPointValue> loop = new ArrayList<GeographyPointValue>();
+        for (int i = 0; i < 3; ++i) {
+            loop.add(getGeographyPointValue(index + i));
+        }
+        loop.add(loop.get(0));
+
+        List<List<GeographyPointValue>> loops = new ArrayList<>();
+        loops.add(loop);
+
+        // It would be nice to test multiple loops here, but to do it right
+        // would require that the inner loops don't cross the outer one,
+        // which is not trivial to do.
+
+        return new GeographyValue(loops);
     }
 }
