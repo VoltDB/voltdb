@@ -586,6 +586,13 @@ public class TestVoltTable extends TestCase {
         // Raw bytes does not include the length prefix
         assertEquals(GEOG_VALUE.getLengthInBytes(), raw.length - 4);
 
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
         assertFalse(vt.advanceRow());
         assertFalse(vtCopy.advanceRow());
     }
@@ -618,6 +625,13 @@ public class TestVoltTable extends TestCase {
 
         byte[] raw = vt.getRaw(0);
         assertEquals(GeographyPointValue.getLengthInBytes(), raw.length);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
 
         assertFalse(vt.advanceRow());
         assertFalse(vtCopy.advanceRow());

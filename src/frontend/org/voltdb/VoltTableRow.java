@@ -423,9 +423,6 @@ public abstract class VoltTableRow {
         int offset = getOffset(columnIndex);
         VoltType type = getColumnType(columnIndex);
 
-        // value is ignored for strings and blobs (variable length types)
-        int length = type.getLengthInBytesForFixedTypesWithoutCheck();
-
         switch(type) {
         case TINYINT:
         case SMALLINT:
@@ -434,18 +431,20 @@ public abstract class VoltTableRow {
         case TIMESTAMP:
         case FLOAT:
         case DECIMAL:
-        case GEOGRAPHY_POINT:
+        case GEOGRAPHY_POINT: {
             // all of these types are fixed length, so easy to get raw type
+            int length = type.getLengthInBytesForFixedTypesWithoutCheck();
             retval = new byte[length];
             m_buffer.position(offset);
             m_buffer.get(retval);
             m_buffer.position(pos);
             return retval;
+        }
         case STRING:
         case VARBINARY:
-        case GEOGRAPHY:
+        case GEOGRAPHY: {
             // all of these types are variable length with a prefix
-            length = m_buffer.getInt(offset);
+            int length = m_buffer.getInt(offset);
             if (length == VoltTable.NULL_STRING_INDICATOR) {
                 length = 0;
             }
@@ -455,6 +454,7 @@ public abstract class VoltTableRow {
             m_buffer.get(retval);
             m_buffer.position(pos);
             return retval;
+        }
         default:
             throw new RuntimeException("Unknown type");
         }
