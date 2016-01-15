@@ -58,8 +58,8 @@ function cleanall() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/windowing/*.java
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/windowing/*.java
+    javac -classpath $APPCLASSPATH procedures/windowing/*.java
+    javac -classpath $CLIENTCLASSPATH client/windowing/*.java
     # build procedure and client jars
     jar cf windowing-procs.jar -C procedures windowing
     jar cf windowing-client.jar -C client windowing
