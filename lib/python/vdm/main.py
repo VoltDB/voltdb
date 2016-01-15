@@ -35,6 +35,7 @@
 # description should also be changed if re-used for another base command.
 import sys
 import os
+from os.path import expanduser
 try:
     # ensure version 2.6+ of python
     if sys.version_info[0] == 2 and sys.version_info[1] < 6:
@@ -69,4 +70,6 @@ try:
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
-HTTPListener.main(None, HTTPListener, 8000, '/tmp')
+home = expanduser("~")
+config_path = home + '.vdm' if home.endswith('/') else home + '/' + '.vdm'
+HTTPListener.main(None, HTTPListener, 8000, config_path)

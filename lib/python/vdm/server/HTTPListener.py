@@ -532,7 +532,6 @@ def make_configuration_file():
         i += 1
 
     i = 0
-
     while i < len(DEPLOYMENT):
         DEPLOYMENT[i]['users'] = {}
         DEPLOYMENT[i]['users']['user'] = []
@@ -575,10 +574,10 @@ def sync_configuration():
      return response
 
 
-def convert_xml_to_json():
+def convert_xml_to_json(config_path):
     xml = ''
     xml_final = ''
-    with open('/home/pmanandhar/GibVoltdb/voltdb_Branch/lib/python/vdm/.vdm2/vdm.xml') as f:
+    with open(config_path) as f:
         xml = f.read()
     o = XML(xml)
     xml_final = json.loads(json.dumps(etree_to_dict(o)))
@@ -665,7 +664,6 @@ def get_deployment_from_xml(deployment_xml, is_list):
     deployments = []
     if is_list is 'list':
         for deployment in deployment_xml:
-            print deployment
             new_deployment = {}
             for field in deployment:
                 if field == 'export':
@@ -684,7 +682,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['adminstartup'] = bool(deployment[field]['adminstartup'])
                         new_deployment[field]['port'] = int(deployment[field]['port'])
                     except Exception, err:
-                        print str(err)
+                        print 'Failed to get deployment: ' % str(err)
                 elif field == 'cluster':
                     try:
                         new_deployment[field] = {}
@@ -1685,7 +1683,7 @@ class VdmGetServerIP(MethodView):
         return jsonify({'ip_address': get_ip_address('eth0')})
 
 
-def main(runner, amodule, aport, apath):
+def main(runner, amodule, aport, config_dir):
     try:
         F_DEBUG = os.environ['DEBUG']
     except KeyError:
@@ -1699,10 +1697,10 @@ def main(runner, amodule, aport, apath):
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
     global PATH
-    PATH = apath
-    if os.path.exists(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'):
-        print 111
-        convert_xml_to_json()
+    PATH = config_dir
+    config_path = config_dir + '/' + 'vdm.xml'
+    if os.path.exists(config_path):
+        convert_xml_to_json(config_path)
     else:
         DEPLOYMENT.append(deployment)
 
