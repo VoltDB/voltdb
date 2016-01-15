@@ -434,6 +434,7 @@ public abstract class VoltTableRow {
         case TIMESTAMP:
         case FLOAT:
         case DECIMAL:
+        case GEOGRAPHY_POINT:
             // all of these types are fixed length, so easy to get raw type
             retval = new byte[length];
             m_buffer.position(offset);
@@ -668,6 +669,7 @@ public abstract class VoltTableRow {
             return null;
         }
 
+        m_wasNull = false;
         offset += 4;
         GeographyValue gv = GeographyValue.unflattenFromBuffer(m_buffer, offset);
         return gv;
