@@ -226,6 +226,8 @@ public class VoltDB {
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
 
+        public int m_queryTimeout = 0;
+
         /** Force catalog upgrade even if version matches. */
         public static boolean m_forceCatalogUpgrade = false;
 
@@ -611,6 +613,10 @@ public class VoltDB {
             assert(testObj.isDirectory());
             assert(testObj.canWrite());
             return testObj.getAbsolutePath() + File.separator + jarname;
+        }
+
+        public int getQueryTimeout() {
+           return m_config.m_queryTimeout;
         }
 
     }

@@ -1284,6 +1284,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
+
+
     /**
      * Schedule all the periodic works
      */
@@ -1507,8 +1509,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (sysType.getSnapshot() != null) {
                     hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
                 }
-                if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
-                    hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                if (sysType.getQuery() != null) {
+                    if (sysType.getQuery().getTimeout() > 0) {
+                        hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                        m_config.m_queryTimeout = sysType.getQuery().getTimeout();
+                    }
+                    else if (sysType.getQuery().getTimeout() == 0) {
+                        hostLog.info("Query timeout set to unlimited");
+                        m_config.m_queryTimeout = 0;
+                    }
                 }
             }
 
@@ -1907,7 +1916,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         if (sysSettings.getQuerytimeout() > 0) {
             hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");
+            m_config.m_queryTimeout = sysSettings.getQuerytimeout();
         }
+        else if (sysSettings.getQuerytimeout() == 0) {
+            hostLog.info("Query timeout set to unlimited");
+            m_config.m_queryTimeout = 0;
+        }
+
     }
 
     /**
