@@ -97,6 +97,7 @@ os.getcwd()
 if path is None:
     home = expanduser("~")
     path = home + '.vdm' if home.endswith('/') else home + '/' + '.vdm'
+
 if os.path.isdir(str(path)):
     if os.access(str(path), os.W_OK):
         HTTPListener.main(runner, HTTPListener, 8000, path)

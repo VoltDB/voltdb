@@ -33,14 +33,17 @@ from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, Con
 import socket
 import os
 import json
-from xml.etree.ElementTree import Element, SubElement, Comment, tostring
+from xml.etree.ElementTree import Element, SubElement, Comment, tostring, parse, XML
 import sys
 import requests
 from flask import Flask
 from flask.ext.cors import CORS
 import fcntl
 import struct
-
+import xmltodict
+from collections import defaultdict
+import ast
+import os.path
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -553,21 +556,478 @@ def make_configuration_file():
         f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
         f.write(tostring(main_header,encoding='UTF-8'))
         f.close()
+
+
+
     except Exception, err:
         print str(err)
 
 
-def get_ip_address(ifname):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(),
-        0x8915,  # SIOCGIFADDR
-        struct.pack('256s', ifname[:15])
-    )[20:24])
+def convert_xml_to_json():
+    xml = ''
+    xml_final = ''
+    with open('/home/pmanandhar/GibVoltdb/voltdb_Branch/lib/python/vdm/.vdm2/vdm.xml') as f:
+        xml = f.read()
+    o = XML(xml)
+    xml_final = json.loads(json.dumps(etree_to_dict(o)))
+    member_json = ''
+    db_json = ''
+    deployment_json = ''
+    try:
+        if type(xml_final['vdm']['members']['member']) is dict:
+            member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'dict')
+        else:
+            member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'list')
 
-IS_CURRENT_NODE_ADDED = False
-IS_CURRENT_DATABASE_ADDED = False
-IGNORETOP = { "databaseid" : True, "users" : True, "dr" : True}
+        if type(xml_final['vdm']['databases']['database']) is dict:
+            db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'dict')
+        else:
+            db_json = get_db_from_xml(xml_final['vdm']['databases']['database'], 'list')
+
+        print xml_final['vdm']
+        if type(xml_final['vdm']['deployments']['deployment']) is dict:
+            deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+        else:
+            deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
+    except Exception,err:
+        print 'dfdf' +str(err)
+
+    global DATABASES
+    DATABASES = db_json
+
+    global SERVERS
+    SERVERS = member_json
+
+    global DEPLOYMENT
+    DEPLOYMENT = deployment_json
+
+
+def get_db_from_xml(db_xml, is_list):
+    new_database = {}
+    db = []
+    if is_list is 'list':
+        for database in db_xml:
+            new_database = {}
+            for field in database:
+                new_database[field] = convert_db_field_required_format(database, field)
+            db.append(new_database)
+    else:
+        for field in db_xml:
+            new_database[field] =  convert_db_field_required_format(db_xml, field)
+        db.append(new_database)
+    return db
+
+
+def convert_db_field_required_format(database, field):
+    if field == 'id':
+        modified_field = int(database[field])
+    elif field == 'members':
+        modified_field = ast.literal_eval(database[field])
+    else:
+        modified_field = database[field]
+    return modified_field
+
+
+def get_member_from_xml(member_xml, is_list):
+    new_member = {}
+    members = []
+    if is_list is 'list':
+        for member in member_xml:
+            new_member = {}
+            for field in member:
+                new_member[field] = convert_server_field_required_format(member, field)
+            members.append(new_member)
+    else:
+        for field in member_xml:
+            new_member[field] = convert_server_field_required_format(member_xml, field)
+        members.append(new_member)
+    return members
+
+
+def convert_server_field_required_format(server, field):
+    if field == 'id':
+        modified_field = int(server[field])
+    else:
+        modified_field = server[field]
+    return modified_field
+
+
+def get_deployment_from_xml(deployment_xml, is_list):
+    new_deployment = {}
+    deployments = []
+    if is_list is 'list':
+        for deployment in deployment_xml:
+            new_deployment = {}
+            for field in deployment:
+                if field == 'export':
+                    if type(deployment[field]['configuration']) is list:
+                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
+                    else:
+                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
+                elif field == 'import':
+                    if type(deployment[field]['configuration']) is list:
+                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
+                    else:
+                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
+                elif field == 'admin-mode':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['adminstartup'] = bool(deployment[field]['adminstartup'])
+                        new_deployment[field]['port'] = int(deployment[field]['port'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'cluster':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['hostcount'] = int(deployment[field]['hostcount'])
+                        new_deployment[field]['kfactor'] = int(deployment[field]['kfactor'])
+                        new_deployment[field]['sitesperhost'] = int(deployment[field]['sitesperhost'])
+                        new_deployment[field]['elastic'] = str(deployment[field]['elastic'])
+                        new_deployment[field]['schema'] = str(deployment[field]['schema'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'commandlog':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['synchronous'] = bool(deployment[field]['synchronous'])
+                        new_deployment[field]['logsize'] = int(deployment[field]['logsize'])
+                        new_deployment[field]['frequency'] = {}
+                        new_deployment[field]['frequency']['transactions'] = int(deployment[field]['frequency']['transactions'])
+                        new_deployment[field]['frequency']['time'] = int(deployment[field]['frequency']['time'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'heartbeat':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['timeout'] = int(deployment[field]['timeout'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'httpd':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['port'] = int(deployment[field]['port'])
+                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['jsonapi'] = {}
+                        new_deployment[field]['jsonapi']['enabled'] = bool(deployment[field]['jsonapi']['enabled'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'partition-detection':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['snapshot'] = {}
+                        new_deployment[field]['snapshot']['prefix'] = bool(deployment[field]['snapshot']['prefix'])
+                    except Exception, err:
+                        print str(err)
+                # elif field == 'paths':
+                #     try:
+                #         new_deployment[field] = {}
+                #         new_deployment[field]['commandlog'] = {}
+                #         new_deployment[field]['commandlog']['path'] = str(deployment_xml[field]['commandlog']['path'])
+                #         new_deployment[field]['commandlogsnapshot'] = {}
+                #         new_deployment[field]['commandlogsnapshot']['path'] = str(deployment_xml[field]['commandlogsnapshot']['path'])
+                #         new_deployment[field]['droverflow'] = {}
+                #         new_deployment[field]['droverflow']['path'] = str(deployment_xml[field]['droverflow']['path'])
+                #         new_deployment[field]['exportoverflow'] = {}
+                #         new_deployment[field]['exportoverflow']['path'] = str(deployment_xml[field]['exportoverflow']['path'])
+                #         new_deployment[field]['snapshots'] = {}
+                #         new_deployment[field]['snapshots']['path'] = str(deployment_xml[field]['snapshots']['path'])
+                #         new_deployment[field]['voltdbroot'] = {}
+                #         new_deployment[field]['voltdbroot']['path'] = str(deployment_xml[field]['voltdbroot']['path'])
+                #     except Exception, err:
+                #         print str(err)
+                elif field == 'security':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['provider'] = str(deployment[field]['provider'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'snapshot':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['frequency'] = str(deployment[field]['frequency'])
+                        new_deployment[field]['prefix'] = str(deployment[field]['prefix'])
+                        new_deployment[field]['retain'] = int(deployment[field]['retain'])
+                    except Exception, err:
+                        print str(err)
+                elif field == 'systemsettings':
+                    try:
+                        new_deployment[field] = {}
+                        new_deployment[field]['elastic'] = {}
+                        new_deployment[field]['elastic']['duration'] = int(deployment[field]['elastic']['duration'])
+                        new_deployment[field]['elastic']['throughput'] = int(deployment[field]['elastic']['throughput'])
+                        new_deployment[field]['query'] = {}
+                        new_deployment[field]['query']['timeout'] = int(deployment[field]['query']['timeout'])
+                        new_deployment[field]['snapshot'] = {}
+                        new_deployment[field]['snapshot']['priority'] = int(deployment[field]['snapshot']['priority'])
+                        new_deployment[field]['temptables'] = {}
+                        new_deployment[field]['temptables']['maxsize'] = int(deployment[field]['temptables']['maxsize'])
+
+                        if deployment[field]['resourcemonitor'] is None:
+                            new_deployment[field]['resourcemonitor'] = (deployment[field]['resourcemonitor'])
+                        else:
+                            new_deployment[field]['resourcemonitor'] = {}
+                            new_deployment[field]['resourcemonitor']['memorylimit'] = deployment[field]['resourcemonitor']['memorylimit']
+                            if type(new_deployment[field]['resourcemonitor']['memorylimit']) is list:
+                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment[field]['resourcemonitor']['disklimit'], 'list')
+                            else:
+                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment[field]['resourcemonitor']['disklimit'], 'dict')
+                    except Exception, err:
+                        print str(err)
+                elif field == 'dr':
+                    try:
+                        if deployment[field] is not None:
+                            new_deployment[field] = {}
+                            new_deployment[field]['id'] = int(deployment[field]['id'])
+                            new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                            new_deployment[field]['type'] = str(deployment[field]['type'])
+                            if 'connection' not in deployment[field]:
+                                new_deployment[field]['connection'] = {}
+                                new_deployment[field]['connection']['source'] = deployment[field]['connection']['source']
+                                new_deployment[field]['connection']['servers'] = deployment[field]['connection']['servers']
+
+                    except Exception, err:
+                        print str(err)
+                else:
+                    new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
+
+
+            deployments.append(new_deployment)
+    else:
+        for field in deployment_xml:
+            if field == 'export':
+                if type(deployment_xml[field]['configuration']) is list:
+                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                else:
+                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+            elif field == 'import':
+                if type(deployment_xml[field]['configuration']) is list:
+                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                else:
+                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+            elif field == 'admin-mode':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['adminstartup'] = bool(deployment_xml[field]['adminstartup'])
+                    new_deployment[field]['port'] = int(deployment_xml[field]['port'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'cluster':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['hostcount'] = int(deployment_xml[field]['hostcount'])
+                    new_deployment[field]['kfactor'] = int(deployment_xml[field]['kfactor'])
+                    new_deployment[field]['sitesperhost'] = int(deployment_xml[field]['sitesperhost'])
+                    new_deployment[field]['elastic'] = str(deployment_xml[field]['elastic'])
+                    new_deployment[field]['schema'] = str(deployment_xml[field]['schema'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'commandlog':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['synchronous'] = bool(deployment_xml[field]['synchronous'])
+                    new_deployment[field]['logsize'] = int(deployment_xml[field]['logsize'])
+                    new_deployment[field]['frequency'] = {}
+                    new_deployment[field]['frequency']['transactions'] = int(deployment_xml[field]['frequency']['transactions'])
+                    new_deployment[field]['frequency']['time'] = int(deployment_xml[field]['frequency']['time'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'heartbeat':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['timeout'] = int(deployment_xml[field]['timeout'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'httpd':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['port'] = int(deployment_xml[field]['port'])
+                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['jsonapi'] = {}
+                    new_deployment[field]['jsonapi']['enabled'] = bool(deployment_xml[field]['jsonapi']['enabled'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'partition-detection':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['snapshot'] = {}
+                    new_deployment[field]['snapshot']['prefix'] = bool(deployment_xml[field]['snapshot']['prefix'])
+                except Exception, err:
+                    print str(err)
+            # elif field == 'paths':
+            #     try:
+            #         new_deployment[field] = {}
+            #         new_deployment[field]['commandlog'] = {}
+            #         new_deployment[field]['commandlog']['path'] = str(deployment_xml[field]['commandlog']['path'])
+            #         new_deployment[field]['commandlogsnapshot'] = {}
+            #         new_deployment[field]['commandlogsnapshot']['path'] = str(deployment_xml[field]['commandlogsnapshot']['path'])
+            #         new_deployment[field]['droverflow'] = {}
+            #         new_deployment[field]['droverflow']['path'] = str(deployment_xml[field]['droverflow']['path'])
+            #         new_deployment[field]['exportoverflow'] = {}
+            #         new_deployment[field]['exportoverflow']['path'] = str(deployment_xml[field]['exportoverflow']['path'])
+            #         new_deployment[field]['snapshots'] = {}
+            #         new_deployment[field]['snapshots']['path'] = str(deployment_xml[field]['snapshots']['path'])
+            #         new_deployment[field]['voltdbroot'] = {}
+            #         new_deployment[field]['voltdbroot']['path'] = str(deployment_xml[field]['voltdbroot']['path'])
+            #     except Exception, err:
+            #         print str(err)
+            elif field == 'security':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['provider'] = str(deployment_xml[field]['provider'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'snapshot':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['frequency'] = str(deployment_xml[field]['frequency'])
+                    new_deployment[field]['prefix'] = str(deployment_xml[field]['prefix'])
+                    new_deployment[field]['retain'] = int(deployment_xml[field]['retain'])
+                except Exception, err:
+                    print str(err)
+            elif field == 'systemsettings':
+                try:
+                    new_deployment[field] = {}
+                    new_deployment[field]['elastic'] = {}
+                    new_deployment[field]['elastic']['duration'] = int(deployment_xml[field]['elastic']['duration'])
+                    new_deployment[field]['elastic']['throughput'] = int(deployment_xml[field]['elastic']['throughput'])
+                    new_deployment[field]['query'] = {}
+                    new_deployment[field]['query']['timeout'] = int(deployment_xml[field]['query']['timeout'])
+                    new_deployment[field]['snapshot'] = {}
+                    new_deployment[field]['snapshot']['priority'] = int(deployment_xml[field]['snapshot']['priority'])
+                    new_deployment[field]['temptables'] = {}
+                    new_deployment[field]['temptables']['maxsize'] = int(deployment_xml[field]['temptables']['maxsize'])
+
+                    if deployment_xml[field]['resourcemonitor'] is None:
+                        new_deployment[field]['resourcemonitor'] = (deployment_xml[field]['resourcemonitor'])
+                    else:
+                        new_deployment[field]['resourcemonitor'] = {}
+                        new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
+                        if type(new_deployment[field]['resourcemonitor']['memorylimit']) is list:
+                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'list')
+                        else:
+                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'dict')
+                except Exception, err:
+                    print str(err)
+            elif field == 'dr':
+                try:
+                    if deployment_xml[field] is not None:
+                        new_deployment[field] = {}
+                        new_deployment[field]['id'] = int(deployment_xml[field]['id'])
+                        new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                        new_deployment[field]['type'] = str(deployment_xml[field]['type'])
+                        if 'connection' not in deployment_xml[field]:
+                            new_deployment[field]['connection'] = {}
+                            new_deployment[field]['connection']['source'] = deployment_xml[field]['connection']['source']
+                            new_deployment[field]['connection']['servers'] = deployment_xml[field]['connection']['servers']
+
+                except Exception, err:
+                    print str(err)
+            else:
+                new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
+
+        deployments.append(new_deployment)
+    return deployments
+
+
+def get_deployment_export_field(export_xml, is_list):
+    new_export = {}
+    exports = []
+    if is_list is 'list':
+        for export in export_xml:
+            new_export = {}
+            for field in export:
+                new_export[field] = export[field]
+            exports.append(new_export)
+    else:
+        for field in export_xml:
+            if field == 'property':
+                if type(export_xml['property']) is list:
+                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'list')
+                else:
+                    print export_xml[field]
+                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'dict')
+                    print export_xml['property']
+            elif field == 'enabled':
+                new_export[field] = bool(export_xml[field])
+            else:
+                new_export[field] = export_xml[field]
+        exports.append(new_export)
+    return {'configuration': exports}
+
+
+def get_deployment_import_field(export_xml, is_list):
+    new_export = {}
+    exports = []
+    if is_list is 'list':
+        for export in export_xml:
+            new_export = {}
+            for field in export:
+                new_export[field] = export[field]
+            exports.append(new_export)
+    else:
+        for field in export_xml:
+            if field == 'property':
+                if type(export_xml['property']) is list:
+                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'list')
+                else:
+                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'dict')
+            else:
+                new_export[field] = export_xml[field]
+        exports.append(new_export)
+    return {'configuration': exports}
+
+
+def get_deployment_export_properties(export_xml, is_list):
+    new_export = {}
+    exports = []
+    if is_list is 'list':
+        for export in export_xml:
+            new_export = {}
+            for field in export:
+                new_export[field] = export[field]
+            exports.append(new_export)
+    else:
+        for field in export_xml:
+            new_export[field] = export_xml[field]
+        exports.append(new_export)
+    return exports
+
+
+def convert_deployment_field_required_format(deployment, field):
+    if field == 'databaseid':
+        modified_field = int(deployment[field])
+    else:
+        modified_field = deployment[field]
+    return modified_field
+
+
+def etree_to_dict(t):
+    d = {t.tag: {} if t.attrib else None}
+    children = list(t)
+    if children:
+        dd = defaultdict(list)
+        for dc in map(etree_to_dict, children):
+            for k, v in dc.iteritems():
+                dd[k].append(v)
+        d = {t.tag: {k:v[0] if len(v) == 1 else v for k, v in dd.iteritems()}}
+    if t.attrib:
+        d[t.tag].update((k, v) for k, v in t.attrib.iteritems())
+    if t.text:
+        text = t.text.strip()
+        if children or t.attrib:
+            if text:
+              d[t.tag]['value'] = text
+        else:
+            d[t.tag] = text
+    return d
 
 
 def handle_deployment_dict(deployment_elem, key, value, istop):
@@ -602,6 +1062,19 @@ def handle_deployment_list(deployment_elem, key, value):
     for items in value:
         handle_deployment_dict(deployment_elem, key, items, False)
 
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+    )[20:24])
+
+
+IS_CURRENT_NODE_ADDED = False
+IS_CURRENT_DATABASE_ADDED = False
+IGNORETOP = { "databaseid" : True, "users" : True, "dr" : True}
 
 
 class ServerAPI(MethodView):
@@ -1195,16 +1668,30 @@ def main(runner, amodule, aport, apath):
     deployment = json.loads(json_data)
     global PATH
     PATH = apath
-    DEPLOYMENT.append(deployment)
+    if os.path.exists(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'):
+        print 111
+        convert_xml_to_json()
+    else:
+        DEPLOYMENT.append(deployment)
 
-    __host_name__ = socket.gethostname()
-    __host_or_ip__ = socket.gethostbyname(__host_name__)
-    SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
-                    'enabled': True, 'external-interface': "", 'internal-interface': "",
-                    'public-interface': "", 'client-listener': "", 'internal-listener': "",
-                    'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-                    'zookeeper-listener': "", 'placement-group': ""})
-    DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
+        __host_name__ = socket.gethostname()
+        __host_or_ip__ = socket.gethostbyname(__host_name__)
+        SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
+                        'enabled': True, 'external-interface': "", 'internal-interface': "",
+                        'public-interface': "", 'client-listener': "", 'internal-listener': "",
+                        'admin-listener': "", 'http-listener': "", 'replication-listener': "",
+                        'zookeeper-listener': "", 'placement-group': ""})
+        DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
+    # DEPLOYMENT.append(deployment)
+    #
+    # __host_name__ = socket.gethostname()
+    # __host_or_ip__ = socket.gethostbyname(__host_name__)
+    # SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
+    #                 'enabled': True, 'external-interface': "", 'internal-interface': "",
+    #                 'public-interface': "", 'client-listener': "", 'internal-listener': "",
+    #                 'admin-listener': "", 'http-listener': "", 'replication-listener': "",
+    #                 'zookeeper-listener': "", 'placement-group': ""})
+    # DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
     make_configuration_file()
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
