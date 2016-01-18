@@ -52,6 +52,10 @@ function clean() {
          geospatial-procs.jar
 }
 
+function cleanall() {
+    clean
+}
+
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
@@ -73,12 +77,15 @@ function jars-ifneeded() {
 
 # Start DB, load schema, procedures, and static data
 function init() {
-    echo "starting server in background..."
-    voltdb create -B -l $LICENSE -H $HOST > nohup.log 2>&1 &
-    wait_for_startup
     jars-ifneeded
     sqlcmd < ddl.sql
     csvloader -f advertisers.csv advertisers
+}
+
+function server() {
+    echo "starting server in background..."
+    voltdb create -B -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    wait_for_startup
 }
 
 # wait for backgrounded server to start up
@@ -109,9 +116,10 @@ function adbroker-benchmark() {
 }
 
 function demo() {
-
-
     # start database and load static data
+    server
+
+    # load the schema and advertiser csv file
     init
 
     # Run the demo app
@@ -124,7 +132,7 @@ function demo() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {demo|clean|init|client|demo}"
+    echo "Usage: ./run.sh {server|clean|init|client|demo}"
 }
 
 # Run the targets pass on the command line
