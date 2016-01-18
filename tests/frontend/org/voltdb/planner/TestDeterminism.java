@@ -536,7 +536,7 @@ public class TestDeterminism extends PlannerTestCase {
         final boolean ENG8677IsFixed = false;
         // Two tables.  Actually, this is a self join as well.  That
         // may be a reason to not allow it here.
-        assertPlanDeterminismCore("select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where b = ? order by a, c limit 1;",
+        assertPlanDeterminismCore("select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where tleft.b = ? order by tleft.a, tleft.c limit 1;",
                                   ENG8677IsFixed,
                                   ENG8677IsFixed,
                                   DeterminismMode.FASTER);

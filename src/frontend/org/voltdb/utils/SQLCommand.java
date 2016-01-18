@@ -45,10 +45,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.console.CursorBuffer;
-import jline.console.KeyMap;
-import jline.console.history.FileHistory;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -65,6 +61,10 @@ import org.voltdb.parser.SQLParser.ParseRecallResults;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
+import jline.console.CursorBuffer;
+import jline.console.KeyMap;
+import jline.console.history.FileHistory;
+
 public class SQLCommand
 {
     private static boolean m_stopOnError = true;
@@ -73,8 +73,8 @@ public class SQLCommand
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
-    private static boolean m_hasBatchTimeout = false;
-    private static int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+    private static boolean m_hasBatchTimeout = true;
+    private static int m_batchTimeout = BatchTimeoutOverrideType.DEFAULT_TIMEOUT;
 
     private static final String m_readme = "SQLCommandReadme.txt";
 
@@ -1028,7 +1028,7 @@ public class SQLCommand
         + "  and returns to the command prompt. Default: true.\n"
         + "\n"
         + "[--query-timeout=millisecond_number]\n"
-        + "  Read-only queries that take longer than this number of milliseconds will abort. Default: no timeout.\n"
+        + "  Read-only queries that take longer than this number of milliseconds will abort. Default: " + BatchTimeoutOverrideType.DEFAULT_TIMEOUT/1000.0 + " seconds.\n"
         + "\n"
         );
         System.exit(exitCode);

@@ -17,6 +17,7 @@
 package com.google_voltpatches.common.util.concurrent;
 
 import com.google_voltpatches.common.annotations.Beta;
+import com.google_voltpatches.common.annotations.GwtCompatible;
 
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -28,6 +29,14 @@ import java.util.concurrent.TimeoutException;
  * A {@code CheckedFuture} is a {@link ListenableFuture} that includes versions
  * of the {@code get} methods that can throw a checked exception.  This makes it
  * easier to create a future that executes logic which can throw an exception.
+ *
+ * <p><b>Warning:</b> We recommend against using {@code CheckedFuture} in new
+ * projects. {@code CheckedFuture} is difficult to build libraries atop. {@code
+ * CheckedFuture} ports of methods like {@link Futures#transformAsync} have
+ * historically had bugs, and some of these bugs are necessary, unavoidable
+ * consequences of the {@code CheckedFuture} API. Additionally, {@code
+ * CheckedFuture} encourages users to take exceptions from one thread and
+ * rethrow them in another, producing confusing stack traces.
  *
  * <p>A common implementation is {@link Futures#immediateCheckedFuture}.
  *
@@ -43,12 +52,13 @@ import java.util.concurrent.TimeoutException;
  * future will guarantee execution of all listeners when the task completes.
  * 
  * <p>For a simpler alternative to CheckedFuture, consider accessing Future 
- * values with {@link Futures#get(Future, Class) Futures.get()}.
+ * values with {@link Futures#getChecked(Future, Class) Futures.getChecked()}.
  *
  * @author Sven Mawson
  * @since 1.0
  */
 @Beta
+@GwtCompatible
 public interface CheckedFuture<V, X extends Exception>
     extends ListenableFuture<V> {
 

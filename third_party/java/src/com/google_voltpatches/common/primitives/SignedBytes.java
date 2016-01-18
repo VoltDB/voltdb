@@ -23,6 +23,8 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 
 import java.util.Comparator;
 
+import javax.annotation_voltpatches.CheckReturnValue;
+
 /**
  * Static utility methods pertaining to {@code byte} primitives that
  * interpret values as signed. The corresponding methods that treat the values
@@ -30,7 +32,7 @@ import java.util.Comparator;
  * signedness is not an issue are in {@link Bytes}.
  * 
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/PrimitivesExplained">
+ * "https://github.com/google/guava/wiki/PrimitivesExplained">
  * primitive utilities</a>.
  *
  * @author Kevin Bourrillion
@@ -38,6 +40,7 @@ import java.util.Comparator;
  */
 // TODO(kevinb): how to prevent warning on UnsignedBytes when building GWT
 // javadoc?
+@CheckReturnValue
 @GwtCompatible
 public final class SignedBytes {
   private SignedBytes() {}

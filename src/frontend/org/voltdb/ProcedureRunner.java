@@ -37,13 +37,13 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
-import org.voltdb.PostgreSQLBackend;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -1139,6 +1139,22 @@ public class ProcedureRunner {
        // ensure the message is returned if we're not going to hit the verbose condition below
        if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
+           if (e instanceof org.voltdb.exceptions.InterruptException && m_isReadOnly) {
+               int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
+               int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
+               if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                   msg.append(" query-specific timeout period.");
+                   msg.append(" The query-specific timeout is currently " +  individualTimeout/1000.0 + " seconds.");
+               }
+               else {
+                   msg.append(" default query timeout period.");
+               }
+               if (originalTimeout > 0 ) {
+                   msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file.");
+               } else if (originalTimeout == 0) {
+                   msg.append(" The default query timeout is currently set to no timeout and can be changed in the systemsettings section of the deployment file.");
+               }
+           }
        }
 
        // Rarely hide the stack trace.

@@ -39,16 +39,16 @@ import java.util.Queue;
  *
  * @author Mike Bostock
  * @author Louis Wasserman
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
-public abstract class ForwardingQueue<E> extends ForwardingCollection<E>
-    implements Queue<E> {
+public abstract class ForwardingQueue<E> extends ForwardingCollection<E> implements Queue<E> {
 
   /** Constructor for use by subclasses. */
   protected ForwardingQueue() {}
 
-  @Override protected abstract Queue<E> delegate();
+  @Override
+  protected abstract Queue<E> delegate();
 
   @Override
   public boolean offer(E o) {

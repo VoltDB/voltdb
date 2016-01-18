@@ -177,10 +177,10 @@ if CTX.PLATFORM == "Darwin":
     CTX.CPPFLAGS += " -DMACOSX -arch x86_64"
     CTX.JNIEXT = "jnilib"
     CTX.JNILIBFLAGS = " -bundle"
-    CTX.JNIBINFLAGS = " -framework JavaVM,1.7"
+    CTX.JNIBINFLAGS = " -framework JavaVM,1.8"
     CTX.SOFLAGS += "-dynamiclib -undefined dynamic_lookup -single_module"
     CTX.SOEXT = "dylib"
-    CTX.JNIFLAGS = "-framework JavaVM,1.7"
+    CTX.JNIFLAGS = "-framework JavaVM,1.8"
 
 if CTX.PLATFORM == "Linux":
     CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -DLINUX -fpic"
@@ -355,12 +355,16 @@ CTX.INPUT['storage'] = """
  TupleStreamBase.cpp
  ExportTupleStream.cpp
  DRTupleStream.cpp
+ BinaryLogSinkWrapper.cpp
  BinaryLogSink.cpp
+ CompatibleBinaryLogSink.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
  ElasticIndex.cpp
  ElasticIndexReadContext.cpp
+ AbstractDRTupleStream.cpp
+ CompatibleDRTupleStream.cpp
 """
 
 CTX.INPUT['stats'] = """

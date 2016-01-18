@@ -151,8 +151,8 @@ def test_ntp(output):
 def test_java_version(output):
     javaVersion = subprocess.Popen("java -version 2>&1 | grep 'java \|openjdk '", stdout=subprocess.PIPE, shell=True).stdout.read()
     javacVersion = subprocess.Popen("javac -version 2>&1", stdout=subprocess.PIPE, shell=True).stdout.read()
-    if '1.7.' in javaVersion or '1.8.' in javaVersion:
-        if '1.7.' in javacVersion or '1.8.' in javacVersion:
+    if '1.8.' in javaVersion:
+        if '1.8.' in javacVersion:
             output['Java'] = ["PASS", javaVersion.strip() + ' ' + javacVersion.strip()]
         else:
             output['Java'] = ["FAIL", "Unsupported Javac version detected, " + javacVersion]
