@@ -132,11 +132,11 @@ function async-benchmark() {
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
-        --duration=120 \
+        --duration=300 \
         --servers=localhost:21212 \
         --contestants=6 \
         --maxvotes=2 \
-        --ratelimit=2000000
+        --ratelimit=2000
 #        --latencyreport=true \
 }
 
