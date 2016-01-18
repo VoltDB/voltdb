@@ -849,6 +849,10 @@ public class HTTPAdminListener {
         qtp.setMinThreads(1);
 
         m_server = new Server(qtp);
+        m_server.setAttribute(
+                "org.eclipse.jetty.server.Request.maxFormContentSize",
+                Integer.toString(HTTPClientInterface.MAX_QUERY_PARAM_SIZE)
+                );
 
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
