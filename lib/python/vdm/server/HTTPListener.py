@@ -351,6 +351,7 @@ def map_deployment(request, database_id):
                     'enabled': configuration['enabled'],
                     'module': configuration['module'],
                     'type': configuration['type'],
+                    'format': configuration['format'],
                     'property': []
                 }
             )
