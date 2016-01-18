@@ -16,7 +16,6 @@
 
 package com.google_voltpatches.common.cache;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 
 import java.util.Iterator;
@@ -29,7 +28,6 @@ import java.util.concurrent.ConcurrentMap;
  * @author Charles Fry
  * @since 10.0
  */
-@Beta
 @GwtCompatible
 public enum RemovalCause {
   /**

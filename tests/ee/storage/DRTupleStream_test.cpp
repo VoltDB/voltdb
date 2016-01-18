@@ -642,7 +642,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     size_t mark1;
     size_t mark2;
     {
-        DRTupleStreamDisableGuard guard(&m_wrapper, NULL);
+        DRTupleStreamDisableGuard guard(m_context.get());
         mark1 = appendTuple(10, 11);
         mark2 = appendTuple(11, 12);
     }

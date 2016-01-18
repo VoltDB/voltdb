@@ -14,8 +14,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef BINARYLOGSINK_H
 #define BINARYLOGSINK_H
+
+#include "common/serializeio.h"
+
 #include <boost/unordered_map.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -24,9 +28,6 @@ namespace voltdb {
 class PersistentTable;
 class Pool;
 class VoltDBEngine;
-class Table;
-class TempTable;
-class TableTuple;
 
 /*
  * Responsible for applying binary logs to table data
@@ -34,24 +35,12 @@ class TableTuple;
 class BinaryLogSink {
 public:
     BinaryLogSink();
-    int64_t apply(const char* taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
-private:
-    void validateChecksum(uint32_t expected, const char *start, const char *end);
 
-    /**
-     * Handle insert constraint violation
-     */
-    bool handleConflict(VoltDBEngine* engine, PersistentTable* drTable, Pool *pool, TableTuple* existingTuple, const TableTuple* expectedTuple, TableTuple* newTuple, int64_t uniqueId,
-            int32_t remoteClusterId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict);
-
-    /**
-     * Export the conflict log to downstream
-     */
-    void exportDRConflict(Table *exportTable, bool applyRemoteChange, bool diverge,
-            TempTable *existingMetaTableForDelete, TempTable *existingTupleTableForDelete,
-            TempTable *expectedMetaTableForDelete, TempTable *expectedTupleTableForDelete,
-            TempTable *existingMetaTableForInsert, TempTable *existingTupleTableForInsert,
-            TempTable *newMetaTableForInsert, TempTable *newTupleTableForInsert);
+    int64_t apply(ReferenceSerializeInputLE *taskInfo,
+                  boost::unordered_map<int64_t, PersistentTable*> &tables,
+                  Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId,
+                  const char *recordStart, int64_t *uniqueId,
+                  int64_t *sequenceNumber);
 };
 
 

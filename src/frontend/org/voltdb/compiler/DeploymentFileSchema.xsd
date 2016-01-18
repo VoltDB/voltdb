@@ -196,7 +196,7 @@
         </xs:element>
         <xs:element name="query" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="timeout" type="latencyType" default="0"/>
+                <xs:attribute name="timeout" type="latencyType" default="10000"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>

@@ -92,7 +92,7 @@ public class SnapshotSaveAPI
      * published under the snapshot create lock.
      */
     private static Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
-    private static Map<Integer, DRLogSegmentId> drTupleStreamInfo;
+    private static Map<Integer, TupleStreamStateInfo> drTupleStreamInfo;
 
     /*
      * Double ugh!, remote DC unique ids get used the same way as the export IDs, end up going into ZK
@@ -127,6 +127,17 @@ public class SnapshotSaveAPI
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
         final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
+        JSONObject jsData = null;
+        if (data != null && !data.isEmpty()) {
+            try {
+                jsData = new JSONObject(data);
+            }
+            catch (JSONException e) {
+                SNAP_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
+                        e);
+            }
+        }
+        final JSONObject finalJsData = jsData;
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -168,7 +179,7 @@ public class SnapshotSaveAPI
                             multiPartTxnId,
                             partitionTransactionIds,
                             remoteDCLastIds,
-                            data,
+                            finalJsData,
                             context,
                             result,
                             exportSequenceNumbers,
@@ -455,25 +466,14 @@ public class SnapshotSaveAPI
             final String file_path, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
-            String data, final SystemProcedureExecutionContext context,
+            JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
     {
-        JSONObject jsData = null;
-        if (data != null && !data.isEmpty()) {
-            try {
-                jsData = new JSONObject(data);
-            }
-            catch (JSONException e) {
-                SNAP_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
-                        e);
-            }
-        }
-
         SnapshotWritePlan plan;
         if (format == SnapshotFormat.NATIVE) {
             plan = new NativeSnapshotWritePlan();

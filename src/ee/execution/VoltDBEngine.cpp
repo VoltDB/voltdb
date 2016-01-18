@@ -80,6 +80,8 @@
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/ExportMaterializedViewMetadata.h"
 #include "storage/TableCatalogDelegate.hpp"
+#include "storage/CompatibleDRTupleStream.h"
+#include "storage/DRTupleStream.h"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
 #include "boost/foreach.hpp"
@@ -159,6 +161,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_drReplicatedConflictExportTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
+      m_compatibleDRStream(NULL),
+      m_compatibleDRReplicatedStream(NULL),
       m_tuplesModifiedStack()
 {
 }
@@ -211,12 +215,20 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
 
+    // configure DR stream and DR compatible stream
     m_drStream = new DRTupleStream();
     m_drStream->configure(partitionId);
+    m_compatibleDRStream = new CompatibleDRTupleStream();
+    m_compatibleDRStream->configure(partitionId);
     if (createDrReplicatedStream) {
         m_drReplicatedStream = new DRTupleStream();
         m_drReplicatedStream->configure(16383);
+        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream();
+        m_compatibleDRReplicatedStream->configure(16383);
     }
+
+    // set the DR version
+    m_drVersion = DRTupleStream::PROTOCOL_VERSION;
 
     // required for catalog loading.
     m_executorContext = new ExecutorContext(siteId,
@@ -271,6 +283,8 @@ VoltDBEngine::~VoltDBEngine() {
 
     delete m_drReplicatedStream;
     delete m_drStream;
+    delete m_compatibleDRStream;
+    delete m_compatibleDRReplicatedStream;
 }
 
 // ------------------------------------------------------------------
@@ -563,11 +577,11 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     // Set DR flag based on current catalog state
     catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
-    m_drStream->m_enabled = catalogCluster->drProducerEnabled();
-    m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
-    if (m_drReplicatedStream) {
-        m_drReplicatedStream->m_enabled = m_drStream->m_enabled;
-        m_drReplicatedStream->m_flushInterval = m_drStream->m_flushInterval;
+    m_executorContext->drStream()->m_enabled = catalogCluster->drProducerEnabled();
+    m_executorContext->drStream()->m_flushInterval = catalogCluster->drFlushInterval();
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
+        m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
     // load up all the tables, adding all tables
@@ -1046,11 +1060,11 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 
     // Set DR flag based on current catalog state
     catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
-    m_drStream->m_enabled = catalogCluster->drProducerEnabled();
-    m_drStream->m_flushInterval = catalogCluster->drFlushInterval();
-    if (m_drReplicatedStream) {
-        m_drReplicatedStream->m_enabled = m_drStream->m_enabled;
-        m_drReplicatedStream->m_flushInterval = m_drStream->m_flushInterval;
+    m_executorContext->drStream()->m_enabled = catalogCluster->drProducerEnabled();
+    m_executorContext->drStream()->m_flushInterval = catalogCluster->drFlushInterval();
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
+        m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
     if (updateCatalogDatabaseReference() == false) {
@@ -1324,9 +1338,9 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
-    m_drStream->periodicFlush(timeInMillis, lastCommittedSpHandle);
-    if (m_drReplicatedStream) {
-        m_drReplicatedStream->periodicFlush(timeInMillis, lastCommittedSpHandle);
+    m_executorContext->drStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->periodicFlush(timeInMillis, lastCommittedSpHandle);
     }
 }
 
@@ -1336,9 +1350,9 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
-    m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
-    if (m_drReplicatedStream) {
-        m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
+    m_executorContext->drStream()->periodicFlush(-1L, lastCommittedSpHandle);
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->periodicFlush(-1L, lastCommittedSpHandle);
     }
 }
 
@@ -1771,18 +1785,19 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
 }
 
 void VoltDBEngine::collectDRTupleStreamStateInfo() {
-    std::size_t size = 3 * sizeof(int64_t) + 1;
-    if (m_drReplicatedStream) {
+    std::size_t size = 3 * sizeof(int64_t) + 4 /*drVersion*/ + 1 /*hasReplicatedStream*/;
+    if (m_executorContext->drReplicatedStream()) {
         size += 3 * sizeof(int64_t);
     }
     m_resultOutput.writeInt(static_cast<int32_t>(size));
-    DRCommittedInfo drInfo = m_drStream->getLastCommittedSequenceNumberAndUniqueIds();
+    DRCommittedInfo drInfo = m_executorContext->drStream()->getLastCommittedSequenceNumberAndUniqueIds();
     m_resultOutput.writeLong(drInfo.seqNum);
     m_resultOutput.writeLong(drInfo.spUniqueId);
     m_resultOutput.writeLong(drInfo.mpUniqueId);
-    if (m_drReplicatedStream) {
+    m_resultOutput.writeInt(m_drVersion);
+    if (m_executorContext->drReplicatedStream()) {
         m_resultOutput.writeByte(static_cast<int8_t>(1));
-        drInfo = m_drReplicatedStream->getLastCommittedSequenceNumberAndUniqueIds();
+        drInfo = m_executorContext->drReplicatedStream()->getLastCommittedSequenceNumberAndUniqueIds();
         m_resultOutput.writeLong(drInfo.seqNum);
         m_resultOutput.writeLong(drInfo.spUniqueId);
         m_resultOutput.writeLong(drInfo.mpUniqueId);
@@ -1798,7 +1813,7 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                   int32_t remoteClusterId,
                                   int64_t undoToken,
                                   const char *log) {
-    DRTupleStreamDisableGuard guard(m_drStream, m_drReplicatedStream, !m_database->isActiveActiveDRed());
+    DRTupleStreamDisableGuard guard(m_executorContext, !m_database->isActiveActiveDRed());
     setUndoToken(undoToken);
     m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
                                              txnId,
@@ -1806,7 +1821,8 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              lastCommittedSpHandle,
                                              uniqueId);
 
-    return m_binaryLogSink.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
+    return rowCount;
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
@@ -1822,11 +1838,28 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         int64_t partitionSequenceNumber = taskInfo.readLong();
         int64_t mpSequenceNumber = taskInfo.readLong();
         if (partitionSequenceNumber >= 0) {
-            m_drStream->setLastCommittedSequenceNumber(partitionSequenceNumber);
+            m_executorContext->drStream()->setLastCommittedSequenceNumber(partitionSequenceNumber);
         }
-        if (m_drReplicatedStream && mpSequenceNumber >= 0) {
-            m_drReplicatedStream->setLastCommittedSequenceNumber(mpSequenceNumber);
+        if (m_executorContext->drReplicatedStream() && mpSequenceNumber >= 0) {
+            m_executorContext->drReplicatedStream()->setLastCommittedSequenceNumber(mpSequenceNumber);
         }
+        break;
+    }
+    case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
+        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+        uint32_t drVersion = taskInfo.readInt();
+        if (drVersion != DRTupleStream::PROTOCOL_VERSION) {
+            m_executorContext->setDrStream(m_compatibleDRStream);
+            if (m_compatibleDRReplicatedStream) {
+                m_executorContext->setDrReplicatedStream(m_compatibleDRReplicatedStream);
+            }
+        } else {
+            m_executorContext->setDrStream(m_drStream);
+            if (m_drReplicatedStream) {
+                m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
+            }
+        }
+        m_drVersion = drVersion;
         break;
     }
     default:
@@ -1876,7 +1909,7 @@ void VoltDBEngine::reportProgressToTopend() {
         VOLT_DEBUG("Interrupt query.");
         char buff[100];
         snprintf(buff, 100,
-                "A SQL query was terminated after %.03f seconds because it exceeded the query timeout period.",
+                "A SQL query was terminated after %.03f seconds because it exceeded the",
                 static_cast<double>(tupleReportThreshold) / -1000.0);
 
         throw InterruptException(std::string(buff));

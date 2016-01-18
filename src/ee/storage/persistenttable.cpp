@@ -81,7 +81,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
-#include "storage/DRTupleStream.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "ExportMaterializedViewMetadata.h"
 
 namespace voltdb {
@@ -135,7 +135,6 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     }
 
     m_preTruncateTable = NULL;
-
     ::memcpy(&m_signature, signature, 20);
 }
 
@@ -396,7 +395,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     engine->rebuildTableCollections();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -524,7 +523,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         setDRTimestampForTuple(ec, target, false);
     }
 
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -675,7 +674,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -840,7 +839,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
