@@ -154,7 +154,6 @@ def map_deployment_without_database_id(deployment):
     new_deployment['users']['user'] = []
 
     deployment_user = filter(lambda t: t['databaseid'] == deployment['databaseid'], DEPLOYMENT_USERS)
-
     for user in deployment_user:
         new_deployment['users']['user'].append({
             'name': user['name'],
@@ -338,8 +337,8 @@ def map_deployment(request, database_id):
                         }
                     )
 
-    if 'import' in request.json:
-        if deployment[0]['import'] is None:
+    if  'import' in request.json:
+        if 'import' not in deployment[0] or  deployment[0]['import'] is None:
             deployment[0]['import'] = {}
 
     if 'import' in request.json and 'configuration' in request.json['import']:
@@ -364,9 +363,8 @@ def map_deployment(request, database_id):
                         }
                     )
                 i += 1
-
     if 'export' in request.json:
-        if deployment[0]['export'] is None:
+        if 'export' not in deployment[0] or deployment[0]['export'] is None:
             deployment[0]['export'] = {}
 
     if 'export' in request.json and 'configuration' in request.json['export']:
@@ -487,6 +485,7 @@ def get_database_deployment(dbid):
     xmlstr = tostring(deployment_top,encoding='UTF-8')
     return xmlstr
 
+
 def get_configuration():
     deployment_json = {
         'vdm': {
@@ -497,6 +496,7 @@ def get_configuration():
         }
     }
     return deployment_json
+
 
 def make_configuration_file():
     main_header = Element('vdm')
@@ -543,7 +543,8 @@ def make_configuration_file():
                 'name': user['name'],
                 'roles': user['roles'],
                 'plaintext': user['plaintext'],
-                'password': user['password']
+                'password': user['password'],
+                'databaseid': user['databaseid']
             })
 
         deployment_elem = SubElement(deployment_top, 'deployment')
@@ -567,6 +568,7 @@ def make_configuration_file():
     except Exception, err:
         print str(err)
 
+
 def sync_configuration():
      headers = {'content-type': 'application/json'}
      url = 'http://localhost:8000/api/1.0/vdm/configuration/'
@@ -575,15 +577,10 @@ def sync_configuration():
 
 
 def convert_xml_to_json(config_path):
-    xml = ''
-    xml_final = ''
     with open(config_path) as f:
         xml = f.read()
     o = XML(xml)
     xml_final = json.loads(json.dumps(etree_to_dict(o)))
-    member_json = ''
-    db_json = ''
-    deployment_json = ''
     if type(xml_final['vdm']['members']['member']) is dict:
         member_json = get_member_from_xml(xml_final['vdm']['members']['member'], 'dict')
     else:
@@ -598,6 +595,10 @@ def convert_xml_to_json(config_path):
         deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
     else:
         deployment_json = get_deployment_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
+    if type(xml_final['vdm']['deployments']['deployment']) is dict:
+        user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'dict')
+    else:
+        user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
 
     global DATABASES
     DATABASES = db_json
@@ -607,6 +608,9 @@ def convert_xml_to_json(config_path):
 
     global DEPLOYMENT
     DEPLOYMENT = deployment_json
+
+    global DEPLOYMENT_USERS
+    DEPLOYMENT_USERS = user_json
 
 
 def get_db_from_xml(db_xml, is_list):
@@ -667,19 +671,25 @@ def get_deployment_from_xml(deployment_xml, is_list):
             new_deployment = {}
             for field in deployment:
                 if field == 'export':
-                    if type(deployment[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
+                    if deployment[field] is not None:
+                        if type(deployment[field]['configuration']) is list:
+                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
+                        else:
+                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
                     else:
-                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
+                        new_deployment[field] = deployment[field]
                 elif field == 'import':
-                    if type(deployment[field]['configuration']) is list:
-                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
+                    if deployment[field] is not None:
+                        if type(deployment[field]['configuration']) is list:
+                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'list')
+                        else:
+                            new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
                     else:
-                        new_deployment[field] = get_deployment_export_field(deployment[field]['configuration'], 'dict')
-                if field == 'admin-mode':
+                        new_deployment[field] = deployment[field]
+                elif field == 'admin-mode':
                     try:
                         new_deployment[field] = {}
-                        new_deployment[field]['adminstartup'] = bool(deployment[field]['adminstartup'])
+                        new_deployment[field]['adminstartup'] = parse_bool_string(deployment[field]['adminstartup'])
                         new_deployment[field]['port'] = int(deployment[field]['port'])
                     except Exception, err:
                         print 'Failed to get deployment: ' % str(err)
@@ -696,8 +706,8 @@ def get_deployment_from_xml(deployment_xml, is_list):
                 elif field == 'commandlog':
                     try:
                         new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
-                        new_deployment[field]['synchronous'] = bool(deployment[field]['synchronous'])
+                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
+                        new_deployment[field]['synchronous'] = parse_bool_string(deployment[field]['synchronous'])
                         new_deployment[field]['logsize'] = int(deployment[field]['logsize'])
                         new_deployment[field]['frequency'] = {}
                         new_deployment[field]['frequency']['transactions'] = int(deployment[field]['frequency']['transactions'])
@@ -714,30 +724,30 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     try:
                         new_deployment[field] = {}
                         new_deployment[field]['port'] = int(deployment[field]['port'])
-                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                         new_deployment[field]['jsonapi'] = {}
-                        new_deployment[field]['jsonapi']['enabled'] = bool(deployment[field]['jsonapi']['enabled'])
+                        new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(deployment[field]['jsonapi']['enabled'])
                     except Exception, err:
                         print str(err)
                 elif field == 'partition-detection':
                     try:
                         new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                         new_deployment[field]['snapshot'] = {}
-                        new_deployment[field]['snapshot']['prefix'] = bool(deployment[field]['snapshot']['prefix'])
+                        new_deployment[field]['snapshot']['prefix'] = parse_bool_string(deployment[field]['snapshot']['prefix'])
                     except Exception, err:
                         print str(err)
                 elif field == 'security':
                     try:
                         new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                         new_deployment[field]['provider'] = str(deployment[field]['provider'])
                     except Exception, err:
                         print str(err)
                 elif field == 'snapshot':
                     try:
                         new_deployment[field] = {}
-                        new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                         new_deployment[field]['frequency'] = str(deployment[field]['frequency'])
                         new_deployment[field]['prefix'] = str(deployment[field]['prefix'])
                         new_deployment[field]['retain'] = int(deployment[field]['retain'])
@@ -762,9 +772,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                             new_deployment[field]['resourcemonitor'] = {}
                             new_deployment[field]['resourcemonitor']['memorylimit'] = deployment[field]['resourcemonitor']['memorylimit']
                             if type(new_deployment[field]['resourcemonitor']['memorylimit']) is list:
-                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment[field]['resourcemonitor']['disklimit'], 'list')
+                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment[field]['resourcemonitor']['disklimit'], 'list')
                             else:
-                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment[field]['resourcemonitor']['disklimit'], 'dict')
+                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment[field]['resourcemonitor']['disklimit'], 'dict')
                     except Exception, err:
                         print str(err)
                 elif field == 'dr':
@@ -772,7 +782,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         if deployment[field] is not None:
                             new_deployment[field] = {}
                             new_deployment[field]['id'] = int(deployment[field]['id'])
-                            new_deployment[field]['enabled'] = bool(deployment[field]['enabled'])
+                            new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                             new_deployment[field]['type'] = str(deployment[field]['type'])
                             if 'connection' not in deployment[field]:
                                 new_deployment[field]['connection'] = {}
@@ -781,27 +791,41 @@ def get_deployment_from_xml(deployment_xml, is_list):
 
                     except Exception, err:
                         print str(err)
+                elif field == 'users':
+                    if deployment[field] is not None:
+                        new_deployment[field] = {}
+                        if type(deployment[field]['user']) is list:
+                            new_deployment[field]['user'] = []
+                            new_deployment[field]['user'] = get_deployment_properties(deployment[field]['user'], 'list')
+                        else:
+                            new_deployment[field]['user'] = []
+                            new_deployment[field]['user'] = get_deployment_properties(deployment[field]['user'], 'dict')
                 else:
                     new_deployment[field] = convert_deployment_field_required_format(deployment, field)
-
 
             deployments.append(new_deployment)
     else:
         for field in deployment_xml:
             if field == 'export':
-                if type(deployment_xml[field]['configuration']) is list:
-                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                if deployment_xml[field] is not None:
+                    if type(deployment_xml[field]['configuration']) is list:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                    else:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
                 else:
-                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+                    new_deployment[field] = deployment_xml[field]
             elif field == 'import':
-                if type(deployment_xml[field]['configuration']) is list:
-                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                if deployment_xml[field] is not None:
+                    if type(deployment_xml[field]['configuration']) is list:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'list')
+                    else:
+                        new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
                 else:
-                    new_deployment[field] = get_deployment_export_field(deployment_xml[field]['configuration'], 'dict')
+                    new_deployment[field] = deployment_xml[field]
             elif field == 'admin-mode':
                 try:
                     new_deployment[field] = {}
-                    new_deployment[field]['adminstartup'] = bool(deployment_xml[field]['adminstartup'])
+                    new_deployment[field]['adminstartup'] = parse_bool_string(deployment_xml[field]['adminstartup'])
                     new_deployment[field]['port'] = int(deployment_xml[field]['port'])
                 except Exception, err:
                     print str(err)
@@ -818,8 +842,8 @@ def get_deployment_from_xml(deployment_xml, is_list):
             elif field == 'commandlog':
                 try:
                     new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
-                    new_deployment[field]['synchronous'] = bool(deployment_xml[field]['synchronous'])
+                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
+                    new_deployment[field]['synchronous'] = parse_bool_string(deployment_xml[field]['synchronous'])
                     new_deployment[field]['logsize'] = int(deployment_xml[field]['logsize'])
                     new_deployment[field]['frequency'] = {}
                     new_deployment[field]['frequency']['transactions'] = int(deployment_xml[field]['frequency']['transactions'])
@@ -836,47 +860,30 @@ def get_deployment_from_xml(deployment_xml, is_list):
                 try:
                     new_deployment[field] = {}
                     new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                     new_deployment[field]['jsonapi'] = {}
-                    new_deployment[field]['jsonapi']['enabled'] = bool(deployment_xml[field]['jsonapi']['enabled'])
+                    new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(deployment_xml[field]['jsonapi']['enabled'])
                 except Exception, err:
                     print str(err)
             elif field == 'partition-detection':
                 try:
                     new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                     new_deployment[field]['snapshot'] = {}
-                    new_deployment[field]['snapshot']['prefix'] = bool(deployment_xml[field]['snapshot']['prefix'])
+                    new_deployment[field]['snapshot']['prefix'] = parse_bool_string(deployment_xml[field]['snapshot']['prefix'])
                 except Exception, err:
                     print str(err)
-            # elif field == 'paths':
-            #     try:
-            #         new_deployment[field] = {}
-            #         new_deployment[field]['commandlog'] = {}
-            #         new_deployment[field]['commandlog']['path'] = str(deployment_xml[field]['commandlog']['path'])
-            #         new_deployment[field]['commandlogsnapshot'] = {}
-            #         new_deployment[field]['commandlogsnapshot']['path'] = str(deployment_xml[field]['commandlogsnapshot']['path'])
-            #         new_deployment[field]['droverflow'] = {}
-            #         new_deployment[field]['droverflow']['path'] = str(deployment_xml[field]['droverflow']['path'])
-            #         new_deployment[field]['exportoverflow'] = {}
-            #         new_deployment[field]['exportoverflow']['path'] = str(deployment_xml[field]['exportoverflow']['path'])
-            #         new_deployment[field]['snapshots'] = {}
-            #         new_deployment[field]['snapshots']['path'] = str(deployment_xml[field]['snapshots']['path'])
-            #         new_deployment[field]['voltdbroot'] = {}
-            #         new_deployment[field]['voltdbroot']['path'] = str(deployment_xml[field]['voltdbroot']['path'])
-            #     except Exception, err:
-            #         print str(err)
             elif field == 'security':
                 try:
                     new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                     new_deployment[field]['provider'] = str(deployment_xml[field]['provider'])
                 except Exception, err:
                     print str(err)
             elif field == 'snapshot':
                 try:
                     new_deployment[field] = {}
-                    new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                    new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                     new_deployment[field]['frequency'] = str(deployment_xml[field]['frequency'])
                     new_deployment[field]['prefix'] = str(deployment_xml[field]['prefix'])
                     new_deployment[field]['retain'] = int(deployment_xml[field]['retain'])
@@ -901,9 +908,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['resourcemonitor'] = {}
                         new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
                         if type(new_deployment[field]['resourcemonitor']['memorylimit']) is list:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'list')
+                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'list')
                         else:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_export_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'dict')
+                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'dict')
                 except Exception, err:
                     print str(err)
             elif field == 'dr':
@@ -911,7 +918,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     if deployment_xml[field] is not None:
                         new_deployment[field] = {}
                         new_deployment[field]['id'] = int(deployment_xml[field]['id'])
-                        new_deployment[field]['enabled'] = bool(deployment_xml[field]['enabled'])
+                        new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                         new_deployment[field]['type'] = str(deployment_xml[field]['type'])
                         if 'connection' not in deployment_xml[field]:
                             new_deployment[field]['connection'] = {}
@@ -940,13 +947,11 @@ def get_deployment_export_field(export_xml, is_list):
         for field in export_xml:
             if field == 'property':
                 if type(export_xml['property']) is list:
-                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'list')
+                    new_export['property'] = get_deployment_properties(export_xml['property'], 'list')
                 else:
-                    print export_xml[field]
-                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'dict')
-                    print export_xml['property']
+                    new_export['property'] = get_deployment_properties(export_xml['property'], 'dict')
             elif field == 'enabled':
-                new_export[field] = bool(export_xml[field])
+                new_export[field] = parse_bool_string(export_xml[field])
             else:
                 new_export[field] = export_xml[field]
         exports.append(new_export)
@@ -966,16 +971,16 @@ def get_deployment_import_field(export_xml, is_list):
         for field in export_xml:
             if field == 'property':
                 if type(export_xml['property']) is list:
-                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'list')
+                    new_export['property'] = get_deployment_properties(export_xml['property'], 'list')
                 else:
-                    new_export['property'] = get_deployment_export_properties(export_xml['property'], 'dict')
+                    new_export['property'] = get_deployment_properties(export_xml['property'], 'dict')
             else:
                 new_export[field] = export_xml[field]
         exports.append(new_export)
     return {'configuration': exports}
 
 
-def get_deployment_export_properties(export_xml, is_list):
+def get_deployment_properties(export_xml, is_list):
     new_export = {}
     exports = []
     if is_list is 'list':
@@ -989,6 +994,37 @@ def get_deployment_export_properties(export_xml, is_list):
             new_export[field] = export_xml[field]
         exports.append(new_export)
     return exports
+
+
+def get_users_from_xml(deployment_xml, is_list):
+    users = []
+    if is_list is 'list':
+        for deployment in deployment_xml:
+            for field in deployment:
+                if field == 'users':
+                    if deployment[field] is not None:
+                        if type(deployment[field]['user']) is list:
+                            for user in deployment[field]['user']:
+                                users.append(convert_user_required_format(user))
+                        else:
+                            users.append(convert_user_required_format(deployment[field]['user']))
+    else:
+        for field in deployment_xml:
+            if field == 'users':
+                if deployment_xml[field] is not None:
+                    if type(deployment_xml[field]['user']) is list:
+                        for user in deployment_xml[field]['user']:
+                                users.append(convert_user_required_format(user))
+                    else:
+                        users.append(convert_user_required_format(deployment_xml[field]['user']))
+    return users
+
+
+def convert_user_required_format(user):
+    for field in user:
+        if field == 'databaseid':
+            user[field] = int(user[field])
+    return user
 
 
 def convert_deployment_field_required_format(deployment, field):
@@ -1018,6 +1054,7 @@ def etree_to_dict(t):
         else:
             d[t.tag] = text
     return d
+
 
 def handle_deployment_dict(deployment_elem, key, value, istop):
 
@@ -1061,6 +1098,10 @@ def get_ip_address(ifname):
         0x8915,  # SIOCGIFADDR
         struct.pack('256s', ifname[:15])
     )[20:24])
+
+
+def parse_bool_string(bool_string):
+    return bool_string.upper() == 'TRUE'
 
 
 IS_CURRENT_NODE_ADDED = False
