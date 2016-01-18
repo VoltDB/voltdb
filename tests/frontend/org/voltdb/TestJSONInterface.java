@@ -155,6 +155,7 @@ public class TestJSONInterface extends TestCase {
         out.close();
         out = null;
         conn.getOutputStream().close();
+        int responsCode = conn.getResponseCode();
 
         BufferedReader in = null;
         try {
@@ -171,7 +172,7 @@ public class TestJSONInterface extends TestCase {
             }
         }
         if (in == null) {
-            throw new Exception("Unable to read response from server, response code: " + conn.getResponseCode());
+            throw new Exception("Unable to read response from server, response code: " + responsCode);
         }
 
         StringBuilder decodedString = new StringBuilder();
