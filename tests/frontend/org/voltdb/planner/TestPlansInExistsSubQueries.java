@@ -301,7 +301,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testExistsJoin() {
         {
-            AbstractPlanNode pn = compile("select a from r1,r2 where exists (" +
+            AbstractPlanNode pn = compile("select r1.a from r1,r2 where exists (" +
                     "select 1 from r3 where r1.d = r3.c and r2.a = r3.c)");
             pn = pn.getChild(0).getChild(0);
             assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
@@ -335,7 +335,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.VALUE_PARAMETER, re.getRight().getExpressionType());
         }
         {
-            AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
+            AbstractPlanNode pn = compile("select r1.a from r1,r2 where r1.a = r2.a and " +
                     "exists ( select 1 from r3 where r1.a = r3.a)");
 
             pn = pn.getChild(0).getChild(0);
@@ -347,7 +347,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.OPERATOR_EXISTS, pred.getExpressionType());
         }
         {
-            AbstractPlanNode pn = compile("select a from r1,r2 where " +
+            AbstractPlanNode pn = compile("select r1.a from r1,r2 where " +
                     "exists ( select 1 from r3 where r1.a = r3.a and r2.c = r3.c)");
 
             pn = pn.getChild(0).getChild(0);
@@ -682,7 +682,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             //EXISTS => TRUE, join predicate is TRUE or EXPR = > TRUE and dropped
-            AbstractPlanNode pn = compile("select a from r1 join r2 on (exists " +
+            AbstractPlanNode pn = compile("select r1.a from r1 join r2 on (exists " +
                 " (select max(a)  from r2) or r2.a > 0)");
             assertEquals(true, pn.getChild(0).getChild(0) instanceof AbstractJoinPlanNode);
             AbstractJoinPlanNode jpn = (AbstractJoinPlanNode) pn.getChild(0).getChild(0);
@@ -690,7 +690,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             //EXISTS => FALSE, join predicate is retained
-            AbstractPlanNode pn = compile("select a from r1 join r2 on exists " +
+            AbstractPlanNode pn = compile("select r1.a from r1 join r2 on exists " +
                 " (select max(a)  from r2 offset 1) ");
             assertEquals(true, pn.getChild(0).getChild(0) instanceof NestLoopPlanNode);
             NestLoopPlanNode jpn = (NestLoopPlanNode) pn.getChild(0).getChild(0);

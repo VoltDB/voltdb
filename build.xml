@@ -1704,7 +1704,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
-            <jvmarg value="-XX:-UseSplitVerifier"/>
+            <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />

@@ -156,6 +156,8 @@ def test_java_version(output):
             output['Java'] = ["PASS", javaVersion.strip() + ' ' + javacVersion.strip()]
         else:
             output['Java'] = ["FAIL", "Unsupported Javac version detected, " + javacVersion]
+    elif len(javaVersion) > 0: # found Java, just not 1.8
+        output['Java'] = ["FAIL", "Unsupported Java detected, " + javaVersion + " Please check if Java has been installed properly."]
     else:
         output['Java'] = ["FAIL", "Please check if Java has been installed properly."]
 
