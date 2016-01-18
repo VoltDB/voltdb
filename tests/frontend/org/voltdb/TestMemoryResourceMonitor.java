@@ -124,14 +124,22 @@ public class TestMemoryResourceMonitor extends TestCase
         }
     }
 
-    public void testNoRssLimit() throws Exception
+    public void testDefaultRssLimit() throws Exception
     {
         setUpServer(null, true);
 
-        // Wait for monitoring interval time and verify server is still in running mode
-        m_mockStatsProducer.m_rss = 2048L*1024*1024;
+        m_mockStatsProducer.m_rss = Double.valueOf(PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*79/100.0).longValue();
         resumeAndWait(MONITORING_INTERVAL+1);
         assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
+    }
+
+    public void testExceedDefaultLimit() throws Exception
+    {
+        setUpServer(null, true);
+
+        m_mockStatsProducer.m_rss = Double.valueOf(PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*85/100.0).longValue();
+        resumeAndWait(MONITORING_INTERVAL+1);
+        assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
     }
 
     // Disabling this test because it takes long. Enable it and run manually to test.

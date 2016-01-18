@@ -112,6 +112,7 @@ import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -911,6 +912,16 @@ public abstract class CatalogUtil {
         if (tt == null) {
             tt = new SystemSettingsType.Temptables();
             ss.setTemptables(tt);
+        }
+        ResourceMonitorType rm = ss.getResourcemonitor();
+        if (rm == null) {
+            rm = new ResourceMonitorType();
+            ss.setResourcemonitor(rm);
+        }
+        ResourceMonitorType.Memorylimit mem = rm.getMemorylimit();
+        if (mem == null) {
+            mem = new ResourceMonitorType.Memorylimit();
+            rm.setMemorylimit(mem);
         }
     }
 
