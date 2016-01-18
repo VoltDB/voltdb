@@ -771,11 +771,17 @@ def get_deployment_from_xml(deployment_xml, is_list):
                             new_deployment[field]['resourcemonitor'] = (deployment[field]['resourcemonitor'])
                         else:
                             new_deployment[field]['resourcemonitor'] = {}
-                            new_deployment[field]['resourcemonitor']['memorylimit'] = deployment[field]['resourcemonitor']['memorylimit']
-                            if type(new_deployment[field]['resourcemonitor']['memorylimit']) is list:
-                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment[field]['resourcemonitor']['disklimit'], 'list')
-                            else:
-                                new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment[field]['resourcemonitor']['disklimit'], 'dict')
+                            if 'memorylimit' in deployment[field]['resourcemonitor']:
+                                new_deployment[field]['resourcemonitor']['memorylimit'] = deployment[field]['resourcemonitor']['memorylimit']
+
+                            if 'disklimit' in deployment[field]['resourcemonitor'] and 'feature' in deployment[field]['resourcemonitor']['disklimit']:
+                                if type(deployment[field]['resourcemonitor']['disklimit']['feature']) is list:
+                                    new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                                    new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment[field]['resourcemonitor']['disklimit']['feature'], 'list')
+                                else:
+                                    new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                                    new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment[field]['resourcemonitor']['disklimit']['feature'], 'dict')
+
                     except Exception, err:
                         print str(err)
                 elif field == 'dr':
@@ -907,11 +913,16 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['resourcemonitor'] = (deployment_xml[field]['resourcemonitor'])
                     else:
                         new_deployment[field]['resourcemonitor'] = {}
-                        new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
-                        if type(new_deployment[field]['resourcemonitor']['memorylimit']) is list:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'list')
-                        else:
-                            new_deployment[field]['resourcemonitor']['disklimit'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit'], 'dict')
+                        if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
+                            new_deployment[field]['resourcemonitor']['memorylimit'] = deployment_xml[field]['resourcemonitor']['memorylimit']
+
+                        if 'disklimit' in deployment_xml[field]['resourcemonitor'] and 'feature' in deployment_xml[field]['resourcemonitor']['disklimit']:
+                            if type(deployment_xml[field]['resourcemonitor']['disklimit']['feature']) is list:
+                                new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                                new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'list')
+                            else:
+                                new_deployment[field]['resourcemonitor']['disklimit'] = {}
+                                new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
                 except Exception, err:
                     print str(err)
             elif field == 'dr':
