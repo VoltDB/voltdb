@@ -128,6 +128,15 @@ public class TestMemoryResourceMonitor extends TestCase
     {
         setUpServer(null, true);
 
+        m_mockStatsProducer.m_rss = Double.valueOf(PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*79/100.0).longValue();
+        resumeAndWait(MONITORING_INTERVAL+1);
+        assertEquals(OperationMode.RUNNING, VoltDB.instance().getMode());
+    }
+
+    public void testExceedDefaultLimit() throws Exception
+    {
+        setUpServer(null, true);
+
         m_mockStatsProducer.m_rss = Double.valueOf(PlatformProperties.getPlatformProperties().ramInMegabytes*1048576L*85/100.0).longValue();
         resumeAndWait(MONITORING_INTERVAL+1);
         assertEquals(OperationMode.PAUSED, VoltDB.instance().getMode());
