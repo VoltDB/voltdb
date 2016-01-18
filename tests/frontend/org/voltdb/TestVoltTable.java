@@ -32,6 +32,8 @@ import java.util.Random;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
@@ -42,6 +44,9 @@ public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
     private VoltTable t;
     private VoltTable t2;
+
+    private static final GeographyValue GEOG_VALUE = GeographyValue.fromWKT("POLYGON((0 0, 0 1, -1 1, -1 0, 0 0))");
+    private static final GeographyPointValue GEOG_PT_VALUE = GeographyPointValue.fromWKT("POINT(-122.0264 36.9719)");
 
     @Override
     public void setUp() {
@@ -75,6 +80,8 @@ public class TestVoltTable extends TestCase {
                 new TimestampType(99),
                 new BigDecimal(7654321)
                         .setScale(VoltDecimalHelper.kDefaultScale),
+                GEOG_VALUE,
+                GEOG_PT_VALUE,
                 new Object(), };
 
         for (Object o : primitives) {
@@ -546,6 +553,88 @@ public class TestVoltTable extends TestCase {
 
         t2.clearRowData();
         assertTrue(t2.getRowCount() == 0);
+    }
+
+    public void testGeographies() {
+        VoltTable vt = new VoltTable(new ColumnInfo("gg", VoltType.GEOGRAPHY));
+        addAllPrimitives(vt, new Class[] {GeographyValue.class});
+
+        VoltTable vtCopy = roundTrip(vt);
+
+        assertEquals(2, vt.getRowCount());
+        assertEquals(2, vtCopy.getRowCount());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        assertNull(vt.getGeographyValue(0));
+        assertNull(vtCopy.getGeographyValue(0));
+        assertNull(vt.get(0, VoltType.GEOGRAPHY));
+        assertTrue(vt.wasNull());
+        assertTrue(vtCopy.wasNull());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        String wkt = GEOG_VALUE.toString();
+        assertEquals(wkt, vt.getGeographyValue(0).toString());
+        assertEquals(wkt, vtCopy.getGeographyValue(0).toString());
+        assertEquals(wkt, vt.getGeographyValue("gg").toString());
+        assertEquals(wkt, vt.get(0, VoltType.GEOGRAPHY).toString());
+
+        byte[] raw = vt.getRaw(0);
+        // Raw bytes does not include the length prefix
+        assertEquals(GEOG_VALUE.getLengthInBytes(), raw.length - 4);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
+        assertFalse(vt.advanceRow());
+        assertFalse(vtCopy.advanceRow());
+    }
+
+    public void testGeographyPoints() {
+        VoltTable vt = new VoltTable(new ColumnInfo("pt", VoltType.GEOGRAPHY_POINT));
+        addAllPrimitives(vt, new Class[] {GeographyPointValue.class});
+
+        VoltTable vtCopy = roundTrip(vt);
+
+        assertEquals(2, vt.getRowCount());
+        assertEquals(2, vtCopy.getRowCount());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        assertNull(vt.getGeographyPointValue(0));
+        assertNull(vtCopy.getGeographyPointValue(0));
+        assertNull(vt.get(0, VoltType.GEOGRAPHY_POINT));
+        assertTrue(vt.wasNull());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        String wkt = GEOG_PT_VALUE.toString();
+        assertEquals(wkt, vt.getGeographyPointValue(0).toString());
+        assertEquals(wkt, vtCopy.getGeographyPointValue(0).toString());
+        assertEquals(wkt, vt.getGeographyPointValue("pt").toString());
+        assertEquals(wkt, vt.get(0, VoltType.GEOGRAPHY_POINT).toString());
+
+        byte[] raw = vt.getRaw(0);
+        assertEquals(GeographyPointValue.getLengthInBytes(), raw.length);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
+        assertFalse(vt.advanceRow());
+        assertFalse(vtCopy.advanceRow());
     }
 
     // At least check that NULL_VALUEs of one type get interpreted as NULL
