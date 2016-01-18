@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,8 +37,10 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -70,6 +72,7 @@ import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -80,6 +83,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -96,7 +100,7 @@ public class SnapshotUtil {
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
-    public static final String JSON_CHECK_CLUSTER_ID = "checkClusterId";
+    public static final String JSON_IS_RECOVER = "isRecover";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -144,7 +148,7 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-        Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+        Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
         Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
         InstanceId instanceId,
@@ -173,6 +177,10 @@ public class SnapshotUtil {
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.key("newPartitionCount").value(newPartitionCount);
+                Iterator<Entry<Integer, TupleStreamStateInfo>> iter = drTupleStreamInfo.entrySet().iterator();
+                if (iter.hasNext()) {
+                    stringer.key("drVersion").value(iter.next().getValue().drVersion);
+                }
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -226,12 +234,18 @@ public class SnapshotUtil {
                 stringer.endObject();
                 stringer.key("drTupleStreamStateInfo");
                 stringer.object();
-                for (Map.Entry<Integer, DRLogSegmentId> e : drTupleStreamInfo.entrySet()) {
+                for (Map.Entry<Integer, TupleStreamStateInfo> e : drTupleStreamInfo.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
-                    stringer.key("sequenceNumber").value(e.getValue().drId);
-                    stringer.key("spUniqueId").value(e.getValue().spUniqueId);
-                    stringer.key("mpUniqueId").value(e.getValue().mpUniqueId);
+                    if (e.getKey() != MpInitiator.MP_INIT_PID) {
+                        stringer.key("sequenceNumber").value(e.getValue().partitionInfo.drId);
+                        stringer.key("spUniqueId").value(e.getValue().partitionInfo.spUniqueId);
+                        stringer.key("mpUniqueId").value(e.getValue().partitionInfo.mpUniqueId);
+                    } else {
+                        stringer.key("sequenceNumber").value(e.getValue().replicatedInfo.drId);
+                        stringer.key("spUniqueId").value(e.getValue().replicatedInfo.spUniqueId);
+                        stringer.key("mpUniqueId").value(e.getValue().replicatedInfo.mpUniqueId);
+                    }
                     stringer.endObject();
                 }
                 stringer.endObject();

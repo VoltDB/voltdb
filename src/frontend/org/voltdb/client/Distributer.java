@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -885,14 +885,14 @@ class Distributer {
         m_subject = subject;
     }
 
-    void createConnection(String host, String program, String password, int port, ClientAuthHashScheme scheme)
+    void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(scheme, password);
         createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
     }
 
-    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthHashScheme scheme)
+    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =

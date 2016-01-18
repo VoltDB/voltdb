@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -79,7 +79,7 @@ def pause(runner):
             notifyInterval -= 1
             if notifyInterval == 0:
                 notifyInterval = 10
-                if last_table_stat_time > 1:
+                if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
                 if partition_min:
                     print_dr_pending(runner, partition_min_host, partition_min, partition_max)
@@ -152,7 +152,7 @@ def check_dr(runner, partition_min_host, partition_min, partition_max):
 
 def print_dr_pending(runner, partition_min_host, partition_min, partition_max):
     runner.info('The following partitions have pending DR transactions that the consumer cluster has not processed:')
-    summaryline = "    Partition %i needs acknowledgments for drIds %i to %i on hosts: %s."
+    summaryline = "    Partition %i needs acknowledgements for drIds %i to %i on hosts: %s."
     for pid in partition_min_host:
         runner.info(summaryline % (pid, partition_min[pid]+1, partition_max[pid], ', '.join(partition_min_host[pid])))
 
@@ -198,7 +198,7 @@ def check_export(runner, export_tables_with_data, last_collection_time):
 
 def print_export_pending(runner, export_tables_with_data):
     runner.info('The following export tables have unacknowledged transactions:')
-    summaryline = "    %s needs acknowledgments on host(s) %s for partition(s) %s."
+    summaryline = "    %s needs acknowledgements on host(s) %s for partition(s) %s."
     for table in export_tables_with_data:
         pidlist = set()
         hostlist = list(export_tables_with_data[table].keys())

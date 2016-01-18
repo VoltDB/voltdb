@@ -152,16 +152,17 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             if b == 'master' and len(u[0]) >= 10:
                 (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
+                median = np.median(ma)
                 failed = 0
                 if polarity==1:
                     cv = np.nanmin(ma)
                     rp = (u[0][np.nanargmin(ma)], cv)
-                    if b == 'master' and ma[-1] > cv * 1.05:
+                    if b == 'master' and ma[-1] > median * 1.05:
                         failed = 1
                 else:
                     cv = np.nanmax(ma)
                     rp = (u[0][np.nanargmax(ma)], cv)
-                    if b == 'master' and ma[-1] < cv * 0.95:
+                    if b == 'master' and ma[-1] < median * 0.95:
                         failed = 1
 
                 twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
@@ -173,6 +174,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 pl.ax.annotate(r"20%", xy=(u[0][-1], twntypercent[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
 
                 p = (ma[-1]-rp[1])/rp[1]*100.
+                q = (ma[-1]-median)/median*100.
 
                 if failed != 0:
                     if p<10:
@@ -191,6 +193,9 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     textcoords='offset points', ha='left')
                 pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
                     textcoords='offset points', ha='left')
+
+                pl.ax.annotate('ma: %.2f median: %.2f (%+.2f) cv: %.2f (%+.2f%%)' % (ma[-1], median, q, cv, p),
+                    xy=(.07, .06), xycoords='figure fraction', horizontalalignment='left', verticalalignment='top')
 
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
@@ -385,9 +390,10 @@ def main():
         fns.append(flags)
         filenames.append(tuple(fns))
 
-    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    #filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    #filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
     filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-kvm-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl-kvm/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

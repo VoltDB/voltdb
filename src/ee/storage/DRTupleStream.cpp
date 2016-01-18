@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,26 +41,10 @@ using namespace std;
 using namespace voltdb;
 
 DRTupleStream::DRTupleStream()
-    : TupleStreamBase(MAGIC_DR_TRANSACTION_PADDING),
-      m_enabled(true),
-      m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
-      m_opened(false),
-      m_rowTarget(-1),
-      m_txnRowCount(0),
+    : AbstractDRTupleStream(),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
-
-void DRTupleStream::setSecondaryCapacity(size_t capacity) {
-    assert (capacity > 0);
-    if (m_uso != 0 || m_openSpHandle != 0 ||
-        m_openTransactionUso != 0 || m_committedSpHandle != 0)
-    {
-        throwFatalException("setSecondaryCapacity only callable before "
-                            "TupleStreamBase is used");
-    }
-    m_secondaryCapacity = capacity;
-}
 
 size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     char *tableHandle,
@@ -88,7 +72,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
 
-    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
     io.writeInt(static_cast<int32_t>(tableName.size()));
@@ -153,7 +137,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -217,7 +201,7 @@ size_t DRTupleStream::appendUpdateRecord(int64_t lastCommittedSpHandle,
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                                  m_currBlock->remaining());
-    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(type));
     io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
 
@@ -324,34 +308,6 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
     return rowHeaderSz + tuple.maxDRSerializationSize(interestingColumns);
 }
 
-// Set m_opened = false first otherwise checkOpenTransaction() may
-// consider the transaction being rolled back as open.
-void DRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
-    if (mark == INVALID_DR_MARK) {
-        return;
-    }
-    if (drRowCost <= m_txnRowCount) {
-        m_txnRowCount -= drRowCost;
-    } else {
-        // convenience to let us just throw away everything at once
-        assert(drRowCost == SIZE_MAX);
-        m_txnRowCount = 0;
-    }
-    if (mark == m_committedUso) {
-        assert(m_txnRowCount == 0);
-        m_opened = false;
-    }
-    TupleStreamBase::rollbackTo(mark, drRowCost);
-}
-
-void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
-    if (sync) return;
-    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
-    if (rowTarget >= 0) {
-        m_rowTarget = rowTarget;
-    }
-}
-
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
     assert(!m_opened);
 
@@ -382,7 +338,7 @@ void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
-     io.writeByte(DR_VERSION);
+     io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
      io.writeLong(sequenceNumber);
@@ -445,7 +401,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                              m_currBlock->remaining());
-    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<uint8_t>(PROTOCOL_VERSION));
     io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
     io.writeLong(m_openSequenceNumber);
     uint32_t crc = vdbcrc::crc32cInit();
@@ -493,12 +449,6 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     }
     assert(!m_opened);
     return false;
-}
-
-void DRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
-    assert(m_committedSequenceNumber == -1);
-    m_openSequenceNumber = sequenceNumber;
-    m_committedSequenceNumber = sequenceNumber;
 }
 
 int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {

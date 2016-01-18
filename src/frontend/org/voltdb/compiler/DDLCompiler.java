@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,7 +123,7 @@ public class DDLCompiler {
     // For internal cluster compilation, this will point to the
     // InMemoryJarfile for the current catalog, so that we can
     // find classes provided as part of the application.
-    private ClassMatcher m_classMatcher = new ClassMatcher();
+    private final ClassMatcher m_classMatcher = new ClassMatcher();
 
     private final HashMap<Table, String> m_matViewMap = new HashMap<>();
 
@@ -179,6 +179,61 @@ public class DDLCompiler {
         m_compiler = compiler;
         m_tracker = tracker;
         m_classLoader = classLoader;
+    }
+
+    private static boolean isVoltTypePresent(VoltXMLElement tableNode, VoltType lookupType, StringBuffer msg) {
+        assert(tableNode.name.equals("table"));
+
+        String valueTypeStr;
+        VoltType type;
+        String columnName;
+        boolean typeDetected = false;
+        String separatorStr;
+
+        for (VoltXMLElement subNode : tableNode.children) {
+            if (subNode.name.equals("columns")) {
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column")) {
+                        valueTypeStr = columnNode.attributes.get("valuetype");
+                        columnName = columnNode.attributes.get("name");
+                        type = VoltType.typeFromString(valueTypeStr);
+                        if (lookupType == type) {
+                            if (msg != null) {
+                                separatorStr = (typeDetected == true)? ", " : " ";
+                                msg.append(separatorStr + "column name: '" + columnName + "' type: '" + valueTypeStr + "'");
+                            }
+                            typeDetected = true;
+                        }
+                    }
+                }
+            } // if (subNode.name.equals("columns"))
+        }
+
+        return typeDetected;
+    }
+
+    // Function to check if the table - TableXML, supplied as VoltXMLElement, does not contain geo types.
+    // If table does contain geo types, VoltCompilerException is generated with information about geo columns
+    // found in table wrapped in exception message
+    private void guardForGeoColumns(VoltXMLElement tableXML, String tableName, String tableVerb)
+            throws VoltCompilerException {
+        assert(tableXML.name.equals("table"));
+        assert(tableVerb != null);
+        assert(tableName != null);
+
+        boolean pointColDetected = false;
+        StringBuffer pointMsg = new StringBuffer();
+        pointColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY_POINT, pointMsg);
+
+        boolean polygonColDetected = false;
+        StringBuffer polygonMsg = new StringBuffer();
+        polygonColDetected = isVoltTypePresent(tableXML, VoltType.GEOGRAPHY, polygonMsg);
+        //
+        if (pointColDetected || polygonColDetected) {
+            String separatorStr = (pointColDetected && polygonColDetected) ? "," : "";
+            throw m_compiler.new VoltCompilerException("Can't " + tableVerb + " table '" + tableName.toUpperCase() + "' containing geo type column(s) -" +
+                    pointMsg + separatorStr + polygonMsg + ".");
+        }
     }
 
     /**
@@ -850,6 +905,7 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is EXPORT TABLE
         statementMatcher = SQLParser.matchExportTable(statement);
         if (statementMatcher.matches()) {
 
@@ -862,7 +918,10 @@ public class DDLCompiler {
                     Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+
             if (tableXML != null) {
+                guardForGeoColumns(tableXML, tableName, EXPORT);
+
                 if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid EXPORT statement: table %s is a DR table.", tableName));
@@ -894,8 +953,12 @@ public class DDLCompiler {
                 tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             }
 
+            //System.out.println("\n\n" + m_schema.toString());
+
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
+                guardForGeoColumns(tableXML, tableName, DR);
+
                 if (tableXML.attributes.containsKey("export")) {
                     throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid DR statement: table %s is an export table", tableName));
@@ -1513,7 +1576,7 @@ public class DDLCompiler {
         int maxRowSize = 0;
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
-            if ((t == VoltType.STRING && c.getInbytes()) || (t == VoltType.VARBINARY)) {
+            if (t.isVariableLength()) {
                 if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
                     throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
                             " specifies a maximum size of " + c.getSize() + " bytes" +
@@ -1530,7 +1593,8 @@ public class DDLCompiler {
                             " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
                 }
                 maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
-            } else {
+            }
+            else {
                 maxRowSize += t.getLengthInBytesForFixedTypes();
             }
         }
@@ -1629,26 +1693,29 @@ public class DDLCompiler {
             inBytes = Boolean.valueOf(node.attributes.get("bytes"));
         }
 
-        // Require a valid length if variable length is supported for a type
-        if (type == VoltType.STRING || type == VoltType.VARBINARY) {
-            if (sizeString == null) {
-                // An unspecified size for a VARCHAR/VARBINARY column should be
-                // for a materialized view column whose type is derived from a
-                // function or expression of variable-length type.
-                // Defaulting these to MAX_VALUE_LENGTH tends to cause them to overflow the
-                // allowed MAX_ROW_SIZE when there are more than one in a view.
-                // It's not clear what benefit, if any, we derive from limiting MAX_ROW_SIZE
-                // based on worst-case length for variable fields, but we comply for now by
-                // arbitrarily limiting these matview column sizes such that
-                // the max number of columns of this size would still fit.
-                size = MAX_ROW_SIZE / MAX_COLUMNS;
-            } else {
-                int userSpecifiedSize = Integer.parseInt(sizeString);
+        // Determine the length of columns with a variable-length type
+        if (type.isVariableLength()) {
+            int userSpecifiedSize = 0;
+            if (sizeString != null) {
+                userSpecifiedSize = Integer.parseInt(sizeString);
+            }
+
+            if (userSpecifiedSize == 0) {
+                // So size specified in the column definition.  Either:
+                // - the user-specified size is zero (unclear how this would happen---
+                //   if someone types VARCHAR(0) HSQL will complain)
+                // - or the sizeString was null, meaning that the size specifier was
+                //   omitted.
+                // Choose an appropriate default for the type.
+                size = type.defaultLengthForVariableLengthType();
+            }
+            else {
                 if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
                     String msg = type.toSQLString() + " column " + name +
-                        " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                            " in table " + table.getTypeName() + " has unsupported length " + sizeString;
                     throw compiler.new VoltCompilerException(msg);
                 }
+
                 if (!inBytes && type == VoltType.STRING) {
                     if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
                         String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
@@ -1661,21 +1728,21 @@ public class DDLCompiler {
                     }
                 }
 
-                if (userSpecifiedSize > 0) {
-                    size = userSpecifiedSize;
-                } else {
-                    // A 0 from the user was already caught
-                    // -- so any 0 at this point was NOT user-specified.
-                    // It must have been generated by mistake.
-                    // We should just stop doing that. It's just noise.
-                    // Treating it as a synonym for sizeString == null.
-                    size = MAX_ROW_SIZE / MAX_COLUMNS;
+                if (userSpecifiedSize < type.getMinLengthInBytes()) {
+                    String msg = type.toSQLString() + " column " + name +
+                            " in table " + table.getTypeName() + " has length of " + sizeString
+                            + " which is shorter than " + type.getMinLengthInBytes() + ", "
+                            + "the minimum allowed length for the type.";
+                    throw compiler.new VoltCompilerException(msg);
                 }
+
+
+                size = userSpecifiedSize;
             }
         }
+
         column.setInbytes(inBytes);
         column.setSize(size);
-
 
         column.setDefaultvalue(defaultvalue);
         if (defaulttype != null)
@@ -1772,9 +1839,10 @@ public class DDLCompiler {
         List<AbstractExpression> exprs = null;
         // "parse" the WHERE expression for partial index if any
         AbstractExpression predicate = null;
-        // Some expressions have special validation in indices.  We
-        // gather all these up into the list checkExpressions.  We
-        // will check them all at once.
+        // Some expressions have special validation in indices.  Not all the expression
+        // can be indexed. We scan for result type at first here and block those which
+        // can't be indexed like boolean, geo ... We gather rest of expression into
+        // checkExpressions list.  We will check on them all at once.
         List<AbstractExpression> checkExpressions = new ArrayList<AbstractExpression>();
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
@@ -1783,7 +1851,15 @@ public class DDLCompiler {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
-                    // We will check this for validity later.
+                    // string will will be populated expression details whose value
+                    // type are not indexable
+                    StringBuffer exprMsg = new StringBuffer();
+                    if (!expr.isValueTypeIndexable(exprMsg)) {
+                        // indexing on expression with boolean result is not supported.
+                        throw compiler.new VoltCompilerException("Cannot create index \""+ name +
+                                "\" because it contains " + exprMsg + ", which is not supported.");
+                    }
+                    // rest of the validity gaurds will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
                     exprs.add(expr);
                 }
@@ -1798,7 +1874,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -1818,6 +1894,12 @@ public class DDLCompiler {
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
+
+                if (! colType.isIndexable()) {
+                    String emsg = colType.getName() + " values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
+
                 if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = colNames[i];
@@ -1827,6 +1909,7 @@ public class DDLCompiler {
         else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
+
                 if (! colType.isBackendIntegerType()) {
                     has_nonint_col = true;
                     nonint_col_name = "<expression>";
@@ -2656,11 +2739,27 @@ public class DDLCompiler {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw compiler.new VoltCompilerException(msg.toString());
             }
+            // check if the expression return type is not indexable
+            StringBuffer exprMsg = new StringBuffer();
+            if (!outcol.expression.isValueTypeIndexable(exprMsg)) {
+                msg.append("with " + exprMsg + " in GROUP BY clause not supported.");
+                throw compiler.new VoltCompilerException(msg.toString());
+            }
+            // collect all the expressions and we will check
+            // for other gaurds on all of them together
             checkExpressions.add(outcol.expression);
         }
-        // Now, the display list must have a count(*).
-        AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
-        if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
+
+        // check for count star in the display list
+        boolean countStarFound = false;
+        if (i < displayColCount) {
+            AbstractExpression coli = stmt.m_displayColumns.get(i).expression;
+            if (coli.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR) {
+                countStarFound = true;
+            }
+        }
+
+        if (countStarFound == false) {
             msg.append("must have count(*) after the GROUP BY columns (if any) but before the aggregate functions (if any).");
             throw compiler.new VoltCompilerException(msg.toString());
         }
@@ -2697,7 +2796,7 @@ public class DDLCompiler {
         }
 
         // Check all the subexpressions we gathered up.
-        if (!AbstractExpression.areIndexableExpressions(checkExpressions, msg)) {
+        if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
             throw compiler.new VoltCompilerException(msg.toString());
         }

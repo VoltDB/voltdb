@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,18 +30,17 @@ import java.math.RoundingMode;
 import java.net.ConnectException;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Pattern;
-
-import junit.framework.TestCase;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientAuthHashScheme;
+import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
@@ -49,10 +48,14 @@ import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
+
+import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -64,6 +67,7 @@ import com.google_voltpatches.common.net.HostAndPort;
  *
  */
 public class RegressionSuite extends TestCase {
+    protected final static double GEOGRAPHY_EPSILON = 1.0e-13;
 
     protected static int m_verboseDiagnosticRowCap = 40;
     protected VoltServerConfig m_config;
@@ -153,14 +157,14 @@ public class RegressionSuite extends TestCase {
     }
 
     public Client getAdminClient() throws IOException {
-        return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256, true); // 10 minute default
+        return getClient(1000 * 60 * 10, ClientAuthScheme.HASH_SHA256, true); // 10 minute default
     }
 
     public Client getClient() throws IOException {
-        return getClient(1000 * 60 * 10, ClientAuthHashScheme.HASH_SHA256); // 10 minute default
+        return getClient(1000 * 60 * 10, ClientAuthScheme.HASH_SHA256); // 10 minute default
     }
 
-    public Client getClient(ClientAuthHashScheme scheme) throws IOException {
+    public Client getClient(ClientAuthScheme scheme) throws IOException {
         return getClient(1000 * 60 * 10, scheme); // 10 minute default
     }
 
@@ -183,7 +187,7 @@ public class RegressionSuite extends TestCase {
      * VoltServerConfig instance.
      */
     public Client getClient(long timeout) throws IOException {
-        return getClient(timeout, ClientAuthHashScheme.HASH_SHA256);
+        return getClient(timeout, ClientAuthScheme.HASH_SHA256);
     }
 
     /**
@@ -196,11 +200,11 @@ public class RegressionSuite extends TestCase {
      * @return A VoltClient instance connected to the server driven by the
      * VoltServerConfig instance.
      */
-    public Client getClient(long timeout, ClientAuthHashScheme scheme) throws IOException {
+    public Client getClient(long timeout, ClientAuthScheme scheme) throws IOException {
         return getClient(timeout, scheme, false);
     }
 
-    public Client getClient(long timeout, ClientAuthHashScheme scheme, boolean useAdmin) throws IOException {
+    public Client getClient(long timeout, ClientAuthScheme scheme, boolean useAdmin) throws IOException {
         final Random r = new Random();
         String listener = null;
         if (useAdmin) {
@@ -243,7 +247,7 @@ public class RegressionSuite extends TestCase {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         String listener = listeners.get(r.nextInt(listeners.size()));
-        ClientConfig config = new ClientConfigForTest(m_username, m_password, ClientAuthHashScheme.HASH_SHA1);
+        ClientConfig config = new ClientConfigForTest(m_username, m_password, ClientAuthScheme.HASH_SHA1);
         config.setConnectionResponseTimeout(timeout);
         config.setProcedureCallTimeout(timeout);
         final Client client = ClientFactory.createClient(config);
@@ -337,7 +341,7 @@ public class RegressionSuite extends TestCase {
         }
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, port, null, ClientAuthHashScheme.getByUnencodedLength(hashedPassword.length))[0];
+                    hNp.getHostText(), m_username, hashedPassword, port, null, ClientAuthScheme.getByUnencodedLength(hashedPassword.length))[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -721,6 +725,187 @@ public class RegressionSuite extends TestCase {
             i++;
         }
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
+    }
+
+    public static void assertEquals(String msg, GeographyPointValue expected, GeographyPointValue actual) {
+            assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
+    }
+    /**
+     * Assert that two points are approximately equal.  By this we mean the latitude and
+     * longitude differ by at most epsilon.  If epsilon is zero or negative this means
+     * equality.
+     *
+     * @param msg
+     * @param expected
+     * @param actual
+     */
+    public static void assertApproximatelyEquals(String msg, GeographyPointValue expected, GeographyPointValue actual, double epsilon) {
+        if (epsilon > 0) {
+            assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude(), epsilon);
+            assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude(), epsilon);
+        } else {
+            assertEquals(msg + " latitude: ", expected.getLatitude(), actual.getLatitude());
+            assertEquals(msg + " longitude: ", expected.getLongitude(), actual.getLongitude());
+        }
+    }
+
+    public static void assertEquals(GeographyPointValue expected, GeographyPointValue actual) {
+        assertEquals("Points not equal: ", expected, actual);
+    }
+
+    /**
+     * Assert that two geography values are equal.  This delegates to
+     * assertApproximatelyEquals with epsilon equal to zero.
+     *
+     * @param msg
+     * @param expected
+     * @param actual
+     */
+    public static void assertEquals(String msg, GeographyValue expected, GeographyValue actual) {
+        assertApproximatelyEquals(msg, expected, actual, GEOGRAPHY_EPSILON);
+    }
+
+    /**
+     * Assert that two geography values are approximately equal.  By approximately
+     * equal we mean that the vertices of the expected and actual values differ
+     * by at most epsilon.  If epsilon is not positive this means the values must
+     * be exactly equal.
+     *
+     * @param msg
+     * @param expected
+     * @param actual
+     * @param epsilon
+     */
+    public static void assertApproximatelyEquals(String msg, GeographyValue expected, GeographyValue actual, double epsilon) {
+        if (expected == actual) {
+            return;
+        }
+
+        // caller checks for null in the expected value
+        assert (expected != null);
+
+        if (actual == null) {
+            fail(msg + " found null value when non-null expected");
+        }
+
+        List<List<GeographyPointValue>> expectedLoops = expected.getLoops();
+        List<List<GeographyPointValue>> actualLoops = actual.getLoops();
+
+        assertEquals(msg + "wrong number of loops, expected " + expectedLoops.size() + ", "
+                + "got " + actualLoops.size(),
+                expectedLoops.size(), actualLoops.size());
+
+        int loopCtr = 0;
+        Iterator<List<GeographyPointValue>> expectedLoopIt = expectedLoops.iterator();
+        for (List<GeographyPointValue> actualLoop : actualLoops) {
+            List<GeographyPointValue> expectedLoop = expectedLoopIt.next();
+            assertEquals(msg + loopCtr + "the loop should have " + expectedLoop.size()
+                    + " vertices, but has " + actualLoop.size(),
+                    expectedLoop.size(), actualLoop.size());
+
+            int vertexCtr = 0;
+            Iterator<GeographyPointValue> expectedVertexIt = expectedLoop.iterator();
+            for (GeographyPointValue actualPt : actualLoop) {
+                GeographyPointValue expectedPt = expectedVertexIt.next();
+                String prefix = msg + "at loop " + loopCtr + ", vertex " + vertexCtr;
+                assertApproximatelyEquals(prefix, expectedPt, actualPt, epsilon);
+                ++vertexCtr;
+            }
+
+            ++loopCtr;
+        }
+    }
+
+    public static void assertEquals(GeographyValue expected, GeographyValue actual) {
+        assertEquals("Geographies not equal: ", expected, actual);
+    }
+
+    private static void assertApproximateContentOfRow(int row,
+                                                      Object[] expectedRow,
+                                                      VoltTable actualRow,
+                                                      double epsilon) {
+        for (int i = 0; i < expectedRow.length; ++i) {
+            String msg = "Row " + row + ", col " + i + ": ";
+            Object expectedObj = expectedRow[i];
+            if (expectedObj == null) {
+                VoltType vt = actualRow.getColumnType(i);
+                actualRow.get(i,  vt);
+                assertTrue(msg, actualRow.wasNull());
+            }
+            else if (expectedObj instanceof GeographyPointValue) {
+                assertApproximatelyEquals(msg, (GeographyPointValue) expectedObj, actualRow.getGeographyPointValue(i), epsilon);
+            }
+            else if (expectedObj instanceof GeographyValue) {
+                assertApproximatelyEquals(msg, (GeographyValue) expectedObj, actualRow.getGeographyValue(i), epsilon);
+            }
+            else if (expectedObj instanceof Long) {
+                long val = ((Long)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof Integer) {
+                long val = ((Integer)expectedObj).longValue();
+                assertEquals(msg, val, actualRow.getLong(i));
+            }
+            else if (expectedObj instanceof Double) {
+                double expectedValue= (Double)expectedObj;
+                double actualValue = actualRow.getDouble(i);
+                // check if the row value was evaluated as null. Looking
+                // at return is not reliable way to do so;
+                // for null values, convert value into double min
+                if (actualRow.wasNull()) {
+                    actualValue = Double.MIN_VALUE;
+                }
+                if (epsilon <= 0) {
+                    String fullMsg = msg + String.format("Expected value %f != actual value %f", expectedValue, actualValue);
+                    assertEquals(fullMsg, expectedValue, actualValue);
+                } else {
+                    String fullMsg = msg + String.format("abs(Expected Value - Actual Value) = %e >= %e",
+                                                         Math.abs(expectedValue - actualValue), epsilon);
+                    assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
+                }
+            }
+            else if (expectedObj instanceof String) {
+                String val = (String)expectedObj;
+                assertEquals(msg, val, actualRow.getString(i));
+            }
+            else {
+                fail("Unexpected type in expected row: " + expectedObj.getClass().getSimpleName());
+            }
+        }
+    }
+
+    /**
+     * Accept expected table contents as 2-dimensional array of objects, to make it easy to write tests.
+     * Currently only handles some data types.  Feel free to add more as needed.
+     */
+    public static void assertContentOfTable(Object[][] expectedTable, VoltTable actualTable) {
+        assertApproximateContentOfTable(expectedTable, actualTable, 0.0d);
+    }
+
+    /**
+     * Assert that the expected and actual valus are approximately equal. By
+     * approximately equal we mean that non-floating point values are identical,
+     * and floating point values differ by at most epsilon. If epsilon is zero or negative,
+     * we require equality.
+     *
+     * @param expectedTable
+     * @param actualTable
+     * @param epsilon
+     */
+    public static void assertApproximateContentOfTable(Object[][] expectedTable,
+                                                       VoltTable actualTable,
+                                                       double epsilon) {
+        for (int i = 0; i < expectedTable.length; ++i) {
+            assertTrue("Fewer rows than expected: "
+                    + "expected: " + expectedTable.length + ", "
+                    + "actual: " + i,
+                    actualTable.advanceRow());
+            assertApproximateContentOfRow(i, expectedTable[i], actualTable, epsilon);
+        }
+        assertFalse("More rows than expected: "
+                + "expected " + expectedTable.length + ", "
+                + "actual: " + actualTable.getRowCount(),
+                actualTable.advanceRow());
     }
 
     static protected void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {

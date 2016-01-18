@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -199,8 +199,7 @@ public:
         for (int i = 0; i < cols; ++i) {
             const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(i);
             voltdb::ValueType columnType = columnInfo->getVoltType();
-            if (((columnType == VALUE_TYPE_VARCHAR) || (columnType == VALUE_TYPE_VARBINARY)) &&
-                !columnInfo->inlined) {
+            if (isVariableLengthType(columnType) && !columnInfo->inlined) {
                 bytes += getNValue(i).getAllocationSizeForObject();
             }
         }
@@ -476,34 +475,37 @@ private:
         }
         voltdb::ValueType columnType = columnInfo->getVoltType();
         switch (columnType) {
-        case VALUE_TYPE_TINYINT:
-            return sizeof (int8_t);
-        case VALUE_TYPE_SMALLINT:
-            return sizeof (int16_t);
-        case VALUE_TYPE_INTEGER:
-            return sizeof (int32_t);
-        case VALUE_TYPE_BIGINT:
-        case VALUE_TYPE_TIMESTAMP:
-        case VALUE_TYPE_DOUBLE:
-            return sizeof (int64_t);
-        case VALUE_TYPE_DECIMAL:
-            //1-byte scale, 1-byte precision, 16 bytes all the time right now
-            return 18;
-        case VALUE_TYPE_VARCHAR:
-        case VALUE_TYPE_VARBINARY:
+          case VALUE_TYPE_TINYINT:
+              return sizeof (int8_t);
+          case VALUE_TYPE_SMALLINT:
+              return sizeof (int16_t);
+          case VALUE_TYPE_INTEGER:
+              return sizeof (int32_t);
+          case VALUE_TYPE_BIGINT:
+          case VALUE_TYPE_TIMESTAMP:
+          case VALUE_TYPE_DOUBLE:
+              return sizeof (int64_t);
+          case VALUE_TYPE_DECIMAL:
+              //1-byte scale, 1-byte precision, 16 bytes all the time right now
+              return 18;
+          case VALUE_TYPE_VARCHAR:
+          case VALUE_TYPE_VARBINARY:
+          case VALUE_TYPE_GEOGRAPHY:
         {
             bool isNullCol = isHidden ? isHiddenNull(colIndex) : isNull(colIndex);
             if (isNullCol) {
                 return (size_t)0;
-            }
-            // 32 bit length preceding value and
-            // actual character data without null string terminator.
-            const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
+              }
+              // 32 bit length preceding value and
+              // actual character data without null string terminator.
+                  const NValue value = isHidden ? getHiddenNValue(colIndex) : getNValue(colIndex);
             int32_t length;
             ValuePeeker::peekObject_withoutNull(value, &length);
             return sizeof(int32_t) + length;
-        }
-        default:
+              }
+          case VALUE_TYPE_POINT:
+              return sizeof (GeographyPointValue);
+          default:
             // let caller handle this error
             throwDynamicSQLException(
                     "Unknown ValueType %s found during Export serialization.",
@@ -516,10 +518,9 @@ private:
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(colIndex);
         voltdb::ValueType columnType = columnInfo->getVoltType();
 
-        if (columnType == VALUE_TYPE_VARCHAR || columnType == VALUE_TYPE_VARBINARY) {
+        if (isVariableLengthType(columnType)) {
             // Null variable length value doesn't take any bytes in
-            // export table, so here needs a special handle for VARCHAR
-            // and VARBINARY
+            // export table.
             if (isNull(colIndex)) {
                 return sizeof(int32_t);
             }

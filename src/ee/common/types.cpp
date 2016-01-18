@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,8 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_VARCHAR):
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
+      case (VALUE_TYPE_POINT):
+      case (VALUE_TYPE_GEOGRAPHY):
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_INVALID):
       case (VALUE_TYPE_ARRAY):
@@ -61,6 +63,8 @@ bool isIntegralType(ValueType type) {
       case (VALUE_TYPE_VARCHAR):
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
+      case (VALUE_TYPE_POINT):
+      case (VALUE_TYPE_GEOGRAPHY):
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_DECIMAL):
       case (VALUE_TYPE_ARRAY):
@@ -70,6 +74,18 @@ bool isIntegralType(ValueType type) {
     }
     throw exception();
 }
+
+bool isVariableLengthType(ValueType type) {
+    switch (type) {
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
+        return true;
+    default:
+        return false;
+    }
+}
+
 
 NValue getRandomValue(ValueType type, uint32_t maxLength) {
     switch (type) {
@@ -160,6 +176,12 @@ string getTypeName(ValueType type) {
         case (VALUE_TYPE_BOOLEAN):
             ret = "boolean";
             break;
+        case (VALUE_TYPE_POINT):
+            ret = "point";
+            break;
+        case (VALUE_TYPE_GEOGRAPHY):
+            ret = "geography";
+            break;
         case (VALUE_TYPE_ADDRESS):
             ret = "address";
             break;
@@ -247,6 +269,12 @@ string valueToString(ValueType type)
       case VALUE_TYPE_DECIMAL: {
           return "DECIMAL";
       }
+      case VALUE_TYPE_POINT: {
+          return "POINT";
+      }
+      case VALUE_TYPE_GEOGRAPHY: {
+          return "GEOGRAPHY";
+      }
       case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
           return "NUMERIC";
       }
@@ -282,6 +310,10 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_TIMESTAMP;
     } else if (str == "DECIMAL") {
         return VALUE_TYPE_DECIMAL;
+    } else if (str == "POINT") {
+        return VALUE_TYPE_POINT;
+    } else if (str == "GEOGRAPHY") {
+        return VALUE_TYPE_GEOGRAPHY;
     } else if (str == "ARRAY") {
         return VALUE_TYPE_ARRAY;
     }

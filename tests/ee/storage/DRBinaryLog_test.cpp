@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,7 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
-#include "storage/BinaryLogSink.h"
+#include "storage/BinaryLogSinkWrapper.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/tableiterator.h"
@@ -392,7 +392,7 @@ public:
             *reinterpret_cast<int32_t*>(&data.get()[startPos]) = htonl(static_cast<int32_t>(sb->offset()));
             m_drStream.m_enabled = false;
             m_drReplicatedStream.m_enabled = false;
-            m_sink.apply(&data[startPos], tables, &m_pool, m_engineReplica, 1);
+            m_sinkWrapper.apply(&data[startPos], tables, &m_pool, m_engineReplica, 1);
             m_drStream.m_enabled = true;
             m_drReplicatedStream.m_enabled = true;
         }
@@ -645,7 +645,7 @@ protected:
 
     DummyTopend m_topend;
     Pool m_pool;
-    BinaryLogSink m_sink;
+    BinaryLogSinkWrapper m_sinkWrapper;
     MockVoltDBEngine* m_engine;
     MockVoltDBEngine* m_engineReplica;
     char tableHandle[20];

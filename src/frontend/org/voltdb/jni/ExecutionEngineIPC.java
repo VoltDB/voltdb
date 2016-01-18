@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -938,7 +938,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     throws EEException
     {
         if (returnUniqueViolations) {
-            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violatiosn");
+            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
@@ -982,15 +982,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
-
-        ByteBuffer responseBuffer = null;
+        /*//
+        // This code will hang expecting input that never arrives
+        // until voltdbipc is extended to respond with information
+        // negative or positive about "unique violations".
         try {
-            responseBuffer = readMessage();
-        } catch (IOException e) {
+            ByteBuffer responseBuffer = readMessage();
+            if (responseBuffer != null) {
+                return responseBuffer.array();
+            }
+        }
+        catch (IOException e) {
             Throwables.propagate(e);
         }
-
-        if (responseBuffer != null) return responseBuffer.array();
+        //*/
         return null;
     }
 

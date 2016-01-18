@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,11 +43,12 @@ import org.codehaus.jackson.annotate.JsonPropertyOrder;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
-import org.eclipse.jetty.server.AsyncContinuation;
+import org.eclipse.jetty.continuation.Continuation;
+import org.eclipse.jetty.continuation.ContinuationSupport;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.bio.SocketConnector;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
@@ -77,10 +78,12 @@ import com.google_voltpatches.common.io.Resources;
 public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
+    public static final String REALM = "VoltDBRealm";
 
-    Server m_server = new Server();
+    Server m_server;
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
+
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
@@ -149,7 +152,7 @@ public class HTTPAdminListener {
                 // jetty we're still working on it. There is a risk of
                 // masking other errors in doing this, but it's probably
                 // low compared with the default policy of retrys.
-                AsyncContinuation cont = baseRequest.getAsyncContinuation();
+                Continuation cont = ContinuationSupport.getContinuation(baseRequest);
                 // this is set to false on internal jetty retrys
                 if (!cont.isInitial()) {
                     // The continuation object has been woken up by the
@@ -175,7 +178,7 @@ public class HTTPAdminListener {
                 URL url = VoltDB.class.getResource("dbmonitor" + target);
                 if (url == null) {
                     // write 404
-                    String msg = "404: Resource not found.\n"+url.toString();
+                    String msg = "404: Resource not found.\n";
                     response.setContentType("text/plain;charset=utf-8");
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                     baseRequest.setHandled(true);
@@ -833,7 +836,20 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+    public HTTPAdminListener(
+            boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+        int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
+        int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
+
+        /*
+         * Don't force us to look at a huge pile of threads
+         */
+        final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
+        qtp.setIdleTimeout(timeout * 1000);
+        qtp.setMinThreads(1);
+
+        m_server = new Server(qtp);
+
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
@@ -846,17 +862,16 @@ public class HTTPAdminListener {
         }
 
         // NOW START SocketConnector and create Jetty server but dont start.
-        SocketConnector connector = null;
+        ServerConnector connector = null;
         try {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
-            connector = new SocketConnector();
+            connector = new ServerConnector(m_server);
 
             if (intf != null && intf.length() > 0) {
                 connector.setHost(intf);
             }
             connector.setPort(port);
-            connector.statsReset();
             connector.setName("VoltDB-HTTPD");
             //open the connector here so we know if port is available and Init work can retry with next port.
             connector.open();
@@ -901,15 +916,6 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
-            int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
-            int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
-            /*
-             * Don't force us to look at a huge pile of threads
-             */
-            final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
-            qtp.setMaxIdleTimeMs(timeout * 1000);
-            qtp.setMinThreads(1);
-            m_server.setThreadPool(qtp);
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {

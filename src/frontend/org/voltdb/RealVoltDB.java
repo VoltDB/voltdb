@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -177,9 +177,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "5.9";
+    static final String m_defaultVersionString = "6.0";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q5.9\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.0\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -675,24 +675,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
              */
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
-            // DR overflow directory
-            if (m_config.m_isEnterprise) {
-                try {
-                    Class<?> ndrgwClass = null;
-                    ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
-                    m_producerDRGateway = (ProducerDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
-                                                                                   getSnapshotPath(m_catalogContext),
-                                                                                   m_replicationActive,
-                                                                                   m_configuredNumberOfPartitions,
-                                                                                   m_catalogContext.getDeployment().getCluster().getHostcount());
-                    m_producerDRGateway.start();
-                    m_producerDRGateway.blockOnDRStateConvergence();
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
-                }
-            }
-
             // Initialize stats
             m_ioStats = new IOStats();
             getStatsAgent().registerStatsSource(StatsSelector.IOSTATS,
@@ -793,6 +775,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath();
             }
 
+            // DR overflow directory
+            if (m_config.m_isEnterprise) {
+                try {
+                    Class<?> ndrgwClass = null;
+                    ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
+                    m_producerDRGateway = (ProducerDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
+                                                                                   getSnapshotPath(m_catalogContext),
+                                                                                   m_replicationActive,
+                                                                                   m_configuredNumberOfPartitions,
+                                                                                   m_catalogContext.getDeployment().getCluster().getHostcount());
+                    m_producerDRGateway.start();
+                    m_producerDRGateway.blockOnDRStateConvergence();
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
+                }
+            }
             createDRConsumerIfNeeded();
 
             /*
@@ -1285,6 +1284,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     }
 
     private final List<ScheduledFuture<?>> m_periodicWorks = new ArrayList<ScheduledFuture<?>>();
+
+
     /**
      * Schedule all the periodic works
      */
@@ -1508,8 +1509,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (sysType.getSnapshot() != null) {
                     hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
                 }
-                if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
-                    hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                if (sysType.getQuery() != null) {
+                    if (sysType.getQuery().getTimeout() > 0) {
+                        hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                        m_config.m_queryTimeout = sysType.getQuery().getTimeout();
+                    }
+                    else if (sysType.getQuery().getTimeout() == 0) {
+                        hostLog.info("Query timeout set to unlimited");
+                        m_config.m_queryTimeout = 0;
+                    }
                 }
             }
 
@@ -1908,7 +1916,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         if (sysSettings.getQuerytimeout() > 0) {
             hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");
+            m_config.m_queryTimeout = sysSettings.getQuerytimeout();
         }
+        else if (sysSettings.getQuerytimeout() == 0) {
+            hostLog.info("Query timeout set to unlimited");
+            m_config.m_queryTimeout = 0;
+        }
+
     }
 
     /**
@@ -2014,7 +2028,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
-                // After sites are terminated, shutdown the InvocationBufferServer.
+                // After sites are terminated, shutdown the DRProducer.
                 // The DRProducer is shared by all sites; don't kill it while any site is active.
                 if (m_producerDRGateway != null) {
                     try {

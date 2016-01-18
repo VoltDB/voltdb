@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,13 +51,13 @@ public abstract class NonVoltDBBackend {
     protected static final Object backendLock = new Object();
     protected static NonVoltDBBackend m_backend = null;
 
-    private String m_database_type = null;
+    protected String m_database_type = null;
     protected Connection dbconn;
 
     /** Constructor specifying the databaseType (e.g. HSQL or PostgreSQL),
      *  driverClassName, connectionURL, username, and password. */
     public NonVoltDBBackend(String databaseType, String driverClassName,
-                          String connectionURL, String username, String password) {
+                            String connectionURL, String username, String password) {
         m_database_type = databaseType;
         try {
             Class.forName(driverClassName);

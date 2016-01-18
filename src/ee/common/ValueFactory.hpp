@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -113,6 +113,13 @@ public:
 
     static NValue getNullBinaryValue() {
         return NValue::getNullBinaryValue();
+    }
+
+    /// Returns an NValue of type Geography that points to an uninitialized temp buffer of the given size
+    static inline NValue getUninitializedTempGeographyValue(int32_t length) {
+        NValue retval(VALUE_TYPE_GEOGRAPHY);
+        retval.allocateValueStorage(length, NValue::getTempStringPool());
+        return retval;
     }
 
     /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -453,7 +453,7 @@ public class TestCatalogUtil extends TestCase {
         String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), false);
         assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(0, sysset.getQuerytimeout());
+        assertEquals(10000, sysset.getQuerytimeout());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
