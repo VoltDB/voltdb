@@ -476,10 +476,7 @@ def get_database_deployment(dbid):
             uelem.attrib["name"] = duser["name"]
             uelem.attrib["password"] = duser["password"]
             uelem.attrib["roles"] = duser["roles"]
-            if duser['plaintext'] == True:
-                uelem.attrib["plaintext"] = "true"
-            else:
-                uelem.attrib["plaintext"] = "false"
+            uelem.attrib["plaintext"] = duser["plaintext"]
 
     handle_deployment_dict(deployment_top, dbid, value, True)
 
@@ -1076,7 +1073,11 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
         deployment_sub_element = SubElement(deployment_elem, str(key))
     for key1, value1 in value.iteritems():
         if type(value1) is dict:
-            handle_deployment_dict(deployment_sub_element, key1, value1, False)
+            if istop == True:
+                if key1 not in IGNORETOP:
+                    handle_deployment_dict(deployment_sub_element, key1, value1, False)
+            else:
+                handle_deployment_dict(deployment_sub_element, key1, value1, False)
         elif type(value1) is list:
             handle_deployment_list(deployment_sub_element, key1, value1)
         else:
