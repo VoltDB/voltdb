@@ -85,7 +85,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
 
-        pn = compile("select A,C  FROM R1 A JOIN R2 B USING(A)");
+        pn = compile("select A,B.C  FROM R1 A JOIN R2 B USING(A)");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         NodeSchema ns = pn.getOutputSchema();
