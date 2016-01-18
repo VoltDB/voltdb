@@ -32,7 +32,6 @@ public interface ImportDataProcessor  {
 
     public static final String IMPORT_MODULE = "__IMPORT_MODULE__";
     public static final String IMPORT_FORMATTER = "__IMPORT_FORMATTER__";
-    public static final String IMPORT_FORMAT_TYPE = "__IMPORT_FORMAT_TYPE__";
     public static final String IMPORT_PROCEDURE = "procedure";
     public static final String IMPORTER_CLASS = "impl";
     public static final String IMPORTER_SERVICE_CLASS = "org.voltdb.importer.ImportHandlerProxy";

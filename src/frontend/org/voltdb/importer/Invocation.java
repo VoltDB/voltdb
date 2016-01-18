@@ -25,11 +25,6 @@ public class Invocation {
     private final String m_proc;
     private final Object[] m_params;
 
-    public Invocation(){
-        m_proc = null;
-        m_params = null;
-    }
-
     public Invocation(String proc, Object[] params) {
         m_proc = proc;
         m_params = params;

@@ -30,18 +30,15 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 public class VoltCSVFormatter implements Formatter<String> {
     final CSVParser m_parser;
 
-    VoltCSVFormatter (Properties prop) {
-        String type = prop.getProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE);
-        if (!("csv".equalsIgnoreCase(type) || "tsv".equalsIgnoreCase(type))) {
-            throw new IllegalArgumentException("Invalid format " + type + ", choices are either \"csv\" or \"tsv\".");
+    VoltCSVFormatter (String formatName, Properties prop) {
+        if (!("csv".equalsIgnoreCase(formatName) || "tsv".equalsIgnoreCase(formatName))) {
+            throw new IllegalArgumentException("Invalid format " + formatName + ", choices are either \"csv\" or \"tsv\".");
         }
-        char separator = "csv".equalsIgnoreCase(type) ? ',' : '\t';
+        char separator = "csv".equalsIgnoreCase(formatName) ? ',' : '\t';
 
         String separatorProp = prop.getProperty("separator", "");
         if (!separatorProp.isEmpty() && separatorProp.length() == 1) {
             separator = separatorProp.charAt(0);
-        } else if ("\t".equals(separatorProp)) {
-            separator = '\t';
         }
 
         char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;

@@ -105,7 +105,7 @@ public class ImportProcessor implements ImportDataProcessor {
     }
 
     public void addProcessorConfig(ImportConfiguration config) {
-        Properties properties = config.getmoduleProp();
+        Properties properties = config.getmoduleProperties();
         String module = properties.getProperty(ImportDataProcessor.IMPORT_MODULE);
         String attrs[] = module.split("\\|");
         String bundleJar = attrs[1];
@@ -218,7 +218,7 @@ public class ImportProcessor implements ImportDataProcessor {
         List<String> configuredImporters = new ArrayList<String>();
         for (String cname : config.keySet()) {
             ImportConfiguration iConfig = config.get(cname);
-            Properties properties = iConfig.getmoduleProp();
+            Properties properties = iConfig.getmoduleProperties();
 
             String importBundleJar = properties.getProperty(IMPORT_MODULE);
             Preconditions.checkNotNull(importBundleJar, "Import source is undefined or custom export plugin class missing.");

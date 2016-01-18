@@ -158,6 +158,8 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
 
+    final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
+
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
@@ -1171,22 +1173,28 @@ public abstract class CatalogUtil {
     }
 
     public static class ImportConfiguration {
-        private final Properties m_moduleProp;
-        private final Properties m_formatterProp;
+        private final String m_formatName;
+        private final Properties m_moduleProps;
+        private final Properties m_formatterProps;
 
         private Formatter m_formatter = null;
 
-        public ImportConfiguration(Properties moduleProp, Properties formatterProp) {
-            m_moduleProp = moduleProp;
-            m_formatterProp = formatterProp;
+        public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
+            m_formatName = formatName;
+            m_moduleProps = moduleProps;
+            m_formatterProps = formatterProps;
         }
 
-        public Properties getmoduleProp() {
-            return m_moduleProp;
+        public String getFormatName() {
+            return m_formatName;
         }
 
-        public Properties getformatterProp() {
-            return m_formatterProp;
+        public Properties getmoduleProperties() {
+            return m_moduleProps;
+        }
+
+        public Properties getformatterProperties() {
+            return m_formatterProps;
         }
 
         public void setFormatter(Formatter formatter) {
@@ -1270,26 +1278,27 @@ public abstract class CatalogUtil {
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
 
-        Properties moduleProp = new Properties();
-        Properties formatterProp = new Properties();
+        Properties moduleProps = new Properties();
+        Properties formatterProps = new Properties();
 
         String formatBundle = importConfiguration.getFormat();
+        String formatName = null;
         if (formatBundle != null && formatBundle.trim().length() > 0) {
-            if (formatBundle.equalsIgnoreCase("csv") || formatBundle.equalsIgnoreCase("tsv")) {
-                formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, formatBundle);
+            if ("csv".equalsIgnoreCase(formatBundle) || "tsv".equalsIgnoreCase(formatBundle)) {
+                formatName = formatBundle;
                 formatBundle = "voltcsvformatter.jar";
-            } else if (formatBundle.matches("(.*)[.]jar/(.*)")) {
+            } else if (JAR_EXTENSION_RE.matcher(formatBundle).matches()) {
                 int typeIndex = formatBundle.lastIndexOf("/");
-                formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMAT_TYPE, formatBundle.substring(typeIndex + 1));
+                formatName = formatBundle.substring(typeIndex + 1);
                 formatBundle = formatBundle.substring(0, typeIndex);
             } else {
                 throw new DeploymentCheckException("Import format " + formatBundle + " not valid.");
             }
-            formatterProp.setProperty(ImportDataProcessor.IMPORT_FORMATTER, buildBundleURL(formatBundle, true));
+            formatterProps.setProperty(ImportDataProcessor.IMPORT_FORMATTER, buildBundleURL(formatBundle, true));
         }
 
         if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
-            moduleProp.setProperty(ImportDataProcessor.IMPORT_MODULE, buildBundleURL(importBundleUrl, false));
+            moduleProps.setProperty(ImportDataProcessor.IMPORT_MODULE, buildBundleURL(importBundleUrl, false));
         }
 
         List<PropertyType> importProperties = importConfiguration.getProperty();
@@ -1298,10 +1307,10 @@ public abstract class CatalogUtil {
                 String key = prop.getName();
                 String value = prop.getValue();
                 if (!key.toLowerCase().contains("passw")) {
-                    moduleProp.setProperty(key, value.trim());
+                    moduleProps.setProperty(key, value.trim());
                 } else {
                     //Dont trim passwords
-                    moduleProp.setProperty(key, value);
+                    moduleProps.setProperty(key, value);
                 }
             }
         }
@@ -1309,13 +1318,11 @@ public abstract class CatalogUtil {
         List<PropertyType> formatProperties = importConfiguration.getFormatProperty();
         if (formatProperties != null && ! formatProperties.isEmpty()) {
             for( PropertyType prop: formatProperties) {
-                String key = prop.getName();
-                String value = prop.getValue();
-                formatterProp.setProperty(key, value);
+                formatterProps.setProperty(prop.getName(), prop.getValue());
             }
         }
 
-        return new ImportConfiguration(moduleProp, formatterProp);
+        return new ImportConfiguration(formatName, moduleProps, formatterProps);
     }
 
     /**

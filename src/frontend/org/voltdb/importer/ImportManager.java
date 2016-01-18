@@ -187,7 +187,7 @@ public class ImportManager implements ChannelChangeCallback {
             m_formatters.clear();
 
             for (ImportConfiguration config : m_processorConfig.values()) {
-                Properties prop = config.getformatterProp();
+                Properties prop = config.getformatterProperties();
                 String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
                 try {
                     AbstractFormatterFactory formatter = m_formatters.get(module);
@@ -203,7 +203,7 @@ public class ImportManager implements ChannelChangeCallback {
                         formatter = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
                         m_formatters.put(module, formatter);
                     }
-                    config.setFormatter(formatter.create(prop));
+                    config.setFormatter(formatter.create(config.getFormatName(), prop));
                 } catch(Throwable t) {
                     VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
                 }
