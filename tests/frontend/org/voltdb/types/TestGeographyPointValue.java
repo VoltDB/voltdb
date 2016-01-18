@@ -50,9 +50,6 @@ public class TestGeographyPointValue extends TestCase {
         assertEquals(20.666, point.getLatitude(), EPSILON);
         assertEquals(10.333, point.getLongitude(), EPSILON);
 
-        assertTrue(point.equals(point));
-        assertFalse(point.equals(new GeographyPointValue(0.0, 10.0)));
-
         assertEquals("POINT (10.333 20.666)", point.toString());
 
         // Make sure that it's not possible to create points
@@ -61,6 +58,67 @@ public class TestGeographyPointValue extends TestCase {
         assertConstructorThrows("Latitude out of range",   100,   91.0);
         assertConstructorThrows("Longitude out of range",  181.0, 45.0);
         assertConstructorThrows("Longitude out of range", -181.0, 45.0);
+    }
+
+    public void testPointEquals() {
+        // We Points within 12 digits of precision should be considered equal for our purposes.
+        final double lessThanEps = 1e-13;
+        final double moreThanEps = 2 * GeographyPointValue.EPSILON;
+
+        GeographyPointValue point = new GeographyPointValue(10.333, 20.666);
+        GeographyPointValue closePoint = new GeographyPointValue(10.333 + lessThanEps, 20.666 - lessThanEps);
+        assertTrue(point.equals(point));
+        assertTrue(point.equals(closePoint));
+        assertTrue(closePoint.equals(point));
+
+        GeographyPointValue farPoint = new GeographyPointValue(0.0, 10.0);
+        assertFalse(point.equals(farPoint));
+        assertFalse(farPoint.equals(point));
+
+        // Points at the north (or south) pole should compare equal regardless of longitude.
+
+        GeographyPointValue northPole1 = new GeographyPointValue( 50.0, 90.0);
+        GeographyPointValue northPole2 = new GeographyPointValue(-70.0, 90.0);
+        GeographyPointValue northPole3 = new GeographyPointValue( 10.0, 90.0 - lessThanEps);
+        assertTrue(northPole1.equals(northPole2));
+        assertTrue(northPole2.equals(northPole1));
+        assertTrue(northPole1.equals(northPole3));
+        assertTrue(northPole3.equals(northPole1));
+
+        GeographyPointValue notNorthPole = new GeographyPointValue( 10.0, 90.0 - moreThanEps);
+        assertFalse(notNorthPole.equals(northPole1));
+        assertFalse(northPole1.equals(notNorthPole));
+
+        GeographyPointValue southPole1 = new GeographyPointValue( 50.0, -90.0);
+        GeographyPointValue southPole2 = new GeographyPointValue(-70.0, -90.0);
+        GeographyPointValue southPole3 = new GeographyPointValue( 10.0, -90.0 + lessThanEps);
+        assertTrue(southPole1.equals(southPole2));
+        assertTrue(southPole2.equals(southPole1));
+        assertTrue(southPole1.equals(southPole3));
+        assertTrue(southPole3.equals(southPole1));
+        assertTrue(southPole3.equals(southPole1));
+
+        GeographyPointValue notSouthPole = new GeographyPointValue( 10.0, -90.0 + moreThanEps);
+        assertFalse(notSouthPole.equals(southPole1));
+        assertFalse(southPole1.equals(notSouthPole));
+
+        assertFalse(southPole2.equals(northPole2));
+
+        // For a given latitude, points at 180 and -180 lontitude are the same.
+
+        GeographyPointValue onIDLNeg1 = new GeographyPointValue(-180.0              , 37.0);
+        GeographyPointValue onIDLNeg2 = new GeographyPointValue(-180.0 + lessThanEps, 37.0);
+        GeographyPointValue onIDLPos1 = new GeographyPointValue( 180.0              , 37.0);
+        GeographyPointValue onIDLPos2 = new GeographyPointValue( 180.0 - lessThanEps, 37.0);
+        assertTrue(onIDLNeg1.equals(onIDLPos1));
+        assertTrue(onIDLNeg2.equals(onIDLPos2));
+        assertTrue(onIDLNeg1.equals(onIDLPos2));
+        assertTrue(onIDLNeg2.equals(onIDLPos1));
+
+        GeographyPointValue notOnIDLNeg = new GeographyPointValue(-180.0 + moreThanEps, 37.0);
+        GeographyPointValue notOnIDLPos = new GeographyPointValue( 180.0 - moreThanEps, 37.0);
+        assertFalse(onIDLNeg1.equals(notOnIDLPos));
+        assertFalse(onIDLPos1.equals(notOnIDLNeg));
     }
 
     public void testPointSerialization() {
