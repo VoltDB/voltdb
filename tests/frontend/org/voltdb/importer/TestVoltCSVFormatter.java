@@ -43,7 +43,6 @@ import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
 import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
-import org.voltdb.importer.formatter.FormatException;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
@@ -51,7 +50,7 @@ import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
-public class TestVoltFormatter extends TestCase {
+public class TestVoltCSVFormatter extends TestCase {
     private Bundle m_bundle;
     private Framework m_framework;
     private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
@@ -93,7 +92,7 @@ public class TestVoltFormatter extends TestCase {
         FrameworkFactory frameworkFactory = ServiceLoader.load(FrameworkFactory.class).iterator().next();
         m_framework = frameworkFactory.newFramework(m_frameworkProps);
         m_framework.start();
-        m_bundle = m_framework.getBundleContext().installBundle("file:" + System.getProperty("user.dir") + "/bundles/volt-formatter.jar");
+        m_bundle = m_framework.getBundleContext().installBundle("file:" + System.getProperty("user.dir") + "/bundles/voltcsvformatter.jar");
         m_bundle.start();
     }
 
@@ -161,6 +160,64 @@ public class TestVoltFormatter extends TestCase {
             fail();
         } catch (ClassCastException e) {
         }
+    }
+    //char separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace
+    @Test
+    public void testQuoteChar() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("quotechar", "'");
+        Formatter formatter = o.create("csv", prop);
+        Object[] results = formatter.transform("12,'10.05,test'");
+        assertEquals(results.length, 2);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05,test");
+    }
+
+    @Test
+    public void testEscape() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("escape", "|");
+        Formatter formatter = o.create("csv", prop);
+        Object[] results = formatter.transform("12,\"10.05,|\"test|\"\"");
+        assertEquals(results.length, 2);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05,\"test\"");
+    }
+
+    @Test
+    public void testStrictQuotes() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("strictquotes", "true");
+        Formatter formatter = o.create("csv", prop);
+        Object[] results = formatter.transform("\"12\",\"10.05\",t\"es\"t");
+        assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05");
+        assertEquals(results[2], "es");
+    }
+
+    @Test
+    public void testIgnoreLeadingWhiteSpace() throws Exception {
+        ServiceReference refs[] = m_bundle.getRegisteredServices();
+        ServiceReference<AbstractFormatterFactory> reference = refs[0];
+        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
+        Properties prop = new Properties();
+        prop.setProperty("ignoreleadingwhitespace", "false");
+        Formatter formatter = o.create("csv", prop);
+        Object[] results = formatter.transform("12,10.05,  test");
+        assertEquals(results.length, 3);
+        assertEquals(results[0], "12");
+        assertEquals(results[1], "10.05");
+        assertEquals(results[2], "  test");
     }
 
     @After

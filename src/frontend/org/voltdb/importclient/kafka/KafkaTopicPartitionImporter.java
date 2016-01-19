@@ -55,7 +55,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.Invocation;
 
 /**
@@ -410,7 +409,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     ByteBuffer payload = messageAndOffset.message().payload();
 
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    CSVInvocation invocation = new CSVInvocation(m_config.getProcedure(), line, m_config.getSeparator());
+                    Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(line));
                     TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                             messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                             invocation);
