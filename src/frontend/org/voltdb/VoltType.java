@@ -260,6 +260,8 @@ public enum VoltType {
     public static final int MAX_VALUE_LENGTH_IN_CHARACTERS = MAX_VALUE_LENGTH / 4;
     /**
      * String representation of <code>MAX_VALUE_LENGTH</code>.
+     * @param size The size you want to represent in human readable string.
+     * @return String representation of Size passed in.
      */
     public static String humanReadableSize(int size)
     {

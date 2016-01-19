@@ -30,7 +30,7 @@ import javax.annotation_voltpatches.Nullable;
  * Static utility methods pertaining to object arrays.
  *
  * @author Kevin Bourrillion
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible(emulated = true)
 public final class ObjectArrays {
@@ -110,8 +110,7 @@ public final class ObjectArrays {
   /** GWT safe version of Arrays.copyOf. */
   static <T> T[] arraysCopyOf(T[] original, int newLength) {
     T[] copy = newArray(original, newLength);
-    System.arraycopy(
-        original, 0, copy, 0, Math.min(original.length, newLength));
+    System.arraycopy(original, 0, copy, 0, Math.min(original.length, newLength));
     return copy;
   }
 

@@ -60,13 +60,13 @@ function cleanall() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 \
+    javac \
         hyperloglogsrc/org/voltdb/hll/HyperLogLog.java \
         hyperloglogsrc/org/voltdb/hll/MurmurHash.java \
         hyperloglogsrc/org/voltdb/hll/RegisterSet.java
-    javac -target 1.7 -source 1.7 -classpath hyperloglogsrc:$APPCLASSPATH \
+    javac -classpath hyperloglogsrc:$APPCLASSPATH \
         procedures/uniquedevices/*.java
-    javac -target 1.7 -source 1.7 -classpath hyperloglogsrc:$CLIENTCLASSPATH \
+    javac -classpath hyperloglogsrc:$CLIENTCLASSPATH \
         client/uniquedevices/*.java
     # build procedure and client jars
     jar cf uniquedevices-procs.jar -C procedures uniquedevices

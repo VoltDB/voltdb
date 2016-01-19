@@ -112,6 +112,7 @@ import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -122,6 +123,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
+import org.voltdb.importer.formatter.Formatter;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -156,6 +158,8 @@ public abstract class CatalogUtil {
     public static final String DEFAULT_DR_CONFLICTS_NONCE = "LOG";
     public static final String DEFAULT_DR_CONFLICTS_DIR = "xdcr_conflicts";
     public static final String DR_HIDDEN_COLUMN_NAME = "dr_clusterid_timestamp";
+
+    final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -912,6 +916,16 @@ public abstract class CatalogUtil {
             tt = new SystemSettingsType.Temptables();
             ss.setTemptables(tt);
         }
+        ResourceMonitorType rm = ss.getResourcemonitor();
+        if (rm == null) {
+            rm = new ResourceMonitorType();
+            ss.setResourcemonitor(rm);
+        }
+        ResourceMonitorType.Memorylimit mem = rm.getMemorylimit();
+        if (mem == null) {
+            mem = new ResourceMonitorType.Memorylimit();
+            rm.setMemorylimit(mem);
+        }
     }
 
     /**
@@ -1169,7 +1183,97 @@ public abstract class CatalogUtil {
         return processorProperties;
     }
 
-    private static Properties checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
+    public static class ImportConfiguration {
+        private final String m_formatName;
+        private final Properties m_moduleProps;
+        private final Properties m_formatterProps;
+
+        private Formatter m_formatter = null;
+
+        public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
+            m_formatName = formatName;
+            m_moduleProps = moduleProps;
+            m_formatterProps = formatterProps;
+        }
+
+        public String getFormatName() {
+            return m_formatName;
+        }
+
+        public Properties getmoduleProperties() {
+            return m_moduleProps;
+        }
+
+        public Properties getformatterProperties() {
+            return m_formatterProps;
+        }
+
+        public void setFormatter(Formatter formatter) {
+            m_formatter = formatter;
+        }
+
+        public Formatter getFormatter() {
+            return m_formatter;
+        }
+    }
+
+    private static String buildBundleURL(String bundle, boolean alwaysBundle) {
+        String modulePrefix = "osgi|";
+        InputStream is;
+        try {
+            //Make sure we can load stream
+            is = (new URL(bundle)).openStream();
+        } catch (Exception ex) {
+            is = null;
+        }
+        String bundleUrl = bundle;
+        if (is == null) {
+            try {
+                String bundlelocation = System.getProperty("voltdbbundlelocation");
+                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
+                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                    hostLog.info("Module base is: " + rpath + "/../bundles/");
+                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + bundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    bundleUrl = "file:" + bpath;
+                } else {
+                    String bpath = bundlelocation + "/" + bundleUrl;
+                    is = new FileInputStream(new File(bpath));
+                    bundleUrl = "file:" + bpath;
+                }
+            } catch (URISyntaxException | FileNotFoundException ex) {
+                is = null;
+            }
+        }
+        if (is != null) {
+            try {
+                is.close();
+            } catch (IOException ex) {
+            }
+        } else if (!alwaysBundle) {
+            //Not a URL try as a class
+            try {
+                CatalogUtil.class.getClassLoader().loadClass(bundleUrl);
+                modulePrefix = "class|";
+            }
+            catch (ClassNotFoundException ex2) {
+                String msg =
+                        "Import failed to configure, failed to load module by URL or classname provided" +
+                        " import module: " + bundleUrl;
+                hostLog.error(msg);
+                throw new DeploymentCheckException(msg);
+            }
+        } else {
+            String msg =
+                    "Import failed to configure, failed to load module by URL or classname provided" +
+                    " format module: " + bundleUrl;
+            hostLog.error(msg);
+            throw new DeploymentCheckException(msg);
+        }
+        return (alwaysBundle ? bundleUrl : modulePrefix + bundleUrl);
+    }
+
+    private static ImportConfiguration checkImportProcessorConfiguration(ImportConfigurationType importConfiguration) {
         String importBundleUrl = importConfiguration.getModule();
 
         if (!importConfiguration.isEnabled()) {
@@ -1185,72 +1289,51 @@ public abstract class CatalogUtil {
                 throw new DeploymentCheckException("Import Configuration type must be specified.");
         }
 
-        Properties processorProperties = new Properties();
-        String modulePrefix = "osgi|";
-        InputStream is;
-        try {
-            //Make sure we can load stream
-            is = (new URL(importBundleUrl)).openStream();
-        } catch (Exception ex) {
-            is = null;
+        Properties moduleProps = new Properties();
+        Properties formatterProps = new Properties();
+
+        String formatBundle = importConfiguration.getFormat();
+        String formatName = null;
+        if (formatBundle != null && formatBundle.trim().length() > 0) {
+            if ("csv".equalsIgnoreCase(formatBundle) || "tsv".equalsIgnoreCase(formatBundle)) {
+                formatName = formatBundle;
+                formatBundle = "voltcsvformatter.jar";
+            } else if (JAR_EXTENSION_RE.matcher(formatBundle).matches()) {
+                int typeIndex = formatBundle.lastIndexOf("/");
+                formatName = formatBundle.substring(typeIndex + 1);
+                formatBundle = formatBundle.substring(0, typeIndex);
+            } else {
+                throw new DeploymentCheckException("Import format " + formatBundle + " not valid.");
+            }
+            formatterProps.setProperty(ImportDataProcessor.IMPORT_FORMATTER, buildBundleURL(formatBundle, true));
         }
-        if (is == null) {
-            try {
-                String bundlelocation = System.getProperty("voltdbbundlelocation");
-                if (bundlelocation == null || bundlelocation.trim().length() == 0) {
-                    String rpath = CatalogUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
-                    hostLog.info("Module base is: " + rpath + "/../bundles/");
-                    String bpath = (new File(rpath)).getParent() + "/../bundles/" + importBundleUrl;
-                    is = new FileInputStream(new File(bpath));
-                    importBundleUrl = "file:" + bpath;
-                } else {
-                    String bpath = bundlelocation + "/" + importBundleUrl;
-                    is = new FileInputStream(new File(bpath));
-                    importBundleUrl = "file:" + bpath;
-                }
-            } catch (URISyntaxException | FileNotFoundException ex) {
-                is = null;
-            }
-        }
-        if (is != null) {
-            try {
-                is.close();
-            } catch (IOException ex) {
-            }
-        } else {
-            //Not a URL try as a class
-            try {
-                CatalogUtil.class.getClassLoader().loadClass(importBundleUrl);
-                modulePrefix = "class|";
-            }
-            catch (ClassNotFoundException ex2) {
-                String msg =
-                        "Import failed to configure, failed to load module by URL or classname provided" +
-                        " import module: " + importBundleUrl;
-                hostLog.error(msg);
-                throw new DeploymentCheckException(msg);
-            }
-        }
+
         if (importBundleUrl != null && importBundleUrl.trim().length() > 0) {
-            processorProperties.setProperty(ImportDataProcessor.IMPORT_MODULE, modulePrefix + importBundleUrl);
+            moduleProps.setProperty(ImportDataProcessor.IMPORT_MODULE, buildBundleURL(importBundleUrl, false));
         }
 
-        List<PropertyType> configProperties = importConfiguration.getProperty();
-        if (configProperties != null && ! configProperties.isEmpty()) {
-
-            for( PropertyType configProp: configProperties) {
-                String key = configProp.getName();
-                String value = configProp.getValue();
+        List<PropertyType> importProperties = importConfiguration.getProperty();
+        if (importProperties != null && ! importProperties.isEmpty()) {
+            for( PropertyType prop: importProperties) {
+                String key = prop.getName();
+                String value = prop.getValue();
                 if (!key.toLowerCase().contains("passw")) {
-                    processorProperties.setProperty(key, value.trim());
+                    moduleProps.setProperty(key, value.trim());
                 } else {
                     //Dont trim passwords
-                    processorProperties.setProperty(key, value);
+                    moduleProps.setProperty(key, value);
                 }
             }
         }
 
-        return processorProperties;
+        List<PropertyType> formatProperties = importConfiguration.getFormatProperty();
+        if (formatProperties != null && ! formatProperties.isEmpty()) {
+            for( PropertyType prop: formatProperties) {
+                formatterProps.setProperty(prop.getName(), prop.getValue());
+            }
+        }
+
+        return new ImportConfiguration(formatName, moduleProps, formatterProps);
     }
 
     /**
@@ -1380,8 +1463,8 @@ public abstract class CatalogUtil {
         }
     }
 
-    public static Map<String, Properties> getImportProcessorConfig(ImportType importType) {
-        Map<String, Properties> processorConfig = new HashMap<String, Properties>();
+    public static Map<String, ImportConfiguration> getImportProcessorConfig(ImportType importType) {
+        Map<String, ImportConfiguration> processorConfig = new HashMap<String, ImportConfiguration>();
         if (importType == null) {
             return processorConfig;
         }
@@ -1395,11 +1478,8 @@ public abstract class CatalogUtil {
                 streamList.add(importConfiguration.getModule());
             }
 
-            Properties processorProperties = checkImportProcessorConfiguration(importConfiguration);
-            String formatter = importConfiguration.getFormat();
-            if (formatter != null && !formatter.isEmpty()) {
-                processorProperties.put(ImportDataProcessor.IMPORT_FORMATTER, formatter);
-            }
+            ImportConfiguration processorProperties = checkImportProcessorConfiguration(importConfiguration);
+
             processorConfig.put(importConfiguration.getModule() + i++, processorProperties);
         }
         return processorConfig;

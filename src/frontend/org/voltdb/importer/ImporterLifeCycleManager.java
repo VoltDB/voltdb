@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.importer.formatter.Formatter;
 
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -86,7 +87,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      * @param distributer ChannelDistributer that is responsible for allocating resources to nodes.
      * This will be used only if the importer must not be run on every site.
      */
-    public final void readyForData(ChannelDistributer distributer)
+    public final void readyForData(ChannelDistributer distributer, Formatter formatter)
     {
         if (m_stopping) return;
 
@@ -115,6 +116,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         if (m_factory.isImporterRunEveryWhere()) {
             for (final ImporterConfig config : m_configs.values()) {
                 AbstractImporter importer = m_factory.createImporter(config);
+                importer.setFormatter(formatter);
                 builder.put(importer.getResourceID(), importer);
             }
             m_importers.set(builder.build());

@@ -331,6 +331,7 @@ chmod +x %%{__perl_requires}
 %%build
 
 %%install
+mv "%%{buildroot}"/../../../installtree/%%{name}-%%{version}-%%{release}.%%{_arch}/* "%%{buildroot}"/
 
 %%clean
 
@@ -587,7 +588,7 @@ def debian():
 def rpm():
 
     blddir = os.path.join(meta.build_root, 'rpmbuild')
-
+    installtree = os.path.join(meta.build_root, 'installtree')
     if os.path.exists(meta.build_root):
         info('Removing existing output directory "%s"...' % meta.build_root)
         if not meta.options.dryrun:
@@ -615,7 +616,7 @@ def rpm():
     voltdb_build = voltdb_dist + "-%(pkgrelease)d.%(arch)s" % syms
 
     # stage the voltdb distribution files where rpmbuild needs them
-    buildroot = os.path.join(blddir, "BUILDROOT", voltdb_build)
+    buildroot = os.path.join(installtree, voltdb_build)
     meta.options.prefix = buildroot
     install()
 
