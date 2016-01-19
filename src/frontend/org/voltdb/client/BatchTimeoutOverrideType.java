@@ -34,6 +34,7 @@ public enum BatchTimeoutOverrideType {
 
     public static final int BATCH_TIMEOUT_VERSION = 1;
     public static final int NO_TIMEOUT = -1;
+    public static final int DEFAULT_TIMEOUT = 10000;
 
     public byte getValue() {
         return m_value;

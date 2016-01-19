@@ -28,8 +28,10 @@ import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
+import org.osgi.framework.ServiceReference;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
 import org.voltcore.logging.VoltLogger;
@@ -38,10 +40,13 @@ import org.voltdb.CatalogContext;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.ImportType;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -60,7 +65,8 @@ public class ImportManager implements ChannelChangeCallback {
     private final static Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
-    private volatile Map<String, Properties> m_processorConfig = new HashMap<>();
+    private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
+    private final Map<String, AbstractFormatterFactory> m_formatters = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
@@ -108,6 +114,7 @@ public class ImportManager implements ChannelChangeCallback {
                 .add("org.voltcore.network")
                 .add("org.voltcore.logging")
                 .add("org.voltdb.importer")
+                .add("org.voltdb.importer.formatter")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")
                 .add("org.slf4j")
@@ -177,6 +184,31 @@ public class ImportManager implements ChannelChangeCallback {
 
             ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework, m_statsCollector);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
+            m_formatters.clear();
+
+            for (ImportConfiguration config : m_processorConfig.values()) {
+                Properties prop = config.getformatterProperties();
+                String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
+                try {
+                    AbstractFormatterFactory formatter = m_formatters.get(module);
+                    if (formatter == null) {
+                        Bundle bundle = m_framework.getBundleContext().installBundle(module);
+                        bundle.start();
+                        ServiceReference refs[] = bundle.getRegisteredServices();
+                        //Must have one service only.
+                        ServiceReference reference = refs[0];
+                        if (reference == null) {
+                            VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
+                        }
+                        formatter = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
+                        m_formatters.put(module, formatter);
+                    }
+                    config.setFormatter(formatter.create(config.getFormatName(), prop));
+                } catch(Throwable t) {
+                    VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
+                }
+            }
+
             newProcessor.setProcessorConfig(catalogContext, m_processorConfig);
             m_processor.set(newProcessor);
         } catch (final Exception e) {

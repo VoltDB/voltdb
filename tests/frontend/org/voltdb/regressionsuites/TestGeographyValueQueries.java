@@ -251,7 +251,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // equals
             VoltTable vt = client.callProcedure("@AdHoc",
-                    "select pk, name, poly "
+                    "select t1.pk, t1.name, t1.poly "
                             + "from " + tbl + " as t1, t as t2 "
                             + "where t1.poly = t2.poly "
                             + "order by t1.pk").getResults()[0];
