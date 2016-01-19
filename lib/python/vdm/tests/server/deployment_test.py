@@ -465,12 +465,12 @@ class UpdateDeployment(Deployment):
                                                    "frequency": 5}},
             "security": {"enabled": False, "provider": "HASH"},
             "export":{"configuration":[{"enabled":False,
-                                        "type": "KAFKA", "exportconnectorclass":"test",
+                                        "type": "kafka", "exportconnectorclass":"test",
                                         "stream": "test", "property":[{"name": "test",
                                                                        "value": "test"}]}]},
-            "import": {"configuration": [{"enabled":False,"type":"KAFKA", "module": "test",
+            "import": {"configuration": [{"enabled":False,"type":"kafka", "module": "test", "format": "test",
                                                                   "property":[{"name":"test","value":"test"}]}]},
-            "dr": {"id": 33, "type": "Master", "enabled": True, "connection": {"source": "testttt", "servers": []}}
+            # "dr": {"id": 33, "type": "Master", "enabled": True, "connection": {"source": "testttt", "servers": []}}
         }
 
         response = requests.put(__url__,

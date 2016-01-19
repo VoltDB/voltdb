@@ -575,7 +575,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	color: #000000;
 }
 
-.btnAddServer {padding: 0px 10px 6px 1px; background:#ccc; color:#222; font-weight:bold; border:none;white-space: nowrap; display:inline-block;}
+.btnAddServer {padding: 0px 10px 7px 1px; background:#ccc; color:#222; font-weight:bold; border:none;white-space: nowrap; display:inline-block;}
 .btnAddServer:hover, .btnAddServer:active, .btnAddServer:focus {background:#ccc; color:#222; border:none;}
 .addServer a:hover, .addServer a:active, .addServer a:focus {
 	color: #000000;
@@ -674,7 +674,7 @@ ul.addServerList li:nth-child(1) {
 	height: 30px;
 	padding: 5px 10px;
 	line-height: 1.5;
-	width: 50px;
+	width: 70px;
 	text-align: center;
 }
 .overviewInputText1 {
@@ -1289,7 +1289,9 @@ ul.nav li a {
 	height: 50px;
 	margin: 0;
 	padding: 14px 15px 0;
+	
 }
+
 .navbar-inverse .navbar-nav > li > a {
 	color: #FFFFFF;
 	background-color: #435464;
@@ -1350,6 +1352,7 @@ ul.drList {
 	width: 100%;
 }
 .modal .connectionSourceModel { overflow:auto; height:450px;}
+.modal-add-user {margin: 30% auto; width:94.5%;}
 
 }
  @media (min-width: 320px) and (max-width: 620px) {

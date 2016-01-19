@@ -79,9 +79,12 @@
             "throughput": 2
         },
         "query": {
-            "timeout": 0
+            "timeout": 10000
         },
-        "resourcemonitor": null
+        "resourcemonitor":{
+            "memorylimit":{"size":"80%"},
+            "disklimit":null
+        }
     },
     "security": {
         "enabled": false,

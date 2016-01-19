@@ -71,5 +71,6 @@ except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
 home = expanduser("~")
-config_path = home + '.vdm' if home.endswith('/') else home + '/' + '.vdm'
+# vdm_path = '.vdm' if home.endswith('/') else home + '/' + '.vdm'
+config_path = os.path.join(home, '.vdm')
 HTTPListener.main(None, HTTPListener, 8000, config_path)
