@@ -553,8 +553,9 @@ def make_configuration_file():
         i += 1
 
     try:
-        # vdm_path = '.vdm' if PATH.endswith('/') else PATH + '/' + '.vdm'
-        path = os.path.join(PATH, '.vdm')
+        # f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
+        # vdm_path = 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'
+        path = os.path.join(PATH, 'vdm.xml')
         f = open(path, 'w')
         f.write(tostring(main_header,encoding='UTF-8'))
         f.close()
@@ -1724,6 +1725,7 @@ def main(runner, amodule, aport, config_dir):
     PATH = config_dir
     # config_path = config_dir + '/' + 'vdm.xml'
     config_path = os.path.join(config_dir, 'vdm.xml')
+
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
