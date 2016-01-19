@@ -34,13 +34,9 @@ import socket
 import os
 import json
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring, parse, XML
-import sys
 import requests
 from flask import Flask
 from flask.ext.cors import CORS
-import fcntl
-import struct
-import xmltodict
 from collections import defaultdict
 import ast
 import os.path
@@ -557,7 +553,10 @@ def make_configuration_file():
         i += 1
 
     try:
-        f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
+        # f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
+        # vdm_path = 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'
+        path = os.path.join(PATH, 'vdm.xml')
+        f = open(path, 'w')
         f.write(tostring(main_header,encoding='UTF-8'))
         f.close()
 
@@ -568,10 +567,10 @@ def make_configuration_file():
 
 
 def sync_configuration():
-     headers = {'content-type': 'application/json'}
-     url = 'http://localhost:8000/api/1.0/vdm/configuration/'
-     response = requests.post(url,headers = headers)
-     return response
+    headers = {'content-type': 'application/json'}
+    url = 'http://localhost:8000/api/1.0/vdm/configuration/'
+    response = requests.post(url,headers = headers)
+    return response
 
 
 def convert_xml_to_json(config_path):
@@ -1102,15 +1101,6 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
 def handle_deployment_list(deployment_elem, key, value):
     for items in value:
         handle_deployment_dict(deployment_elem, key, items, False)
-
-
-def get_ip_address(ifname):
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    return socket.inet_ntoa(fcntl.ioctl(
-        s.fileno(),
-        0x8915,  # SIOCGIFADDR
-        struct.pack('256s', ifname[:15])
-    )[20:24])
 
 
 def parse_bool_string(bool_string):
@@ -1668,15 +1658,6 @@ class SyncVdmConfiguration(MethodView):
     """
 
     @staticmethod
-    def get():
-        try:
-            r = requests.get('http://192.168.2.33:8000/api/1.0/vdm/configuration/')
-            r.status_code
-        except Exception, err:
-            print str(err)
-        return jsonify(json.loads(r.text))
-
-    @staticmethod
     def post():
         try:
             result = request.json
@@ -1719,22 +1700,11 @@ class VdmConfiguration(MethodView):
         result = get_configuration()
 
         for member in result['vdm']['members']:
-            # print result
             headers = {'content-type': 'application/json'}
             url = 'http://'+member['hostname']+':8000/api/1.0/vdm/sync_configuration/'
             data = result
             response = requests.post(url,data=json.dumps(data),headers = headers)
         return jsonify({'deployment': response.status_code})
-
-
-
-class VdmGetServerIP(MethodView):
-    """
-    Class to get the IP address of the server
-    """
-    @staticmethod
-    def get():
-        return jsonify({'ip_address': get_ip_address('eth0')})
 
 
 def main(runner, amodule, aport, config_dir):
@@ -1747,12 +1717,15 @@ def main(runner, amodule, aport, config_dir):
         APP.config.update(DEBUG=True)
 
     path = os.path.dirname(amodule.__file__)
-    depjson = path + "/deployment.json"
+    # depjson = path + "/deployment.json"
+    depjson = os.path.join(path, "deployment.json")
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
     global PATH
     PATH = config_dir
-    config_path = config_dir + '/' + 'vdm.xml'
+    # config_path = config_dir + '/' + 'vdm.xml'
+    config_path = os.path.join(config_dir, 'vdm.xml')
+
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
@@ -1766,16 +1739,6 @@ def main(runner, amodule, aport, config_dir):
                         'admin-listener': "", 'http-listener': "", 'replication-listener': "",
                         'zookeeper-listener': "", 'placement-group': ""})
         DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
-    # DEPLOYMENT.append(deployment)
-    #
-    # __host_name__ = socket.gethostname()
-    # __host_or_ip__ = socket.gethostbyname(__host_name__)
-    # SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
-    #                 'enabled': True, 'external-interface': "", 'internal-interface': "",
-    #                 'public-interface': "", 'client-listener': "", 'internal-listener': "",
-    #                 'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-    #                 'zookeeper-listener': "", 'placement-group': ""})
-    # DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
 
     make_configuration_file()
 
@@ -1787,7 +1750,6 @@ def main(runner, amodule, aport, config_dir):
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
     SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
-    VDM_SERVER_IP = VdmGetServerIP.as_view('vdm_server_view_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1815,9 +1777,5 @@ def main(runner, amodule, aport, config_dir):
     APP.add_url_rule('/api/1.0/vdm/configuration/',
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
-                     view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['GET','POST'])
-    APP.add_url_rule('/api/1.0/ServerIP/',
-                     view_func=VDM_SERVER_IP, methods=['GET'])
-    # APP.add_url_rule('/api/1.0/vdm/configuration_sync/<string:ip_address>', view_func=SYNC_VDM_CONFIGURATION_VIEW,
-    #                  methods=['POST'])
+                     view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)
