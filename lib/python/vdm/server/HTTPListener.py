@@ -1700,10 +1700,14 @@ class VdmConfiguration(MethodView):
         result = get_configuration()
 
         for member in result['vdm']['members']:
-            headers = {'content-type': 'application/json'}
-            url = 'http://'+member['hostname']+':8000/api/1.0/vdm/sync_configuration/'
-            data = result
-            response = requests.post(url,data=json.dumps(data),headers = headers)
+            try:
+                headers = {'content-type': 'application/json'}
+                url = 'http://'+member['hostname']+':8000/api/1.0/vdm/sync_configuration/'
+                data = result
+                response = requests.post(url,data=json.dumps(data),headers = headers)
+            except Exception,errs:
+                print str(errs)
+
         return jsonify({'deployment': response.status_code})
 
 
