@@ -23,7 +23,10 @@
 
 package org.voltdb_testprocs.regressionsuites.saverestore;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     singlePartition = false
@@ -33,8 +36,14 @@ public class SaveRestoreSelect extends VoltProcedure {
     public final SQLStmt selectAllPartitioned =
         new SQLStmt("SELECT * FROM PARTITION_TESTER ORDER BY PT_ID ASC;");
 
+    public final SQLStmt selectAllPartitionedDR =
+            new SQLStmt("SELECT * FROM PARTITION_TESTER_DR ORDER BY PT_ID ASC;");
+
     public final SQLStmt selectAllReplicated =
         new SQLStmt("SELECT * FROM REPLICATED_TESTER ORDER BY RT_ID ASC;");
+
+    public final SQLStmt selectAllReplicatedDR =
+            new SQLStmt("SELECT * FROM REPLICATED_TESTER_DR ORDER BY RT_ID ASC;");
 
     public final SQLStmt selectAllBecomesMaterialized =
         new SQLStmt("SELECT * FROM BECOMES_MATERIALIZED ORDER BY PT_INTVAL ASC;");
@@ -50,9 +59,17 @@ public class SaveRestoreSelect extends VoltProcedure {
         {
             voltQueueSQL(selectAllPartitioned);
         }
+        else if (tableName.equals("PARTITION_TESTER_DR"))
+        {
+            voltQueueSQL(selectAllPartitionedDR);
+        }
         else if (tableName.equals("REPLICATED_TESTER"))
         {
             voltQueueSQL(selectAllReplicated);
+        }
+        else if (tableName.equals("REPLICATED_TESTER_DR"))
+        {
+            voltQueueSQL(selectAllReplicatedDR);
         }
         else if (tableName.equals("BECOMES_MATERIALIZED"))
         {

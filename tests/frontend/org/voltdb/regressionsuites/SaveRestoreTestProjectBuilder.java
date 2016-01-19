@@ -45,6 +45,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 
     public static String partitioning[][] =
         new String[][] {{"PARTITION_TESTER", "PT_ID"},
+                        {"PARTITION_TESTER_DR", "PT_ID"},
                         {"CHANGE_COLUMNS", "ID"},
                         {"JUMBO_ROW", "PKEY"},
                         {"JUMBO_ROW_UTF8", "PKEY"},
