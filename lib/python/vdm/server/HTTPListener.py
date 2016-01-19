@@ -402,7 +402,7 @@ def map_deployment(request, database_id):
             )
 
     if 'dr' in request.json:
-        if deployment[0]['dr'] is None:
+        if 'dr' not in deployment[0] or deployment[0]['dr'] is None:
             deployment[0]['dr'] = {}
 
     if 'dr' in request.json and 'connection' in request.json['dr']:
@@ -762,9 +762,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['snapshot']['priority'] = int(deployment[field]['snapshot']['priority'])
                         new_deployment[field]['temptables'] = {}
                         new_deployment[field]['temptables']['maxsize'] = int(deployment[field]['temptables']['maxsize'])
-
-                        if deployment[field]['resourcemonitor'] is None:
-                            new_deployment[field]['resourcemonitor'] = (deployment[field]['resourcemonitor'])
+                        if 'resourcemonitor' not in deployment[field] or deployment[field]['resourcemonitor'] is None:
+                            if 'resourcemonitor'  in deployment[field]:
+                                new_deployment[field]['resourcemonitor'] = deployment[field]['resourcemonitor']
                         else:
                             new_deployment[field]['resourcemonitor'] = {}
                             if 'memorylimit' in deployment[field]['resourcemonitor']:
@@ -785,15 +785,14 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         if deployment[field] is not None:
                             new_deployment[field] = {}
                             new_deployment[field]['id'] = int(deployment[field]['id'])
-                            new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
                             new_deployment[field]['type'] = str(deployment[field]['type'])
-                            if 'connection' not in deployment[field]:
+                            if 'connection' in deployment[field] and deployment[field]['connection'] is not None and 'source' in deployment[field]['connection']:
                                 new_deployment[field]['connection'] = {}
                                 new_deployment[field]['connection']['source'] = deployment[field]['connection']['source']
-                                new_deployment[field]['connection']['servers'] = deployment[field]['connection']['servers']
+                                new_deployment[field]['connection']['servers'] = ast.literal_eval(str(deployment[field]['connection']['servers']))
 
                     except Exception, err:
-                        print str(err)
+                        print 'dr:' + str(err)
                 elif field == 'users':
                     if deployment[field] is not None:
                         new_deployment[field] = {}
@@ -926,9 +925,8 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     if deployment_xml[field] is not None:
                         new_deployment[field] = {}
                         new_deployment[field]['id'] = int(deployment_xml[field]['id'])
-                        new_deployment[field]['enabled'] = parse_bool_string(deployment_xml[field]['enabled'])
                         new_deployment[field]['type'] = str(deployment_xml[field]['type'])
-                        if 'connection' not in deployment_xml[field]:
+                        if 'connection' not in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment[field]['connection']:
                             new_deployment[field]['connection'] = {}
                             new_deployment[field]['connection']['source'] = deployment_xml[field]['connection']['source']
                             new_deployment[field]['connection']['servers'] = deployment_xml[field]['connection']['servers']
@@ -1099,8 +1097,11 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
 
 
 def handle_deployment_list(deployment_elem, key, value):
-    for items in value:
-        handle_deployment_dict(deployment_elem, key, items, False)
+    if (key == 'servers'):
+        deployment_elem.attrib[key] = str(value)
+    else:
+        for items in value:
+            handle_deployment_dict(deployment_elem, key, items, False)
 
 
 def parse_bool_string(bool_string):
@@ -1505,7 +1506,6 @@ class deploymentAPI(MethodView):
                         if len(deployment_selected) == 0:
                             make_response(jsonify({'error': 'The selected database must have database enabled.'}), 404)
                         if deployment_selected[0]['dr'] is not None and \
-                                        deployment_selected[0]['dr']['enabled'] is True and \
                                         deployment_selected[0]['dr']['type'] is not None:
                             deployment_type = deployment_selected[0]['dr']['type']
                             if deployment_type != 'Master':
@@ -1517,11 +1517,15 @@ class deploymentAPI(MethodView):
                     if request.json['dr']['type'] == 'XDCR':
                         if len(deployment_selected) != 0 and deployment_selected[0]['dr'] is not None and \
                                         len(deployment_selected[0]['dr']) != 0 and \
-                                        deployment_selected[0]['dr']['enabled'] is True and \
                                         deployment_selected[0]['dr']['type'] is not None:
                             database_selected = [database for database in DATABASES if database['id'] == database_id]
                             if len(database_selected) == 0:
                                 return make_response(jsonify({'error': 'Database not found.'}))
+
+                            if deployment_selected[0]['dr']['type'] == 'Master':
+                                return make_response(jsonify({'error': 'The selected database should be '
+                                                                           'of DR type "XDCR".'}), 404)
+
                             if database_selected[0]['name'] != deployment_selected[0]['dr']['connection']['source']:
                                 if deployment_selected[0]['dr']['type'] == 'Master' or \
                                                 deployment_selected[0]['dr']['type'] == 'Replica':

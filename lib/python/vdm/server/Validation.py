@@ -744,10 +744,6 @@ schema = {
                     "id": "type",
                     "type": "string",
                 },
-                "enabled": {
-                    "id": "enabled",
-                    "type": "boolean"
-                },
                 "connection": {
                     "id": "connection",
                     "type": "object",
