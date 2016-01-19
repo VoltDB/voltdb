@@ -451,17 +451,23 @@ public class plannerTester {
                 joinOrder = splitLine[1];
                 query = splitLine[2];
             }
-            List<AbstractPlanNode> pnList = s_singleton.compileWithJoinOrderToFragments(query, joinOrder);
-            AbstractPlanNode pn = pnList.get(0);
-            if (pnList.size() == 2) {// multi partition query plan
-                assert(pnList.get(1) instanceof SendPlanNode);
-                if ( ! pn.reattachFragment((SendPlanNode) pnList.get(1))) {
-                    System.err.println("Receive plan node not found in reattachFragment.");
+            // If one compilation fails, try subsequent ones.
+            // This avoids cascading "file-not-found" errors.
+            try {
+                List<AbstractPlanNode> pnList = s_singleton.compileWithJoinOrderToFragments(query, joinOrder);
+                AbstractPlanNode pn = pnList.get(0);
+                if (pnList.size() == 2) {// multi partition query plan
+                    assert(pnList.get(1) instanceof SendPlanNode);
+                    if ( ! pn.reattachFragment((SendPlanNode) pnList.get(1))) {
+                        System.err.println("Receive plan node not found in reattachFragment.");
+                    }
                 }
-            }
-            writePlanToFile(pn, m_workPath, config + ".plan" + i, m_stmts.get(i));
-            if (isSave) {
-                writePlanToFile(pn, m_baselinePath, config + ".plan" + i, m_stmts.get(i));
+                writePlanToFile(pn, m_workPath, config + ".plan" + i, m_stmts.get(i));
+                if (isSave) {
+                    writePlanToFile(pn, m_baselinePath, config + ".plan" + i, m_stmts.get(i));
+                }
+            } catch (PlanningErrorException ex) {
+                System.err.printf("Planning error, line %d: %s\n", i, ex.getMessage());
             }
         }
         if (isSave) {
