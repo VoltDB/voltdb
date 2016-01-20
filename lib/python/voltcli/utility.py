@@ -858,6 +858,22 @@ def get_java_version():
         return ""
 
 #===============================================================================
+def is_pro_version(voltdb_jar):
+#===============================================================================
+    """
+    Assumes caller has already run "find_in_path(jar)" so we know it can be checked.
+    """
+    try:
+        proc = subprocess.Popen(['jar', 'tvf', voltdb_jar], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        out, err = proc.communicate()
+        if "org/voltdb/CommandLogImpl.class" in out:
+            return True
+        else:
+            return False
+    except (OSError):
+        return False
+
+#===============================================================================
 def kwargs_merge_list(kwargs, name, *args):
 #===============================================================================
     """

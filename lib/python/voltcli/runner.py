@@ -584,7 +584,7 @@ class VOLT(object):
         self.utility = utility
 
 #===============================================================================
-def load_verbspace(command_name, command_dir, config, version, description, package):
+def load_verbspace(command_name, command_dir, config, version, description, package, pro_version):
 #===============================================================================
     """
     Build a verb space by searching for source files with verbs in this source
@@ -626,7 +626,7 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs)
+    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs, pro_version)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -658,7 +658,7 @@ class VoltCLIParser(cli.CLIParser):
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
                                                 base_cli_spec.description)),
-                                     '%%prog version %s' % verbspace.version)
+                                     '%%prog version %s\npro=%s' % (verbspace.version, verbspace.pro_version))
 
 #===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
@@ -717,7 +717,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,
-                                   description, package)
+                                   description, package, environment.pro_version)
 
         # Make internal commands available to user commands via runner.verbspace().
         internal_verbspaces = {}
