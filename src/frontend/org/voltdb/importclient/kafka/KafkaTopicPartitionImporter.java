@@ -55,7 +55,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.CSVInvocation;
 import org.voltdb.importer.Invocation;
 
 /**
@@ -344,7 +343,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         sleepCounter = backoffSleep(sleepCounter);
                         continue;
                     }
+
                     long lastOffset = getLastOffset();
+                    if (lastOffset == -1) {
+                        sleepCounter = backoffSleep(sleepCounter);
+                        continue;
+                    }
 
                     m_gapTracker.resetTo(lastOffset);
                     m_lastCommittedOffset = lastOffset;
@@ -410,7 +414,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     ByteBuffer payload = messageAndOffset.message().payload();
 
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    CSVInvocation invocation = new CSVInvocation(m_config.getProcedure(), line, m_config.getSeparator());
+                    Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(line));
                     TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                             messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                             invocation);
@@ -528,7 +532,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
 
         private final int idx(long offset) {
-            return (int)offset % lag.length;
+            return (int)(offset % lag.length);
         }
 
         synchronized void resetTo(long offset) {

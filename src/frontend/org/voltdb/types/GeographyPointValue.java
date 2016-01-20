@@ -49,6 +49,7 @@ public class GeographyPointValue {
     private final double m_longitude;
 
     private static final int BYTES_IN_A_COORD = Double.SIZE / 8;
+    static final double EPSILON = 1.0e-12;
 
     // We use this value to represent a null point.
     // (Only for sending data over the wire.  The client
@@ -117,8 +118,8 @@ public class GeographyPointValue {
         // force them to be zero.  Otherwise you may find a case
         // where two points differ in the less significant bits, but
         // they format as the same number.
-        double lng = (Math.abs(m_longitude) < 1.0e-12) ? 0 : m_longitude;
-        double lat = (Math.abs(m_latitude) < 1.0e-12) ? 0 : m_latitude;
+        double lng = (Math.abs(m_longitude) < EPSILON) ? 0 : m_longitude;
+        double lat = (Math.abs(m_latitude) < EPSILON) ? 0 : m_latitude;
         return df.format(lng) + " " + df.format(lat);
     }
 
@@ -144,12 +145,18 @@ public class GeographyPointValue {
         }
 
         GeographyPointValue that = (GeographyPointValue)o;
+        if (this == that) {
+            return true;
+        }
 
-        if (that.getLatitude() != getLatitude()) {
+        GeographyPointValue normThis = normalizeLngLat(getLongitude(), getLatitude());
+        GeographyPointValue normThat = normalizeLngLat(that.getLongitude(), that.getLatitude());
+
+        if (Math.abs(normThis.getLongitude() - normThat.getLongitude()) > EPSILON) {
             return false;
         }
 
-        return that.getLongitude() == getLongitude();
+        return Math.abs(normThis.getLatitude() - normThat.getLatitude()) < EPSILON;
     }
 
     /**
@@ -269,8 +276,22 @@ public class GeographyPointValue {
                 lngFinal = lngNorm - 180;
             }
         }
-        assert(-180 <= lngFinal && lngFinal <= 180);
+
         assert(-90 <= latFinal && latFinal <= 90);
+        // For latitude of 90 or -90, canonicalize longitude to
+        // to 0.
+        if (90 - Math.abs(latFinal) < EPSILON) {
+            // We are at one of the poles
+            lngFinal = 0;
+        }
+
+        // For longitudes within epsilon of the international dateline
+        // (on the east side), canonicalize to 180.0.
+        if (lngFinal < 0 && 180 + lngFinal < EPSILON) {
+            lngFinal = 180.0;
+        }
+
+        assert(-180 < lngFinal && lngFinal <= 180);
         // Return the point.
         return new GeographyPointValue(lngFinal + 0.0, latFinal + 0.0);
     }

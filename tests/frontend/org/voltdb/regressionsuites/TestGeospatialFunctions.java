@@ -535,7 +535,7 @@ public class TestGeospatialFunctions extends RegressionSuite {
      *
      */
     private static String MULTI_POLYGON
-      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, -1 0, -1 -1, 0 -1, 0 0))";
+      = "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0), (0 0, 0 -1, -1 -1, -1 0, 0 0))";
     /*
      *
      *  X------------------------------X
@@ -645,9 +645,9 @@ public class TestGeospatialFunctions extends RegressionSuite {
            + ")";
 
     private static String ISLAND_IN_A_LAKE
-    = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"
-            + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CCW.
-            + "(2 2,  8 2,  8  8, 2  8, 2 2)"  // This is CW.
+    = "POLYGON((0 0, 10 0, 10 10, 0 10, 0 0),"  // This is CCW
+            + "(1 1,  1 9,  9  9, 9  1, 1 1),"  // This is CW.
+            + "(2 2,  2 8,  8  8, 8  2, 2 2)"   // This is CW.
             + ")";
 
 
@@ -664,13 +664,13 @@ public class TestGeospatialFunctions extends RegressionSuite {
                   GeographyValue.fromWKT(SHARED_INNER_EDGES)),
        new Border(105, "IntersectingHoles", "Loop 1 crosses loop 2",
                   GeographyValue.fromWKT(INTERSECTING_HOLES)),
-       new Border(106, "OuterInnerIntersect", "Loop 1 crosses loop 2",
+       new Border(106, "OuterInnerIntersect", "Loop 0 crosses loop 1",
                   GeographyValue.fromWKT(OUTER_INNER_INTERSECT)),
        new Border(108, "TwoNestedSunwise", "Loop 0 encloses more than half the sphere",
                   GeographyValue.fromWKT(TWO_NESTED_SUNWISE)),
        new Border(109, "TwoNestedWiddershins", "Loop 0 encloses more than half the sphere",
                   GeographyValue.fromWKT(TWO_NESTED_WIDDERSHINS)),
-       new Border(110, "IslandInALake", "Polygons can have only one shell.",
+       new Border(110, "IslandInALake", "Polygons can only be shells or holes",
                   GeographyValue.fromWKT(ISLAND_IN_A_LAKE)),
       /*
        * These are apparently legal. Should they be?
@@ -707,10 +707,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message from borders").getResults()[0];
         while (vt.advanceRow()) {
-            assertTrue(String.format("Expected error message containing \"%s\" but got \"%s\"",
-                                       vt.getString(3),
-                                       vt.getString(2)),
-                         vt.getString(2).contains(vt.getString(2)));
+            long pk = vt.getLong(0);
+            String expected = vt.getString(3);
+            String actual = vt.getString(2);
+            assertTrue(String.format("Border %s, key %d, Expected error message containing \"%s\" but got \"%s\"",
+                                       vt.getString(1),
+                                       pk,
+                                       expected,
+                                       actual),
+                         vt.getString(2).equals(vt.getString(3)));
         }
     }
 
