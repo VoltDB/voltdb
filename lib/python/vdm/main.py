@@ -36,6 +36,7 @@
 import sys
 import os
 from os.path import expanduser
+
 try:
     # ensure version 2.6+ of python
     if sys.version_info[0] == 2 and sys.version_info[1] < 6:
@@ -51,10 +52,9 @@ try:
 
     cmd_dir, cmd_name = os.path.split(os.path.realpath(sys.argv[0]))
     # Adjust these variables as needed for other base commands, locations, etc..
-    base_dir    = os.path.dirname(cmd_dir)
+    base_dir = os.path.dirname(cmd_dir)
     description = 'Command line interface to VoltDB functions.'
-    standalone  = False
-    # Tweak the Python library path to call voltcli.runner.main().
+    standalone = False
     # Possible installed library locations.
     if os.path.isdir('/opt/lib/voltdb/python'):
         sys.path.insert(0, '/opt/lib/voltdb/python')

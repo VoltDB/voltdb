@@ -1110,7 +1110,7 @@ def parse_bool_string(bool_string):
 
 IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
-IGNORETOP = { "databaseid" : True, "users" : True, "dr" : True}
+IGNORETOP = { "databaseid" : True, "users" : True}
 
 
 class ServerAPI(MethodView):
