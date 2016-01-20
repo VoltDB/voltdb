@@ -57,6 +57,42 @@ static void throwInvalidWktPoly(const std::string& reason)
                        oss.str().c_str());
 }
 
+static void throwInvalidPointLatitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POINTFROMTEXT: '" << input << "'";
+    oss << ".  Latitude must be in the range [-90,90].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidPointLongitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POINTFROMTEXT: '" << input << "'";
+    oss << ".  Longitude must be in the range [-180,180].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidPolygonLatitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POLYGONFROMTEXT: '" << input << "'";
+    oss << ".  Latitude must be in the range [-90,90].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
+static void throwInvalidPolygonLongitude(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << "Invalid input to POLYGONFROMTEXT: '" << input << "'";
+    oss << ".  Longitude must be in the range [-180,180].";
+    throw SQLException(SQLException::data_exception_invalid_parameter,
+                       oss.str().c_str());
+}
+
 static GeographyPointValue::Coord stringToCoord(int pointOrPoly,
                                   const std::string& input,
                            const std::string& val)
@@ -108,6 +144,14 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
 
     GeographyPointValue::Coord lat = stringToCoord(POINT, wkt, *it);
     ++it;
+
+    if ( lng < -180.0 || lng > 180.0) {
+        throwInvalidPointLongitude(wkt);
+    }
+
+    if (lat < -90.0 || lat > 90.0 ) {
+        throwInvalidPointLatitude(wkt);
+    }
 
     if (! boost::iequals(*it, ")")) {
         throwInvalidWktPoint(wkt);
@@ -165,9 +209,15 @@ static void readLoop(bool is_shell,
     std::vector<S2Point> points;
     while (it != end && *it != ")") {
         GeographyPointValue::Coord lng = stringToCoord(POLY, wkt, *it);
-        ++it;
 
+        if (lng < -180 || lng > 180) {
+            throwInvalidPolygonLongitude(*it);
+        }
+        ++it;
         GeographyPointValue::Coord lat = stringToCoord(POLY, wkt, *it);
+        if (lat < -90 || lat > 90) {
+            throwInvalidPolygonLatitude(*it);
+        }
         ++it;
 
         // Note: This is S2.  It takes latitude, longitude, not
