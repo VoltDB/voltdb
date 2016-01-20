@@ -684,6 +684,13 @@ ul.addServerList li:nth-child(1) {
 	width: 100px;
 	text-align: center;
 }
+.overviewInputTextDR {
+	height: 30px;
+	padding: 5px 10px;
+	line-height: 1.5;
+	width: 60px;
+	text-align: center;
+}
 .upDownBtn {
 	background: none repeat scroll 0 0 #CCCCCC;
 	cursor: pointer;

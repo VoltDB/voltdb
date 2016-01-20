@@ -409,11 +409,11 @@ def map_deployment(request, database_id):
         if not hasattr(deployment[0]['dr'], 'connection'):
             deployment[0]['dr']['connection'] = {}
 
+    if 'dr' in request.json and 'connection' in request.json['dr'] and 'source' not in request.json['dr']['connection']:
+        deployment[0]['dr']['connection'] = None
+
     if 'dr' in request.json and 'id' in request.json['dr']:
         deployment[0]['dr']['id'] = request.json['dr']['id']
-
-    if 'dr' in request.json and 'type' in request.json['dr']:
-        deployment[0]['dr']['type'] = request.json['dr']['type']
 
     if 'dr' in request.json and 'connection' in request.json['dr'] \
             and 'source' in request.json['dr']['connection']:
@@ -785,11 +785,11 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         if deployment[field] is not None:
                             new_deployment[field] = {}
                             new_deployment[field]['id'] = int(deployment[field]['id'])
-                            new_deployment[field]['type'] = str(deployment[field]['type'])
-                            if 'connection' in deployment[field] and deployment[field]['connection'] is not None and 'source' in deployment[field]['connection']:
+                            if 'connection' in deployment[field] and deployment[field]['connection'] is not None and 'source' in deployment[field]['connection'] \
+                                    and 'servers' in deployment[field]['connection']:
                                 new_deployment[field]['connection'] = {}
-                                new_deployment[field]['connection']['source'] = deployment[field]['connection']['source']
-                                new_deployment[field]['connection']['servers'] = ast.literal_eval(str(deployment[field]['connection']['servers']))
+                                new_deployment[field]['connection']['source'] = str(deployment[field]['connection']['source'])
+                                new_deployment[field]['connection']['servers'] = str(deployment[field]['connection']['servers'])
 
                     except Exception, err:
                         print 'dr:' + str(err)
@@ -925,11 +925,11 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     if deployment_xml[field] is not None:
                         new_deployment[field] = {}
                         new_deployment[field]['id'] = int(deployment_xml[field]['id'])
-                        new_deployment[field]['type'] = str(deployment_xml[field]['type'])
-                        if 'connection' not in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment[field]['connection']:
+                        if 'connection' not in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment[field]['connection']\
+                                and 'servers' in deployment[field]['connection']:
                             new_deployment[field]['connection'] = {}
-                            new_deployment[field]['connection']['source'] = deployment_xml[field]['connection']['source']
-                            new_deployment[field]['connection']['servers'] = deployment_xml[field]['connection']['servers']
+                            new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
+                            new_deployment[field]['connection']['servers'] = str(deployment_xml[field]['connection']['servers'])
 
                 except Exception, err:
                     print str(err)
@@ -1489,56 +1489,6 @@ class deploymentAPI(MethodView):
         inputs = JsonInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
-
-        if 'dr' in request.json and 'type' in request.json['dr']:
-            if request.json['dr']['type'] != 'Master':
-                if 'connection' in request.json['dr'] \
-                        and 'source' in request.json['dr']['connection'] \
-                        and 'servers' in request.json['dr']['connection']:
-                    database_selected = [database for database in DATABASES if
-                                         database['name'] == str(request.json['dr']['connection']['source'])]
-                    if len(database_selected) == 0:
-                        make_response(jsonify({'error': 'The selected database must have database enabled.'}), 404)
-                    deployment_selected = [deployment1 for deployment1 in DEPLOYMENT
-                                           if deployment1['databaseid'] == database_selected[0]['id']]
-
-                    if request.json['dr']['type'] == 'Replica':
-                        if len(deployment_selected) == 0:
-                            make_response(jsonify({'error': 'The selected database must have database enabled.'}), 404)
-                        if deployment_selected[0]['dr'] is not None and \
-                                        deployment_selected[0]['dr']['type'] is not None:
-                            deployment_type = deployment_selected[0]['dr']['type']
-                            if deployment_type != 'Master':
-                                return make_response(jsonify({'error': 'The selected database '
-                                                                       'must be of type Master.'}), 404)
-                        else:
-                            return make_response(jsonify({'error': 'The selected database '
-                                                                   'must have database enabled.'}), 404)
-                    if request.json['dr']['type'] == 'XDCR':
-                        if len(deployment_selected) != 0 and deployment_selected[0]['dr'] is not None and \
-                                        len(deployment_selected[0]['dr']) != 0 and \
-                                        deployment_selected[0]['dr']['type'] is not None:
-                            database_selected = [database for database in DATABASES if database['id'] == database_id]
-                            if len(database_selected) == 0:
-                                return make_response(jsonify({'error': 'Database not found.'}))
-
-                            if deployment_selected[0]['dr']['type'] == 'Master':
-                                return make_response(jsonify({'error': 'The selected database should be '
-                                                                           'of DR type "XDCR".'}), 404)
-
-                            if database_selected[0]['name'] != deployment_selected[0]['dr']['connection']['source']:
-                                if deployment_selected[0]['dr']['type'] == 'Master' or \
-                                                deployment_selected[0]['dr']['type'] == 'Replica':
-                                    return make_response(jsonify({'error': 'The selected database should be '
-                                                                           'of DR type "XDCR".'}), 404)
-                                elif deployment_selected[0]['dr']['type'] == 'XDCR':
-                                    return make_response(jsonify({'error': 'The selected database is configured '
-                                                                           'to use XDCR with another database. '
-                                                                           'Please use another database.'}), 404)
-
-                else:
-                    return make_response(jsonify({'error': 'Connection source '
-                                                           'not defined properly.'}), 404)
 
         # if 'users' in request.json:
         #     if 'user' in request.json['users']:

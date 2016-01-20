@@ -740,10 +740,6 @@ schema = {
                     "minimum": 0,
                     "maximum": 2147483647
                 },
-                "type": {
-                    "id": "type",
-                    "type": "string",
-                },
                 "connection": {
                     "id": "connection",
                     "type": "object",
@@ -754,10 +750,7 @@ schema = {
                         },
                         "servers": {
                             "id": "servers",
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
+                            "type": "string",
                         }
                     }
                 }
