@@ -57,7 +57,7 @@ public abstract class AbstractImporterFactory implements BundleActivator
     /**
      * Passes in the adapter class that the importers may use to execute procedures.
      *
-     * @param importServerAdapter
+     * @param importServerAdapter which adapter is used for invoking procedures from importer.
      */
     public final void setImportServerAdapter(ImporterServerAdapter importServerAdapter)
     {
@@ -104,6 +104,8 @@ public abstract class AbstractImporterFactory implements BundleActivator
     /**
      * Returns true if an importer instance must be run on every site for every resource.
      * Returns false if the resources must be distributed between available sites.
+     * @return Returns true if importer needs to be run in distributed fashion on all nodes.
+     * This also means the importer is asked for URIs to distribute.
      */
     public abstract boolean isImporterRunEveryWhere();
 }

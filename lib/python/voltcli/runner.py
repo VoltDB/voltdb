@@ -159,8 +159,7 @@ class JavaRunner(object):
         self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-        utility.run_cmd('javac', '-target', '1.7', '-source', '1.7',
-                          '-classpath', self.classpath, '-d', outdir, *srcfiles)
+        utility.run_cmd('javac', '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
 class VerbRunner(object):

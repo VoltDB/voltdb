@@ -365,8 +365,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Enable Kerberos authentication with the provided subject credentials<p>
-     * @param subject
+     * <p>Enable Kerberos authentication with the provided subject credentials</p>
+     * @param subject Identity of the authenticated user.
      */
     public void enableKerberosAuthentication(final Subject subject) {
         m_subject = subject;

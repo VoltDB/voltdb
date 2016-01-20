@@ -55,8 +55,8 @@ function clean() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/geospatial/*.java
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/geospatial/*.java
+    javac -classpath $APPCLASSPATH procedures/geospatial/*.java
+    javac -classpath $CLIENTCLASSPATH client/geospatial/*.java
     # build procedure and client jars
     jar cf geospatial-procs.jar -C procedures geospatial
     jar cf geospatial-client.jar -C client geospatial

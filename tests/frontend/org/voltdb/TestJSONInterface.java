@@ -155,6 +155,7 @@ public class TestJSONInterface extends TestCase {
         out.close();
         out = null;
         conn.getOutputStream().close();
+        int responsCode = conn.getResponseCode();
 
         BufferedReader in = null;
         try {
@@ -171,7 +172,7 @@ public class TestJSONInterface extends TestCase {
             }
         }
         if (in == null) {
-            throw new Exception("Unable to read response from server, response code: " + conn.getResponseCode());
+            throw new Exception("Unable to read response from server, response code: " + responsCode);
         }
 
         StringBuilder decodedString = new StringBuilder();
@@ -1567,7 +1568,7 @@ public class TestJSONInterface extends TestCase {
             String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
-            params.put("deployment", jdep);
+            params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
@@ -1588,7 +1589,7 @@ public class TestJSONInterface extends TestCase {
                 deptype.getHeartbeat().setTimeout(99);
             }
             String ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1614,7 +1615,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1628,7 +1629,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -2182,7 +2183,7 @@ public class TestJSONInterface extends TestCase {
                             deptype.getHeartbeat().setTimeout(timeout);
                         }
                         Map<String,String> params = new HashMap<>();
-                        params.put("deployment", mapper.writeValueAsString(deptype));
+                        params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
                         params.put("admin", "true");
                         String responseJSON = postUrlOverJSON("http://localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {

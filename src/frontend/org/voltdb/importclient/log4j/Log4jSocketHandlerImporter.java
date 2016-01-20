@@ -140,7 +140,7 @@ public class Log4jSocketHandlerImporter extends AbstractImporter
                 ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(m_socket.getInputStream()));
                 while (true) {
                     LoggingEvent event = (LoggingEvent) ois.readObject();
-                    if (!Log4jSocketHandlerImporter.this.callProcedure(new SaveLog4jEventInvocation(hostname, event, m_config.getTableName()))) {
+                    if (!Log4jSocketHandlerImporter.this.callProcedure(saveLog4jEventInvocation(hostname, event, m_config.getTableName()))) {
                         Log4jSocketHandlerImporter.this.error(null, "Failed to insert log4j event");
                     }
                 }
@@ -171,56 +171,25 @@ public class Log4jSocketHandlerImporter extends AbstractImporter
         }
     }
 
-    /**
-     * Class with invocation details for the stored procedure to insert a logging event into voltdb.
-     */
-    private class SaveLog4jEventInvocation implements Invocation {
-
-        private final String m_hostName;
-        private final LoggingEvent m_event;
-        private final String m_procName;
-
-        public SaveLog4jEventInvocation(String hostName, LoggingEvent loggingEvent, String tableName) {
-            m_hostName = hostName;
-            m_event = loggingEvent;
-            m_procName = tableName + ".insert";
-        }
-        @Override
-        public String getProcedure()
-        {
-            return m_procName;
-        }
-
-        @Override
-        public Object[] getParams() throws IOException
-        {
-            return new Object[] {
-                    m_hostName,
-                    m_event.getLoggerName(),
-                    m_event.getLevel().toString(),
-                    m_event.getThreadName(),
-                    m_event.getTimeStamp()*1000,
-                    m_event.getRenderedMessage(),
-                    getThrowableRep(m_event)
-           };
-        }
-
-        // Gets the throwable representation from LoggingEvent as a single string
-        // with newline chars between lines.
-        // Returns null if there is no throwable information in the logging event.
-        private String getThrowableRep(LoggingEvent event)
-        {
-            if (event.getThrowableStrRep() == null || event.getThrowableStrRep().length==0) {
-                return null;
-            }
-
+    private Invocation saveLog4jEventInvocation(String hostName, LoggingEvent loggingEvent, String tableName) {
+        String throwRep = null;
+        if (loggingEvent.getThrowableStrRep() != null && loggingEvent.getThrowableStrRep().length != 0) {
             StringBuffer sb = new StringBuffer();
-            for (String line : event.getThrowableStrRep()) {
+            for (String line : loggingEvent.getThrowableStrRep()) {
                 sb.append(line + "\n");
             }
-
-            // remove the last newline and return the string
-            return sb.deleteCharAt(sb.length() - 1).toString();
+            throwRep = sb.deleteCharAt(sb.length() - 1).toString();
         }
+
+        return new Invocation(tableName + ".insert",
+                              new Object[] {
+                                hostName,
+                                loggingEvent.getLoggerName(),
+                                loggingEvent.getLevel().toString(),
+                                loggingEvent.getThreadName(),
+                                loggingEvent.getTimeStamp()*1000,
+                                loggingEvent.getRenderedMessage(),
+                                throwRep}
+        );
     }
 }
