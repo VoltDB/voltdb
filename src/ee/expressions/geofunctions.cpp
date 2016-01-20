@@ -493,7 +493,7 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
         case 1:
             break;
         default:
-            VMLOG(2, msg) << "Polygons can only be shells or holes." << std::endl;
+            VMLOG(2, msg) << "Polygons can only be shells or holes";
             return true;
         }
         if (!loop->IsNormalized(msg)) {
@@ -501,7 +501,7 @@ static bool isMultiPolygon(const Polygon &poly, std::stringstream *msg = NULL) {
         }
     }
     if (nouters != 1) {
-        VMLOG(2, msg) << "Polygons can have only one shell.";
+        VMLOG(2, msg) << "Polygons can have only one shell";
         return true;
     }
     return false;
