@@ -862,16 +862,22 @@ def is_pro_version(voltdb_jar):
 #===============================================================================
     """
     Assumes caller has already run "find_in_path(jar)" so we know it can be checked.
+    The jar is already validated as present before this is called.
     """
     try:
-        proc = subprocess.Popen(['jar', 'tvf', voltdb_jar], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        out, err = proc.communicate()
-        if "org/voltdb/CommandLogImpl.class" in out:
-            return True
-        else:
-            return False
+        zf = zipfile.ZipFile(voltdb_jar, 'r')
+    except (IOError, OSError), e:
+        print 'Error reading zip file "%s".' % voltdb_jar, e
+        return False
+    try:
+        for ze in zf.infolist():
+            if "org/voltdb/CommandLogImpl.class" == ze.filename:
+                return True
+        return False
     except (OSError):
         return False
+    finally:
+        zf.close()
 
 #===============================================================================
 def kwargs_merge_list(kwargs, name, *args):
