@@ -176,84 +176,7 @@ def formatList(list):
         indent += len(name) + 1
     return str
 
-def buildMakefile(CTX):
-    global version
-
-    CPPFLAGS = " ".join(CTX.CPPFLAGS.split())
-    MAKECPPFLAGS = CPPFLAGS
-    for dir in CTX.SYSTEM_DIRS:
-        MAKECPPFLAGS += " -isystem $(ROOTDIR)/%s" % (dir)
-    for dir in CTX.SRC_INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I$(ROOTDIR)/%s" % (dir)
-    for dir in CTX.OBJ_INCLUDE_DIRS:
-        MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
-    MAKECPPFLAGS += " -I${OBJDIR}"
-    JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
-    JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
-    INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
-    THIRD_PARTY_INPUT_PREFIX = CTX.THIRD_PARTY_INPUT_PREFIX.rstrip("/")
-    OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
-    TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
-    IGNORE_SYS_PREFIXES = CTX.IGNORE_SYS_PREFIXES
-    JNIEXT = CTX.JNIEXT.strip()
-    NM = CTX.NM
-    NMFLAGS = CTX.NMFLAGS
-    THIRD_PARTY_INSTALL_DIR=(OUTPUT_PREFIX + "/" + "3pty-install")
-
-    # create directories for output if they don't exist
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX))
-    os.system("mkdir -p %s" % THIRD_PARTY_INSTALL_DIR)
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
-
-    input_paths = []
-    for dir in CTX.INPUT.keys():
-        input = CTX.INPUT[dir].split()
-        input_paths += [INPUT_PREFIX + "/" + dir + "/" + x for x in input]
-
-    third_party_input_paths = []
-    for dir in CTX.THIRD_PARTY_INPUT.keys():
-        input = CTX.THIRD_PARTY_INPUT[dir].split()
-        third_party_input_paths += [THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x for x in input]
-
-    tests = []
-    for dir in CTX.TESTS.keys():
-        input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
-
-    makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
-    makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
-    makefile.write("CC = %s\n" % CTX.CC)
-    makefile.write("CXX = %s\n" % CTX.CXX)
-    makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
-    makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
-    makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
-    makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
-    makefile.write("JNIEXT = %s\n" % (JNIEXT))
-    makefile.write("NM = %s\n" % (NM))
-    makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
-    makefile.write('RM = /bin/rm -rf\n')
-    makefile.write("#\n")
-    makefile.write("# Capture the (relative) name of the root directory.\n")
-    makefile.write("# Also, remember the obj directory,\n")
-    makefile.write("# which should be the directory we are currently in.\n")
-    makefile.write("#\n")
-    makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
-    makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
-    makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
-    makefile.write('#\n')
-    makefile.write('# This is the root of the cpp sources.\n')
-    makefile.write('#\n')
-    makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
-    makefile.write('#\n')
-    makefile.write('# This is the root of the third party sources.\n')
-    makefile.write('#\n')
-    makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
-    makefile.write("#\n")
-
+def buildThirdPartyTools(CTX, makefile):
     makefile.write("########################################################################\n")
     makefile.write("#\n")
     makefile.write("# Third Party Tools Section Start\n")
@@ -426,10 +349,87 @@ def buildMakefile(CTX):
     makefile.write("#\n")
     makefile.write("########################################################################\n")
 
+    return None
+
+def buildMakefile(CTX):
+    global version
+
+    CPPFLAGS = " ".join(CTX.CPPFLAGS.split())
+    MAKECPPFLAGS = CPPFLAGS
+    for dir in CTX.SYSTEM_DIRS:
+        MAKECPPFLAGS += " -isystem $(ROOTDIR)/%s" % (dir)
+    for dir in CTX.SRC_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I$(ROOTDIR)/%s" % (dir)
+    for dir in CTX.OBJ_INCLUDE_DIRS:
+        MAKECPPFLAGS += " -I${OBJDIR}/%s" % (dir)
+    MAKECPPFLAGS += " -I${OBJDIR}"
+    JNILIBFLAGS = " ".join(CTX.JNILIBFLAGS.split())
+    JNIBINFLAGS = " ".join(CTX.JNIBINFLAGS.split())
+    INPUT_PREFIX = CTX.INPUT_PREFIX.rstrip("/")
+    THIRD_PARTY_INPUT_PREFIX = CTX.THIRD_PARTY_INPUT_PREFIX.rstrip("/")
+    OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
+    TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
+    IGNORE_SYS_PREFIXES = CTX.IGNORE_SYS_PREFIXES
+    JNIEXT = CTX.JNIEXT.strip()
+    NM = CTX.NM
+    NMFLAGS = CTX.NMFLAGS
+    THIRD_PARTY_INSTALL_DIR=(OUTPUT_PREFIX + "/" + "3pty-install")
+
+    # create directories for output if they don't exist
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX))
+    os.system("mkdir -p %s" % THIRD_PARTY_INSTALL_DIR)
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
+
+    input_paths = []
+    for dir in CTX.INPUT.keys():
+        input = CTX.INPUT[dir].split()
+        input_paths += [INPUT_PREFIX + "/" + dir + "/" + x for x in input]
+
+    third_party_input_paths = []
+    for dir in CTX.THIRD_PARTY_INPUT.keys():
+        input = CTX.THIRD_PARTY_INPUT[dir].split()
+        third_party_input_paths += [THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x for x in input]
+
+    tests = []
+    for dir in CTX.TESTS.keys():
+        input = CTX.TESTS[dir].split()
+        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
+
+    makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
+    makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
+    makefile.write("CC = %s\n" % CTX.CC)
+    makefile.write("CXX = %s\n" % CTX.CXX)
+    makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
+    makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
+    makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
+    makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
+    makefile.write("JNIEXT = %s\n" % (JNIEXT))
+    makefile.write("NM = %s\n" % (NM))
+    makefile.write("NMFLAGS = %s\n" % (NMFLAGS))
+    makefile.write('RM = /bin/rm -rf\n')
+    makefile.write("#\n")
+    makefile.write("# Capture the (relative) name of the root directory.\n")
+    makefile.write("# Also, remember the obj directory,\n")
+    makefile.write("# which should be the directory we are currently in.\n")
+    makefile.write("#\n")
+    makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
+    makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
+    makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
+    makefile.write('#\n')
+    makefile.write('# This is the root of the cpp sources.\n')
+    makefile.write('#\n')
+    makefile.write("SRCDIR = $(ROOTDIR)/src/ee\n")
+    makefile.write('#\n')
+    makefile.write('# This is the root of the third party sources.\n')
+    makefile.write('#\n')
+    makefile.write("THIRD_PARTY_SRC = $(ROOTDIR)/third_party/cpp\n")
+    makefile.write("#\n")
+
     if CTX.TARGET == "CLEAN":
-        makefile.write('########################################################################\n')
-        makefile.write('# CLEAN target\n')
-        makefile.write('########################################################################\n')
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
         makefile.write('\t${RM} "${PCRE2_SRC}"\n')
@@ -508,6 +508,9 @@ def buildMakefile(CTX):
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]
+
+    # build the third party tools
+    buildThirdPartyTools(CTX, makefile)
 
     makefile.write("########################################################################\n")
     makefile.write("#\n# %s\n#\n" % "Volt Files")
