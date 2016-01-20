@@ -652,13 +652,15 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
+        verstr = '%%prog version %s Enterprise Edition' % verbspace.version \
+            if verbspace.pro_version else '%%prog version %s' % verbspace.version
         cli.CLIParser.__init__(self, environment.command_name,
                                      verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
                                                 base_cli_spec.description)),
-                                     '%%prog version %s\npro=%s' % (verbspace.version, verbspace.pro_version))
+                                     verstr)
 
 #===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
