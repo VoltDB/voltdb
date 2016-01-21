@@ -19,6 +19,8 @@ package org.voltdb.importer;
 
 import java.net.URI;
 
+import org.voltdb.importer.formatter.Formatter;
+
 
 /**
  * Represents importer configurations created from properties specified in deployment file.
@@ -35,4 +37,6 @@ public interface ImporterConfig
      * @return the unique resource id
      */
     public URI getResourceID();
+
+    public Formatter<?> getFormatter();
 }

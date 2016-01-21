@@ -28,6 +28,7 @@ import java.util.List;
 import org.voltcore.logging.Level;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.Formatter;
 
 /**
  * Importer that listens on a server socket for data. Data is expected in CSV format currently,
@@ -107,11 +108,12 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
+                Formatter<String> formatter = m_config.getFormatter();
                 while (shouldRun()) {
                     String line = in.readLine();
                     //You should convert your data to params here.
                     if (line == null) continue;
-                    Invocation invocation = new Invocation(m_procedure, m_formatter.transform(line));
+                    Invocation invocation = new Invocation(m_procedure, formatter.transform(line));
                     if (!callProcedure(invocation)) {
                         rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                     }
