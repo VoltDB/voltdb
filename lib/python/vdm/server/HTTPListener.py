@@ -27,7 +27,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from flask import Flask, render_template, jsonify, abort, make_response, request
+from flask import Flask, render_template, jsonify, abort, make_response, request, Response
 from flask.views import MethodView
 from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import socket
@@ -1675,6 +1675,14 @@ class VdmConfiguration(MethodView):
 
         return jsonify({'deployment': response.status_code})
 
+class DatabaseDeploymentAPI(MethodView):
+    """
+    Class related to the vdm configuration
+    """
+    @staticmethod
+    def get(database_id):
+        deployment_content = get_database_deployment(database_id)
+        return Response(deployment_content, mimetype='text/xml')
 
 def main(runner, amodule, aport, config_dir):
     try:
@@ -1719,6 +1727,7 @@ def main(runner, amodule, aport, config_dir):
     VDM_STATUS_VIEW = VdmStatus.as_view('vdm_status_api')
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
     SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
+    DATABASE_DEPLOYMENT_VIEW = DatabaseDeploymentAPI.as_view('database_deployment_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1747,4 +1756,6 @@ def main(runner, amodule, aport, config_dir):
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
+    APP.add_url_rule('/api/1.0/database/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+                     methods=['GET'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)
