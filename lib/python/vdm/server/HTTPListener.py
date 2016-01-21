@@ -418,6 +418,11 @@ def map_deployment(request, database_id):
     if 'dr' in request.json and 'listen' in request.json['dr']:
         deployment[0]['dr']['listen'] = request.json['dr']['listen']
 
+    if 'dr' in request.json and 'port' in request.json['dr']:
+        deployment[0]['dr']['port'] = request.json['dr']['port']
+    else:
+        deployment[0]['dr']['port'] = None
+
     if 'dr' in request.json and 'connection' in request.json['dr'] \
             and 'source' in request.json['dr']['connection']:
         deployment[0]['dr']['connection']['source'] = request.json['dr']['connection']['source']
@@ -788,6 +793,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         if deployment[field] is not None:
                             new_deployment[field] = {}
                             new_deployment[field]['id'] = int(deployment[field]['id'])
+                            new_deployment[field]['listen'] = parse_bool_string(deployment[field]['listen'])
+                            if 'port' in deployment[field]:
+                                new_deployment[field]['port'] = int(deployment[field]['port'])
                             if 'connection' in deployment[field] and deployment[field]['connection'] is not None and 'source' in deployment[field]['connection'] \
                                     and 'servers' in deployment[field]['connection']:
                                 new_deployment[field]['connection'] = {}

@@ -744,6 +744,12 @@ schema = {
                     "id": "listen",
                     "type": "boolean"
                 },
+                "port": {
+                    "id": "port",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65536
+                },
                 "connection": {
                     "id": "connection",
                     "type": "object",
