@@ -223,7 +223,7 @@ class Metadata:
             #depends     = 'openjdk-8-jdk,libc6',
             # nb. at release time java 8 not yet available from apt or backports
             # see voltdb installation instructions
-            depends     = 'libc6,libstdc++6 (>= 4.4.0),libgcc (>= 4.4.0), python (>= 2.5)',
+            depends     = 'libc6,libstdc++6 (>= 4.4.0),libgcc1 (>= 4.4.0), python (>= 2.6)',
             priority    = 'extra',
             section     = 'database',
             maintainer  = 'VoltDB',
