@@ -289,19 +289,20 @@ except Exception as e:
     print "Coult not build LINUX kit: " + str(e)
     build_errors=True
 
-try:
-# build kits on the mini
-    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
-        assert versionCentos == versionMac
-        buildCommunity()
-        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
-        buildPro()
-        buildRabbitMQExport(versionMac)
-        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
-except Exception as e:
-    print "Coult not build MAC kit: " + str(e)
-    build_errors=True
+# disabling mac build
+#try:
+## build kits on the mini
+#    with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
+#        versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish)
+#        assert versionCentos == versionMac
+#        buildCommunity()
+#        copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
+#        buildPro()
+#        buildRabbitMQExport(versionMac)
+#        copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
+#except Exception as e:
+#    print "Coult not build MAC kit: " + str(e)
+#    build_errors=True
 
 # build debian kit
 try:
