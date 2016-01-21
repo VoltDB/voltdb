@@ -25,6 +25,7 @@ import java.util.Properties;
 
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
  * ImporterConfig for server socket importer.
@@ -39,8 +40,11 @@ public class ServerSocketImporterConfig implements ImporterConfig
     private final int m_port;
     private final ServerSocket m_serverSocket;
 
-    public ServerSocketImporterConfig(Properties props, Formatter<String> formatter)
+    public ServerSocketImporterConfig(ImportConfiguration config)
     {
+        Properties props = config.getmoduleProperties();
+        Formatter<String> formatter = (Formatter<String>) config.getFormatter().create(
+                config.getFormatName(), config.getformatterProperties());
         Properties propsCopy = (Properties) props.clone();
 
         m_procedure = (String) propsCopy.get("procedure");

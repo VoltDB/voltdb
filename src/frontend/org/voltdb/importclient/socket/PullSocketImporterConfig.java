@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -71,8 +72,11 @@ public class PullSocketImporterConfig implements ImporterConfig
         return m_procedure;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Formatter<String> formatter)
+    public static Map<URI, ImporterConfig> createConfigEntries(ImportConfiguration config)
     {
+        Properties props = config.getmoduleProperties();
+        Formatter<String> formatter = (Formatter<String>) config.getFormatter().create(
+                config.getFormatName(), config.getformatterProperties());
         String hosts = props.getProperty("addresses", "").trim();
         if (hosts.isEmpty()) {
             throw new IllegalArgumentException("'adresses' is a required property and must be defined");

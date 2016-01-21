@@ -39,6 +39,7 @@ import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.ImporterConfig;
 import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
  * Holds configuration information required to connect to a single partition for a topic.
@@ -146,8 +147,11 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return m_formatter;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Formatter<String> formatter)
+    public static Map<URI, ImporterConfig> createConfigEntries(ImportConfiguration config)
     {
+        Properties props = config.getmoduleProperties();
+        Formatter<String> formatter = (Formatter<String>) config.getFormatter().create(
+                config.getFormatName(), config.getformatterProperties());
         String brokers = props.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
             throw new IllegalArgumentException("Missing kafka broker");

@@ -46,7 +46,6 @@ import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -117,6 +116,7 @@ public class ImportManager implements ChannelChangeCallback {
                 .add("org.voltdb.importer.formatter")
                 .add("org.apache.log4j")
                 .add("org.voltdb.client")
+                .add("org.voltdb.utils")
                 .add("org.slf4j")
                 .add("org.voltcore.utils")
                 .add("com.google_voltpatches.common.base")
@@ -203,7 +203,7 @@ public class ImportManager implements ChannelChangeCallback {
                         formatter = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
                         m_formatters.put(module, formatter);
                     }
-                    config.setFormatter(formatter.create(config.getFormatName(), prop));
+                    config.setFormatter(formatter);
                 } catch(Throwable t) {
                     VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
                 }
