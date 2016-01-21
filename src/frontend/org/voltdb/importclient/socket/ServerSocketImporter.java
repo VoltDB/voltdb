@@ -108,7 +108,7 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
-                Formatter<String> formatter = m_config.getFormatter();
+                Formatter<String> formatter = (Formatter<String>) m_config.getFormatterFactory().create();
                 while (shouldRun()) {
                     String line = in.readLine();
                     //You should convert your data to params here.

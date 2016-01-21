@@ -24,7 +24,7 @@ import java.util.Properties;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 /**
  * Importer factory implementation for pull socket importer.
@@ -39,9 +39,9 @@ public class PullSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Formatter<?> formatter)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, AbstractFormatterFactory formatterFactory)
     {
-        return PullSocketImporterConfig.createConfigEntries(props, (Formatter<String>) formatter);
+        return PullSocketImporterConfig.createConfigEntries(props, formatterFactory);
     }
 
     @Override

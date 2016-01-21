@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -68,10 +68,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      *
      * @param props Properties defined in a configuration section for this importer
      */
-    public final void configure(Properties props, Formatter<?> formatter)
+    public final void configure(Properties props, AbstractFormatterFactory formatterFactory)
     {
         ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
-        builder.putAll(m_factory.createImporterConfigurations(props, formatter));
+        builder.putAll(m_factory.createImporterConfigurations(props, formatterFactory));
         m_configs = builder.build();
     }
 

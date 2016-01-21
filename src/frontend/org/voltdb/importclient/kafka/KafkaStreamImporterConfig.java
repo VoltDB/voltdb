@@ -38,6 +38,7 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import org.apache.log4j.Logger;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.Formatter;
 
 /**
@@ -64,10 +65,10 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private final String m_procedure;
     private final int m_partition;
     private HostAndPort m_partitionLeader;
-    private Formatter<String> m_formatter;
+    private AbstractFormatterFactory m_formatterFactory;
 
     private KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
-            String groupId, int fetchSize, int soTimeout, String procedure, Formatter<String> formatter)
+            String groupId, int fetchSize, int soTimeout, String procedure, AbstractFormatterFactory formatterFactory)
     {
         m_uri = uri;
         m_brokers = brokers;
@@ -78,7 +79,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
-        m_formatter = formatter;
+        m_formatterFactory = formatterFactory;
     }
 
 
@@ -141,12 +142,12 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     @Override
-    public Formatter<String> getFormatter()
+    public AbstractFormatterFactory getFormatterFactory()
     {
-        return m_formatter;
+        return m_formatterFactory;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, Formatter<String> formatter)
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, AbstractFormatterFactory formatterFactory)
     {
         String brokers = props.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
@@ -197,7 +198,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
-                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, formatter));
+                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, formatterFactory));
             } catch(Exception e) {
                 m_logger.warn(String.format("Error trying to get partition information for topic [%s] on host [%s]", topic, hapList.get(0).getHost()), e);
             }
@@ -221,7 +222,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
-            final String topic, String groupId, String procedure, int soTimeout, int fetchSize, Formatter<String> formatter)
+            final String topic, String groupId, String procedure, int soTimeout, int fetchSize, AbstractFormatterFactory formatterFactory)
     {
         SimpleConsumer consumer = null;
         Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
@@ -254,7 +255,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                         Broker leader = part.leader();
                         KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
                                 part.partitionId(), new HostAndPort(leader.host(), leader.port()),
-                                groupId, fetchSize, soTimeout, procedure, formatter);
+                                groupId, fetchSize, soTimeout, procedure, formatterFactory);
                         configs.put(uri, config);
                     }
                 }

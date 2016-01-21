@@ -24,7 +24,7 @@ import java.util.Properties;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
-import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -41,9 +41,9 @@ public class ServerSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, Formatter<?> formatter)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, AbstractFormatterFactory formatterFactory)
     {
-        ImporterConfig config = new ServerSocketImporterConfig(props, (Formatter<String>) formatter);
+        ImporterConfig config = new ServerSocketImporterConfig(props, formatterFactory);
         return ImmutableMap.of(config.getResourceID(), config);
     }
 
