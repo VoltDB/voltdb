@@ -24,59 +24,59 @@ namespace voltdb {
 class ValueFactory {
 public:
 
-    static NValue getTinyIntValue(int8_t value) {
+    static inline NValue getTinyIntValue(int8_t value) {
         return NValue::getTinyIntValue(value);
     }
 
-    static NValue getSmallIntValue(int16_t value) {
+    static inline NValue getSmallIntValue(int16_t value) {
         return NValue::getSmallIntValue(value);
     }
 
-    static NValue getIntegerValue(int32_t value) {
+    static inline NValue getIntegerValue(int32_t value) {
         return NValue::getIntegerValue(value);
     }
 
-    static NValue getBigIntValue(int64_t value) {
+    static inline NValue getBigIntValue(int64_t value) {
         return NValue::getBigIntValue(value);
     }
 
-    static NValue getTimestampValue(int64_t value) {
+    static inline NValue getTimestampValue(int64_t value) {
         return NValue::getTimestampValue(value);
     }
 
-    static NValue getDoubleValue(double value) {
+    static inline NValue getDoubleValue(double value) {
         return NValue::getDoubleValue(value);
     }
 
-    static NValue getBooleanValue(bool value) {
+    static inline NValue getBooleanValue(bool value) {
         return NValue::getBooleanValue(value);
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static NValue getStringValue(const char *value, Pool* pool = NULL) {
+    static inline NValue getStringValue(const char *value, Pool* pool = NULL) {
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value, (size_t)(value ? strlen(value) : 0), pool);
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static NValue getStringValue(const std::string value, Pool* pool = NULL) {
+    static inline NValue getStringValue(const std::string value, Pool* pool = NULL) {
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 
     /// Constructs a value copied into temporary thread-local storage.
-    static NValue getTempStringValue(const std::string value) {
-        return NValue::getTempStringValue(value.c_str(), value.length());
+    static inline NValue getTempStringValue(const std::string value) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NValue::getTempStringPool());
     }
 
-    static NValue getNullStringValue() {
+    static inline NValue getNullStringValue() {
         return NValue::getNullStringValue();
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     /// Assumes hex-encoded input
-    static NValue getBinaryValue(const std::string& value, Pool* pool = NULL) {
+    static inline NValue getBinaryValue(const std::string& value, Pool* pool = NULL) {
         size_t rawLength = value.length() / 2;
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
@@ -85,33 +85,28 @@ public:
 
     /// Constructs a value copied into temporary string pool
     /// Assumes hex-encoded input
-    static NValue getTempBinaryValue(const std::string& value) {
+    static inline NValue getTempBinaryValue(const std::string& value) {
         size_t rawLength = value.length() / 2;
         unsigned char rawBuf[rawLength];
         hexDecodeToBinary(rawBuf, value.c_str());
-        return getBinaryValue(rawBuf, static_cast<int32_t>(rawLength),
-                              NValue::getTempStringPool());
+        return getTempBinaryValue(reinterpret_cast<const char*>(rawBuf), static_cast<int32_t>(rawLength));
     }
 
     /// Constructs a varbinary value copied into temporary string
     /// pool.  Arguments provide a pointer to the raw bytes and the
     /// size of the value.
-    static NValue getTempBinaryValue(const char* rawBuf, int32_t rawLength) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, rawBuf, rawLength,
-                                         NValue::getTempStringPool());
+    static inline NValue getTempBinaryValue(const char* rawBuf, int32_t rawLength) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, rawBuf, (size_t)rawLength, NValue::getTempStringPool());
     }
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
     /// Assumes raw byte input
-    static NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength, Pool* pool = NULL) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                                         reinterpret_cast<const char*>(rawBuf),
-                                         (size_t)rawLength,
-                                         pool);
+    static inline NValue getBinaryValue(const unsigned char* rawBuf, int32_t rawLength, Pool* pool = NULL) {
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY, reinterpret_cast<const char*>(rawBuf), (size_t)rawLength, pool);
     }
 
-    static NValue getNullBinaryValue() {
+    static inline NValue getNullBinaryValue() {
         return NValue::getNullBinaryValue();
     }
 
@@ -123,33 +118,33 @@ public:
     }
 
     /** Returns valuetype = VALUE_TYPE_NULL. Careful with this! */
-    static NValue getNullValue() {
+    static inline NValue getNullValue() {
         return NValue::getNullValue();
     }
 
-    static NValue getDecimalValueFromString(const std::string &txt) {
+    static inline NValue getDecimalValueFromString(const std::string &txt) {
         return NValue::getDecimalValueFromString(txt);
     }
 
-    static NValue getArrayValueFromSizeAndType(size_t elementCount,
-                                               ValueType elementType) {
+    static NValue getArrayValueFromSizeAndType(size_t elementCount, ValueType elementType)
+    {
         return NValue::getAllocatedArrayValueFromSizeAndType(elementCount, elementType);
     }
 
-    static NValue getAddressValue(void *address) {
+    static inline NValue getAddressValue(void *address) {
         return NValue::getAddressValue(address);
     }
 
     // What follows exists for test only!
 
-    static NValue castAsBigInt(const NValue& value) {
+    static inline NValue castAsBigInt(NValue value) {
         if (value.isNull()) {
             return NValue::getNullValue(VALUE_TYPE_BIGINT);
         }
         return value.castAsBigInt();
     }
 
-    static NValue castAsInteger(const NValue& value) {
+    static inline NValue castAsInteger(NValue value) {
         if (value.isNull()) {
             NValue retval(VALUE_TYPE_INTEGER);
             retval.setNull();
@@ -159,7 +154,7 @@ public:
         return value.castAsInteger();
     }
 
-    static NValue castAsSmallInt(const NValue& value) {
+    static inline NValue castAsSmallInt(NValue value) {
         if (value.isNull()) {
             NValue retval(VALUE_TYPE_SMALLINT);
             retval.setNull();
@@ -169,7 +164,7 @@ public:
         return value.castAsSmallInt();
     }
 
-    static NValue castAsTinyInt(const NValue& value) {
+    static inline NValue castAsTinyInt(NValue value) {
         if (value.isNull()) {
             NValue retval(VALUE_TYPE_TINYINT);
             retval.setNull();
@@ -179,7 +174,7 @@ public:
         return value.castAsTinyInt();
     }
 
-    static NValue castAsDouble(const NValue& value) {
+    static inline NValue castAsDouble(NValue value) {
         if (value.isNull()) {
             NValue retval(VALUE_TYPE_DOUBLE);
             retval.setNull();
@@ -189,7 +184,7 @@ public:
         return value.castAsDouble();
     }
 
-    static NValue castAsDecimal(const NValue& value) {
+    static inline NValue castAsDecimal(NValue value) {
         if (value.isNull()) {
             NValue retval(VALUE_TYPE_DECIMAL);
             retval.setNull();
@@ -198,7 +193,7 @@ public:
         return value.castAsDecimal();
     }
 
-    static NValue castAsString(const NValue& value) {
+    static inline NValue castAsString(NValue value) {
         return value.castAsString();
     }
 

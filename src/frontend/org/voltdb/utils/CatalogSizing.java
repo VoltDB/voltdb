@@ -239,21 +239,18 @@ public abstract class CatalogSizing {
         return bufferSize + 8 + 8;
     }
 
-    public static int testOnlyAllocationSizeForObject(int dataSize) {
-        // See the comments in getVariableColumnSize for the significance of
-        // these adjustments.
-        int content = 4 + 8 + dataSize;
-        if (content <= 48) {
-            // Short-cut calculations for sizes that are not used in the
-            // catalog sizing.
-            return roundedAllocationSize(16, content);
+    public static int testOnlyAllocationSizeForObject(int requestSize) {
+        if (requestSize <= 48) {
+            // Short-cut calculations for sizes that are not used in the catalog sizing.
+            if (requestSize <= 2) {
+                return 2;
+            }
+            return roundedAllocationSize(4, requestSize);
         }
-        // Otherwise exercise as much of the catalog sizing code path as
-        // possible but strip out any adjustments that are not directly a
-        // result of allocation rounding.
-        // See the comments in getVariableColumnSize for the significance of
-        // these adjustments.
-        return getVariableColumnSize(64, dataSize, false, false) - 8 - 8;
+        // Otherwise exercise as much of the common catalog sizing code path as possible
+        // but strip out any adjustments that are not directly a result of allocation rounding.
+        // See the comments in getVariableColumnSize for the significance of these adjustments.
+        return getVariableColumnSize(64, requestSize - 4 - 8, false, false) - 8 - 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {

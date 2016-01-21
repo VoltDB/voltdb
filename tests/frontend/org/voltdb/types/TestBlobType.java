@@ -26,6 +26,8 @@ package org.voltdb.types;
 import java.security.MessageDigest;
 import java.util.Arrays;
 
+import junit.framework.TestCase;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -39,8 +41,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.TestCase;
 
 public class TestBlobType extends TestCase {
     public void testVarbinary() throws Exception {

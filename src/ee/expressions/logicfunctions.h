@@ -36,7 +36,7 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
         NValue defaultResult = arguments[size-1];
         // See the comment above about the reason for un-inlining, here.
         if ( defaultResult.m_sourceInlined ) {
-            defaultResult.allocateObjectFromInlinedValue(getTempStringPool());
+            defaultResult.allocateObjectFromInlinedValue();
         }
         return defaultResult;
     }

@@ -34,20 +34,6 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
-    /// The layout of an allocation segregated by size,
-    /// including overhead to help identify the size-specific
-    /// pool from which the allocation must be freed.
-    /// Uses placement new and a constructor to overlay onto
-    /// the variable-length raw internal allocation and
-    /// initialize the requested size as a prefix field.
-    /// The m_data field makes it easy to access the user
-    /// data at its fixed offset.
-    struct Sized {
-        int32_t m_size;
-        char m_data[0];
-        Sized(int32_t requested_size) : m_size(requested_size) { }
-    };
-
     static const int POOLED_MAX_VALUE_LENGTH;
 
     /**
@@ -101,19 +87,19 @@ public:
      * a function that allowed the persistent pointer to be safely relocated
      * and re-registered.
      */
-    static Sized* allocateRelocatable(char** referrer, int32_t sz);
+    static char* allocateRelocatable(char** referrer, int32_t sz);
 
     /**
      * Return the rounded-up buffer size that was allocated for the string.
      */
-    static int32_t getAllocationSizeForRelocatable(Sized* string);
+    static int32_t getAllocationSizeForRelocatable(char* string);
 
     /**
      * Deallocate the object returned by allocateRelocatable.
      * This implements continuous compaction which can have the side effect of
      * relocating some other allocation.
      */
-    static void freeRelocatable(Sized* string);
+    static void freeRelocatable(char* string);
 };
 }
 

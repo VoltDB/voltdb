@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 public class VarbinaryStringLookup extends VoltProcedure {
     public final SQLStmt sqlSelect = new SQLStmt("select * from blah where ival = ? and s = ?");
 
-    public VoltTable[] run(long ival, String str1, String str2) {
+    public VoltTable[] run(long ival, byte[] str1, String str2) {
         voltQueueSQL(sqlSelect, ival, str1);
         VoltTable t1 = voltExecuteSQL()[0];
         assert(t1.getRowCount() == 1);

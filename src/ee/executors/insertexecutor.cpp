@@ -197,12 +197,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     TableTuple inputTuple(m_inputTable->schema());
     assert (inputTuple.sizeInValues() == m_inputTable->columnCount());
     TableIterator iterator = m_inputTable->iterator();
-    Pool* tempPool = ExecutorContext::getTempStringPool();
-    const std::vector<int>& fieldMap = m_node->getFieldMap();
-    std::size_t mapSize = fieldMap.size();
     while (iterator.next(inputTuple)) {
 
-        for (int i = 0; i < mapSize; ++i) {
+        for (int i = 0; i < m_node->getFieldMap().size(); ++i) {
             // Most executors will just call setNValue instead of
             // setNValueAllocateForObjectCopies.
             //
@@ -212,9 +209,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             // it's being assigned to the target table's outlined
             // string field.  In this case we need to tell the NValue
             // where to allocate the string data.
-            templateTuple.setNValueAllocateForObjectCopies(fieldMap[i],
+            templateTuple.setNValueAllocateForObjectCopies(m_node->getFieldMap()[i],
                                                            inputTuple.getNValue(i),
-                                                           tempPool);
+                                                           ExecutorContext::getTempStringPool());
         }
 
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
