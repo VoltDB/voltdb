@@ -1,4 +1,5 @@
 <grammar.sql>
+{@cmp = "_eqne"} -- geo types don't do <, >, <=, >= (at least, not in a way that agrees with PostGIS)
 {@star = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), AREA(POLY1)"}
 
 -- Test inserting points & polygons, via the pointFromText & polygonFromText functions...
@@ -11,29 +12,38 @@ INSERT INTO _table VALUES (103, pointFromText('POINT(  0.01    1.01 )'), pointFr
 INSERT INTO _table VALUES (104, pointFromText('POINT( -1.01    0.01 )'), pointFromText('POINT( -0.01  -0.01 )'), null, null)
 INSERT INTO _table VALUES (105, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(  1.01   1.01 )'), null, null)
 INSERT INTO _table VALUES (106, pointFromText('POINT(  1.01    1.01 )'), pointFromText('POINT(  2.01   2.01 )'), null, null)
-INSERT INTO _table VALUES (107, pointFromText('POINT(-71.065  42.355)'), pointFromText('POINT(  0.01  -0.01 )'), null, null)
+-- Points very close to each other (near Herald Square, New York, NY):
+INSERT INTO _table VALUES (107, pointFromText('POINT(-73.988  40.7504)'),pointFromText('POINT(-73.988 40.75037)'),null,null)
+INSERT INTO _table VALUES (108, pointFromText('POINT(-73.988  40.750401)'),pointFromText('POINT(-73.98801 40.7504)'),null,null)
+
 -- Simple ("square", in the lat/long sense) polygons (without holes; and slightly un-square, to reduce round-off errors):
-INSERT INTO _table VALUES (201, null,                                    null,                                   null, polygonFromText('POLYGON((-0.01 -0.01, 0.01 -0.01, 0.011 0.011, -0.01 0.01, -0.01 -0.01))') )
-INSERT INTO _table VALUES (202, pointFromText('POINT(  0.005   0.005)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.01 -0.01, 0.01 -0.01, 0.011 0.011, -0.01 0.01, -0.01 -0.01))') )
-INSERT INTO _table VALUES (203, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.1  -1.1,  1.1  -1.1,  1.11  1.11,  -1.1  1.1,  -1.1  -1.1))') )
-INSERT INTO _table VALUES (204, pointFromText('POINT( -4.01    2.5  )'), pointFromText('POINT( -2.5    2.5  )'), null, polygonFromText('POLYGON((-3.3   2.2, -2.2   2.2, -2.2   3.3,   -3.3  3.3,  -3.3   2.2))') )
+INSERT INTO _table VALUES (201, null,                                    null,                                   null, polygonFromText('POLYGON((-0.01 -0.01, 0.41 -0.01, 0.41 0.41, -0.01 0.41, -0.01 -0.01))') )
+INSERT INTO _table VALUES (202, pointFromText('POINT(  0.005   0.005)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.01 -0.01, 0.41 -0.01, 0.41 0.41, -0.01 0.41, -0.01 -0.01))') )
+INSERT INTO _table VALUES (203, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.1  -1.1,  1.3  -1.1,  1.3  1.3,  -1.1  1.3,  -1.1  -1.1 ))') )
+INSERT INTO _table VALUES (204, pointFromText('POINT( -4.01    2.51 )'), pointFromText('POINT( -2.5    2.5  )'), null, polygonFromText('POLYGON((-3.3   2.2, -2.2   2.2, -2.22 3.32, -3.3  3.3,  -3.3   2.2 ))') )
 
--- A small polygon: Times Square, New York, NY (approximate)
-INSERT INTO _table VALUES (205, pointFromText('POINT(-73.98558 40.75798)'), pointFromText('POINT(-73.98552 40.75796)'), null, polygonFromText('POLYGON((-73.98512 40.75942, -73.98563 40.75800, -73.98695 40.75603, -73.98644 40.75582, -73.98554 40.75796, -73.98461 40.75920, -73.98512 40.75942))') )
+-- Large but simple polygons: Colorado & Wyoming (very approximate, without considering that latitude lines
+-- are not great circles; and northern borders changed slightly, to avoid round-off errors with CENTROID)
+-- (The first point for each is within that state; the second is in Boston, MA, which is not)
+INSERT INTO _table VALUES (205, pointFromText('POINT(-105.5   39.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-109.05 41.2, -109.05 37, -102.05 37, -102.05 41.2, -109.05 41))') )
+INSERT INTO _table VALUES (206, pointFromText('POINT(-107.5   43.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-111.05 45.2, -111.05 41, -104.05 41, -104.05 45.2, -111.05 45))') )
 
--- Large but simple polygons: Colorado & Wyoming (very approximate, without considering that latitude lines are not great circles)
-INSERT INTO _table VALUES (206, pointFromText('POINT(-105.5   39.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-109.05 41, -109.05 37, -102.05 37, -102.05 41, -109.05 41))') )
-INSERT INTO _table VALUES (207, pointFromText('POINT(-107.5   43.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-111.05 45, -111.05 41, -104.05 41, -104.05 45, -111.05 45))') )
+-- Small polygons: Times Square & Herald Square, New York, NY (approximate)
+-- (The first point for each is within that square; the second is just outside it)
+INSERT INTO _table VALUES (207, pointFromText('POINT(-73.98558 40.75798)'), pointFromText('POINT(-73.98552 40.75796)'), null, polygonFromText('POLYGON((-73.98512 40.75942, -73.98563 40.75800, -73.98695 40.75603, -73.98644 40.75582, -73.98554 40.75796, -73.98461 40.75920, -73.98512 40.75942))') )
+INSERT INTO _table VALUES (208, pointFromText('POINT(-73.98759 40.75039)'), pointFromText('POINT(-73.98800 40.75037)'), null, polygonFromText('POLYGON((-73.98783 40.75070, -73.98798 40.74988, -73.98776 40.74978, -73.98728 40.75046, -73.98783 40.75070))') )
 
 -- Super-large polygons, dividing the Earth up into 8 octants:
 -- (Note: the longitude of the North and South Pole is arbitrary; however, it has been set here to the values
 --  -45, 45, -135, 135, in a (partially successful) attempt to avoid a PostGIS bug in computing the CENTROID)
--- First, the "front": the North-West, North-East, South-East & South-West octants that touch the Prime (Greenwich) Meridian
+-- First, the "front": the North-West, North-East, South-East & South-West octants that touch where the Prime (Greenwich) Meridian meets the Equator
 INSERT INTO _table VALUES (311, pointFromText('POINT(-71.065  42.355)'), pointFromText('POINT( 71.065 42.355)'), null, polygonFromText('POLYGON((   0 0, -45  90, -90   0,    0 0))') )
-INSERT INTO _table VALUES (312, pointFromText('POINT( 71.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,  90   0,  45  90,    0 0))') )
+-- This one has been made slightly smaller, to avoid a PostGIS bug (it works fine either way, in VoltDB):
+--INSERT INTO _table VALUES (312, pointFromText('POINT( 71.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 0 0,  90   0,  45  90,    0 0))') )
+INSERT INTO _table VALUES (312, pointFromText('POINT( 71.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   1 1,  89   1,  45  89,    1 1))') )
 INSERT INTO _table VALUES (313, pointFromText('POINT( 71.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,  45 -90,  90   0,    0 0))') )
 INSERT INTO _table VALUES (314, pointFromText('POINT(-71.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0, -90   0, -45 -90,    0 0))') )
--- Then, the "back": the North-West, North-East, South-East & South-West octants that touch the Antimeridian (International Date Line)
+-- Then, the "back": the North-West, North-East, South-East & South-West octants that touch the Antimeridian (International Date Line) meets the Equator
 INSERT INTO _table VALUES (315, pointFromText('POINT(-99.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-180 0, -90   0,-135  90, -180 0))') )
 INSERT INTO _table VALUES (316, pointFromText('POINT( 99.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 180 0, 135  90,  90   0,  180 0))') )
 INSERT INTO _table VALUES (317, pointFromText('POINT( 99.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 180 0,  90   0, 135 -90,  180 0))') )
@@ -41,35 +51,35 @@ INSERT INTO _table VALUES (318, pointFromText('POINT(-99.065 -42.355)'), pointFr
 
 -- Note: valid polygon exterior vertices must be listed counter-clockwise; but interior hole vertices must be clockwise:
 -- A simple ("square-ish") polygon, without a hole (slightly un-square, to reduce round-off errors):
-INSERT INTO _table VALUES (221, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2))') )
+INSERT INTO _table VALUES (221, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2))') )
 -- A simple ("square-ish") polygon, with a ("square", asymmetric) hole:
-INSERT INTO _table VALUES (222, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
+INSERT INTO _table VALUES (222, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
 -- A simple ("square-ish") polygon, with 2 ("square", asymmetric) holes:
-INSERT INTO _table VALUES (223, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (223, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 -- A star-shaped polygon (approximately), with 8 points (16 vertices), without a hole:
 INSERT INTO _table VALUES (224, pointFromText('POINT( -0.099  -0.044)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01))') )
 -- An 8-point (approximately) star-shaped polygon, with an (approximately) star-shaped (symmetric, half-sized) hole:
-INSERT INTO _table VALUES (225, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
--- A simple ("square-ish") polygon, with 9 holes:
--- (Note: hole 6 changed to use 2.429 (not 2.43), in order to avoid 'Loop 0 crosses loop 6')
-INSERT INTO _table VALUES (226, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((2.43 48.89, 2.25 48.89, 2.25 48.83, 2.43 48.83, 2.43 48.89),(2.37 48.87, 2.37 48.85, 2.31 48.85, 2.31 48.87, 2.37 48.87),(2.40 48.88, 2.40 48.87, 2.37 48.87, 2.37 48.88, 2.40 48.88),(2.40 48.85, 2.40 48.84, 2.37 48.84, 2.37 48.85, 2.40 48.85),(2.31 48.85, 2.31 48.84, 2.28 48.84, 2.28 48.85, 2.31 48.85),(2.31 48.88, 2.31 48.87, 2.28 48.87, 2.28 48.88, 2.31 48.88),(2.429 48.86, 2.38 48.855, 2.38 48.865, 2.429 48.86),(2.25 48.86, 2.30 48.865, 2.30 48.855, 2.25 48.86),(2.34 48.85, 2.37 48.835, 2.31 48.835, 2.34 48.85),(2.34 48.89, 2.36 48.875, 2.32 48.875, 2.34 48.89))') )
+INSERT INTO _table VALUES (225, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.44 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
+-- A simple ("square-ish") polygon, with 9 holes (around Paris, France):
+-- (Note: hole 6 changed to use 2.42999 (not 2.43), in order to avoid 'Loop 0 crosses loop 6', due to round-off)
+INSERT INTO _table VALUES (226, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((2.43 48.89, 2.25 48.89, 2.25 48.83, 2.43 48.83, 2.43 48.89),(2.37 48.87, 2.37 48.85, 2.31 48.85, 2.31 48.87, 2.37 48.87),(2.40 48.88, 2.40 48.87, 2.37 48.87, 2.37 48.88, 2.40 48.88),(2.40 48.85, 2.40 48.84, 2.37 48.84, 2.37 48.85, 2.40 48.85),(2.31 48.85, 2.31 48.84, 2.28 48.84, 2.28 48.85, 2.31 48.85),(2.31 48.88, 2.31 48.87, 2.28 48.87, 2.28 48.88, 2.31 48.88),(2.42999 48.86, 2.38 48.855, 2.38 48.865, 2.42999 48.86),(2.25 48.86, 2.30 48.865, 2.30 48.855, 2.25 48.86),(2.34 48.85, 2.37 48.835, 2.31 48.835, 2.34 48.85),(2.34 48.89, 2.36 48.875, 2.32 48.875, 2.34 48.89))') )
 
 -- Just the holes (but counter-clockwise), from the above (with ID 222, 223, 225: 227, 228 are both holes from 223):
 INSERT INTO _table VALUES (227, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1))') )
-INSERT INTO _table VALUES (228, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.3 0.01, 0.3 0.3, 0.01 0.3, 0.01 0.01))') )
+INSERT INTO _table VALUES (228, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.4 0.01, 0.4 0.4, 0.01 0.4, 0.01 0.01))') )
 INSERT INTO _table VALUES (229, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.5 0.01, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.01 -0.5, 0.02 -0.045, 0.35 -0.35, 0.045 -0.02, 0.5 0.01, 0.045 0.02, 0.35 0.35, 0.02 0.045, 0.01 0.5, -0.02 0.045, -0.35 0.35, -0.045 0.02, -0.5 0.01))') )
 
 
 -- The following polygons are considered invalid by both VoltDB and PostGIS, due to failure to close a loop (i.e., the last vertex is not the
 -- same as the first); these INSERT statements, unlike the subsequent ones, will actually return an error, so the INSERT will not succeed
 -- (Note: ID values correspond to a similar polygon above, plus 500)
-INSERT INTO _table VALUES (701, null,                                    null,                                   null, polygonFromText('POLYGON((-0.01 -0.01, 0.01 -0.01, 0.01 0.01, -0.01 0.01))') )
-INSERT INTO _table VALUES (702, pointFromText('POINT(  0.005   0.005)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.01 -0.01, 0.01 -0.01, 0.01 0.01, -0.01 0.01))') )
-INSERT INTO _table VALUES (703, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.1  -1.1,  1.1  -1.1,  1.1  1.1,  -1.1  1.1))') )
-INSERT INTO _table VALUES (704, pointFromText('POINT( -4.01    2.5  )'), pointFromText('POINT( -2.5    2.5  )'), null, polygonFromText('POLYGON((-3.3   2.2, -2.2   2.2, -2.2  3.3,  -3.3  3.3))') )
-INSERT INTO _table VALUES (705, pointFromText('POINT(-73.98558 40.75798)'), pointFromText('POINT(-73.98552 40.75796)'), null, polygonFromText('POLYGON((-73.98512 40.75942, -73.98563 40.75800, -73.98695 40.75603, -73.98644 40.75582, -73.98554 40.75796, -73.98461 40.75920))') )
-INSERT INTO _table VALUES (706, pointFromText('POINT(-105.5   39.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-109.05 41, -109.05 37, -102.05 37, -102.05 41))') )
-INSERT INTO _table VALUES (707, pointFromText('POINT(-107.5   43.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-111.05 45, -111.05 41, -104.05 41, -104.05 45))') )
+INSERT INTO _table VALUES (701, null,                                    null,                                   null, polygonFromText('POLYGON((-0.01 -0.01, 0.41 -0.01, 0.41 0.41, -0.01 0.41))') )
+INSERT INTO _table VALUES (702, pointFromText('POINT(  0.005   0.005)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.01 -0.01, 0.41 -0.01, 0.41 0.41, -0.01 0.41))') )
+INSERT INTO _table VALUES (703, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.1  -1.1,  1.3  -1.1,  1.3  1.3,  -1.1  1.3 ))') )
+INSERT INTO _table VALUES (704, pointFromText('POINT( -4.01    2.5  )'), pointFromText('POINT( -2.5    2.5  )'), null, polygonFromText('POLYGON((-3.3   2.2, -2.2   2.2, -2.2  3.3,  -3.3  3.3 ))') )
+INSERT INTO _table VALUES (705, pointFromText('POINT(-105.5   39.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-109.05 41, -109.05 37, -102.05 37, -102.05 41))') )
+INSERT INTO _table VALUES (706, pointFromText('POINT(-107.5   43.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-111.05 45, -111.05 41, -104.05 41, -104.05 45))') )
+INSERT INTO _table VALUES (707, pointFromText('POINT(-73.98558 40.75798)'), pointFromText('POINT(-73.98552 40.75796)'), null, polygonFromText('POLYGON((-73.98512 40.75942, -73.98563 40.75800, -73.98695 40.75603, -73.98644 40.75582, -73.98554 40.75796, -73.98461 40.75920))') )
 INSERT INTO _table VALUES (711, pointFromText('POINT(-71.065  42.355)'), pointFromText('POINT( 71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,   0  90, -90   0))') )
 INSERT INTO _table VALUES (712, pointFromText('POINT( 71.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,  90   0,   0  90))') )
 INSERT INTO _table VALUES (713, pointFromText('POINT( 71.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,   0 -90,  90   0))') )
@@ -78,29 +88,29 @@ INSERT INTO _table VALUES (715, pointFromText('POINT(-99.065  42.355)'), pointFr
 INSERT INTO _table VALUES (716, pointFromText('POINT( 99.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 180 0,   0  90,  90   0))') )
 INSERT INTO _table VALUES (717, pointFromText('POINT( 99.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 180 0,  90   0,   0 -90))') )
 INSERT INTO _table VALUES (718, pointFromText('POINT(-99.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-180 0,   0 -90, -90   0))') )
-INSERT INTO _table VALUES (721, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2))') )
-INSERT INTO _table VALUES (722, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
-INSERT INTO _table VALUES (723, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (721, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4))') )
+INSERT INTO _table VALUES (722, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
+INSERT INTO _table VALUES (723, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 INSERT INTO _table VALUES (724, pointFromText('POINT( -0.099  -0.044)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04))') )
 INSERT INTO _table VALUES (725, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
 INSERT INTO _table VALUES (727, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01))') )
-INSERT INTO _table VALUES (728, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.3 0.01, 0.3 0.3, 0.01 0.3))') )
+INSERT INTO _table VALUES (728, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.4 0.01, 0.4 0.4, 0.01 0.4))') )
 INSERT INTO _table VALUES (729, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.5 0.01, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.01 -0.5, 0.02 -0.045, 0.35 -0.35, 0.045 -0.02, 0.5 0.01, 0.045 0.02, 0.35 0.35, 0.02 0.045, 0.01 0.5, -0.02 0.045, -0.35 0.35, -0.045 0.02))') )
 -- These are invalid due to failure to close an interior hole (ID values from above plus 10; or 20 for the last one, for the second hole)
-INSERT INTO _table VALUES (732, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1))') )
-INSERT INTO _table VALUES (733, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (732, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1))') )
+INSERT INTO _table VALUES (733, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 INSERT INTO _table VALUES (735, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02))') )
-INSERT INTO _table VALUES (743, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01))') )
+INSERT INTO _table VALUES (743, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01))') )
 
 -- The following polygons are considered invalid by both VoltDB and PostGIS, due to crossing edges:
 -- (Note: ID values correspond to a similar polygon above, plus 600)
-INSERT INTO _table VALUES (801, null,                                    null,                                   null, polygonFromText('POLYGON((-0.01 -0.01, 0.01  0.01,  0.01 -0.01, -0.01 0.01, -0.01 -0.01))') )
-INSERT INTO _table VALUES (802, pointFromText('POINT(  0.005   0.005)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.01 -0.01, 0.01 -0.01, -0.01 0.01,   0.01 0.01, -0.01 -0.01))') )
-INSERT INTO _table VALUES (803, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.1  -1.1,  1.1   1.1,   1.1 -1.1,   -1.1  1.1,  -1.1  -1.1 ))') )
+INSERT INTO _table VALUES (801, null,                                    null,                                   null, polygonFromText('POLYGON((-0.01 -0.01, 0.41  0.41,  0.41 -0.01, -0.01 0.41, -0.01 -0.01))') )
+INSERT INTO _table VALUES (802, pointFromText('POINT(  0.005   0.005)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.01 -0.01, 0.41 -0.01, -0.01 0.41,   0.41 0.41, -0.01 -0.01))') )
+INSERT INTO _table VALUES (803, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.1  -1.1,  1.3   1.3,   1.3 -1.1,   -1.1  1.3,  -1.1  -1.1 ))') )
 INSERT INTO _table VALUES (804, pointFromText('POINT( -4.01    2.5  )'), pointFromText('POINT( -2.5    2.5  )'), null, polygonFromText('POLYGON((-3.3   2.2, -2.2   2.2,  -3.3  3.3,   -2.2  3.3,  -3.3   2.2 ))') )
-INSERT INTO _table VALUES (805, pointFromText('POINT(-73.98558 40.75798)'), pointFromText('POINT(-73.98552 40.75796)'), null, polygonFromText('POLYGON((-73.98512 40.75942, -73.98554 40.75796, -73.98695 40.75603, -73.98644 40.75582, -73.98563 40.75800, -73.98461 40.75920, -73.98512 40.75942))') )
-INSERT INTO _table VALUES (806, pointFromText('POINT(-105.5   39.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-109.05 41, -102.05 37, -109.05 37, -102.05 41, -109.05 41))') )
-INSERT INTO _table VALUES (807, pointFromText('POINT(-107.5   43.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-111.05 45, -111.05 41, -104.05 45, -104.05 41, -111.05 45))') )
+INSERT INTO _table VALUES (805, pointFromText('POINT(-105.5   39.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-109.05 41, -102.05 37, -109.05 37, -102.05 41, -109.05 41))') )
+INSERT INTO _table VALUES (806, pointFromText('POINT(-107.5   43.1  )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-111.05 45, -111.05 41, -104.05 45, -104.05 41, -111.05 45))') )
+INSERT INTO _table VALUES (807, pointFromText('POINT(-73.98558 40.75798)'), pointFromText('POINT(-73.98552 40.75796)'), null, polygonFromText('POLYGON((-73.98512 40.75942, -73.98554 40.75796, -73.98695 40.75603, -73.98644 40.75582, -73.98563 40.75800, -73.98461 40.75920, -73.98512 40.75942))') )
 INSERT INTO _table VALUES (811, pointFromText('POINT(-71.065  42.355)'), pointFromText('POINT( 71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,   0  90, -90   0,    1  1,    0 0))') )
 INSERT INTO _table VALUES (812, pointFromText('POINT( 71.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,  90   0,   0  90,    1 -1,    0 0))') )
 INSERT INTO _table VALUES (813, pointFromText('POINT( 71.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((   0 0,   0 -90,  90   0,   -1 -1,    0 0))') )
@@ -109,41 +119,42 @@ INSERT INTO _table VALUES (815, pointFromText('POINT(-99.065  42.355)'), pointFr
 INSERT INTO _table VALUES (816, pointFromText('POINT( 99.065  42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 180 0,   0  90,  90   0, -179  1,  180 0))') )
 INSERT INTO _table VALUES (817, pointFromText('POINT( 99.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON(( 180 0,  90   0,   0 -90,  179  1,  180 0))') )
 INSERT INTO _table VALUES (818, pointFromText('POINT(-99.065 -42.355)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-180 0,   0 -90, -90   0,  179 -1, -180 0))') )
-INSERT INTO _table VALUES (821, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.22 2.2, 2.2 -2.2, -2.2 2.2, -2.2 -2.2))') )
+INSERT INTO _table VALUES (821, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 2.4, 2.4 -2.2, -2.2 2.4, -2.2 -2.2))') )
 -- TODO: commented out (invalid) polygons that have negative Area (according to PostGIS), which causes PostGIS to throw an error
---INSERT INTO _table VALUES (822, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, -2.2 2.2, 2.22 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
---INSERT INTO _table VALUES (823, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.22 2.2, 2.2 -2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+--INSERT INTO _table VALUES (822, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, -2.2 2.4, 2.4 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
+--INSERT INTO _table VALUES (823, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 2.4, 2.4 -2.2, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 INSERT INTO _table VALUES (824, pointFromText('POINT( -0.099  -0.044)'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09   0.04, 1.02 0.01, 0.09 -0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01))') )
 INSERT INTO _table VALUES (825, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09   0.04, 1.02 0.01, 0.09 -0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
 INSERT INTO _table VALUES (827, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-1.1 -1.1, 0.01 0.01, 0.01 -1.1, -1.1 0.01, -1.1 -1.1))') )
-INSERT INTO _table VALUES (828, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.3 0.01, 0.3 0.3, 0.01 0.3, 0.3 0.3, 0.01 0.01))') )
+INSERT INTO _table VALUES (828, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.4 0.01, 0.4 0.4, 0.01 0.4, 0.4 0.4, 0.01 0.01))') )
 INSERT INTO _table VALUES (829, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.5 0.01, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.01 -0.5, 0.02 -0.045, 0.35 -0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 0.35, 0.02 0.045, 0.01 0.5, -0.02 0.045, -0.35 0.35, -0.045 0.02, -0.5 0.01))') )
 -- These are invalid due to an interior hole with crossing edges (ID values from above plus 10; or 20 for the last one, for the second hole)
-INSERT INTO _table VALUES (832, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 0.01, -1.1 0.01, 0.01 -1.1, -1.1 -1.1))') )
-INSERT INTO _table VALUES (833, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 -1.1, 0.01 0.01, -1.1 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (832, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT(  -0.05 -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, 0.01 0.01, -1.1 0.01, 0.01 -1.1, -1.1 -1.1))') )
+--INSERT INTO _table VALUES (833, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 -1.1, 0.01 0.01, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (833, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, 0.01 0.01, -1.1 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 INSERT INTO _table VALUES (835, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 -0.02, 0.5 0.01, 0.045 0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
-INSERT INTO _table VALUES (843, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.3 0.3, 0.01 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (843, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT(  -0.5  -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.4 0.4, 0.01 0.4, 0.4 0.01, 0.01 0.01))') )
 
 -- The following polygons are considered invalid by VoltDB, but valid by PostGIS, which does not care about clockwise vs. counter-clockwise:
 -- (Note: ID values correspond to a similar polygon above, plus 700)
 -- Similar polygons to the above (with ID 221, 224), without holes, but vertices reversed (clockwise): [invalid!]
-INSERT INTO _table VALUES (921, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.2, 2.22 2.2, 2.2 -2.2, -2.2 -2.2))') )
+INSERT INTO _table VALUES (921, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.4, 2.4 2.4, 2.4 -2.2, -2.2 -2.2))') )
 INSERT INTO _table VALUES (924, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , 0.01 1.01, 0.04 0.09 , 0.7  0.7 , 0.09  0.04, 1.02 0.01, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 0.01 -1.01, -0.04 -0.09 , -0.7  -0.7 , -0.09  -0.04, -1.01 0.01))') )
 -- Similar polygons to the above (with ID 222, 223, 225), with reversed (clockwise) exterior vertices: [invalid!]
-INSERT INTO _table VALUES (922, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.2, 2.22 2.2, 2.2 -2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
-INSERT INTO _table VALUES (923, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.2, 2.22 2.2, 2.2 -2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (922, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.4, 2.4 2.4, 2.4 -2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
+INSERT INTO _table VALUES (923, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.4, 2.4 2.4, 2.4 -2.2, -2.2 -2.2),(-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1),(0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 INSERT INTO _table VALUES (925, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , 0.01 1.01, 0.04 0.09 , 0.7  0.7 , 0.09  0.04, 1.02 0.01, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 0.01 -1.01, -0.04 -0.09 , -0.7  -0.7 , -0.09  -0.04, -1.01 0.01),(-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
 -- Just the holes (like those with ID 227, 228, 229), but clockwise: [invalid!]
 INSERT INTO _table VALUES (927, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-1.1 -1.1, -1.1 0.01, 0.01 0.01, 0.01 -1.1, -1.1 -1.1))') )
-INSERT INTO _table VALUES (928, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.01 0.3, 0.3 0.3, 0.3 0.01, 0.01 0.01))') )
+INSERT INTO _table VALUES (928, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((0.01 0.01, 0.01 0.4, 0.4 0.4, 0.4 0.01, 0.01 0.01))') )
 INSERT INTO _table VALUES (929, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-0.5 0.01, -0.045 0.02, -0.35 0.35, -0.02 0.045, 0.01 0.5, 0.02 0.045, 0.35 0.35, 0.045 0.02, 0.5 0.01, 0.045 -0.02, 0.35 -0.35, 0.02 -0.045, 0.01 -0.5, -0.02 -0.045, -0.35 -0.35, -0.045 -0.02, -0.5 0.01))') )
 -- Similar polygons to the above (with ID 222, 223, 225), with reversed (counter-clockwise) holes: [invalid!]
-INSERT INTO _table VALUES (932, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1))') )
-INSERT INTO _table VALUES (933, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.2 -2.2, 2.22 2.2, -2.2 2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1),(0.01 0.01, 0.3 0.01, 0.3 0.3, 0.01 0.3, 0.01 0.01))') )
+INSERT INTO _table VALUES (932, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1))') )
+INSERT INTO _table VALUES (933, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, 2.4 -2.2, 2.4 2.4, -2.2 2.4, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1),(0.01 0.01, 0.4 0.01, 0.4 0.4, 0.01 0.4, 0.01 0.01))') )
 INSERT INTO _table VALUES (935, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  -0.04, -0.7  -0.7 , -0.04 -0.09 , 0.01 -1.01, 0.04 -0.09 , 0.7  -0.7 , 0.09  -0.04, 1.02 0.01, 0.09  0.04, 0.7  0.7 , 0.04 0.09 , 0.01 1.01, -0.04  0.09, -0.7  0.7 , -0.09 0.04 , -1.01 0.01),(-0.5 0.01, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.01 -0.5, 0.02 -0.045, 0.35 -0.35, 0.045 -0.02, 0.5 0.01, 0.045 0.02, 0.35 0.35, 0.02 0.045, 0.01 0.5, -0.02 0.045, -0.35 0.35, -0.045 0.02, -0.5 0.01))') )
 -- Similar polygons to the above (with ID 222, 223, 225), with reversed exterior vertices (clockwise) AND holes (counter-clockwise): [invalid!]
-INSERT INTO _table VALUES (942, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.2, 2.22 2.2, 2.2 -2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1))') )
-INSERT INTO _table VALUES (943, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.2, 2.22 2.2, 2.2 -2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1),(0.01 0.01, 0.3 0.01, 0.3 0.3, 0.01 0.3, 0.01 0.01))') )
+INSERT INTO _table VALUES (942, pointFromText('POINT( -0.5    -0.5  )'), pointFromText('POINT( -0.05  -0.1  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.4, 2.4 2.4, 2.4 -2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1))') )
+INSERT INTO _table VALUES (943, pointFromText('POINT( -0.05   -0.1  )'), pointFromText('POINT( -0.5   -0.5  )'), null, polygonFromText('POLYGON((-2.2 -2.2, -2.2 2.4, 2.4 2.4, 2.4 -2.2, -2.2 -2.2),(-1.1 -1.1, 0.01 -1.1, 0.01 0.01, -1.1 0.01, -1.1 -1.1),(0.01 0.01, 0.4 0.01, 0.4 0.4, 0.01 0.4, 0.01 0.01))') )
 INSERT INTO _table VALUES (945, pointFromText('POINT(  0.01    0.01 )'), pointFromText('POINT(-71.065 42.355)'), null, polygonFromText('POLYGON((-1.01 0.01, -0.09  0.04, -0.7  0.7 , -0.04 0.09 , 0.01 1.01, 0.04 0.09 , 0.7  0.7 , 0.09  0.04, 1.02 0.01, 0.09  -0.04, 0.7  -0.7 , 0.04 -0.09 , 0.01 -1.01, -0.04 -0.09 , -0.7  -0.7 , -0.09  -0.04, -1.01 0.01),(-0.5 0.01, -0.045 -0.02, -0.35 -0.35, -0.02 -0.045, 0.01 -0.5, 0.02 -0.045, 0.35 -0.35, 0.045 -0.02, 0.5 0.01, 0.045 0.02, 0.35 0.35, 0.02 0.045, 0.01 0.5, -0.02 0.045, -0.35 0.35, -0.045 0.02, -0.5 0.01))') )
 
 
@@ -162,8 +173,9 @@ SELECT ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2) from _ta
 SELECT ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2) from _table G05 WHERE LONGITUDE(PT1) < 0 AND LATITUDE(PT1) > 0
 
 -- Test polygons and the AsText, CAST(polygon AS VARCHAR), NumPoints & NumInteriorRings functions
-SELECT ID,    AsText(POLY1)            POLY1AT                      from _table G06
-SELECT ID,      CAST(POLY1 as VARCHAR) POLY1VC                      from _table G07
+-- (Note: certain troublesome invalid polygons avoided here, with ID > 930)
+SELECT ID,    AsText(POLY1)            POLY1AT                      from _table G06 WHERE ID < 930
+SELECT ID,      CAST(POLY1 as VARCHAR) POLY1VC                      from _table G07 WHERE ID < 930
 SELECT ID, NumPoints(POLY1) NPoints, NumInteriorRings(POLY1) NHoles from _table G08
 SELECT ID, NumPoints(POLY1) NPoints, NumInteriorRings(POLY1) NHoles from _table G09 WHERE NumPoints(POLY1) > 5 AND NumInteriorRings(POLY1) > 0
 
@@ -186,27 +198,28 @@ SELECT ID, DISTANCE(PT1,  PT2  ) from _table G18
 SELECT ID, DISTANCE(PT1,  PT2  ) from _table G19 WHERE DISTANCE(PT1,  PT2  ) > 200000
 SELECT A.ID AID, B.ID BID, DISTANCE(A.PT1  ,B.PT1  ) G20DIST FROM _table A JOIN _table B ON A.ID <= B.ID
 SELECT ID, DISTANCE(PT1,  POLY1) from _table G21
-SELECT ID, DISTANCE(PT1,  POLY1) from _table G22 WHERE DISTANCE(PT1,  POLY1) > 200000
-SELECT A.ID AID, B.ID BID, DISTANCE(A.PT1  ,B.POLY1) G23DIST FROM _table A JOIN _table B ON A.ID <= B.ID
-SELECT ID, DISTANCE(POLY1,PT1  ) from _table G24
-SELECT ID, DISTANCE(POLY1,PT1  ) from _table G25 WHERE DISTANCE(POLY1,PT1  ) > 200000
-SELECT A.ID AID, B.ID BID, DISTANCE(A.POLY1,B.PT1  ) G26DIST FROM _table A JOIN _table B ON A.ID <= B.ID
+SELECT ID, DISTANCE(PT1,  POLY1) from _table G22 WHERE DISTANCE(PT1,  POLY1) > 4000
+SELECT A.ID AID, B.ID BID, DISTANCE(A.PT1  ,B.POLY1) G23DIST FROM _table A JOIN _table B ON A.ID <> B.ID
+SELECT ID, DISTANCE(POLY1,PT2  ) from _table G24
+SELECT ID, DISTANCE(POLY1,PT2  ) from _table G25 WHERE DISTANCE(POLY1,PT2  ) > 4000
+SELECT A.ID AID, B.ID BID, DISTANCE(A.POLY1,B.PT2  ) G26DIST FROM _table A JOIN _table B ON A.ID <> B.ID
 -- DISTANCE between two polygons is not yet supported; so this fails in the (VoltDB)
 -- planner (even when running against the PostGIS backend, which does call the planner)
 SELECT ID, DISTANCE(POLY1,POLY1) from _table G27
 SELECT ID, DISTANCE(POLY1,POLY1) from _table G28 WHERE DISTANCE(POLY1,POLY1) < 200000
-SELECT A.ID AID, B.ID BID, DISTANCE(A.POLY1,B.POLY1) G29DIST FROM _table A JOIN _table B ON A.ID <= B.ID
+SELECT A.ID AID, B.ID BID, DISTANCE(A.POLY1,B.POLY1) G29DIST FROM _table A JOIN _table B ON A.ID >= B.ID
 
 -- Test polygons and the AREA & CENTROID functions (also using AsText, LONGITUDE, LATITUDE, IsValid)
 SELECT ID, AREA(POLY1)                 from _table G31
 SELECT ID, AREA(POLY1)                 from _table G32 WHERE AREA(POLY1) > 2000000
 SELECT ID, AREA(POLY1), AsText(POLY1)  from _table G33
 SELECT ID, AREA(POLY1), AsText(POLY1)  from _table G34 WHERE AREA(POLY1) > 2000000
-SELECT ID, AsText(CENTROID(POLY1))     from _table G35
-SELECT ID, LONGITUDE(CENTROID(POLY1)), LATITUDE(CENTROID(POLY1)) from _table G36
-SELECT ID, AREA(POLY1)                 from _table G36 WHERE _maybe IsValid(POLY1)
+-- (Note: certain troublesome polygons avoided here, with ID > 300)
+SELECT ID, AsText(CENTROID(POLY1))                               from _table G35 WHERE ID < 300
+SELECT ID, LONGITUDE(CENTROID(POLY1)), LATITUDE(CENTROID(POLY1)) from _table G36 WHERE ID < 300
+SELECT ID, AREA(POLY1)                 from _table G37 WHERE _maybe IsValid(POLY1)
 -- This won't work until IsValid (& boolean return values) is supported in the initial SELECT clause
-SELECT ID, IsValid(POLY1), AREA(POLY1) from _table G37
+SELECT ID, IsValid(POLY1), AREA(POLY1) from _table G38
 
 -- Test the CONTAINS function, with polygons & points (also using LONGITUDE, LATITUDE, AsText)
 SELECT ID, LONGITUDE(PT1), LATITUDE(PT1) from _table G41 WHERE _maybe CONTAINS(POLY1,PT1)
@@ -215,9 +228,20 @@ SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G43 WHERE _maybe CONTAINS(P
 SELECT ID, AsText(PT2),    AsText(POLY1) from _table G44 WHERE _maybe CONTAINS(POLY1,PT2)
 -- Test UPDATE using CENTROID, and re-test CONTAINS afterward
 UPDATE _table G45 SET PT2 = CENTROID(POLY1)
-SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G46 WHERE _maybe CONTAINS(POLY1,PT2)
-SELECT ID, AsText(PT2),    AsText(POLY1) from _table G47 WHERE _maybe CONTAINS(POLY1,PT2)
+-- (Note: certain troublesome polygons avoided here, with ID > 300)
+SELECT ID, LONGITUDE(PT2), LATITUDE(PT2) from _table G46 WHERE _maybe CONTAINS(POLY1,PT2) AND ID < 300
+SELECT ID, AsText(PT2),    AsText(POLY1) from _table G47 WHERE _maybe CONTAINS(POLY1,PT2) AND ID < 300
 
 -- These won't work until CONTAINS (& boolean return values) is supported in the initial SELECT clause
 SELECT ID, CONTAINS(POLY1,PT1), LONGITUDE(PT1), LATITUDE(PT1) from _table G48
 SELECT ID, CONTAINS(POLY1,PT1), AsText(PT1),    AsText(POLY1) from _table G49
+
+-- Test joins against point & polygon columns
+-- (Note: PostGIS considers two geographies to be equal if their 'bounding boxes' are the same, which
+--  includes polygons with the same exterior ring but different interior rings, as well as points that
+--  are very close together, but not quite identical (see: http://postgis.net/docs/ST_Geometry_EQ.html);
+--  so such cases have been excluded here, since VoltDB treats them differently, by design. Similarly,
+--  we avoid the use of <, <=, >, >= here, since PostGIS and VoltDB also treat those very differently,
+--  by design.)
+SELECT A.ID AID, AsText(A.PT1  ) APT1  , B51.ID BID, AsText(B51.PT1  ) BPT1   FROM _table A JOIN _table B51 ON A.PT1   @cmp B51.PT1   AND BID NOT IN (107, 108)
+SELECT A.ID AID, AsText(A.POLY1) APOLY1, B52.ID BID, AsText(B52.POLY1) BPOLY1 FROM _table A JOIN _table B52 ON A.POLY1 @cmp B52.POLY1 AND NumInteriorRings(A.POLY1) = NumInteriorRings(B52.POLY1)
