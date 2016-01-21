@@ -234,12 +234,14 @@ if len(sys.argv) == 2:
     createCandidate = False
     proTreeish = sys.argv[1]
     voltdbTreeish = sys.argv[1]
-    rbmqExportTreeish = sys.argv[1]
+    #rbmqbranch always use master 
+    #rbmqExportTreeish = sys.argv[1]
 if len(sys.argv) == 3:
     createCandidate = False
     voltdbTreeish = sys.argv[1]
     proTreeish = sys.argv[2]
-    rbmqExportTreeish = sys.argv[2]
+    #rbmq always use master
+    #rbmqExportTreeish = sys.argv[2]
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
 
