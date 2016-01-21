@@ -1063,7 +1063,14 @@ def etree_to_dict(t):
 
 
 def handle_deployment_dict(deployment_elem, key, value, istop):
+    if key == 'connection':
+        if value:
+            make_deployment_dict(deployment_elem, key, value, istop)
+    else:
+        make_deployment_dict(deployment_elem, key, value, istop)
 
+
+def make_deployment_dict(deployment_elem, key, value, istop):
     if istop == True:
         deployment_sub_element = deployment_elem
     else:
@@ -1094,6 +1101,7 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
                     elif key1 not in IGNORETOP:
                         if value1 != None:
                             deployment_sub_element.attrib[key1] = str(value1)
+
 
 
 def handle_deployment_list(deployment_elem, key, value):
