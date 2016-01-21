@@ -1074,45 +1074,37 @@ def etree_to_dict(t):
 
 
 def handle_deployment_dict(deployment_elem, key, value, istop):
-    if key == 'connection':
-        if value:
-            make_deployment_dict(deployment_elem, key, value, istop)
-    else:
-        make_deployment_dict(deployment_elem, key, value, istop)
-
-
-def make_deployment_dict(deployment_elem, key, value, istop):
-    if istop == True:
-        deployment_sub_element = deployment_elem
-    else:
-        deployment_sub_element = SubElement(deployment_elem, str(key))
-    for key1, value1 in value.iteritems():
-        if type(value1) is dict:
-            if istop == True:
-                if key1 not in IGNORETOP:
-                    handle_deployment_dict(deployment_sub_element, key1, value1, False)
-            else:
-                handle_deployment_dict(deployment_sub_element, key1, value1, False)
-        elif type(value1) is list:
-            handle_deployment_list(deployment_sub_element, key1, value1)
+    if value:
+        if istop == True:
+            deployment_sub_element = deployment_elem
         else:
-            if isinstance(value1, bool):
-                if value1 == False:
-                    deployment_sub_element.attrib[key1] = "false"
+            deployment_sub_element = SubElement(deployment_elem, str(key))
+        for key1, value1 in value.iteritems():
+            if type(value1) is dict:
+                if istop == True:
+                    if key1 not in IGNORETOP:
+                        handle_deployment_dict(deployment_sub_element, key1, value1, False)
                 else:
-                    deployment_sub_element.attrib[key1] = "true"
+                    handle_deployment_dict(deployment_sub_element, key1, value1, False)
+            elif type(value1) is list:
+                handle_deployment_list(deployment_sub_element, key1, value1)
             else:
-                if key == "property":
-                    deployment_sub_element.attrib["name"] = value["name"];
-                    deployment_sub_element.text = str(value1)
+                if isinstance(value1, bool):
+                    if value1 == False:
+                        deployment_sub_element.attrib[key1] = "false"
+                    else:
+                        deployment_sub_element.attrib[key1] = "true"
                 else:
-                    if istop == False:
-                        if value1 != None:
-                            deployment_sub_element.attrib[key1] = str(value1)
-                    elif key1 not in IGNORETOP:
-                        if value1 != None:
-                            deployment_sub_element.attrib[key1] = str(value1)
-
+                    if key == "property":
+                        deployment_sub_element.attrib["name"] = value["name"];
+                        deployment_sub_element.text = str(value1)
+                    else:
+                        if istop == False:
+                            if value1 != None:
+                                deployment_sub_element.attrib[key1] = str(value1)
+                        elif key1 not in IGNORETOP:
+                            if value1 != None:
+                                deployment_sub_element.attrib[key1] = str(value1)
 
 
 def handle_deployment_list(deployment_elem, key, value):
