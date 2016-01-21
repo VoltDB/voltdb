@@ -496,7 +496,13 @@ def get_database_deployment(dbid):
             uelem.attrib["name"] = duser["name"]
             uelem.attrib["password"] = duser["password"]
             uelem.attrib["roles"] = duser["roles"]
-            uelem.attrib["plaintext"] = duser["plaintext"]
+            plaintext = str(duser["plaintext"])
+            if isinstance(duser["plaintext"], bool):
+                if duser["plaintext"] == False:
+                    plaintext = "false"
+                else:
+                    plaintext = "true"
+            uelem.attrib["plaintext"] = plaintext
 
     handle_deployment_dict(deployment_top, dbid, value, True)
 
@@ -788,7 +794,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['temptables']['maxsize'] = int(deployment[field]['temptables']['maxsize'])
                         if 'resourcemonitor' not in deployment[field] or deployment[field]['resourcemonitor'] is None:
                             if 'resourcemonitor'  in deployment[field]:
-                                new_deployment[field]['resourcemonitor'] = none
+                                new_deployment[field]['resourcemonitor'] = None
                         else:
                             new_deployment[field]['resourcemonitor'] = {}
                             if 'memorylimit' in deployment[field]['resourcemonitor']:
@@ -956,8 +962,8 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
                         if 'port' in deployment_xml[field]:
                             new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                        if 'connection' not in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment[field]['connection']\
-                                and 'servers' in deployment[field]['connection']:
+                        if 'connection' not in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']\
+                                and 'servers' in deployment_xml[field]['connection']:
                             new_deployment[field]['connection'] = {}
                             new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
                             new_deployment[field]['connection']['servers'] = str(deployment_xml[field]['connection']['servers'])
