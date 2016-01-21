@@ -23,7 +23,6 @@ import static com.google_voltpatches.common.collect.Maps.keyOrNull;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
-import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
 
 import java.util.Arrays;
@@ -817,7 +816,7 @@ public final class ImmutableSortedMap<K, V> extends ImmutableSortedMapFauxveride
     ImmutableSortedMap<K, V> result = descendingMap;
     if (result == null) {
       if (isEmpty()) {
-        return result = emptyMap(Ordering.from(comparator()).reverse());
+        return result = emptyMap((Comparator<? super K>) Ordering.from(comparator()).reverse());
       } else {
         return result =
             new ImmutableSortedMap<K, V>(
