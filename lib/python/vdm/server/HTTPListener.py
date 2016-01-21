@@ -415,6 +415,9 @@ def map_deployment(request, database_id):
     if 'dr' in request.json and 'id' in request.json['dr']:
         deployment[0]['dr']['id'] = request.json['dr']['id']
 
+    if 'dr' in request.json and 'listen' in request.json['dr']:
+        deployment[0]['dr']['listen'] = request.json['dr']['listen']
+
     if 'dr' in request.json and 'connection' in request.json['dr'] \
             and 'source' in request.json['dr']['connection']:
         deployment[0]['dr']['connection']['source'] = request.json['dr']['connection']['source']
