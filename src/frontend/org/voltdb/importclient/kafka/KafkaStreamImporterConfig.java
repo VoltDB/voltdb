@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,6 +36,7 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 
 import org.apache.log4j.Logger;
+import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.ImporterConfig;
 
 /**
@@ -195,42 +197,75 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return configs;
     }
 
+    private final static class FailedMetaDataAttempt {
+        final String msg;
+        final Throwable cause;
+
+        FailedMetaDataAttempt(String msg, Throwable cause) {
+            this.cause = cause;
+            this.msg = msg;
+        }
+
+        private void log() {
+            m_logger.error(msg,cause);
+        }
+    }
+
     private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
-            String topic, String groupId, String procedure, int soTimeout, int fetchSize)
+            final String topic, String groupId, String procedure, int soTimeout, int fetchSize)
     {
         SimpleConsumer consumer = null;
-        try {
-            consumer = new SimpleConsumer(brokerList.get(0).getHost(), brokerList.get(0).getPort(), soTimeout, fetchSize, CLIENT_ID);
+        Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
+        List<FailedMetaDataAttempt> attempts = new ArrayList<>();
 
-            TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
-            kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
+        Iterator<HostAndPort> hpitr = brokerList.iterator();
+        while (configs.isEmpty() && hpitr.hasNext()) {
+            HostAndPort hp = hpitr.next();
+            try {
+                consumer = new SimpleConsumer(hp.getHost(), hp.getPort(), soTimeout, fetchSize, CLIENT_ID);
 
-            List<TopicMetadata> metaData = resp.topicsMetadata();
-            if (metaData == null) {
-                //called once.
-                throw new RuntimeException("Failed to get topic metadata for topic " + topic);
-            }
-            Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
-            for (TopicMetadata item : metaData) {
-                for (PartitionMetadata part : item.partitionsMetadata()) {
-                    URI uri;
-                    try {
-                        uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
-                    } catch (URISyntaxException ex) { // Should not happen
-                        throw new RuntimeException(ex);
-                    }
-                    Broker leader = part.leader();
-                    KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
-                            part.partitionId(), new HostAndPort(leader.host(), leader.port()),
-                            groupId, fetchSize, soTimeout, procedure);
-                    configs.put(uri, config);
+                TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
+                kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
+
+                List<TopicMetadata> metaData = resp.topicsMetadata();
+                if (metaData == null) {
+                    attempts.add(new FailedMetaDataAttempt(
+                            "Failed to get topic metadata for topic " + topic + " from host " + hp.getHost(), null
+                            ));
+                    continue;
                 }
+                for (TopicMetadata item : metaData) {
+                    for (PartitionMetadata part : item.partitionsMetadata()) {
+                        URI uri;
+                        try {
+                            uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
+                        } catch (URISyntaxException ex) { // Should not happen
+                            throw new KafkaConfigurationException("unable to create topic resource URI", ex);
+                        }
+                        Broker leader = part.leader();
+                        KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
+                                part.partitionId(), new HostAndPort(leader.host(), leader.port()),
+                                groupId, fetchSize, soTimeout, procedure);
+                        configs.put(uri, config);
+                    }
+                }
+            } catch (Exception e) {
+                attempts.add(new FailedMetaDataAttempt(
+                        "Failed to send topic metadata request for topic " + topic + " from host " + hp.getHost(), e
+                        ));
+                continue;
+            } finally {
+                closeConsumer(consumer);
             }
-
-            return configs;
-        } finally {
-            closeConsumer(consumer);
         }
+        if (!attempts.isEmpty()) {
+            for (FailedMetaDataAttempt attempt: attempts) {
+                attempt.log();
+            }
+            attempts.clear();
+            throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
+        }
+        return configs;
     }
 
     private static String getBrokerKey(String brokers)
@@ -241,10 +276,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     public static void closeConsumer(SimpleConsumer consumer) {
-        try {
-            if (consumer != null) {
-                consumer.close();
-            }
+        if (consumer != null) try {
+            consumer.close();
         } catch (Exception e) {
             m_logger.error("Failed to close consumer connection.", e);
         }
@@ -303,6 +336,28 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 return true;
             }
             return (hap.getHost().equals(getHost()) && hap.getPort() == getPort());
+        }
+    }
+
+    public static class KafkaConfigurationException extends ImportBaseException {
+
+        private static final long serialVersionUID = -3413349105074207334L;
+
+        public KafkaConfigurationException() {
+            super();
+        }
+
+        public KafkaConfigurationException(String format, Object... args) {
+            super(format, args);
+        }
+
+        public KafkaConfigurationException(String format, Throwable cause,
+                Object... args) {
+            super(format, cause, args);
+        }
+
+        public KafkaConfigurationException(Throwable cause) {
+            super(cause);
         }
     }
 }

@@ -707,11 +707,15 @@ public class TestGeospatialFunctions extends RegressionSuite {
 
         VoltTable vt = client.callProcedure("@AdHoc", "select pk, name, isinvalidreason(region), message from borders").getResults()[0];
         while (vt.advanceRow()) {
-            assertTrue(String.format("Border %s, Expected error message containing \"%s\" but got \"%s\"",
+            long pk = vt.getLong(0);
+            String expected = vt.getString(3);
+            String actual = vt.getString(2);
+            assertTrue(String.format("Border %s, key %d, Expected error message containing \"%s\" but got \"%s\"",
                                        vt.getString(1),
-                                       vt.getString(3),
-                                       vt.getString(2)),
-                         vt.getString(2).contains(vt.getString(3)));
+                                       pk,
+                                       expected,
+                                       actual),
+                         vt.getString(2).equals(vt.getString(3)));
         }
     }
 
