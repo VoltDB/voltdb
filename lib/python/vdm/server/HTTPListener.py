@@ -483,7 +483,9 @@ def map_deployment_users(request, user):
 def get_database_deployment(dbid):
     deployment_top = Element('deployment')
     value = DEPLOYMENT[dbid-1]
-
+    db = DATABASES[dbid-1]
+    host_count = len(db['members'])
+    value['cluster']['hostcount'] = host_count
     # Add users
     addTop = False
     for duser in DEPLOYMENT_USERS:
@@ -527,8 +529,6 @@ def make_configuration_file():
     db_top = SubElement(main_header, 'databases')
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
-    # db1 = get_database_deployment(1)
-    # print db1
     i = 0
     while i < len(DATABASES):
         db_elem = SubElement(db_top, 'database')
@@ -1782,6 +1782,6 @@ def main(runner, amodule, aport, config_dir):
                      view_func=VDM_CONFIGURATION_VIEW, methods=['GET', 'POST'])
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
-    APP.add_url_rule('/api/1.0/database/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET'])
     APP.run(threaded=True, host='0.0.0.0', port=aport)

@@ -32,7 +32,7 @@ import xmlrunner
 from xml.etree import ElementTree
 
 
-__url__ = 'http://localhost:8000/api/1.0/database/1/deployment/'
+__url__ = 'http://localhost:8000/api/1.0/databases/1/deployment/'
 
 
 class XML(unittest.TestCase):
