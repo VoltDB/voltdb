@@ -56,6 +56,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.Formatter;
 
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
@@ -331,6 +332,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
+        Formatter<String> formatter = m_config.getFormatter();
         try {
             //Start with the starting leader.
             resetLeader();
@@ -414,7 +416,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     ByteBuffer payload = messageAndOffset.message().payload();
 
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
-                    Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(line));
+                    Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
                     TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                             messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
                             invocation);

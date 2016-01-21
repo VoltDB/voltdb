@@ -19,11 +19,11 @@ package org.voltdb.importclient.socket;
 
 import java.net.URI;
 import java.util.Map;
-import java.util.Properties;
 
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 /**
  * Importer factory implementation for pull socket importer.
@@ -38,9 +38,9 @@ public class PullSocketImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props)
+    public Map<URI, ImporterConfig> createImporterConfigurations(ImportConfiguration config)
     {
-        return PullSocketImporterConfig.createConfigEntries(props);
+        return PullSocketImporterConfig.createConfigEntries(config);
     }
 
     @Override

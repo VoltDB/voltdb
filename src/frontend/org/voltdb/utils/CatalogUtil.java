@@ -123,7 +123,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
-import org.voltdb.importer.formatter.Formatter;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -1188,7 +1188,7 @@ public abstract class CatalogUtil {
         private final Properties m_moduleProps;
         private final Properties m_formatterProps;
 
-        private Formatter m_formatter = null;
+        private AbstractFormatterFactory m_formatter = null;
 
         public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
             m_formatName = formatName;
@@ -1208,11 +1208,11 @@ public abstract class CatalogUtil {
             return m_formatterProps;
         }
 
-        public void setFormatter(Formatter formatter) {
+        public void setFormatter(AbstractFormatterFactory formatter) {
             m_formatter = formatter;
         }
 
-        public Formatter getFormatter() {
+        public AbstractFormatterFactory getFormatter() {
             return m_formatter;
         }
     }
