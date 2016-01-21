@@ -314,8 +314,11 @@ def map_deployment(request, database_id):
             if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings'] \
                 and 'memorylimit' in request.json['systemsettings']['resourcemonitor'] \
                 and 'size' in request.json['systemsettings']['resourcemonitor']['memorylimit']:
-                deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
-                request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+                if request.json['systemsettings']['resourcemonitor']['memorylimit']['size'] != '':
+                    deployment[0]['systemsettings']['resourcemonitor']['memorylimit']['size'] = \
+                    request.json['systemsettings']['resourcemonitor']['memorylimit']['size']
+                else:
+                    deployment[0]['systemsettings']['resourcemonitor']['memorylimit'] = {}
 
     if 'systemsettings' in request.json and 'resourcemonitor' in request.json['systemsettings']:
         if 'resourcemonitor' not in deployment[0]['systemsettings'] or deployment[0]['systemsettings']['resourcemonitor'] is None:
@@ -325,15 +328,27 @@ def map_deployment(request, database_id):
             deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
             if 'feature' in request.json['systemsettings']['resourcemonitor']['disklimit']:
                 deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'] = []
-                for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
-                    deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'].append(
-                        {
-                            'name': feature['name'],
-                            'size': feature['size']
-                        }
-                    )
+                if request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                    for feature in request.json['systemsettings']['resourcemonitor']['disklimit']['feature']:
+                        deployment[0]['systemsettings']['resourcemonitor']['disklimit']['feature'].append(
+                            {
+                                'name': feature['name'],
+                                'size': feature['size']
+                            }
+                        )
+                else:
+                    deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
 
-    if  'import' in request.json:
+    if 'systemsettings' in deployment[0] and 'resourcemonitor' in deployment[0]['systemsettings']:
+        result = False;
+        if 'memorylimit' in deployment[0]['systemsettings']['resourcemonitor'] and deployment[0]['systemsettings']['resourcemonitor']['memorylimit']:
+            result = True;
+        if 'disklimit' in deployment[0]['systemsettings']['resourcemonitor'] and deployment[0]['systemsettings']['resourcemonitor']['disklimit']:
+            result = True;
+        if result == False:
+            deployment[0]['systemsettings']['resourcemonitor'] = {}
+
+    if 'import' in request.json:
         if 'import' not in deployment[0] or  deployment[0]['import'] is None:
             deployment[0]['import'] = {}
 
@@ -773,7 +788,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['temptables']['maxsize'] = int(deployment[field]['temptables']['maxsize'])
                         if 'resourcemonitor' not in deployment[field] or deployment[field]['resourcemonitor'] is None:
                             if 'resourcemonitor'  in deployment[field]:
-                                new_deployment[field]['resourcemonitor'] = deployment[field]['resourcemonitor']
+                                new_deployment[field]['resourcemonitor'] = none
                         else:
                             new_deployment[field]['resourcemonitor'] = {}
                             if 'memorylimit' in deployment[field]['resourcemonitor']:
@@ -916,8 +931,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['temptables'] = {}
                     new_deployment[field]['temptables']['maxsize'] = int(deployment_xml[field]['temptables']['maxsize'])
 
-                    if deployment_xml[field]['resourcemonitor'] is None:
-                        new_deployment[field]['resourcemonitor'] = (deployment_xml[field]['resourcemonitor'])
+                    if 'resourcemonitor' not in deployment_xml[field] or deployment_xml[field]['resourcemonitor'] is None:
+                        if 'resourcemonitor'  in deployment_xml[field]:
+                            new_deployment[field]['resourcemonitor'] = None
                     else:
                         new_deployment[field]['resourcemonitor'] = {}
                         if 'memorylimit' in deployment_xml[field]['resourcemonitor']:
