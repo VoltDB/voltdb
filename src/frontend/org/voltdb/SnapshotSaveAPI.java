@@ -298,6 +298,14 @@ public class SnapshotSaveAPI
                     "FAILURE",
                     CoreUtils.throwableToString(e));
             earlyResultTable = result;
+        } catch (IllegalArgumentException e) {
+            result.addRow(
+                    context.getHostId(),
+                    hostname,
+                    "",
+                    "FAILURE",
+                    CoreUtils.throwableToString(e));
+            earlyResultTable = result;
         }
 
         // If earlyResultTable is set, return here
