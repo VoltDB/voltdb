@@ -433,6 +433,12 @@
                     <td align="right" id="lblDrId"></td>
                     <td>&nbsp;</td>
                   </tr>
+                  <tr id="rowDrPort" class="rowDr clsDrType">
+                    <td class="configLabel" width="62%">Port</td>
+                    <td>&nbsp;</td>
+                    <td align="right" id="lblDrPort"></td>
+                    <td>&nbsp;</td>
+                  </tr>
                   <tr class="rowDr clsDrEnabled clsDrType" >
                     <td class="configLabel" width="62%">Connection Source</td>
                     <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
@@ -440,7 +446,7 @@
                     <td class="onOff" id="chkDrOnOffConnectionVal" width="10%"> On</td>
                   </tr>
                   <tr class="rowDr subLabelRow clsDrEnabled" style="display:none" id="row-master-cluster">
-                    <td class="configLabel label-master-cluster">Master Cluster</td>
+                    <td class="configLabel label-master-cluster">Source</td>
                     <td colspan="2" align="right"><span id="master-cluster-name"></span></td>
                      <td>&nbsp;</td>
                   </tr>
@@ -1048,7 +1054,13 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
                     <input id="txtDrId" name="txtDrId" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>
                   </td>
-
+                </tr>
+                <tr class="showHideDrConfig" id="trDrPort">
+                    <td>Port</td>
+                    <td id="tdDrPort" width="10%" align="">
+                      <input id="txtDrPort" name="txtDrPort" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                      <label id="errorDrPort" for="txtDrPort" class="error ccErrorMsg" style="display: none;"></label>
+                    </td>
                 </tr>
                 <tr class="showHideDrConfig">
                   <td><h4>Connection Source</h4></td>
@@ -1058,7 +1070,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
                    </td>
                 </tr>
                 <tr class="trConnectionSource showHideDrConfig">
-                  <td>Master Cluster:</td>
+                  <td>Source</td>
                   <td>
                     <input id="txtDatabase" name="txtDatabase" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <label id="errorDatabase" for="txtDatabase" class="error ccErrorMsg" style="display: none;"></label>
