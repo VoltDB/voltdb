@@ -345,7 +345,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         sleepCounter = backoffSleep(sleepCounter);
                         continue;
                     }
+
                     long lastOffset = getLastOffset();
+                    if (lastOffset == -1) {
+                        sleepCounter = backoffSleep(sleepCounter);
+                        continue;
+                    }
 
                     m_gapTracker.resetTo(lastOffset);
                     m_lastCommittedOffset = lastOffset;
@@ -529,7 +534,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
 
         private final int idx(long offset) {
-            return (int)offset % lag.length;
+            return (int)(offset % lag.length);
         }
 
         synchronized void resetTo(long offset) {
