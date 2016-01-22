@@ -344,11 +344,11 @@ def map_deployment(request, database_id):
                     deployment[0]['systemsettings']['resourcemonitor']['disklimit'] = {}
 
     if 'systemsettings' in deployment[0] and 'resourcemonitor' in deployment[0]['systemsettings']:
-        result = False;
+        result = False
         if 'memorylimit' in deployment[0]['systemsettings']['resourcemonitor'] and deployment[0]['systemsettings']['resourcemonitor']['memorylimit']:
-            result = True;
+            result = True
         if 'disklimit' in deployment[0]['systemsettings']['resourcemonitor'] and deployment[0]['systemsettings']['resourcemonitor']['disklimit']:
-            result = True;
+            result = True
         if result == False:
             deployment[0]['systemsettings']['resourcemonitor'] = {}
 
@@ -1129,7 +1129,7 @@ def handle_deployment_dict(deployment_elem, key, value, istop):
                         deployment_sub_element.attrib[key1] = "true"
                 else:
                     if key == "property":
-                        deployment_sub_element.attrib["name"] = value["name"];
+                        deployment_sub_element.attrib["name"] = value["name"]
                         deployment_sub_element.text = str(value1)
                     else:
                         if istop == False:
