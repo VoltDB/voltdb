@@ -504,7 +504,7 @@ def start_local_server(deploymentcontents, primary=''):
 
     # Start server in a separate process
     voltserver = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
-                                  preexec_fn=ignore_signals)
+                                  preexec_fn=ignore_signals, close_fds=True)
 
     initialized = False
     rfile = open(outfilename, 'r')
