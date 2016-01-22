@@ -24,7 +24,6 @@ import java.util.Properties;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
-import org.voltdb.importer.formatter.Formatter;
 
 
 /**
