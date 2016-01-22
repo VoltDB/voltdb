@@ -39,7 +39,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
     private final long m_connectionId;
     private int m_nextLength;
 
-    private static int MAX_MESSAGE_LENGTH = 52428800;
+    private static int MAX_MESSAGE_LENGTH = 1024*1024*1024 ;
 
     public VoltProtocolHandler() {
         m_sequenceId = 0;

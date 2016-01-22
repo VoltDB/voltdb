@@ -96,9 +96,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Context information of the current running procedure,
      * for logging "long running query" messages */
-    private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
+    private static long INITIAL_LOG_DURATION = 300000; // in milliseconds,
                                                      // not final to allow unit testing
-    private static final long LONG_OP_THRESHOLD = 10000;
+    private static final long LONG_OP_THRESHOLD = 100000;
 
     public static final int NO_BATCH_TIMEOUT_VALUE = 0;
     /** Fragment or batch time out in milliseconds.
@@ -402,7 +402,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, false);
         log.info(msg);
 
-        m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
+        m_logDuration = m_logDuration + 300000 ;
         m_lastMsgTime = currentTime;
         // Return 0 if we want to interrupt ee. Otherwise return the number of tuple operations to let
         // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
@@ -760,6 +760,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             byte hostname[],
             int drClusterId,
             long tempTableMemory,
+            long networkBufferSize,
             boolean createDrReplicatedStream,
             int compactionThreshold);
 

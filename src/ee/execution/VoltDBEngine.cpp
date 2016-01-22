@@ -169,6 +169,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          std::string hostname,
                          int32_t drClusterId,
                          int64_t tempTableMemoryLimit,
+                         int64_t networkBufferSize,
                          bool createDrReplicatedStream,
                          int32_t compactionThreshold)
 {
@@ -176,6 +177,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_resultOutput.setNetworkBufferSize(networkBufferSize);
     m_compactionThreshold = compactionThreshold;
 
     // Instantiate our catalog - it will be populated later on by load()

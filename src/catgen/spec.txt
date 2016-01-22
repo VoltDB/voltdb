@@ -32,6 +32,7 @@ end
 
 begin Systemsettings javaonly "Container for deployment systemsettings element"
   int temptablemaxsize        "The maximum allocation size for temp tables in the EE"
+  int networkbuffersize       "Network buffer size"
   int snapshotpriority        "The priority of snapshot work"
   int elasticduration         "Maximum duration time for rebalancing"
   int elasticthroughput       "Target throughput in megabytes for elasticity"

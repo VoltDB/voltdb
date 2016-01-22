@@ -183,6 +183,11 @@
                 <xs:attribute name="maxsize" type="memorySizeType" default="100"/>
             </xs:complexType>
         </xs:element>
+        <xs:element name="networkbuffer" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="maxsize" type="memorySizeType" default="50"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>

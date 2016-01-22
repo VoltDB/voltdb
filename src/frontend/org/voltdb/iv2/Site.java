@@ -515,6 +515,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        deploy.getSystemsettings().get("systemsettings").getNetworkbuffersize(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
             }
@@ -530,6 +531,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDrclusterid(),
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
+                        deploy.getSystemsettings().get("systemsettings").getNetworkbuffersize(),
                         hashinatorConfig,
                         m_mpDrGateway != null);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);

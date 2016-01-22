@@ -912,6 +912,11 @@ public abstract class CatalogUtil {
             tt = new SystemSettingsType.Temptables();
             ss.setTemptables(tt);
         }
+        SystemSettingsType.Networkbuffer nb = ss.getNetworkbuffer();
+        if (nb == null) {
+            nb = new SystemSettingsType.Networkbuffer();
+            ss.setNetworkbuffer(nb);
+        }
     }
 
     /**
@@ -1046,6 +1051,7 @@ public abstract class CatalogUtil {
             catDeployment.getSystemsettings().add("systemsettings");
 
         syssettings.setTemptablemaxsize(deployment.getSystemsettings().getTemptables().getMaxsize());
+        syssettings.setNetworkbuffersize(deployment.getSystemsettings().getNetworkbuffer().getMaxsize());
         syssettings.setSnapshotpriority(deployment.getSystemsettings().getSnapshot().getPriority());
         syssettings.setElasticduration(deployment.getSystemsettings().getElastic().getDuration());
         syssettings.setElasticthroughput(deployment.getSystemsettings().getElastic().getThroughput());

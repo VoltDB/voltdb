@@ -73,6 +73,7 @@ import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Networkbuffer;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.export.ExportDataProcessor;
@@ -278,6 +279,7 @@ public class VoltProjectBuilder {
     private Integer m_snapshotPriority;
 
     private Integer m_maxTempTableMemory = 100;
+    private Integer m_networkBufferSize = 50;
 
     private List<String> m_diagnostics;
 
@@ -660,9 +662,11 @@ public class VoltProjectBuilder {
         m_compilerDebugPrintStream = out;
     }
 
-    public void setMaxTempTableMemory(int max)
+    public void setMaxTempTableMemory(int max)  {  m_maxTempTableMemory = max;
+    }
+    public void setNetworkBufferSize(int max)
     {
-        m_maxTempTableMemory = max;
+        m_networkBufferSize = max;
     }
 
     public void setDRMasterHost(String drMasterHost) {
@@ -1159,6 +1163,11 @@ public class VoltProjectBuilder {
         Temptables temptables = factory.createSystemSettingsTypeTemptables();
         temptables.setMaxsize(m_maxTempTableMemory);
         systemSettingType.setTemptables(temptables);
+
+        Networkbuffer networkbuffer = factory.createSystemSettingsTypeNetworkbuffer();
+        networkbuffer.setMaxsize(m_networkBufferSize);
+        systemSettingType.setNetworkbuffer(networkbuffer);
+
         if (m_snapshotPriority != null) {
             SystemSettingsType.Snapshot snapshot = factory.createSystemSettingsTypeSnapshot();
             snapshot.setPriority(m_snapshotPriority);

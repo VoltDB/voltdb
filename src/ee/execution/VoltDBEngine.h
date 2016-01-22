@@ -115,6 +115,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         std::string hostname,
                         int32_t drClusterId,
                         int64_t tempTableMemoryLimit,
+                        int64_t networkBufferSize,
                         bool createDrReplicatedStream,
                         int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();

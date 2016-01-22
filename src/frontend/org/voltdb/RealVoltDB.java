@@ -1505,6 +1505,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 if (sysType.getTemptables() != null) {
                     hostLog.info("Max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
                 }
+                if (sysType.getNetworkbuffer() != null) {
+                    hostLog.info("Max network buffer size set to " + sysType.getNetworkbuffer().getMaxsize() + " mb");
+                }
                 if (sysType.getSnapshot() != null) {
                     hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
                 }
