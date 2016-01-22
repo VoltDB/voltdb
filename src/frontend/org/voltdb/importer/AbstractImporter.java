@@ -24,7 +24,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.InternalConnectionContext;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.importer.formatter.Formatter;
 
 
 /**
@@ -56,14 +55,8 @@ public abstract class AbstractImporter
     private volatile boolean m_stopping;
     private AtomicInteger m_backPressureCount = new AtomicInteger(0);
 
-    protected Formatter m_formatter;
-
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
-    }
-
-    public final void setFormatter(Formatter formatter) {
-        m_formatter = formatter;
     }
 
     /**
