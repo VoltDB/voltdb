@@ -976,7 +976,15 @@ def get_deployment_export_field(export_xml, is_list):
         for export in export_xml:
             new_export = {}
             for field in export:
-                new_export[field] = export[field]
+                if field == 'property':
+                    if type(export['property']) is list:
+                        new_export['property'] = get_deployment_properties(export['property'], 'list')
+                    else:
+                        new_export['property'] = get_deployment_properties(export['property'], 'dict')
+                elif field == 'enabled':
+                    new_export[field] = parse_bool_string(export[field])
+                else:
+                    new_export[field] = export[field]
             exports.append(new_export)
     else:
         for field in export_xml:
