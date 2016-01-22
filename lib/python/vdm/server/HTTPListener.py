@@ -962,7 +962,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
                         if 'port' in deployment_xml[field]:
                             new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                        if 'connection' not in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']\
+                        if 'connection' in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']\
                                 and 'servers' in deployment_xml[field]['connection']:
                             new_deployment[field]['connection'] = {}
                             new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
