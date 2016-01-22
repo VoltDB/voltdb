@@ -24,6 +24,7 @@ import java.util.Properties;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.AbstractImporterFactory;
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 /**
  * Importer factory implementation for kafka stream importers.
@@ -38,9 +39,9 @@ public class KafkaStreamImporterFactory extends AbstractImporterFactory
     }
 
     @Override
-    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props)
+    public Map<URI, ImporterConfig> createImporterConfigurations(Properties props, AbstractFormatterFactory formatterFactory)
     {
-        return KafkaStreamImporterConfig.createConfigEntries(props);
+        return KafkaStreamImporterConfig.createConfigEntries(props, formatterFactory);
     }
 
     @Override
