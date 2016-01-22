@@ -598,7 +598,7 @@ def make_configuration_file():
 
 def sync_configuration():
     headers = {'content-type': 'application/json'}
-    url = 'http://'+__IP__+':'+__PORT__+'/api/1.0/vdm/configuration/'
+    url = 'http://'+__IP__+':'+str(__PORT__)+'/api/1.0/vdm/configuration/'
     response = requests.post(url,headers = headers)
     return response
 
@@ -1746,7 +1746,6 @@ def main(runner, amodule, config_dir, server):
         convert_xml_to_json(config_path)
     else:
         DEPLOYMENT.append(deployment)
-
 
         if server is None:
             __host_name__ = socket.gethostname()
