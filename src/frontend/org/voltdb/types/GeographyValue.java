@@ -26,14 +26,32 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * This class is used to values in GEOGRAPHY columns in database tables.
+ * The Java class used to represent data with the SQL type GEOGRAPHY.
  * For now, this means polygons, but may include other kinds of geospatial
- * types in the future (linestring, etc)
+ * types in the future.
  */
 public class GeographyValue {
+
+    // Note that Google S2 refers to each ring of a polygon as a "loop"
+    // whereas VoltDB uses the term "ring" or "linear ring" in documentation
+    // and comments on public APIs.  In other places in the code, the terms
+    // "loop" and "ring" are used interchangeably.
+
+    /**
+     * The default length (in bytes) for a column with type GEOGRAPHY, if no
+     * length is specified.
+     */
+    public static final int DEFAULT_LENGTH = 32768;
+
+    /**
+     * The minimum-allowed length (in bytes) for a column with type GEOGRAPHY.
+     * This is the length of a polygon with just three vertices.
+     */
+    public static final int MIN_SERIALIZED_LENGTH = 155; // number of bytes need to store a triangle
+
     //
     // This is a list of loops.  Each loop must be in
-    // S2Loop format.  That is to say, it must have type XYPPoint
+    // S2Loop format.  That is to say, it must have type XYZPoint
     // type, it must be in counter-clockwise order and it must not
     // be closed.  All loops, even holes, are CCW.
     //
@@ -41,29 +59,30 @@ public class GeographyValue {
 
      /**
      * Create a polygon from a list of rings.  Each ring is a list of points:
-     *   - The first ring in the list is the outer ring, also known as the
-     *     shell.
-     *   - Subsequent rings should be inside of the outer ring and represent
-     *     "holes" in the polygon.
-     *   - Each shell should have its vertices listed in counter-clockwise order,
-     *     so that the area inside the ring is on the left side of the line segments
-     *     formed by adjacent vertices.
-     *   - Each hole, or inner ring, should have its vertices listed in clockwise
-     *     order, so that the area inside the ring is on the right side of the
-     *     line segments formed by adjacent vertices.
-     *
+     * <ol>
+     *   <li>The first ring in the list is the outer ring, also known as the
+     *       shell.</li>
+     *   <li>Subsequent rings should be inside of the outer ring and represent
+     *       "holes" in the polygon.</li>
+     *   <li>The shell should have its vertices listed in counter-clockwise order,
+     *       so that the area inside the ring is on the left side of the line segments
+     *       formed by adjacent vertices.</li>
+     *   <li>Each hole, or inner ring, should have its vertices listed in clockwise
+     *       order, so that the area inside the ring (the "hole") is on the right side
+     *       of the line segments formed by adjacent vertices.</li>
+     * </ol>
      * Note that this is the same as the order expected by the OGC standard's
-     * Well Known Text format.
+     * Well-Known Text format.
      *
-     * Note also that the loops here are GeographyPointValues, and that they
-     * are closed loops.  That is to say, the first vertex and the last
+     * Note also that the rings here are lists of GeographyPointValues, and that they
+     * are closed.  That is to say, the first vertex and the last
      * vertex must be equal.
      *
-     * @param loops
+     * @param rings  A list of lists of points that will form a polygon.
      */
-     public GeographyValue(List<List<GeographyPointValue>> loops) {
-         if (loops == null || loops.size() < 1) {
-             throw new IllegalArgumentException("GeographyValue must be instantiated with at least one loop");
+     public GeographyValue(List<List<GeographyPointValue>> rings) {
+         if (rings == null || rings.size() < 1) {
+             throw new IllegalArgumentException("GeographyValue must be instantiated with at least one ring");
          }
          // Note that we need to reverse all but the
          // first loop, since the EE wants them all in CCW order,
@@ -71,7 +90,7 @@ public class GeographyValue {
          //
          m_loops = new ArrayList<List<XYZPoint>>();
          boolean firstLoop = true;
-         for (List<GeographyPointValue> loop : loops) {
+         for (List<GeographyPointValue> loop : rings) {
              diagnoseLoop(loop, "Invalid loop for GeographyValue: ");
              List<XYZPoint> oneLoop = new ArrayList<XYZPoint>();
              int startIdx;
@@ -98,19 +117,34 @@ public class GeographyValue {
     }
 
     /**
-     * Create a GeometryValue object from an OGC Well Known Text format string.
-     * The format, which is different from the raw loop constructor above, is
-     * as follows.
+     * Create a GeographyValue object from an OGC well-known text-formatted string.
+     * Currently only polygons can be created via this method.
+     *
+     * Well-known text format for polygons is composed of the "POLYGON" keyword
+     * followed by a list of rings enclosed in parenthesis.  For example:
+     * <p><tt>
+     *   POLYGON((0 0, 20 0, 20 20, 0 20, 0 0),(5 5, 5 15, 15 15, 15 5, 5 5))
+     * </tt></p>
+     * Each point in a ring is composed of a coordinate of longitude and a coordinate
+     * of latitude separated by a space. Note that longitude comes first in this notation.
+     *
+     * Additional notes about rings:
      * <ol>
-     *   <li>Each polygon is a sequence of loops.</li>
-     *   <li>Each loop is either a shell or a hole.  There is exactly
-     *       one shell, but there may be zero or more holes.</li>
-     *   <li>The first loop in the sequence is the only shell.  Its vertices
-     *       should be given in counterclockwise order</li>
-     *   <li>All subsequent loops, if there are any, are holes.  Their vertices
-     *       should be given in <em>clockwise</em> order.  Note that this
-     *       is the opposite of the raw loop constructor from above.
-     * @param wkt
+     *   <li>The first ring in the list is the outer ring, also known as the
+     *       shell.</li>
+     *   <li>Subsequent rings should be inside of the outer ring and represent
+     *       "holes" in the polygon.</li>
+     *   <li>The shell should have its vertices listed in counter-clockwise order,
+     *       so that the area inside the ring is on the left side of the line segments
+     *       formed by adjacent vertices.</li>
+     *   <li>Each hole, or inner ring, should have its vertices listed in clockwise
+     *       order, so that the area inside the ring (the "hole") is on the right side
+     *       of the line segments formed by adjacent vertices.</li>
+     *   <li>Each ring must be closed; that is, the last point in the ring must be
+     *       equal to this first.</li>
+     * </ol>
+     *
+     * @param wkt  A well-known text-formatted string for a polygon.
      */
     public GeographyValue(String wkt) {
         if (wkt == null) {
@@ -125,25 +159,25 @@ public class GeographyValue {
     }
 
     /**
-     * This is a factory function to create a GeometryValue object
-     * from OGC's Well Known Text strings.  The format is given
-     * in the documentation for {@link GeographyValue.GeographyValue(String)}.
+     * Create a GeographyValue object from a well-known text string.
+     * This format is described in {@link #GeographyValue(String) the WKT constructor}
+     * for this class.
      *
-     * @param text
-     * @return
+     * @param text A well-known text string
+     * @return A new instance of GeographyValue
      */
     public static GeographyValue fromWKT(String text) {
         return new GeographyValue(text);
     }
 
     /**
-     * Return the list of loops of a polygon.  The list has the same
-     * values as the list of loops used to construct the polygon, or
-     * the sequence of WKT loops used to construct the polygon.
+     * Return the list of rings of a polygon.  The list has the same
+     * values as the list of rings used to construct the polygon, or
+     * the sequence of WKT rings used to construct the polygon.
      *
-     * @return A list of loops.
+     * @return A list of rings.
      */
-    public List<List<GeographyPointValue>> getLoops() {
+    public List<List<GeographyPointValue>> getRings() {
         /*
          * Gets the loops that make up the polygon, with the outer loop first.
          * Note that we need to convert from XYZPoint to GeographyPointValue.
@@ -178,7 +212,8 @@ public class GeographyValue {
     }
 
     /**
-     * Print out this polygon as text.  We currently use WKT.
+     * Return a representation of this object as well-known text.
+     * @return A well-known text string for this object.
      */
     @Override
     public String toString() {
@@ -186,7 +221,8 @@ public class GeographyValue {
     }
 
     /**
-     * Print out this polygon in WKT format.  Use 12 digits of precision.
+     * Return a representation of this object as well-known text.
+     * @return A well-known text string for this object.
      */
     public String toWKT() {
         StringBuffer sb = new StringBuffer();
@@ -247,13 +283,12 @@ public class GeographyValue {
 
     private static final byte INCOMPLETE_ENCODING_FROM_JAVA = 0;
     private static final byte COMPLETE_ENCODING = 1;
-    public static final int DEFAULT_LENGTH = 32768;
-    public static final int MIN_SERIALIZED_LENGTH = 155; // number of bytes need to store a triangle
 
     /**
-     * Return the number of bytes in the serialization for this polygon
-     * (not including the 4-byte length prefix that precedes variable-length types).
-     *  */
+     * Return the number of bytes in the serialization for this polygon.
+     * Returned value does not include the 4-byte length prefix that precedes variable-length types.
+     * @return The number of bytes in the serialization for this polygon.
+     */
     public int getLengthInBytes() {
         long length = 7;
         for (List<XYZPoint> loop : m_loops) {
@@ -284,12 +319,12 @@ public class GeographyValue {
     }
 
     /**
-     * Deserialize a GeographyValue from a ByteBuffer.
+     * Deserialize a GeographyValue from a ByteBuffer from an absolute offset.
      * (Assumes that the 4-byte length prefix has already been deserialized, and that
      * offset points to the start of data just after the prefix.)
-     * @param inBuffer
-     * @param offset
-     * @return a new GeographyValue
+     * @param inBuffer  The ByteBuffer from which to read a GeographyValue
+     * @param offset    The absolute offset in the ByteBuffer from which to read data
+     * @return A new GeographyValue instance.
      */
     public static GeographyValue unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
         int origPos = inBuffer.position();
@@ -300,10 +335,11 @@ public class GeographyValue {
     }
 
     /**
-     * Deserialize a GeographyValue from a ByteBuffer.
+     * Deserialize a GeographyValue from a ByteBuffer at the ByteBuffer's
+     * current position.
      * (Assumes that the 4-byte length prefix has already been deserialized.)
-     * @param inBuffer
-     * @return a new GeographyValue
+     * @param inBuffer  The ByteBuffer from which to read a GeographyValue
+     * @return A new GeographyValue instance.
      */
     public static GeographyValue unflattenFromBuffer(ByteBuffer inBuffer) {
         byte version = inBuffer.get(); // encoding version
@@ -652,8 +688,8 @@ public class GeographyValue {
      * stay in range because we are using the normalizing operations
      * in GeographyPointValue.
      *
-     * @param offset
-     * @return
+     * @param offset  The point by which to translate vertices in this
+     * @return  The resulting GeographyValue.
      */
     public GeographyValue add(GeographyPointValue offset) {
         List<List<GeographyPointValue>> newLoops = new ArrayList<List<GeographyPointValue>>();
