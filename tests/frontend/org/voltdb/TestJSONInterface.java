@@ -155,7 +155,16 @@ public class TestJSONInterface extends TestCase {
         out.close();
         out = null;
         conn.getOutputStream().close();
-        int responsCode = conn.getResponseCode();
+        int responsCode = 200;
+        IOException rcexp = null;
+        try {
+            responsCode = conn.getResponseCode();
+        } catch (IOException e) {
+            rcexp = e;
+        }
+        if (rcexp != null) {
+            throw rcexp;
+        }
 
         BufferedReader in = null;
         try {
