@@ -47,6 +47,27 @@ __EXPR = re.compile(r"ORDER BY\s+((\w+\.)?(?P<column_1>\w+)(\s+\w+)?)"
                     r"((\s+)?,\s+(\w+\.)?(?P<column_5>\w+)(\s+\w+)?)?"
                     r"((\s+)?,\s+(\w+\.)?(?P<column_6>\w+)(\s+\w+)?)?")
 
+# matches a string (VARCHAR) column representing a GEOGRAPHY_POINT (point),
+# of roughly this form: 'POINT (-12.3456 -65.4321)', but the initial space
+# between 'POINT' and '(', the minus signs, and the decimal points are optional
+__NUMBER = '-?\d+\.?\d*'
+__LONG_LAT_NUMS   =     __NUMBER+ '\s+' +__NUMBER
+__LONG_LAT_GROUPS = '('+__NUMBER+')\s+('+__NUMBER+')'
+__POINT = re.compile(r"^POINT\s?\("+__LONG_LAT_GROUPS+"\)$")
+
+# matches a string (VARCHAR) column representing a GEOGRAPHY (polygon), of roughly this form:
+# 'POLYGON ((-1.1 -1.1, -4.4 -1.1, -4.4 -4.4, -1.1 -4.4, -1.1 -1.1), (-2.2 -2.2, -3.3 -2.2, -2.2 -3.3, -2.2 -2.2))',
+# but the initial space between 'POINT' and '(', the spaces following the commas, the minus
+# signs, and the decimal points are all optional; and of course the number of loops (2 in this
+# example), the number of vertices within each loop, the number of digits before or after the
+# decimal point, and the actual numbers, can all vary.
+__LOOP_GROUP = '(\('+__LONG_LAT_NUMS+'(?:,\s?'+__LONG_LAT_NUMS+')+\))'
+__POLYGON = re.compile(r"^POLYGON\s?\("+__LOOP_GROUP+"(?:,\s?"+__LOOP_GROUP+")*\)$")
+# used to match individual loops within a in a GEOGRAPHY (polygon), and vertices (longitude
+# & latitude) within a loop
+__LOOP = re.compile(r"\("+__LONG_LAT_NUMS+"(?:,\s?"+__LONG_LAT_NUMS+")+\)")
+__LONG_LAT = re.compile(r"^\s?"+__LONG_LAT_GROUPS+"$")
+
 # This appears to be a weak knock-off of FastSerializer.NullCheck
 # TODO: There's probably a way to use the actual FastSerializer.NullCheck
 __NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR,
@@ -56,9 +77,16 @@ __NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR
           FastSerializer.VOLTTYPE_FLOAT: FastSerializer.NULL_FLOAT_INDICATOR,
           FastSerializer.VOLTTYPE_STRING: FastSerializer.NULL_STRING_INDICATOR}
 
-SIGNIFICANT_DIGITS = 12
+def round_to_num_digits(v, num_digits):
+    # round to the total number of significant digits,
+    # regardless of where the decimal point occurs
+    f = float(v)
+    if f == 0.0:
+        return f
+    decimal_places = num_digits - int(math.floor(math.log10(abs(f)))) - 1
+    return round(f, decimal_places)
 
-def normalize_value(v, vtype):
+def normalize_value(v, vtype, num_digits):
     global __NULL
     if v is None:
         return None
@@ -66,21 +94,55 @@ def normalize_value(v, vtype):
         return None
     elif vtype == FastSerializer.VOLTTYPE_FLOAT:
         # round to the desired number of decimal places -- accounting for significant digits before the decimal
-        decimal_places = SIGNIFICANT_DIGITS
-        abs_v = abs(float(v))
-        if abs_v >= 1.0:
-            # round to the total number of significant digits, including the integer part
-            decimal_places = SIGNIFICANT_DIGITS - 1 - int(math.floor(math.log10(abs_v)))
-        # print "DEBUG normalized float:(", round(v, decimal_places), ")"
-        return round(v, decimal_places)
+#         decimal_places = num_digits
+#         abs_v = abs(float(v))
+#         if abs_v >= 1.0:
+#             # round to the total number of significant digits, including the integer part
+#             decimal_places = num_digits - 1 - int(math.floor(math.log10(abs_v)))
+#         # print "DEBUG normalized float:(", round(v, decimal_places), ")"
+#         return round(v, decimal_places)
+        return round_to_num_digits(v, num_digits)
     elif vtype == FastSerializer.VOLTTYPE_DECIMAL:
         # print "DEBUG normalized_to:(", decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN"), ")"
         return decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN")
+    elif vtype == FastSerializer.VOLTTYPE_STRING and v:
+        # for strings (VARCHAR) representing a point or polygon (GEOGRAPHY_POINT
+        # or GEOGRAPHY), round off the longitude and latitude values to the desired
+        # number of significant digits (regardless of where the decimal point is);
+        # but leave other strings alone
+        r = v
+        point = __POINT.search(v)
+        if point:
+            r = 'POINT (' + str(round_to_num_digits(point.group(1), num_digits)) + ' ' \
+                          + str(round_to_num_digits(point.group(2), num_digits)) + ')'
+        polygon = __POLYGON.search(v)
+        if polygon:
+            r = "POLYGON ("
+            loops = re.findall(__LOOP, v)
+            for i in range(len(loops)):
+                loop = loops[i]
+                if loop:
+                    if i > 0:
+                        r += ", "
+                    r += '('
+                    points = loop[1:-1].split(',')
+                    for j in range(len(points)):
+                        if j > 0:
+                            r += ", "
+                        longlat = __LONG_LAT.search(points[j])
+                        r += str(round_to_num_digits(longlat.group(1), num_digits)) + ' ' \
+                           + str(round_to_num_digits(longlat.group(2), num_digits))
+                    r += ')'
+            r += ')'
+#         if r != v:
+#             print "DEBUG: normalizing:", v
+#             print "DEBUG: modified to:", r
+        return r
     else:
         # print "DEBUG normalized pass-through:(", v, ")"
         return v
 
-def normalize_values(tuples, columns):
+def normalize_values(tuples, columns, num_digits):
     # 'c' here is a voltdbclient.VoltColumn and
     # I assume t is a voltdbclient.VoltTable.
     if hasattr(tuples, "__iter__"):
@@ -88,9 +150,9 @@ def normalize_values(tuples, columns):
             # varbinary is array.array type and has __iter__ defined, but should be considered
             # as a single value to be compared.
             if hasattr(tuples[i], "__iter__") and type(tuples[i]) is not array.array:
-                normalize_values(tuples[i], columns)
+                normalize_values(tuples[i], columns, num_digits)
             else:
-                tuples[i] = normalize_value(tuples[i], columns[i].type)
+                tuples[i] = normalize_value(tuples[i], columns[i].type, num_digits)
 
 def project_sorted(row, sorted_cols):
     """Extract the values in the ORDER BY columns from a row.
@@ -275,12 +337,12 @@ class StandardNormalizer(NotANormalizer):
     """
 
     @staticmethod
-    def normalize(table, sql, sort_nulls=SortNulls.never):
+    def normalize(table, sql, sort_nulls=SortNulls.never, num_digits=12):
         """Normalizes the result tuples of ORDER BY statements, sorting SQL
            NULL (Python None) values in the ORDER BY columns in the specified
            manner (by default, not at all).
         """
-        normalize_values(table.tuples, table.columns)
+        normalize_values(table.tuples, table.columns, num_digits)
 
         sql_upper = sql.upper()
         # Ignore ORDER BY clause only in a sub-query
