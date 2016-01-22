@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,6 +31,8 @@ import java.sql.SQLException;
 
 import junit.framework.Test;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -59,7 +61,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         fail("Invalid selector should have resulted in a ProcCallException but didn't");
     }
 
-    public void testTablesSelector() throws IOException, ProcCallException
+    public void testTablesSelector() throws IOException, ProcCallException, JSONException
     {
         Client client = getClient();
         VoltTable results = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
@@ -74,7 +76,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
 
         results.advanceRow();
         assertEquals("BB_V", results.get("TABLE_NAME", VoltType.STRING));
-        assertEquals("{\"partitionColumn\":\"A1\",\"sourceTable\":\"AA_T\"}", results.get("REMARKS", VoltType.STRING));
+        assertEquals(new JSONObject("{\"partitionColumn\":\"A1\",\"sourceTable\":\"AA_T\"}").toString(), results.get("REMARKS", VoltType.STRING));
 
         results.advanceRow();
         assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
