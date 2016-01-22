@@ -30,6 +30,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from wtforms.validators import DataRequired, IPAddress, ValidationError, Optional, Regexp
 from flask_inputs import Inputs
 import socket
+import traceback
 from flask_inputs.validators import JsonSchema
 
 
@@ -51,12 +52,15 @@ class Validation(object):
                 try:
                     socket.inet_pton(socket.AF_INET, array[0])
                 except AttributeError:
+                    print traceback.format_exc()
                     try:
                         socket.inet_aton(array[0])
                     except socket.error:
+                        print traceback.format_exc()
                         raise ValidationError('Invalid IP address')
                     return array[0].count('.') == 3
                 except socket.error:
+                    print traceback.format_exc()
                     raise ValidationError('Invalid IP address')
                 try:
                     val = int(array[1])
@@ -64,6 +68,7 @@ class Validation(object):
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                 except ValueError as err:
                     msg = err.message
+                    print traceback.format_exc()
                     if msg is 'Port must be greater than 1 and less than 65535':
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                     else:
@@ -77,6 +82,7 @@ class Validation(object):
                     raise ValidationError('Port must be greater than 1 and less than 65535')
             except ValueError as err:
                 msg = err.message
+                print traceback.format_exc()
                 if msg is 'Port must be greater than 1 and less than 65535':
                     raise ValidationError('Port must be greater than 1 and less than 65535')
                 else:
