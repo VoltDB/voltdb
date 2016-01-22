@@ -54,6 +54,10 @@ DEPLOYMENT_USERS = []
 
 __PATH__ = ""
 
+__IP__ = "localhost"
+
+__PORT__ = 8000
+
 
 @APP.errorhandler(400)
 def not_found(error):
@@ -598,10 +602,9 @@ def make_configuration_file():
 
 def sync_configuration():
     headers = {'content-type': 'application/json'}
-    url = 'http://localhost:8000/api/1.0/vdm/configuration/'
+    url = 'http://'+__IP__+':'+__PORT__+'/api/1.0/vdm/configuration/'
     response = requests.post(url,headers = headers)
     return response
-
 
 def convert_xml_to_json(config_path):
     with open(config_path) as f:
@@ -1697,7 +1700,7 @@ class VdmConfiguration(MethodView):
         for member in result['vdm']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://'+member['hostname']+':8000/api/1.0/vdm/sync_configuration/'
+                url = 'http://'+member['hostname']+':'+__PORT__+'/api/1.0/vdm/sync_configuration/'
                 data = result
                 response = requests.post(url,data=json.dumps(data),headers = headers)
             except Exception,errs:
@@ -1714,7 +1717,7 @@ class DatabaseDeploymentAPI(MethodView):
         deployment_content = get_database_deployment(database_id)
         return Response(deployment_content, mimetype='text/xml')
 
-def main(runner, amodule, aport, config_dir):
+def main(runner, amodule, config_dir, server):
     try:
         F_DEBUG = os.environ['DEBUG']
     except KeyError:
@@ -1730,16 +1733,30 @@ def main(runner, amodule, aport, config_dir):
     deployment = json.loads(json_data)
     global PATH
     PATH = config_dir
+    global __IP__
+    global __PORT__
+
     # config_path = config_dir + '/' + 'vdm.xml'
     config_path = os.path.join(config_dir, 'vdm.xml')
 
+    arrServer = {}
+    if server is not None:
+        arrServer = server.split(':', 2)
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
         DEPLOYMENT.append(deployment)
 
-        __host_name__ = socket.gethostname()
-        __host_or_ip__ = socket.gethostbyname(__host_name__)
+
+        if server is None:
+            __host_name__ = socket.gethostname()
+            __host_or_ip__ = socket.gethostbyname(__host_name__)
+        else:
+            __host_name__ = arrServer[0]
+            __host_or_ip__ = arrServer[0]
+            __IP__ = arrServer[0]
+            __PORT__ = arrServer[1]
+
         SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
                         'enabled': True, 'external-interface': "", 'internal-interface': "",
                         'public-interface': "", 'client-listener': "", 'internal-listener': "",
@@ -1788,4 +1805,7 @@ def main(runner, amodule, aport, config_dir):
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
                      methods=['GET'])
-    APP.run(threaded=True, host='0.0.0.0', port=aport)
+    if server is not None:
+        APP.run(threaded=True, host=arrServer[0], port=int(arrServer[1]))
+    else:
+        APP.run(threaded=True, host='0.0.0.0', port=8000)
