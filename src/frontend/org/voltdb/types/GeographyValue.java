@@ -37,16 +37,16 @@ public class GeographyValue {
     // and comments on public APIs.  In other places in the code, the terms
     // "loop" and "ring" are used interchangeably.
 
-	/**
-	 * The default length (in bytes) for a column with type GEOGRAPHY, if no
-	 * length is specified.
-	 */
+    /**
+     * The default length (in bytes) for a column with type GEOGRAPHY, if no
+     * length is specified.
+     */
     public static final int DEFAULT_LENGTH = 32768;
 
-	/**
-	 * The minimum-allowed length (in bytes) for a column with type GEOGRAPHY.
-	 * This is the length of a polygon with just three vertices.
-	 */
+    /**
+     * The minimum-allowed length (in bytes) for a column with type GEOGRAPHY.
+     * This is the length of a polygon with just three vertices.
+     */
     public static final int MIN_SERIALIZED_LENGTH = 155; // number of bytes need to store a triangle
 
     //

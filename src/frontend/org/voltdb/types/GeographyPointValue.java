@@ -163,9 +163,9 @@ public class GeographyPointValue {
     }
 
     /**
-	 * Compare this point with another object. Returns true
-	 * if this point is being compared to another point that
-	 * represents the same location.
+     * Compare this point with another object. Returns true
+     * if this point is being compared to another point that
+     * represents the same location.
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
@@ -427,7 +427,7 @@ public class GeographyPointValue {
     }
 
     /**
-     * 	Return <code>alpha*(this - center) + center</code>.  This is
+     * Return <code>alpha*(this - center) + center</code>.  This is
      * used to scale the vector from center to this as an offset by
      * alpha.  This is equivalent to <code>this.sub(center).mul(alpha).add(center)</code>,
      * but with fewer object creations.
