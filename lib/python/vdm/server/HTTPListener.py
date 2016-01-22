@@ -34,8 +34,11 @@ import socket
 import os
 import json
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring, parse, XML
+import sys
+import subprocess
+import signal
+import time
 import requests
-from flask import Flask
 from flask.ext.cors import CORS
 from collections import defaultdict
 import ast
@@ -480,6 +483,63 @@ def map_deployment_users(request, user):
     return deployment_user[0]
 
 
+def ignore_signals():
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+def start_local_server(deploymentcontents, primary=''):
+    filename = os.path.join(PATH, 'deployment.xml')
+    deploymentfile = open(filename, 'w')
+    deploymentfile.write(deploymentcontents)
+    deploymentfile.close()
+    voltdb_dir = os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
+    voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), 'create', '-d', filename ]
+    if primary:
+        voltdb_cmd = voltdb_cmd + [ '-H', primary ]
+
+    global OUTFILE_COUNTER
+    OUTFILE_COUNTER = OUTFILE_COUNTER + 1
+    outfilename = os.path.join(PATH, ('voltserver.output.%s.%u') % (OUTFILE_TIME, OUTFILE_COUNTER))
+    outfile = open(outfilename, 'w')
+
+    # Start server in a separate process
+    voltserver = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
+                                  preexec_fn=ignore_signals)
+
+    initialized = False
+    rfile = open(outfilename, 'r')
+
+    # Wait till server is ready or process exited due to error.
+    # Wait for a couple of seconds to see if the server errors out
+    endtime = time.time() + 2
+    while ((endtime-time.time()>0) and
+           (voltserver.returncode is None) and (not initialized)):
+        time.sleep(0.5)
+        voltserver.poll()
+        initialized = 'Server completed initialization' in rfile.readline()
+
+    rfile.close()
+    if (voltserver.returncode is None):
+        return 0
+    else:
+        return 1
+
+def get_first_hostname(database_id):
+    """
+    Gets the first hostname configured in the deployment file for a given database
+    """
+
+    current_database = [database for database in DATABASES if database['id'] == database_id]
+    if not current_database:
+        abort(404)
+
+    server_id = current_database[0]['members'][0]
+    server = [server for server in SERVERS if server['id'] == server_id]
+    if not server:
+        abort(404)
+
+    return server[0]['hostname']
+  
 def get_database_deployment(dbid):
     deployment_top = Element('deployment')
     value = DEPLOYMENT[dbid-1]
@@ -1175,7 +1235,7 @@ class ServerAPI(MethodView):
             return jsonify({'servers': [make_public_server(x) for x in SERVERS]})
         else:
             server = [server for server in SERVERS if server['id'] == server_id]
-            if len(server) == 0:
+            if not server:
                 abort(404)
             return jsonify({'server': make_public_server(server[0])})
 
@@ -1637,6 +1697,91 @@ class deploymentUserAPI(MethodView):
         DEPLOYMENT_USERS.remove(current_user[0])
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
 
+class StartDatabaseAPI(MethodView):
+    """Class to handle request to start servers on all nodes of a database."""
+
+    @staticmethod
+    def put(database_id):
+        """
+        Starts VoltDB database servers on all nodes for the specified database
+        Args:
+            database_id (int): The id of the database that should be started
+        Returns:
+            Status string indicating if the database start requesst was sent successfully
+        """
+
+        # TODO: assume deployment file has been sync'ed already????
+        members = []
+        current_database = [database for database in DATABASES if database['id'] == database_id]
+        if not current_database:
+            abort(404)
+        else:
+            members = current_database[0]['members']
+        if not members:
+            return make_response(jsonify({'statusstring': 'No servers configured for the database'}),
+                                             500)
+
+        # Check if there are valid servers configured for all ids
+        for server_id in members:
+            server = [server for server in SERVERS if server['id'] == server_id]
+            if not server:
+                return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
+                                             500)
+        # Now start each server
+        failed = False
+        server_status = {}
+        for server_id in members:
+            server = [server for server in SERVERS if server['id'] == server_id]
+            curr = server[0]
+            try:
+                url = ('http://%s:8000/api/1.0/databases/%u/servers/%u/start') % \
+                                  (curr['hostname'], database_id, server_id)
+                response = requests.put(url)
+                if (response.status_code != requests.codes.ok):
+                    failed = True
+                server_status[curr['hostname']] = json.loads(response.text)['statusstring']
+            except Exception, err:
+                failed = True
+                server_status[curr['hostname']] = str(err)
+
+        if failed:
+            return make_response(jsonify({'statusstring':
+                                          'There were errors starting servers: ' + str(server_status)}),
+                                     500)
+        else:
+            return make_response(jsonify({'statusstring':
+                                          'Start request sent successfully to servers: ' + str(server_status)}),
+                                     200)
+
+class StartServerAPI(MethodView):
+    """Class to handle request to start a server."""
+
+    @staticmethod
+    def put(database_id, server_id):
+        """
+        Starts VoltDB database server on the specified server
+        Args:
+            database_id (int): The id of the database that should be started
+            server_id (int): The id of the server node that is to be started
+        Returns:
+            Status string indicating if the server node was started successfully
+        """
+
+        # TODO: Fix this later. Assume  this is local server for now
+        deploymentcontents = get_database_deployment(database_id)
+        primary = get_first_hostname(database_id)
+        try:
+            retcode = start_local_server(deploymentcontents, primary)
+            if (retcode == 0):
+                return make_response(jsonify({'statusstring': 'Success'}),
+                                             200)
+            else:
+                return make_response(jsonify({'statusstring': 'Error starting server'}),
+                                             500)
+        except Exception, err:
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
+
 
 class VdmStatus(MethodView):
     """
@@ -1727,7 +1872,8 @@ def main(runner, amodule, config_dir, server):
         APP.config.update(DEBUG=True)
 
     path = os.path.dirname(amodule.__file__)
-    # depjson = path + "/deployment.json"
+    global MODULE_PATH
+    MODULE_PATH = path
     depjson = os.path.join(path, "deployment.json")
     json_data= open(depjson).read()
     deployment = json.loads(json_data)
@@ -1738,6 +1884,10 @@ def main(runner, amodule, config_dir, server):
 
     # config_path = config_dir + '/' + 'vdm.xml'
     config_path = os.path.join(config_dir, 'vdm.xml')
+    global OUTFILE_TIME
+    OUTFILE_TIME = str(time.time())
+    global OUTFILE_COUNTER
+    OUTFILE_COUNTER = 0
 
     arrServer = {}
     if server is not None:
@@ -1767,6 +1917,8 @@ def main(runner, amodule, config_dir, server):
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
+    START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
+    START_DATABASE_VIEW = StartDatabaseAPI.as_view('start_database_api')
     DATABASE_MEMBER_VIEW = DatabaseMemberAPI.as_view('database_member_api')
     DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
     DEPLOYMENT_USER_VIEW = deploymentUserAPI.as_view('deployment_user_api')
@@ -1787,6 +1939,11 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/databases/', view_func=DATABASE_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/member/<int:database_id>',
                      view_func=DATABASE_MEMBER_VIEW, methods=['GET', 'PUT', 'DELETE'])
+
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
+                     view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
+                     view_func=START_DATABASE_VIEW, methods=['PUT'])
 
     APP.add_url_rule('/api/1.0/deployment/', defaults={'database_id': None},
                      view_func=DEPLOYMENT_VIEW, methods=['GET'])
