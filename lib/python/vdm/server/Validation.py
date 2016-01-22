@@ -293,7 +293,7 @@ schema = {
             },
             "additionalProperties": False
         },
-        "partitionDetection": {
+        "partition-detection": {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
@@ -315,8 +315,8 @@ schema = {
             },
             "additionalProperties": False
         },
-        "adminMode": {
-            "id": "adminMode",
+        "admin-mode": {
+            "id": "admin-mode",
             "type": "object",
             "properties": {
                 "port": {
@@ -481,7 +481,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "exportconnectorclass": {
                                         "id": "exportconnectorclass",
@@ -543,7 +543,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
@@ -740,13 +740,15 @@ schema = {
                     "minimum": 0,
                     "maximum": 2147483647
                 },
-                "type": {
-                    "id": "type",
-                    "type": "string",
-                },
-                "enabled": {
-                    "id": "enabled",
+                "listen": {
+                    "id": "listen",
                     "type": "boolean"
+                },
+                "port": {
+                    "id": "port",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65536
                 },
                 "connection": {
                     "id": "connection",
@@ -755,13 +757,6 @@ schema = {
                         "source": {
                             "id": "source",
                             "type": "string",
-                        },
-                        "servers": {
-                            "id": "servers",
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
                         }
                     }
                 }
@@ -788,5 +783,17 @@ class DatabaseInputs(Inputs):
         'name': [
             DataRequired('Database name is required.'),
             Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+        ]
+    }
+
+
+class ConfigValidation(Inputs):
+    """
+    Validation class for ip address used to sync cluster.
+    """
+    json = {
+        'ip_address': [
+            DataRequired('IP address is required.'),
+            IPAddress('Invalid IP address.')
         ]
     }

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
 function server() {
-    python main.py
+    tmpdir=`mktemp -d`
+    echo "Temp directory for vdm config is: " $tmpdir
+    python ../../../bin/vdm --path=$tmpdir
+    rm -f $tmpdir/vdm.xml
+    rmdir $tmpdir
 }
 
 function tests() {
