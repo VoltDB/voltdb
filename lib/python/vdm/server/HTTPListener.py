@@ -1080,7 +1080,11 @@ def etree_to_dict(t):
         for dc in map(etree_to_dict, children):
             for k, v in dc.iteritems():
                 dd[k].append(v)
-        d = {t.tag: {k:v[0] if len(v) == 1 else v for k, v in dd.iteritems()}}
+        #d = {t.tag: {k:v[0] if len(v) == 1 else v for k, v in dd.iteritems()}}
+        aa = {}
+        for k, v in dd.iteritems():
+             aa[k]=v[0] if len(v) == 1 else v
+        d = {t.tag: aa}
     if t.attrib:
         d[t.tag].update((k, v) for k, v in t.attrib.iteritems())
     if t.text:
