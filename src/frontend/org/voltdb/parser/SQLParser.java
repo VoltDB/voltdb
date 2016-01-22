@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -296,11 +296,27 @@ public class SQLParser extends SQLPatternFactory
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (group 1) <table name>
-            "(?:\\s+TO\\s+STREAM\\s+" +         // begin optional TO STREAM <export target> clause
+            "(?:\\s+TO\\s+TARGET\\s+" +         // begin optional TO STREAM <export target> clause
             "([\\w.$]+)" +                      // (group 2) <export target>
             ")?" +                              // end optional TO STREAM <export target> clause
             "\\s*;\\z"                          // (end statement)
             );
+
+    /*
+     * CREATE STREAM statement regex
+     *
+     * Capture groups:
+     *  (1) stream name
+     *  (2) optional target name
+     */
+    private static final Pattern PAT_CREATE_STREAM =
+        SPF.statementLeader(
+            SPF.token("create"), SPF.token("stream"), SPF.capture("object", SPF.databaseObjectName()),
+            SPF.optional(SPF.clause(
+                    SPF.token("export to target"),
+                    SPF.capture("target", SPF.databaseObjectName())))
+        ).compile("PAT_CREATE_STREAM");
+
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
      *  one of create procedure, create role, drop procedure, drop role,
@@ -581,6 +597,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchExportTable(String statement)
     {
         return PAT_EXPORT_TABLE.matcher(statement);
+    }
+
+    /**
+     * Match statement against create stream pattern
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchCreateStream(String statement)
+    {
+        return PAT_CREATE_STREAM.matcher(statement);
     }
 
     /**
