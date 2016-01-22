@@ -757,10 +757,6 @@ schema = {
                         "source": {
                             "id": "source",
                             "type": "string",
-                        },
-                        "servers": {
-                            "id": "servers",
-                            "type": "string",
                         }
                     }
                 }

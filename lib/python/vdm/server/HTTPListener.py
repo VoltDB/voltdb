@@ -447,10 +447,6 @@ def map_deployment(request, database_id):
             and 'source' in request.json['dr']['connection']:
         deployment[0]['dr']['connection']['source'] = request.json['dr']['connection']['source']
 
-    if 'dr' in request.json and 'connection' in request.json['dr'] \
-            and 'servers' in request.json['dr']['connection']:
-        deployment[0]['dr']['connection']['servers'] = request.json['dr']['connection']['servers']
-
     if 'dr' in request.json and not request.json['dr']:
         deployment[0]['dr'] = {}
 
@@ -821,11 +817,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                             new_deployment[field]['listen'] = parse_bool_string(deployment[field]['listen'])
                             if 'port' in deployment[field]:
                                 new_deployment[field]['port'] = int(deployment[field]['port'])
-                            if 'connection' in deployment[field] and deployment[field]['connection'] is not None and 'source' in deployment[field]['connection'] \
-                                    and 'servers' in deployment[field]['connection']:
+                            if 'connection' in deployment[field] and deployment[field]['connection'] is not None and 'source' in deployment[field]['connection']:
                                 new_deployment[field]['connection'] = {}
                                 new_deployment[field]['connection']['source'] = str(deployment[field]['connection']['source'])
-                                new_deployment[field]['connection']['servers'] = str(deployment[field]['connection']['servers'])
 
                     except Exception, err:
                         print 'dr:' + str(err)
@@ -965,11 +959,9 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['listen'] = parse_bool_string(deployment_xml[field]['listen'])
                         if 'port' in deployment_xml[field]:
                             new_deployment[field]['port'] = int(deployment_xml[field]['port'])
-                        if 'connection' in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']\
-                                and 'servers' in deployment_xml[field]['connection']:
+                        if 'connection' in deployment_xml[field] and deployment_xml[field]['connection'] is not None and 'source' in deployment_xml[field]['connection']:
                             new_deployment[field]['connection'] = {}
                             new_deployment[field]['connection']['source'] = str(deployment_xml[field]['connection']['source'])
-                            new_deployment[field]['connection']['servers'] = str(deployment_xml[field]['connection']['servers'])
 
                 except Exception, err:
                     print str(err)
@@ -987,7 +979,15 @@ def get_deployment_export_field(export_xml, is_list):
         for export in export_xml:
             new_export = {}
             for field in export:
-                new_export[field] = export[field]
+                if field == 'property':
+                    if type(export['property']) is list:
+                        new_export['property'] = get_deployment_properties(export['property'], 'list')
+                    else:
+                        new_export['property'] = get_deployment_properties(export['property'], 'dict')
+                elif field == 'enabled':
+                    new_export[field] = parse_bool_string(export[field])
+                else:
+                    new_export[field] = export[field]
             exports.append(new_export)
     else:
         for field in export_xml:
