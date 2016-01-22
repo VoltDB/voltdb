@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.util.Properties;
 
 import org.voltdb.importer.ImporterConfig;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 /**
  * ImporterConfig for server socket importer.
@@ -33,11 +34,12 @@ public class ServerSocketImporterConfig implements ImporterConfig
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
     private final URI m_resourceID;
+    private final AbstractFormatterFactory m_formatterFactory;
     private final String m_procedure;
     private final int m_port;
     private final ServerSocket m_serverSocket;
 
-    public ServerSocketImporterConfig(Properties props)
+    public ServerSocketImporterConfig(Properties props, AbstractFormatterFactory formatterFactory)
     {
         Properties propsCopy = (Properties) props.clone();
 
@@ -67,12 +69,20 @@ public class ServerSocketImporterConfig implements ImporterConfig
         } catch(URISyntaxException e) { // Will not happen
             throw new RuntimeException(e);
         }
+
+        m_formatterFactory = formatterFactory;
     }
 
     @Override
     public URI getResourceID()
     {
         return m_resourceID;
+    }
+
+    @Override
+    public AbstractFormatterFactory getFormatterFactory()
+    {
+        return m_formatterFactory;
     }
 
     public String getProcedure()

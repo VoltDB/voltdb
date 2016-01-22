@@ -46,7 +46,6 @@ import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -66,7 +65,7 @@ public class ImportManager implements ChannelChangeCallback {
 
     AtomicReference<ImportDataProcessor> m_processor = new AtomicReference<ImportDataProcessor>();
     private volatile Map<String, ImportConfiguration> m_processorConfig = new HashMap<>();
-    private final Map<String, AbstractFormatterFactory> m_formatters = new HashMap<String, AbstractFormatterFactory>();
+    private final Map<String, AbstractFormatterFactory> m_formatterFactories = new HashMap<String, AbstractFormatterFactory>();
 
     /** Obtain the global ImportManager via its instance() method */
     private static ImportManager m_self;
@@ -184,14 +183,14 @@ public class ImportManager implements ChannelChangeCallback {
 
             ImportDataProcessor newProcessor = new ImportProcessor(myHostId, m_distributer, m_framework, m_statsCollector);
             m_processorConfig = CatalogUtil.getImportProcessorConfig(catalogContext.getDeployment().getImport());
-            m_formatters.clear();
+            m_formatterFactories.clear();
 
             for (ImportConfiguration config : m_processorConfig.values()) {
                 Properties prop = config.getformatterProperties();
                 String module = prop.getProperty(ImportDataProcessor.IMPORT_FORMATTER);
                 try {
-                    AbstractFormatterFactory formatter = m_formatters.get(module);
-                    if (formatter == null) {
+                    AbstractFormatterFactory formatterFactory = m_formatterFactories.get(module);
+                    if (formatterFactory == null) {
                         Bundle bundle = m_framework.getBundleContext().installBundle(module);
                         bundle.start();
                         ServiceReference refs[] = bundle.getRegisteredServices();
@@ -200,10 +199,11 @@ public class ImportManager implements ChannelChangeCallback {
                         if (reference == null) {
                             VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
                         }
-                        formatter = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
-                        m_formatters.put(module, formatter);
+                        formatterFactory = (AbstractFormatterFactory)bundle.getBundleContext().getService(reference);
+                        m_formatterFactories.put(module, formatterFactory);
                     }
-                    config.setFormatter(formatter.create(config.getFormatName(), prop));
+                    formatterFactory.configureFormatterFactory(config.getFormatName(), prop);
+                    config.setFormatterFactory(formatterFactory);
                 } catch(Throwable t) {
                     VoltDB.crashLocalVoltDB("Failed to configure import handler for " + module);
                 }
