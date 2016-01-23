@@ -80,6 +80,8 @@ public:
     // function should return a value that is the same as in Java
     // code: GeographyPointValue.EPSILON.
     static Coord epsilon() {
+        // Making this a static method rather than a static member
+        // variable for the same reason as nullCoord(), above.
         return 1e-12;
     }
 
@@ -229,7 +231,7 @@ private:
 
         // For longitudes within epsilon of the antimeridian
         // (on the east side), canonicalize to 180.0.
-        if (m_longitude < 0.0 && 180.0 + m_longitude < epsilon()) {
+        if (180.0 + m_longitude < epsilon()) {
             newLng = 180.0;
         }
 
