@@ -119,8 +119,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POINTFROMTEXT>() const
         return NValue::getNullValue(VALUE_TYPE_POINT);
     }
 
-    int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
+    int32_t textLength = getObjectLength_withoutNull();
+    const char* textData = static_cast<char*>(getObjectValue_withoutNull());
     std::string wkt(textData, textLength);
 
     // Discard whitespace, but return commas or parentheses as tokens
@@ -275,8 +275,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
         return NValue::getNullValue(VALUE_TYPE_GEOGRAPHY);
     }
 
-    int32_t textLength;
-    const char* textData = getObject_withoutNull(&textLength);
+    int32_t textLength = getObjectLength_withoutNull();
+    const char* textData = static_cast<char*>(getObjectValue_withoutNull());
     const std::string wkt(textData, textLength);
 
     // Discard whitespace, but return commas or parentheses as tokens
@@ -320,7 +320,7 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGONFROMTEXT>() const
     }
 
     NValue nval = ValueFactory::getUninitializedTempGeographyValue(length);
-    char* storage = const_cast<char*>(ValuePeeker::peekObjectValue(nval));
+    char* storage = static_cast<char*>(ValuePeeker::peekObjectValue(nval));
 
     Polygon poly;
     poly.init(&loops); // polygon takes ownership of loops here.

@@ -1024,8 +1024,8 @@ private:
             return GeographyValue();
         }
 
-        int32_t objectLength;
-        const char* objectValue = getObject_withoutNull(&objectLength);
+        int32_t objectLength = getObjectLength_withoutNull();
+        const char* objectValue = static_cast<char*>(getObjectValue_withoutNull());
         return GeographyValue(objectValue, objectLength);
     }
 
@@ -1082,8 +1082,9 @@ private:
             return getTimestamp();
         default:
             throwCastSQLException(type, VALUE_TYPE_BIGINT);
-            return 0; // NOT REACHED
         }
+        assert(false); // NOT REACHED
+        return 0;
     }
 
     /**
@@ -1113,8 +1114,9 @@ private:
         }
         default:
             throwCastSQLException(type, VALUE_TYPE_INTEGER);
-            return 0; // NOT REACHED
         }
+        assert(false); // NOT REACHED
+        return 0;
     }
 
     double castAsDoubleAndGetValue() const {
@@ -1154,8 +1156,9 @@ private:
           case VALUE_TYPE_VARBINARY:
           default:
             throwCastSQLException(type, VALUE_TYPE_DOUBLE);
-            return 0; // NOT REACHED
         }
+        assert(false);
+        return 0; // NOT REACHED
     }
 
     TTInt castAsDecimalAndGetValue() const {
@@ -1192,8 +1195,9 @@ private:
           case VALUE_TYPE_VARBINARY:
           default:
             throwCastSQLException(type, VALUE_TYPE_DECIMAL);
-            return 0; // NOT REACHED
         }
+        assert(false);
+        return 0; // NOT REACHED
     }
 
     /**
@@ -1888,7 +1892,6 @@ private:
             throw SQLException(SQLException::
                     data_exception_most_specific_type_mismatch,
                     message);
-            // Not reached
         }
 
         return compareDoubleValue(lhsValue, rhsValue);
@@ -2023,24 +2026,14 @@ private:
             return compareValue<TTInt>(getDecimal(), rhsValue);
         }
         default:
-        {
-            char message[128];
-            snprintf(message, 128,
-                    "Type %s cannot be cast for comparison to type %s",
-                    valueToString(rhs.getValueType()).c_str(),
-                    valueToString(getValueType()).c_str());
-            throw SQLException(SQLException::
-                    data_exception_most_specific_type_mismatch,
-                    message);
-            // Not reached
-            return 0;
+            break;
         }
-        }
+
         char message[128];
         snprintf(message, 128,
-                 "Type %s cannot be cast for comparison to type %s",
-                 valueToString(rhs.getValueType()).c_str(),
-                 valueToString(getValueType()).c_str());
+                "Type %s cannot be cast for comparison to type %s",
+                valueToString(rhs.getValueType()).c_str(),
+                valueToString(getValueType()).c_str());
         throw SQLException(SQLException::
                 data_exception_most_specific_type_mismatch,
                 message);
@@ -2048,36 +2041,30 @@ private:
 
     int comparePointValue (const NValue &rhs) const {
         assert(m_valueType == VALUE_TYPE_POINT);
-        switch (rhs.getValueType()) {
-        case VALUE_TYPE_POINT:
+        if (rhs.getValueType() == VALUE_TYPE_POINT) {
             return getGeographyPointValue().compareWith(rhs.getGeographyPointValue());
-        default:
-            std::ostringstream oss;
-            oss << "Type " << valueToString(rhs.getValueType())
-                << " cannot be cast for comparison to type "
-                << valueToString(getValueType());
-            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                               oss.str().c_str());
-            // Not reached
-            return 0;
         }
+
+        std::ostringstream oss;
+        oss << "Type " << valueToString(rhs.getValueType())
+            << " cannot be cast for comparison to type "
+            << valueToString(getValueType());
+        throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                oss.str().c_str());
     }
 
     int compareGeographyValue (const NValue &rhs) const {
         assert(m_valueType == VALUE_TYPE_GEOGRAPHY);
-        switch (rhs.getValueType()) {
-        case VALUE_TYPE_GEOGRAPHY:
+        if (rhs.getValueType() == VALUE_TYPE_GEOGRAPHY) {
             return getGeographyValue().compareWith(rhs.getGeographyValue());
-        default:
-            std::ostringstream oss;
-            oss << "Type " << valueToString(rhs.getValueType())
-                << " cannot be cast for comparison to type "
-                << valueToString(getValueType());
-            throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                               oss.str().c_str());
-            // Not reached
-            return 0;
         }
+
+        std::ostringstream oss;
+        oss << "Type " << valueToString(rhs.getValueType())
+            << " cannot be cast for comparison to type "
+            << valueToString(getValueType());
+        throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
+                oss.str().c_str());
     }
 
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
@@ -2623,14 +2610,16 @@ inline int NValue::compare_withoutNull(const NValue rhs) const {
         return comparePointValue(rhs);
     case VALUE_TYPE_GEOGRAPHY:
         return compareGeographyValue(rhs);
-    default: {
+    default:
+    {
         throwDynamicSQLException(
                 "non comparable types lhs '%s' rhs '%s'",
                 getValueTypeString().c_str(),
                 rhs.getValueTypeString().c_str());
     }
-    /* no break */
     }
+    assert(false); // NOT REACHED
+    return 0;
 }
 
 /**
@@ -2837,26 +2826,25 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         const int32_t maxLength, const bool isInBytes, Pool *dataPool) const
 {
     const ValueType type = getValueType();
-
     switch (type) {
     case VALUE_TYPE_TIMESTAMP:
         *reinterpret_cast<int64_t*>(storage) = getTimestamp();
-        break;
+        return;
     case VALUE_TYPE_TINYINT:
         *reinterpret_cast<int8_t*>(storage) = getTinyInt();
-        break;
+        return;
     case VALUE_TYPE_SMALLINT:
         *reinterpret_cast<int16_t*>(storage) = getSmallInt();
-        break;
+        return;
     case VALUE_TYPE_INTEGER:
         *reinterpret_cast<int32_t*>(storage) = getInteger();
-        break;
+        return;
     case VALUE_TYPE_BIGINT:
         *reinterpret_cast<int64_t*>(storage) = getBigInt();
-        break;
+        return;
     case VALUE_TYPE_DOUBLE:
         *reinterpret_cast<double*>(storage) = getDouble();
-        break;
+        return;
     case VALUE_TYPE_DECIMAL:
         ::memcpy(storage, m_data, sizeof(TTInt));
         return;
@@ -2865,37 +2853,38 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         return;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
-    case VALUE_TYPE_GEOGRAPHY: {
+    case VALUE_TYPE_GEOGRAPHY:
+    {
         //Potentially non-inlined type requires special handling
         if (isInlined) {
             assert (type != VALUE_TYPE_GEOGRAPHY);
             inlineCopyObject(storage, maxLength, isInBytes);
+            return;
         }
-        else {
-            if (isNull()) {
-                *reinterpret_cast<void**>(storage) = NULL;
-            }
-            else {
-                int32_t objLength = getObjectLength_withoutNull();
-                const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                checkTooWideForVariableLengthType(m_valueType, ptr, objLength, maxLength, isInBytes);
+        if (isNull()) {
+            *reinterpret_cast<void**>(storage) = NULL;
+            return;
+        }
+        int32_t objLength = getObjectLength_withoutNull();
+        const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+        checkTooWideForVariableLengthType(m_valueType, ptr, objLength, maxLength, isInBytes);
 
-                const int8_t lengthLength = getObjectLengthLength();
-                const int32_t minlength = lengthLength + objLength;
-                StringRef* sref = StringRef::create(minlength, dataPool);
-                char *copy = sref->get();
-                setObjectLengthToLocation(objLength, copy);
-                ::memcpy(copy + lengthLength, getObjectValue_withoutNull(), objLength);
-                *reinterpret_cast<StringRef**>(storage) = sref;
-            }
-        }
+        const int8_t lengthLength = getObjectLengthLength();
+        const int32_t minlength = lengthLength + objLength;
+        StringRef* sref = StringRef::create(minlength, dataPool);
+        char *copy = sref->get();
+        setObjectLengthToLocation(objLength, copy);
+        ::memcpy(copy + lengthLength, getObjectValue_withoutNull(), objLength);
+        *reinterpret_cast<StringRef**>(storage) = sref;
+        return;
+    }
+    default:
         break;
-    default: {
-        throwDynamicSQLException(
-                "NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%s'",
-                getTypeName(type).c_str());
     }
-    }
+    throwDynamicSQLException(
+        "NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%s'",
+        getTypeName(type).c_str());
+    assert(false); // NOT REACHED
 }
 
 /**
@@ -2942,7 +2931,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             if (!isNull()) {
                 int objLength = getObjectLength_withoutNull();
                 const char* ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
-                checkTooNarrowVarcharAndVarbinary(m_valueType, ptr, objLength, maxLength, isInBytes);
+                checkTooWideForVariableLengthType(m_valueType, ptr, objLength, maxLength, isInBytes);
             }
 
             // copy the StringRef pointers, even for NULL case.
@@ -3051,7 +3040,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
         // Create the string ref without passing the source pointer, so we can use
         // GeographyValue's deserialize method to initialize it.
         StringRef* sref = StringRef::create(length, dataPool);
-        GeographyValue::deserializeFrom(input, sref->getObjectValue(), length);
+        GeographyValue::deserializeFrom(input, sref->get(), length);
         *reinterpret_cast<StringRef**>(storage) = sref;
         return;
     }
@@ -3111,37 +3100,37 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
         if (getBigInt() == INT64_NULL) {
             tagAsNull();
         }
-        break;
+        return;
     case VALUE_TYPE_TIMESTAMP:
         getTimestamp() = input.readLong();
         if (getTimestamp() == INT64_NULL) {
             tagAsNull();
         }
-        break;
+        return;
     case VALUE_TYPE_TINYINT:
         getTinyInt() = input.readByte();
         if (getTinyInt() == INT8_NULL) {
             tagAsNull();
         }
-        break;
+        return;
     case VALUE_TYPE_SMALLINT:
         getSmallInt() = input.readShort();
         if (getSmallInt() == INT16_NULL) {
             tagAsNull();
         }
-        break;
+        return;
     case VALUE_TYPE_INTEGER:
         getInteger() = input.readInt();
         if (getInteger() == INT32_NULL) {
             tagAsNull();
         }
-        break;
+        return;
     case VALUE_TYPE_DOUBLE:
         getDouble() = input.readDouble();
         if (getDouble() <= DOUBLE_NULL) {
             tagAsNull();
         }
-        break;
+        return;
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
     {
@@ -3171,7 +3160,7 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
     case VALUE_TYPE_DECIMAL: {
         getDecimal().table[1] = input.readLong();
         getDecimal().table[0] = input.readLong();
-        break;
+        return;
     }
     case VALUE_TYPE_POINT: {
         getGeographyPointValue() = GeographyPointValue::deserializeFrom(input);
@@ -3179,16 +3168,17 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
     }
     case VALUE_TYPE_NULL: {
         setNull();
-        break;
+        return;
     }
     case VALUE_TYPE_ARRAY: {
         deserializeIntoANewNValueList(input, dataPool);
-        break;
+        return;
     }
     default:
         throwDynamicSQLException("NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
                                  getTypeName(type).c_str());
     }
+    assert(false); // NOT REACHED
 }
 
 /**
@@ -3203,7 +3193,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
     {
         if (isNull()) {
             output.writeInt(OBJECTLENGTH_NULL);
-            break;
+            return;
         }
         const int32_t length = getObjectLength_withoutNull();
         if (length <= OBJECTLENGTH_NULL) {
@@ -3212,53 +3202,49 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         output.writeInt(static_cast<int32_t>(length));
 
         // Not a null string: write it out
-        if (type != VALUE_TYPE_GEOGRAPHY) {
-            output.writeBytes(buf, length);
-        }
-        else {
+        if (type == VALUE_TYPE_GEOGRAPHY) {
             // geography gets its own serialization to deal with
             // byteswapping and endianness
             getGeographyValue().serializeTo(output);
+            return;
         }
+        const char* buf = reinterpret_cast<const char*>(getObjectValue_withoutNull());
+        output.writeBytes(buf, length);
         return;
     }
-    case VALUE_TYPE_TINYINT: {
+    case VALUE_TYPE_TINYINT:
         output.writeByte(getTinyInt());
-        break;
-    }
-    case VALUE_TYPE_SMALLINT: {
+        return;
+    case VALUE_TYPE_SMALLINT:
         output.writeShort(getSmallInt());
-        break;
-    }
-    case VALUE_TYPE_INTEGER: {
+        return;
+    case VALUE_TYPE_INTEGER:
         output.writeInt(getInteger());
-        break;
-    }
-    case VALUE_TYPE_TIMESTAMP: {
+        return;
+    case VALUE_TYPE_TIMESTAMP:
         output.writeLong(getTimestamp());
-        break;
-    }
-    case VALUE_TYPE_BIGINT: {
+        return;
+    case VALUE_TYPE_BIGINT:
         output.writeLong(getBigInt());
-        break;
-    }
-    case VALUE_TYPE_DOUBLE: {
+        return;
+    case VALUE_TYPE_DOUBLE:
         output.writeDouble(getDouble());
-        break;
-    }
-    case VALUE_TYPE_DECIMAL: {
+        return;
+    case VALUE_TYPE_DECIMAL:
         output.writeLong(getDecimal().table[1]);
         output.writeLong(getDecimal().table[0]);
         return;
-    }
     case VALUE_TYPE_POINT:
         getGeographyPointValue().serializeTo(output);
         return;
-    }
     default:
-        throwDynamicSQLException( "NValue::serializeTo() found a column "
-                "with ValueType '%s' that is not handled", getValueTypeString().c_str());
+        break;
     }
+
+    throwDynamicSQLException( "NValue::serializeTo() found a column "
+            "with ValueType '%s' that is not handled", getValueTypeString().c_str());
+    assert(false); // NOT REACHED
+    return;
 }
 
 inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) const
@@ -3510,6 +3496,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
         boost::hash_combine(seed, getDouble());
         return;
     case VALUE_TYPE_VARCHAR:
+    {
         if (isNull()) {
             boost::hash_combine(seed, std::string(""));
             return;
@@ -3517,17 +3504,20 @@ inline void NValue::hashCombine(std::size_t &seed) const {
         const int32_t length = getObjectLength_withoutNull();
         boost::hash_combine(seed, std::string(reinterpret_cast<const char*>(getObjectValue_withoutNull()), length));
         return;
+    }
     case VALUE_TYPE_VARBINARY:
+    {
         if (isNull()) {
-            boost::hash_combine( seed, std::string(""));
+            boost::hash_combine(seed, std::string(""));
             return;
         }
         const int32_t length = getObjectLength_withoutNull();
         char* data = reinterpret_cast<char*>(getObjectValue_withoutNull());
-        for (int32_t i = 0; i < length; i++)
+        for (int32_t i = 0; i < length; i++) {
             boost::hash_combine(seed, data[i]);
         }
         return;
+    }
     case VALUE_TYPE_DECIMAL:
         getDecimal().hash(seed);
         return;
@@ -3542,6 +3532,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
     }
 
     throwDynamicSQLException("NValue::hashCombine unknown type %s", getValueTypeString().c_str());
+    assert(false); // NOT REACHED
 }
 
 
@@ -3600,6 +3591,8 @@ inline void* NValue::castAsAddress() const {
                 "Type %s not a recognized type for casting as an address",
                 getValueTypeString().c_str());
     }
+    assert(false); // NOT REACHED
+    return 0;
 }
 
 inline NValue NValue::op_increment() const {
@@ -3635,6 +3628,7 @@ inline NValue NValue::op_increment() const {
         retval.getDouble() = getDouble() + 1; break;
     default:
         throwDynamicSQLException( "type %s is not incrementable", getValueTypeString().c_str());
+        assert(false); // NOT REACHED
         break;
     }
     return retval;
@@ -3673,6 +3667,7 @@ inline NValue NValue::op_decrement() const {
         retval.getDouble() = getDouble() - 1; break;
     default:
         throwDynamicSQLException( "type %s is not decrementable", getValueTypeString().c_str());
+        assert(false); // NOT REACHED
         break;
     }
     return retval;
@@ -3698,6 +3693,8 @@ inline bool NValue::isZero() const {
 
     throwDynamicSQLException("type %s is not a numeric type that implements isZero()",
                              getValueTypeString().c_str());
+    assert(false); // NOT REACHED
+    return false;
 }
 
 inline NValue NValue::op_subtract(const NValue rhs) const {
@@ -3729,6 +3726,8 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
     throwDynamicSQLException("Promotion of %s and %s failed in op_subtract.",
             getValueTypeString().c_str(),
             rhs.getValueTypeString().c_str());
+    assert(false); // NOT REACHED
+    return getNullValue(vt);
 }
 
 inline NValue NValue::op_add(const NValue rhs) const {
@@ -3760,6 +3759,8 @@ inline NValue NValue::op_add(const NValue rhs) const {
     throwDynamicSQLException("Promotion of %s and %s failed in op_add.",
             getValueTypeString().c_str(),
             rhs.getValueTypeString().c_str());
+    assert(false); // NOT REACHED
+    return getNullValue(vt);
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
@@ -3791,6 +3792,8 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
     throwDynamicSQLException("Promotion of %s and %s failed in op_multiply.",
             getValueTypeString().c_str(),
             rhs.getValueTypeString().c_str());
+    assert(false); // NOT REACHED
+    return getNullValue(vt);
 }
 
 inline NValue NValue::op_divide(const NValue rhs) const {
@@ -3822,6 +3825,8 @@ inline NValue NValue::op_divide(const NValue rhs) const {
     throwDynamicSQLException("Promotion of %s and %s failed in op_divide.",
             getValueTypeString().c_str(),
             rhs.getValueTypeString().c_str());
+    assert(false); // NOT REACHED
+    return getNullValue(vt);
 }
 
 /*
@@ -3851,6 +3856,8 @@ inline int32_t NValue::murmurHash3() const {
     }
 
     throwFatalException("Unknown type for murmur hashing %d", type);
+    assert(false); // NOT REACHED
+    return 0;
 }
 
 /*
