@@ -96,11 +96,11 @@ class ServerInputs(Inputs):
     json = {
         'name': [
             DataRequired('Server name is required.'),
-            Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ],
         'enabled': [
             Optional(),

@@ -1871,7 +1871,7 @@ class VdmConfiguration(MethodView):
         for member in result['vdm']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://'+member['hostname']+':'+__PORT__+'/api/1.0/vdm/sync_configuration/'
+                url = 'http://'+member['hostname']+':'+str(__PORT__)+'/api/1.0/vdm/sync_configuration/'
                 data = result
                 response = requests.post(url,data=json.dumps(data),headers = headers)
             except Exception,errs:

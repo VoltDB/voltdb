@@ -290,11 +290,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly < t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
-                    {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
-                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
+                    {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 0, "Bermuda Triangle"},
                     {2, "Billerica Triangle", 1, "Bermuda Triangle with a hole"},
-                    {2, "Billerica Triangle" , 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 3, "Lowell Square"},
                     {3, "Lowell Square", 1, "Bermuda Triangle with a hole"}},
                     vt);
 
@@ -305,14 +305,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly <= t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
-                    {0, "Bermuda Triangle" , 0, "Bermuda Triangle"},
-                    {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
-                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
+                    {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
+                    {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
-                    {1, "Bermuda Triangle with a hole" , 1, "Bermuda Triangle with a hole"},
+                    {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
+                    {2, "Billerica Triangle", 0, "Bermuda Triangle"},
                     {2, "Billerica Triangle", 1, "Bermuda Triangle with a hole"},
                     {2, "Billerica Triangle", 2, "Billerica Triangle"},
-                    {2, "Billerica Triangle" , 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 3, "Lowell Square"},
                     {3, "Lowell Square", 1, "Bermuda Triangle with a hole"},
                     {3, "Lowell Square", 3, "Lowell Square"}},
                     vt);
@@ -324,10 +324,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly > t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
+                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
-                    {2, "Billerica Triangle",0 ,"Bermuda Triangle"},
                     {3, "Lowell Square", 0, "Bermuda Triangle"},
                     {3, "Lowell Square", 2, "Billerica Triangle"}},
                     vt);
@@ -340,11 +340,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
+                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
                     {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
-                    {2, "Billerica Triangle", 0 ,"Bermuda Triangle"},
                     {2, "Billerica Triangle", 2, "Billerica Triangle"},
                     {3, "Lowell Square", 0, "Bermuda Triangle"},
                     {3, "Lowell Square", 2, "Billerica Triangle"},
@@ -589,8 +589,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             .getResults()[0];
             assertContentOfTable(new Object[][] {
                     {null, 3},
-                    {BERMUDA_TRIANGLE_POLY, 3},
                     {BILLERICA_TRIANGLE_POLY, 3},
+                    {BERMUDA_TRIANGLE_POLY, 3},
                     {LOWELL_SQUARE_POLY, 3},
                     {BERMUDA_TRIANGLE_HOLE_POLY, 3}},
                     vt);
