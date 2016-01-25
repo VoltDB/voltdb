@@ -494,11 +494,12 @@ def start_local_server(deploymentcontents, primary=''):
     deploymentfile = open(filename, 'w')
     deploymentfile.write(deploymentcontents)
     deploymentfile.close()
-    voltdb_dir = os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
+    voltdb_dir = get_voltdb_dir()
     voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), 'create', '-d', filename ]
     if primary:
         voltdb_cmd = voltdb_cmd + [ '-H', primary ]
 
+    print '******start voltdb_cmd=' + str(voltdb_cmd)
     global OUTFILE_COUNTER
     OUTFILE_COUNTER = OUTFILE_COUNTER + 1
     outfilename = os.path.join(PATH, ('voltserver.output.%s.%u') % (OUTFILE_TIME, OUTFILE_COUNTER))
@@ -526,6 +527,37 @@ def start_local_server(deploymentcontents, primary=''):
     else:
         return 1
 
+def get_voltdb_dir():
+    return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
+
+def stop_server(database_id, server_id):
+    members = []
+    current_database = [database for database in DATABASES if database['id'] == database_id]
+    if not current_database:
+        abort(404)
+    else:
+        members = current_database[0]['members']
+    if not members:
+        return make_response(jsonify({'statusstring': 'No servers configured for the database'}),
+                                             500)
+
+    server = [server for server in SERVERS if server['id'] == server_id]
+    if not server:
+        return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
+                                         404)
+
+    print server
+    voltdb_dir = get_voltdb_dir()
+    voltdb_cmd = [ os.path.join(voltdb_dir, 'voltadmin'), 'stop', '-H', server[0]['hostname'] server[0]['name'] ]
+    print '**voltdb_cmd=' + str(voltdb_cmd)
+    shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+    (output, error) = shutdown_proc.communicate()
+    exit_code = shutdown_proc.wait()
+    print '*******shutdown proc exited'
+    print output
+    print error
+
+
 def get_first_hostname(database_id):
     """
     Gets the first hostname configured in the deployment file for a given database
@@ -537,6 +569,8 @@ def get_first_hostname(database_id):
 
     server_id = current_database[0]['members'][0]
     server = [server for server in SERVERS if server['id'] == server_id]
+    print '***In get_first_hostname, server:'
+    print server
     if not server:
         abort(404)
 
@@ -1807,6 +1841,28 @@ class StartServerAPI(MethodView):
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
 
+class StopServerAPI(MethodView):
+    """Class to handle request to stop a server."""
+
+    @staticmethod
+    def put(database_id, server_id):
+        """
+        Stops VoltDB database server on the specified server
+        Args:
+            database_id (int): The id of the database that should be stopped
+            server_id (int): The id of the server node that is to be stopped
+        Returns:
+            Status string indicating if the stop request was sent successfully
+        """
+
+	try:
+            stop_server(database_id, server_id)
+            return make_response(jsonify({'statusstring': 'Success'}), 200)
+        except Exception, err:
+            print traceback.format_exc()
+            return make_response(jsonify({'statusstring': str(err)}),
+                                 500)
+
 
 class VdmStatus(MethodView):
     """
@@ -1958,6 +2014,7 @@ def main(runner, amodule, config_dir, server):
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
     START_DATABASE_SERVER_VIEW = StartServerAPI.as_view('start_server_api')
+    STOP_DATABASE_SERVER_VIEW = StopServerAPI.as_view('stop_server_api')
     START_DATABASE_VIEW = StartDatabaseAPI.as_view('start_database_api')
     DATABASE_MEMBER_VIEW = DatabaseMemberAPI.as_view('database_member_api')
     DEPLOYMENT_VIEW = deploymentAPI.as_view('deployment_api')
@@ -1983,6 +2040,8 @@ def main(runner, amodule, config_dir, server):
 
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/start',
                      view_func=START_DATABASE_SERVER_VIEW, methods=['PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/servers/<int:server_id>/stop',
+                     view_func=STOP_DATABASE_SERVER_VIEW, methods=['PUT'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/start',
                      view_func=START_DATABASE_VIEW, methods=['PUT'])
 
