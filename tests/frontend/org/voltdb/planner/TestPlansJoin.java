@@ -90,11 +90,6 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(pn.getOutputSchema().getColumns().get(0).getTableName().equalsIgnoreCase("R1"));
         assertTrue("R2".equalsIgnoreCase(table) || "R1".equalsIgnoreCase(table));
 
-        // Column from USING expression can not have qualifier in the SELECT clause
-        failToCompile("select R1.C FROM R1 JOIN R2 USING(C)",
-                      "user lacks privilege or object not found: R1.C");
-        failToCompile("select R2.C FROM R1 JOIN R2 USING(C)",
-                      "user lacks privilege or object not found: R2.C");
         failToCompile("select R2.C FROM R1 JOIN R2 USING(X)",
                       "user lacks privilege or object not found: X");
         failToCompile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X",
@@ -128,9 +123,6 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n.getChild(0) instanceof NestLoopIndexPlanNode);
         assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
         assertEquals(1, pn.getOutputSchema().getColumns().size());
-        // Here, the USING(C) causes R1.C to be hidden from lookup.
-        failToCompile("select C, R3.C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3_NOC ON R1.C = R3_NOC.NOTC",
-                      "user lacks privilege or object not found: R1.C");
         // Here C could be the C from USING(C), which would be R1.C or R2.C, or else
         // R3.C.  Either is possible, and this is ambiguous.
         failToCompile("select C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A",
@@ -1236,11 +1228,20 @@ public class TestPlansJoin extends PlannerTestCase {
                      "Column \"ALPHA\" is ambiguous.  It's in tables: S1, S2");
        failToCompile("select ALPHA from (select SQRT(A), SQRT(C) from R1, R3) as S1, (select SQRT(C) as ALPHA from R1) as S2;",
                      "Column \"A\" is ambiguous.  It's in tables: R1, R3");
-       // This is not actually an ambigous query.  This is actually ok.
+       failToCompile("select C from R1 inner join R2 using(C), R3 where R1.A = R3.A;",
+                     "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
+       failToCompile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 ON C=R3.A;",
+                     "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
+       // This is not actually an ambiguous query.  This is actually ok.
        compile("select * from R2 where A in (select A from R1);");
+       compile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 USING(C);");
        // This one is ok too.  There are several common columns in R2, R1.  But they
        // are fully qualified as R1.A, R2.A and so forth when * is expanded.
        compile("select * from R2, R1");
+       compile("SELECT R1.C FROM R1 INNER JOIN R2 USING (C), R3");
+       compile("SELECT R2.C FROM R1 INNER JOIN R2 USING (C), R3");
+       compile("SELECT R1.C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A");
+       compile("SELECT R3.C, R1.C FROM R1 INNER JOIN R2 USING(C), R3;");
    }
 
     @Override

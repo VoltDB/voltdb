@@ -202,7 +202,7 @@ static void readLoop(bool is_shell,
                      S2Loop *loop)
 {
     if (! boost::iequals(*it, "(")) {
-        throwInvalidWktPoly("expected left parenthesis to start a loop");
+        throwInvalidWktPoly("expected left parenthesis to start a ring");
     }
     ++it;
 

@@ -788,8 +788,8 @@ public class RegressionSuite extends TestCase {
             fail(msg + " found null value when non-null expected");
         }
 
-        List<List<GeographyPointValue>> expectedLoops = expected.getLoops();
-        List<List<GeographyPointValue>> actualLoops = actual.getLoops();
+        List<List<GeographyPointValue>> expectedLoops = expected.getRings();
+        List<List<GeographyPointValue>> actualLoops = actual.getRings();
 
         assertEquals(msg + "wrong number of loops, expected " + expectedLoops.size() + ", "
                 + "got " + actualLoops.size(),
