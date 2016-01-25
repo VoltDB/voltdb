@@ -36,10 +36,13 @@ __url__ = 'http://localhost:8000/api/1.0/databases/1/deployment/'
 
 class XML(unittest.TestCase):
     """
-    test case for database
+    test case for testing valid deployment.xml
     """
 
     def test_valid_xml(self):
+        """
+            test valid xml
+        """
         data = requests.get(__url__)
         try:
             doc = ElementTree.fromstring(data.content)
@@ -49,7 +52,9 @@ class XML(unittest.TestCase):
         return doc
 
     def test_default_xml_attributes(self):
-
+        """
+            test xml default attributes
+        """
         data = requests.get(__url__)
         tree = ElementTree.fromstring(data.content)
 
@@ -114,7 +119,7 @@ class XML(unittest.TestCase):
 
 class Deployment(unittest.TestCase):
     """
-    test case for database
+    test case for Updating Deployment
     """
 
     def setUp(self):
