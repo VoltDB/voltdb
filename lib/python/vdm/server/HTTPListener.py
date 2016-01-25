@@ -1439,7 +1439,7 @@ class DatabaseAPI(MethodView):
         # Create new deployment
         app_root = os.path.dirname(os.path.abspath(__file__))
 
-        with open(app_root +"/deployment.json") as json_file:
+        with open(os.path.join(app_root, "deployment.json")) as json_file:
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
 
@@ -1697,6 +1697,7 @@ class deploymentUserAPI(MethodView):
         DEPLOYMENT_USERS.remove(current_user[0])
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
 
+
 class StartDatabaseAPI(MethodView):
     """Class to handle request to start servers on all nodes of a database."""
 
@@ -1852,6 +1853,7 @@ class VdmConfiguration(MethodView):
                 print str(errs)
 
         return jsonify({'deployment': response.status_code})
+
 
 class DatabaseDeploymentAPI(MethodView):
     """
