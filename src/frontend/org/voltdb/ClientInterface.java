@@ -104,6 +104,7 @@ import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.jni.ExecutionEngine;
@@ -1046,7 +1047,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 partition,
                 messageSize,
                 nowNanos,
-                false);  // is for replay.
+                false,  // is for replay.
+                SiteTaskerQueueType.DEFAULT_QUEUE);
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
@@ -1061,7 +1063,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final int partition,
             final int messageSize,
             long nowNanos,
-            final boolean isForReplay)
+            final boolean isForReplay,
+            final SiteTaskerQueueType siteTaskerQueueType)
     {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
@@ -1113,7 +1116,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     invocation,
                     handle,
                     connectionId,
-                    isForReplay);
+                    isForReplay,
+                    siteTaskerQueueType);
 
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);

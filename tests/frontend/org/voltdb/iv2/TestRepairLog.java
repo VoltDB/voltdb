@@ -45,6 +45,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -342,7 +343,7 @@ public class TestRepairLog
 
         Iv2InitiateTaskMessage msg =
                 new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,
-                        spi, 0l, 0l, false);
+                        spi, 0l, 0l, false, SiteTaskerQueueType.DEFAULT_QUEUE);
         msg.setSpHandle(900l);
         RepairLog log = new RepairLog();
         log.deliver(msg);

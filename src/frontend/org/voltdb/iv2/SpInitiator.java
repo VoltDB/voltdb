@@ -78,7 +78,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             StartAction startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
+                new SpScheduler(partition, SiteTaskerQueue.create(), snapMonitor),
                 "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);

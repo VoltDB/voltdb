@@ -34,6 +34,7 @@ import junit.framework.TestCase;
 import org.junit.Test;
 import org.voltdb.StarvationTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.iv2.SiteTaskerQueue.DefaultSiteTaskerQueue;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -42,7 +43,7 @@ public class TestTransactionTaskQueue extends TestCase
 {
 
     private static SiteTaskerQueue getSiteTaskerQueue() {
-        SiteTaskerQueue queue = new SiteTaskerQueue();
+        SiteTaskerQueue queue = new DefaultSiteTaskerQueue();
         queue.setStarvationTracker(new StarvationTracker(0));
         return queue;
     }

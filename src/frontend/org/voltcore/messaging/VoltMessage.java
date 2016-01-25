@@ -20,6 +20,8 @@ package org.voltcore.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
+
 public abstract class VoltMessage
 {
     // place holder for destination site ids when using multi-cast
@@ -46,5 +48,9 @@ public abstract class VoltMessage
 
     public byte getSubject() {
         return m_subject;
+    }
+
+    public SiteTaskerQueueType getSiteTaskerQueueType() {
+        return SiteTaskerQueueType.DEFAULT_QUEUE;
     }
 }

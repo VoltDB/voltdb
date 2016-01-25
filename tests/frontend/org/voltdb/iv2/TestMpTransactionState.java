@@ -51,6 +51,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -224,7 +225,8 @@ public class TestMpTransactionState extends TestCase
                     new StoredProcedureInvocation(),
                     0,
                     0,
-                    false);
+                    false,
+                    SiteTaskerQueueType.DEFAULT_QUEUE);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -280,7 +282,8 @@ public class TestMpTransactionState extends TestCase
                     new StoredProcedureInvocation(),
                     0,
                     0,
-                    false);
+                    false,
+                    SiteTaskerQueueType.DEFAULT_QUEUE);
         int hsids = 6;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -333,7 +336,8 @@ public class TestMpTransactionState extends TestCase
                     new StoredProcedureInvocation(),
                     0,
                     0,
-                    false);
+                    false,
+                    SiteTaskerQueueType.DEFAULT_QUEUE);
         int hsids = 6;
         buddyHSId = 3;
         long[] non_local = configureHSIds(hsids);
@@ -388,7 +392,8 @@ public class TestMpTransactionState extends TestCase
                     new StoredProcedureInvocation(),
                     0,
                     0,
-                    false);
+                    false,
+                    SiteTaskerQueueType.DEFAULT_QUEUE);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -448,7 +453,8 @@ public class TestMpTransactionState extends TestCase
                     new StoredProcedureInvocation(),
                     0,
                     0,
-                    false);
+                    false,
+                    SiteTaskerQueueType.DEFAULT_QUEUE);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -501,7 +507,8 @@ public class TestMpTransactionState extends TestCase
         long truncPt = 100L;
         Iv2InitiateTaskMessage taskmsg =
             new Iv2InitiateTaskMessage(0, 0, truncPt, 101L, System.currentTimeMillis(),
-                                       true, false, new StoredProcedureInvocation(), 0, 0, false);
+                                       true, false, new StoredProcedureInvocation(), 0, 0, false,
+                                       SiteTaskerQueueType.DEFAULT_QUEUE);
         assertEquals(truncPt, taskmsg.getTruncationHandle());
 
         FragmentTaskMessage localFrag = mock(FragmentTaskMessage.class);
@@ -541,7 +548,8 @@ public class TestMpTransactionState extends TestCase
                         new StoredProcedureInvocation(),
                         0,
                         0,
-                        false);
+                        false,
+                        SiteTaskerQueueType.DEFAULT_QUEUE);
         int hsids = 6;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);

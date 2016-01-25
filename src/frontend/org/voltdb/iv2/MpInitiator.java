@@ -59,7 +59,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 new MpScheduler(
                     MP_INIT_PID,
                     buddyHSIds,
-                    new SiteTaskerQueue()),
+                    SiteTaskerQueue.create()),
                 "MP",
                 agent,
                 StartAction.CREATE /* never for rejoin */);

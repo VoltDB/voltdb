@@ -60,7 +60,7 @@ class MpRoSitePool {
         {
             m_backend = backend;
             m_catalogContext = context;
-            m_queue = new SiteTaskerQueue();
+            m_queue = SiteTaskerQueue.create();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);

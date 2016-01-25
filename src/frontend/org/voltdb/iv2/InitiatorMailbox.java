@@ -31,6 +31,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.FairSiteTaskerQueue.SiteTaskerQueueType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -258,6 +259,14 @@ public class InitiatorMailbox implements Mailbox
                     synchronized (InitiatorMailbox.this) {
                         deliverInternal(message);
                     }
+                }
+
+                @Override
+                public SiteTaskerQueueType getQueueIdentifier() {
+                    if (m_scheduler.m_isLeader) {
+                        return message.getSiteTaskerQueueType();
+                    }
+                    return super.getQueueIdentifier();
                 }
             });
         } else {

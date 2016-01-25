@@ -480,7 +480,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
-                    message.isForReplay());
+                    message.isForReplay(),
+                    message.getSiteTaskerQueueType());
 
             msg.setSpHandle(newSpHandle);
 
@@ -507,7 +508,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
-                            msg.isForReplay());
+                            msg.isForReplay(),
+                            msg.getSiteTaskerQueueType());
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 m_mailbox.send(m_sendToHSIds, replmsg);
