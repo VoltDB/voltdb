@@ -30,6 +30,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from flask import Flask, render_template, jsonify, abort, make_response, request, Response
 from flask.views import MethodView
 from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
+import traceback
 import socket
 import os
 import json
@@ -654,6 +655,7 @@ def make_configuration_file():
 
     except Exception, err:
         print str(err)
+        print traceback.format_exc()
 
 
 def sync_configuration():
@@ -779,6 +781,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['port'] = int(deployment[field]['port'])
                     except Exception, err:
                         print 'Failed to get deployment: ' % str(err)
+                        print traceback.format_exc()
                 elif field == 'cluster':
                     try:
                         new_deployment[field] = {}
@@ -789,6 +792,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['schema'] = str(deployment[field]['schema'])
                     except Exception, err:
                         print str(err)
+                        print traceback.format_exc()
                 elif field == 'commandlog':
                     try:
                         new_deployment[field] = {}
@@ -800,12 +804,14 @@ def get_deployment_from_xml(deployment_xml, is_list):
                         new_deployment[field]['frequency']['time'] = int(deployment[field]['frequency']['time'])
                     except Exception, err:
                         print str(err)
+                        print traceback.format_exc()
                 elif field == 'heartbeat':
                     try:
                         new_deployment[field] = {}
                         new_deployment[field]['timeout'] = int(deployment[field]['timeout'])
                     except Exception, err:
                         print str(err)
+                        print traceback.format_exc()
                 elif field == 'httpd':
                     try:
                         new_deployment[field] = {}
@@ -869,6 +875,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
 
                     except Exception, err:
                         print str(err)
+                        print traceback.format_exc()
                 elif field == 'dr':
                     try:
                         if deployment[field] is not None:
@@ -883,6 +890,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
 
                     except Exception, err:
                         print 'dr:' + str(err)
+                        print traceback.format_exc()
                 elif field == 'users':
                     if deployment[field] is not None:
                         new_deployment[field] = {}
@@ -921,6 +929,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['port'] = int(deployment_xml[field]['port'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'cluster':
                 try:
                     new_deployment[field] = {}
@@ -931,6 +940,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['schema'] = str(deployment_xml[field]['schema'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'commandlog':
                 try:
                     new_deployment[field] = {}
@@ -942,12 +952,14 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['frequency']['time'] = int(deployment_xml[field]['frequency']['time'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'heartbeat':
                 try:
                     new_deployment[field] = {}
                     new_deployment[field]['timeout'] = int(deployment_xml[field]['timeout'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'httpd':
                 try:
                     new_deployment[field] = {}
@@ -957,6 +969,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['jsonapi']['enabled'] = parse_bool_string(deployment_xml[field]['jsonapi']['enabled'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'partition-detection':
                 try:
                     new_deployment[field] = {}
@@ -965,6 +978,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['snapshot']['prefix'] = parse_bool_string(deployment_xml[field]['snapshot']['prefix'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'security':
                 try:
                     new_deployment[field] = {}
@@ -972,6 +986,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['provider'] = str(deployment_xml[field]['provider'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'snapshot':
                 try:
                     new_deployment[field] = {}
@@ -981,6 +996,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                     new_deployment[field]['retain'] = int(deployment_xml[field]['retain'])
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'systemsettings':
                 try:
                     new_deployment[field] = {}
@@ -1011,6 +1027,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
                                 new_deployment[field]['resourcemonitor']['disklimit']['feature'] = get_deployment_properties(deployment_xml[field]['resourcemonitor']['disklimit']['feature'], 'dict')
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             elif field == 'dr':
                 try:
                     if deployment_xml[field] is not None:
@@ -1025,6 +1042,7 @@ def get_deployment_from_xml(deployment_xml, is_list):
 
                 except Exception, err:
                     print str(err)
+                    print traceback.format_exc()
             else:
                 new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
 
@@ -1742,6 +1760,7 @@ class StartDatabaseAPI(MethodView):
                 server_status[curr['hostname']] = json.loads(response.text)['statusstring']
             except Exception, err:
                 failed = True
+                print traceback.format_exc()
                 server_status[curr['hostname']] = str(err)
 
         if failed:
@@ -1779,6 +1798,7 @@ class StartServerAPI(MethodView):
                 return make_response(jsonify({'statusstring': 'Error starting server'}),
                                              500)
         except Exception, err:
+            print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
 
@@ -1811,6 +1831,7 @@ class SyncVdmConfiguration(MethodView):
             deployment_users = result['vdm']['deployment_users']
 
         except Exception, errs:
+            print traceback.format_exc()
             return jsonify({'status':'success', 'error': str(errs)})
 
         # try:
@@ -1845,10 +1866,11 @@ class VdmConfiguration(MethodView):
         for member in result['vdm']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://'+member['hostname']+':'+__PORT__+'/api/1.0/vdm/sync_configuration/'
+                url = 'http://'+member['hostname'] + ':' + str(__PORT__) + '/api/1.0/vdm/sync_configuration/'
                 data = result
                 response = requests.post(url,data=json.dumps(data),headers = headers)
             except Exception,errs:
+                print traceback.format_exc()
                 print str(errs)
 
         return jsonify({'deployment': response.status_code})
@@ -1863,10 +1885,7 @@ class DatabaseDeploymentAPI(MethodView):
         return Response(deployment_content, mimetype='text/xml')
 
 def main(runner, amodule, config_dir, server):
-    try:
-        F_DEBUG = os.environ['DEBUG']
-    except KeyError:
-        F_DEBUG = 'False'
+    F_DEBUG = os.getenv('DEBUG', 'False')
 
     if F_DEBUG == 'True':
         APP.config.update(DEBUG=True)
