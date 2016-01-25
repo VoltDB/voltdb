@@ -43,6 +43,7 @@ from flask.ext.cors import CORS
 from collections import defaultdict
 import ast
 import os.path
+import urllib
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -465,7 +466,7 @@ def map_deployment_users(request, user):
             {
                 'databaseid': request.json['databaseid'],
                 'name': request.json['name'],
-                'password': request.json['password'],
+                'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
                 'roles': request.json['roles'],
                 'plaintext': request.json['plaintext']
             }
@@ -1680,9 +1681,8 @@ class deploymentUserAPI(MethodView):
 
         current_user = [user for user in DEPLOYMENT_USERS if
                         user['name'] == username and user['databaseid'] == database_id]
-
         current_user[0]['name'] = request.json.get('name', current_user[0]['name'])
-        current_user[0]['password'] = request.json.get('password', current_user[0]['password'])
+        current_user[0]['password'] = urllib.unquote(str(request.json.get('password', current_user[0]['password'])).encode('ascii')).decode('utf-8')
         current_user[0]['roles'] = request.json.get('roles', current_user[0]['roles'])
         current_user[0]['plaintext'] = request.json.get('plaintext', current_user[0]['plaintext'])
         sync_configuration()
