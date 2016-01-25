@@ -44,6 +44,7 @@ from flask.ext.cors import CORS
 from collections import defaultdict
 import ast
 import os.path
+import urllib
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -466,7 +467,7 @@ def map_deployment_users(request, user):
             {
                 'databaseid': request.json['databaseid'],
                 'name': request.json['name'],
-                'password': request.json['password'],
+                'password': urllib.unquote(str(request.json['password']).encode('ascii')).decode('utf-8'),
                 'roles': request.json['roles'],
                 'plaintext': request.json['plaintext']
             }
@@ -585,6 +586,22 @@ def get_configuration():
     return deployment_json
 
 
+def write_configuration_file():
+
+    main_header = make_configuration_file()
+
+    try:
+        # f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
+        # vdm_path = 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'
+        path = os.path.join(PATH, 'vdm.xml')
+        f = open(path, 'w')
+        f.write(main_header)
+        f.close()
+
+    except Exception, err:
+        print str(err)
+
+
 def make_configuration_file():
     main_header = Element('vdm')
     db_top = SubElement(main_header, 'databases')
@@ -642,20 +659,8 @@ def make_configuration_file():
                 if value is not None:
                     deployment_elem.attrib[key] = str(value)
         i += 1
+    return tostring(main_header,encoding='UTF-8')
 
-    try:
-        # f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
-        # vdm_path = 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'
-        path = os.path.join(PATH, 'vdm.xml')
-        f = open(path, 'w')
-        f.write(tostring(main_header,encoding='UTF-8'))
-        f.close()
-
-
-
-    except Exception, err:
-        print str(err)
-        print traceback.format_exc()
 
 
 def sync_configuration():
@@ -1311,7 +1316,7 @@ class ServerAPI(MethodView):
         current_database[0]['members'].append(server_id)
 
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'server': server, 'status': 1,
                         'members': current_database[0]['members']}), 201
 
@@ -1345,7 +1350,7 @@ class ServerAPI(MethodView):
 
         SERVERS.remove(server[0])
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'result': True})
 
     @staticmethod
@@ -1395,7 +1400,7 @@ class ServerAPI(MethodView):
         current_server[0]['placement-group'] = \
             request.json.get('placement-group', current_server[0]['placement-group'])
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'server': current_server[0], 'status': 1})
 
 
@@ -1432,7 +1437,7 @@ class DatabaseAPI(MethodView):
             Information and the status of database if it is saved otherwise the error message.
         """
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         inputs = DatabaseInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
@@ -1456,7 +1461,7 @@ class DatabaseAPI(MethodView):
         # Create new deployment
         app_root = os.path.dirname(os.path.abspath(__file__))
 
-        with open(app_root +"/deployment.json") as json_file:
+        with open(os.path.join(app_root, "deployment.json")) as json_file:
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
 
@@ -1464,7 +1469,7 @@ class DatabaseAPI(MethodView):
 
         sync_configuration()
 
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'database': database, 'status': 1}), 201
 
     @staticmethod
@@ -1488,7 +1493,7 @@ class DatabaseAPI(MethodView):
         current_database[0]['deployment'] = \
             request.json.get('deployment', current_database[0]['deployment'])
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'database': current_database[0], 'status': 1})
 
     @staticmethod
@@ -1528,7 +1533,7 @@ class DatabaseAPI(MethodView):
 
         DEPLOYMENT.remove(deployment[0])
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'result': True})
 
 
@@ -1576,7 +1581,7 @@ class DatabaseMemberAPI(MethodView):
             if member_id not in current_database[0]['members']:
                 current_database[0]['members'].append(member_id)
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'members': current_database[0]['members'], 'status': 1})
 
 
@@ -1623,7 +1628,7 @@ class deploymentAPI(MethodView):
 
         deployment = map_deployment(request, database_id)
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'deployment': deployment, 'status': 1})
 
 
@@ -1679,7 +1684,7 @@ class deploymentUserAPI(MethodView):
 
 
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'user': deployment_user, 'status': 1, 'statusstring': 'User Created'})
 
     @staticmethod
@@ -1698,13 +1703,12 @@ class deploymentUserAPI(MethodView):
 
         current_user = [user for user in DEPLOYMENT_USERS if
                         user['name'] == username and user['databaseid'] == database_id]
-
         current_user[0]['name'] = request.json.get('name', current_user[0]['name'])
-        current_user[0]['password'] = request.json.get('password', current_user[0]['password'])
+        current_user[0]['password'] = urllib.unquote(str(request.json.get('password', current_user[0]['password'])).encode('ascii')).decode('utf-8')
         current_user[0]['roles'] = request.json.get('roles', current_user[0]['roles'])
         current_user[0]['plaintext'] = request.json.get('plaintext', current_user[0]['plaintext'])
         sync_configuration()
-        make_configuration_file()
+        write_configuration_file()
         return jsonify({'user': current_user[0], 'status': 1, 'statusstring': "User Updated"})
 
     @staticmethod
@@ -1714,6 +1718,7 @@ class deploymentUserAPI(MethodView):
 
         DEPLOYMENT_USERS.remove(current_user[0])
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
+
 
 class StartDatabaseAPI(MethodView):
     """Class to handle request to start servers on all nodes of a database."""
@@ -1866,7 +1871,7 @@ class VdmConfiguration(MethodView):
         for member in result['vdm']['members']:
             try:
                 headers = {'content-type': 'application/json'}
-                url = 'http://'+member['hostname'] + ':' + str(__PORT__) + '/api/1.0/vdm/sync_configuration/'
+                url = 'http://'+member['hostname']+':'+__PORT__+'/api/1.0/vdm/sync_configuration/'
                 data = result
                 response = requests.post(url,data=json.dumps(data),headers = headers)
             except Exception,errs:
@@ -1874,6 +1879,7 @@ class VdmConfiguration(MethodView):
                 print str(errs)
 
         return jsonify({'deployment': response.status_code})
+
 
 class DatabaseDeploymentAPI(MethodView):
     """
@@ -1884,8 +1890,23 @@ class DatabaseDeploymentAPI(MethodView):
         deployment_content = get_database_deployment(database_id)
         return Response(deployment_content, mimetype='text/xml')
 
+
+class VdmAPI(MethodView):
+    """
+    Class to return vdm.xml file
+    """
+
+    @staticmethod
+    def get():
+        vdm_content = make_configuration_file()
+        return Response(vdm_content, mimetype='text/xml')
+
+
 def main(runner, amodule, config_dir, server):
-    F_DEBUG = os.getenv('DEBUG', 'False')
+    try:
+        F_DEBUG = os.environ['DEBUG']
+    except KeyError:
+        F_DEBUG = 'False'
 
     if F_DEBUG == 'True':
         APP.config.update(DEBUG=True)
@@ -1932,7 +1953,7 @@ def main(runner, amodule, config_dir, server):
                         'zookeeper-listener': "", 'placement-group': ""})
         DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
 
-    make_configuration_file()
+    write_configuration_file()
 
     SERVER_VIEW = ServerAPI.as_view('server_api')
     DATABASE_VIEW = DatabaseAPI.as_view('database_api')
@@ -1945,6 +1966,7 @@ def main(runner, amodule, config_dir, server):
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
     SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
     DATABASE_DEPLOYMENT_VIEW = DatabaseDeploymentAPI.as_view('database_deployment_api')
+    VDM_VIEW = VdmAPI.as_view('vdm_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/servers/<int:database_id>', view_func=SERVER_VIEW, methods=['POST'])
@@ -1979,6 +2001,8 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
+                     methods=['GET'])
+    APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
                      methods=['GET'])
     if server is not None:
         APP.run(threaded=True, host=arrServer[0], port=int(arrServer[1]))
