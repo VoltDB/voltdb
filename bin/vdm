@@ -105,6 +105,8 @@ app_root = os.path.dirname(os.path.abspath(__file__))
 os.chdir(os.path.normpath(os.path.join(app_root, os.pardir, 'lib/python/vdm')))
 os.getcwd()
 
+
+
 if path is None:
     home = expanduser("~")
     # path = home + '.vdm' if home.endswith('/') else home + '/' + '.vdm'
@@ -114,11 +116,13 @@ if os.path.isdir(str(path)):
     if os.access(str(path), os.W_OK):
         HTTPListener.main(runner, HTTPListener, path, server)
     else:
-        print 'Error: There is no permission to create file in this folder. ' \
-              'Unable to start VDM.'
+        sys.stderr.write('Error: There is no permission to create file in this folder. '
+                         'Unable to start VDM.')
+        sys.exit(1)
 else:
     try:
         os.makedirs(path)
         HTTPListener.main(runner, HTTPListener, path, server)
     except Exception, err:
-        print str(err) + '. Unable to start VDM.'
+        sys.stderr.write('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
+        sys.exit(1)
