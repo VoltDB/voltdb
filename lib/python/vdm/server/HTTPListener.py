@@ -34,7 +34,7 @@ import traceback
 import socket
 import os
 import json
-from xml.etree.ElementTree import Element, SubElement, Comment, tostring, parse, XML
+from xml.etree.ElementTree import Element, SubElement, tostring, XML
 import sys
 import subprocess
 import signal
@@ -45,6 +45,7 @@ from collections import defaultdict
 import ast
 import os.path
 import urllib
+import DeploymentConfig
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -489,8 +490,9 @@ def ignore_signals():
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+
 def start_local_server(database_id, recover=False):
-    deploymentcontents = get_database_deployment(database_id)
+    deploymentcontents = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
     primary = get_first_hostname(database_id)
     filename = os.path.join(PATH, 'deployment.xml')
     deploymentfile = open(filename, 'w')
@@ -529,8 +531,10 @@ def start_local_server(database_id, recover=False):
     else:
         return 1
 
+
 def get_voltdb_dir():
     return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
+
 
 def stop_server(database_id, server_id):
     members = []
@@ -645,37 +649,6 @@ def get_first_hostname(database_id):
 
     return server[0]['hostname']
 
-def get_database_deployment(dbid):
-    deployment_top = Element('deployment')
-    value = DEPLOYMENT[dbid-1]
-    db = DATABASES[dbid-1]
-    host_count = len(db['members'])
-    value['cluster']['hostcount'] = host_count
-    # Add users
-    addTop = False
-    for duser in DEPLOYMENT_USERS:
-        if duser['databaseid'] == dbid:
-            # Only create subelement if users have anything in this database.
-            if addTop != True:
-                users_top = SubElement(deployment_top, 'users')
-                addTop = True
-            uelem = SubElement(users_top, "user")
-            uelem.attrib["name"] = duser["name"]
-            uelem.attrib["password"] = duser["password"]
-            uelem.attrib["roles"] = duser["roles"]
-            plaintext = str(duser["plaintext"])
-            if isinstance(duser["plaintext"], bool):
-                if duser["plaintext"] == False:
-                    plaintext = "false"
-                else:
-                    plaintext = "true"
-            uelem.attrib["plaintext"] = plaintext
-
-    handle_deployment_dict(deployment_top, dbid, value, True)
-
-    xmlstr = tostring(deployment_top,encoding='UTF-8')
-    return xmlstr
-
 
 def get_configuration():
     deployment_json = {
@@ -755,9 +728,9 @@ def make_configuration_file():
         deployment_elem = SubElement(deployment_top, 'deployment')
         for key, value in DEPLOYMENT[i].iteritems():
             if type(value) is dict:
-                handle_deployment_dict(deployment_elem, key, value, False)
+                DeploymentConfig.handle_deployment_dict(deployment_elem, key, value, False)
             elif type(value) is list:
-                handle_deployment_list(deployment_elem, key, value)
+                DeploymentConfig.handle_deployment_list(deployment_elem, key, value)
             else:
                 if value is not None:
                     deployment_elem.attrib[key] = str(value)
@@ -765,12 +738,12 @@ def make_configuration_file():
     return tostring(main_header,encoding='UTF-8')
 
 
-
 def sync_configuration():
     headers = {'content-type': 'application/json'}
     url = 'http://'+__IP__+':'+str(__PORT__)+'/api/1.0/vdm/configuration/'
     response = requests.post(url,headers = headers)
     return response
+
 
 def convert_xml_to_json(config_path):
     with open(config_path) as f:
@@ -1292,48 +1265,6 @@ def etree_to_dict(t):
     return d
 
 
-def handle_deployment_dict(deployment_elem, key, value, istop):
-    if value:
-        if istop == True:
-            deployment_sub_element = deployment_elem
-        else:
-            deployment_sub_element = SubElement(deployment_elem, str(key))
-        for key1, value1 in value.iteritems():
-            if type(value1) is dict:
-                if istop == True:
-                    if key1 not in IGNORETOP:
-                        handle_deployment_dict(deployment_sub_element, key1, value1, False)
-                else:
-                    handle_deployment_dict(deployment_sub_element, key1, value1, False)
-            elif type(value1) is list:
-                handle_deployment_list(deployment_sub_element, key1, value1)
-            else:
-                if isinstance(value1, bool):
-                    if value1 == False:
-                        deployment_sub_element.attrib[key1] = "false"
-                    else:
-                        deployment_sub_element.attrib[key1] = "true"
-                else:
-                    if key == "property":
-                        deployment_sub_element.attrib["name"] = value["name"]
-                        deployment_sub_element.text = str(value1)
-                    else:
-                        if istop == False:
-                            if value1 != None:
-                                deployment_sub_element.attrib[key1] = str(value1)
-                        elif key1 not in IGNORETOP:
-                            if value1 != None:
-                                deployment_sub_element.attrib[key1] = str(value1)
-
-
-def handle_deployment_list(deployment_elem, key, value):
-    if (key == 'servers'):
-        deployment_elem.attrib[key] = str(value)
-    else:
-        for items in value:
-            handle_deployment_dict(deployment_elem, key, items, False)
-
-
 def parse_bool_string(bool_string):
     return bool_string.upper() == 'TRUE'
 
@@ -1838,6 +1769,7 @@ class StartDatabaseAPI(MethodView):
 
         return start_database(database_id)
 
+
 class RecoverDatabaseAPI(MethodView):
     """Class to handle request to start servers on all nodes of a database."""
 
@@ -1852,6 +1784,7 @@ class RecoverDatabaseAPI(MethodView):
         """
 
         start_database(database_id, True)
+
 
 class StopDatabaseAPI(MethodView):
     """Class to handle request to stop a database."""
@@ -1873,6 +1806,7 @@ class StopDatabaseAPI(MethodView):
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
+
 
 class StartServerAPI(MethodView):
     """Class to handle request to start a server."""
@@ -1901,6 +1835,7 @@ class StartServerAPI(MethodView):
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
 
+
 class RecoverServerAPI(MethodView):
     """Class to handle request to issue recover cmd on a server."""
 
@@ -1927,6 +1862,7 @@ class RecoverServerAPI(MethodView):
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
                                  500)
+
 
 class StopServerAPI(MethodView):
     """Class to handle request to stop a server."""
@@ -2030,7 +1966,7 @@ class DatabaseDeploymentAPI(MethodView):
     """
     @staticmethod
     def get(database_id):
-        deployment_content = get_database_deployment(database_id)
+        deployment_content = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
         return Response(deployment_content, mimetype='text/xml')
 
 
