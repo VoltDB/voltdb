@@ -497,14 +497,18 @@ def start_local_server(database_id, recover=False):
         verb = 'recover'
     voltdb_cmd = [ 'nohup', os.path.join(voltdb_dir, 'voltdb'), verb, '-d', filename, '-H', primary ]
 
-    global OUTFILE_COUNTER
-    OUTFILE_COUNTER = OUTFILE_COUNTER + 1
-    outfilename = os.path.join(PATH, ('voltserver.output.%s.%u') % (OUTFILE_TIME, OUTFILE_COUNTER))
+    Global.OUTFILE_COUNTER = Global.OUTFILE_COUNTER + 1
+    outfilename = os.path.join(PATH, ('voltserver.output.%s.%u') % (Global.OUTFILE_TIME, Global.OUTFILE_COUNTER))
     outfile = open(outfilename, 'w')
 
     # Start server in a separate process
-    voltserver = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
-                                  preexec_fn=ignore_signals, close_fds=True)
+    oldwd = os.getcwd()
+    os.chdir(PATH)
+    try:
+        voltserver = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
+                                      preexec_fn=ignore_signals, close_fds=True)
+    finally:
+        os.chdir(oldwd)
 
     initialized = False
     rfile = open(outfilename, 'r')
@@ -545,8 +549,12 @@ def stop_server(database_id, server_id):
         return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                          404)
 
+    args = [ 'stop', '-H', server[0]['hostname'], server[0]['name'] ]
+    return run_voltdb_cmd('voltadmin', args)
+
+def run_voltdb_cmd(cmd, args):
     voltdb_dir = get_voltdb_dir()
-    voltdb_cmd = [ os.path.join(voltdb_dir, 'voltadmin'), 'stop', '-H', server[0]['hostname'], server[0]['name'] ]
+    voltdb_cmd = os.path.join(voltdb_dir, cmd) + args
     shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
     (output, error) = shutdown_proc.communicate()
     exit_code = shutdown_proc.wait()
@@ -580,8 +588,8 @@ def start_database(database_id, recover=False):
         server = [server for server in Global.SERVERS if server['id'] == server_id]
         curr = server[0]
         try:
-            url = ('http://%s:8000/api/1.0/databases/%u/servers/%u/%s') % \
-                              (curr['hostname'], database_id, server_id, action)
+            url = ('http://%s:%u/api/1.0/databases/%u/servers/%u/%s') % \
+                              (curr['hostname'], __PORT__, database_id, server_id, action)
             response = requests.put(url)
             if (response.status_code != requests.codes.ok):
                 failed = True
@@ -618,12 +626,8 @@ def stop_database(database_id):
         return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                          404)
 
-    voltdb_dir = get_voltdb_dir()
-    voltdb_cmd = [ os.path.join(voltdb_dir, 'voltadmin'), 'shutdown', '-H', server[0]['hostname'] ]
-    shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-    (output, error) = shutdown_proc.communicate()
-    exit_code = shutdown_proc.wait()
-    return output + error
+    args = [ 'shutdown', '-H', server[0]['hostname'] ]
+    return run_voltdb_cmd('voltadmin', args)
 
 
 def get_first_hostname(database_id):
@@ -1275,6 +1279,8 @@ class Global:
     DATABASES = []
     DEPLOYMENT = []
     DEPLOYMENT_USERS = []
+    OUTFILE_TIME = str(time.time())
+    OUTFILE_COUNTER = 0
 
 
 class ServerAPI(MethodView):
@@ -2002,10 +2008,6 @@ def main(runner, amodule, config_dir, server):
 
     # config_path = config_dir + '/' + 'vdm.xml'
     config_path = os.path.join(config_dir, 'vdm.xml')
-    global OUTFILE_TIME
-    OUTFILE_TIME = str(time.time())
-    global OUTFILE_COUNTER
-    OUTFILE_COUNTER = 0
 
     arrServer = {}
     if server is not None:
