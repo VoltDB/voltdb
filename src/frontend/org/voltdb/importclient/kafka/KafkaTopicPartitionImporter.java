@@ -503,6 +503,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
             } catch (Exception e) {
                 rateLimitedLog(Level.ERROR, e, "Failed to commit Offset for " + m_topicAndPartition);
+                if (e instanceof IOException) {
+                    getOffsetCoordinator();
+                }
                 return false;
             }
             final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
