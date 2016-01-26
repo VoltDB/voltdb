@@ -83,14 +83,10 @@ public class TestReportMaker extends TestCase {
     private void validateDeltas(int input, int testcase,
                                 int byte_increment, int percent_increment)
     {
-        if (byte_increment < 0) {
-            System.out.println("Failing case " + testcase + " input " + input +
-                               " byte_increment " + byte_increment);
-        }
         assertTrue(byte_increment >= 0);
         if (byte_increment >= ((1<<19) + MAX_OVERHEAD)) {
             System.out.println("Failing case " + testcase + " input " + input +
-                               " byte_increment " + byte_increment);
+                    " byte_increment " + byte_increment);
         }
         assertTrue(byte_increment < ((1<<19) + MAX_OVERHEAD));
         if (percent_increment >= 66) {

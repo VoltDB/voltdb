@@ -77,17 +77,32 @@ public:
     }
 
     static const char* peekObjectValue(const NValue& value) {
-        assert(isVariableLengthType(value.getValueType()));
         if (value.isNull()) {
             return NULL;
         }
-        return value.getObjectValue_withoutNull();
+        return peekObjectValue_withoutNull(value);
     }
 
     static const char* peekObject_withoutNull(const NValue& value, int32_t* lengthOut) {
         assert(isVariableLengthType(value.getValueType()));
-        // NEEDS WORK
         return value.getObject_withoutNull(lengthOut);
+    }
+
+    static const char* peekObjectValue_withoutNull(const NValue& value) {
+        assert(isVariableLengthType(value.getValueType()));
+        return value.getObjectValue_withoutNull();
+    }
+
+    static int32_t peekObjectLength_withoutNull(const NValue& value) {
+        assert(isVariableLengthType(value.getValueType()));
+        return value.getObjectLength_withoutNull();
+    }
+
+    static std::string peekStringCopy_withoutNull(const NValue& value) {
+        assert(isVariableLengthType(value.getValueType()));
+        std::string result(reinterpret_cast<const char*>(value.getObjectValue_withoutNull()),
+                                                         value.getObjectLength_withoutNull());
+        return result;
     }
 
     static ValueType peekValueType(const NValue& value) {
@@ -120,7 +135,7 @@ public:
     /// The length of the data bytes via output parameter.
     ///
     /// Assumes that value is not null!!
-    static const char* peekPointerToDataBytes(const NValue &value, int32_t *length) {
+    static const char* peekPointerToDataBytes(const NValue& value, int32_t* length) {
         ValueType vt = value.getValueType();
         switch (vt) {
         case VALUE_TYPE_TINYINT:

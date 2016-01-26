@@ -42,9 +42,8 @@ namespace voltdb {
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull())
         return getNullValue();
-    int32_t length;
-    getObject_withoutNull(&length);
-    return getIntegerValue(length);
+
+    return getIntegerValue(getObjectLength_withoutNull());
 }
 
 /** implement the 1-argument SQL CHAR function */
@@ -273,8 +272,7 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
         if (iter->getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (iter->getValueType(), VALUE_TYPE_VARCHAR);
         }
-        int32_t length;
-        iter->getObject_withoutNull(&length);
+        int32_t length = iter->getObjectLength_withoutNull();
         size += length;
         if (size > (int64_t)INT32_MAX) {
             throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
@@ -377,7 +375,7 @@ inline NValue NValue::trimWithOptions(const std::vector<NValue>& arguments, bool
 
     const NValue& strVal = arguments[1];
     if (strVal.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (trimChar.getValueType(), VALUE_TYPE_VARCHAR);
+        throwCastSQLException(trimChar.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
     buf = strVal.getObject_withoutNull(&length);

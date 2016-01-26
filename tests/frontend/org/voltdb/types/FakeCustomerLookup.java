@@ -23,6 +23,8 @@
 
 package org.voltdb.types;
 
+import java.io.UnsupportedEncodingException;
+
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
