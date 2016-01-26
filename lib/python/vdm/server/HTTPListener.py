@@ -532,6 +532,28 @@ def start_local_server(database_id, recover=False):
 def get_voltdb_dir():
     return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
 
+def is_security_enabled(database_id):
+    security_config = Global.DEPLOYMENT[database_id-1]['security']
+    if not security_config:
+        return False
+
+    return security_config['enabled']
+
+def get_admin_user(database_id):
+    
+    users_outer = Global.DEPLOYMENT[database_id-1]['users']
+    if not users_outer:
+        return None
+
+    users = users_outer['user']
+    if not users:
+        return None
+
+    admins = [auser for auser in users if auser['roles'] == 'Administrator']
+    if not admins:
+        return None
+    else:
+        return admins[0]
 
 def stop_server(database_id, server_id):
     members = []
@@ -549,12 +571,20 @@ def stop_server(database_id, server_id):
         return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                          404)
 
-    args = [ 'stop', '-H', server[0]['hostname'], server[0]['name'] ]
-    return run_voltdb_cmd('voltadmin', args)
+    args = [ '-H', server[0]['hostname'], server[0]['name'] ]
+    return run_voltdb_cmd('voltadmin', 'stop', args, database_id)
 
-def run_voltdb_cmd(cmd, args):
+def run_voltdb_cmd(cmd, verb, args, database_id):
+    user_options = []
+    if is_security_enabled(database_id):
+        admin = get_admin_user(database_id)
+	if admin is None:
+	    raise Exception('No admin users found')
+	user_options = [ '-u', admin['name'], '-p', admin['password'] ]
+
     voltdb_dir = get_voltdb_dir()
-    voltdb_cmd = os.path.join(voltdb_dir, cmd) + args
+    voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
+
     shutdown_proc = subprocess.Popen(voltdb_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
     (output, error) = shutdown_proc.communicate()
     exit_code = shutdown_proc.wait()
@@ -626,8 +656,8 @@ def stop_database(database_id):
         return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                          404)
 
-    args = [ 'shutdown', '-H', server[0]['hostname'] ]
-    return run_voltdb_cmd('voltadmin', args)
+    args = [ '-H', server[0]['hostname'] ]
+    return run_voltdb_cmd('voltadmin', 'shutdown', args, database_id)
 
 
 def get_first_hostname(database_id):
