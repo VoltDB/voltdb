@@ -28,7 +28,7 @@
 {@fromtables = "_table"}
 {@idcol = "ID"}
 
-{@insertvals = "_id, _value[point:10,12], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], null"}
+{@insertvals = "_id, _value[point:-109,-102,37,41], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], null"}
 
 {@onefun = ""}  -- There are no handy unary polygon-to-polygon functions.
 {@optionalfn = "_geofun"}
