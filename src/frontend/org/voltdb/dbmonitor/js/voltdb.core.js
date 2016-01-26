@@ -66,6 +66,10 @@
                             if (i > 0) {
                                 params += ',';
                             }
+                            if (localParameters[i] === null) {
+                                params += "null";
+                                continue;
+                            }
                             switch (signature[i]) {
                                 case 'tinyint':
                                 case 'smallint':

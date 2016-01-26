@@ -290,11 +290,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly < t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
-                    {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
-                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
+                    {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 0, "Bermuda Triangle"},
                     {2, "Billerica Triangle", 1, "Bermuda Triangle with a hole"},
-                    {2, "Billerica Triangle" , 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 3, "Lowell Square"},
                     {3, "Lowell Square", 1, "Bermuda Triangle with a hole"}},
                     vt);
 
@@ -305,14 +305,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly <= t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
-                    {0, "Bermuda Triangle" , 0, "Bermuda Triangle"},
-                    {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
-                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
+                    {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
+                    {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
-                    {1, "Bermuda Triangle with a hole" , 1, "Bermuda Triangle with a hole"},
+                    {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
+                    {2, "Billerica Triangle", 0, "Bermuda Triangle"},
                     {2, "Billerica Triangle", 1, "Bermuda Triangle with a hole"},
                     {2, "Billerica Triangle", 2, "Billerica Triangle"},
-                    {2, "Billerica Triangle" , 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 3, "Lowell Square"},
                     {3, "Lowell Square", 1, "Bermuda Triangle with a hole"},
                     {3, "Lowell Square", 3, "Lowell Square"}},
                     vt);
@@ -324,10 +324,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly > t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
+                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
-                    {2, "Billerica Triangle",0 ,"Bermuda Triangle"},
                     {3, "Lowell Square", 0, "Bermuda Triangle"},
                     {3, "Lowell Square", 2, "Billerica Triangle"}},
                     vt);
@@ -340,11 +340,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
+                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
                     {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
-                    {2, "Billerica Triangle", 0 ,"Bermuda Triangle"},
                     {2, "Billerica Triangle", 2, "Billerica Triangle"},
                     {3, "Lowell Square", 0, "Bermuda Triangle"},
                     {3, "Lowell Square", 2, "Billerica Triangle"},
@@ -414,7 +414,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // to reverse them.
         //
         List<GeographyValue> cheesyHoles = new ArrayList<GeographyValue>();
-        List<List<GeographyPointValue>> loops = cheesyPolygon.getLoops();
+        List<List<GeographyPointValue>> loops = cheesyPolygon.getRings();
         for (int idx = 1; idx < loops.size(); idx += 1) {
             List<GeographyPointValue> oneHole = loops.get(idx);
             List<GeographyPointValue> rev = new ArrayList<GeographyPointValue>();
@@ -589,8 +589,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             .getResults()[0];
             assertContentOfTable(new Object[][] {
                     {null, 3},
-                    {BERMUDA_TRIANGLE_POLY, 3},
                     {BILLERICA_TRIANGLE_POLY, 3},
+                    {BERMUDA_TRIANGLE_POLY, 3},
                     {LOWELL_SQUARE_POLY, 3},
                     {BERMUDA_TRIANGLE_HOLE_POLY, 3}},
                     vt);
@@ -804,9 +804,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
         assertGeographyValueWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
         assertGeographyValueWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
-        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a ring", "POLYGON ()");
         assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
-        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a ring", "POLYGON(3 3, 4 4, 5 5, 3 3)");
         assertGeographyValueWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
         assertGeographyValueWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
         assertGeographyValueWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");

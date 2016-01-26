@@ -200,6 +200,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
         </fileset>
     </javadoc>
 </target>
