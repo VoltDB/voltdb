@@ -49,7 +49,12 @@
  */
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 
 //Notes on Stored Procedure:
 //return VoltTables has 2 elements:
