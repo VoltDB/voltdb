@@ -89,6 +89,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      */
     public final void readyForData(ChannelDistributer distributer)
     {
+        distributer.registerCallback(m_factory.getTypeName(), this);
         if (m_stopping) return;
 
         if (m_executorService != null) { // Should be caused by coding error. Generic RuntimeException is OK
@@ -122,7 +123,6 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             startImporters(m_importers.get().values());
         } else {
             m_importers.set(ImmutableMap.<URI, AbstractImporter> of());
-            distributer.registerCallback(m_factory.getTypeName(), this);
             distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
         }
     }
