@@ -32,9 +32,39 @@ import xmlrunner
 from xml.etree import ElementTree
 
 __url__ = 'http://localhost:8000/api/1.0/databases/1/deployment/'
+__db_url__ = 'http://localhost:8000/api/1.0/databases/'
 
 
-class XML(unittest.TestCase):
+class Database(unittest.TestCase):
+    """
+    setup a new database for test
+    """
+
+    def setUp(self):
+        # Create a db
+        headers = {'Content-Type': 'application/json; charset=utf-8'}
+        db_data = {'name': 'testDB'}
+        response = requests.post(__db_url__, json=db_data, headers=headers)
+        if response.status_code == 201:
+            self.assertEqual(response.status_code, 201)
+        else:
+            self.assertEqual(response.status_code, 404)
+
+    def tearDown(self):
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+            # Delete database
+            db_url = __db_url__ + str(last_db_id)
+            response = requests.delete(db_url)
+            self.assertEqual(response.status_code, 200)
+        else:
+            print "The database list is empty"
+
+
+class XML(Database):
     """
     test case for testing valid deployment.xml
     """
@@ -55,7 +85,17 @@ class XML(unittest.TestCase):
         """
             test xml default attributes
         """
-        data = requests.get(__url__)
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+        else:
+            raise self.fail('The database list is empty')
+
+        xml_url = __db_url__ + str(last_db_id) + '/deployment/'
+
+        data = requests.get(xml_url)
         tree = ElementTree.fromstring(data.content)
 
         for child in tree:
@@ -99,7 +139,7 @@ class XML(unittest.TestCase):
                 self.assertEqual(child.attrib['port'], "21211")
             if child.tag == "cluster":
                 self.assertEqual(child.attrib['elastic'], "enabled")
-                self.assertEqual(child.attrib['hostcount'], "1")
+                self.assertEqual(child.attrib['hostcount'], "0")
                 self.assertEqual(child.attrib['kfactor'], "0")
                 self.assertEqual(child.attrib['schema'], "ddl")
                 self.assertEqual(child.attrib['sitesperhost'], "8")
