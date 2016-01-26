@@ -236,8 +236,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     private OffsetFetchResponse getClientTopicOffset() {
         final short version = 1;
+        final int correlationId = m_topicAndPartition.partition();
         final OffsetFetchRequest rq = new OffsetFetchRequest(
-                m_config.getGroupId(), singletonList(m_topicAndPartition), version, 1, KafkaStreamImporterConfig.CLIENT_ID
+                m_config.getGroupId(),
+                singletonList(m_topicAndPartition),
+                version, correlationId,
+                KafkaStreamImporterConfig.CLIENT_ID
                 );
         OffsetFetchResponse rsp = null;
         Throwable fault = null;
@@ -463,6 +467,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     public boolean commitOffset() {
         final int correlationId = m_topicAndPartition.partition();
         final short version = 1;
+        final short notCoordinatorCode = ErrorMapping.NotCoordinatorForConsumerCode();
 
         final long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
@@ -476,24 +481,24 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     );
             OffsetCommitResponse offsetCommitResponse = null;
             try {
-                SimpleConsumer consumer = m_offsetManager.get();
-                if (consumer == null) {
-                    getOffsetCoordinator();
-                    consumer = m_offsetManager.get();
-                }
-                if (consumer != null) {
+                SimpleConsumer consumer = null;;
+                int retries = 3;
+                short code = notCoordinatorCode;
+                while ((consumer == null || code == notCoordinatorCode) && --retries >= 0) {
+                    if ((consumer = m_offsetManager.get()) == null) {
+                        getOffsetCoordinator();
+                        rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                        continue;
+                    }
                     offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                    final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                    if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
+                    code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                    if (code == notCoordinatorCode) {
                         info(null, "Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
                         getOffsetCoordinator();
-                        consumer = m_offsetManager.get();
-                        if (consumer != null) {
-                            offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                        }
+                        continue;
                     }
-                } else {
-                    rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
+                }
+                if (retries < 0 || offsetCommitResponse == null) {
                     return false;
                 }
             } catch (Exception e) {
