@@ -99,6 +99,9 @@ public class TestReportMaker extends TestCase {
     private int validateAllocation(int input)
     {
         int result = CatalogSizing.testOnlyAllocationSizeForObject(input);
+        // Add the minimum overhead size to the input to establish a baseline
+        // against which the round-up effect can be measured.
+        input += 4 + 8;
         int byte_overhead = result - input;
         int percent_overhead = byte_overhead * 100 / input;
         validateDeltas(input, 0, byte_overhead, percent_overhead);
