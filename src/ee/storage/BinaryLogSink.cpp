@@ -721,6 +721,11 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
                                 (intmax_t)*sequenceNumber, (intmax_t)tempSequenceNumber);
         }
+        int64_t txnPkHash = taskInfo->readLong();
+        if (txnPkHash > LONG_MIN && txnPkHash < LONG_MAX && !engine->isLocalSite((int32_t)txnPkHash)) {
+            throwSerializableEEException("Binary log transaction routed to wrong partition. Expected %d but found %d",
+                                         engine->getPartitionId(), engine->getPartitionForPkHash((int32_t)txnPkHash));
+        }
         uint32_t checksum = taskInfo->readInt();
         validateChecksum(checksum, recordStart, taskInfo->getRawPointer());
         break;
