@@ -145,7 +145,7 @@ label.ccErrorMsg {
   height: auto!important;
 
 }
-.clusterIcon, .plus, .stop, .stopServer, .deleteServer,.editServerDatabase,.deleteDatabaseServer,.deleteDisableDS,.editServer, .uploadIcon, .downloadIcon, .drArrow, .popup_close, .popup_close:hover, .clusterConfigIcon, .serverIcon, .plusIcon, .secCrossIcon, .popDelete, .onIcon, .offIcon,.editIcon, .offIconSecurity {
+.clusterIcon, .plus, .stop, .stopServer, .deleteServer,.editServerDatabase,.deleteDatabaseServer,.deleteDisableDS,.editServer, .uploadIcon, .downloadIcon, .drArrow, .popup_close, .popup_close:hover, .clusterConfigIcon, .serverIcon, .plusIcon, .secCrossIcon, .popDelete, .onIcon, .offIcon,.editIcon, .offIconSecurity, .deleteDiskLimit {
 	background-image: url(../images/icons.png);
 	background-repeat: no-repeat;
 }
@@ -196,6 +196,13 @@ label.ccErrorMsg {
     height: 26px;
     background-position: -6px -95px;
     cursor: pointer;
+}
+.deleteDiskLimit {
+    height: 26px;
+    background-position: -6px -95px;
+    cursor: pointer;
+	position:relative;
+	top:10px;
 }
 .deleteDisableDS{
     height: 26px;
@@ -568,7 +575,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 	color: #000000;
 }
 
-.btnAddServer {padding: 0px 10px 6px 1px; background:#ccc; color:#222; font-weight:bold; border:none;white-space: nowrap; display:inline-block;}
+.btnAddServer {padding: 0px 10px 7px 1px; background:#ccc; color:#222; font-weight:bold; border:none;white-space: nowrap; display:inline-block;}
 .btnAddServer:hover, .btnAddServer:active, .btnAddServer:focus {background:#ccc; color:#222; border:none;}
 .addServer a:hover, .addServer a:active, .addServer a:focus {
 	color: #000000;
@@ -667,7 +674,7 @@ ul.addServerList li:nth-child(1) {
 	height: 30px;
 	padding: 5px 10px;
 	line-height: 1.5;
-	width: 50px;
+	width: 70px;
 	text-align: center;
 }
 .overviewInputText1 {
@@ -675,6 +682,13 @@ ul.addServerList li:nth-child(1) {
 	padding: 5px 10px;
 	line-height: 1.5;
 	width: 100px;
+	text-align: center;
+}
+.overviewInputTextDR {
+	height: 30px;
+	padding: 5px 10px;
+	line-height: 1.5;
+	width: 60px;
 	text-align: center;
 }
 .upDownBtn {
@@ -1105,6 +1119,11 @@ table.tblPopup {
     font-weight: bold;
     background: #FBFBFB;
 	}
+.featureTbl { overflow:auto; height:180px;}
+.addConfigProperTbl tr td label.error {
+    line-height: 12px;
+    height: auto;
+}
 /*************overwriting the bootstrap***************/
 
 #createDatabase, #addDatabase, #deleteDatabase { z-index:9999;}
@@ -1277,7 +1296,9 @@ ul.nav li a {
 	height: 50px;
 	margin: 0;
 	padding: 14px 15px 0;
+	
 }
+
 .navbar-inverse .navbar-nav > li > a {
 	color: #FFFFFF;
 	background-color: #435464;
@@ -1338,6 +1359,7 @@ ul.drList {
 	width: 100%;
 }
 .modal .connectionSourceModel { overflow:auto; height:450px;}
+.modal-add-user {margin: 30% auto; width:94.5%;}
 
 }
  @media (min-width: 320px) and (max-width: 620px) {
@@ -1386,6 +1408,4 @@ ul.drList {
     width: 67%;
 }
 }
-
-
 

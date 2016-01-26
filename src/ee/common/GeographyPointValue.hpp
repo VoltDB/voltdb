@@ -74,6 +74,17 @@ public:
         return 360.0;
     }
 
+    // Due to conversion to and from (x,y,z) coordinates needed to
+    // support our polygon representation, we consider points whose
+    // coordinates vary by less than this epsilon to be equal.  This
+    // function should return a value that is the same as in Java
+    // code: GeographyPointValue.EPSILON.
+    static Coord epsilon() {
+        // Making this a static method rather than a static member
+        // variable for the same reason as nullCoord(), above.
+        return 1e-12;
+    }
+
     // The null point has 360 for both lat and long.
     bool isNull() const {
         return (m_latitude == nullCoord()) &&
@@ -98,24 +109,26 @@ public:
         assert(! isNull());
         assert(! rhs.isNull());
 
-        Coord lhsLong = getLongitude();
-        Coord rhsLong = rhs.getLongitude();
-        if (lhsLong < rhsLong) {
+        const GeographyPointValue canonThis = canonicalize();
+        const GeographyPointValue canonRhs = rhs.canonicalize();
+        Coord lhsLong = canonThis.getLongitude();
+        Coord rhsLong = canonRhs.getLongitude();
+        if (rhsLong - lhsLong > epsilon()) {
             return VALUE_COMPARE_LESSTHAN;
         }
 
-        if (lhsLong > rhsLong) {
+        if (lhsLong - rhsLong > epsilon()) {
             return VALUE_COMPARE_GREATERTHAN;
         }
 
         // latitude is equal; compare longitude
-        Coord lhsLat = getLatitude();
-        Coord rhsLat = rhs.getLatitude();
-        if (lhsLat < rhsLat) {
+        Coord lhsLat = canonThis.getLatitude();
+        Coord rhsLat = canonRhs.getLatitude();
+        if (rhsLat - lhsLat > epsilon()) {
             return VALUE_COMPARE_LESSTHAN;
         }
 
-        if (lhsLat > rhsLat) {
+        if (lhsLat - rhsLat > epsilon()) {
             return VALUE_COMPARE_GREATERTHAN;
         }
 
@@ -201,6 +214,28 @@ private:
 
         // decimal number
         return false;
+    }
+
+    // return a point that is equivalent to this but make sure that
+    // longitude is always 0 at either pole, and longitude of -180 is
+    // converted to 180.  Canonicalized points whose coordinates are
+    // within epsilon of each other are equal.
+    GeographyPointValue canonicalize() const {
+        Coord newLng = m_longitude;
+
+        if (90.0 - fabs(m_latitude) < epsilon()) {
+            // We are at one of the poles;
+            // longitude doesn't matter, so choose 0.
+            newLng = 0.0;
+        }
+
+        // For longitudes within epsilon of the antimeridian
+        // (on the east side), canonicalize to 180.0.
+        if (180.0 + m_longitude < epsilon()) {
+            newLng = 180.0;
+        }
+
+        return GeographyPointValue(newLng, m_latitude);
     }
 
     Coord m_latitude;

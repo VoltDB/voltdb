@@ -2305,7 +2305,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     // Test subqueries on partitioned table cases not yet supported
-    public void notestSubSelects_from_partitioned() throws Exception
+    public void testSubSelects_from_partitioned() throws Exception
     {
         Client client = getClient();
         loadData(false);
@@ -3204,6 +3204,34 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "       having MAX(WAGE) > 9 offset 2);";
         validateTableOfLongs(client, sql, EMPTY_TABLE);
 
+    }
+
+    public void testAmbiguousColumns() throws Exception {
+        Client client = getClient();
+        Object [][] R1Contents = {
+                { 101, 100, 10, "2013-07-18 02:00:00.123457" },
+                { 102, 101, 10, "2013-07-18 02:00:00.123457" },
+                { 103, 104, 10, "2013-07-18 02:00:00.123457" }
+        };
+        Object [][] R2Contents = {
+                { 201, 100 + 101, 21, "2013-07-18 02:00:00.123457"},
+                { 202, 102 + 101, 22, "2013-07-18 02:00:00.123457"},
+                { 203, 103 + 104, 23, "2013-07-18 02:00:00.123457"}
+        };
+        for (Object[] row : R1Contents) {
+            client.callProcedure("R1.insert", row);
+        }
+        for (Object[] row : R2Contents) {
+            client.callProcedure("R2.insert", row);
+        }
+        // DEPT should be from R2.  WAGE should be from S1 and R2 both.
+        String sql = "select DEPT, WAGE from (select ID + WAGE as WAGE from R1) AS S1 join R2 using(WAGE) order by DEPT;";
+        long[][] expected = {
+                {21, 100 + 101},
+                {22, 102 + 101},
+                {23, 103 + 104}
+        };
+        validateTableOfLongs(client, sql, expected);
     }
 
     public void testEng8394SubqueryWithUnionAndCorrelation() throws Exception {

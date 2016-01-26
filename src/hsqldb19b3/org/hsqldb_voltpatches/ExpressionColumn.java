@@ -653,7 +653,7 @@ public class ExpressionColumn extends Expression {
             }
 
             if (rangeVar.variables != null) {
-                int colIndex = rangeVar.findColumn(columnName);
+                int colIndex = rangeVar.findColumn(tableName, columnName);
 
                 if (colIndex == -1) {
                     return null;
@@ -677,7 +677,7 @@ public class ExpressionColumn extends Expression {
             return null;
         }
 
-        int colIndex = rangeVar.findColumn(columnName);
+        int colIndex = rangeVar.findColumn(tableName, columnName);
 
         if (colIndex != -1) {
             return makeRangeVariableResolution(rangeVar, colIndex);

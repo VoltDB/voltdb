@@ -94,7 +94,7 @@ public class TestGeographyValue extends TestCase {
         // Try getting the loops as loops, and see if we get what we put in.
         geog = new GeographyValue(expectedLol);
         final double EPSILON = 1.0e-13;
-        List<List<GeographyPointValue>> lol = geog.getLoops();
+        List<List<GeographyPointValue>> lol = geog.getRings();
         assertEquals(expectedLol.size(), lol.size());
         for (int oidx = 0; oidx < lol.size(); oidx += 1) {
             List<GeographyPointValue> loop = lol.get(oidx);

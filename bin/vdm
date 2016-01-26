@@ -35,6 +35,10 @@
 # description should also be changed if re-used for another base command.
 import sys
 import os
+from optparse import OptionParser
+from os.path import expanduser
+
+
 try:
     # ensure version 2.6+ of python
     if sys.version_info[0] == 2 and sys.version_info[1] < 6:
@@ -67,8 +71,58 @@ try:
     sys.path.insert(0, os.path.join(base_dir, 'lib/python', 'vdm'))
     from voltcli import runner
     from server import HTTPListener
+
 # Be selective about exceptions to avoid masking load-time library exceptions.
 except (IOError, OSError, ImportError), e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
     sys.exit(1)
-HTTPListener.main(runner, HTTPListener, 8000)
+
+def main():
+    parser = OptionParser(usage="usage: %prog [options] filepath",
+                          version="%prog 1.0")
+    parser.add_option("-p", "--path",
+                  action="store", type="string", dest="filepath")
+    parser.add_option("-s", "--server",
+                  action="store", type="string", dest="server")
+    (options, args) = parser.parse_args()
+
+    arr = [{
+        "filepath": options.filepath,
+        "server": options.server
+    }]
+
+    return arr
+
+
+if __name__ == '__main__':
+  options = main()
+
+  path = options[0]['filepath']
+  server = options[0]['server']
+
+
+app_root = os.path.dirname(os.path.abspath(__file__))
+os.chdir(os.path.normpath(os.path.join(app_root, os.pardir, 'lib/python/vdm')))
+os.getcwd()
+
+
+
+if path is None:
+    home = expanduser("~")
+    # path = home + '.vdm' if home.endswith('/') else home + '/' + '.vdm'
+    path = os.path.join(home, '.vdm')
+
+if os.path.isdir(str(path)):
+    if os.access(str(path), os.W_OK):
+        HTTPListener.main(runner, HTTPListener, path, server)
+    else:
+        sys.stderr.write('Error: There is no permission to create file in this folder. '
+                         'Unable to start VDM.')
+        sys.exit(1)
+else:
+    try:
+        os.makedirs(path)
+        HTTPListener.main(runner, HTTPListener, path, server)
+    except Exception, err:
+        sys.stderr.write('Exception (%s): %s\n' % (err.__class__.__name__, str(err)))
+        sys.exit(1)

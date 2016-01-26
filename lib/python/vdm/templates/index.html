@@ -34,7 +34,7 @@
         <div class="col-md-12 clusterWrapTop">
               <div class="clusterHeading">
                 <h4 class="clusterIcon" style="float:left"> <div class="clusterName"> Database </div> </h4>
-               <a class="createDB" data-toggle="modal" data-target="#createDatabase" id="btnDatabaseLink"href="javascript:void(0)">
+               <a class="createDB" data-toggle="modal" data-target="#createDatabase" id="btnDatabaseLink">
                    <span class="clusterDBName" id="clusterName">  </span>
                     <span class="glyphicon glyphicon-triangle-bottom"></span>
                   </a>
@@ -70,8 +70,8 @@
                               <span class="plus"></span> Add Server <span class="caret"></span>
                               </button>
                               <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
-                              <li><a id="btnAddServer"  href="javascript:void(0);"data-toggle="modal" data-target="#addServer">Add New Server</a></li>
-                              <li><a id="btnAddExistingServer" href="javascript:void(0);"data-toggle="modal" data-target="#addExistingServer">Add Existing Server</a></li>
+                              <li><a id="btnAddServer"  data-toggle="modal" data-target="#addServer">Add New Server</a></li>
+                              <li><a id="btnAddExistingServer" data-toggle="modal" data-target="#addExistingServer">Add Existing Server</a></li>
                               </ul>
                           </div>
                           <div class="clear"></div>
@@ -115,15 +115,15 @@
               <div class="mainTbl">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" id="adminTbl" class="adminTbl">
                   <tr>
-                    <td width="42%" class="configLabel">Site per host</td>
-                    <td id="sitePerHost" width="45%" align="right" >
+                    <td width="44%" class="configLabel">Site per host</td>
+                    <td id="sitePerHost" width="40%" align="right" >
                       <form id="frmSitePerHost" action="" method="get" class="form-horizontal">
                         <input id="txtSitePerHost" name="txtSitePerHost" type="text" class="overviewInputText">
                       <label id="errorSitesPerHost" for="txtSitePerHost" class="error ccErrorMsg" style="display: none;">This field is required</label>
                         </form>
                     </td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
+                    <td width="8%">&nbsp;</td>
+                    <td width="8%">&nbsp;</td>
                   </tr>
                   <tr>
                     <td class="configLabel">K-safety </td>
@@ -274,16 +274,6 @@
                     <td>&nbsp;</td>
                   </tr>
                   <tr class="child-row-5 subLabelRow">
-                    <td class="configLabel">Max Java Heap </td>
-                    <td align="right">
-                      <form id="frmMaxJavaHeap" action="" method="get" class="form-horizontal">
-                      <input id="txtMaxJavaHeap" name="txtMaxJavaHeap" type="text" value="" class="overviewInputText">
-                      </form>
-                    </td>
-                    <td>MB</td>
-                    <td>&nbsp;</td>
-                  </tr>
-                  <tr class="child-row-5 subLabelRow">
                     <td class="configLabel">Heartbeat time out </td>
                     <td align="right" class="heartBeatTd">
                       <form id="frmHeartBeatTimeout" action="" method="get" class="form-horizontal">
@@ -327,7 +317,7 @@
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                   </tr>
-                   <tr class="child-row-5 subLabelRow">
+                  <tr class="child-row-5 subLabelRow">
                     <td class="configLabel">Memory Limit</td>
                     <td id="MemoryLimit" align="right">
                       <form id="frmMemoryLimit" action="" method="get" class="form-horizontal">
@@ -335,8 +325,20 @@
                     <label id="errorMemoryLimit" for="txtMemoryLimit" class="error ccErrorMsg" style="display: none;">This field is required</label>
                       </form>
                     </td>
-                    <td>GB</td>
+                    <td><select id="selMemoryLimitUnit">
+                    <option val="GB">GB</option>
+                    <option val="%">%</option>
+                    </select></td>
                     <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow diskLimitParentProp" id="row-51">
+                   <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Disk Limit</span></a></td>
+
+                    <td id="DiskLimit" align="right"> </td>
+                    <td>&nbsp;</td>
+                    <td><a data-target="#diskLimit" data-toggle="modal" href="javascript:void(0);" id="btnEditDiskLimit" class="">
+                      <span class="editIcon"></span></a></td>
+
                   </tr>
                 </table>
               </div>
@@ -394,6 +396,14 @@
                     </form>
                     </td>
                   </tr>
+                   <tr>
+                    <td>DR Overflow</td>
+                    <td>
+                      <form id="frmDrOverflow" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtDrOverflow" name="txtDrOverflow" value="" class="inputText">
+                    </form>
+                    </td>
+                  </tr>
                 </table>
               </div>
             </div>
@@ -417,59 +427,29 @@
                     <td align="right" width="13%"><div id="onOffIcon"></div></td>
                     <td class="onOff" id="chkDrOnOffVal"width="10%"> On</td>
                   </tr>
-                  <!--<tr id="row-DrId" class="rowDr clsDrType">-->
-                    <!--<td class="configLabel" width="62%">Id</td>-->
-                    <!--<td  width="45%" align="right" colspan="2">-->
-                      <!--<form id="frmDrId" action="" method="get" class="form-horizontal">-->
-                        <!--<input id="txtDrId" name="txtDrId" type="text" class="overviewInputText valid" aria-required="true" aria-invalid="false">-->
-                        <!--<label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>-->
-                      <!--</form>-->
-                    <!--</td>-->
-                    <!--<td>&nbsp;</td>-->
-                  <!--</tr>-->
                   <tr id="row-DrId" class="rowDr clsDrType">
                     <td class="configLabel" width="62%">Id</td>
                     <td>&nbsp;</td>
                     <td align="right" id="lblDrId"></td>
                     <td>&nbsp;</td>
                   </tr>
-                  <!--<tr class="rowDr clsDrEnabled clsDrType">-->
-                    <!--<td class="configLabel">Type</td>-->
-                    <!--<td align="right">&nbsp;</td>-->
-                    <!--<td align="right">-->
-                      <!--<select id="selectDrType" class="tblSelect">-->
-                        <!--<option value="Master">Master</option>-->
-                        <!--<option value="Replica">Replica</option>-->
-                        <!--<option value="xDCR">XDCR</option>-->
-                      <!--</select>-->
-                    <!--</td>-->
-                    <!--<td>&nbsp;</td>-->
-                  <!--</tr>-->
-                  <tr class="rowDr clsDrEnabled clsDrType">
-                    <td class="configLabel">Type</td>
-                    <td align="right">&nbsp;</td>
-                    <td align="right" id="lblDrType">
-                      Master
-                    </td>
+                  <tr id="rowDrPort" class="rowDr clsDrType">
+                    <td class="configLabel" width="62%">Port</td>
+                    <td>&nbsp;</td>
+                    <td align="right" id="lblDrPort"></td>
                     <td>&nbsp;</td>
                   </tr>
-                  <tr class="rowDr clsDrEnabled" >
-                    <td class="configLabel">Connection Source</td>
-                     <td colspan="2">&nbsp;</td>
-                     <td align="right">&nbsp;</td>
+                  <tr class="rowDr clsDrEnabled clsDrType" >
+                    <td class="configLabel" width="62%">Connection Source</td>
+                    <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
+                    <td align="right" width="13%"><div id="onOffConnectionIcon"></div></td>
+                    <td class="onOff" id="chkDrOnOffConnectionVal" width="10%"> On</td>
                   </tr>
                   <tr class="rowDr subLabelRow clsDrEnabled" style="display:none" id="row-master-cluster">
-                    <td class="configLabel label-master-cluster">Master Cluster</td>
+                    <td class="configLabel label-master-cluster">Source</td>
                     <td colspan="2" align="right"><span id="master-cluster-name"></span></td>
                      <td>&nbsp;</td>
                   </tr>
-                  <tr class="hasSubLabel parent clsDrEnabled" id="row-server" style="display:none" id="trConnectionSource">
-                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily"></span></a>Servers</td>
-                    <td colspan="3">&nbsp;</td>
-                  </tr>
-                  <!--<tr class="child-row-server subLabelRowSub clsServerList"><td class="configLabel" colspan="3">Server1</td><td>&nbsp;</td></tr>-->
-                  <!--<tr class="child-row-server subLabelRowSub clsServerList"><td class="configLabel" colspan="3">Server2</td><td>&nbsp;</td></tr>-->
-                  <!--<tr class="child-row-server subLabelRowSub clsServerList"><td class="configLabel" colspan="3">Server3</td><td>&nbsp;</td></tr>-->
                 </table>
               </div>
             </div>
@@ -479,7 +459,6 @@
       </div>
     </div>
   </div>
-
 <div class="footer" id="mainFooter">
   <p>Copyright © 2015 VoltDB. All rights reserved. </p>
 </div>
@@ -560,7 +539,7 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal">&times;</button>
         <h4 class="modal-title">Database
-        <a id="btnAddDatabase" href="javascript:void(0);"data-toggle="modal" data-target="#addDatabase" class="addDatabase"> <span class="plus"></span>Add Database</a>
+        <a id="btnAddDatabase" data-toggle="modal" data-target="#addDatabase" class="addDatabase"> <span class="plus"></span>Add Database</a>
         </h4>
         
       </div>
@@ -1066,60 +1045,43 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
                 <tr class="showHideDrConfig">
                   <td>Id</td>
                   <td id="trDrId" width="10%" align="">
-                    <input id="txtDrId" name="txtDrId" type="text" class="overviewInputText valid" aria-required="true" aria-invalid="false">
+                    <input id="txtDrId" name="txtDrId" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>
                   </td>
-
+                </tr>
+                <tr class="showHideDrConfig" id="trDrPort">
+                    <td>Port</td>
+                    <td id="tdDrPort" width="10%" align="">
+                      <input id="txtDrPort" name="txtDrPort" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                      <label id="errorDrPort" for="txtDrPort" class="error ccErrorMsg" style="display: none;"></label>
+                    </td>
                 </tr>
                 <tr class="showHideDrConfig">
-                  <td>Type</td>
-                  <td><select id="selectDrType" class="tblSelect">
-                        <option value="Master">Master</option>
-                        <option value="Replica">Replica</option>
-                        <option value="XDCR">XDCR</option>
-                      </select></td>
-                </tr>
-
-                <tr class="trConnectionSource showHideDrConfig">
-                  <td colspan="2"><h4>Connection Source</h4></td>
+                  <td><h4>Connection Source</h4></td>
+                  <td width="10%">
+                     <span><input id="chkConnectionSourceOnOff" tabindex="6" type="checkbox" checked></span>
+                     <span id="chkConnectionSourceOnOffValue" class="onOffDr">On</span>
+                   </td>
                 </tr>
                 <tr class="trConnectionSource showHideDrConfig">
-                  <td>Master Cluster:</td>
+                  <td>Source</td>
                   <td>
-                    <div id="selectDrDatabase">
-                      <select >
-                        <option>Local</option>
-                        <option>ABC</option>
-                        <option>XYZ</option>
-                      </select>
-                    </div>
+                    <input id="txtDatabase" name="txtDatabase" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                    <label id="errorDatabase" for="txtDatabase" class="error ccErrorMsg" style="display: none;"></label>
                   </td>
                 </tr>
-                <tr id="trServerList" class="trConnectionSource showHideDrConfig">
-                  <td>Servers</td>
-                  <td>
-                    <div id="divDrServerList" >
-                      <ul class="server-lists">
-                          <li class="checked-server"><span><input type="checkbox" id="1" checked />Server1</span></li>
-                          <li><span><input type="checkbox"  />Server2</span></li>
-                          <li class="checked-server"><span><input type="checkbox"  checked />Server3</span></li>
-                          <li class="checked-server"><span><input type="checkbox" checked  />Server4</span></li>
-                          <li><span><input type="checkbox"  />Server5</span></li>
-                          <li><span><input type="checkbox"  />Server6</span></li>
-                      </ul>
-                    </div>
-                  </td>
-                </tr>
+                <!--<tr id="trServerList" class="trConnectionSource showHideDrConfig">-->
+                  <!--<td>Servers</td>-->
+                  <!--<td id="trDrId1" width="10%" align="">-->
+                    <!--<input id="txtServers" name="txtServers" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">-->
+                    <!--<label id="errorServers" for="txtServers" class="error ccErrorMsg" style="display: none;"></label>-->
+                  <!--</td>-->
+                <!--</tr>-->
 
                 <tr class="showHideDrConfig" style="border-bottom:none;" >
                   <td></td>
                   <td colspan="3">
                     <label id="drServers-error" class="error" for="drServers" style="display:none">No servers selected.</label>
-                  </td>
-                </tr>
-                <tr id="drMessage" style="border-bottom:none;" class="showHideXDCRMessagge">
-                  <td colspan="2" class="drnote">
-                    Note:You cannot change the selected DR Type and Master Cluster because the database "<span id="spanCurrentDb"></span>" is configured to use Type "XDCR" for this database. To change the DR Type, please disable DR for this database and choose another DR Type in "<span id="spanSelectedDb"></span>".
                   </td>
                 </tr>
               </table>
@@ -1134,6 +1096,30 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Connection Source End -->
+<!-- Disk Limit -->
+<div id="diskLimit" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Edit Disk Limit</h4>
+      </div>
+      <div class="modal-body">
+         <form id="formAddDiskLimit" method="get" action="" novalidate style="overflow:auto;">
+          <div id="addDiskLimitWrapper" class="configWrapper-modal">
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveDiskLimitOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button id="btnSaveDiskLimitCancel" type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Disk Limit End-->
 
 <div class="loader" ></div>
 </div>

@@ -30,6 +30,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from wtforms.validators import DataRequired, IPAddress, ValidationError, Optional, Regexp
 from flask_inputs import Inputs
 import socket
+import traceback
 from flask_inputs.validators import JsonSchema
 
 
@@ -51,12 +52,15 @@ class Validation(object):
                 try:
                     socket.inet_pton(socket.AF_INET, array[0])
                 except AttributeError:
+                    print traceback.format_exc()
                     try:
                         socket.inet_aton(array[0])
                     except socket.error:
+                        print traceback.format_exc()
                         raise ValidationError('Invalid IP address')
                     return array[0].count('.') == 3
                 except socket.error:
+                    print traceback.format_exc()
                     raise ValidationError('Invalid IP address')
                 try:
                     val = int(array[1])
@@ -64,6 +68,7 @@ class Validation(object):
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                 except ValueError as err:
                     msg = err.message
+                    print traceback.format_exc()
                     if msg is 'Port must be greater than 1 and less than 65535':
                         raise ValidationError('Port must be greater than 1 and less than 65535')
                     else:
@@ -77,6 +82,7 @@ class Validation(object):
                     raise ValidationError('Port must be greater than 1 and less than 65535')
             except ValueError as err:
                 msg = err.message
+                print traceback.format_exc()
                 if msg is 'Port must be greater than 1 and less than 65535':
                     raise ValidationError('Port must be greater than 1 and less than 65535')
                 else:
@@ -90,11 +96,11 @@ class ServerInputs(Inputs):
     json = {
         'name': [
             DataRequired('Server name is required.'),
-            Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ],
         'hostname': [
             DataRequired('Host name is required.'),
-            Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+            Regexp('^[a-zA-Z0-9_.-]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
         ],
         'enabled': [
             Optional(),
@@ -293,7 +299,7 @@ schema = {
             },
             "additionalProperties": False
         },
-        "partitionDetection": {
+        "partition-detection": {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
@@ -315,8 +321,8 @@ schema = {
             },
             "additionalProperties": False
         },
-        "adminMode": {
-            "id": "adminMode",
+        "admin-mode": {
+            "id": "admin-mode",
             "type": "object",
             "properties": {
                 "port": {
@@ -481,7 +487,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "exportconnectorclass": {
                                         "id": "exportconnectorclass",
@@ -543,7 +549,7 @@ schema = {
                                     "type": {
                                         "id": "type",
                                         "type": "string",
-                                        "enum": ["KAFKA", "ELASTICSEARCH", "HTTP", "FILE", "RABBITMQ", "JDBC", "CUSTOM"]
+                                        "enum": ["kafka", "elasticsearch", "http", "file", "rabbitmq", "jdbc", "custom"]
                                     },
                                     "format": {
                                         "id": "format",
@@ -740,13 +746,15 @@ schema = {
                     "minimum": 0,
                     "maximum": 2147483647
                 },
-                "type": {
-                    "id": "type",
-                    "type": "string",
-                },
-                "enabled": {
-                    "id": "enabled",
+                "listen": {
+                    "id": "listen",
                     "type": "boolean"
+                },
+                "port": {
+                    "id": "port",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65536
                 },
                 "connection": {
                     "id": "connection",
@@ -755,13 +763,6 @@ schema = {
                         "source": {
                             "id": "source",
                             "type": "string",
-                        },
-                        "servers": {
-                            "id": "servers",
-                            "type": "array",
-                            "items": {
-                                "type": "integer"
-                            }
                         }
                     }
                 }
@@ -788,5 +789,17 @@ class DatabaseInputs(Inputs):
         'name': [
             DataRequired('Database name is required.'),
             Regexp('^[a-zA-Z0-9_.]+$', 0, 'Only alphabets, numbers, _ and . are allowed.')
+        ]
+    }
+
+
+class ConfigValidation(Inputs):
+    """
+    Validation class for ip address used to sync cluster.
+    """
+    json = {
+        'ip_address': [
+            DataRequired('IP address is required.'),
+            IPAddress('Invalid IP address.')
         ]
     }
