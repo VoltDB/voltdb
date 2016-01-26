@@ -162,13 +162,11 @@ std::string NValue::debug() const {
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
     case VALUE_TYPE_VARBINARY:
-    {
         ptr = getObject_withoutNull(&length);
         addr = reinterpret_cast<int64_t>(ptr);
         buffer << "[" << length << "]";
         buffer << "-bin[@" << addr << "]";
         break;
-    }
     case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
