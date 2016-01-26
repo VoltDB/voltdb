@@ -84,13 +84,13 @@ class DeploymentConfiguration():
     @staticmethod
     def get_database_deployment(dbid):
         deployment_top = Element('deployment')
-        value = HTTPListener.DEPLOYMENT[dbid-1]
-        db = HTTPListener.DATABASES[dbid-1]
+        value = HTTPListener.Global.DEPLOYMENT[dbid-1]
+        db = HTTPListener.Global.DATABASES[dbid-1]
         host_count = len(db['members'])
         value['cluster']['hostcount'] = host_count
         # Add users
         addTop = False
-        for duser in HTTPListener.DEPLOYMENT_USERS:
+        for duser in HTTPListener.Global.DEPLOYMENT_USERS:
             if duser['databaseid'] == dbid:
                 # Only create subelement if users have anything in this database.
                 if addTop != True:
