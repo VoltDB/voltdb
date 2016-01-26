@@ -50,13 +50,6 @@ import DeploymentConfig
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
 
-SERVERS = []
-
-DATABASES = []
-
-DEPLOYMENT = []
-
-DEPLOYMENT_USERS = []
 
 __PATH__ = ""
 
@@ -159,7 +152,7 @@ def map_deployment_without_database_id(deployment):
     new_deployment['users'] = {}
     new_deployment['users']['user'] = []
 
-    deployment_user = filter(lambda t: t['databaseid'] == deployment['databaseid'], DEPLOYMENT_USERS)
+    deployment_user = filter(lambda t: t['databaseid'] == deployment['databaseid'], Global.DEPLOYMENT_USERS)
     for user in deployment_user:
         new_deployment['users']['user'].append({
             'name': user['name'],
@@ -179,7 +172,7 @@ def map_deployment(request, database_id):
     Returns:
         Deployment object in required format.
     """
-    deployment = filter(lambda t: t['databaseid'] == database_id, DEPLOYMENT)
+    deployment = filter(lambda t: t['databaseid'] == database_id, Global.DEPLOYMENT)
 
     if 'cluster' in request.json and 'elastic' in request.json['cluster']:
         deployment[0]['cluster']['elastic'] = request.json['cluster']['elastic']
@@ -463,8 +456,8 @@ def map_deployment(request, database_id):
 
 
 def map_deployment_users(request, user):
-    if 'name' not in DEPLOYMENT_USERS:
-        DEPLOYMENT_USERS.append(
+    if 'name' not in Global.DEPLOYMENT_USERS:
+        Global.DEPLOYMENT_USERS.append(
             {
                 'databaseid': request.json['databaseid'],
                 'name': request.json['name'],
@@ -473,9 +466,9 @@ def map_deployment_users(request, user):
                 'plaintext': request.json['plaintext']
             }
         )
-        deployment_user = filter(lambda t: t['name'] == user, DEPLOYMENT_USERS)
+        deployment_user = filter(lambda t: t['name'] == user, Global.DEPLOYMENT_USERS)
     else:
-        deployment_user = filter(lambda t: t['name'] == user, DEPLOYMENT_USERS)
+        deployment_user = filter(lambda t: t['name'] == user, Global.DEPLOYMENT_USERS)
 
         if len(deployment_user) != 0:
             deployment_user[0]['name'] = request.json['name']
@@ -538,7 +531,7 @@ def get_voltdb_dir():
 
 def stop_server(database_id, server_id):
     members = []
-    current_database = [database for database in DATABASES if database['id'] == database_id]
+    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
     if not current_database:
         abort(404)
     else:
@@ -547,7 +540,7 @@ def stop_server(database_id, server_id):
         return make_response(jsonify({'statusstring': 'No servers configured for the database'}),
                                              500)
 
-    server = [server for server in SERVERS if server['id'] == server_id]
+    server = [server for server in Global.SERVERS if server['id'] == server_id]
     if not server:
         return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                          404)
@@ -562,7 +555,7 @@ def stop_server(database_id, server_id):
 
 def start_database(database_id, recover=False):
     members = []
-    current_database = [database for database in DATABASES if database['id'] == database_id]
+    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
     if not current_database:
         abort(404)
     else:
@@ -573,7 +566,7 @@ def start_database(database_id, recover=False):
 
     # Check if there are valid servers configured for all ids
     for server_id in members:
-        server = [server for server in SERVERS if server['id'] == server_id]
+        server = [server for server in Global.SERVERS if server['id'] == server_id]
         if not server:
             return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                              500)
@@ -584,7 +577,7 @@ def start_database(database_id, recover=False):
     if recover:
         action = 'recover'
     for server_id in members:
-        server = [server for server in SERVERS if server['id'] == server_id]
+        server = [server for server in Global.SERVERS if server['id'] == server_id]
         curr = server[0]
         try:
             url = ('http://%s:8000/api/1.0/databases/%u/servers/%u/%s') % \
@@ -610,7 +603,7 @@ def start_database(database_id, recover=False):
 
 def stop_database(database_id):
     members = []
-    current_database = [database for database in DATABASES if database['id'] == database_id]
+    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
     if not current_database:
         abort(404)
     else:
@@ -620,7 +613,7 @@ def stop_database(database_id):
                                              500)
 
     server_id = members[0]
-    server = [server for server in SERVERS if server['id'] == server_id]
+    server = [server for server in Global.SERVERS if server['id'] == server_id]
     if not server:
         return make_response(jsonify({'statusstring': 'Server details not found for id ' + server_id}),
                                          404)
@@ -638,12 +631,12 @@ def get_first_hostname(database_id):
     Gets the first hostname configured in the deployment file for a given database
     """
 
-    current_database = [database for database in DATABASES if database['id'] == database_id]
+    current_database = [database for database in Global.DATABASES if database['id'] == database_id]
     if not current_database:
         abort(404)
 
     server_id = current_database[0]['members'][0]
-    server = [server for server in SERVERS if server['id'] == server_id]
+    server = [server for server in Global.SERVERS if server['id'] == server_id]
     if not server:
         abort(404)
 
@@ -653,10 +646,10 @@ def get_first_hostname(database_id):
 def get_configuration():
     deployment_json = {
         'vdm': {
-            'databases': DATABASES,
-            'members': SERVERS,
-            'deployments': DEPLOYMENT,
-            'deployment_users': DEPLOYMENT_USERS
+            'databases': Global.DATABASES,
+            'members': Global.SERVERS,
+            'deployments': Global.DEPLOYMENT,
+            'deployment_users': Global.DEPLOYMENT_USERS
         }
     }
     return deployment_json
@@ -684,9 +677,9 @@ def make_configuration_file():
     server_top = SubElement(main_header, 'members')
     deployment_top = SubElement(main_header, 'deployments')
     i = 0
-    while i < len(DATABASES):
+    while i < len(Global.DATABASES):
         db_elem = SubElement(db_top, 'database')
-        for key, value in DATABASES[i].iteritems():
+        for key, value in Global.DATABASES[i].iteritems():
             if isinstance(value, bool):
                 if value == False:
                     db_elem.attrib[key] = "false"
@@ -697,9 +690,9 @@ def make_configuration_file():
         i += 1
 
     i = 0
-    while i < len(SERVERS):
+    while i < len(Global.SERVERS):
         server_elem = SubElement(server_top, 'member')
-        for key, value in SERVERS[i].iteritems():
+        for key, value in Global.SERVERS[i].iteritems():
             if isinstance(value, bool):
                 if value == False:
                     server_elem.attrib[key] = "false"
@@ -710,14 +703,14 @@ def make_configuration_file():
         i += 1
 
     i = 0
-    while i < len(DEPLOYMENT):
-        DEPLOYMENT[i]['users'] = {}
-        DEPLOYMENT[i]['users']['user'] = []
-        deployment_user = filter(lambda t: t['databaseid'] == DEPLOYMENT[i]['databaseid'], DEPLOYMENT_USERS)
+    while i < len(Global.DEPLOYMENT):
+        Global.DEPLOYMENT[i]['users'] = {}
+        Global.DEPLOYMENT[i]['users']['user'] = []
+        deployment_user = filter(lambda t: t['databaseid'] == Global.DEPLOYMENT[i]['databaseid'], Global.DEPLOYMENT_USERS)
         if len(deployment_user) == 0:
-            DEPLOYMENT[i]['users'] = None
+            Global.DEPLOYMENT[i]['users'] = None
         for user in deployment_user:
-            DEPLOYMENT[i]['users']['user'].append({
+            Global.DEPLOYMENT[i]['users']['user'].append({
                 'name': user['name'],
                 'roles': user['roles'],
                 'plaintext': user['plaintext'],
@@ -726,7 +719,7 @@ def make_configuration_file():
             })
 
         deployment_elem = SubElement(deployment_top, 'deployment')
-        for key, value in DEPLOYMENT[i].iteritems():
+        for key, value in Global.DEPLOYMENT[i].iteritems():
             if type(value) is dict:
                 DeploymentConfig.handle_deployment_dict(deployment_elem, key, value, False)
             elif type(value) is list:
@@ -769,17 +762,13 @@ def convert_xml_to_json(config_path):
     else:
         user_json = get_users_from_xml(xml_final['vdm']['deployments']['deployment'], 'list')
 
-    global DATABASES
-    DATABASES = db_json
+    Global.DATABASES = db_json
 
-    global SERVERS
-    SERVERS = member_json
+    Global.SERVERS = member_json
 
-    global DEPLOYMENT
-    DEPLOYMENT = deployment_json
+    Global.DEPLOYMENT = deployment_json
 
-    global DEPLOYMENT_USERS
-    DEPLOYMENT_USERS = user_json
+    Global.DEPLOYMENT_USERS = user_json
 
 
 def get_db_from_xml(db_xml, is_list):
@@ -1274,6 +1263,20 @@ IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = { "databaseid" : True, "users" : True}
 
 
+class Global:
+    """
+    Class to defined global variables for HTTPListener.
+    """
+
+    def __init__(self):
+        pass
+
+    SERVERS = []
+    DATABASES = []
+    DEPLOYMENT = []
+    DEPLOYMENT_USERS = []
+
+
 class ServerAPI(MethodView):
     """Class to handle requests related to server"""
 
@@ -1289,9 +1292,9 @@ class ServerAPI(MethodView):
         """
         get_configuration()
         if server_id is None:
-            return jsonify({'servers': [make_public_server(x) for x in SERVERS]})
+            return jsonify({'servers': [make_public_server(x) for x in Global.SERVERS]})
         else:
-            server = [server for server in SERVERS if server['id'] == server_id]
+            server = [server for server in Global.SERVERS if server['id'] == server_id]
             if not server:
                 abort(404)
             return jsonify({'server': make_public_server(server[0])})
@@ -1309,18 +1312,18 @@ class ServerAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        server = [server for server in SERVERS if server['name'] == request.json['name']]
+        server = [server for server in Global.SERVERS if server['name'] == request.json['name']]
         if len(server) > 0:
             return make_response(jsonify({'error': 'Server name already exists'}), 404)
 
-        server = [server for server in SERVERS if server['hostname'] == request.json['hostname']]
+        server = [server for server in Global.SERVERS if server['hostname'] == request.json['hostname']]
         if len(server) > 0:
             return make_response(jsonify({'error': 'Host name already exists'}), 404)
 
-        if not SERVERS:
+        if not Global.SERVERS:
             server_id = 1
         else:
-            server_id = SERVERS[-1]['id'] + 1
+            server_id = Global.SERVERS[-1]['id'] + 1
         server = {
             'id': server_id,
             'name': request.json['name'].strip(),
@@ -1339,10 +1342,10 @@ class ServerAPI(MethodView):
             'placement-group': request.json.get('placement-group', "").strip(),
 
         }
-        SERVERS.append(server)
+        Global.SERVERS.append(server)
 
         # Add server to the current database
-        current_database = [database for database in DATABASES if database['id'] == database_id]
+        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(current_database) == 0:
             abort(404)
         if not request.json:
@@ -1367,14 +1370,14 @@ class ServerAPI(MethodView):
             abort(400)
         database_id = request.json['dbId']
         # delete a single server
-        server = [server for server in SERVERS if server['id'] == server_id]
+        server = [server for server in Global.SERVERS if server['id'] == server_id]
         if len(server) == 0:
             abort(404)
         # remove the server from given database member list
-        current_database = [database for database in DATABASES if database['id'] == database_id]
+        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
         current_database[0]['members'].remove(server_id)
         # Check if server is referenced by database
-        for database in DATABASES:
+        for database in Global.DATABASES:
             if database["id"] == database_id:
                 continue
             if server_id in database["members"]:
@@ -1382,7 +1385,7 @@ class ServerAPI(MethodView):
                                            "Server cannot be deleted completely since"
                                            " it is referred by database."})
 
-        SERVERS.remove(server[0])
+        Global.SERVERS.remove(server[0])
         sync_configuration()
         write_configuration_file()
         return jsonify({'result': True})
@@ -1401,7 +1404,7 @@ class ServerAPI(MethodView):
         inputs = ServerInputs(request)
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
-        current_server = [server for server in SERVERS if server['id'] == server_id]
+        current_server = [server for server in Global.SERVERS if server['id'] == server_id]
         if len(current_server) == 0:
             abort(404)
 
@@ -1455,10 +1458,10 @@ class DatabaseAPI(MethodView):
         """
         if database_id is None:
             # return a list of users
-            return jsonify({'databases': [make_public_database(x) for x in DATABASES]})
+            return jsonify({'databases': [make_public_database(x) for x in Global.DATABASES]})
         else:
             # expose a single user
-            database = [database for database in DATABASES if database['id'] == database_id]
+            database = [database for database in Global.DATABASES if database['id'] == database_id]
             if len(database) == 0:
                 abort(404)
             return jsonify({'database': make_public_database(database[0])})
@@ -1476,21 +1479,21 @@ class DatabaseAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        database = [database for database in DATABASES if database['name'] == request.json['name']]
+        database = [database for database in Global.DATABASES if database['name'] == request.json['name']]
         if len(database) != 0:
             return make_response(jsonify({'error': 'database name already exists'}), 404)
 
-        if not DATABASES:
+        if not Global.DATABASES:
             database_id = 1
         else:
-            database_id = DATABASES[-1]['id'] + 1
+            database_id = Global.DATABASES[-1]['id'] + 1
         database = {
             'id': database_id,
             'name': request.json['name'],
             'deployment': request.json.get('deployment', ""),
             'members': []
         }
-        DATABASES.append(database)
+        Global.DATABASES.append(database)
 
         # Create new deployment
         app_root = os.path.dirname(os.path.abspath(__file__))
@@ -1499,7 +1502,7 @@ class DatabaseAPI(MethodView):
             deployment = json.load(json_file)
             deployment['databaseid'] = database_id
 
-        DEPLOYMENT.append(deployment)
+        Global.DEPLOYMENT.append(deployment)
 
         sync_configuration()
 
@@ -1519,7 +1522,7 @@ class DatabaseAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        current_database = [database for database in DATABASES if database['id'] == database_id]
+        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(current_database) == 0:
             abort(404)
 
@@ -1540,7 +1543,7 @@ class DatabaseAPI(MethodView):
         True if the server is deleted otherwise the error message.
         """
         members = []
-        current_database = [database for database in DATABASES if database['id'] == database_id]
+        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(current_database) == 0:
             abort(404)
         else:
@@ -1549,23 +1552,23 @@ class DatabaseAPI(MethodView):
         for server_id in members:
             is_server_associated = False
             # Check if server is referenced by database
-            for database in DATABASES:
+            for database in Global.DATABASES:
                 if database["id"] == database_id:
                     continue
                 if server_id in database["members"]:
                     is_server_associated = True
             # if server is not referenced by other database then delete it
             if not is_server_associated:
-                server = [server for server in SERVERS if server['id'] == server_id]
+                server = [server for server in Global.SERVERS if server['id'] == server_id]
                 if len(server) == 0:
                     continue
-                SERVERS.remove(server[0])
+                Global.SERVERS.remove(server[0])
 
-        DATABASES.remove(current_database[0])
+        Global.DATABASES.remove(current_database[0])
 
-        deployment = [deployment for deployment in DEPLOYMENT if deployment['databaseid'] == database_id]
+        deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
 
-        DEPLOYMENT.remove(deployment[0])
+        Global.DEPLOYMENT.remove(deployment[0])
         sync_configuration()
         write_configuration_file()
         return jsonify({'result': True})
@@ -1585,7 +1588,7 @@ class DatabaseMemberAPI(MethodView):
         Returns:
             List of member ids related to specified database.
         """
-        database = [database for database in DATABASES if database['id'] == database_id]
+        database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(database) == 0:
             abort(404)
 
@@ -1600,7 +1603,7 @@ class DatabaseMemberAPI(MethodView):
         Returns:
             List of member ids related to specified database.
         """
-        current_database = [database for database in DATABASES if database['id'] == database_id]
+        current_database = [database for database in Global.DATABASES if database['id'] == database_id]
         if len(current_database) == 0:
             abort(404)
         if not request.json:
@@ -1608,7 +1611,7 @@ class DatabaseMemberAPI(MethodView):
 
         # if 'members' not in request.json:
         for member_id in request.json['members']:
-            current_server = [server for server in SERVERS if server['id'] == member_id]
+            current_server = [server for server in Global.SERVERS if server['id'] == member_id]
             if len(current_server) == 0:
                 return jsonify({'error': 'Server id %d does not exists' % member_id})
 
@@ -1633,9 +1636,9 @@ class deploymentAPI(MethodView):
         """
         if database_id is None:
             # return a list of users
-            return jsonify({'deployment': [make_public_deployment(x) for x in DEPLOYMENT]})
+            return jsonify({'deployment': [make_public_deployment(x) for x in Global.DEPLOYMENT]})
         else:
-            deployment = [deployment for deployment in DEPLOYMENT if deployment['databaseid'] == database_id]
+            deployment = [deployment for deployment in Global.DEPLOYMENT if deployment['databaseid'] == database_id]
             return jsonify({'deployment': map_deployment_without_database_id(deployment[0])})
 
     @staticmethod
@@ -1678,7 +1681,7 @@ class deploymentUserAPI(MethodView):
         Returns:
             List of deployment information with specified database.
         """
-        deployment_user = [deployment_user for deployment_user in DEPLOYMENT_USERS
+        deployment_user = [deployment_user for deployment_user in Global.DEPLOYMENT_USERS
                            if deployment_user['name'] == username]
 
         return jsonify({'deployment': deployment_user})
@@ -1697,7 +1700,7 @@ class deploymentUserAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        current_user = [user for user in DEPLOYMENT_USERS if
+        current_user = [user for user in Global.DEPLOYMENT_USERS if
                         user['name'] == username and user['databaseid'] == database_id]
 
         if len(current_user) != 0:
@@ -1706,11 +1709,11 @@ class deploymentUserAPI(MethodView):
 
         deployment_user = map_deployment_users(request, username)
 
-        if DEPLOYMENT[0]['users'] is None:
-            DEPLOYMENT[0]['users'] = {}
-            DEPLOYMENT[0]['users']['user'] = []
+        if Global.DEPLOYMENT[0]['users'] is None:
+            Global.DEPLOYMENT[0]['users'] = {}
+            Global.DEPLOYMENT[0]['users']['user'] = []
 
-        DEPLOYMENT[0]['users']['user'].append({
+        Global.DEPLOYMENT[0]['users']['user'].append({
             'name': deployment_user['name'],
             'roles': deployment_user['roles'],
             'plaintext': deployment_user['plaintext']
@@ -1735,7 +1738,7 @@ class deploymentUserAPI(MethodView):
         if not inputs.validate():
             return jsonify(success=False, errors=inputs.errors)
 
-        current_user = [user for user in DEPLOYMENT_USERS if
+        current_user = [user for user in Global.DEPLOYMENT_USERS if
                         user['name'] == username and user['databaseid'] == database_id]
         current_user[0]['name'] = request.json.get('name', current_user[0]['name'])
         current_user[0]['password'] = urllib.unquote(str(request.json.get('password', current_user[0]['password'])).encode('ascii')).decode('utf-8')
@@ -1747,10 +1750,10 @@ class deploymentUserAPI(MethodView):
 
     @staticmethod
     def delete(username, database_id):
-        current_user = [user for user in DEPLOYMENT_USERS if
+        current_user = [user for user in Global.DEPLOYMENT_USERS if
                         user['name'] == username and user['databaseid'] == database_id]
 
-        DEPLOYMENT_USERS.remove(current_user[0])
+        Global.DEPLOYMENT_USERS.remove(current_user[0])
         return jsonify({'status': 1, 'statusstring': "User Deleted"})
 
 
@@ -1919,14 +1922,10 @@ class SyncVdmConfiguration(MethodView):
             return jsonify({'status':'success', 'error': str(errs)})
 
         # try:
-        global DATABASES
-        DATABASES = databases
-        global SERVERS
-        SERVERS = servers
-        global DEPLOYMENT
-        DEPLOYMENT = deployments
-        global DEPLOYMENT_USERS
-        DEPLOYMENT_USERS = deployment_users
+        Global.DATABASES = databases
+        Global.SERVERS = servers
+        Global.DEPLOYMENT = deployments
+        Global.DEPLOYMENT_USERS = deployment_users
 
         # except Exception, errs:
         #     print str(errs)
@@ -2014,7 +2013,7 @@ def main(runner, amodule, config_dir, server):
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
-        DEPLOYMENT.append(deployment)
+        Global.DEPLOYMENT.append(deployment)
 
         if server is None:
             __host_name__ = socket.gethostname()
@@ -2025,12 +2024,12 @@ def main(runner, amodule, config_dir, server):
             __IP__ = arrServer[0]
             __PORT__ = arrServer[1]
 
-        SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
+        Global.SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
                         'enabled': True, 'external-interface': "", 'internal-interface': "",
                         'public-interface': "", 'client-listener': "", 'internal-listener': "",
                         'admin-listener': "", 'http-listener': "", 'replication-listener': "",
                         'zookeeper-listener': "", 'placement-group': ""})
-        DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
+        Global.DATABASES.append({'id': 1, 'name': "local", 'deployment': "default", "members": [1]})
 
     write_configuration_file()
 
