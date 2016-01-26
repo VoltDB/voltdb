@@ -2010,19 +2010,22 @@ def main(runner, amodule, config_dir, server):
     arrServer = {}
     if server is not None:
         arrServer = server.split(':', 2)
+        __host_name__ = arrServer[0]
+        __host_or_ip__ = arrServer[0]
+        __PORT__ = int(8000)
+        __IP__ = arrServer[0]
+        if len(arrServer) >= 2:
+            __PORT__ = int(arrServer[1])
+    else:
+        __host_name__ = socket.gethostname()
+        __host_or_ip__ = socket.gethostbyname(__host_name__)
+        __IP__ = __host_or_ip__
+        __PORT__ = int(8000)
+
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
         Global.DEPLOYMENT.append(deployment)
-
-        if server is None:
-            __host_name__ = socket.gethostname()
-            __host_or_ip__ = socket.gethostbyname(__host_name__)
-        else:
-            __host_name__ = arrServer[0]
-            __host_or_ip__ = arrServer[0]
-            __IP__ = arrServer[0]
-            __PORT__ = arrServer[1]
 
         Global.SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
                         'enabled': True, 'external-interface': "", 'internal-interface': "",
@@ -2094,7 +2097,4 @@ def main(runner, amodule, config_dir, server):
                      methods=['GET'])
     APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
                      methods=['GET'])
-    if server is not None:
-        APP.run(threaded=True, host=arrServer[0], port=int(arrServer[1]))
-    else:
-        APP.run(threaded=True, host='0.0.0.0', port=8000)
+    APP.run(threaded=True, host=__IP__, port=__PORT__)
