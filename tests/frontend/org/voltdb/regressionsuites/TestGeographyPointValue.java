@@ -28,7 +28,6 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.GeographyPointValue;
@@ -252,17 +251,15 @@ public class TestGeographyPointValue extends RegressionSuite {
                 + "from t as t1 inner join t as t2 "
                 + "  on t1.pt = t2.pt "
                 + "where t1.name = ? "
-                + "order by t1.pk";
+                + "order by t2.pk";
 
         vt = client.callProcedure("@AdHoc", query, "point").getResults()[0];
-        System.out.println(vt);
         assertContentOfTable(new Object[][] {
                 {"point"},
                 {"closePoint"}},
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "northPole1").getResults()[0];
-        System.out.println(vt);
         assertContentOfTable(new Object[][] {
                 {"northPole1"},
                 {"northPole2"},
@@ -270,7 +267,6 @@ public class TestGeographyPointValue extends RegressionSuite {
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "southPole1").getResults()[0];
-        System.out.println(vt);
         assertContentOfTable(new Object[][] {
                 {"southPole1"},
                 {"southPole2"},
@@ -278,7 +274,6 @@ public class TestGeographyPointValue extends RegressionSuite {
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "onAntimeridianNeg1").getResults()[0];
-        System.out.println(vt);
         assertContentOfTable(new Object[][] {
                 {"onAntimeridianNeg1"},
                 {"onAntimeridianNeg2"},
@@ -287,7 +282,6 @@ public class TestGeographyPointValue extends RegressionSuite {
                 vt);
 
         vt = client.callProcedure("@AdHoc", query, "onAntimeridianPos2").getResults()[0];
-        System.out.println(vt);
         assertContentOfTable(new Object[][] {
                 {"onAntimeridianNeg1"},
                 {"onAntimeridianNeg2"},
