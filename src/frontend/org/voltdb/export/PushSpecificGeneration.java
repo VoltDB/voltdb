@@ -61,7 +61,7 @@ public class PushSpecificGeneration {
                     }
                     break;
             }
-            StandaloneExportManager.initialize(0, args[1], exportClientClassName, dep.getExport().getConfiguration().getProperty());
+            StandaloneExportManager.initialize(0, args[1], exportClientClassName, /* TODO */ null);
             while (true) {
                 Thread.sleep(10000);
             }

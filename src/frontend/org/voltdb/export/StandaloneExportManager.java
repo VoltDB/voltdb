@@ -240,7 +240,7 @@ public class StandaloneExportManager
          * makes it safe to accept mastership.
          */
         StandaloneExportGeneration gen = m_generations.firstEntry().getValue();
-        if (gen != null && !gen.isDiskBased()) {
+        if (gen != null && !gen.isContinueingGeneration()) {
             gen.acceptMastershipTask(partitionId);
         } else {
             exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);

@@ -87,10 +87,10 @@ public class ExportGeneration implements Generation {
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    private final HashMap<Integer, HashMap<String, ExportDataSource>> m_dataSourcesByPartition
-            =        new HashMap<Integer, HashMap<String, ExportDataSource>>();
+    private final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition
+            =        new HashMap<Integer, Map<String, ExportDataSource>>();
     @Override
-    public HashMap<Integer, HashMap<String, ExportDataSource>> getDataSourceByPartition() {
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
         return m_dataSourcesByPartition;
     }
 

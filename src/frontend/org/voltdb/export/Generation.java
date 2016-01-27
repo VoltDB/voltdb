@@ -17,7 +17,7 @@
 package org.voltdb.export;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -37,5 +37,5 @@ public interface Generation {
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream);
     public boolean truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds);
 
-    public HashMap<Integer, HashMap<String, ExportDataSource>> getDataSourceByPartition();
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition();
 }

@@ -36,6 +36,7 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import java.util.Map;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -56,10 +57,11 @@ public class StandaloneExportGeneration implements Generation {
      * are configured by the Export manager at initialization time.
      * partitionid : <tableid : datasource>.
      */
-    public final HashMap<Integer, HashMap<String, ExportDataSource>> m_dataSourcesByPartition =
-        new HashMap<Integer, HashMap<String, ExportDataSource>>();
+    public final Map<Integer, Map<String, ExportDataSource>> m_dataSourcesByPartition =
+        new HashMap<Integer, Map<String, ExportDataSource>>();
+
     @Override
-    public HashMap<Integer, HashMap<String, ExportDataSource>> getDataSourceByPartition() {
+    public Map<Integer, Map<String, ExportDataSource>> getDataSourceByPartition() {
         return m_dataSourcesByPartition;
     }
 
@@ -172,7 +174,7 @@ public class StandaloneExportGeneration implements Generation {
      */
     @Override
     public void kickOffLeaderElection() {
-        for (HashMap<String, ExportDataSource> sources : getDataSourceByPartition().values()) {
+        for (Map<String, ExportDataSource> sources : getDataSourceByPartition().values()) {
 
             for (final ExportDataSource source : sources.values()) {
                 try {
@@ -188,7 +190,7 @@ public class StandaloneExportGeneration implements Generation {
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
-        HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
             /*
@@ -226,7 +228,7 @@ public class StandaloneExportGeneration implements Generation {
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
-        HashMap<String, ExportDataSource> dataSourcesForPartition =
+        Map<String, ExportDataSource> dataSourcesForPartition =
             m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
             dataSourcesForPartition = new HashMap<String, ExportDataSource>();
@@ -237,7 +239,7 @@ public class StandaloneExportGeneration implements Generation {
                     + " signature " + source.getSignature() + " partition id " + source.getPartitionId()
                     + " bytes " + source.sizeInBytes());
 
-            dataSourcesForPartition.put(source.getSignature() + source.getHSId(), source);
+            dataSourcesForPartition.put(source.getSignature(), source);
         } else {
             dataSourcesForPartition.put(source.getSignature(), source);
         }
@@ -247,7 +249,7 @@ public class StandaloneExportGeneration implements Generation {
      * An unfortunate test only method for supplying a mock source
      */
     public void addDataSource(ExportDataSource source) {
-        HashMap<String, ExportDataSource> dataSourcesForPartition =
+        Map<String, ExportDataSource> dataSourcesForPartition =
             m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
             dataSourcesForPartition = new HashMap<String, ExportDataSource>();
@@ -264,7 +266,7 @@ public class StandaloneExportGeneration implements Generation {
         //        }
         assert(m_dataSourcesByPartition.containsKey(partitionId));
         assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
-        HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
+        Map<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
             exportLog.error("Could not find export data sources for partition "
@@ -291,7 +293,7 @@ public class StandaloneExportGeneration implements Generation {
 
     public void closeAndDelete() throws IOException {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
+        for (Map<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
                 tasks.add(source.closeAndDelete());
             }
@@ -317,7 +319,7 @@ public class StandaloneExportGeneration implements Generation {
     @Override
     public void close() {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
-        for (HashMap<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
+        for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
                 tasks.add(source.close());
             }
@@ -339,7 +341,7 @@ public class StandaloneExportGeneration implements Generation {
      */
     @Override
     public void acceptMastershipTask( int partitionId) {
-        HashMap<String, ExportDataSource> partitionDataSourceMap =
+        Map<String, ExportDataSource> partitionDataSourceMap =
                 m_dataSourcesByPartition.get(partitionId);
 
         // this case happens when there are no export tables
