@@ -97,7 +97,7 @@ class ClusterSettingsPage extends Page {
         dr              { module DatabaseReplicationModule }
 
         // trial
-        trialerror      { $("#tblDatabaseList > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        trialerror      { $("#serverList > tbody > tr > td:nth-child(1)") }
     }
 
     static at = {
@@ -153,6 +153,9 @@ class ClusterSettingsPage extends Page {
     boolean foundStatus = false
     int count= 0
 
+    /*
+     *  Create a new Database
+     */
     int createNewDatabase(String create_DatabaseTest_File) {
         newValueDatabase = 0
         foundStatus = false
@@ -210,7 +213,7 @@ class ClusterSettingsPage extends Page {
                 }
             }
         }
-        String nameValue = extractedValue[0].substring(1, extractedValue[0].length() - 1)
+        String nameValue = nameOfDatabaseInCSV(create_DatabaseTest_File)
         String deploymentValue = extractedValue[1].substring(1, extractedValue[1].length() - 1)
 
         for (count = 0; count < numberOfTrials; count++) {
@@ -262,6 +265,9 @@ class ClusterSettingsPage extends Page {
         return (Integer.valueOf(newValueDatabase) +1)
     }
 
+    /*
+     *  Delete the database with the given index and name
+     */
     boolean deleteNewDatabase(int indexOfNewDatabase, String databaseName) {
         int nextCount =0
         String new_string = ""
@@ -276,6 +282,8 @@ class ClusterSettingsPage extends Page {
                 println("Unable to find the Delete popup - Retrying")
             } catch(geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the delete button - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 try {
                     waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
@@ -301,6 +309,8 @@ class ClusterSettingsPage extends Page {
                 println("Unable to find the Ok button - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 break
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
             }
         }
 
@@ -314,6 +324,9 @@ class ClusterSettingsPage extends Page {
         }
     }
 
+    /*
+     *  Choose the database with given index and name
+     */
     boolean chooseDatabase(int indexOfNewDatabase, String newDatabaseName) {
         for (count = 0; count < numberOfTrials; count++) {
             try {
@@ -322,6 +335,8 @@ class ClusterSettingsPage extends Page {
                 return true
             } catch (geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException exception) {
                 try {
                     waitFor(60) { currentDatabase.text().equals(newDatabaseName) }
@@ -334,6 +349,9 @@ class ClusterSettingsPage extends Page {
         return false
     }
 
+    /*
+     *  Check the Save Message
+     */
     boolean checkSaveMessage() {
         if(waitFor(60) { saveStatus.text().equals(saveMessage) }) {
             return true
@@ -344,6 +362,9 @@ class ClusterSettingsPage extends Page {
         }
     }
 
+    /*
+     *
+     */
     boolean openDatabase() {
         for(count=0; count<numberOfTrials; count++) {
             try {
@@ -352,6 +373,8 @@ class ClusterSettingsPage extends Page {
                 break
             }  catch (geb.waiting.WaitTimeoutException exception) {
                 println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
             } catch(org.openqa.selenium.ElementNotVisibleException exception) {
                 if(count>1) {
                     try {
@@ -373,6 +396,9 @@ class ClusterSettingsPage extends Page {
         }
     }
 
+    /*
+     *  Return the value of Database name in CSV file
+     */
     String nameOfDatabaseInCSV(String create_DatabaseTest_File) {
         try {
             br = new BufferedReader(new FileReader(create_DatabaseTest_File))
@@ -444,5 +470,76 @@ class ClusterSettingsPage extends Page {
             println("The database to delete wasn't found")
         }
         return false
+    }
+
+    boolean deleteDatabase(String create_DatabaseTest_File) {
+        String databaseName = nameOfDatabaseInCSV(create_DatabaseTest_File)
+        int numberOfDatabases =  $('.btnDbList').size()
+        //buttonDatabase.click()
+        int indexOfDatabaseToDelete = returnTheDatabaseIndexToDelete(numberOfDatabases, databaseName)
+
+        if(indexOfDatabaseToDelete==0) {
+            println("Database not found")
+        }
+        else {
+            for(count=0; count<numberOfTrials; count++) {
+                try {
+                    $(returnCssPathOfDatabaseDelete(indexOfDatabaseToDelete)).click()
+                    waitFor { popupDeleteDatabaseButtonOk.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException exception) {
+
+                }
+            }
+            for(count=0; count<numberOfTrials; count++) {
+                try {
+                    popupDeleteDatabaseButtonOk.click()
+                    if(checkIfDatabaseExists(numberOfDatabases, databaseName, false)==false) {
+                        println("Database was deleted")
+                    }
+                } catch(Exception e) {
+
+                }
+            }
+            println()
+        }
+    }
+
+    /// Trial of new methods to return css path
+    /// If the index is 1 then there must not be other servers
+    def String getCssPathOfServer(int index) {
+        String cssPath
+
+        if(index==1) {
+            cssPath = "#serverList > tbody > tr > td:nth-child(1)"
+        }
+        else {
+            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) + ") > td:nth-child(1)"
+        }
+        return cssPath
+    }
+
+    def String getCssPathOfEditServer(int index) {
+        String cssPath
+
+        if(index==1) {
+            cssPath = "#serverList > tbody > tr > td:nth-child(2) > a > div"
+        }
+        else {
+            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) +") > td:nth-child(2) > a > div"
+        }
+        return cssPath
+    }
+
+    def String getCssPathOfDeleteServer(int index) {
+        String cssPath
+
+        if(index==1) {
+            cssPath = "#serverList > tbody > tr > td:nth-child(3) > a > div"
+        }
+        else {
+            cssPath = "#serverList > tbody > tr:nth-child(" + String.valueOf(index) +") > td:nth-child(3) > a > div"
+        }
+        return cssPath
     }
 }
