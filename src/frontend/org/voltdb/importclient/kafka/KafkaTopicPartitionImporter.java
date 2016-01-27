@@ -268,7 +268,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             short code = rsp.offsets().get(m_topicAndPartition).error();
             if (code != ErrorMapping.NoError()) {
                 fault = ErrorMapping.exceptionFor(code);
-                warn(null, "STEBUG get client offset returned error code %d", code);
                 backoffSleep(attempts+1);
                 if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
                     getOffsetCoordinator();
@@ -478,7 +477,9 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
             BlockingChannel channel = m_offsetManager.getAndSet(null);
-            if (channel != null) try { channel.disconnect(); } catch (Exception ignoreIt) {}
+            if (channel != null) {
+                try { channel.disconnect(); } catch (Exception ignoreIt) {}
+            }
         }
         m_dead.compareAndSet(false, true);
         info(null, "Partition fetcher stopped for " + m_topicAndPartition
