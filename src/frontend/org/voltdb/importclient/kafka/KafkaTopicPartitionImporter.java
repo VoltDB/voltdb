@@ -189,7 +189,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         m_offsetManager.get().connect();
                         info(null, "Offset Coordinator for " + m_topicAndPartition + " is " + offsetManager);
                         if (consumer != null) try {
-                            channel.disconnect();
+                            consumer.disconnect();
                         } catch (Exception ignoreIt) {
                         }
                         probeException = null;
