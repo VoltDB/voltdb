@@ -43,9 +43,11 @@ import requests
 import xmlrunner
 import socket
 
+__host_name__ = socket.gethostname()
+__host_or_ip__ = socket.gethostbyname(__host_name__)
 
-URL = 'http://localhost:8000/api/1.0/servers/'
-__db_url__ = 'http://localhost:8000/api/1.0/databases/'
+URL = 'http://'+__host_or_ip__+':8000/api/1.0/servers/'
+__db_url__ = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
 
 
 class Server(unittest.TestCase):

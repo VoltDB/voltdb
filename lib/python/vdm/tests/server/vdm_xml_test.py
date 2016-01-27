@@ -30,8 +30,12 @@ import unittest
 import requests
 import xmlrunner
 from xml.etree import ElementTree
+import socket
 
-__url__ = 'http://localhost:8000/api/1.0/vdm/'
+__host_name__ = socket.gethostname()
+__host_or_ip__ = socket.gethostbyname(__host_name__)
+
+__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/vdm/'
 
 
 class XML(unittest.TestCase):

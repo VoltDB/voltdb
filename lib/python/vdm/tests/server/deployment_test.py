@@ -30,8 +30,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 import unittest
 import requests
 import xmlrunner
+import socket
 
-__url__ = 'http://localhost:8000/api/1.0/deployment/1'
+__host_name__ = socket.gethostname()
+__host_or_ip__ = socket.gethostbyname(__host_name__)
+
+__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/1'
 
 
 class Deployment(unittest.TestCase):
@@ -41,7 +45,7 @@ class Deployment(unittest.TestCase):
 
     def setUp(self):
         """Create a db"""
-        url = 'http://localhost:8000/api/1.0/databases/'
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
         headers = {'Content-Type': 'application/json; charset=utf-8'}
         db_data = {'name': 'testDB'}
         response = requests.post(url, json=db_data, headers=headers)
@@ -52,7 +56,7 @@ class Deployment(unittest.TestCase):
 
     def tearDown(self):
         """Delte a db"""
-        url = 'http://localhost:8000/api/1.0/databases/'
+        url = 'http://'+__host_or_ip__+':8000/api/1.0/databases/'
         response = requests.get(url)
         value = response.json()
         if value:
@@ -84,7 +88,7 @@ class DefaultDeployment(unittest.TestCase):
 
 class UpdateDeployment(Deployment):
     """test case for update deployment and validation related to it"""
-    __url__ = "http://localhost:8000/api/1.0/deployment/2"
+    __url__ = "http://"+__host_or_ip__+":8000/api/1.0/deployment/2"
 
     def test_get_deployment(self):
         """
