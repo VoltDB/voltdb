@@ -1,0 +1,3 @@
+FILE scripts/errors/file_command2.in
+-- ENG-8503
+SELECT "need to add test cases when fake-interactive mode is added.";

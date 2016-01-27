@@ -1,0 +1,65 @@
+
+FILE scripts/simple/exec_via_file.sqlfile
+
+drop table t if exists;
+Command succeeded.
+
+create table t ( c integer, d varchar(4) );
+Command succeeded.
+
+exec T.insert 1,'a';
+(Returned 1 rows in #.##s)
+
+execute T.insert 2 ab;
+(Returned 1 rows in #.##s)
+
+exec T.insert 3,'abc';
+(Returned 1 rows in #.##s)
+
+execute T.insert,4,'abcd';
+(Returned 1 rows in #.##s)
+
+ exec T.insert 11, 'a';
+(Returned 1 rows in #.##s)
+
+  execute T.insert 12 ab;
+(Returned 1 rows in #.##s)
+
+exec    T.insert 13 , 'abc';
+(Returned 1 rows in #.##s)
+
+execute  T.insert  ,  14  ,  'abcd';
+(Returned 1 rows in #.##s)
+
+	exec T.insert 21, 'a';
+(Returned 1 rows in #.##s)
+
+  execute T.insert	22	ab;
+(Returned 1 rows in #.##s)
+
+exec	   T.insert 23	,	'abc';
+(Returned 1 rows in #.##s)
+
+execute 		T.insert		,		24		,		'abcd';
+(Returned 1 rows in #.##s)
+
+select * from t;
+C   D    
+--- -----
+  1 a    
+  2 ab   
+  3 abc  
+  4 abcd 
+ 11 a    
+ 12 ab   
+ 13 abc  
+ 14 abcd 
+ 21 a    
+ 22 ab   
+ 23 abc  
+ 24 abcd 
+
+(Returned 12 rows in #.##s)
+
+drop table t;
+Command succeeded.

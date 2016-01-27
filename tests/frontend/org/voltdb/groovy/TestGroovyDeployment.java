@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,25 +44,25 @@ public class TestGroovyDeployment extends RegressionSuite {
             "PARTITION TABLE MAMMA_MIA ON COLUMN MAMMA\n" +
             ";\n" +
             "\n" +
-            "CREATE PROCEDURE voltdb.groovy.example.AddMamma AS ###\n" +
+            "CREATE PROCEDURE voltdb.groovy.example.AddMamma\n" +
+            "PARTITION ON TABLE MAMMA_MIA COLUMN MAMMA\n" +
+            "AS ###\n" +
             "  addMamma = new SQLStmt('INSERT INTO MAMMA_MIA (MAMMA,MIA) VALUES (?,?);')\n" +
             "  transactOn = { int mammaId, String miaName ->\n" +
             "    voltQueueSQL(addMamma, mammaId, miaName)\n" +
             "    voltExecuteSQL(true)\n" +
             "  }\n" +
             "### LANGUAGE GROOVY;\n" +
-            "PARTITION PROCEDURE AddMamma ON TABLE MAMMA_MIA COLUMN MAMMA\n" +
-            ";\n" +
             "\n" +
-            "CREATE PROCEDURE voltdb.groovy.example.GetMamma AS ###\n" +
+            "CREATE PROCEDURE voltdb.groovy.example.GetMamma\n" +
+            "PARTITION ON TABLE MAMMA_MIA COLUMN MAMMA\n" +
+            "AS ###\n" +
             "  getMamma = new SQLStmt('SELECT MAMMA,MIA FROM MAMMA_MIA WHERE MAMMA = ?')\n" +
             "  transactOn = { int mammaId ->\n" +
             "    voltQueueSQL(getMamma,mammaId)\n" +
             "    voltExecuteSQL(true)\n" +
             "  }\n" +
-            "### LANGUAGE GROOVY;\n" +
-            "PARTITION PROCEDURE GetMamma ON TABLE MAMMA_MIA COLUMN MAMMA\n" +
-            ";\n";
+            "### LANGUAGE GROOVY;";
 
     public TestGroovyDeployment(String name) {
         super(name);

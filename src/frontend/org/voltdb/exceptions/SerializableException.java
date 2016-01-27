@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,10 @@
 
 package org.voltdb.exceptions;
 
-import java.io.*;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 import org.json_voltpatches.JSONString;
@@ -81,6 +84,12 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
             @Override
             protected SerializableException deserializeException(ByteBuffer b) {
                 return new TransactionRestartException(b);
+            }
+        },
+        SpecifiedException() {
+            @Override
+            protected SerializableException deserializeException(ByteBuffer b) {
+                return new SpecifiedException(b);
             }
         },
         GenericSerializableException() {

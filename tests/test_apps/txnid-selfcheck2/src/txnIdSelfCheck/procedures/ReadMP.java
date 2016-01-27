@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 public class ReadMP extends VoltProcedure {
 
     public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
 
     public VoltTable[] run(byte cid) {
         voltQueueSQL(r_getCIDData, cid);

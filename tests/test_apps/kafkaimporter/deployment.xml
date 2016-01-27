@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <commandlog enabled="false" />
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="brokers">kafka2:9092</property>
+            <property name="topics">T1_KAFKAEXPORTTABLE1</property>
+            <property name="groupid">A8</property>
+            <property name="procedure">InsertImport</property>
+        </configuration>
+    
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+            <property name="brokers">kafka2:9092</property>
+            <property name="topics">T8_KAFKAEXPORTTABLE2</property>
+            <property name="groupid">T8</property>
+            <property name="procedure">InsertImport2</property>
+        </configuration>
+    </import>
+
+    <export enabled="true" target="kafka">
+        <configuration>
+            <property name="metadata.broker.list">kafka2:9092</property>
+            <property name="producer.type">async</property>
+            <property name="request.required.acks">1</property>
+            <property name="skipinternals">true</property>
+            <property name="topic.prefix">T8_</property>
+        </configuration>
+    </export>
+</deployment>

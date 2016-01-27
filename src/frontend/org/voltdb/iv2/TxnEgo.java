@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -162,6 +162,10 @@ final public class TxnEgo {
             mask >>>= 1;
         }
         return retval.toString();
+    }
+
+    public static String txnIdSeqToString(long txnId) {
+        return Long.toString(TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO);
     }
 
     public static String txnIdToString(long txnId)

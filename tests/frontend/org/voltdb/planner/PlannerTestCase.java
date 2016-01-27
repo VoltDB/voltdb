@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,12 +26,13 @@ package org.voltdb.planner;
 import java.net.URL;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.types.PlanNodeType;
+
+import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -39,11 +40,14 @@ public class PlannerTestCase extends TestCase {
     private boolean m_byDefaultInferPartitioning = true;
     private boolean m_byDefaultPlanForSinglePartition;
 
-    protected void failToCompile(String sql, String... patterns)
-    {
+    /**
+     * @param sql
+     * @return
+     */
+    private int countQuestionMarks(String sql) {
         int paramCount = 0;
         int skip = 0;
-        while(true) {
+        while (true) {
             // Yes, we ARE assuming that test queries don't contain quoted question marks.
             skip = sql.indexOf('?', skip);
             if (skip == -1) {
@@ -52,16 +56,23 @@ public class PlannerTestCase extends TestCase {
             skip++;
             paramCount++;
         }
+        return paramCount;
+    }
+
+    protected void failToCompile(String sql, String... patterns)
+    {
+        int paramCount = countQuestionMarks(sql);
         try {
-            m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
-            fail();
+            List<AbstractPlanNode> unexpected = m_aide.compile(sql, paramCount,
+                    m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
+            printExplainPlan(unexpected);
+            fail("Expected planner failure, but found success.");
         }
-        catch (PlanningErrorException ex) {
+        catch (Exception ex) {
             String result = ex.toString();
             for (String pattern : patterns) {
                 if ( ! result.contains(pattern)) {
-                    System.err.println("Did not find pattern '" + pattern + "' in error string '" + result + "'");
-                    fail();
+                    fail("Did not find pattern '" + pattern + "' in error string '" + result + "'");
                 }
             }
         }
@@ -190,10 +201,25 @@ public class PlannerTestCase extends TestCase {
         }
         catch (Exception ex) {
             ex.printStackTrace();
-            fail();
+            fail(ex.getMessage());
         }
         assertTrue(pns.get(0) != null);
         return pns.get(0);
+    }
+
+    /**
+     *  Find all the aggregate nodes in a fragment, whether they are hash, serial or partial.
+     * @param fragment     Fragment to search for aggregate plan nodes
+     * @return a list of all the nodes we found
+     */
+    protected static List<AbstractPlanNode> findAllAggPlanNodes(AbstractPlanNode fragment) {
+        List<AbstractPlanNode> aggNodes = fragment.findAllNodesOfType(PlanNodeType.AGGREGATE);
+        List<AbstractPlanNode> hashAggNodes = fragment.findAllNodesOfType(PlanNodeType.HASHAGGREGATE);
+        List<AbstractPlanNode> partialAggNodes = fragment.findAllNodesOfType(PlanNodeType.PARTIALAGGREGATE);
+
+        aggNodes.addAll(hashAggNodes);
+        aggNodes.addAll(partialAggNodes);
+        return aggNodes;
     }
 
 
@@ -215,4 +241,49 @@ public class PlannerTestCase extends TestCase {
         return m_aide.getDatabase();
     }
 
+    protected void printExplainPlan(List<AbstractPlanNode> planNodes) {
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
+    }
+
+    protected String buildExplainPlan(List<AbstractPlanNode> planNodes) {
+        String explain = "";
+        for (AbstractPlanNode apn: planNodes) {
+            explain += apn.toExplainPlanString() + '\n';
+        }
+        return explain;
+    }
+
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        String explainStr1, explainStr2;
+        List<AbstractPlanNode> pns = compileToFragments(sql1);
+        explainStr1 = buildExplainPlan(pns);
+        pns = compileToFragments(sql2);
+        explainStr2 = buildExplainPlan(pns);
+
+        assertEquals(explainStr1, explainStr2);
+    }
+
+    /** Given a list of Class objects for plan node subclasses, asserts
+     * if the given plan doesn't contain instances of those classes.
+     */
+    static protected void assertClassesMatchNodeChain(
+            List<Class<? extends AbstractPlanNode>> expectedClasses,
+            AbstractPlanNode actualPlan) {
+        AbstractPlanNode pn = actualPlan;
+        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
+            assertFalse("Actual plan shorter than expected",
+                    pn == null);
+            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
+                    + "instead found " + pn.getClass().getSimpleName(),
+                    c.isInstance(pn));
+            if (pn.getChildCount() > 0)
+                pn = pn.getChild(0);
+            else
+                pn = null;
+        }
+
+        assertTrue("Actual plan longer than expected", pn == null);
+    }
 }

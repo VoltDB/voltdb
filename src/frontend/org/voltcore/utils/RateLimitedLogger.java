@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,10 @@
 
 package org.voltcore.utils;
 
+import java.util.Arrays;
+import java.util.IllegalFormatConversionException;
+import java.util.MissingFormatArgumentException;
+import java.util.UnknownFormatConversionException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -76,6 +80,78 @@ public class RateLimitedLogger {
         }
     }
 
+    /**
+     * This variant delays the formatting of the string message until it is actually logged
+     * @param now
+     * @param level a {@link Level debug level}
+     * @param cause evidentiary exception
+     * @param stemformat a {@link String#format(String, Object...) string format}
+     * @param args format arguments
+     */
+    public void log(long now, Level level, Throwable cause, String stemformat, Object...args) {
+        if (now - m_lastLogTime > m_maxLogIntervalMillis) {
+            synchronized (this) {
+                if (now - m_lastLogTime > m_maxLogIntervalMillis) {
+                    String message = formatMessage(cause, stemformat, args);
+                    switch(level) {
+                        case DEBUG:
+                            m_logger.debug(message); break;
+                        case ERROR:
+                            m_logger.error(message); break;
+                        case FATAL:
+                            m_logger.fatal(message); break;
+                        case INFO:
+                            m_logger.info(message); break;
+                        case TRACE:
+                            m_logger.trace(message); break;
+                        case WARN:
+                            m_logger.warn(message); break;
+                    }
+                    m_lastLogTime = now;
+                }
+            }
+        }
+    }
+
+    private String formatMessage(Throwable cause, String stemformat, Object...args) {
+        String format = stemformat;
+        if (cause != null) {
+            format = new StringBuilder(stemformat.length()+8)
+                .append(stemformat).append("\n%s")
+                .toString().intern()
+                ;
+            args = Arrays.copyOf(args, args.length+1);
+            args[args.length-1] = Throwables.getStackTraceAsString(cause);
+        }
+        String msg = null;
+        try {
+            msg = String.format(format, args);
+        } catch (MissingFormatArgumentException ex) {
+            m_logger.error(
+                    "failed to format log message. Format: "
+                  + format + ", arguments: "
+                  + Arrays.toString(args), ex
+                  );
+        } catch (IllegalFormatConversionException ex) {
+            m_logger.error(
+                    "failed to format log message. Format: "
+                  + format + ", arguments: "
+                  + Arrays.toString(args), ex
+                  );
+        } catch (UnknownFormatConversionException ex) {
+            m_logger.error(
+                    "failed to format log message. Format: "
+                  + format + ", arguments: "
+                  + Arrays.toString(args), ex
+                  );
+        } finally {
+            if (msg == null) {
+                msg = "Format: " + format + ", arguments: " + Arrays.toString(args);
+            }
+        }
+        return msg;
+    }
+
     private static final Cache<String, RateLimitedLogger> m_loggersCached =
             CacheBuilder.newBuilder().maximumSize(1000).build();
 
@@ -83,13 +159,11 @@ public class RateLimitedLogger {
      * It is a very bad idea to use this when the message changes all the time.
      * It's also a cache and only makes a best effort to enforce the rate limit.
      */
-    public static void tryLogForMessage(
-            String message,
-            long now,
+    public static void tryLogForMessage(long now,
             final long maxLogInterval,
             final TimeUnit maxLogIntervalUnit,
             final VoltLogger logger,
-            final Level level) {
+            final Level level, String format, Object... parameters) {
         Callable<RateLimitedLogger> builder = new Callable<RateLimitedLogger>() {
             @Override
             public RateLimitedLogger call() throws Exception {
@@ -99,10 +173,43 @@ public class RateLimitedLogger {
 
         final RateLimitedLogger rll;
         try {
-            rll = m_loggersCached.get(message, builder);
-            rll.log(message, now, level);
-        } catch (ExecutionException e) {
-            Throwables.propagate(Throwables.getRootCause(e));
+            rll = m_loggersCached.get(format, builder);
+            rll.log(now, level, null, format, parameters);
+        } catch (ExecutionException ex) {
+            Throwables.propagate(Throwables.getRootCause(ex));
+        }
+    }
+
+    /**
+     * This variant delays the formatting of the string message until it is actually logged
+     * @param now
+     * @param maxLogInterval suppress time
+     * @param maxLogIntervalUnit suppress time units
+     * @param logger a {@link VoltLogger}
+     * @param level a {@link Level debug level}
+     * @param cause evidentiary exception
+     * @param stemformat a {@link String#format(String, Object...) string format}
+     * @param parameters format parameters
+     */
+    public static void tryLogForMessage(long now,
+            final long maxLogInterval,
+            final TimeUnit maxLogIntervalUnit,
+            final VoltLogger logger,
+            final Level level, Throwable cause,
+            String stemformat, Object... parameters) {
+        Callable<RateLimitedLogger> builder = new Callable<RateLimitedLogger>() {
+            @Override
+            public RateLimitedLogger call() throws Exception {
+                return new RateLimitedLogger(maxLogIntervalUnit.toMillis(maxLogInterval), logger, level);
+            }
+        };
+
+        final RateLimitedLogger rll;
+        try {
+            rll = m_loggersCached.get(stemformat, builder);
+            rll.log(now, level, cause, stemformat, parameters);
+        } catch (ExecutionException ex) {
+            Throwables.propagate(Throwables.getRootCause(ex));
         }
     }
 }

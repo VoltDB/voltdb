@@ -2,29 +2,11 @@
 
 APPNAME="schemachange"
 
-# find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb 2> /dev/null)" ]; then
-    VOLTDB_BIN=$(dirname "$(which voltdb)")
-else
-    VOLTDB_BIN="$(pwd)/../../../bin"
-fi
-# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
-if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
-    VOLTDB_VOLTDB="$VOLTDB_LIB"
-# distribution layout has libraries in separate lib and voltdb directories
-else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
-fi
+# Sets env. vars and provides voltdb_daemon_start()
+source ../../scripts/run_tools.sh
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
-VOLTDB="$VOLTDB_BIN/voltdb"
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
-LICENSE="$VOLTDB_VOLTDB/license.xml"
-HOST="localhost"
+# run_tools.sh assumes there is no deployment
+DEPLOYMENT=deployment.xml
 
 # remove build artifacts
 function clean() {
@@ -62,11 +44,45 @@ function client() {
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
-        --targetrowcount=100000
+        --targetrowcount=100000 \
+        --duration=1800
+}
+
+# Automatically starts the server in the background and runs the client
+# with the options provided. voltdb_daemon_start() (test_daemon_server.sh)
+# sets a trap to kill the server before the script exits.
+function _auto_run() {
+    local OPTIONS="$@"
+    srccompile || exit 1
+    catalog || exit 1
+    voltdb_daemon_start $APPNAME.jar $HOST deployment.xml $LICENSE || exit 1
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+        schemachange.SchemaChangeClient --servers=localhost $OPTIONS
+    if [ $? -eq 0 ]; then
+        echo SUCCESS
+    else
+        echo FAILURE
+    fi
+}
+
+# Run automatic test with forced failures to exercise retry logic.
+function auto_smoke() {
+    _auto_run \
+        --targetrowcount=1000 \
+        --duration=180 \
+        --retryForcedPercent=20 \
+        --retryLimit=10 \
+        --retrySleep=2
+}
+
+# Run automatic quick test.
+function auto_quick() {
+    _auto_run --targetrowcount=10000 --duration=180
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client}"
+    echo "Usage: ./run.sh {clean|catalog|server|client|...}"
+    echo "                {...|auto_smoke|auto_quick}"
 }
 
 # Run the target passed as the first arg on the command line

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ public class AdHocPlannedStatement {
 
     AdHocPlannedStatement(CompiledPlan plan, CorePlan coreIn) {
         this(plan.sql.getBytes(Constants.UTF8ENCODING), coreIn,
-             plan.extractedParamValues, plan.boundParamIndexes());
+             plan.extractedParamValues(), plan.boundParamIndexes());
     }
 
     AdHocPlannedStatement(AdHocPlannedStatement original, CorePlan coreIn) {
@@ -127,6 +127,10 @@ public class AdHocPlannedStatement {
 
         // sql bytes
         short sqlLength = buf.getShort();
+        if (sqlLength < 0) {
+            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Short.MAX_VALUE);
+        }
+
         byte[] sql = new byte[sqlLength];
         buf.get(sql);
 

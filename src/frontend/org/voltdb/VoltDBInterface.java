@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,12 +21,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
@@ -99,15 +100,25 @@ public interface VoltDBInterface
      * Updates the catalog context stored by this VoltDB without destroying the old one,
      * in case anything still links to it.
      *
-     * @param newCatalogBytes The catalog bytes.
      * @param diffCommands The commands to update the current catalog to the new one.
+     * @param newCatalogBytes The catalog bytes.
+     * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
+     * @param currentTxnId
+     * @param currentTxnTimestamp
      * @param currentTxnId  The transaction ID at which this method is called
+     * @param deploymentBytes  The deployment file bytes
      * @param deploymentHash The SHA-1 hash of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
-            byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
+            String diffCommands,
+            byte[] newCatalogBytes,
+            byte[] catalogBytesHash,
+            int expectedCatalogVersion,
+            long currentTxnId,
+            long currentTxnTimestamp,
+            byte[] deploymentBytes,
+            byte[] deploymentHash);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
@@ -126,6 +137,18 @@ public interface VoltDBInterface
      * @return The number of milliseconds the cluster has been up
      */
     public long getClusterUptime();
+
+    /**
+     * @return The time the cluster's Create start action
+     */
+    public long getClusterCreateTime();
+
+    /**
+     * Set the time at which the cluster was created. This method is used when
+     * in the Recover action and @SnapshotRestore paths to assign the cluster
+     * create time that was preserved in the snapshot.
+     */
+    public void setClusterCreateTime(long clusterCreateTime);
 
     /**
      * Notify RealVoltDB that recovery is complete
@@ -152,6 +175,14 @@ public interface VoltDBInterface
     public void setReplicationActive(boolean active);
 
     public boolean getReplicationActive();
+
+    public ProducerDRGateway getNodeDRGateway();
+
+    public ConsumerDRGateway getConsumerDRGateway();
+
+    public void setDurabilityUniqueIdListener(Integer partition, DurableUniqueIdListener listener);
+
+    public void onSyncSnapshotCompletion();
 
     /**
      * Set the operation mode of this server.
@@ -219,8 +250,12 @@ public interface VoltDBInterface
 
     /**
      * Return the license api. This may be null in community editions!
+     * @return License API based on edition.
      */
      public LicenseApi getLicenseApi();
+     //Return JSON string represenation of license information.
+     public String getLicenseInformation();
+
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 }

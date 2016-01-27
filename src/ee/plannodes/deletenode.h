@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,7 +46,6 @@
 #ifndef HSTOREDELETENODE_H
 #define HSTOREDELETENODE_H
 
-#include <sstream>
 #include "abstractoperationnode.h"
 
 namespace voltdb {
@@ -55,24 +54,17 @@ namespace voltdb {
  *
  */
 class DeletePlanNode : public AbstractOperationPlanNode {
-    public:
-        DeletePlanNode(CatalogId id) : AbstractOperationPlanNode(id) {
-            truncate = false;
-        }
-        DeletePlanNode() : AbstractOperationPlanNode() {
-            truncate = false;
-        }
+public:
+    DeletePlanNode() : m_truncate(false) { }
+    PlanNodeType getPlanNodeType() const;
+    bool getTruncate() const { return m_truncate; }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_DELETE); }
-        bool getTruncate() const { return truncate; }
-        void setTruncate(bool truncate) { this->truncate = truncate; }
-
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        /** true if all tuples are deleted. */
-        bool truncate;
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
+    /** true if all tuples are deleted. */
+    bool m_truncate;
 };
 
-}
+} // namepace voltdb
 
 #endif

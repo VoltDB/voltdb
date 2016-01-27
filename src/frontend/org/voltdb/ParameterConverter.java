@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,8 +23,12 @@ import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
+import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
+import org.voltdb.parser.SQLParser;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -105,8 +109,17 @@ public class ParameterConverter {
         return true;
     }
 
+    private static final Pattern thousandSeparator = Pattern.compile("\\,");
+
     /**
      * Given a string, covert it to a primitive type or return null.
+     *
+     * If the string value is a VARBINARY constant of the form X'00ABCD', and the
+     * expected class is one of byte, short, int or long, then we interpret the
+     * string as specifying bits of a 64-bit signed integer (padded with zeroes if
+     * there are fewer than 16 digits).
+     * Corresponding code for handling hex literals appears in HSQL's ExpressionValue class
+     * and in voltdb.expressions.ConstantValueExpression.
      */
     private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
     throws VoltTypeException
@@ -114,28 +127,48 @@ public class ParameterConverter {
         value = value.trim();
         // detect CSV null
         if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
-        // remove commas and escape chars
-        value = value.replaceAll("\\,","");
+
+        // Remove commas.  Doing this seems kind of dubious since it lets strings like
+        //    ,,,3.1,4,,e,+,,16
+        // be parsed as a valid double value (for example).
+        String commaFreeValue = thousandSeparator.matcher(value).replaceAll("");
 
         try {
             if (expectedClz == long.class) {
-                return Long.parseLong(value);
+                return Long.parseLong(commaFreeValue);
             }
             if (expectedClz == int.class) {
-                return Integer.parseInt(value);
+                return Integer.parseInt(commaFreeValue);
             }
             if (expectedClz == short.class) {
-                return Short.parseShort(value);
+                return Short.parseShort(commaFreeValue);
             }
             if (expectedClz == byte.class) {
-                return Byte.parseByte(value);
+                return Byte.parseByte(commaFreeValue);
             }
             if (expectedClz == double.class) {
-                return Double.parseDouble(value);
+                return Double.parseDouble(commaFreeValue);
             }
         }
         // ignore the exception and fail through below
-        catch (NumberFormatException nfe) {}
+        catch (NumberFormatException nfe) {
+
+            // If we failed to parse the string in decimal form it could still
+            // be a numeric value specified as X'....'
+            //
+            // Do this only after trying to parse a decimal literal, which is the
+            // most common case.
+            if (expectedClz != double.class) {
+                String hexDigits = SQLParser.getDigitsFromHexLiteral(value);
+                if (hexDigits != null) {
+                    try {
+                        return SQLParser.hexDigitsToLong(hexDigits);
+                    }
+                    catch (SQLParser.Exception spe) {
+                    }
+                }
+            }
+        }
 
         throw new VoltTypeException(
                 "tryToMakeCompatible: Unable to convert string "
@@ -214,15 +247,17 @@ public class ParameterConverter {
     public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
     throws VoltTypeException
     {
-        // uncomment for debugging
-        /*System.err.printf("Converting %s of type %s to type %s\n",
+        /* uncomment for debugging
+        System.err.printf("Converting %s of type %s to type %s\n",
+
                 String.valueOf(param),
                 param == null ? "NULL" : param.getClass().getName(),
-                paramType.getName());
-        System.err.flush();*/
+                expectedClz.getName());
+        System.err.flush();
+        // */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
-        // There are some suble null values that aren't java null coming up, but wait until
+        // There are some subtle null values that aren't java null coming up, but wait until
         // after the basics to check for those.
         if (param == null) {
             return nullValueForType(expectedClz);
@@ -269,16 +304,25 @@ public class ParameterConverter {
             if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
         }
         else if (inputClz == String.class) {
-            if (((String) param).equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
+            String stringParam = (String)param;
+            if (stringParam.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
             else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
             else if (expectedClz == byte[].class) {
-                return Encoder.hexDecode((String) param);
+                // regular expressions can be expensive, so don't invoke SQLParser
+                // unless the param really looks like an x-quoted literal
+                if (stringParam.startsWith("X") || stringParam.startsWith("x")) {
+                    String hexDigits = SQLParser.getDigitsFromHexLiteral(stringParam);
+                    if (hexDigits != null) {
+                        stringParam = hexDigits;
+                    }
+                }
+                return Encoder.hexDecode(stringParam);
             }
             // We allow all values to be passed as strings for csv loading, json, etc...
             // This code handles primitive types. Complex types come later.
             if (expectedClz.isPrimitive()) {
-                return convertStringToPrimitive((String) param, expectedClz);
+                return convertStringToPrimitive(stringParam, expectedClz);
             }
         }
         else if (inputClz == byte[].class) {
@@ -293,8 +337,10 @@ public class ParameterConverter {
         // null sigils. (ning - if we're not checking if the sigil matches the expected type,
         // why do we have three sigils for three types??)
         else if (param == VoltType.NULL_TIMESTAMP ||
-                 param == VoltType.NULL_STRING_OR_VARBINARY ||
-                 param == VoltType.NULL_DECIMAL) {
+                param == VoltType.NULL_STRING_OR_VARBINARY ||
+                param == VoltType.NULL_GEOGRAPHY ||
+                param == VoltType.NULL_POINT ||
+                param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
         }
 
@@ -449,6 +495,36 @@ public class ParameterConverter {
             } catch (IOException ex) {
                 throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
                         inputClz.getName(), expectedClz.getName()));
+            }
+        } else if (expectedClz == GeographyPointValue.class) {
+            // Is it a point already?  If so, just return it.
+            if (inputClz == GeographyPointValue.class) {
+                return param;
+            }
+            // Is it a string from which we can construct a point?
+            // If so, return the newly constructed point.
+            if (inputClz == String.class) {
+                try {
+                    GeographyPointValue pt = GeographyPointValue.fromWKT((String)param);
+                    return pt;
+                } catch (IllegalArgumentException e) {
+                    throw new VoltTypeException(String.format("deserialize GeographyPointValue from string failed (string %s)",
+                                                              (String)param));
+                }
+            }
+        } else if (expectedClz == GeographyValue.class) {
+            if (inputClz == GeographyValue.class) {
+                return param;
+            }
+            if (inputClz == String.class) {
+                String paramStr = (String)param;
+                try {
+                    GeographyValue gv = GeographyValue.fromWKT(paramStr);
+                    return gv;
+                } catch (IllegalArgumentException e) {
+                    throw new VoltTypeException(String.format("deserialize GeographyValue from string failed (string %s)",
+                                                              paramStr));
+                }
             }
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;

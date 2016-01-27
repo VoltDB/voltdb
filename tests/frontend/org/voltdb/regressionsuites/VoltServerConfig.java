@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -72,12 +72,26 @@ public interface VoltServerConfig {
     public String getListenerAddress(int hostId);
 
     /**
+     * Get the  host:port for admin connection for the matching hostId.
+     * @param hostId
+     * @return The host:port for admin connection for the matching hostId.
+     */
+    public String getAdminAddress(int hostId);
+
+    /**
      * Get the list of hostnames/ips that are listening
      * for the running VoltDB instance.
      *
      * @return A list of hostnames/ips as strings.
      */
     public List<String> getListenerAddresses();
+
+    /**
+     * Returns the number of listeners for this configuration of VoltDB.
+     *
+     * @return the number of listeners for this VoltDB configuration.
+     */
+    public int getListenerCount();
 
     /**
      * Get the name of this particular configuration. This may be
@@ -104,6 +118,11 @@ public interface VoltServerConfig {
      * @return Is the underlying instance of VoltDB running IPC with Valgrind?
      */
     public boolean isValgrind();
+
+    /**
+     * @return Is the underlying instance of VoltDB running DEBUG mode
+     */
+    public boolean isDebug();
 
     boolean compileWithPartitionDetection(VoltProjectBuilder builder,
             String snapshotPath,
@@ -140,4 +159,9 @@ public interface VoltServerConfig {
     public File[] getPathInSubroots(File path) throws IOException;
 
     public void setMaxHeap(int max);
+
+    /**
+     * @return the number of logical partitions in this configuration
+     * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
+    public int getLogicalPartitionCount();
 }

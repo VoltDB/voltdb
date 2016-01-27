@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,8 +106,9 @@ public class SnapshotVerifier {
     }
 
     private static void printHelpAndQuit( int code) {
-        System.out.println("Usage\nSpecific snapshot: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
-        System.out.println("All snapshots: java -cp <classpath> -Djava.library.path=<library path> org.voltdb.utils.SnapshotVerifier --dir dir1 --dir dir2 --dir dir3");
+        System.out.println("Usage: snapshotverifier --help");
+        System.out.println("Specific snapshot: snapshotverifier snapshot_name --dir dir1 --dir dir2 --dir dir3");
+        System.out.println("All snapshots: snapshotverifier --dir dir1 --dir dir2 --dir dir3");
         System.exit(code);
     }
 }

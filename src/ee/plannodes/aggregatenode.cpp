@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,41 +45,21 @@
 
 #include "aggregatenode.h"
 
-#include "common/types.h"
-#include "storage/table.h"
-
 #include <sstream>
-#include <stdexcept>
 
 using namespace std;
-using namespace voltdb;
 
-AggregatePlanNode::~AggregatePlanNode()
+namespace voltdb {
+
+PlanNodeType AggregatePlanNode::getPlanNodeType() const { return m_type; }
+
+AggregatePlanNode::~AggregatePlanNode() { }
+
+std::string AggregatePlanNode::debugInfo(const std::string &spacer) const
 {
-    if (!isInline())
-    {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
-    for (int i = 0; i < m_aggregateInputExpressions.size(); i++)
-    {
-        delete m_aggregateInputExpressions[i];
-    }
-    for (int i = 0; i < m_groupByExpressions.size(); i++)
-    {
-        delete m_groupByExpressions[i];
-    }
-    delete m_prePredicate;
-    delete m_postPredicate;
-}
-
-string AggregatePlanNode::debugInfo(const string &spacer) const {
-    ostringstream buffer;
-    buffer << spacer << "\nAggregates["
-           << (int) m_aggregates.size() << "]: {";
-    for (int ctr = 0, cnt = (int) m_aggregates.size();
-         ctr < cnt; ctr++)
-    {
+    std::ostringstream buffer;
+    buffer << spacer << "\nAggregates[" << (int) m_aggregates.size() << "]: {";
+    for (int ctr = 0, cnt = (int) m_aggregates.size(); ctr < cnt; ctr++) {
         buffer << spacer << "type="
                << expressionToString(m_aggregates[ctr]) << "\n";
         buffer << spacer << "distinct="
@@ -97,8 +77,7 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
     buffer << spacer << "\nGroupByExpressions[";
     string add = "";
     for (int ctr = 0, cnt = (int) m_groupByExpressions.size();
-         ctr < cnt; ctr++)
-    {
+         ctr < cnt; ctr++) {
         buffer << spacer << m_groupByExpressions[ctr]->debug(spacer);
         add = ", ";
     }
@@ -107,8 +86,7 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
     return buffer.str();
 }
 
-void
-AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
+void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
     for (int i = 0; i < aggregateColumnsArray.arrayLen(); i++) {
@@ -148,23 +126,15 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
     }
 
-    if (obj.hasNonNullKey("GROUPBY_EXPRESSIONS")) {
-        PlannerDomValue groupByExpressionsArray = obj.valueForKey("GROUPBY_EXPRESSIONS");
-        for (int i = 0; i < groupByExpressionsArray.arrayLen(); i++) {
-            m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionsArray.valueAtIndex(i)));
-        }
-    }
+    m_groupByExpressions.loadExpressionArrayFromJSONObject("GROUPBY_EXPRESSIONS", obj);
+    m_prePredicate.reset(loadExpressionFromJSONObject("PRE_PREDICATE", obj));
+    m_postPredicate.reset(loadExpressionFromJSONObject("POST_PREDICATE", obj));
 
-    if (obj.hasNonNullKey("PRE_PREDICATE")) {
-        m_prePredicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PRE_PREDICATE"));
-    }
-
-    if (obj.hasNonNullKey("POST_PREDICATE")) {
-        m_postPredicate = AbstractExpression::buildExpressionTree(obj.valueForKey("POST_PREDICATE"));
-    }
+    loadIntArrayFromJSONObject("PARTIAL_GROUPBY_COLUMNS", obj, m_partialGroupByColumns);
 }
 
-void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
+void AggregatePlanNode::collectOutputExpressions(
+        std::vector<AbstractExpression*>& outputColumnExpressions) const
 {
     const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
     size_t size = outputSchema.size();
@@ -175,16 +145,4 @@ void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*
     }
 }
 
-// definitions of public test methods
-
-void
-AggregatePlanNode::setAggregates(vector<ExpressionType> &aggregates)
-{
-    m_aggregates = aggregates;
-}
-
-void
-AggregatePlanNode::setAggregateOutputColumns(vector<int> outputColumns)
-{
-    m_aggregateOutputColumns = outputColumns;
-}
+} // namespace voltdb

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.jni;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -41,6 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -54,7 +56,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     static VoltLogger log = new VoltLogger("HOST");
 
     public static enum TaskType {
-        VALIDATE_PARTITIONING(0);
+        VALIDATE_PARTITIONING(0),
+        GET_DR_TUPLESTREAM_STATE(1),
+        SET_DR_SEQUENCE_NUMBERS(2),
+        SET_DR_PROTOCOL_VERSION(3);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -72,6 +77,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
     public static final int ERRORCODE_PROGRESS_UPDATE = 111;
+    public static final int ERRORCODE_DECODE_BASE64_AND_DECOMPRESS = 112;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -89,17 +95,31 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
-    /** Context information of the current running procedure*/
+    /** Context information of the current running procedure,
+     * for logging "long running query" messages */
+    private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
+                                                     // not final to allow unit testing
+    private static final long LONG_OP_THRESHOLD = 10000;
+
+    public static final int NO_BATCH_TIMEOUT_VALUE = 0;
+    /** Fragment or batch time out in milliseconds.
+     *  By default 0 means no time out setting.
+     */
+    private int m_batchTimeout = NO_BATCH_TIMEOUT_VALUE;
+
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
     private boolean m_readOnly;
     private long m_startTime;
     private long m_lastMsgTime;
-    private long m_logDuration = 1000;
+    private long m_logDuration = INITIAL_LOG_DURATION;
+    private String[] m_sqlTexts = null;
 
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
     public long m_lastTuplesAccessed = 0;
+    public long m_currMemoryInBytes = 0;
+    public long m_peakMemoryInBytes = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -109,6 +129,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Has the database changed any state since the last reset of dirty status? */
     public boolean getDirtyStatus() {
         return m_dirty;
+    }
+
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
+    }
+
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    private boolean shouldTimedOut (long latency) {
+        if (m_readOnly
+                && m_batchTimeout > NO_BATCH_TIMEOUT_VALUE
+                && m_batchTimeout < latency) {
+            return true;
+        }
+        return false;
     }
 
     /** Utility method to verify return code and throw as required */
@@ -123,7 +160,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * derived classes. This needs to be implemented by each interface
      * as data is required from the execution engine.
      */
-    abstract protected void throwExceptionForError(final int errorCode);
+    protected abstract void throwExceptionForError(final int errorCode);
 
     @Override
     public void deserializedBytes(final int numBytes) {
@@ -318,21 +355,33 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    static final long LONG_OP_THRESHOLD = 10000;
-    public long fragmentProgressUpdate(int batchIndex,
-                                          String planNodeName,
-                                          String lastAccessedTable,
-                                          long lastAccessedTableSize,
-                                          long tuplesProcessed)
+    public long fragmentProgressUpdate(int indexFromFragmentTask,
+            int planNodeTypeAsInt,
+            long tuplesProcessed,
+            long currMemoryInBytes,
+            long peakMemoryInBytes)
     {
         ++m_callsFromEE;
         m_lastTuplesAccessed = tuplesProcessed;
+        m_currMemoryInBytes = currMemoryInBytes;
+        m_peakMemoryInBytes = peakMemoryInBytes;
 
         long currentTime = System.currentTimeMillis();
         if (m_startTime == 0) {
             m_startTime = m_lastMsgTime = currentTime;
             return LONG_OP_THRESHOLD;
         }
+        long latency = currentTime - m_startTime;
+
+        if (shouldTimedOut(latency)) {
+
+            String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, true);
+            log.info(msg);
+
+            // timing out the long running queries
+            return -1 * latency;
+        }
+
         if (currentTime <= (m_logDuration + m_lastMsgTime)) {
             // The callback was triggered earlier than we were ready to log.
             // If this keeps happening, it might makes sense to ramp up the threshold
@@ -351,26 +400,73 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
-        String msg = String.format(
-                "Procedure %s is taking a long time to execute -- at least " +
-                "%.1f seconds spent accessing " +
-                "%d tuples. Current plan fragment " +
-                "%s in call " +
-                "%d to voltExecuteSQL on site " +
-                "%s.",
-                m_currentProcedureName,
-                (currentTime - m_startTime) / 1000.0,
-                tuplesProcessed,
-                planNodeName,
-                m_currentBatchIndex,
-                CoreUtils.hsIdToString(m_siteId));
+        String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, false);
         log.info(msg);
+
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;
         // Return 0 if we want to interrupt ee. Otherwise return the number of tuple operations to let
         // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
         // to try to get one callback to arrive just after the log duration interval expires.
         return LONG_OP_THRESHOLD;
+    }
+
+    private String getLongRunningQueriesMessage(int indexFromFragmentTask,
+            long latency, int planNodeTypeAsInt, boolean timeout) {
+        String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
+        String msg = String.format(
+                "Procedure %s is %s " +
+                        "%.2f seconds spent accessing " +
+                        "%d tuples. Current plan fragment " +
+                        "%s in call " +
+                        "%d to voltExecuteSQL on site " +
+                        "%s. Current temp table uses " +
+                        "%d bytes memory, and the peak usage of memory for temp table is " +
+                        "%d bytes.",
+                        m_currentProcedureName,
+                        status,
+                        latency / 1000.0,
+                        m_lastTuplesAccessed,
+                        PlanNodeType.get(planNodeTypeAsInt).name(),
+                        m_currentBatchIndex,
+                        CoreUtils.hsIdToString(m_siteId),
+                        m_currMemoryInBytes,
+                        m_peakMemoryInBytes);
+
+        if (m_sqlTexts != null
+                && indexFromFragmentTask >= 0
+                && indexFromFragmentTask < m_sqlTexts.length) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[indexFromFragmentTask] + "\".";
+        }
+        else if (m_sqlTexts == null) {
+            // Can this happen?
+            msg += "  SQL statement text is not available.";
+        }
+        else {
+            // For some reason, the current index in the fragment task message isn't a valid
+            // index into the m_sqlTexts array.  We don't expect this to happen,
+            // but let's dump something useful if it does.  (See ENG-7610)
+            StringBuffer sb = new StringBuffer();
+            sb.append("  Unable to report specific SQL statement text for "
+                    + "fragment task message index " + indexFromFragmentTask + ".  ");
+            sb.append("It MAY be one of these " + m_sqlTexts.length + " items: ");
+            for (int i = 0; i < m_sqlTexts.length; ++i) {
+                if (m_sqlTexts[i] != null) {
+                    sb.append("\"" + m_sqlTexts[i] + "\"");
+                }
+                else {
+                    sb.append("[null]");
+                }
+
+                if (i != m_sqlTexts.length - 1) {
+                    sb.append(", ");
+                }
+            }
+
+            msg += sb.toString();
+        }
+
+        return msg;
     }
 
     /**
@@ -381,7 +477,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // track cache misses
         m_cacheMisses++;
         // estimate the cache size by the number of misses
-        m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
+        if (m_eeCacheSize < EE_PLAN_CACHE_SIZE) {
+            m_eeCacheSize++;
+        }
         // get the plan for realz
         return ActivePlanRepository.planForFragmentId(fragmentId);
     }
@@ -390,7 +488,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId,
+    public abstract boolean activateTableStream(final int tableId,
                                                 TableStreamType type,
                                                 long undoQuantumToken,
                                                 byte[] predicates);
@@ -410,13 +508,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
     /** Releases the Engine object. */
-    abstract public void release() throws EEException, InterruptedException;
+    public abstract void release() throws EEException, InterruptedException;
+
+    public static byte[] getStringBytes(String string) {
+        try {
+            return string.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    public void loadCatalog(long timestamp, String serializedCatalog) {
+        loadCatalog(timestamp, getStringBytes(serializedCatalog));
+    }
 
     /** Pass the catalog to the engine */
-    abstract public void loadCatalog(final long timestamp, final String serializedCatalog) throws EEException;
+    protected abstract void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
+    public abstract void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     public void setBatch(int batchIndex) {
         m_currentBatchIndex = batchIndex;
@@ -431,6 +541,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            String[] sqlTexts,
+                                            long txnId,
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
@@ -442,10 +554,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
             // reset context for progress updates
             m_startTime = 0;
-            m_logDuration = 1000;
+            m_logDuration = INITIAL_LOG_DURATION;
+            m_sqlTexts = sqlTexts;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -455,6 +568,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
+
+            m_sqlTexts = null;
         }
     }
 
@@ -462,19 +577,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long[] planFragmentIds,
                                                             long[] inputDepIds,
                                                             Object[] parameterSets,
+                                                            long txnId,
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
                                                             long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
-    abstract public VoltTable serializeTable(int tableId) throws EEException;
+    public abstract VoltTable serializeTable(int tableId) throws EEException;
 
-    abstract public long getThreadLocalPoolAllocations();
+    public abstract long getThreadLocalPoolAllocations();
 
-    abstract public byte[] loadTable(
-        int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations,
+    public abstract byte[] loadTable(
+        int tableId, VoltTable table, long txnId, long spHandle,
+        long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException;
 
     /**
@@ -482,7 +598,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param logLevels Levels to set
      * @throws EEException
      */
-    abstract public boolean setLogLevels(long logLevels) throws EEException;
+    public abstract boolean setLogLevels(long logLevels) throws EEException;
 
     /**
      * This method should be called roughly every second. It allows the EE
@@ -490,13 +606,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param time The current time in milliseconds since the epoch. See
      * System.currentTimeMillis();
      */
-    abstract public void tick(long time, long lastCommittedSpHandle);
+    public abstract void tick(long time, long lastCommittedSpHandle);
 
     /**
      * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
-    abstract public void quiesce(long lastCommittedSpHandle);
+    public abstract void quiesce(long lastCommittedSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
@@ -506,7 +622,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param now Timestamp to return with each row
      * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
      */
-    abstract public VoltTable[] getStats(
+    public abstract VoltTable[] getStats(
             StatsSelector selector,
             int locators[],
             boolean interval,
@@ -568,14 +684,39 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract void updateHashinator(HashinatorConfig config);
 
     /**
-     * Execute an arbitrary task that is described by the task id and serialized task parameters.
-     * The return value is also opaquely encoded. This means you don't have to update the IPC
-     * client when adding new task types
+     * Apply binary log data. To be able to advance the DR sequence number and
+     * regenerate binary log for chaining correctly, proper spHandle and
+     * lastCommittedSpHandle from the current transaction need to be passed in.
+     * @param log                      The binary log data
+     * @param txnId                    The txnId of the current transaction
+     * @param spHandle                 The spHandle of the current transaction
+     * @param lastCommittedSpHandle    The spHandle of the last committed transaction
+     * @param uniqueId                 The uniqueId of the current transaction
+     * @param undoToken                For undo
+     * @throws EEException
+     */
+    public abstract long applyBinaryLog(ByteBuffer log,
+                                        long txnId,
+                                        long spHandle,
+                                        long lastCommittedSpHandle,
+                                        long uniqueId,
+                                        int remoteClusterId,
+                                        long undoToken) throws EEException;
+
+    /**
+     * Execute an arbitrary non-transactional task that is described by the task id and
+     * serialized task parameters. The return value is also opaquely encoded. This means
+     * you don't have to update the IPC client when adding new task types.
+     *
+     * This method shouldn't be used to perform transactional tasks such as mutating
+     * table data because it doesn't setup transaction context in the EE.
      * @param taskId
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(TaskType taskType, byte task[]);
+    public abstract byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException;
+
+    public abstract ByteBuffer getParamBufferForExecuteTask(int requiredCapacity);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -618,7 +759,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int partitionId,
             int hostId,
             byte hostname[],
+            int drClusterId,
             long tempTableMemory,
+            boolean createDrReplicatedStream,
             int compactionThreshold);
 
     /**
@@ -667,8 +810,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
      * @param undoToken The undo token to release
      */
-    protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken);
+    protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table, long txnId,
+            long spHandle, long lastCommittedSpHandle, long uniqueId, boolean returnUniqueViolations, boolean shouldDRStream,
+            long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
@@ -682,7 +826,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,
-            long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoToken);
 
     /**
      * Serialize the result temporary table.
@@ -814,13 +962,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native long nativeTableHashCode(long pointer, int tableId);
 
+    protected native long nativeApplyBinaryLog(long pointer,
+                                               long txnId,
+                                               long spHandle,
+                                               long lastCommittedSpHandle,
+                                               long uniqueId,
+                                               int remoteClusterId,
+                                               long undoToken);
+
     /**
      * Execute an arbitrary task based on the task ID and serialized task parameters.
      * This is a generic entry point into the EE that doesn't need to be updated in the IPC
      * client every time you add a new task
      * @param pointer
+     * @return error code
      */
-    protected native void nativeExecuteTask(long pointer);
+    protected native int nativeExecuteTask(long pointer);
 
     /**
      * Perform an export poll or ack action. Poll data will be returned via the usual
@@ -853,6 +1010,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public native static long nativeGetRSS();
 
+    public native static byte[] getTestDRBuffer(boolean compatible);
+
     /**
      * Start collecting statistics (starts timer).
      */
@@ -874,4 +1033,34 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /**
+     * Useful in unit tests.  Allows one to supply a mocked logger
+     * to verify that something was logged.
+     *
+     * @param vl  The new logger to install
+     */
+    @Deprecated
+    public static void setVoltLoggerForTest(VoltLogger vl) {
+        log = vl;
+    }
+
+    /**
+     * Useful in unit tests.  Sets the starting frequency with which
+     * the long-running query info message will be logged.
+     *
+     * @param newDuration  The duration in milliseconds before the first message is logged
+     */
+    @Deprecated
+    public void setInitialLogDurationForTest(long newDuration) {
+        INITIAL_LOG_DURATION = newDuration;
+    }
+
+    /**
+     * Useful in unit tests.  Gets the initial frequency with which
+     * the long-running query info message will be logged.
+     */
+    @Deprecated
+    public long getInitialLogDurationForTest() {
+        return INITIAL_LOG_DURATION;
+    }
 }

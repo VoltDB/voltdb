@@ -14,8 +14,11 @@
 --{_stringfun |= "LOWER"}
 --{_stringfun |= "UPPER"}
 
-{_genericagg |= "MIN"}
-{_genericagg |= "MAX"}
+-- Aggregate functions that accept a string (or numeric) column and return the same type
+{_stringagg |= "MIN"}
+{_stringagg |= "MAX"}
+
+{_genericagg |= "_stringagg"}
 {_genericagg |= "COUNT"}
 
 {_numagg |= "SUM"}
@@ -25,6 +28,17 @@
 {_distinctableagg |= "COUNT"}
 {_distinctableagg |= "SUM"}
 --HSQL refuses to do AVG(DISTINCT) {_distinctableagg |= "AVG"}
+
+{_geofun |= ""}
+-- There are no unary point-to-point or polygon-to-polygon functions supported yet.
+{_point2numfun |= "LATITUDE"}
+{_point2numfun |= "LONGITUDE"}
+{_poly2numfun |= "AREA"}
+{_2geo2numfun |= "DISTANCE"}
+{_polypoint2boolfun |= "CONTAINS"}
+{_poly2boolfun |= "isValid"}
+{_poly2pointfun |= "CENTROID"}
+{_geo2stringfun |= "asText"}
 
 {_maybe |= ""}
 {_maybe |= " NOT "}
@@ -42,13 +56,21 @@
 {_math |= " / "}
 -- {_math |= " % "}
 
-{_cmp |= "="}
-{_cmp |= "<>"}
+{_eqne |= "="}
+{_eqne |= "<>"}
+{_eqne |= "!="} -- Apparently, an HSQL-supported alias for the standard <>
+
+{_cmp |= "_eqne"}
 {_cmp |= "<"}
 {_cmp |= ">"}
 {_cmp |= "<="}
 {_cmp |= ">="}
-{_cmp |= "!="} -- Apparently, an HSQL-supported alias for the standard <>
+
+-- A smaller list of comparison operators, used to reduce the
+-- explosion of generated queries that result from 7 _cmp values
+{_somecmp |= " = "}
+{_somecmp |= " < "}
+{_somecmp |= " >= "}
 
 {_jointype |= " "}
 {_jointype |= " INNER "}

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,11 +20,11 @@
 #include <cxxabi.h>   // for abi
 #include <execinfo.h> // for backtrace, backtrace_symbols
 
-#include <cstdlib> // for malloc/free
 #include <cstring> // for strn*
 #include <dlfcn.h>
 #include <stdio.h> // for fopen, fprintf, fclose
 #include <string.h>
+#include "common/debuglog.h"
 
 #ifdef MACOSX // mac os requires _XOPEN_SOURCE for ucontext for some reason
 #define _XOPEN_SOURCE
@@ -41,67 +41,10 @@ FatalException::FatalException(std::string message,
 {
     FILE *bt = fopen(m_backtracepath.c_str(), "a+");
 
-    /**
-     * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
-     */
-    void *traces[128];
-    for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
-    const int numTraces = backtrace( traces, 128);
-    char** traceSymbols = backtrace_symbols( traces, numTraces);
-
-    // write header for backtrace file
-    if (bt) fprintf(bt, "VoltDB Backtrace (%d)\n", numTraces);
-
-    for (int ii = 0; ii < numTraces; ii++) {
-        std::size_t sz = 200;
-        // Note: must use malloc vs. new so __cxa_demangle can use realloc.
-        char *function = static_cast<char*>(::malloc(sz));
-        char *begin = NULL, *end = NULL;
-
-        // write original symbol to file.
-        if (bt) fprintf(bt, "raw[%d]: %s\n", ii, traceSymbols[ii]);
-
-        //Find parens surrounding mangled name
-        for (char *j = traceSymbols[ii]; *j; ++j) {
-            if (*j == '(') {
-                begin = j;
-            }
-            else if (*j == '+') {
-                end = j;
-            }
-        }
-
-        if (begin && end) {
-            *begin++ = '\0';
-            *end = '\0';
-
-            int status;
-            char *ret = abi::__cxa_demangle(begin, function, &sz, &status);
-            if (ret) {
-                //return value may be a realloc of input
-                function = ret;
-            } else {
-                // demangle failed, treat it like a C function with no args
-                strncpy(function, begin, sz);
-                strncat(function, "()", sz);
-                function[sz-1] = '\0';
-            }
-            m_traces.push_back(std::string(function));
-        } else {
-            //didn't find the mangled name in the trace
-            m_traces.push_back(std::string(traceSymbols[ii]));
-        }
-        ::free(function);
-    }
-
     if (bt) {
-        for (int ii=0; ii < m_traces.size(); ii++) {
-            const char* str = m_traces[ii].c_str();
-            fprintf(bt, "demangled[%d]: %s\n", ii, str);
-        }
+        StackTrace::printMangledAndUnmangledToFile(bt);
         fclose(bt);
     }
-    ::free(traceSymbols);
 }
 
 void FatalException::reportAnnotations(const std::string& str)

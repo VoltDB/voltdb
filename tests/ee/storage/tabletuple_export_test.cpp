@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -144,42 +144,42 @@ TEST_F(TableTupleExportTest, maxExportSerSize_tiny) {
     // just tinyint in schema
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(8, sz);
+    EXPECT_EQ(1, sz);
 
     // tinyint + smallint
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(16, sz);
+    EXPECT_EQ(3, sz);
 
     // + integer
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(24, sz);
+    EXPECT_EQ(7, sz);
 
     // + bigint
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(32, sz);
+    EXPECT_EQ(15, sz);
 
     // + timestamp
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(40, sz);
+    EXPECT_EQ(23, sz);
 
     // + decimal
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(40 + 4 + 1 + 1 + 38, sz);  // length, radix pt, sign, prec.
+    EXPECT_EQ(41, sz);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(84 + 14, sz); // length, 10 chars
+    EXPECT_EQ(55, sz); // length, 10 chars
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(98 + 24, sz); // length, 20 chars
+    EXPECT_EQ(79, sz); // length, 20 chars
 }
 
 /*
@@ -195,42 +195,42 @@ TEST_F(TableTupleExportTest, maxExportSerSize_withNulls) {
     // just tinyint in schema
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(8, sz);
+    EXPECT_EQ(1, sz);
 
     // tinyint + smallint
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(16, sz);
+    EXPECT_EQ(3, sz);
 
     // + integer
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(24, sz);
+    EXPECT_EQ(7, sz);
 
     // + bigint
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(32, sz);
+    EXPECT_EQ(15, sz);
 
     // + timestamp
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(40, sz);
+    EXPECT_EQ(23, sz);
 
     // + decimal
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets);
-    EXPECT_EQ(40 + 4 + 1 + 1 + 38, sz);  // length, radix pt, sign, prec.
+    EXPECT_EQ(41, sz);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets, true);
-    EXPECT_EQ(84, sz);
+    EXPECT_EQ(41, sz);
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = maxElSize(keep_offsets, true);
-    EXPECT_EQ(84, sz);
+    EXPECT_EQ(41, sz);
 }
 
 // helper to make a schema, a tuple and serialize to a buffer
@@ -333,17 +333,17 @@ TableTupleExportTest::verSer(int cnt, char *data)
 
     if (cnt-- >= 0)
     {
-        int64_t v = sin.readLong();
+        int8_t v = sin.readByte();
         EXPECT_EQ(120, v);
     }
     if (cnt-- >= 0)
     {
-        int64_t v = sin.readLong();
+        int16_t v = sin.readShort();
         EXPECT_EQ(256, v);
     }
     if (cnt-- >= 0)
     {
-        EXPECT_EQ(512, sin.readLong());
+        EXPECT_EQ(512, sin.readInt());
     }
     if (cnt-- >= 0)
     {
@@ -355,23 +355,16 @@ TableTupleExportTest::verSer(int cnt, char *data)
     }
     if (cnt-- >= 0)
     {
-        EXPECT_EQ(16, sin.readInt());
-        EXPECT_EQ('-', sin.readChar());
-        EXPECT_EQ('1', sin.readChar());
-        EXPECT_EQ('2', sin.readChar());
-        EXPECT_EQ('.', sin.readChar());
-        EXPECT_EQ('3', sin.readChar());
-        EXPECT_EQ('4', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
-        EXPECT_EQ('0', sin.readChar());
+        EXPECT_EQ(12, sin.readByte());
+        EXPECT_EQ(16, sin.readByte());
+        int64_t low = sin.readLong();
+        low = ntohll(low);
+        int64_t high = sin.readLong();
+        high = ntohll(high);
+        NValue nv = ValueFactory::getDecimalValueFromString("-12.34");
+        TTInt val = ValuePeeker::peekDecimal(nv);
+        EXPECT_EQ(low, val.table[1]);
+        EXPECT_EQ(high, val.table[0]);
     }
     if (cnt-- >= 0)
     {
@@ -418,56 +411,56 @@ TEST_F(TableTupleExportTest, serToExport)
     // tinyiny
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(8, sz);
+    EXPECT_EQ(1, sz);
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // tinyint + smallint
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(16, sz);
+    EXPECT_EQ(3, sz);
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + integer
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(24, sz);
+    EXPECT_EQ(7, sz);
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + bigint
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(32, sz);
+    EXPECT_EQ(15, sz);
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + timestamp
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(40, sz);
+    EXPECT_EQ(23, sz);
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + decimal
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(40 + 14 + 1 + 1 + 4, sz);  // length, radix pt, sign, prec.
+    EXPECT_EQ(41, sz);  // length, radix pt, sign, prec.
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + first varchar
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(60 + 14, sz); // length, 10 chars
+    EXPECT_EQ(55, sz); // length, 10 chars
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 
     // + second varchar
     keep_offsets.push_back(i++);
     sz = serElSize(keep_offsets, nulls, data);
-    EXPECT_EQ(74 + 24, sz); // length, 20 chars
+    EXPECT_EQ(79, sz); // length, 20 chars
     EXPECT_EQ(0x0, nulls[0]);  // all null
     verSer(i-1, data);
 }

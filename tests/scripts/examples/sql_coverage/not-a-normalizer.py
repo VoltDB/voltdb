@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -22,13 +22,25 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from NotANormalizer import NotANormalizer
 from SQLCoverageReport import generate_html_reports
 
-def normalize(table, sql):
-    """Do nothing other than returning the table
+def safecmp(x, y):
+    """Calls the 'standard' safecmp function, which performs a comparison
+       similar to cmp, including iterating over lists, but two None values
+       are considered equal, and a TypeError is avoided when a None value
+       and a datetime are corresponding members of a list.
     """
-    return table
+    return NotANormalizer.safecmp(x,y)
 
-def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all):
-    return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all, True)
+def normalize(table, sql):
+    """Do nothing other than returning the table.
+    """
+    return NotANormalizer.normalize(table, sql)
+
+def compare_results(suite, seed, statements_path, hsql_path, jni_path,
+                    output_dir, report_all, extra_stats, comparison_database):
+    """Just calls SQLCoverageReport.generate_html_reports(...).
+    """
+    return generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
+                                 output_dir, report_all, extra_stats, comparison_database, True)

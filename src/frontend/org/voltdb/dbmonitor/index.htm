@@ -1,0 +1,1944 @@
+﻿<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>VoltDB Management Center</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link href="css/resources/layout.css" rel="stylesheet" />
+    <link href="css/resources/aero.css" rel="stylesheet" />
+    <link href="css/resources/nv.d3.css" rel="stylesheet" />
+    <link href="css/resources/tablesorter.css" rel="stylesheet" />
+    <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
+    <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
+    <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
+    <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
+    <script type="text/javascript" src="js/d3/nv.d3.min(modified).js"></script>
+    <script type="text/javascript" src="js/jquery.slimscroll.min.js"></script>
+    <script type="text/javascript" src="js/jquery.popup.js"></script>
+    <script type="text/javascript" src="js/jquery.cookie.js"></script>
+    <script type="text/javascript" src="js/voltdb.config.js"></script>
+    <script type="application/javascript" src="js/jquery-ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.core.js"></script>
+    <script type="text/javascript" src="js/voltdb.service.js"></script>
+    <script type="text/javascript" src="js/voltdb.render.js"></script>
+    <script type="text/javascript" src="js/voltdb.ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.graph.js"></script>
+    <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
+    <script type="text/javascript" src="js/voltdb.sqlquery.ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.queryrender.js"></script>
+    <script type="text/javascript" src="js/sorttable.js"></script>
+    <script type="text/javascript" src="js/shortcut.js"></script>
+    <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
+    <script type="text/javascript" src="js/icheck.js"></script>
+    <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
+    <script type="text/javascript" src="js/jquery.validate.min.js"></script>
+    <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
+    <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
+    <link href="css/resources/datatables/jquery.dataTables.css" rel="stylesheet" />
+    <script src="js/bignumber.js"></script>
+    <script src="js/jsonParse.js"></script>
+    <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
+    <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
+    <script src="js/jquery.dataTables.js"></script>
+    <script src="js/jqueryDatatablePlugins.js"></script>
+    <script src="js/sha256.js"></script>
+</head>
+<body>
+    <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
+    <div class="page-wrap">
+        <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
+        <div id="wrapper">
+            <div class="header" id="headerMain">
+                <div class="headLeft">
+                    <div class="logo">
+                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" />
+                    </div>
+                    <div class="menu" id="toggle">
+                        <div class="toggleMenu" id="toggleMenu">Menu</div>
+                        <nav id="nav">
+                            <ul>
+                                <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
+                                <li id="navAdmin" style="display: none;"><a href="#">Admin</a></li>
+                                <li id="navSchema"><a href="#o">Schema</a></li>
+                                <li id="navSqlQuery"><a href="#">SQL Query</a></li>
+                            </ul>
+                        </nav>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div class="headRight">
+                    <ul class="topRightList" id="userSection">
+                        <li>
+                            <a href="#logoutPopup" id="btnlogOut">
+                                <div class="userN" title=""></div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#logoutPopup" id="logOut">
+                                <div class="user" title="Log Out"></div>
+                            </a>
+                        </li>
+                        <li class="line" id="userLine"></li>
+                        <li>
+                            <div class="menuHome">
+                                <ul class="menuHomeList">
+                                    <li>
+                                        <a href="javascript:void(0);" style="float:left">Help</a>
+                                        <div class="helpDrop"></div>
+                                        <div class="clear"></div>
+                                        <ul>
+                                            <li><a href="#help" id="showMyHelp">DB Monitor Help</a></li>
+                                            <li><a href="#About" id="ShowAbout">About</a></li>
+                                        </ul>
+                                    </li>
+                                </ul>	
+                            </div>
+                        </li>
+                        <li class="responsiveMenuPlaceHolder">&nbsp;</li>
+                    </ul>
+                </div>
+                <div class="clear"></div>
+            </div>
+            <div class="contents">
+                <!-- Loading -->
+                <div id="overlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
+                <div class="container" id="containerMain">
+                    <div class="clusterDetailsWrapper" id="clusterDetails">
+                        <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
+                            <h1 class="headText clusterIcon">Cluster <span id="clusterId"></span></h1>
+                            <ul class="clusterStat" id="clusterHealth">
+                                <li class="activeIcon">Active <span>()</span></li>
+                                <li class="joiningIcon">Joining <span>()</span></li>
+                                <li class="missingIcon">Missing <span>()</span></li>
+                                <li style="display: none;" class="alertIcon"><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>()</span></a></li>
+                            </ul>
+                            <div class="clear"></div>
+                        </div>
+                        <div class="clusterDetailsContRight" id="clusterDetailsRight">
+                            <ul class="serverStat" id="serverStatSection">
+                                <li>Monitoring</li>
+                                <li class="activeServerName" id="activeServerName" title=""></li>
+                            </ul>
+                            <div style="float: right; padding: 0 0 0 10px;"><a href="#" id="btnPopServerList" class="btn showServers">Server</a></div>
+                            <div class="clear"></div>
+                        </div>
+                        <div class="clear"></div>
+                        <!-- Server List popup-->
+                        <div id="popServerList" style="display: none;">
+                            <div class="slide-pop-wrapper">
+                                <div class="slide-pop-title">
+                                    <div class="icon-server searchLeft">Servers</div>
+                                    <div class="searchRight">
+                                        <div class="search">
+                                            <input type="text" id="popServerSearch" class="icon-search" onClick="this.value = '';" onBlur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
+                                        </div>
+                                        <div class="thresholdVal">
+                                            Alert Threshold
+                                            <input type="text" id="threshold" class="theVal" maxlength="3" />
+                                            % <a href="#" id="saveThreshold" class="setVal">Set</a>
+                                        </div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="clear"></div>
+                                </div>
+                                <div class="slide-pop-content">
+                                    <!-- <div class="server-info-heading">
+                                         <span class="server">Server Name</span> <span class="servIp">IP Address</span> <span class="memory-use">Memory Usage</span>
+                                         <div class="clear"></div>
+                                     </div>-->
+                                    <div class="slimScrollDiv" style="position: relative; overflow: hidden; width: auto; ">
+                                        <div id="serverListWrapper">
+                                            <table id="tblServerListHeader" class="serversTbl">
+                                                <tr>
+                                                    <th id="thServerName" width="40%">Server Name</th>
+                                                    <th id="thIpAddress" width="30%">IP Address</th>
+                                                    <th id="thMemoryUsage" width="30%">Memory Usage</th>
+                                                </tr>
+                                            </table>
+                                            <div style="overflow:auto; width: auto; height: 225px;">
+                                                <table class="serversTbl" id="serversList"></table>
+                                            </div>
+                                        </div>
+                                        <div class="slimScrollBar" style="width: 14px; position: absolute; top: 0px; opacity: 0.8; display: none; border-radius: 0px; z-index: 99; right: 1px; height: 255px; background: rgb(63, 83, 100);"></div><div class="slimScrollRail" style="width: 14px; height: 100%; position: absolute; top: 0px; display: none; border-radius: 0px; opacity: 0.2; z-index: 90; right: 1px; background: rgb(63, 83, 100);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="content displayPre" id="contentServer">
+                        <div class="leftShowhide">
+                            <div id="GraphBlock" class="">
+                                <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
+                            </div>
+                        </div>
+                        <div class="rightShowhide">
+                            <ul class="rightShowhideList" id="showHideRightlist">
+                                <li class="viewSelect">
+                                    <label>View</label>
+                                    <select id="graphView">
+                                        <option selected="selected">Seconds</option>
+                                        <option>Minutes</option>
+                                        <option>Days</option>
+                                    </select>
+                                </li>
+                            </ul>
+                            <div class="preBtn"><a href="#myPreference" class="btn" id="showMyPreference">Show More/Fewer Charts</a> </div>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div id="mainGraphBlock">
+                        <div class="graphChart" id="graphChart">
+                            <div id="chartServerCPU" class="chart">
+                                <div class="chartHeader" id="chartHead">
+                                    <h1>Server CPU <span class="activeServerName" title=""></span></h1>
+                                </div>
+                                <svg id="visualisationCpu" width="100%" height="350"></svg>
+                            </div>
+                            <div id="chartServerRAM" class="chart">
+                                <div class="chartHeader" id="chartRamHeader">
+                                    <h1>Server RAM<span class="activeServerName" title=""></span></h1>
+                                </div>
+                                <svg id="visualisationRam" width="100%" height="400"></svg>
+                            </div>
+                            <div id="chartClusterLatency" class="chart">
+                                <div class="chartHeader">
+                                    <h1>Cluster Latency (99th percentile, ms)</h1>
+                                </div>
+                                <svg id="visualisationLatency" width="100%" height="400"></svg>
+                            </div>
+                            <div id="chartClusterTransactions" class="chart">
+                                <div class="chartHeader">
+                                    <h1>Cluster Transactions (tps)</h1>
+                                </div>
+                                <svg id="visualisationTransaction" width="100%" height="400"></svg>
+                            </div>
+                            <div id="chartPartitionIdleTime" class="chart">
+                                <div class="chartHeader">
+                                    <h1>Partition Idle Time</h1>
+                                </div>
+                                <div class="legend" style="display:none;">
+                                    <ul>
+                                        <li><div class="dotGray"></div>Local partitions </li>
+                                        <li><div class="dotBlue"></div>Cluster-wide Maximum / Minimum</li>
+                                        <li><div class="dotOrange"></div>Multi-partition</li>
+                                    </ul>
+                                </div>
+                                <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
+                            </div>
+                            <div id="ChartDrReplicationRate" class="chart" style="display: none">
+                                <div class="chartHeader">
+                                    <h1>Database Replication (DR)</h1>
+                                </div>
+                                <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
+                            </div>
+                            <div id="chartCommandLogging" class="chart" style="display: none">
+                                <div class="chartHeader">
+                                    <h1>Command Log Statistics</h1>
+                                </div>
+                                <div class="cmdLogLegend" style="display:none;">
+                                    <ul>
+                                        <li><div class="dotLightBlue"></div>Command Log Statistics</li>
+                                        <li><div class="dotRed"></div>Snapshots</li>
+                                    </ul>
+                                </div>
+                                <svg id="visualisationCommandLog" class="logHeight"></svg>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                    </div>
+                    <div class="data">
+                        <div id="firstpane" class="menu_list">
+                            <!--Code for menu starts here-->
+                            <div class="menu_head expanded">
+                                <h1 id="ShowHideBlock">Show/Hide Data</h1>
+                            </div>
+                            <div class="menu_body" style="display: block;">
+                                <div id="tblStoredProcedures" class="storedProcWrapper">
+                                    <div class="tabs-filter-wrapper">
+                                        <div class="tableTitle icon-procedures">Stored Procedures (Cluster)</div>
+                                        <div class="filter">
+                                            <input name="filter" id="filterStoredProc" type="text" class="search-box" onBlur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" />
+                                            <a id="searchStoredProc" href="javascript:void(0)" class="icon-search" title="Search">search</a>
+                                        </div>
+                                        <div class="pagination">
+                                            <a id="previousProcedures" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
+                                            <label id="lblPrevious"></label>
+                                            of
+                                            <label id="lblTotalPages"></label>
+                                            <a id="nextProcedures" href="javascript:void(0)" class="next" title="Next Page">Next</a>
+                                        </div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="tblScroll">
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
+                                            <thead>
+                                                <tr>
+                                                    <th id="PROCEDURE" width="30%" data-name="ascending" class="sorttable_sorted">Stored Procedure</th>
+                                                    <th id="INVOCATIONS" width="10%" data-name="none">Invocations</th>
+                                                    <th id="MIN_LATENCY" width="15%" data-name="none">Min Latency (ms)</th>
+                                                    <th id="MAX_LATENCY" width="15%" data-name="none">Max Latency (ms)</th>
+                                                    <th id="AVG_LATENCY" width="15%" data-name="none">Avg Latency (ms)</th>
+                                                    <th id="PERC_EXECUTION" width="15%" data-name="none">% Time of Execution</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="storeProcedureBody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div id="tblDataTables" class="dataTablesWrapper">
+                                    <div class="tabs-filter-wrapper">
+                                        <div class="tableTitle icon-tables">Database Tables</div>
+                                        <div class="filter">
+                                            <input name="filter" id="filterDatabaseTable" type="text" class="search-box" onBlur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" />
+                                            <a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a>
+                                        </div>
+                                        <div class="pagination">
+                                            <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
+                                            <label id="lblPreviousTable"></label>
+                                            of
+                                            <label id="lblTotalPagesofTables"></label>
+                                            <a id="nextTables" href="javascript:void(0)" class="next" title="Next Page">Next</a>
+                                        </div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="tblScroll">
+                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
+                                            <thead>
+                                                <tr>
+                                                    <th id="TABLE_NAME" width="30%" data-name="ascending" class="sorttable_sorted">Table</th>
+                                                    <th id="TUPLE_COUNT" width="10%" data-name="none">Row Count</th>
+                                                    <th id="MAX_ROWS" width="15%" data-name="none">Max Rows (per partition)</th>
+                                                    <th id="MIN_ROWS" width="15%" data-name="none">Min Rows (per partition)</th>
+                                                    <th id="AVG_ROWS" width="15%" data-name="none">Avg Rows (per partition)</th>
+                                                    <th id="TABLE_TYPE" width="15%" data-name="none">Type</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tablesBody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="drWrapper" id="divDrReplication" style="display:none">
+                        <div class="content drHeader" id="drHeader">
+                            <div class="leftShowhide">
+                                <div class="dr">
+                                    <h1 class="headText1">
+                                        <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>
+                                    </h1>
+                                </div>
+                            </div>
+                            <div class="rightShowhide">
+                                <ul class="drList">
+                                    <li>Mode</li>
+                                    <li id="dbDrMode" class="drArrow">Master</li>
+                                </ul>
+                                <ul class="drList">
+                                    <!-- <li>State</li>
+                                        <li class="drArrow">On</li>-->
+                                    <li class="alertIcon warningDr" id="drAlertWarning" style="display: none">
+                                        <a id="drWarning" href="#drPartitionWarning" class="drWarning">
+                                            <span style="margin:0 0 0 24px">Warning</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                                <div class="clear"></div>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                        <div id="drSection" class="drShowHide" style="display:none;">
+                            <div id="drMasterSection" class="masterWrapper" style="display:block;">
+                                <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
+                                    <div class="tabs-filter-wrapperDR">
+                                        <div class="drTitle icon-master" id="drMasterTitle">Master</div>
+                                        <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="clear"></div>
+                                    <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
+                                        <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                        <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                        <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                    </div>
+                                    <div class="drMasterContainer">
+                                        <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
+                                            <thead>
+                                                <tr role="row">
+                                                    <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>
+                                                    <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>
+                                                    <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>
+                                                    <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>
+                                                    <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>
+                                                    <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="drReplicaSection" class="replicaWrapper" style="display:block">
+                                <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
+                                    <div class="tabs-filter-wrapperDR">
+                                        <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
+                                        <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="clear"></div>
+                                    <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
+                                        <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                        <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                        <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                    </div>
+                                    <div class="drReplicaContainer">
+                                        <table width="100%" border="0" cellspacing="0" id="tblDrReplica" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">
+                                            <thead>
+                                                <tr>
+                                                    <th id="Th7" width="25%" data-name="none">Server</th>
+                                                    <th id="Th8" width="25%" data-name="none">Status</th>
+                                                    <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>
+                                                    <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="divCommandLog" class="clpWrapper" style="display:none">
+                        <div class="content drHeader" id="clpHeader">
+                            <div class="leftShowhide">
+                                <div class="dr">
+                                    <h1 class="headText1">
+                                        <a href="javascript:void(0);" id="showHideCLPBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Command Log Performance</a>
+                                    </h1>
+                                </div>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                        <div id="clpSection" class="clpShowHide" style="display:none;">
+                            <!--<div id="drMasterSection" class="masterWrapper" style="display:block;">-->
+                            <div id="tblCmdLog_wrapper" class="dataTables_wrapper no-footer">
+                                <div class="tabs-filter-wrapperDR">
+                                    <div class="drTitle icon-command" id="drCLPTitle">Command Log Data</div>
+                                    <div class="filter"><input name="filter" id="filterServer" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchServer" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                    <div class="clear"></div>
+                                </div>
+                                <div class="clear"></div>
+                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblCmdLog_paginate">
+                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                </div>
+                                <div class="cmdLogContainer">
+                                    <table width="100%" border="0" cellspacing="0" id="tblCmdLog" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblCmdLog_info" role="grid">
+                                        <thead>
+                                            <tr role="row">
+                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Server: activate to sort column ascending">Server</th>
+                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Pending (in bytes): activate to sort column ascending">Pending (in bytes)</th>
+                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Pending (in transactions): activate to sort column ascending">Pending (in transactions)</th>
+                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Total segments: activate to sort column ascending">Total segments</th>
+                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Segments in use: activate to sort column ascending">Segments in use</th>
+                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblCLP" rowspan="1" colspan="1" aria-label="Fsyncinterval: activate to sort column ascending">Fsyncinterval</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <!--</div>-->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--Admin-->
+            <div id="admin" class="container contents">
+                <!-- Loading -->
+                <div id="adminActionOverlay" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
+                <div class="adminWrapper">
+                    <div class="adminLeft">
+                        <h1 class="headText clusterIcon">Cluster</h1>
+                        <div class="adminClusterProperties">
+                            <ul class="adminClusterList">
+                                <li><a href="#pauseConfirmationPop" class="resume" id="pauseConfirmation">Pause</a> <a href="#resumeConfirmationPop" class="pause" id="resumeConfirmation" style="display: none;">Resume</a> </li>
+                                <li><a href="#promoteConfirmationPop" class="promote-disabled" id="promoteConfirmation">Promote</a></li>
+                                <li><a href="#savePop" id="saveConfirmation" class="saveme">Save</a></li>
+                                <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
+                                <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
+                            </ul>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="adminRight">
+                        <div class="downloadConfig">
+                            <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml" class="btnDown">Download Configuration</a>
+                        </div>
+                        <div class="adminServer">
+                            <div class="serverName" id="serverName">Server<span class="setServer adminIcons"></span></div>
+                            <!-- <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>-->
+                            <!-- server list -->
+                            <div id="serverConfigAdmin" style="display: none;">
+                                <div class="slide-pop-wrapper">
+                                    <div class="slide-pop-title ">
+                                        <div class="icon-server searchLeft searchLeftAdmin">Servers</div>
+                                        <div class="searchRight">
+                                            <div class="search">
+                                                <!-- <input type="text" id="popServerSearchAdmin" class="icon-search icoSS" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" placeholder="Search Server"> -->
+                                            </div>
+                                        </div>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="slide-pop-content" style="padding: 0 0 15px 0;">
+                                        <div style="padding: 15px 16px 0 15px;">
+                                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                                                <tr class="serverHeader">
+                                                    <th class="configLabel" width="40%"> Server Name </th>
+                                                    <th align="center">IP Address</th>
+                                                    <th align="right"> State</th>
+                                                </tr>
+                                            </table>
+                                            <div id="serverListWrapperAdmin" style="height:220px; overflow: auto;">
+                                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                                                    <tbody> </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- server list -->
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div class="adminContainer">
+                    <div class="adminContentLeft">
+                        <div class="headerAdminContent">
+                            <h1>Overview</h1>
+                        </div>
+                        <div class="overviewTbl">
+                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
+                                <tr>
+                                    <td width="62%" class="configLabel">Sites Per Host</td>
+                                    <td id="sitePerHost" width="20%" align="right"></td>
+                                    <td width="2%">&nbsp;</td>
+                                    <td width="16%">&nbsp;</td>
+                                </tr>
+                                <tr>
+                                    <td class="configLabel">K-Safety </td>
+                                    <td id="kSafety" align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr>
+                                    <td class="configLabel">Partition Detection </td>
+                                    <td align="right">
+                                        <div id="partitionDetectionIcon" class="onIcon"></div>
+                                    </td>
+                                    <td id="partitionDetectionLabel"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <!--<tr class="security" id="securityRow">
+                                    <td class="configLabel">Security</td>-->
+                                <tr class="hasSubLabel parent security" id="row-6">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Security</a></td>
+                                    <td align="right" class="securitytd">
+                                        <div id="securityOptionIcon" class="offIcon"></div>
+                                        <input type="checkbox" id="chkSecurity" class="chkSecurity" />
+                                        <div id="loadingSecurity" class="loading-small" style="display: none"></div>
+                                    </td>
+                                    <td><span id="spanSecurity" style="display: inline"></span></td>
+                                    <td>
+                                        <a id="btnEditSecurityOk" href="#securityPop" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditSecurityCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
+                                    </td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow">
+                                    <td colspan="4">
+                                        <div id="loadingUserList" class="userSecurity" style="display: none;">
+                                            <div class="loading-small loadingSecurity"></div>
+                                        </div>
+                                        <div class="securWrapper" id="UsersList">
+                                            <!--<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">
+                                                    <tr>
+                                                        <th>Username</th>
+                                                        <th>Password</th>
+                                                        <th>Role</th>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Test</td>
+                                                        <td>Test</td>
+                                                        <td>User</td>
+                                                    </tr>
+                                                </table>-->
+                                        </div>
+                                        <div class="securWrapper" id="UsersListEditable" style="display: none;">
+                                            <div class="userName">Users</div>
+                                            <div class="editBtn"><a href="javascript:void(0)" class="btnEd" id="addmorePOIbutton" onClick="insRow()"><span class="userPlus">+</span> Add User</a> </div>
+                                            <div class="clear secLine"></div>
+                                            <form id="frmUserList" method="get" action="">
+                                                <div id="editUserList">
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-1">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">HTTP Access</a></td>
+                                    <td align="right">
+                                        <div id="httpAccessIcon" class="onIcon"></div>
+                                    </td>
+                                    <td id="httpAccessLabel"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-1 subLabelRow">
+                                    <td class="configLabel">JSON API</td>
+                                    <td align="right">
+                                        <div id="jsonAPIIcon" class="onIcon"></div>
+                                    </td>
+                                    <td id="txtJsonAPI"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-2">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Auto Snapshots</a></td>
+                                    <td align="right" id="autoSnapshotOption" class="snapshottd">
+                                        <div id="autoSnapshotIcon" class="onIcon"></div>
+                                        <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot" />
+                                        <div id="loadingSnapshot" class="loading-small" style="display: none"></div>
+                                    </td>
+                                    <td>
+                                        <div id="txtAutoSnapshot" class="SnapshotsOn"></div>
+                                    </td>
+                                    <td><a id="btnEditAutoSnapshotOk" href="#autoSnapshotPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditAutoSnapshotCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="autoSnapshotEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-2 subLabelRow" id="snapshotPrefixRow">
+                                    <td class="configLabel">File Prefix </td>
+                                    <td align="right" class="tdSnapshotPrefix">
+                                        <form id="frmSnapshotFilePrefix" method="get" action="">
+                                            <div id="loadingSnapshotPrefix" class="loading-small" style="display: none;"></div>
+                                            <span id="prefixSpan"></span>
+                                            <input id="txtPrefix" name="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none" />
+                                            <label id="errorSnapshotFilePrefix" for="txtPrefix" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-2 subLabelRow" id="snapshotFrequencyRow">
+                                    <td class="configLabel">Frequency </td>
+                                    <td align="right" class="tdSnapshotFrequency">
+                                        <form id="frmSnapshotFrequency" method="get" action="">
+                                            <div id="loadingSnapshotFrequency" class="loading-small" style="display: none;"></div>
+                                            <span id="frequencySpan"></span>
+                                            <input id="txtFrequency" name="txtFrequency" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="spanFrequencyUnit"></span>
+                                            <select id="ddlfrequencyUnit" style="display: none;">
+                                                <option>Hrs</option>
+                                                <option>Min</option>
+                                                <option>Sec</option>
+                                            </select>
+                                            <label id="errorSnapshotFrequency" for="txtFrequency" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-2 subLabelRow" id="snapshotRetainedRow">
+                                    <td class="configLabel">Retained </td>
+                                    <td align="right" class="tdSnapshotRetained">
+                                        <form id="frmSnapshotRetained" method="get" action="">
+                                            <div id="loadingSnapshotRetained" class="loading-small" style="display: none;"></div>
+                                            <span id="retainedSpan"></span>
+                                            <input id="txtRetained" name="txtRetained" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="retainedSpanUnit"></span>
+                                            <label id="errorSnapshotRetained" for="txtRetained" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-3">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Command Logging</a></td>
+                                    <td align="right">
+                                        <div id="commandLogIcon" class="offIcon"></div>
+                                    </td>
+                                    <td id="commandLogLabel"></td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-3 subLabelRow">
+                                    <td class="configLabel">Log Frequency Time </td>
+                                    <td align="right">
+                                        <span id="commandLogFrequencyTime"></span>
+                                        <span id="commandLogFrequencyUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-3 subLabelRow">
+                                    <td class="configLabel">Log Frequency Transactions </td>
+                                    <td id="commandLogFrequencyTxns" align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-3 subLabelRow">
+                                    <td class="configLabel">Log Size</td>
+                                    <td align="right">
+                                        <span id="commandLogSegmentSize"></span>
+                                        <span id="commandLogSegmentSizeUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="hasSubLabel parent" id="row-4">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
+                                    <td align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>
+                                        <a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>
+                                        <div id="loadingConfiguration" class="loading-small loadExport" style="display: none"></div>
+                                        <a href="#addConfigPopup" id="addConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
+                                    </td>
+                                </tr>
+                                <tr class="child-row-4 subLabelRow">
+                                    <td class="configLabel">Export Tables</td>
+                                    <td align="right">&nbsp;
+                                        
+                                    </td>
+                                    <td></td>
+                                    <td>
+                                        <a href="javascript:void(0);" id="lstExportTbl" class="drTblBtn" style="display: block;" title="List of Export Tables">Export Tables</a>
+                                        <a href="#exportTablePopup" id="lstExportTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
+                                    </td>
+                                </tr>
+                                <tbody id="exportConfiguration" data-status="value" style="display: none;"></tbody>
+                                <tr class="hasSubLabel parent" id="row-5">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Import</a></td>
+                                    <td align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>
+                                        <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
+                                        <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
+                                    </td>
+                                </tr>
+                                <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
+                                <tr class="hasSubLabel parent" id="row-6">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow">
+                                    <td class="configLabel">Max Java Heap </td>
+                                    <td align="right">
+                                        <span id="maxJavaHeap"></span>
+                                        <span id="maxJavaHeapUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow" id="heartbeatTimeoutRow">
+                                    <td class="configLabel">Heartbeat Timeout </td>
+                                    <td align="right" class="heartbeattd">
+                                        <form id="formHeartbeatTimeout" method="get" action="">
+                                            <div id="loadingHeartbeatTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="hrtTimeOutSpan"></span>
+                                            <input id="txtHrtTimeOut" name="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="hrtTimeOutUnitSpan"></span>
+                                            <label id="errorHeartbeatTimeout" for="txtHrtTimeOut" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow" id="queryTimoutRow">
+                                    <td class="configLabel">Query Timeout</td>
+                                    <td align="right" class="queryTimeOut">
+                                        <form id="formQueryTimeout" method="get" action="">
+                                            <div id="loadingQueryTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="queryTimeOutSpan"></span>
+                                            <input id="txtQueryTimeout" name="txtQueryTimeout" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="queryTimeOutUnitSpan"></span>
+                                            <label id="errorQueryTimeout" for="txtQueryTimeout" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow">
+                                    <td class="configLabel">Max Temp Table Memory</td>
+                                    <td align="right">
+                                        <span id="temptablesmaxsize"></span>
+                                        <span id="temptablesmaxsizeUnit"></span>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow">
+                                    <td class="configLabel">Snapshot Priority</td>
+                                    <td id="snapshotpriority" align="right"></td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-6 subLabelRow" id="memorySizeTimeout">
+                                    <td class="configLabel">Memory Limit</td>
+                                    <td align="right" class="memorySize">
+                                        <form id="formMemoryLimit" method="get" action="">
+                                            <div id="loadingMemoryLimit" class="loading-small" style="display: none;"></div>
+                                            <span id="memoryLimitSize"></span>
+                                            <input id="txtMemoryLimitSize" name="txtMemoryLimitSize" class="exitableMemoryLimit" type="text" style="display: none" />
+                                            <span id="memoryLimitSizeUnit"></span>
+                                            <select id="ddlMemoryLimitUnit" style="display: none;">
+                                                <option>GB</option>
+                                                <option>%</option>
+                                            </select>
+                                            <label id="errorMemorySize" for="txtMemoryLimitSize" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>
+                                        <a id="btnEditMemorySizeOk" href="#MemoryLimitPopup" class="editOk" title="Save" style="">Ok</a>
+                                        <a id="btnEditMemorySizeCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                        <a id="btnEditMemorySize" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                                        <a href="#addDiskLimitPopup" id="addDiskLimitPopupLink" data-id="-1" title="Add Disk Limit" style="display: none">Add Disk Limit</a>
+                                        <a id="btnDeleteMemory" href="#deleteMemoryLimitPopup" class="deleteSmall" title="Delete" style="display:none;">&nbsp;</a>
+                                    </td>
+                                </tr>
+                                <tbody id="diskLimitConfiguration" data-status="value" style="display: none;"></tbody>
+                            </table>
+                        </div>
+                        <div class="drWrapperAdmin" id="divDrWrapperAdmin" style="display:none">
+                            <div class="headerAdminContent">
+                                <h1>
+                                    <div class="drAdminHeaderLeft">Database Replication (DR)</div>
+                                    <div class="drAdminHeaderRight">
+                                        <ul class="drList">
+                                            <li>Mode</li>
+                                            <li id="drMode" class="drArrow"></li>
+                                        </ul>
+                                        <div class="clear"></div>
+                                    </div>
+                                    <div class="clear"></div>
+                                </h1>
+                            </div>
+                            <div class="drContent">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
+                                    <!--<tr>
+                                        <td width="62%" class="configLabel">State</td>
+                                        <td width="20%" align="right">
+                                            <div id="drStateIcon" class="onIcon"></div>
+                                            <input style="display: none;" type="checkbox" id="chkDrState" checked="checked" class="drstate" />
+                                            <div id="loadingDrState" class="loading-small" style="display: none"></div>
+                                        </td>
+                                         <td width="2%"><div id="txtDrState" class="drStateOn">On</div></td>
+                                        <td width="16%"><a id="btnEditDrStateOk" href="#drStatePop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrStateCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="drStateEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                    </tr>-->
+                                    <tr>
+                                        <td width="62%" class="configLabel">ID</td>
+                                        <td id="drId" width="20%" align="right"></td>
+                                        <td width="2%">&nbsp;</td>
+                                        <td width="16%">&nbsp;</td>
+                                    </tr>
+                                    <tr id="row-DrConfig">
+                                        <td class="configLabel">Master</td>
+                                        <td align="right" class="tdDrConfig">
+                                            <div id="drMasterIcon" class="offIcon"></div>
+                                            <input style="display: none;" type="checkbox" checked="checked" id="chkDrMaster" />
+                                            <div id="loadingDrMaster" class="loading-small" style="display: none"></div>
+                                        </td>
+                                        <td><div id="txtDrMaster" class="drMasterOn"></div></td>
+                                        <td>
+                                            <a id="btnEditDrMasterOk" href="#drMasterPop" class="editOk" title="Save" style="">Ok</a>
+                                            <a id="btnEditDrMasterCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                                            <a href="javascript:void(0);" id="drMasterEdit" class="edit" title="Edit">&nbsp;</a>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="configLabel">Replica <span id="replicaSource" style="font-weight:normal"></span></td>
+                                        <td align="right">
+                                            <div id="drReplicaIcon" class="offIcon" title=""></div>
+                                            <input style="display: none;" type="checkbox" id="chkDrReplica" checked="checked" />
+                                            <div id="loadingDrReplica" class="loading-small" style="display: none"></div>
+                                        </td>
+                                        <td><div id="txtDrReplica" class="drReplicaOn" title=""></div></td>
+                                        <td><!--<a id="btnEditDrReplicaOk" href="#drReplicaPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditDrReplicaCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0);" id="drReplicaEdit" class="edit" title="Edit">&nbsp;</a>--> &nbsp;</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="configLabel">DR Tables</td>
+                                        <td></td>
+                                        <td><a href="#replicatedTablePopup" id="lstDrTblLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a></td>
+                                        <td align="right"><a href="javascript:void(0);" id="lstDrTbl" class="drTblBtn" style="display: block;" title="List of DR Tables">DR Tables</a></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="adminContentRight">
+                        <div class="adminPorts">
+                            <div class="headerAdminContent">
+                                <h1>Network Interfaces</h1>
+                            </div>
+                            <div style="overflow: auto">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2 network">
+                                    <tr>
+                                        <th width="30%" id="hPortName">Port Name</th>
+                                        <th width="45%" id="hServerSettings">Server Settings</th>
+                                        <th width="25%" id="hClusterSettings">Cluster Settings</th>
+                                    </tr>
+                                    <tr>
+                                        <td>Client Port</td>
+                                        <td id="clientport"></td>
+                                        <td id="clusterClientport"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Admin Port</td>
+                                        <td id="adminport"></td>
+                                        <td id="clusterAdminport"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>HTTP Port</td>
+                                        <td id="httpport"></td>
+                                        <td id="clusterHttpport"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Internal Port</td>
+                                        <td id="internalPort"></td>
+                                        <td id="clusterInternalPort"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Zookeeper Port</td>
+                                        <td id="zookeeperPort"></td>
+                                        <td id="clusterZookeeperPort"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Replication Port</td>
+                                        <td id="replicationPort"></td>
+                                        <td id="clusterReplicationPort"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="adminDirectories">
+                            <div class="headerAdminContent">
+                                <h1>Directories</h1>
+                            </div>
+                            <div class="adminDirect">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
+                                    <tr>
+                                        <td width="76%">Root (Destination)</td>
+                                        <td id="voltdbroot" width="24%"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Snapshot</td>
+                                        <td id="snapshotpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Export Overflow</td>
+                                        <td id="exportOverflow"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Command Log</td>
+                                        <td id="commandlogpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Command Log Snapshots</td>
+                                        <td id="commandlogsnapshotpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>DR Overflow</td>
+                                        <td id="droverflowpath"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+            </div>
+            <!--Schema Tab-->
+            <div id="schema" class="contents">
+            </div>
+            <!--Sql Query Tab-->
+            <div id="sqlQuery" class="containerStudio contents">
+                <div class="blockWrapper" id="BlockContainer01">
+                    <div class="objectExplorer">
+                        <!-- Loading -->
+                        <div id="sqlQueryOverlay" style="display: none;">
+                            <div class="loading-medium"></div>
+                        </div>
+                        <!-- Loading -->
+                        <div class="explorer">
+                            <!--tab-->
+                            <div class="tabContant" id="tabMain">
+                                <button class="refreshBtn">Refresh</button>
+                                <ul class="tabs">
+                                    <li><a href="#tab1">Tables</a></li>
+                                    <li><a href="#tab2">Views</a></li>
+                                    <li><a href="#tab3">Stored Procedures</a></li>
+                                </ul>
+                                <div class="tab_container">
+                                    <div id="tabScroller">
+                                        <div id="tab1" class="tab_content">
+                                            <div id="accordionTable">
+                                            </div>
+                                        </div>
+                                        <div id="tab2" class="tab_content">
+                                            <div id="accordionViews"></div>
+                                        </div>
+                                        <div id="tab3" class="tab_content">
+                                            <div id="accordionProcedures"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="queryInput" id="inputQuery">
+                    <h1 class="theHeadingQuery">
+                    
+                    <div class="icon-query queryHeadName"><span>Query</span></div>
+                        <ul class="btnList" id="queryBtnList">
+                            <li>
+                              <div class="queryTimeOutLabel" id="divQueryTimeOut"><span id="queryTimeoutTxt" class="qtmText"></span><span id="timeoutCross" class="setqueryTimeOut timeOutCross"></span></div>
+
+                            </li>
+                            <li>
+                                <a href="#queryTimeoutConfigPopup" id="bntTimeoutSetting" class="setServer sqlSetting"></a>
+                            </li>
+                            <li>
+                                <button class="btnStudio" id="runBTn">Run</button>
+                            </li>
+                            <li>
+                                <button class="btnStudio" id="clearQuery">Clear</button>
+                            </li>
+                        </ul>
+                         <div class="clear"></div>
+                        </h1>
+                        <div class="query">
+                            <form name="" id="queryForm">
+                                <div class="textWritingArea">
+                                    <textarea id="theQueryText"></textarea>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div class="blockWrapper" id="blockContainer02">
+                    <div class="exportType">
+                        <form name="" id="queryResult">
+                            <select id="exportType">
+                                <option selected="selected">HTML</option>
+                                <option>CSV</option>
+                                <option>Monospace</option>
+                            </select>
+                        </form>
+                    </div>
+                    <h1 class="theHeading icon-queryResult">Query Result</h1>
+                    <div class="queryResult">
+                        <div id="resultHtml" style="display: block;" class="resultHtml"></div>
+                        <div id="resultCsv" style="display: none;" class="resultCsv"></div>
+                        <div id="resultMonospace" style="display: none;" class="resultMonospace">
+                            <pre>
+                    </pre>
+                        </div>
+                    </div>
+                    <div id="queryResults" class="queryStatus"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer" id="mainFooter">
+        <p>Copyright (C) 2008-2016 VoltDB Inc. All rights reserved. </p>
+    </div>
+    <!-- POPUP Saved Preferences -->
+    <div id="myPreference" style="display: none">
+        <div class="overlay-title">Graph/Data Preferences</div>
+        <div class="clear"></div>
+        <div class="overlay-content graphPop">
+            <form name="popupForm" id="formPopup" method="post">
+                <ul class="user-preferences" id="userPreferences">
+                    <li class="pref-graph">
+                        Server CPU
+                        <input type="checkbox" id="ServerCPU" name="" value="cpu" checked="checked" />
+                    </li>
+                    <li class="pref-graph">
+                        Server RAM
+                        <input type="checkbox" id="ServerRAM" name="" value="ram" checked="checked" />
+                    </li>
+                    <li class="pref-graph">
+                        Cluster Latency
+                        <input type="checkbox" id="ClusterLatency" name="" value="latency" checked="checked" />
+                    </li>
+                    <li class="pref-graph">
+                        Cluster Transactions
+                        <input type="checkbox" id="ClusterTransactions" name="" value="transaction" checked="checked" />
+                    </li>
+                    <li class="pref-graph">
+                        Partition Idle Time
+                        <input type="checkbox" id="PartitionIdleTime" name="" value="transaction" checked="checked" />
+                    </li>
+                    <li class="pref-graph " id="liDrReplication" style="display:block;">
+                        <span>Data Replication (DR)</span>
+                        <input type="checkbox" id="DrReplicationRate" name="" value="drReplication" checked="checked" />
+                    </li>
+                    <li class="pref-graph" id="liCommandLogStat" style="display:block">
+                        <span>Command Log Statistics</span>
+                        <input type="checkbox" id="CommandLogStat" name="" value="commandLogStat" checked="checked" />
+                    </li>
+                    <li class="pref-storedProc">
+                        Stored Procedures
+                        <input type="checkbox" id="StoredProcedures" name="" value="stored_proc" checked="checked" />
+                    </li>
+                    <li class="pref-tables" id="liTables">
+                        Database Tables
+                        <input type="checkbox" id="DatabaseTables" name="" value="table" checked="checked" />
+                    </li>
+                    <li class="pref-tables" id="liCommandLogTables" style="display:block;">
+                        <span>Command Log Data</span>
+                        <input type="checkbox" id="CommandLogTables" name="" value="table" checked="checked" />
+                    </li>
+                    <li class="pref-tables" id="liDrTables" style="display:block">
+                        <span>Data Replication Tables</span>
+                        <input type="checkbox" id="DRTables" name="" value="table" checked="checked" />
+                    </li>
+                </ul>
+                <input type="submit" name="account_details" id="account_details" value="Save" class="input-submit left" hidden="hidden" style="display: none;" />
+            </form>
+        </div>
+        <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
+    </div>
+    <!-- POPUP Saved Preferences -->
+    <!-- POPUP Alerts -->
+    <div id="memoryAlerts" style="display: none">
+        <div class="overlay-title">Memory Usage Alerts</div>
+        <div class="clear"></div>
+        <div class="overlay-content overlayAlert">
+            <!--style="display:block;height: auto !important"-->
+            <div class="mainContentAlert">
+                <table class="serversListTbl">
+                    <tr class="serverHeader">
+                        <th width="40%">Server Name</th>
+                        <th width="30%">IP Address</th>
+                        <th width="30%">Memory Usage</th>
+                    </tr>
+                </table>
+                <div class="alertWrap">
+                    <table class="serversListTbl" id="memoryAlertsList"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- POPUP Alerts -->
+    <div style="display: none"><a href="#error" id="errorPopup">Error</a></div>
+    <!--Error popup-->
+    <div id="error" style="display: none">
+        <div class="overlay-title errorIcon ">Error</div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p id="errorMessage"></p>
+            <br />
+            <div class="overlay-btns" style="padding: 0"><a href="#" class="btn" id="btnOk">Ok</a></div>
+        </div>
+    </div>
+    <!--Error popup-->
+    <!--Logout popup-->
+    <div id="logoutPopup" style="display: none">
+        <div class="overlay-title ">
+            <img src="css/resources/images/Information.png" class="imgError" />Logout
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p>Do you want to logout?</p>
+            <br />
+            <ul class="btnList" id="Ul1">
+                <li>
+                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="A1" onClick="logout();">Ok</a></div>
+                </li>
+                <li>
+                    <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnCancel">Cancel</a></div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <!--Logout popup-->
+    <!--Connection popup-->
+    <div style="display: none"><a href="#connectionPopup" id="conPopup">Connection Error</a></div>
+    <div id="connectionPopup" style="display: none">
+        <div id="conpop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>Lost connection to Database. Please click ok when the server is back online. </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnConOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Connection popup-->
+    <!--Server Shutdown Information-->
+    <div style="display: none"><a href="#shutdownInfoPopup" id="serverShutdownPopup">Cluster Shutdown</a></div>
+    <div id="shutdownInfoPopup" style="display: none">
+        <div id="shutdownPop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>Database has been shutdown. Please click ok when the server is back online. </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnServerShutdownOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Server Shutdown Information-->
+    <!--Server not available popup-->
+    <div style="display: none"><a href="#serverUnavailablePopup" id="serUnavailablePopup">Connection Error</a></div>
+    <div id="serverUnavailablePopup" style="display: none">
+        <div id="servUnavailablePop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not establish connection to Database. The service is either down, very slow to respond or the server refused connection.
+                    Please click ok when the server is back online.
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Server not available popup-->
+    <!--Help popup-->
+    <div id="helppopup"></div>
+    <!--help popup ends-->
+    <!--About popup-->
+    <div id="About" style="display: none">
+        <div class="overlay-title helpIcon ">System Overview</div>
+        <div class="clear"></div>
+        <div class="overlay-contentAbout helpAboutWrap">
+            <!-- <h1>VoltDB Management Center: DB Monitor</h1> -->
+            <div class="dataBlock">
+                <div class="dataBlockContent systemOver" style="padding:0;">
+                    <table id="tblSystemOverview" class="table table-condensed">
+                        <tbody>
+                            <tr>
+                                <td>Mode</td>
+                                <td id="mode"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>VoltDB Version</td>
+                                <td id="voltdbVersion"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Buildstring</td>
+                                <td id="buildString"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Cluster Composition</td>
+                                <td id="clusterComposition"></td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td>Running Since</td>
+                                <td id="runningSince"></td>
+                                <td></td>
+                            </tr>
+                            <!--<tr class="trLicenseInfo">
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>-->
+                            <tr>
+                                <td style="font-weight: bold" class="trLicenseInfo">License Information:</td>
+                                <td class="trLicenseInfo"></td>
+                                <td class="trLicenseInfo"></td>
+                            </tr>
+                            <tr id="tdLicenseInfo" style="display: none">
+                                <td>Community Edition</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Host Count</td>
+                                <td id="tdHostCount"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>WAN Replication</td>
+                                <td id="tdWanReplication"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Expiration</td>
+                                <td id="tdExpiration"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Command Logging</td>
+                                <td id="tdCommandLogging"></td>
+                                <td></td>
+                            </tr>
+                            <tr class="licenseInfo" style="display: none">
+                                <td>Trial</td>
+                                <td id="tdTrial"></td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--help popup ends-->
+    <!-- POPUP shutDownConfirmationPop -->
+    <div id="shutDownConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnShutdownConfirmationOk" class="btn">Ok</a> <a id="btnShutdownConfirmationCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP shutDownConfirmationPop -->
+    <!-- POPUP stopConfirmationPop -->
+    <div id="stopConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Stop: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to stop the Server?</p>
+        </div>
+        <div class="overlay-btns"><a id="StopConfirmOK" class="btn closeBtn">Ok</a> <a id="StopConfirmCancel" class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP stopConfirmationPop -->
+    <!-- POPUP stopConfirmationPop -->
+    <div id="startConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Start: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to start the Server?</p>
+        </div>
+        <div class="overlay-btns"><a id="startConfirmOk" class="btn">Ok</a> <a id="startConfirmCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP stopConfirmationPop -->
+    <!-- POPUP promoteConfirmationPop -->
+    <div id="promoteConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Promote: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to promote the cluster?</p>
+        </div>
+        <div class="overlay-btns"><a id="promoteConfirmOk" class="btn">Ok</a> <a id="promoteConfirmCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP promoteConfirmationPop -->
+    <!-- POPUP pauseConfirmationPop 1 -->
+    <div id="pauseConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Pause: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to pause the cluster and enter admin mode?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnPauseConfirmationOk" class="btn">Ok</a> <a id="btnPauseConfirmationCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP pauseConfirmationPop -->
+    <!-- POPUP shutdownPopupPop 2 -->
+    <div id="shutdownPopupPop" style="display: none">
+        <div class="overlay-title icon-alert">Server</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to stop this node?</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+    <!-- POPUP shutdownPopupPop -->
+    <div id="shutdownPopupPop1" style="display: none">
+        <div class="overlay-title icon-alert">Server</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to enable this node?</p>
+            <p>Continue with the enable?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+    <!-- POPUP shutdownClusterPopupPop -->
+    <div id="shutdownClusterPopupPop" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+    <!-- POPUP resumeConfirmationPop -->
+    <div id="resumeConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Resume: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to resume the cluster and exit admin mode?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnResumeConfirmationOk" class="btn">Ok</a> <a id="btnResumeConfirmationCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP resumeConfirmationPop -->
+    <!-- POPUP autoSnapshotyPop -->
+    <div id="autoSnapshotPop" style="display: none">
+        <div class="overlay-title icon-alert">Auto Snapshots</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP autoSnapshotyPop -->
+    <!-- POPUP securityPop -->
+    <div id="securityPop" style="display: none">
+        <div class="overlay-title icon-alert">Security: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to change Security?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnSecurityOk">Ok</a> <a id="btnPopupSecurityCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP securityPop -->
+    <!-- POPUP securityWarningPop -->
+    <div style="display: none"><a id="loginWarnPopup" href="#loginWarningPopup">login error</a></div>
+    <div id="loginWarningPopup" style="display: none">
+        <div class="overlay-title ">
+            <img src="css/resources/images/error.png" class="imgError" />Error
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p id="loginWarningPopupMsg">Security settings have been changed. You no longer have permission to view this page.</p>
+            <br />
+            <div class="overlay-btns"><a class="btn" id="btnLoginWarningOk">Ok</a></div>
+        </div>
+    </div>
+    <!-- POPUP securityWarningPop -->
+    <!-- POPUP savePop -->
+    <div id="savePop" style="display: none">
+        <div class="overlay-title icon-alert">Save</div>
+        <div class="clear"></div>
+        <div id="saveSnapshot">
+            <div class="overlay-content ">
+                <form id="formSaveSnapshot" method="get" action="">
+                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
+                        <tr>
+                            <td>Directory:<br />(absolute path)</td>
+                            <td id="tdSnapshotDirectory"></td>
+                        </tr>
+                        <tr>
+                            <td>Snapshot Name:</td>
+                            <td id="tdSnapshotName"></td>
+                        </tr>
+                    </table>
+                </form>
+            </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn">Save</a> <a id="btnSaveSnapshotCancel" class="btn btn-gray">Cancel</a> </div>
+        </div>
+    </div>
+    <!-- POPUP savePop -->
+    <!-- POPUP restorePop -->
+    <div id="restorePop" style="display: none">
+        <div id="restoredPopup">
+            <div class="overlay-title icon-alert">Restore</div>
+            <div class="clear"></div>
+            <div class="restoreInfo">
+                <div class="overlay-content">
+                    <div class="restoreCont">
+                        <form id="formSearchSnapshot" method="get" action="">
+                            <div class="directoryRestore">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+                                    <tr>
+                                        <th align="left">Directory <br />(absolute path)</th>
+                                        <td align="left" id="tdSearchSnapshots">
+                                            <!--<input id="txtSearchSnapshots" type="text">-->
+                                        </td>
+                                        <td align="left" id="tdSearchSnapshotsBtn">
+                                            <!--<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>-->
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </form>
+                        <form id="formRestoreSnapshot" method="get" action="">
+                            <div class="restoreSnapshot">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList"></table>
+                            </div>
+                            <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
+                        </form>
+                    </div>
+                </div>
+                <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn">Restore</a> <a id="btnRestoreCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="restoreConfirm" class="restoreConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to Restore?</div>
+                </div>
+                <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn">Yes</a> <a class="btn btn-gray confirmNoRestore">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!-- POPUP restorePop -->
+    <!-- POPUP restorePop -->
+    <div id="HrtTimeOutPopup" style="display: none">
+        <div class="overlay-title icon-alert">Heartbeat Timeout</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupHeartbeatTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupHeartbeatTimeoutCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP restorePop -->
+    <!-- POPUP Query timeout Popup -->
+    <div id="QueryTimeOutPopup" style="display: none">
+        <div class="overlay-title icon-alert">Query Timeout</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="MemoryLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+    <div id="deleteMemoryLimitPopup" style="display:none">
+        <div class="overlay-title icon-alert">Memory Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to delete the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnDelPopupMemoryLimitOk">Ok</a> <a class="btn btn-gray" id="btnDelPopupMemoryLimitCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP Query timeout Popup -->
+    <!-- POPUP Memory Limit -->
+    <div id="diskLimitPopup" style="display: none">
+        <div class="overlay-title icon-alert">Disk Limit</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" id="btnPopupDiskLimitOk">Ok</a> <a class="btn btn-gray" id="btnPopupDiskLimitCancel">Cancel</a> </div>
+    </div>
+    <!-- POPUP Memory Limit -->
+    <!-- POPUP saveConfirmationPopup -->
+    <div id="Div2" style="display: none">
+        <div class="overlay-title icon-alert">Save Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP saveConfirmationPopup -->
+    <!-- POPUP RestoreConfirmationPopup -->
+    <div id="Div3" style="display: none">
+        <div class="overlay-title icon-alert">Restore Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A4">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
+    </div>
+    <!-- POPUP RestoreConfirmationPopup -->
+    <!-- POPUP SaveSnapshotPopup -->
+    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Save Snapshot</a></div>
+    <div id="saveSnapShotPopup" style="display: none">
+        <div id="saveSnaps">
+            <div class="overlay-title ">
+                <img id="imgSaveSnapshotStatus" src="css/resources/images/Information.png" class="imgError" /> <span id="saveSnapshotStatus"></span>
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="saveSnapshotMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSaveSnapshotStatus">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- POPUP SaveSnapshotPopup -->
+    <!-- Error Promote Popup-->
+    <div style="display: none"><a href="#errorPromotePopup" id="btnErrorPromotePopup">Cluster Promote Error</a></div>
+    <div id="errorPromotePopup" style="display: none">
+        <div id="errorPromote">
+            <div class="overlay-title ">
+                <img src="css/resources/images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="promoteErrorMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnPromoteErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- Error Promote Popupp -->
+    <!--Update error Popup-->
+    <div style="display: none"><a href="#updateErrorPopup" id="updateErrorPopupLink">Update Error</a></div>
+    <div id="updateErrorPopup" style="display: none">
+        <div id="updateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update error Auto Snapshot Popup-->
+    <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
+    <div id="updateSnapshotErrorPopup" style="display: none">
+        <div id="updateInnerSnapshotErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateSnapshotErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateSnapshotErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update error DR Master Popup-->
+    <div style="display: none"><a href="#updateDrMasterErrorPopup" id="updateErrorDrMasterPopupLink">Update Error</a></div>
+    <div id="updateDrMasterErrorPopup" style="display: none">
+        <div id="updateInnerDrMasterErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateDrMasterErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateDrMasterOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Query Timeout error Popup-->
+    <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
+    <div id="queryTimeoutUpdateErrorPopup" style="display: none">
+        <div id="queryTimeoutUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="queryTimeoutUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryTimeoutUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Memory Limit error Popup-->
+    <div style="display: none"><a href="#memorySizeUpdateErrorPopup" id="memorySizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="memorySizeUpdateErrorPopup" style="display: none">
+        <div id="memorySizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="memorySizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnMemorySizeUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update Disk Limit error Popup-->
+    <div style="display: none"><a href="#diskSizeUpdateErrorPopup" id="diskSizeUpdateErrorPopupLink">Update Error</a></div>
+    <div id="diskSizeUpdateErrorPopup" style="display: none">
+        <div id="diskSizeUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="diskSizeUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnDiskSizeUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!--Update error Security User-->
+    <div style="display: none"><a href="#securityUserErrorPopup" id="sercurityUserPopupLink">Update Error</a></div>
+    <div id="securityUserErrorPopup" style="display: none">
+        <div id="securityUserInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    <span id="securityUserErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSecurityUserErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    <!-- POPUP StopServerErrorPopup-->
+    <div id="divStopServerError" style="display: none;">
+        <div class="overlay-title icon-alert">Stop Error</div>
+        <div class="clear"></div>
+        <div class="overlay-content resizeCon">
+            <p id="errorLabel" class="txt-bold resizeRestore">Server could not be stopped at the moment</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
+    <!-- POPUP StopServerErrorPopup-->
+    <!--Add Configuration Popup-->
+    <div id="addConfigPopup" style="display: none">
+        <div id="addConfigInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addConfigHeader" class="addConfigHeader">Add Configuration</div>
+                <div id="deleteAddConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+            <div id="addConfigControls">
+                <div class="clear"></div>
+                <form id="formAddConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddConfigSave" class="btn">Save</a> <a id="btnAddConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveConfigText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!--Add Disk Limit Popup-->
+    <div id="addDiskLimitPopup" style="display: none">
+        <div id="addDiskLimitInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addDiskLimitHeader" class="addConfigHeader">Add Disk Limit</div>
+                <div class="clear"></div>
+            </div>
+            <div id="addDiskLimitControls">
+                <div class="clear"></div>
+                <form id="formAddDiskLimit" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addDiskLimitWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddDiskLimitSave" class="btn">Save</a> <a id="btnAddDiskLimitCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveDiskLimitConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="expotSaveDiskLimitText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveDiskLimitOk" class="btn closeBtn">Yes</a> <a id="btnSaveDiskLimitCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <div id="replicatedTablePopup" style="display:none">
+        <div class="overlay-title icon-alert">DR Tables</div>
+        <div class="overlay-content resizeCon">
+            <div id="drPopup" class="repliWrapper">
+            </div>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
+    <div id="exportTablePopup" style="display:none">
+        <div class="overlay-title icon-alert">Export Tables</div>
+        <div class="overlay-content resizeCon">
+            <div id="exportPopup" class="repliWrapper">
+            </div>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
+    </div>
+    <!--Add Configuration Popup-->
+    <!-- Query error because of Paused Database Popup-->
+    <div style="display: none"><a href="#queryDatabasePausedErrorPopup" id="queryDatabasePausedErrorPopupLink">Query Error</a></div>
+    <div id="queryDatabasePausedErrorPopup" style="display: none">
+        <div id="queryDatabasePausedInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Query Execution Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorQueryDbPause">
+                <p>
+                    The query could not be executed because the database is Paused. You can run the query by switching to admin port.
+                </p>
+                <p>&nbsp;</p>
+                <p>
+                    <span style="font-weight: bold">Do you want to switch to admin port?</span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryDatabasePausedErrorOk">Ok</a> <a id="btnQueryDatabasePausedErrorCancel" class="btn btn-gray closeBtn">Cancel</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- Query error because of Paused Database Popup-->
+    <a href="#addUserPopup" id="addNewUserLink" class="plusAdd" title="Add User" style="display: none;">&nbsp;</a>
+    <div id="addUserPopup" style="display: none">
+        <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
+            <div class="overlay-title icon-alert">
+                <div id="addUserHeader" class="addConfigHeader">Add User</div>
+                <div id="deleteUser" class="deleteAddConfig"><a id="deleteSecUser" href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this User</a></div>
+                <div class="clear"></div>
+            </div>
+            <div id="addUserControl">
+                <div class="clear"></div>
+                <form id="frmAddUser" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addUserWrapper" class="editUserWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnSaveUser" class="btn">Save</a> <a id="btnCancelUser" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveUserControl" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span id="userSaveDelete" data-status=""></span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveSecUser" class="btn closeBtn">Yes</a> <a id="btnCancelSaveSecUser" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!--DR warning POPUP  -->
+    <div id="drPartitionWarning" style="display: none">
+        <div class="overlay-title"><div class="warninghead"><img src="css/resources/images/Information.png" />Warning</div></div>
+        <div class="clear"></div>
+        <div class="overlay-content warning">
+            <p id="drPartitionWarningMsg"></p>
+            <div class="overlay-btns" style="padding:0;">
+                <a id="btnDrPartitionWarning" class="btn">Ok</a>
+                <div class="clear"></div>
+            </div>
+        </div>
+    </div>
+    <!-- DR warning POPUP end  -->
+    <!-- POPUP DRStatePop -->
+    <div id="drStatePop" style="display: none">
+        <div class="overlay-title icon-alert">DR State</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveDrState" class="btn">Ok</a> <a id="btnPopupDrStateCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP DRStatePop -->
+    <!-- POPUP DRMasterPop -->
+    <div id="drMasterPop" style="display: none">
+        <div class="overlay-title icon-alert">DR Master</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveDrMaster" class="btn">Ok</a> <a id="btnPopupDrMasterCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP DRStatePop -->
+    <!-- POPUP DRReplicaPop -->
+    <div id="drReplicaPop" style="display: none">
+        <div class="overlay-title icon-alert">DR Replica</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveDrReplica" class="btn">Ok</a> <a id="btnPopupDrReplicaCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
+    <!-- POPUP DRReplicaPop -->
+    <!--Configure Query Timeout Popup-->
+    <div id="queryTimeoutConfigPopup" style="display: none;">
+      <div id="queryTimeoutConfigInnerPopup">
+        <div class="overlay-title icon-alert">
+          <div id="queryTimeoutConfigHeader" class="addConfigHeader">Query Timeout</div>
+          <div class="clear"></div>
+        </div>
+        <div id="queryTimeoutConfigControls">
+          <div class="queryTimeout">
+            <form id="formQueryTimeoutConfiguration" method="get" action="">
+              <table id="tblAddNewProperty" width="100%" class="QueryTbl">
+                <tbody><tr>
+                  <td>Query Timeout</td>
+                  <td align="center">
+                    <input id="txtQueryTimeoutConfig" name="txtQueryTimeoutConfig"  type="text">
+                    <label id="errorQueryTimeoutConfig" for="txtQueryTimeoutConfig" class="error errorTimeOut" style="display: none;"></label>
+                  </td>
+                  <td align="left">milliseconds</td>
+                  </tr>
+                </tbody>
+              </table>
+            </form>
+            <p> You can set time limit for read-only queries. Read-only queries that take longer than the specified time will
+              be canceled.</p>
+          </div>
+
+          <div class="overlay-btns">
+            <a id="btnQueryTimeoutConfigSave" class="btn">Save</a>
+            <a id="btnQueryTimeoutConfigClear" class="btn btn-gray">Clear</a>
+            <a id="btnQueryTimeoutConfigCancel" class="btn btn-gray" style="margin-left:0.02%;">Cancel</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/bootstrap.js"></script>
+    <script src="js/jquery.tablesorter.js"></script>
+    <script src="js/jquery.tablesorter.widgets.js"></script>
+    <!-- Placed at the end of the document so the pages load faster -->
+</body>
+</html>

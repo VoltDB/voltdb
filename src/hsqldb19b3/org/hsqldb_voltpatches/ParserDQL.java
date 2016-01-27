@@ -64,6 +64,10 @@ public class ParserDQL extends ParserBase {
     HsqlException                  lastError;
     boolean                        strictSQLNames;
     boolean                        strictSQLIdentifierParts;
+    // A VoltDB extension to reject quoted (delimited) names.
+    // TODO: Set flag from property?
+    boolean rejectQuotedSchemaObjectNames = true;
+    // End of VoltDB extension
 
     //
 
@@ -106,6 +110,11 @@ public class ParserDQL extends ParserBase {
         } else {
             checkIsNonCoreReservedIdentifier();
         }
+        // A VoltDB extension to reject quoted (delimited) names.
+        if (rejectQuotedSchemaObjectNames && token.isDelimitedIdentifier) {
+            throw unexpectedToken();
+        }
+        // End of VoltDB extension
 
         if (token.namePrePrefix != null) {
             throw tooManyIdentifiers();
@@ -1263,12 +1272,25 @@ public class ParserDQL extends ParserBase {
                      && ((Integer) e1.getValue(null)).intValue() >= 0);
         }
 
+        // A VoltDB extension to allow OFFSET without LIMIT
+        if (e2 != null) {
+            if (e2.isParam()) {
+                e2.setDataType(session, Type.SQL_INTEGER);
+            } else {
+                valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
+                        && ((Integer) e2.getValue(null)).intValue() >= 0);
+            }
+        }
+        // End of VoltDB extension
+
+        /* disable 6 lines ...
         if (e2.isParam()) {
             e2.setDataType(session, Type.SQL_INTEGER);
         } else {
             valid &= (e2.getDataType().typeCode == Types.SQL_INTEGER
                       && ((Integer) e2.getValue(null)).intValue() >= 0);
         }
+        ... disabled 6 lines */
 
         if (valid) {
             sortAndSlice.addLimitCondition(new ExpressionOp(OpTypes.LIMIT, e1,
@@ -1503,6 +1525,9 @@ public class ParserDQL extends ParserBase {
             case OpTypes.STDDEV_SAMP :
             case OpTypes.VAR_POP :
             case OpTypes.VAR_SAMP :
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT :
+            // End of VoltDB extension
                 if (all || distinct) {
                     throw Error.error(ErrorCode.X_42582, all ? Tokens.T_ALL
                                                              : Tokens
@@ -1795,11 +1820,25 @@ public class ParserDQL extends ParserBase {
                             return null;
                         }
 
+                        // A VoltDB extension to adapt to the hsqldb 2.3.2 change for fuller subquery support.
+                        SubQuery td = sq;
+                        // End of VoltDB extension
+                        // BEGIN Cherry-picked code change from hsqldb-2.3.2
+                        if (td.queryExpression.isSingleColumn()) {
+                            e = new Expression(OpTypes.SCALAR_SUBQUERY, td);
+                        } else {
+                            e = new Expression(OpTypes.ROW_SUBQUERY, td);
+                        }
+
+                        return e;
+                        /* Disable 5 lines ...
                         if (!sq.queryExpression.isSingleColumn()) {
                             throw Error.error(ErrorCode.W_01000);
                         }
 
                         return new Expression(OpTypes.SCALAR_SUBQUERY, sq);
+                        ... disabled 5 lines. */
+                        // END Cherry-picked code change from hsqldb-2.3.2
 
                     default :
                         rewind(position);
@@ -1847,6 +1886,9 @@ public class ParserDQL extends ParserBase {
             case Tokens.SOME :
             case Tokens.EVERY :
             case Tokens.COUNT :
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            case Tokens.APPROX_COUNT_DISTINCT :
+            // End of VoltDB extension
             case Tokens.MAX :
             case Tokens.MIN :
             case Tokens.SUM :
@@ -4083,13 +4125,15 @@ public class ParserDQL extends ParserBase {
             exprList  = new HsqlArrayList();
 
             // A VoltDB extension to avoid using exceptions for flow control.
-            e = readExpression(exprList, parseList, 0, parseList.length, false, preferToThrow);
-            if (e != null) {
+            HsqlException e2 = readExpression(exprList, parseList, 0, parseList.length, false, false);
+            if (e2 != null) {
+                // Return or throw the original exception (e) thrown from the
+                // mismatch with the preferred standard argument syntax,
+                // rather than (e2) from the mismatch with the (not as
+                // standard) alternative syntax that also failed.
                 if ( ! preferToThrow ) {
                     return new ExpressionOrException(e);
                 }
-                // It's a little strange to be here -- should have thrown already.
-                // But better late than sorry.
                 throw e;
             }
             /* disable 1 line ...

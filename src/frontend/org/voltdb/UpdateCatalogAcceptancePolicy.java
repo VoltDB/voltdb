@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,7 @@ import org.voltdb.utils.Encoder;
 /**
  * Check update catalog parameters.
  */
-public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
+public class UpdateCatalogAcceptancePolicy extends InvocationValidationPolicy {
 
     public UpdateCatalogAcceptancePolicy(boolean isOn) {
         super(isOn);

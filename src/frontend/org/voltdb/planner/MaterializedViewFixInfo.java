@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -35,7 +34,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -160,7 +159,6 @@ public class MaterializedViewFixInfo {
                 }
             }
         }
-        assert(numOfGroupByColumns > 0);
         m_mvTableScan = mvTableScan;
 
         Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
@@ -182,9 +180,9 @@ public class MaterializedViewFixInfo {
             String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
-            tve.setValueType(VoltType.get((byte)mvCol.getType()));
-            tve.setValueSize(mvCol.getSize());
-            tve.setInBytes(mvCol.getInbytes());
+
+            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
 
             mvDDLGroupbyColumnNames.add(colName);
 
@@ -251,8 +249,9 @@ public class MaterializedViewFixInfo {
             String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
-            tve.setValueType(VoltType.get((byte)mvCol.getType()));
-            tve.setValueSize(mvCol.getSize());
+
+            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            tve.setOrigStmtId(mvTableScan.getStatementId());
 
             needReAggTVEs.add(tve);
         }

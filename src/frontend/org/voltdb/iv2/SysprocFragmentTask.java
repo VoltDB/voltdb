@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,10 +25,18 @@ import java.util.Map;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.*;
+import org.voltdb.DependencyPair;
+import org.voltdb.ParameterSet;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -36,7 +44,6 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
-import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -197,7 +204,19 @@ public class SysprocFragmentTask extends TransactionTask
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
-            } catch (final VoltAbortException e) {
+            }
+            catch (final SpecifiedException e) {
+                // Note that with SpecifiedException, the error code here might get changed before
+                // the client/user sees it. It really just needs to indicate failure.
+                //
+                // Key point here vs the next catch block for VAE is to not wrap the subclass of
+                // SerializableException here to preserve it during the serialization.
+                //
+                currentFragResponse.setStatus(
+                        FragmentResponseMessage.USER_ERROR,
+                        e);
+            }
+            catch (final VoltAbortException e) {
                 currentFragResponse.setStatus(
                         FragmentResponseMessage.USER_ERROR,
                         new SerializableException(CoreUtils.throwableToString(e)));

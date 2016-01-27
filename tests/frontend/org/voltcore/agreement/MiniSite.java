@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ package org.voltcore.agreement;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
@@ -173,8 +174,9 @@ class MiniSite extends Thread implements MeshAide
         if (m_siteLog.isDebugEnabled()) {
             m_siteLog.debug("Saw fault: " + faultMessage);
         }
-        Map<Long, Long> results = m_arbiter.reconfigureOnFault(m_currentHSIds, faultMessage);
-        if (results.isEmpty()) {
+        Set<Long> unknownFaultedSites = new TreeSet<>();
+        Map<Long, Long> results = m_arbiter.reconfigureOnFault(m_currentHSIds, faultMessage, unknownFaultedSites);
+        if (results.isEmpty() && unknownFaultedSites.isEmpty()) {
             return;
         }
         m_failedHSIds.addAll(results.keySet());
@@ -182,6 +184,9 @@ class MiniSite extends Thread implements MeshAide
         ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
         for (long HSId : results.keySet()) {
             failedHosts.add(CoreUtils.getHostIdFromHSId(HSId));
+        }
+        for (long hsId : unknownFaultedSites) {
+            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
         m_failedHosts.disconnect(failedHosts.build());
         // need to "disconnect" these failed guys somehow?

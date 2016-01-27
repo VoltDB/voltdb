@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,13 +36,13 @@ public class DeferredSnapshotSetup implements Callable<DeferredSnapshotSetup> {
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     private final SnapshotWritePlan m_plan;
-    private final Callable m_deferredSetup;
+    private final Callable<Boolean> m_deferredSetup;
     private final long m_txnId;
     private final Map<Integer, Long> m_partitionTransactionIds;
 
     private volatile Exception m_error = null;
 
-    public DeferredSnapshotSetup(SnapshotWritePlan plan, Callable deferredSetup, long txnId,
+    public DeferredSnapshotSetup(SnapshotWritePlan plan, Callable<Boolean> deferredSetup, long txnId,
                                  final Map<Integer, Long> partitionTransactionIds)
     {
         m_plan = plan;

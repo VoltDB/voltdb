@@ -32,6 +32,8 @@ import static java.lang.Math.getExponent;
 import static java.lang.Math.log;
 import static java.lang.Math.rint;
 
+import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.primitives.Booleans;
 
@@ -45,11 +47,13 @@ import java.util.Iterator;
  * @author Louis Wasserman
  * @since 11.0
  */
+@GwtCompatible(emulated = true)
 public final class DoubleMath {
   /*
    * This method returns a value y such that rounding y DOWN (towards zero) gives the same result
    * as rounding x according to the specified mode.
    */
+  @GwtIncompatible("#isMathematicalInteger, com.google_voltpatches.common.math.DoubleUtils")
   static double roundIntermediate(double x, RoundingMode mode) {
     if (!isFinite(x)) {
       throw new ArithmeticException("input is infinite or NaN");
@@ -123,6 +127,7 @@ public final class DoubleMath {
    *         {@link RoundingMode#UNNECESSARY}
    *         </ul>
    */
+  @GwtIncompatible("#roundIntermediate")
   public static int roundToInt(double x, RoundingMode mode) {
     double z = roundIntermediate(x, mode);
     checkInRange(z > MIN_INT_AS_DOUBLE - 1.0 & z < MAX_INT_AS_DOUBLE + 1.0);
@@ -146,6 +151,7 @@ public final class DoubleMath {
    *         {@link RoundingMode#UNNECESSARY}
    *         </ul>
    */
+  @GwtIncompatible("#roundIntermediate")
   public static long roundToLong(double x, RoundingMode mode) {
     double z = roundIntermediate(x, mode);
     checkInRange(MIN_LONG_AS_DOUBLE - z < 1.0 & z < MAX_LONG_AS_DOUBLE_PLUS_ONE);
@@ -170,6 +176,8 @@ public final class DoubleMath {
    *         {@link RoundingMode#UNNECESSARY}
    *         </ul>
    */
+  @GwtIncompatible("#roundIntermediate, java.lang.Math.getExponent, "
+      + "com.google_voltpatches.common.math.DoubleUtils")
   public static BigInteger roundToBigInteger(double x, RoundingMode mode) {
     x = roundIntermediate(x, mode);
     if (MIN_LONG_AS_DOUBLE - x < 1.0 & x < MAX_LONG_AS_DOUBLE_PLUS_ONE) {
@@ -185,6 +193,7 @@ public final class DoubleMath {
    * Returns {@code true} if {@code x} is exactly equal to {@code 2^k} for some finite integer
    * {@code k}.
    */
+  @GwtIncompatible("com.google_voltpatches.common.math.DoubleUtils")
   public static boolean isPowerOfTwo(double x) {
     return x > 0.0 && isFinite(x) && LongMath.isPowerOfTwo(getSignificand(x));
   }
@@ -219,6 +228,7 @@ public final class DoubleMath {
    * @throws IllegalArgumentException if {@code x <= 0.0}, {@code x} is NaN, or {@code x} is
    *         infinite
    */
+  @GwtIncompatible("java.lang.Math.getExponent, com.google_voltpatches.common.math.DoubleUtils")
   @SuppressWarnings("fallthrough")
   public static int log2(double x, RoundingMode mode) {
     checkArgument(x > 0.0 && isFinite(x), "x must be positive and finite");
@@ -265,6 +275,7 @@ public final class DoubleMath {
    * <p>This is equivalent to, but not necessarily implemented as, the expression {@code
    * !Double.isNaN(x) && !Double.isInfinite(x) && x == Math.rint(x)}.
    */
+  @GwtIncompatible("java.lang.Math.getExponent, com.google_voltpatches.common.math.DoubleUtils")
   public static boolean isMathematicalInteger(double x) {
     return isFinite(x)
         && (x == 0.0 ||
@@ -273,7 +284,7 @@ public final class DoubleMath {
 
   /**
    * Returns {@code n!}, that is, the product of the first {@code n} positive
-   * integers, {@code 1} if {@code n == 0}, or e n!}, or
+   * integers, {@code 1} if {@code n == 0}, or {@code n!}, or
    * {@link Double#POSITIVE_INFINITY} if {@code n! > Double.MAX_VALUE}.
    *
    * <p>The result is within 1 ulp of the true value.
@@ -372,85 +383,120 @@ public final class DoubleMath {
     }
   }
 
-  private static final class MeanAccumulator {
+  /**
+   * Returns the <a href="http://en.wikipedia.org/wiki/Arithmetic_mean">arithmetic mean</a> of
+   * {@code values}.
+   *
+   * <p>If these values are a sample drawn from a population, this is also an unbiased estimator of
+   * the arithmetic mean of the population.
+   *
+   * @param values a nonempty series of values
+   * @throws IllegalArgumentException if {@code values} is empty or contains any non-finite value
+   */
+  @GwtIncompatible("com.google_voltpatches.common.math.DoubleUtils")
+  public static double mean(double... values) {
+    checkArgument(values.length > 0, "Cannot take mean of 0 values");
+    long count = 1;
+    double mean = checkFinite(values[0]);
+    for (int index = 1; index < values.length; ++index) {
+      checkFinite(values[index]);
+      count++;
+      // Art of Computer Programming vol. 2, Knuth, 4.2.2, (15)
+      mean += (values[index] - mean) / count;
+    }
+    return mean;
+  }
 
-    private long count = 0;
-    private double mean = 0.0;
+  /**
+   * Returns the <a href="http://en.wikipedia.org/wiki/Arithmetic_mean">arithmetic mean</a> of
+   * {@code values}.
+   *
+   * <p>If these values are a sample drawn from a population, this is also an unbiased estimator of
+   * the arithmetic mean of the population.
+   *
+   * @param values a nonempty series of values
+   * @throws IllegalArgumentException if {@code values} is empty
+   */
+  public static double mean(int... values) {
+    checkArgument(values.length > 0, "Cannot take mean of 0 values");
+    // The upper bound on the the length of an array and the bounds on the int values mean that, in
+    // this case only, we can compute the sum as a long without risking overflow or loss of
+    // precision. So we do that, as it's slightly quicker than the Knuth algorithm.
+    long sum = 0;
+    for (int index = 0; index < values.length; ++index) {
+      sum += values[index];
+    }
+    return (double) sum / values.length;
+  }
 
-    void add(double value) {
-      checkArgument(isFinite(value));
-      ++count;
+  /**
+   * Returns the <a href="http://en.wikipedia.org/wiki/Arithmetic_mean">arithmetic mean</a> of
+   * {@code values}.
+   *
+   * <p>If these values are a sample drawn from a population, this is also an unbiased estimator of
+   * the arithmetic mean of the population.
+   *
+   * @param values a nonempty series of values, which will be converted to {@code double} values
+   *     (this may cause loss of precision for longs of magnitude over 2^53 (slightly over 9e15))
+   * @throws IllegalArgumentException if {@code values} is empty
+   */
+  public static double mean(long... values) {
+    checkArgument(values.length > 0, "Cannot take mean of 0 values");
+    long count = 1;
+    double mean = values[0];
+    for (int index = 1; index < values.length; ++index) {
+      count++;
+      // Art of Computer Programming vol. 2, Knuth, 4.2.2, (15)
+      mean += (values[index] - mean) / count;
+    }
+    return mean;
+  }
+
+  /**
+   * Returns the <a href="http://en.wikipedia.org/wiki/Arithmetic_mean">arithmetic mean</a> of
+   * {@code values}.
+   *
+   * <p>If these values are a sample drawn from a population, this is also an unbiased estimator of
+   * the arithmetic mean of the population.
+   *
+   * @param values a nonempty series of values, which will be converted to {@code double} values
+   *     (this may cause loss of precision)
+   * @throws IllegalArgumentException if {@code values} is empty or contains any non-finite value
+   */
+  @GwtIncompatible("com.google_voltpatches.common.math.DoubleUtils")
+  public static double mean(Iterable<? extends Number> values) {
+    return mean(values.iterator());
+  }
+
+  /**
+   * Returns the <a href="http://en.wikipedia.org/wiki/Arithmetic_mean">arithmetic mean</a> of
+   * {@code values}.
+   *
+   * <p>If these values are a sample drawn from a population, this is also an unbiased estimator of
+   * the arithmetic mean of the population.
+   *
+   * @param values a nonempty series of values, which will be converted to {@code double} values
+   *     (this may cause loss of precision)
+   * @throws IllegalArgumentException if {@code values} is empty or contains any non-finite value
+   */
+  @GwtIncompatible("com.google_voltpatches.common.math.DoubleUtils")
+  public static double mean(Iterator<? extends Number> values) {
+    checkArgument(values.hasNext(), "Cannot take mean of 0 values");
+    long count = 1;
+    double mean = checkFinite(values.next().doubleValue());
+    while (values.hasNext()) {
+      double value = checkFinite(values.next().doubleValue());
+      count++;
       // Art of Computer Programming vol. 2, Knuth, 4.2.2, (15)
       mean += (value - mean) / count;
     }
-
-    double mean() {
-      checkArgument(count > 0, "Cannot take mean of 0 values");
-      return mean;
-    }
+    return mean;
   }
 
-  /**
-   * Returns the arithmetic mean of the values. There must be at least one value, and they must all
-   * be finite.
-   */
-  public static double mean(double... values) {
-    MeanAccumulator accumulator = new MeanAccumulator();
-    for (double value : values) {
-      accumulator.add(value);
-    }
-    return accumulator.mean();
-  }
-
-  /**
-   * Returns the arithmetic mean of the values. There must be at least one value. The values will
-   * be converted to doubles, which does not cause any loss of precision for ints.
-   */
-  public static double mean(int... values) {
-    MeanAccumulator accumulator = new MeanAccumulator();
-    for (int value : values) {
-      accumulator.add(value);
-    }
-    return accumulator.mean();
-  }
-
-  /**
-   * Returns the arithmetic mean of the values. There must be at least one value. The values will
-   * be converted to doubles, which causes loss of precision for longs of magnitude over 2^53
-   * (slightly over 9e15).
-   */
-  public static double mean(long... values) {
-    MeanAccumulator accumulator = new MeanAccumulator();
-    for (long value : values) {
-      accumulator.add(value);
-    }
-    return accumulator.mean();
-  }
-
-  /**
-   * Returns the arithmetic mean of the values. There must be at least one value, and they must all
-   * be finite. The values will be converted to doubles, which may cause loss of precision for some
-   * numeric types.
-   */
-  public static double mean(Iterable<? extends Number> values) {
-    MeanAccumulator accumulator = new MeanAccumulator();
-    for (Number value : values) {
-      accumulator.add(value.doubleValue());
-    }
-    return accumulator.mean();
-  }
-
-  /**
-   * Returns the arithmetic mean of the values. There must be at least one value, and they must all
-   * be finite. The values will be converted to doubles, which may cause loss of precision for some
-   * numeric types.
-   */
-  public static double mean(Iterator<? extends Number> values) {
-    MeanAccumulator accumulator = new MeanAccumulator();
-    while (values.hasNext()) {
-      accumulator.add(values.next().doubleValue());
-    }
-    return accumulator.mean();
+  @GwtIncompatible("com.google_voltpatches.common.math.DoubleUtils")
+  private static double checkFinite(double argument) {
+    checkArgument(isFinite(argument));
+    return argument;
   }
 
   private DoubleMath() {}

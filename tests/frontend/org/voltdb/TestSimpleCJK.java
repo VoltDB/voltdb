@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,14 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 
-import junit.framework.TestCase;
-
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.TestJSONInterface.Response;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -36,7 +38,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestSimpleCJK extends TestCase {
+public class TestSimpleCJK {
     public static final String POORLY_TRANSLATED_CHINESE =
         "两条路分叉在黄色的树林，\n" +
         "可惜我不能到处都\n" +
@@ -64,7 +66,10 @@ public class TestSimpleCJK extends TestCase {
 
     public static final String POORLY_TRANSLATED_KOREAN = "두도";*/
 
-    ServerThread startup() throws UnsupportedEncodingException {
+    ServerThread m_server;
+
+    @Before
+    public void startup() throws Exception {
         String simpleSchema =
             "create table cjk (" +
             "sval1 varchar(1024) not null, " +
@@ -99,11 +104,12 @@ public class TestSimpleCJK extends TestCase {
         server.start();
         server.waitForInitialization();
 
-        return server;
+        m_server =  server;
     }
 
+    @Test
     public void testRoundTripCJKWithRegularInsert() throws Exception {
-        ServerThread server = startup();
+        ServerThread server = m_server;
 
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
@@ -160,8 +166,9 @@ public class TestSimpleCJK extends TestCase {
         server.join();
     }
 
+    @Test
     public void testRoundTripCJKWithJSONInsert() throws Exception {
-        ServerThread server = startup();
+        ServerThread server = m_server;
 
         ParameterSet pset;
         String responseJSON;

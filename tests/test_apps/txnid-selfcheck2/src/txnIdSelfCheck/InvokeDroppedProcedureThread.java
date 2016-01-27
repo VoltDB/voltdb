@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,16 +28,13 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
-public class InvokeDroppedProcedureThread extends Thread {
-
-    static VoltLogger log = new VoltLogger("HOST");
+public class InvokeDroppedProcedureThread extends BenchmarkThread {
 
     Random r = new Random(8278923);
     long counter = 0;
@@ -48,8 +45,6 @@ public class InvokeDroppedProcedureThread extends Thread {
 
     public InvokeDroppedProcedureThread(Client client) {
         setName("InvokeDroppedProcedureThread");
-        setDaemon(true);
-
         this.client = client;
     }
 
@@ -62,6 +57,8 @@ public class InvokeDroppedProcedureThread extends Thread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
+                Benchmark.txnCount.incrementAndGet();
             //The procedure may be dropped so we don't really care, just want to test the server with dropped procedure invocations in flight
         }
     }
@@ -107,9 +104,7 @@ public class InvokeDroppedProcedureThread extends Thread {
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
-                log.error("InvokeDroppedProcedureThread failed to run client. Will exit.", e);
-                Benchmark.printJStack();
-                System.exit(-1);
+                hardStop("InvokeDroppedProcedureThread failed to run client. Will exit.", e);
             }
         }
     }

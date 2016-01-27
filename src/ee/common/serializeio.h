@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -61,12 +61,15 @@
 #include "bytearray.h"
 #include "debuglog.h"
 #include "common/SQLException.h"
+#include "common/types.h"
 
 namespace voltdb {
 
 
 #ifdef __DARWIN_OSSwapInt64 // for darwin/macosx
 
+#undef htonll
+#undef ntohll
 #define htonll(x) __DARWIN_OSSwapInt64(x)
 #define ntohll(x) __DARWIN_OSSwapInt64(x)
 
@@ -79,11 +82,15 @@ namespace voltdb {
 
 #ifdef __bswap_64 // recent linux
 
+#undef htonll
+#undef ntohll
 #define htonll(x) static_cast<uint64_t>(__bswap_constant_64(x))
 #define ntohll(x) static_cast<uint64_t>(__bswap_constant_64(x))
 
 #else // unix in general again
 
+#undef htonll
+#undef ntohll
 #define htonll(x) (((int64_t)(ntohl((int32_t)((x << 32) >> 32))) << 32) | (uint32_t)ntohl(((int32_t)(x >> 32))))
 #define ntohll(x) (((int64_t)(ntohl((int32_t)((x << 32) >> 32))) << 32) | (uint32_t)ntohl(((int32_t)(x >> 32))))
 
@@ -94,7 +101,7 @@ namespace voltdb {
 
 
 /** Abstract class for reading from memory buffers. */
-class SerializeInput {
+template <Endianess E> class SerializeInput {
 protected:
     /** Does no initialization. Subclasses must call initialize. */
     SerializeInput() : current_(NULL), end_(NULL) {}
@@ -118,12 +125,20 @@ public:
 
     inline int16_t readShort() {
         int16_t value = readPrimitive<int16_t>();
-        return ntohs(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            return ntohs(value);
+        } else {
+            return value;
+        }
     }
 
     inline int32_t readInt() {
         int32_t value = readPrimitive<int32_t>();
-        return ntohl(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            return ntohl(value);
+        } else {
+            return value;
+        }
     }
 
     inline bool readBool() {
@@ -136,12 +151,18 @@ public:
 
     inline int64_t readLong() {
         int64_t value = readPrimitive<int64_t>();
-        return ntohll(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            return ntohll(value);
+        } else {
+            return value;
+        }
     }
 
     inline float readFloat() {
         int32_t value = readPrimitive<int32_t>();
-        value = ntohl(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            value = ntohl(value);
+        }
         float retval;
         memcpy(&retval, &value, sizeof(retval));
         return retval;
@@ -149,19 +170,25 @@ public:
 
     inline double readDouble() {
         int64_t value = readPrimitive<int64_t>();
-        value = ntohll(value);
+        if (E == BYTE_ORDER_BIG_ENDIAN) {
+            value = ntohll(value);
+        }
         double retval;
         memcpy(&retval, &value, sizeof(retval));
         return retval;
     }
 
     /** Returns a pointer to the internal data buffer, advancing the read position by length. */
-    const void* getRawPointer(size_t length) {
-        const void* result = current_;
+    const char* getRawPointer(size_t length) {
+        const char* result = current_;
         current_ += length;
         // TODO: Make this a non-optional check?
         assert(current_ <= end_);
         return result;
+    }
+
+    const char* getRawPointer() {
+        return current_;
     }
 
     /** Copy a string from the buffer. */
@@ -194,6 +221,10 @@ public:
     // TODO(evanj): Change the implementation to validate this?
     void unread(size_t bytes) {
         current_ -= bytes;
+    }
+
+    bool hasRemaining() {
+        return current_ < end_;
     }
 
 private:
@@ -427,10 +458,10 @@ protected:
 };
 
 /** Implementation of SerializeInput that references an existing buffer. */
-class ReferenceSerializeInput : public SerializeInput {
+template <Endianess E> class ReferenceSerializeInput : public SerializeInput<E> {
 public:
     ReferenceSerializeInput(const void* data, size_t length) {
-        initialize(data, length);
+        this->initialize(data, length);
     }
 
     // Destructor does nothing: nothing to clean up!
@@ -438,11 +469,11 @@ public:
 };
 
 /** Implementation of SerializeInput that makes a copy of the buffer. */
-class CopySerializeInput : public SerializeInput {
+template <Endianess E> class CopySerializeInput : public SerializeInput<E> {
 public:
     CopySerializeInput(const void* data, size_t length) :
             bytes_(reinterpret_cast<const char*>(data), static_cast<int>(length)) {
-        initialize(bytes_.data(), static_cast<int>(length));
+        this->initialize(bytes_.data(), static_cast<int>(length));
     }
 
     // Destructor frees the ByteArray.
@@ -451,6 +482,18 @@ public:
 private:
     ByteArray bytes_;
 };
+
+#ifndef SERIALIZE_IO_DECLARATIONS
+#define SERIALIZE_IO_DECLARATIONS
+typedef SerializeInput<BYTE_ORDER_BIG_ENDIAN> SerializeInputBE;
+typedef SerializeInput<BYTE_ORDER_LITTLE_ENDIAN> SerializeInputLE;
+
+typedef ReferenceSerializeInput<BYTE_ORDER_BIG_ENDIAN> ReferenceSerializeInputBE;
+typedef ReferenceSerializeInput<BYTE_ORDER_LITTLE_ENDIAN> ReferenceSerializeInputLE;
+
+typedef CopySerializeInput<BYTE_ORDER_BIG_ENDIAN> CopySerializeInputBE;
+typedef CopySerializeInput<BYTE_ORDER_LITTLE_ENDIAN> CopySerializeInputLE;
+#endif
 
 /** Implementation of SerializeOutput that references an existing buffer. */
 class ReferenceSerializeOutput : public SerializeOutput {

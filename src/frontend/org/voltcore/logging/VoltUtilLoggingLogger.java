@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,6 @@
 
 package org.voltcore.logging;
 
-import java.io.StringWriter;
 import java.util.logging.Logger;
 
 /**
@@ -89,11 +88,6 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
         if (t != null)
             msg += " : Throwable: " + t.toString();
         m_logger.log(getPriorityForLevel(level), msg);
-    }
-
-    @Override
-    public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.log(java.util.logging.Level.INFO, "This logger doesn't support appenders. You need Log4j.");
     }
 
     @Override

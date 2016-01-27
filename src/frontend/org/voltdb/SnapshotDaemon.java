@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -63,6 +64,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -193,7 +195,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private State m_state = State.STARTUP;
 
-    SnapshotDaemon() {
+    SnapshotDaemon(CatalogContext catalogContext) {
         m_esBase.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         m_esBase.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
@@ -205,10 +207,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_path = null;
         m_prefixAndSeparator = null;
 
-
-
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus();
+        snapshotStatus.setSnapshotPath(
+                catalogContext.cluster.getLogconfig().get("log").getInternalsnapshotpath(),
+                catalogContext.database.getSnapshotschedule().get("default").getPath());
         VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS,
                                                               0,
                                                               snapshotStatus);
@@ -303,7 +306,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 // Do scan work on all known live hosts
                 VoltMessage msg = new SnapshotCheckRequestMessage(jsString);
-                List<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
                 for (int hostId : liveHosts) {
                     m_mb.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SNAPSHOT_IO_AGENT_ID), msg);
                 }
@@ -452,15 +455,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             TruncationSnapshotAttempt snapshotAttempt = entry.getValue();
             if (!foundMostRecentSuccess) {
                 if (snapshotAttempt.finished) {
-                    loggingLog.info("Found most recent successful snapshot txnid " + entry.getKey()
+                    loggingLog.info("Found most recent successful snapshot txnid " + TxnEgo.txnIdToString(entry.getKey())
                             + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                     foundMostRecentSuccess = true;
                 } else {
-                    loggingLog.info("Retaining possible partial snapshot txnid " + entry.getKey()
+                    loggingLog.info("Retaining possible partial snapshot txnid " + TxnEgo.txnIdToString(entry.getKey())
                             + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                 }
             } else {
-                loggingLog.info("Deleting old unecessary snapshot txnid " + entry.getKey()
+                loggingLog.info("Deleting old unecessary snapshot txnid " + TxnEgo.txnIdToString(entry.getKey())
                         + " path " + entry.getValue().path + " nonce " + entry.getValue().nonce);
                 toDelete.add(entry.getValue());
                 iter.remove();
@@ -674,12 +677,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         // for the snapshot save invocations
         JSONObject jsObj = new JSONObject();
         try {
+            assert truncReqId != null;
             String sData = "";
-            if (truncReqId != null) {
-                JSONObject jsData = new JSONObject();
-                jsData.put("truncReqId", truncReqId);
-                sData = jsData.toString();
-            }
+            JSONObject jsData = new JSONObject();
+            jsData.put("truncReqId", truncReqId);
+            sData = jsData.toString();
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
@@ -728,7 +730,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
                 if (err != null) {
-                    loggingLog.warn("Snapshot failed with failure response: " + err);
+                    if (err.trim().equalsIgnoreCase("SNAPSHOT IN PROGRESS")) {
+                        loggingLog.info("Snapshot is in progress");
+                    } else {
+                        loggingLog.warn("Snapshot failed with failure response: " + err);
+                    }
                     success = false;
                 }
 
@@ -1290,7 +1296,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (m_state == State.STARTUP) {
             initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
-            RateLimitedLogger.tryLogForMessage("Blocked in scanning", System.nanoTime(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO);
+            RateLimitedLogger.tryLogForMessage(System.nanoTime(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO, "Blocked in scanning");
             return;
         } else if (m_state == State.WAITING){
             processWaitingPeriodicWork(now);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -74,12 +74,12 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
-        assert(m_node->getInputTables().size() == 0);
+        assert(m_node->getInputTableCount() == 0);
         return true;
     }
 
-    assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    assert(m_node->getInputTableCount() == 1);
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
@@ -106,11 +106,10 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    (int)targetTable->visibleTupleCount(),
                    (int)targetTable->allocatedTupleCount());
 
-        // actually delete all the tuples: undo by table not by each tuple.
+        // empty the table either by table swap or iteratively deleting tuple-by-tuple
         targetTable->truncateTable(m_engine);
     }
-    else
-    {
+    else {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(targetTuple.sizeInValues() == targetTable->columnCount());
@@ -153,7 +152,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    m_node->getOutputTable()->name().c_str());
         return false;
     }
-    m_engine->m_tuplesModified += modified_tuples;
+    m_engine->addToTuplesModified(modified_tuples);
 
     return true;
 }

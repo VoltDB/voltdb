@@ -23,6 +23,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 
 import java.io.Serializable;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -33,9 +34,10 @@ import javax.annotation_voltpatches.Nullable;
  * @author Bob Lee
  * @author Ben Yu
  * @author Gregory Kick
- * @since 10.0 (<a href="http://code.google.com/p/guava-libraries/wiki/Compatibility"
+ * @since 10.0 (<a href="https://github.com/google/guava/wiki/Compatibility"
  *        >mostly source-compatible</a> since 4.0)
  */
+@CheckReturnValue
 @GwtCompatible
 public abstract class Equivalence<T> {
   /**
@@ -90,9 +92,9 @@ public abstract class Equivalence<T> {
    *     {@code hash(x}} consistently return the same value provided {@code x} remains unchanged
    *     according to the definition of the equivalence. The hash need not remain consistent from
    *     one execution of an application to another execution of the same application.
-   * <li>It is <i>distributable accross equivalence</i>: for any references {@code x} and {@code y},
+   * <li>It is <i>distributable across equivalence</i>: for any references {@code x} and {@code y},
    *     if {@code equivalent(x, y)}, then {@code hash(x) == hash(y)}. It is <i>not</i> necessary
-   *     that the hash be distributable accorss <i>inequivalence</i>. If {@code equivalence(x, y)}
+   *     that the hash be distributable across <i>inequivalence</i>. If {@code equivalence(x, y)}
    *     is false, {@code hash(x) == hash(y)} may still be true.
    * <li>{@code hash(null)} is {@code 0}.
    * </ul>
@@ -143,7 +145,7 @@ public abstract class Equivalence<T> {
   /**
    * Returns a wrapper of {@code reference} that implements
    * {@link Wrapper#equals(Object) Object.equals()} such that
-   * {@code wrap(this, a).equals(wrap(this, b))} if and only if {@code this.equivalent(a, b)}.
+   * {@code wrap(a).equals(wrap(b))} if and only if {@code equivalent(a, b)}.
    * 
    * @since 10.0
    */
@@ -179,7 +181,8 @@ public abstract class Equivalence<T> {
     }
 
     /** Returns the (possibly null) reference wrapped by this instance. */
-    @Nullable public T get() {
+    @Nullable
+    public T get() {
       return reference;
     }
 
@@ -188,29 +191,32 @@ public abstract class Equivalence<T> {
      * references is {@code true} and both wrappers use the {@link Object#equals(Object) same}
      * equivalence.
      */
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj == this) {
         return true;
-      } else if (obj instanceof Wrapper) {
-        Wrapper<?> that = (Wrapper<?>) obj;
-        /*
-         * We cast to Equivalence<Object> here because we can't check the type of the reference held
-         * by the other wrapper.  But, by checking that the Equivalences are equal, we know that
-         * whatever type it is, it is assignable to the type handled by this wrapper's equivalence.
-         */
-        @SuppressWarnings("unchecked")
-        Equivalence<Object> equivalence = (Equivalence<Object>) this.equivalence;
-        return equivalence.equals(that.equivalence)
-            && equivalence.equivalent(this.reference, that.reference);
-      } else {
-        return false;
       }
+      if (obj instanceof Wrapper) {
+        Wrapper<?> that = (Wrapper<?>) obj; // note: not necessarily a Wrapper<T>
+
+        if (this.equivalence.equals(that.equivalence)) {
+          /*
+           * We'll accept that as sufficient "proof" that either equivalence should be able to
+           * handle either reference, so it's safe to circumvent compile-time type checking.
+           */
+          @SuppressWarnings("unchecked")
+          Equivalence<Object> equivalence = (Equivalence<Object>) this.equivalence;
+          return equivalence.equivalent(this.reference, that.reference);
+        }
+      }
+      return false;
     }
 
     /**
      * Returns the result of {@link Equivalence#hash(Object)} applied to the wrapped reference.
      */
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return equivalence.hash(reference);
     }
 
@@ -218,7 +224,8 @@ public abstract class Equivalence<T> {
      * Returns a string representation for this equivalence wrapper. The form of this string
      * representation is not specified.
      */
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return equivalence + ".wrap(" + reference + ")";
     }
 
@@ -264,27 +271,30 @@ public abstract class Equivalence<T> {
       this.target = target;
     }
 
-    @Override public boolean apply(@Nullable T input) {
+    @Override
+    public boolean apply(@Nullable T input) {
       return equivalence.equivalent(input, target);
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (this == obj) {
         return true;
       }
       if (obj instanceof EquivalentToPredicate) {
         EquivalentToPredicate<?> that = (EquivalentToPredicate<?>) obj;
-        return equivalence.equals(that.equivalence)
-            && Objects.equal(target, that.target);
+        return equivalence.equals(that.equivalence) && Objects.equal(target, that.target);
       }
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return Objects.hashCode(equivalence, target);
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return equivalence + ".equivalentTo(" + target + ")";
     }
 
@@ -317,40 +327,45 @@ public abstract class Equivalence<T> {
     return Identity.INSTANCE;
   }
 
-  static final class Equals extends Equivalence<Object>
-      implements Serializable {
+  static final class Equals extends Equivalence<Object> implements Serializable {
     
     static final Equals INSTANCE = new Equals();
 
-    @Override protected boolean doEquivalent(Object a, Object b) {
+    @Override
+    protected boolean doEquivalent(Object a, Object b) {
       return a.equals(b);
     }
-    @Override public int doHash(Object o) {
+
+    @Override
+    protected int doHash(Object o) {
       return o.hashCode();
     }
 
     private Object readResolve() {
       return INSTANCE;
     } 
+
     private static final long serialVersionUID = 1;
   }
   
-  static final class Identity extends Equivalence<Object>
-      implements Serializable {
+  static final class Identity extends Equivalence<Object> implements Serializable {
     
     static final Identity INSTANCE = new Identity();
     
-    @Override protected boolean doEquivalent(Object a, Object b) {
+    @Override
+    protected boolean doEquivalent(Object a, Object b) {
       return false;
     }
 
-    @Override protected int doHash(Object o) {
+    @Override
+    protected int doHash(Object o) {
       return System.identityHashCode(o);
     }
  
     private Object readResolve() {
       return INSTANCE;
     }
+
     private static final long serialVersionUID = 1;
   }
 }

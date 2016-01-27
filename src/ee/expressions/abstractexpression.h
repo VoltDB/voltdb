@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,7 +48,6 @@
 
 #include "boost/shared_ptr.hpp"
 #include "common/types.h"
-#include "common/valuevector.h"
 #include "common/PlannerDomValue.h"
 
 #include <string>
@@ -56,8 +55,6 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
 class NValue;
 class TableTuple;
 
@@ -75,9 +72,6 @@ class AbstractExpression {
     virtual ~AbstractExpression();
 
     virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
-
-    /** set parameter values for this node and its descendents */
-    virtual void substitute(const NValueArray &params);
 
     /** return true if self or descendent should be substitute()'d */
     virtual bool hasParameter() const;

@@ -5,13 +5,14 @@
 --end of Instruction
 --num=5
 --- this is comments 123!@#
-exec @SystemCatalog,tables
-select * from votes         --comments
-select * fRom        CONTESTANTS
-         delete from votes where PHONE_NUMBER = 3082086134    select * from AREA_CODE_STATE
+exec @SystemCatalog,tables;
+select * from votes;         --comments
+select * fRom        CONTESTANTS;
+         delete from votes where PHONE_NUMBER = 3082086134;    select * from AREA_CODE_STATE;
     
 /* 
-   -- select * from V_VOTES_BY_PHONE_NUMBER
+   -- select * from V_VOTES_BY_PHONE_NUMBER <-- a semicolon here fooled the parser and foiled the test.
+   replace the semicolon and fix the test when we get more serious about processing block comments.
    this is a commenting line inside a block 
    another comment 
    more comments 

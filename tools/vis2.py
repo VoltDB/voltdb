@@ -11,8 +11,6 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))) +
                 os.sep + 'tests/scripts/')
-
-import time
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -23,13 +21,7 @@ import numpy as np
 
 STATS_SERVER = 'volt2'
 
-def COLORS(k):
-    return (((k ** 3) % 255) / 255.0,
-            ((k * 100) % 255) / 255.0,
-            ((k * k) % 255) / 255.0)
-
-#COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
-COLORS = ['b','g','r','c','m','y','k']
+COLORS = ['b','g','c','m','k']
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
@@ -41,7 +33,7 @@ def get_stats(hostname, port, days):
     """
 
     conn = FastSerializer(hostname, port)
-    proc = VoltProcedure(conn, 'CenterAverageOfPeriod',
+    proc = VoltProcedure(conn, 'AverageOfPeriod',
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()
@@ -68,13 +60,15 @@ def get_stats(hostname, port, days):
 class Plot:
     DPI = 100.0
 
-    def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax):
+    def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax, series):
         self.filename = filename
         self.legends = {}
         w = w == None and 2000 or w
         h = h == None and 1000 or h
         self.xmax = xmax
         self.xmin = xmin
+        self.series = series
+        self.title = title
 
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
@@ -82,30 +76,47 @@ class Plot:
         self.ax.set_title(title)
         plt.tick_params(axis='x', which='major', labelsize=16)
         plt.tick_params(axis='y', labelright=True, labelleft=False, labelsize=16)
+        plt.Locator.MAXTICKS=2000
         plt.grid(True)
         self.fig.autofmt_xdate()
+        plt.ylabel(ylabel)
+        plt.xlabel(xlabel)
 
     def plot(self, x, y, color, marker_shape, legend, linestyle):
         self.ax.plot(x, y, linestyle, label=legend, color=color,
                      marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
+        plt.axvline(x=datetime.datetime(2016,1,11,12,00,0),color='black')
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(x_formatter)
-        loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=1)
-        self.ax.xaxis.set_major_locator(loc)
-        self.ax.xaxis.set_minor_locator(matplotlib.ticker.AutoMinorLocator(n=7))
+        xmin, xmax = plt.xlim()
+        if (self.xmax - self.xmin).days >= 365:
+            l = 13
+            loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=13)
+            minloc = None
+        else:
+            l = 7
+            loc = matplotlib.dates.WeekdayLocator(byweekday=matplotlib.dates.MO, interval=1)
+            minloc = matplotlib.ticker.AutoMinorLocator(n=l)
+        if loc:
+            self.ax.xaxis.set_major_locator(loc)
+        if minloc:
+            self.ax.xaxis.set_minor_locator(minloc)
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin-(ymax-ymin)*0.05, ymax+(ymax-ymin)*0.05))
         plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
-        plt.legend(prop={'size': 16}, loc=2)
+        if self.series.startswith('lat'):
+            lloc = 2
+        else:
+            lloc = 3
+        plt.legend(prop={'size': 10}, loc=lloc)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
 
-def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate):
+def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mindate, maxdate, polarity):
     global mc
     plot_data = dict()
     for run in data:
@@ -123,7 +134,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
     if len(plot_data) == 0:
         return
 
-    pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
+    pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
 
     flag = dict()
     for b,bd in plot_data.items():
@@ -136,32 +147,54 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
-            if len(u[0]) > 10:
-                ma = moving_average(u[1], 10)
+            ma = [None]
+            if b == 'master' and len(u[0]) >= 10:
+                (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
+                median = np.median(ma)
                 failed = 0
-                if k.startswith('lat'):
+                if polarity==1:
                     cv = np.nanmin(ma)
-                    if ma[-1] > cv * 1.05:
-                        failed = -1
-                        rp = (u[0][np.nanargmin(ma)], cv)
+                    rp = (u[0][np.nanargmin(ma)], cv)
+                    if b == 'master' and ma[-1] > median * 1.05:
+                        failed = 1
                 else:
                     cv = np.nanmax(ma)
-                    if ma[-1] < cv * 0.95:
+                    rp = (u[0][np.nanargmax(ma)], cv)
+                    if b == 'master' and ma[-1] < median * 0.95:
                         failed = 1
-                        rp = (u[0][np.nanargmax(ma)], cv)
+
+                twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
+                pl.plot(u[0], twosigma, mc[b][0], None, None, '-.')
+                pl.ax.annotate(r"$2\sigma$", xy=(u[0][-1], twosigma[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
+
+                twntypercent = np.sum([np.convolve(ma, polarity*0.2), ma], axis=0)
+                pl.plot(u[0], twntypercent, mc[b][0], None, None, '-.')
+                pl.ax.annotate(r"20%", xy=(u[0][-1], twntypercent[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
+
+                p = (ma[-1]-rp[1])/rp[1]*100.
+                q = (ma[-1]-median)/median*100.
 
                 if failed != 0:
-                    p = (ma[-1]-rp[1])/rp[1]*100.
+                    if p<10:
+                        color = 'yellow'
+                    else:
+                        color = 'red'
                     flag[k].append((b, p))
-                    pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,10*failed),
-                        textcoords='offset points', ha='center', color='red')
-                    pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
-                        textcoords='offset points', ha='left', color='red')
-                    pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
-                        textcoords='offset points', ha='left', color='red')
                     for pos in ['top', 'bottom', 'right', 'left']:
-                        pl.ax.spines[pos].set_edgecolor("red")
+                        pl.ax.spines[pos].set_edgecolor(color)
+                    pl.ax.set_axis_bgcolor(color)
+                    pl.ax.patch.set_alpha(0.1)
+
+                pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,-10*polarity),
+                    textcoords='offset points', ha='center')
+                pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
+                    textcoords='offset points', ha='left')
+                pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
+                    textcoords='offset points', ha='left')
+
+                pl.ax.annotate('ma: %.2f median: %.2f (%+.2f) cv: %.2f (%+.2f%%)' % (ma[-1], median, q, cv, p),
+                    xy=(.07, .06), xycoords='figure fraction', horizontalalignment='left', verticalalignment='top')
 
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
@@ -222,20 +255,22 @@ def generate_index_file(filenames):
         <td %s><a href=#%s>%s</a></td>
     </tr>
 """
+    #h = map(lambda x:(x[0].replace(' ','%20'), x[0]), filenames)
     h = []
     for x in filenames:
-        tdattr = ""
+        tdattr = "<span></span>" #"bgcolor=green"
         tdnote = ""
         M = 0.0
         if len(x) == 6:
-            print x[5].values()
             for v in x[5].values():
                 if len(v) > 0:
                     M = max(M, abs(v[0][1]))
         if M > 0.0:
-            tdattr = 'bgcolor=red'
+            tdattr = '<span style="color:yellow">&#9658;</span>'
+            if M > 10.0:
+                tdattr = '<span style="color:red">&#9658;</span>'
             tdnote = " (by %.2f%%)" % M
-        h.append((tdattr, x[0].replace(' ','%20'), x[0] + tdnote))
+        h.append(("", x[0].replace(' ','%20'), tdattr + x[0] + tdnote))
     n = 4
     z = n-len(h)%n
     while z > 0 and z < n:
@@ -276,7 +311,11 @@ def moving_average(x, n, type='simple'):
 
     a =  np.convolve(x, weights, mode='full')[:len(x)]
     a[:n-1] = None
-    return a
+
+    s = [float('NaN')]*(n-1)
+    for d in range(n, len(x)+1):
+        s.append(np.std(x[d-n:d]))
+    return (a,s)
 
 
 def usage():
@@ -318,37 +357,42 @@ def main():
     iorder = 0
     for group, data in stats.iteritems():
         (app,nodes) = group
+        app = app.replace('/','')
 
         conn = FastSerializer(STATS_SERVER, 21212)
         proc = VoltProcedure(conn, "@AdHoc", [FastSerializer.VOLTTYPE_STRING])
-        resp = proc.call(["select series, chart_heading, x_label, y_label from charts where appname = '%s' order by chart_order" % app])
+        resp = proc.call(["select chart_order, series, chart_heading, x_label, y_label, polarity from charts where appname = '%s' order by chart_order" % app])
         conn.close()
 
         app = app +" %d %s" % (nodes, ["node","nodes"][nodes>1])
 
-        if len(resp.tables[0].tuples) > 0:
-            legend = resp.tables[0].tuples
-        else:
-            legend = [ ('lat95',    "avg latency95",             "Time",     "Latency (ms)"),
-                       ('lat99',    "avg latency99",             "Time",     "latency (ms)"),
-                       ('tppn',     "avg throughput per node",   "Time",     "TPS per node"),
-                     ]
+        #chart polarity: -1 for tps (decreasing is bad), 1 for latencies (increasing is bad)
 
-        app_filename = app.replace(' ', '_')
+        legend = { 1 : dict(series="lat95", heading="95tile latency",            xlabel="Time",      ylabel="Latency (ms)",      polarity=1),
+                   2 : dict(series="lat99", heading="99tile latency",            xlabel="Time",      ylabel="Latency (ms)",      polarity=1),
+                   3 : dict(series="tppn",  heading="avg throughput per node",    xlabel="Time",      ylabel="ops/sec per node", polarity=-1)
+                 }
+
+        for r in resp.tables[0].tuples:
+            legend[r[0]] = dict(series=r[1], heading=r[2], xlabel=r[3], ylabel=r[4], polarity=r[5])
+
         fns = [app]
         flags = dict()
-        for r in legend:
-            title = app + " " + r[1]
+        for r in legend.itervalues():
+            title = app + " " + r['heading']
             fn = "_" + title.replace(" ","_") + ".png"
             fns.append(prefix + fn)
-            f = plot(title, r[2], r[3], path + fn, width, height, app, data, r[0], mindate, maxdate)
+            f = plot(title, r['xlabel'], r['ylabel'], path + fn, width, height, app, data, r['series'], mindate, maxdate, r['polarity'])
             flags.update(f)
 
         fns.append(iorder)
         fns.append(flags)
         filenames.append(tuple(fns))
 
-    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    #filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    #filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-kvm-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl-kvm/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

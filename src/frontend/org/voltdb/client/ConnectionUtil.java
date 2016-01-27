@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,12 +19,12 @@ package org.voltdb.client;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
@@ -41,13 +41,18 @@ import org.ietf.jgss.GSSContext;
 import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.GSSName;
+import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
 
+import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.base.Optional;
+import com.google_voltpatches.common.base.Predicates;
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.FluentIterable;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well
@@ -95,22 +100,28 @@ public class ConnectionUtil {
      * @return The bytes of the hashed password.
      */
     public static byte[] getHashedPassword(String password) {
+        return getHashedPassword(ClientAuthScheme.HASH_SHA256, password);
+    }
+
+    /**
+     * Get a hashed password using SHA-1 in a consistent way.
+     * @param scheme hashing scheme for password.
+     * @param password The password to encode.
+     * @return The bytes of the hashed password.
+     */
+    public static byte[] getHashedPassword(ClientAuthScheme scheme, String password) {
         if (password == null)
             return null;
 
         MessageDigest md = null;
         try {
-            md = MessageDigest.getInstance("SHA-1");
+            md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
             System.exit(-1);
         }
         byte hashedPassword[] = null;
-        try {
-            hashedPassword = md.digest(password.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
-        }
+        hashedPassword = md.digest(password.getBytes(Constants.UTF8ENCODING));
         return hashedPassword;
     }
 
@@ -129,22 +140,38 @@ public class ConnectionUtil {
      */
     public static Object[] getAuthenticatedConnection(String host, String username,
                                                       byte[] hashedPassword, int port,
-                                                      final Subject subject) throws IOException {
+                                                      final Subject subject, ClientAuthScheme scheme) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme);
+    }
+
+    private final static Function<Principal, DelegatePrincipal> narrowPrincipal = new Function<Principal, DelegatePrincipal>() {
+        @Override
+        public DelegatePrincipal apply(Principal input) {
+            return DelegatePrincipal.class.cast(input);
+        }
+    };
+
+    public final static Optional<DelegatePrincipal> getDelegate(Subject s) {
+        if (s == null) return Optional.absent();
+        return FluentIterable
+                .from(s.getPrincipals())
+                .filter(Predicates.instanceOf(DelegatePrincipal.class))
+                .transform(narrowPrincipal)
+                .first();
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject)
+            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -172,7 +199,8 @@ public class ConnectionUtil {
             byte[] usernameBytes = username == null ? null : username.getBytes(Constants.UTF8ENCODING);
 
             // get the length of the data to serialize
-            int requestSize = 4 + 1;
+            int requestSize = 4;
+            requestSize += 2; //version and scheme
             requestSize += serviceBytes == null ? 4 : 4 + serviceBytes.length;
             requestSize += usernameBytes == null ? 4 : 4 + usernameBytes.length;
             requestSize += hashedPassword.length;
@@ -181,7 +209,8 @@ public class ConnectionUtil {
 
             // serialize it
             b.putInt(requestSize - 4);                            // length prefix
-            b.put((byte) 0);                                      // version
+            b.put((byte) 1);                                      // version
+            b.put((byte )scheme.getValue());
             SerializationHelper.writeVarbinary(serviceBytes, b);  // data service (export|database)
             SerializationHelper.writeVarbinary(usernameBytes, b);
             b.put(hashedPassword);
@@ -276,7 +305,7 @@ public class ConnectionUtil {
             int buildStringLength = loginResponse.getInt();
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
-            returnArray[2] = new String(buildStringBytes, "UTF-8");
+            returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
 
             aChannel.configureBlocking(false);
             aChannel.socket().setKeepAlive(true);
@@ -289,12 +318,107 @@ public class ConnectionUtil {
         return returnArray;
     }
 
+
+    private final static void establishSecurityContext(
+            final SocketChannel channel, GSSContext context, Optional<DelegatePrincipal> delegate)
+                    throws IOException, GSSException {
+
+        ByteBuffer bb = ByteBuffer.allocate(4096);
+        byte [] token;
+        int msgSize = 0;
+
+        /*
+         * Establishing a kerberos secure context, requires a handshake conversation
+         * where client, and server exchange and use tokens generated via calls to initSecContext
+         */
+        bb.limit(msgSize);
+        while (!context.isEstablished()) {
+            token = context.initSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
+            if (token != null) {
+                msgSize = 4 + 1 + 1 + token.length;
+                bb.clear().limit(msgSize);
+                bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+                bb.put(token).flip();
+
+                while (bb.hasRemaining()) {
+                    channel.write(bb);
+                }
+            }
+            if (!context.isEstablished()) {
+                bb.clear().limit(4);
+
+                while (bb.hasRemaining()) {
+                    if (channel.read(bb) == -1) throw new EOFException();
+                }
+                bb.flip();
+
+                msgSize = bb.getInt();
+                if (msgSize > bb.capacity()) {
+                    throw new IOException("Authentication packet exceeded alloted size");
+                }
+                if (msgSize <= 0) {
+                    throw new IOException("Wire Protocol Format error 0 or negative message length prefix");
+                }
+                bb.clear().limit(msgSize);
+
+                while (bb.hasRemaining()) {
+                    if (channel.read(bb) == -1) throw new EOFException();
+                }
+                bb.flip();
+
+                byte version = bb.get();
+                if (version != Constants.AUTH_HANDSHAKE_VERSION) {
+                    throw new IOException("Encountered unexpected authentication protocol version " + version);
+                }
+
+                byte tag = bb.get();
+                if (tag != Constants.AUTH_HANDSHAKE) {
+                    throw new IOException("Encountered unexpected authentication protocol tag " + tag);
+                }
+            }
+        }
+
+        if (!context.getMutualAuthState()) {
+            throw new IOException("Authentication Handshake Failed");
+        }
+
+        if (delegate.isPresent() && !context.getConfState()) {
+            throw new IOException("Cannot transmit delegate user name securely");
+        }
+
+        // encrypt and transmit the delegate principal if it is present
+        if (delegate.isPresent()) {
+            MessageProp mprop = new MessageProp(0, true);
+
+            bb.clear().limit(delegate.get().wrappedSize());
+            delegate.get().wrap(bb);
+            bb.flip();
+
+            token = context.wrap(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), mprop);
+
+            msgSize = 4 + 1 + 1 + token.length;
+            bb.clear().limit(msgSize);
+            bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
+            bb.put(token).flip();
+
+            while (bb.hasRemaining()) {
+                channel.write(bb);
+            }
+        }
+    }
+
     private final static ByteBuffer performAuthenticationHandShake(
             final SocketChannel channel, final Subject subject,
             final String serviceName) throws IOException {
 
         try {
-             Subject.doAs(subject, new PrivilegedAction<GSSContext>() {
+            String subjectPrincipal = subject.getPrincipals().iterator().next().getName();
+            final Optional<DelegatePrincipal> delegate = getDelegate(subject);
+            if (delegate.isPresent() && !subjectPrincipal.equals(serviceName)) {
+                throw new IOException("Delegate authentication is not allowed for user " + delegate.get().getName());
+            }
+
+            Subject.doAs(subject, new PrivilegedAction<GSSContext>() {
                 @Override
                 public GSSContext run() {
                     GSSContext context = null;
@@ -309,70 +433,13 @@ public class ConnectionUtil {
                         final Oid krb5PrincipalNameType = new Oid("1.2.840.113554.1.2.2.1");
                         final GSSName serverName = m_gssManager.createName(serviceName, krb5PrincipalNameType);
 
-                        ByteBuffer bb = ByteBuffer.allocate(4096);
-
-                        context = m_gssManager.createContext(serverName, krb5Oid, null, GSSContext.DEFAULT_LIFETIME);
+                        context = m_gssManager.createContext(serverName, krb5Oid, null, GSSContext.INDEFINITE_LIFETIME);
                         context.requestMutualAuth(true);
                         context.requestConf(true);
                         context.requestInteg(true);
 
-                        byte [] token;
-                        int msgSize = 0;
+                        establishSecurityContext(channel, context, delegate);
 
-                        /*
-                         * Establishing a kerberos secure context, requires a handshake conversation
-                         * where client, and server exchange and use tokens generated via calls to initSecContext
-                         */
-                        bb.limit(msgSize);
-                        while (!context.isEstablished()) {
-                            token = context.initSecContext(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining());
-                            if (token != null) {
-                                msgSize = 4 + 1 + 1 + token.length;
-                                bb.clear().limit(msgSize);
-                                bb.putInt(msgSize-4).put(Constants.AUTH_HANDSHAKE_VERSION).put(Constants.AUTH_HANDSHAKE);
-                                bb.put(token).flip();
-
-                                while (bb.hasRemaining()) {
-                                    channel.write(bb);
-                                }
-                            }
-                            if (!context.isEstablished()) {
-                                bb.clear().limit(4);
-
-                                while (bb.hasRemaining()) {
-                                    if (channel.read(bb) == -1) throw new EOFException();
-                                }
-                                bb.flip();
-
-                                msgSize = bb.getInt();
-                                if (msgSize > bb.capacity()) {
-                                    throw new IOException("Authentication packet exceeded alloted size");
-                                }
-                                if (msgSize <= 0) {
-                                    throw new IOException("Wire Protocol Format error 0 or negative message length prefix");
-                                }
-                                bb.clear().limit(msgSize);
-
-                                while (bb.hasRemaining()) {
-                                    if (channel.read(bb) == -1) throw new EOFException();
-                                }
-                                bb.flip();
-
-                                byte version = bb.get();
-                                if (version != Constants.AUTH_HANDSHAKE_VERSION) {
-                                    throw new IOException("Encountered unexpected authentication protocol version " + version);
-                                }
-
-                                byte tag = bb.get();
-                                if (tag != Constants.AUTH_HANDSHAKE) {
-                                    throw new IOException("Encountered unexpected authentication protocol tag " + tag);
-                                }
-                            }
-                        }
-
-                        if (!context.getMutualAuthState()) {
-                            throw new IOException("Authentication Handshake Failed");
-                        }
                         context.dispose();
                         context = null;
                     } catch (GSSException ex) {

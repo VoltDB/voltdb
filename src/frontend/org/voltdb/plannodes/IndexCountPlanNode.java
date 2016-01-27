@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,10 +37,8 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
@@ -160,47 +158,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (nextKeyIndex < 0) {
             return ;
         }
-
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-
-        String exprsjson = m_catalogIndex.getExpressionsjson();
-        List<AbstractExpression> indexedExprs = null;
-        if (exprsjson.isEmpty()) {
-            indexedExprs = new ArrayList<AbstractExpression>();
-
-            List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
-            for (int i = 0; i <= nextKeyIndex; i++) {
-                ColumnRef colRef = indexedColRefs.get(i);
-                Column col = colRef.getColumn();
-                TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
-                        col.getTypeName(), col.getTypeName());
-                tve.setValueType(VoltType.get((byte)col.getType()));
-                tve.setValueSize(col.getSize());
-                tve.setInBytes(col.getInbytes());
-                tve.resolveForTable((Table)m_catalogIndex.getParent());
-                indexedExprs.add(tve);
-            }
-        } else {
-            try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
-            } catch (JSONException e) {
-                e.printStackTrace();
-                assert(false);
-            }
-
+        m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+        if (m_skip_null_predicate != null) {
+            m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
         }
-        AbstractExpression expr;
-        for (int i = 0; i < nextKeyIndex; i++) {
-            AbstractExpression idxExpr = indexedExprs.get(i);
-            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                    idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
-            exprs.add(expr);
-        }
-        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-        exprs.add(expr);
-        m_skip_null_predicate = ExpressionUtil.combine(exprs);
-        m_skip_null_predicate.finalizeValueTypes();
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
@@ -525,5 +486,21 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public ArrayList<AbstractExpression> getBindings() {
         return m_bindings;
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_skip_null_predicate, aeClass));
+        for (AbstractExpression ae : m_searchkeyExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        if (m_bindings != null) {
+            for (AbstractExpression ae : m_bindings) {
+                collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+            }
+        }
+        return collected;
     }
 }

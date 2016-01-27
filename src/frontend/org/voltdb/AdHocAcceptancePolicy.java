@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,13 @@
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 
 /**
  * Check ad hoc query parameters.
  */
-public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
+public class AdHocAcceptancePolicy extends InvocationValidationPolicy {
+
     public AdHocAcceptancePolicy(boolean isOn) {
         super(isOn);
     }

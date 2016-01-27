@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,9 +24,10 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -35,9 +36,11 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
+import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 
 /**
  * Actual regression tests for SQL that I found that was broken and
@@ -47,21 +50,28 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 
 public class TestFixedSQLSuite extends RegressionSuite {
 
-    /**
-     * Inner class procedure to see if we can invoke it.
-     */
-    public static class InnerProc extends VoltProcedure {
-        public long run() {
-            return 0L;
-        }
-    }
-
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class, InnerProc.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class,
+        TestENG2423.InnerProc.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
-    public void testTicketEng2250_IsNull() throws Exception
+    public void testSmallFixedTests() throws IOException, ProcCallException
+    {
+        subTestInsertNullPartitionString();
+        subTestAndExpressionComparingSameTableColumns();
+        subTestSeqScanFailedPredicateDoesntCountAgainstLimit();
+        subTestSelectExpression();
+        subTestNestLoopJoinPredicates();
+        subTestnestLoopJoinPredicatesWithExpressions();
+        subTestNestLoopJoinPredicatesWithAliases();
+        subTestGreaterThanOnOrderedIndex();
+        subTestForHSQLDecimalFailures();
+        subTestNumericExpressionConversion();
+        subTestInsertWithCast();
+    }
+
+    private void subTestTicketEng2250_IsNull() throws IOException, ProcCallException, InterruptedException
     {
         System.out.println("STARTING testTicketEng2250_IsNull");
         Client client = getClient();
@@ -113,9 +123,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         //* enable for debugging */ System.out.println(r5);
         assertEquals(1, r5.asScalarLong());
 
+        truncateTables(client, "P1");
+
     }
 
-    public void testTicketEng1850_WhereOrderBy() throws Exception
+    private void subTestTicketEng1850_WhereOrderBy() throws Exception
     {
         System.out.println("STARTING testTicketENG1850_WhereOrderBy");
 
@@ -159,9 +171,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable r5 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2 order by pid, aid limit 1").getResults()[0];
         //* enable for debugging */ System.out.println("r5\n" + r5);
         assertEquals(1, r5.getRowCount());
+
+        truncateTables(client, "ENG1850");
     }
 
-    public void testTicketEng1850_WhereOrderBy2() throws Exception
+    private void subTestTicketEng1850_WhereOrderBy2() throws Exception
     {
         System.out.println("STARTING testTIcketEng1850_WhereOrderBy2");
 
@@ -198,9 +212,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable r4 = client.callProcedure("@AdHoc", "select * from ENG1850 where pid = 2").getResults()[0];
         //* enable for debugging */ System.out.println(r4);
         assertEquals(isHSQL() ? 2 : 3, r4.getRowCount());
+
+
+        truncateTables(client, "ENG1850");
     }
 
-    public void testTicketENG1232() throws Exception {
+    private void subTestTicketENG1232() throws Exception {
         Client client = getClient();
 
         client.callProcedure("@AdHoc", "insert into test_eng1232 VALUES(9);");
@@ -218,9 +235,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(result[0].advanceRow());
         assertEquals(1, result[0].getLong(0));
         assertFalse(result[1].advanceRow());
+
+        truncateTables(client, "test_eng1232");
     }
 
-    public void testInsertNullPartitionString() throws IOException, ProcCallException
+    private void subTestInsertNullPartitionString() throws IOException, ProcCallException
     {
         // This test is for issue ENG-697
         Client client = getClient();
@@ -241,7 +260,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(caught);
     }
 
-    public void testTicket309() throws IOException, ProcCallException
+    private void subTestTicket309() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -279,6 +298,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 }
             }
         }
+
+        truncateTables(client, tables);
     }
 
     //
@@ -290,13 +311,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // which would return results any time TABLE.ID = value was true,
     // regardless of whether the second expression was true.
     //
-    public void testAndExpressionComparingSameTableColumns()
+    private void subTestAndExpressionComparingSameTableColumns()
     throws IOException, ProcCallException
     {
+        Client client = getClient();
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
-            Client client = getClient();
             client.callProcedure("Insert", table, 5, "desc", 10, 14.5);
             client.callProcedure("Insert", table, 15, "desc2", 10, 14.5);
             // These queries should result in no rows, but the defect in
@@ -319,6 +340,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
     //
@@ -333,13 +356,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    public void testSeqScanFailedPredicateDoesntCountAgainstLimit()
+    private void subTestSeqScanFailedPredicateDoesntCountAgainstLimit()
     throws IOException, ProcCallException
     {
+        Client client = getClient();
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
-            Client client = getClient();
             // our predicate is going to be ID < NUM.
             // Insert one row where this is false
             client.callProcedure("Insert", table, 1, "desc", -1, 14.5);
@@ -352,6 +375,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             // we should get 2 rows but this bug would result in only 1 returned
             assertEquals(2, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
     //
@@ -367,13 +392,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // Note: Adding 5.5 in the third test here also tests a "fix" in
     // HSQL where we coerce the type of numeric literals from NUMERIC to DOUBLE
     //
-    public void testSelectExpression()
-    throws IOException, ProcCallException
+    private void subTestSelectExpression() throws IOException, ProcCallException
     {
+        Client client = getClient();
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
-            Client client = getClient();
             client.callProcedure("Insert", table, 1, "desc", 2, 14.5);
             String query = String.format("select %s.ID + 10 from %s",
                                          table, table);
@@ -408,6 +432,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results[0].advanceRow();
             assertEquals("qwertyuiop", results[0].getString(1));
         }
+
+        truncateTables(client, tables);
     }
 
 
@@ -421,8 +447,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // understand which column(s) needed to be evaluated by the TVE's
     // operators.
     //
-    public void testNestLoopJoinPredicates()
-    throws IOException, ProcCallException
+    private void subTestNestLoopJoinPredicates() throws IOException, ProcCallException
     {
         Client client = getClient();
         for (int id=0; id < 5; id++) {
@@ -450,6 +475,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         query = "select * from P1 INNER JOIN R1 on P1.ID = R1.ID";
         vts = client.callProcedure("@AdHoc", query).getResults();
         nestLoopJoinPredicates_verifyid(vts);
+
+        truncateTables(client, new String[]{"P1", "R1"});
     }
 
     private void nestLoopJoinPredicates_verifyid(VoltTable[] vts) {
@@ -492,8 +519,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // Select a complex expression (not just a TupleValueExpression)
     // to verify that non-root TVEs are correctly offset.
     //
-    public void nestLoopJoinPredicatesWithExpressions()
-    throws IOException, ProcCallException
+    private void subTestnestLoopJoinPredicatesWithExpressions() throws IOException, ProcCallException
     {
         Client client = getClient();
         for (int id=0; id < 5; id++) {
@@ -511,6 +537,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         query = "select (P1.ID + 20), (R1.ID + 40) from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
         nestLoopJoinPredicatesWithExpressions_verify(vts);
+
+        truncateTables(client, new String[]{"P1", "R1"});
     }
 
     private void nestLoopJoinPredicatesWithExpressions_verify(
@@ -540,8 +568,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     //
     // Select columns and expressions with aliases.
     //
-    public void testNestLoopJoinPredicatesWithAliases()
-    throws IOException, ProcCallException
+    private void subTestNestLoopJoinPredicatesWithAliases() throws IOException, ProcCallException
     {
         Client client = getClient();
         for (int id=0; id < 5; id++) {
@@ -560,6 +587,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         query = "select R1.ID AS DESC, (P1.ID + 20) AS THOMAS from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
         nestLoopJoinPredicatesWithAliases_verify(vts);
+
+        truncateTables(client, new String[]{"P1", "R1"});
     }
 
     private void nestLoopJoinPredicatesWithAliases_verify(VoltTable[] vts) {
@@ -592,8 +621,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    public void testGreaterThanOnOrderedIndex()
-    throws IOException, ProcCallException
+    private void subTestGreaterThanOnOrderedIndex() throws IOException, ProcCallException
     {
         String[] tables = {"P2", "R2"};
         Client client = getClient();
@@ -620,9 +648,54 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
-    public void testTicket196() throws IOException, ProcCallException
+    public void testFixedTickets() throws Exception
+    {
+        subTestTicketEng2250_IsNull();
+        subTestTicketEng1850_WhereOrderBy();
+        subTestTicketEng1850_WhereOrderBy2();
+        subTestTicketENG1232();
+        subTestTicket309();
+        subTestTicket196();
+        subTestTicket201();
+        subTestTicket216();
+        subTestTicket194();
+        subTestTickets227And228();
+        subTestTicket220();
+        subTestTicket310();
+        subTestTicket221();
+        subTestTicket222();
+        subTestTicket224();
+        subTestTicket226();
+        subTestTicket231();
+        subTestTicket232();
+        subTestTicket293();
+        subTestTicketEng397();
+        //subTestTicketEng490();
+        subTestTicketEng993();
+        subTestTicketEng1316();
+        subTestTicket2423();
+        subTestTicket5151_ColumnDefaultNull();
+        subTestTicket5486_NULLcomparison();
+        subTestENG4146();
+        subTestENG5669();
+        subTestENG5637_VarcharVarbinaryErrorMessage();
+        subTestENG6870();
+        subTestENG6926();
+        subTestENG7041ViewAndExportTable();
+        subTestENG7349_InnerJoinWithOverflow();
+        subTestENG7724();
+        subTestENG7480();
+        subTestENG8120();
+        subTestENG9032();
+        subTestENG9389();
+        subTestENG9533();
+    }
+
+    private void subTestTicket196() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -681,9 +754,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(1, results[0].getRowCount());
         results[0].advanceRow();
         assertEquals(4, results[0].getLong(0));
+
+
+        truncateTables(client, tables);
+        truncateTables(client, "COUNT_NULL");
     }
 
-    public void testTicket201() throws IOException, ProcCallException
+    private void subTestTicket201() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -708,6 +785,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
     //public void testTicket205() throws IOException, ProcCallException
@@ -733,7 +812,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     //    }
     //}
 
-    public void testTicket216() throws IOException, ProcCallException
+    private void subTestTicket216() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -758,10 +837,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
 
-    public void testTicket194() throws IOException, ProcCallException
+    private void subTestTicket194() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -782,10 +863,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
 
-    public void testTickets227And228() throws IOException, ProcCallException
+    private void subTestTickets227And228() throws IOException, ProcCallException
     {
         String[] tables = {"P2", "R2"};
         Client client = getClient();
@@ -818,9 +901,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         query = "select * from P2, R2 where R2.ID >= 4";
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(18, results[0].getRowCount());
+
+        truncateTables(client, tables);
     }
 
-    public void testTicket220() throws IOException, ProcCallException
+    private void subTestTicket220() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1"};
         Client client = getClient();
@@ -842,12 +927,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 assertEquals(i + 3 + 5, results[0].getLong(0));
             }
         }
+
+        truncateTables(client, tables);
     }
 
     //
     // At first pass, HSQL barfed on decimal in sql-coverage. Debug/test that here.
     //
-    public void testForHSQLDecimalFailures() throws IOException, ProcCallException
+    private void subTestForHSQLDecimalFailures() throws IOException, ProcCallException
     {
         Client client = getClient();
         String sql =
@@ -856,9 +943,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         sql = "select R1_DECIMAL.CASH + 2.0 from R1_DECIMAL";
         VoltTable[] results = client.callProcedure("@AdHoc", sql).getResults();
         assertEquals(1, results.length);
+
+        truncateTables(client, "R1_DECIMAL");
     }
 
-    public void testTicket310() throws IOException, ProcCallException
+    private void subTestTicket310() throws IOException, ProcCallException
     {
         Client client = getClient();
         String sql =
@@ -875,7 +964,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         try
         {
             sql = "SELECT * FROM R1_DECIMAL WHERE " +
-            "(R1_DECIMAL.CASH <= 0.0622493314185)" +
+            "(R1_DECIMAL.CASH <= 999999999999999999999999999999.0622493314185)" +
             " AND (R1_DECIMAL.ID > R1_DECIMAL.CASH)";
             client.callProcedure("@AdHoc", sql);
         }
@@ -884,9 +973,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             caught = true;
         }
         assertTrue(caught);
+
+        truncateTables(client, "R1_DECIMAL");
     }
 
-    public void testNumericExpressionConversion() throws IOException, ProcCallException
+    private void subTestNumericExpressionConversion() throws IOException, ProcCallException
     {
         VoltTable[] results;
         Client client = getClient();
@@ -908,9 +999,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc", sql).getResults();
         assertEquals(1, results.length);
         assertEquals(1, results[0].asScalarLong());
+
+
+        truncateTables(client, "R1_DECIMAL");
     }
 
-    public void testTicket221() throws IOException, ProcCallException
+    private void subTestTicket221() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1"};
         Client client = getClient();
@@ -930,9 +1024,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(i, results[0].getLong(0));
             //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
         }
+
+        truncateTables(client, tables);
     }
 
-    public void testTicket222() throws IOException, ProcCallException
+    private void subTestTicket222() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1"};
         Client client = getClient();
@@ -950,9 +1046,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         results[0].advanceRow();
         assertEquals(2, results[0].getLong(0));
         //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
+
+        truncateTables(client, tables);
     }
 
-    public void testTicket224() throws IOException, ProcCallException
+    private void subTestTicket224() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1"};
         Client client = getClient();
@@ -976,9 +1074,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
             assertEquals(i, results[0].getLong(0));
             //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
         }
+
+        truncateTables(client, tables);
     }
 
-    public void testTicket226() throws IOException, ProcCallException
+    private void subTestTicket226() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1"};
         Client client = getClient();
@@ -1003,9 +1103,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 //* enable for debugging */ System.out.println("i: " + results[0].getLong(0));
             }
         }
+
+        truncateTables(client, tables);
     }
 
-    public void testTicket231() throws IOException, ProcCallException
+    private void subTestTicket231() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -1032,11 +1134,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
 //            results = client.callProcedure("@AdHoc", query);
 //            assertEquals(6, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
 
 
-    public void testTicket232() throws IOException, ProcCallException
+    private void subTestTicket232() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -1054,10 +1158,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
         }
+
+        truncateTables(client, tables);
     }
 
 
-    public void testTicket293() throws IOException, ProcCallException
+    private void subTestTicket293() throws IOException, ProcCallException
     {
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
@@ -1078,9 +1184,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(4, results[0].getRowCount());
+
+        truncateTables(client, tables);
     }
 
-    public void testTicketEng397() throws IOException, ProcCallException
+    private void subTestTicketEng397() throws IOException, ProcCallException
     {
         Client client = getClient();
         for (int i=0; i < 20; i++) {
@@ -1102,22 +1210,24 @@ public class TestFixedSQLSuite extends RegressionSuite {
             ex.printStackTrace();
         }
         assertTrue(caught);
+
+        truncateTables(client, "P1");
     }
 
     // RE-ENABLE ONCE ENG-490 IS FIXED
-    //public void testTicketEng490() throws IOException, ProcCallException {
-    //    Client client = getClient();
-    //
-    //    VoltTable[] results = client.callProcedure("Eng490Select");
-    //    assertEquals(1, results.length);
-    //
-    //    String query = "SELECT  A.ASSET_ID,  A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID " +
-    //        "FROM   ASSET A,  OBJECT_DETAIL OD WHERE   A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID";
-    //    results = client.callProcedure("@AdHoc", query);
-    //    assertEquals(1, results.length);
-    //}
+//    private void subTestTicketEng490() throws IOException, ProcCallException {
+//        Client client = getClient();
+//
+//        VoltTable[] results = client.callProcedure("Eng490Select").getResults();
+//        assertEquals(1, results.length);
+//
+//        String query = "SELECT  A.ASSET_ID,  A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID " +
+//                "FROM   ASSET A,  OBJECT_DETAIL OD WHERE   A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;";
+//        results = client.callProcedure("@AdHoc", query).getResults();
+//        assertEquals(1, results.length);
+//    }
 
-    public void testTicketEng993() throws IOException, ProcCallException
+    private void subTestTicketEng993() throws IOException, ProcCallException
     {
         Client client = getClient();
         // this tests some other mumbo jumbo as well like ENG-999 and ENG-1001
@@ -1171,7 +1281,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("invalid format for a constant"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 3, passed 0"));
         }
         // test that missing parameters don't work (ENG-1000)
         try {
@@ -1179,10 +1289,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().contains("Number of arguments provided was 0 where 4 was expected"));
+            assertTrue(e.getMessage().contains("Incorrect number of parameters passed: expected 4, passed 0"));
         }
         //VoltTable results = client.callProcedure("@AdHoc", "select * from P1;").getResults()[0];
         //System.out.println(results.toJSONString());
+
+
+        truncateTables(client, new String[]{"P1", "PWEE"});
     }
 
     /**
@@ -1190,7 +1303,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testTicketEng1316() throws IOException, ProcCallException
+    private void subTestTicketEng1316() throws IOException, ProcCallException
     {
         // Fake HSQL. Only care about Volt column naming code.
         if (isHSQL())
@@ -1237,20 +1350,22 @@ public class TestFixedSQLSuite extends RegressionSuite {
         rsp = client.callProcedure("Eng1316Update_R"); // update where id < 104
         assertEquals(4, rsp.getResults()[0].asScalarLong());
         assertEquals("modified_tuples", rsp.getResults()[0].getColumnName(0));
+
+        truncateTables(client, new String[]{"P1", "R1"});
     }
 
     // make sure we can call an inner proc
-    public void testTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
+    private void subTestTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
         Client client = getClient();
-        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.callProcedure("TestENG2423$InnerProc");
         releaseClient(client);
         // get it again to make sure the server is all good
         client = getClient();
-        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.callProcedure("TestENG2423$InnerProc");
     }
 
     // Ticket: ENG-5151
-    public void testColumnDefaultNull() throws IOException, ProcCallException {
+    private void subTestTicket5151_ColumnDefaultNull() throws IOException, ProcCallException {
         System.out.println("STARTING default null test...");
         Client client = getClient();
         VoltTable result = null;
@@ -1274,10 +1389,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
             result.getDouble(3);
             assertTrue(result.wasNull());
         }
+
+        truncateTables(client, "DEFAULT_NULL");
     }
 
     // Ticket: ENG-5486
-    public void testNULLcomparison() throws IOException, ProcCallException {
+    private void subTestTicket5486_NULLcomparison() throws IOException, ProcCallException {
         System.out.println("STARTING default null test...");
         Client client = getClient();
         VoltTable result = null;
@@ -1331,40 +1448,46 @@ public class TestFixedSQLSuite extends RegressionSuite {
         result = client.callProcedure("@AdHoc",
                 " select count(*) from DEFAULT_NULL where num3 < 3;").getResults()[0];
         validateTableOfScalarLongs(result, new long[]{0});
+
+        truncateTables(client, "DEFAULT_NULL");
     }
 
 
-    public void testENG4146() throws IOException, ProcCallException {
+    private void subTestENG4146() throws IOException, ProcCallException {
         System.out.println("STARTING insert no json string...");
+        if (isHSQL()) {
+            return;
+        }
         Client client = getClient();
         VoltTable result = null;
-        if (!isHSQL()) {
-            // it used to throw EE exception
-            // when inserting a non-json encoded var char into a column that has a field() index;
-            client.callProcedure("NO_JSON.insert",  1, "jpiekos1", "foo", "no json");
 
-            result = client.callProcedure("@AdHoc","select id, var1, var2, var3 from no_json;").getResults()[0];
-            assertTrue(result.advanceRow());
-            assertEquals(1, result.getLong(0));
+        // it used to throw EE exception
+        // when inserting a non-json encoded var char into a column that has a field() index;
+        client.callProcedure("NO_JSON.insert",  1, "jpiekos1", "foo", "no json");
 
-            assertEquals("jpiekos1", result.getString(1));
-            assertEquals("foo", result.getString(2));
-            assertEquals("no json", result.getString(3));
+        result = client.callProcedure("@AdHoc","select id, var1, var2, var3 from no_json;").getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(1, result.getLong(0));
 
-            client.callProcedure("NO_JSON.insert",  2, "jpiekos2", "foo2", "no json2");
+        assertEquals("jpiekos1", result.getString(1));
+        assertEquals("foo", result.getString(2));
+        assertEquals("no json", result.getString(3));
 
-            result = client.callProcedure("@AdHoc","select id from no_json " +
-                    "order by var2, field(var3,'color');").getResults()[0];
-            validateTableOfLongs(result, new long[][] {{1},{2}});
+        client.callProcedure("NO_JSON.insert",  2, "jpiekos2", "foo2", "no json2");
 
-            result = client.callProcedure("@AdHoc","select id from no_json " +
-                    "where var2 = 'foo' and field(var3,'color') = 'red';").getResults()[0];
-            assertEquals(0, result.getRowCount());
-        }
+        result = client.callProcedure("@AdHoc","select id from no_json " +
+                "order by var2, field(var3,'color');").getResults()[0];
+        validateTableOfLongs(result, new long[][] {{1},{2}});
+
+        result = client.callProcedure("@AdHoc","select id from no_json " +
+                "where var2 = 'foo' and field(var3,'color') = 'red';").getResults()[0];
+        assertEquals(0, result.getRowCount());
+
+        truncateTables(client, "NO_JSON");
     }
 
     // SQL HAVING bug on partitioned materialized table
-    public void testENG5669() throws IOException, ProcCallException {
+    private void subTestENG5669() throws IOException, ProcCallException {
         System.out.println("STARTING testing HAVING......");
         Client client = getClient();
         VoltTable vt = null;
@@ -1421,9 +1544,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "SELECT SUM(V_SUM_RENT) FROM V_P3 HAVING SUM(V_G2) < 42").getResults()[0];
         validateTableOfLongs(vt, new long[][] { {90814}});
         //* enable for debugging */ System.out.println(vt);
+
+        truncateTables(client, "P3");
     }
 
-    public void testVarcharByBytes() throws IOException, ProcCallException {
+    public void testVarchar() throws IOException, ProcCallException {
+        subTestVarcharByBytes();
+        subTestVarcharByCharacter();
+        subTestInlineVarcharAggregation();
+    }
+
+    private void subTestVarcharByBytes() throws IOException, ProcCallException {
         System.out.println("STARTING testing varchar by BYTES ......");
 
         Client client = getClient();
@@ -1476,9 +1607,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         client.callProcedure("VARCHARBYTES.insert", 2, null, var);
         vt = client.callProcedure("@AdHoc", "select var80 from VarcharBYTES where id = 2").getResults()[0];
         validateTableColumnOfScalarVarchar(vt, new String[] {var});
+
+        truncateTables(client, "VarcharBYTES");
     }
 
-    public void testVarcharByCharacter() throws IOException, ProcCallException {
+    private void subTestVarcharByCharacter() throws IOException, ProcCallException {
         System.out.println("STARTING testing varchar by character ......");
 
         Client client = getClient();
@@ -1508,7 +1641,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             if (isHSQL()) {
-                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+                assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s' exceeds the size of the VARCHAR(%d) column.",
@@ -1531,16 +1664,18 @@ public class TestFixedSQLSuite extends RegressionSuite {
         } catch(Exception ex) {
             System.err.println(ex.getMessage());
             if (isHSQL()) {
-                assertTrue(ex.getMessage().contains("HSQLDB Backend DML Error (data exception: string data, right truncation)"));
+                assertTrue(ex.getMessage().contains("HSQL Backend DML Error (data exception: string data, right truncation)"));
             } else {
                 assertTrue(ex.getMessage().contains(
                         String.format("The size %d of the value '%s...' exceeds the size of the VARCHAR(%d) column.",
                                 var.length(), var.substring(0, 100), 80)));
             }
         }
+
+        truncateTables(client, "VarcharTB");
     }
 
-    public void testENG5637_VarcharVarbinaryErrorMessage() throws IOException, ProcCallException {
+    private void subTestENG5637_VarcharVarbinaryErrorMessage() throws IOException, ProcCallException {
         System.out.println("STARTING testing error message......");
 
         if (isHSQL()) {
@@ -1665,8 +1800,819 @@ public class TestFixedSQLSuite extends RegressionSuite {
                             bin1.length()/2, 10)));
         }
 
+
+        truncateTables(client, "VARLENGTH");
     }
 
+    // This is a regression test for ENG-6792
+    private void subTestInlineVarcharAggregation() throws IOException, ProcCallException {
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure("VARCHARTB.insert",  1, "zz", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 6, "a", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 7, "mm", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("VARCHARTB.insert",  8, "z", "orangutan");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 9, "aa", "orangutan");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 10, "n", "orangutan");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "select max(var2), min(var2) from VarcharTB");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals("zz", vt.getString(0));
+        assertEquals("a", vt.getString(1));
+
+        // Hash aggregation may have the same problem, so let's
+        // test it here as well.
+        String sql = "select var80, max(var2) as maxvar2, min(var2) as minvar2 " +
+                "from VarcharTB " +
+                "group by var80 " +
+                "order by maxvar2, minvar2";
+                cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+
+        // row 1: panda, zz, a
+        // row 2: orangutan, z, aa
+        assertEquals("orangutan", vt.getString(0));
+        assertEquals("z", vt.getString(1));
+        assertEquals("aa", vt.getString(2));
+
+        assertTrue(vt.advanceRow());
+        assertEquals("panda", vt.getString(0));
+        assertEquals("zz", vt.getString(1));
+        assertEquals("a", vt.getString(2));
+
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 0, "MM", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 1, "ZZ", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 2, "AA", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 3, "NN", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "select num, max(wee), min(wee) " +
+                "from pwee_with_index group by num order by num");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals("ZZ", vt.getString(1));
+        assertEquals("AA", vt.getString(2));
+
+
+        truncateTables(client, new String[]{"VARCHARTB", "PWEE_WITH_INDEX"});
+    }
+
+    // Bug: parser drops extra predicates over certain numbers e.g. 10.
+    private void subTestENG6870() throws IOException, ProcCallException {
+        System.out.println("test ENG6870...");
+
+        Client client = this.getClient();
+        VoltTable vt;
+        String sql;
+
+        client.callProcedure("ENG6870.insert",
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, null, 1, 1);
+
+        client.callProcedure("ENG6870.insert",
+                2, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1);
+
+        client.callProcedure("ENG6870.insert",
+                3, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1);
+
+        sql = "SELECT COUNT(*) FROM ENG6870 "
+                + "WHERE C14 = 1 AND C1 IS NOT NULL AND C2 IS NOT NULL "
+                + "AND C5  = 3 AND C7 IS NOT NULL AND C8 IS NOT NULL "
+                + "AND C0 IS NOT NULL AND C10 IS NOT NULL "
+                + "AND C11 IS NOT NULL AND C13 IS NOT NULL  "
+                + "AND C12 IS NOT NULL;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+
+        truncateTables(client, "ENG6870");
+    }
+
+    private void subTestInsertWithCast() throws IOException, ProcCallException {
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "delete from p1");
+
+        // in ENG-5929, this would cause a null pointer exception,
+        // because OperatorException.refineValueType was not robust to casts.
+        String stmt = "insert into p1 (id, num) values (1, cast(1 + ? as integer))";
+        VoltTable vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        // This should even work when assigning the expression to the partitioning column:
+        // Previously this would fail with a mispartitioned tuple error.
+        stmt = "insert into p1 (id, num) values (cast(1 + ? as integer), 1)";
+        vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        stmt = "select id, num from p1 order by id";
+        vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 101}, {101, 1}});
+
+        truncateTables(client, "P1");
+    }
+
+    private void subTestENG6926() throws Exception {
+        // Aggregation of a joined table was not ordered
+        // according to ORDER BY clause when the OB column
+        // was not first in the select list.
+
+        Client client = getClient();
+
+        String insStmt = "insert into eng6926_ipuser(ip, countrycode, province) values (?, ?, ?)";
+        client.callProcedure("@AdHoc", insStmt, "23.101.135.101", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.142.5", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.143.89", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.138.62", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "69.67.23.26", "US", "Minnesota");
+        client.callProcedure("@AdHoc", insStmt, "198.179.137.202", "US", "Minnesota");
+        client.callProcedure("@AdHoc", insStmt, "23.99.35.61", "US", "Washington");
+
+        insStmt = "insert into eng6926_hits(ip, week) values (?, ?)";
+        client.callProcedure("@AdHoc", insStmt, "23.101.135.101", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.142.5", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.143.89", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.138.62", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "69.67.23.26", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "198.179.137.202", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.99.35.61", 20140914);
+
+        String query = "select count(ip.ip), ip.province as state " +
+                "from eng6926_hits as h, eng6926_ipuser as ip " +
+                "where ip.ip=h.ip and ip.countrycode='US' " +
+                    "group by ip.province " + "order by count(ip.ip) desc";
+
+        VoltTable vt = client.callProcedure("@AdHoc", query).getResults()[0];
+        long[] col0Expected = new long[] {4, 2, 1};
+        String[] col1Expected = new String[] {"District of Columbia", "Minnesota", "Washington"};
+        int i = 0;
+        while (vt.advanceRow()) {
+            assertEquals(col0Expected[i], vt.getLong(0));
+            assertEquals(col1Expected[i], vt.getString(1));
+            ++i;
+        }
+
+        truncateTables(client, "eng6926_ipuser");
+    }
+
+    private void subTestENG7041ViewAndExportTable() throws Exception {
+        Client client = getClient();
+
+        // Materialized view wasn't being updated, because the
+        // connection with its source table wasn't getting created
+        // when there was a (completely unrelated) export table in the
+        // database.
+        //
+        // When loading the catalog in the EE, we were erroneously
+        // aborting view processing when encountering an export table.
+        client.callProcedure("TRANSACTION.insert", 1, 99, 100.0, "NH", "Manchester", new TimestampType(), 20);
+
+        validateTableOfLongs(client, "select count(*) from transaction",
+                new long[][] {{1}});
+
+        // The buggy behavior would show zero rows in the view.
+        validateTableOfLongs(client, "select count(*) from acct_vendor_totals",
+                new long[][] {{1}});
+
+        truncateTables(client, "TRANSACTION");
+    }
+
+    private void subTestENG7349_InnerJoinWithOverflow() throws IOException, ProcCallException {
+        // In this bug, ENG-7349, we would fail an erroneous assertion
+        // in the EE that we must have more than one active index key when
+        // joining with a multi-component index.
+
+        Client client = getClient();
+
+        VoltTable vt = client.callProcedure("SM_IDX_TBL.insert", 1, 1, 1000)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        validateTableOfLongs(client,
+                "select * "
+                + "from sm_idx_tbl as t1 inner join sm_idx_tbl as t2 "
+                + "on t1.ti1 = t2.bi",
+                new long[][] {});
+
+        truncateTables(client, "SM_IDX_TBL");
+    }
+
+    private void insertForInParamsTests(Client client) throws IOException, ProcCallException {
+        for (int i = 0; i < 10; ++i) {
+            VoltTable vt = client.callProcedure("P1.insert",
+                    i, Integer.toString(i), i * 10, i * 100.0)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+    }
+
+    public void testInWithString() throws IOException, ProcCallException, InterruptedException {
+        subTestInWithIntParams();
+        subTestInWithStringParams();
+        subTestInWithStringParamsAdHoc();
+        subTestInWithStringParamsAsync();
+    }
+
+
+    // Note: the following tests for IN with parameters should at some point
+    // be moved into their own suite along with existing tests for IN
+    // that now live in TestIndexesSuite.  This is ENG-7607.
+    private void subTestInWithIntParams() throws IOException, ProcCallException {
+        // HSQL does not support WHERE f IN ?
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+        insertForInParamsTests(client);
+
+        VoltTable vt = client.callProcedure("one_list_param", new int[] {1, 2})
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1, 2});
+
+        // The following error message characterizes what happens if the
+        // users passes long array to an IN parameter on an INTEGER column.
+        // VoltDB requires that the data types match exactly here.
+        //
+        // This error message isn't that friendly (ENG-7606).
+        verifyProcFails(client,
+                "tryScalarMakeCompatible: "
+                + "Unable to match parameter array:int to provided long",
+                "one_list_param", new long[] {1, 2});
+
+        // scalar param where list should be provided fails
+        verifyProcFails(client,
+                "Array / Scalar parameter mismatch",
+                "one_list_param", 1);
+
+        vt = client.callProcedure("one_scalar_param", 5)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {5});
+
+        // passing a list to a scalar int parameter fails
+        verifyProcFails(client , "Array / Scalar parameter mismatch",
+                "one_scalar_param", new long[] {1, 2});
+
+
+        truncateTables(client, "P1");
+    }
+
+    private void subTestInWithStringParams() throws IOException, ProcCallException {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+        insertForInParamsTests(client);
+
+        String[] stringArgs = {"7", "8"};
+
+        // For vararg methods like callProcedure, when there is an array of objects
+        // (not an array of native types) passed as the only vararg argument, the
+        // compile-time type affects how the compiler presents the arguments to the
+        // callee:
+        //    cast to Object   - callProcedure sees just one param (which is an array)
+        //    cast to Object[] - (or a subclass of Object[]) callee sees each array
+        //                       element as its own parameter value
+
+        // where desc in ?
+        // Cast parameter value as an object and it's treated as a single parameter in the callee.
+        VoltTable vt = client.callProcedure("one_string_list_param", (Object)stringArgs)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {7, 8});
+
+        // where desc in ?
+        // Casting the argument to object array means it's treated
+        // as two arguments in the callee.
+        verifyProcFails(client, "EXPECTS 1 PARAMS, BUT RECEIVED 2",
+                "one_string_list_param", (Object[])stringArgs);
+
+        // where desc in ?
+        // scalar parameter fails
+        verifyProcFails(client, "Array / Scalar parameter mismatch",
+                "one_string_list_param", "scalar param");
+
+        // where desc in (?)
+        // Caller treats this as a single list parameter.
+        verifyProcFails(client, "Array / Scalar parameter mismatch",
+                "one_string_scalar_param", (Object)stringArgs);
+
+        // where desc in (?)
+        // Cast to an array type makes caller treat this as two arguments.
+        verifyProcFails(client, "EXPECTS 1 PARAMS, BUT RECEIVED 2",
+                 "one_string_scalar_param", (Object[])stringArgs);
+
+        // where desc in (?)
+        // This succeeds as it should
+        vt = client.callProcedure("one_string_scalar_param", "9")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {9});
+
+
+        truncateTables(client, "P1");
+    }
+
+    private void subTestInWithStringParamsAdHoc() throws IOException, ProcCallException {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+        insertForInParamsTests(client);
+
+        String[] stringArgs = {"7", "8"};
+
+        String adHocQueryWithListParam = "select id from P1 where desc in ?";
+        String adHocQueryWithScalarParam = "select id from P1 where desc in (?)";
+
+        VoltTable vt;
+
+        verifyProcFails(client, "Array / Scalar parameter mismatch",
+                "@AdHoc", adHocQueryWithListParam, stringArgs);
+
+        // where desc in ?
+        // scalar parameter fails
+        verifyProcFails(client, "rhs of IN expression is of a non-list type varchar",
+                "@AdHoc", adHocQueryWithListParam, "scalar param");
+
+        // where desc in (?)
+        // Caller treats this as a single list parameter.
+        verifyProcFails(client, "Array / Scalar parameter mismatch",
+                "@AdHoc", adHocQueryWithScalarParam, stringArgs);
+
+        // where desc in (?)
+        // This succeeds as it should
+        vt = client.callProcedure("@AdHoc", adHocQueryWithScalarParam, "9")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {9});
+
+        truncateTables(client, "P1");
+    }
+
+    static private final class SimpleCallback implements ProcedureCallback {
+
+        private ClientResponse m_clientResponse = null;
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            m_clientResponse = clientResponse;
+        }
+
+        public ClientResponse getClientResponse() {
+            return m_clientResponse;
+        }
+    }
+
+    private void subTestInWithStringParamsAsync() throws IOException, ProcCallException, InterruptedException {
+        if (isHSQL())
+            return;
+
+        // There is nothing particularly special about asynchronous procedure calls
+        // with IN and parameters.  I wrote these test cases to try and
+        // reproduce ENG-7354, which was closed as "not a bug."
+        //
+        // There doesn't seem to be a lot of tests for async call error recovery,
+        // so these tests are preserved here (hopefully they can find a better
+        // home someday).
+
+        Client client = getClient();
+        insertForInParamsTests(client);
+        String[] stringArgs = {"7", "8"};
+
+        // Try with the async version of callProcedure.
+        boolean b;
+        SimpleCallback callback = new SimpleCallback();
+        b = client.callProcedure(callback,
+                "one_string_scalar_param", (Object)stringArgs);
+        // This is queued, but execution fails as it should.
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "Array / Scalar parameter mismatch"));
+
+        b = client.callProcedure(callback,
+                "one_string_scalar_param", (Object[])stringArgs);
+        // This is queued, but execution fails as it should.
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
+
+        // This should succeed
+        b = client.callProcedure(callback,
+                "one_string_list_param", (Object)stringArgs);
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.SUCCESS, callback.getClientResponse().getStatus());
+        VoltTable vt = callback.getClientResponse().getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {7, 8});
+
+        // Try some ad hoc queries as well.
+        String adHocQueryWithListParam = "select id from P1 where desc in ?";
+        String adHocQueryWithScalarParam = "select id from P1 where desc in (?)";
+
+        // Here's what happens with too many parameters
+        b = client.callProcedure(callback,
+                "one_string_scalar_param", "dog", "cat");
+        // This is queued, but execution fails as it should.
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "EXPECTS 1 PARAMS, BUT RECEIVED 2"));
+
+        b = client.callProcedure(callback, "@AdHoc",
+                adHocQueryWithScalarParam, stringArgs);
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "Array / Scalar parameter mismatch"));
+
+        // This should succeed, but doesn't (ENG-7604 again)
+        b = client.callProcedure(callback, "@AdHoc",
+                adHocQueryWithListParam, stringArgs);
+        assertTrue(b);
+        client.drain();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, callback.getClientResponse().getStatus());
+        assertTrue(callback.getClientResponse().getStatusString().contains(
+                "Array / Scalar parameter mismatch"));
+
+        truncateTables(client, "P1");
+    }
+
+    private void subTestENG7724() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = client.callProcedure("voltdbSelectProductChanges", 1, 1).getResults()[0];
+        assertEquals(13, vt.getColumnCount());
+    }
+
+    private void runQueryGetDecimal(Client client, String sql, double value) throws IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDecimalAsBigDecimal(0).doubleValue(), 0.0001);
+    }
+
+    private void runQueryGetDouble(Client client, String sql, double value) throws IOException, ProcCallException {
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals(value, vt.getDouble(0), 0.0001);
+    }
+
+    private void subTestENG7480() throws IOException, ProcCallException {
+        Client client = getClient();
+
+        String sql;
+        sql = "insert into R1 Values(1, 'MA', 2, 2.2);";
+        client.callProcedure("@AdHoc", sql);
+        // query constants interpreted as DECIMAL
+
+        //
+        // operation between float and decimal
+        //
+        sql = "SELECT 0.1 + (1-0.1) + ratio FROM R1";
+        runQueryGetDouble(client, sql, 3.2);
+
+        sql = "SELECT 0.1 + (1-0.1) - ratio FROM R1";
+        runQueryGetDouble(client, sql, -1.2);
+
+        sql = "SELECT 0.1 + (1-0.1) / ratio FROM R1";
+        runQueryGetDouble(client, sql, 0.509090909091);
+
+        sql = "SELECT 0.1 + (1-0.1) * ratio FROM R1";
+        runQueryGetDouble(client, sql, 2.08);
+
+        // reverse order
+        sql = "SELECT 0.1 + ratio + (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 3.2);
+
+        sql = "SELECT 0.1 + ratio - (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 1.4);
+
+        sql = "SELECT 0.1 + ratio / (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.544444444444);
+
+        sql = "SELECT 0.1 + ratio * (1-0.1) FROM R1";
+        runQueryGetDouble(client, sql, 2.08);
+
+
+        //
+        // operation between decimal and integer
+        //
+        sql = "SELECT 0.1 + (1-0.1) + NUM FROM R1";
+        runQueryGetDecimal(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + (1-0.1) - NUM FROM R1";
+        runQueryGetDecimal(client, sql, -1.0);
+
+        sql = "SELECT 0.1 + (1-0.1) / NUM FROM R1";
+        runQueryGetDecimal(client, sql, 0.55);
+
+        sql = "SELECT 0.1 + (1-0.1) * NUM FROM R1";
+        runQueryGetDecimal(client, sql, 1.9);
+
+        // reverse order
+        sql = "SELECT 0.1 + NUM + (1-0.1) FROM R1";
+        runQueryGetDecimal(client, sql, 3.0);
+
+        sql = "SELECT 0.1 + NUM - (1-0.1) FROM R1";
+        runQueryGetDecimal(client, sql, 1.2);
+
+        sql = "SELECT 0.1 + NUM / (1-0.1) FROM R1";
+        runQueryGetDecimal(client, sql, 2.322222222222);
+
+        sql = "SELECT 0.1 + NUM * (1-0.1) FROM R1";
+        runQueryGetDecimal(client, sql, 1.9);
+
+
+        //
+        // test Out of range decimal and float
+        //
+
+        // test overflow and any underflow decimal are rounded
+        sql = "SELECT NUM + 111111111111111111111111111111111111111.1111 FROM R1";
+        if (isHSQL()) {
+            verifyStmtFails(client, sql, "HSQL-BACKEND ERROR");
+            verifyStmtFails(client, sql, "to the left of the decimal point is 39 and the max is 26");
+        } else {
+            verifyStmtFails(client, sql, "Maximum precision exceeded. "
+                    + "Maximum of 26 digits to the left of the decimal point");
+        }
+
+        sql = "SELECT NUM + 111111.1111111111111111111111111111111111111 FROM R1";
+        runQueryGetDecimal(client, sql, 111113.1111111111111111111111111111111111111);
+
+        sql = "SELECT NUM + " + StringUtils.repeat("1", 256) + ".1111E1 FROM R1";
+        runQueryGetDouble(client, sql, Double.parseDouble(StringUtils.repeat("1", 255) + "3.1111E1"));
+
+        sql = "SELECT NUM + " + StringUtils.repeat("1", 368) + ".1111E1 FROM R1";
+        verifyStmtFails(client, sql, "java.lang.NumberFormatException");
+
+
+        // test stored procedure
+        VoltTable vt = null;
+        vt = client.callProcedure("R1_PROC1").getResults()[0];
+        validateTableColumnOfScalarDecimal(vt, 0, new BigDecimal[]{new BigDecimal(2.1)});
+
+        vt = client.callProcedure("R1_PROC2").getResults()[0];
+        validateTableColumnOfScalarFloat(vt, 0, new double[]{2.1});
+
+        truncateTables(client, "R1");
+    }
+
+
+    private void nullIndexSearchKeyChecker(Client client, String sql, String tbleName, String columnName) throws IOException, ProcCallException {
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", sql, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{});
+
+
+        String sql1;
+        // We replace a select list element with its count.
+        // if tbleName == null,
+        //   Replace "SELECT $columnName" with "SELECT COUNT($columnName)"
+        // else
+        //   Replace "SELECT $tbleName.$columnName" with "SELECT COUNT($tableName.$columnName)"
+        //
+        // Of course, we can't use $tbleName and $columnName, so we need to
+        // do some hacking with strings.
+        //
+        String pattern = ((tbleName == null) ? "" : (tbleName + ".")) + columnName;
+        String selectListElement = "SELECT " + pattern;
+        String repl = "SELECT COUNT(" + pattern + ")";
+        sql1 = sql.replace(selectListElement, repl);
+        assertTrue(sql1.contains(repl + " FROM"));
+        vt = client.callProcedure("@AdHoc", sql1, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+        String sql2 = sql.replace(selectListElement, "SELECT COUNT(*)");
+        assertTrue(sql2.contains("SELECT COUNT(*) FROM"));
+        vt = client.callProcedure("@AdHoc", sql2, null).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[]{0});
+    }
+
+    private void subTestENG8120() throws IOException, ProcCallException {
+        // hsqldb does not handle null
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        VoltTable vt;
+        String sql;
+
+        String[] tables = {"R1", "R3", "R4"};
+        for (String tb : tables)
+        {
+            sql = "insert into " + tb + "  (id, num) Values(?, ?);";
+            client.callProcedure("@AdHoc", sql, 1, null);
+            client.callProcedure("@AdHoc", sql, 2, null);
+            client.callProcedure("@AdHoc", sql, 3, 3);
+            client.callProcedure("@AdHoc", sql, 4, 4);
+
+            sql = "select count(*) from " + tb;
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{4});
+
+            // activate # of searchkey is 1
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID >= ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID <= ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            // activate # of searchkey is 2
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num > ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num >= ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num = ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num < ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = 3 and num <= ?;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            // post predicate
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID > ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID = ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            sql = "SELECT ID FROM " + tb + " B WHERE B.ID < ? and num > 1;";
+            nullIndexSearchKeyChecker(client, sql, null, "ID");
+
+            // nest loop index join
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num > ?;";
+
+            if (tb != "R4") {
+                vt = client.callProcedure("@Explain", sql, null).getResults()[0];
+                assertTrue(vt.toString().contains("inline INDEX SCAN of \"" + tb));
+                assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"R4"));
+            }
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
+
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num >= ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
+
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num = ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
+
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num < ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
+
+            sql = "SELECT A.ID FROM R4 A, " + tb + " B WHERE B.ID = A.ID and B.num <= ?;";
+            nullIndexSearchKeyChecker(client, sql, "A", "ID");
+        }
+
+        truncateTables(client, tables);
+    }
+
+    private void subTestENG9032() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9032...");
+        Client client = getClient();
+        String sql;
+
+        sql = "INSERT INTO t1 VALUES (NULL, 1);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (10, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (20, 3);";
+        client.callProcedure("@AdHoc", sql);
+
+        sql = "SELECT * from t1 where a < 15 order by a;";
+        validateTableOfLongs(client, sql, new long[][]{{10, 2}});
+
+        truncateTables(client, "T1");
+    }
+
+    private void subTestENG9389() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9389 outerjoin is null...");
+        Client client = getClient();
+        String sql;
+
+        sql = "INSERT INTO t1 VALUES (1, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (2, 2);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t1 VALUES (3, 2);";
+
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t2 VALUES (2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+
+        sql = "INSERT INTO t3 VALUES (2, 2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t3 VALUES (3, 3, 10);";
+        client.callProcedure("@AdHoc", sql);
+
+        sql = "INSERT INTO t3_no_index VALUES (2, 2, NULL);";
+        client.callProcedure("@AdHoc", sql);
+        sql = "INSERT INTO t3_no_index VALUES (3, 3, 10);";
+        client.callProcedure("@AdHoc", sql);
+
+        // NULL padded row in T3 will trigger the bug ENG-9389
+        // Test with both indexed and unindexed inner table to exercise both
+        // nested-loop and nested-loop-index joins
+        for (String innerTable : new String[] {"t3", "t3_no_index"}) {
+
+            sql = "select t1.A "
+                    + "from t1 left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t3.D is null and t1.B = 2 "
+                    + "order by t1.A;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = " select t1.A "
+                    + "from T1 left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t3.D is null and t1.B = 2 "
+                    + "and exists(select 1 from t2 where t2.B = t1.B and t2.D is null) "
+                    + "order by t1.a;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = "select t1.A "
+                    + "from t1 inner join t2 on t2.B = t1.B "
+                    + "left join " + innerTable + " as t3 "
+                    + "on t3.A = t1.A "
+                    + "where t2.D is null and t3.D is null and t2.B = 2 "
+                    + "order by t1.a;";
+            validateTableOfScalarLongs(client, sql, new long[]{1, 2});
+
+            sql = "select t1.b + t3.d as thesum "
+                    + "from t1 "
+                    + "left outer join " + innerTable + " as t3 "
+                    + "on t1.a = t3.a "
+                    + "where t1.b > 1 "
+                    + "order by thesum;";
+            System.out.println(client.callProcedure("@Explain", sql).getResults()[0]);
+            validateTableOfScalarLongs(client, sql, new long[]{Long.MIN_VALUE, Long.MIN_VALUE, 12});
+        }
+
+        truncateTables(client, new String[]{"T1", "T2", "T3", "T3_NO_INDEX"});
+    }
+
+    private void subTestENG9533() throws IOException, ProcCallException {
+        System.out.println("test subTestENG9533 outerjoin with OR pred...");
+        Client client = getClient();
+        String insStmts[] = {
+                "insert into test1_eng_9533 values (0);",
+                "insert into test1_eng_9533 values (1);",
+                "insert into test1_eng_9533 values (2);",
+                "insert into test1_eng_9533 values (3);",
+                "insert into test2_eng_9533 values (1, 'athing', 'one', 5);",
+                "insert into test2_eng_9533 values (2, 'otherthing', 'two', 10);",
+                "insert into test2_eng_9533 values (3, 'yetotherthing', 'three', 3);"
+        };
+
+        for (String stmt : insStmts) {
+            validateTableOfScalarLongs(client, stmt, new long[] {1});
+        }
+
+        String sqlStmt =
+                "select "
+                + "  id, t_int "
+                + "from test1_eng_9533 "
+                + "  left join test2_eng_9533 "
+                + "  on t_id = id "
+                + "where "
+                + "  id <= 1 or t_int > 4 "
+                + "order by id * 2"; // this order by is so that we don't force an index scan on the outer table.
+
+        validateTableOfLongs(client, sqlStmt, new long[][] {
+                {0, Long.MIN_VALUE},
+                {1, 5},
+                {2, 10}
+        });
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -1686,12 +2632,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
         project.addProcedures(PROCEDURES);
 
-        //TODO: Now that this fails to compile with an overflow error, it should be migrated to a
+        // Now that this fails to compile with an overflow error, it should be migrated to a
         // Failures suite.
         //project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
 
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
-        //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
+//        project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
         project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
                                  "STRINGPART.NAME: 0");
         project.addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);");

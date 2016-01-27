@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -275,6 +275,21 @@ public class TestRollbackSuite extends RegressionSuite {
     }
 
     // ENG-487
+    /**
+     * Test whether the transactions are correctly rolled back
+     * given a sequence of CRUD operations.  The input is the name
+     * of a stored procedure, a sequence of integers denoting
+     * operations and an integer id.  The stored procedure will
+     * execute the operations in order, then abort with some
+     * kind of an error.  After the stored procedure's execution
+     * has completed, we verify that the database contents have
+     * not changed, and that the rollback was successful.
+     *
+     * @param procName The name of the stored procedure.
+     * @param order The sequence of names of operations.
+     * @param id An integer id.
+     * @throws IOException
+     */
     public void allTypesTestHelper(String procName, int[] order, int id)
     throws IOException {
         Client client = getClient();
@@ -496,6 +511,88 @@ public class TestRollbackSuite extends RegressionSuite {
                                       AllTypesMultiOpsJavaError.INSERT,
                                       AllTypesMultiOpsJavaError.UPDATE,
                                       AllTypesMultiOpsJavaError.DELETE},
+                           7);
+    }
+
+    /**
+     * Verify that the database is correct after rolling back a
+     * transaction consisting of updates and deletes and also
+     * table truncation.
+     *
+     * @throws IOException
+     */
+    public void testTruncateRollbackAfterJavaError() throws IOException {
+        /*
+         * Test one truncate table.
+         */
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.TRUNCATE},
+                           7);
+        /*
+         * Test a truncate table followed by some other operations.
+         */
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.TRUNCATE,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.INSERT},
+                           7);
+        /*
+         * Test a truncate table followed immediately by a
+         * deletion.
+         */
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.TRUNCATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.INSERT},
+                           7);
+        /*
+         * Test more than one table truncations.
+         */
+        allTypesTestHelper("AllTypesMultiOpsJavaError",
+                           new int[] {AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.UPDATE,
+                                      AllTypesMultiOpsJavaError.DELETE,
+                                      AllTypesMultiOpsJavaError.TRUNCATE,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.INSERT,
+                                      AllTypesMultiOpsJavaError.TRUNCATE,
+                                      AllTypesMultiOpsJavaError.TRUNCATE},
                            7);
     }
 
@@ -802,7 +899,7 @@ public class TestRollbackSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException e) {
-           e.printStackTrace();
+            e.printStackTrace();
         }
         catch (IOException e) {
             e.printStackTrace();
@@ -882,7 +979,7 @@ public class TestRollbackSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException e) {
-           System.out.println(e);
+            System.out.println(e);
         }
         catch (IOException e) {
             e.printStackTrace();

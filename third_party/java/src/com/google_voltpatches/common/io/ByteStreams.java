@@ -21,10 +21,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Preconditions.checkPositionIndex;
 
 import com.google_voltpatches.common.annotations.Beta;
-import com.google_voltpatches.common.base.Function;
-import com.google_voltpatches.common.collect.Iterables;
-import com.google_voltpatches.common.hash.HashCode;
-import com.google_voltpatches.common.hash.HashFunction;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -38,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.Arrays;
@@ -51,104 +48,48 @@ import java.util.Arrays;
  */
 @Beta
 public final class ByteStreams {
-  private static final int BUF_SIZE = 0x1000; // 4K
+
+  /**
+   * Default size of buffers allocated for copies.
+   */
+  static final int BUF_SIZE = 8192;
+
+  /**
+   * A buffer for skipping bytes in an input stream. Only written to and never read, so actual
+   * contents don't matter.
+   */
+  static final byte[] skipBuffer = new byte[BUF_SIZE];
+
+  /**
+   * There are three methods to implement {@link FileChannel#transferTo(long, long,
+   *  WritableByteChannel)}:
+   *
+   * <ol>
+   * <li> Use sendfile(2) or equivalent. Requires that both the input channel and the output channel
+   *    have their own file descriptors. Generally this only happens when both channels are files or
+   *    sockets. This performs zero copies - the bytes never enter userspace.</li>
+   * <li> Use mmap(2) or equivalent. Requires that either the input channel or the output channel
+   *    have file descriptors. Bytes are copied from the file into a kernel buffer, then directly
+   *    into the other buffer (userspace). Note that if the file is very large, a naive
+   *    implementation will effectively put the whole file in memory. On many systems with paging
+   *    and virtual memory, this is not a problem - because it is mapped read-only, the kernel can
+   *    always page it to disk "for free". However, on systems where killing processes happens all
+   *    the time in normal conditions (i.e., android) the OS must make a tradeoff between paging
+   *    memory and killing other processes - so allocating a gigantic buffer and then sequentially
+   *    accessing it could result in other processes dying. This is solvable via madvise(2), but
+   *    that obviously doesn't exist in java.</li>
+   * <li> Ordinary copy. Kernel copies bytes into a kernel buffer, from a kernel buffer into a
+   *    userspace buffer (byte[] or ByteBuffer), then copies them from that buffer into the
+   *    destination channel.</li>
+   * </ol>
+   *
+   * This value is intended to be large enough to make the overhead of system calls negligible,
+   * without being so large that it causes problems for systems with atypical memory management if
+   * approaches 2 or 3 are used.
+   */
+  private static final int ZERO_COPY_CHUNK_SIZE = 512 * 1024;
 
   private ByteStreams() {}
-
-  /**
-   * Returns a factory that will supply instances of
-   * {@link ByteArrayInputStream} that read from the given byte array.
-   *
-   * @param b the input buffer
-   * @return the factory
-   */
-  public static InputSupplier<ByteArrayInputStream> newInputStreamSupplier(
-      byte[] b) {
-    return asInputSupplier(ByteSource.wrap(b));
-  }
-
-  /**
-   * Returns a factory that will supply instances of
-   * {@link ByteArrayInputStream} that read from the given byte array.
-   *
-   * @param b the input buffer
-   * @param off the offset in the buffer of the first byte to read
-   * @param len the maximum number of bytes to read from the buffer
-   * @return the factory
-   */
-  public static InputSupplier<ByteArrayInputStream> newInputStreamSupplier(
-      final byte[] b, final int off, final int len) {
-    return asInputSupplier(ByteSource.wrap(b).slice(off, len));
-  }
-
-  /**
-   * Returns a new {@link ByteSource} that reads bytes from the given byte array.
-   *
-   * @since 14.0
-   * @deprecated Use {@link ByteSource#wrap(byte[])} instead. This method is
-   *     scheduled to be removed in Guava 16.0.
-   */
-  @Deprecated
-  public static ByteSource asByteSource(byte[] b) {
-    return ByteSource.wrap(b);
-  }
-
-  /**
-   * Writes a byte array to an output stream from the given supplier.
-   *
-   * @param from the bytes to write
-   * @param to the output supplier
-   * @throws IOException if an I/O error occurs
-   */
-  public static void write(byte[] from,
-      OutputSupplier<? extends OutputStream> to) throws IOException {
-    asByteSink(to).write(from);
-  }
-
-  /**
-   * Opens input and output streams from the given suppliers, copies all
-   * bytes from the input to the output, and closes the streams.
-   *
-   * @param from the input factory
-   * @param to the output factory
-   * @return the number of bytes copied
-   * @throws IOException if an I/O error occurs
-   */
-  public static long copy(InputSupplier<? extends InputStream> from,
-      OutputSupplier<? extends OutputStream> to) throws IOException {
-    return asByteSource(from).copyTo(asByteSink(to));
-  }
-
-  /**
-   * Opens an input stream from the supplier, copies all bytes from the
-   * input to the output, and closes the input stream. Does not close
-   * or flush the output stream.
-   *
-   * @param from the input factory
-   * @param to the output stream to write to
-   * @return the number of bytes copied
-   * @throws IOException if an I/O error occurs
-   */
-  public static long copy(InputSupplier<? extends InputStream> from,
-      OutputStream to) throws IOException {
-    return asByteSource(from).copyTo(to);
-  }
-
-  /**
-   * Opens an output stream from the supplier, copies all bytes from the input
-   * to the output, and closes the output stream. Does not close or flush the
-   * input stream.
-   *
-   * @param from the input stream to read from
-   * @param to the output factory
-   * @return the number of bytes copied
-   * @throws IOException if an I/O error occurs
-   * @since 10.0
-   */
-  public static long copy(InputStream from,
-      OutputSupplier<? extends OutputStream> to) throws IOException {
-    return asByteSink(to).writeFrom(from);
-  }
 
   /**
    * Copies all bytes from the input stream to the output stream.
@@ -189,6 +130,19 @@ public final class ByteStreams {
       WritableByteChannel to) throws IOException {
     checkNotNull(from);
     checkNotNull(to);
+    if (from instanceof FileChannel) {
+      FileChannel sourceChannel = (FileChannel) from;
+      long oldPosition = sourceChannel.position();
+      long position = oldPosition;
+      long copied;
+      do {
+        copied = sourceChannel.transferTo(position, ZERO_COPY_CHUNK_SIZE, to);
+        position += copied;
+        sourceChannel.position(position);
+      } while (copied > 0 || position < sourceChannel.size());
+      return position - oldPosition;
+    }
+
     ByteBuffer buf = ByteBuffer.allocate(BUF_SIZE);
     long total = 0;
     while (from.read(buf) != -1) {
@@ -216,14 +170,56 @@ public final class ByteStreams {
   }
 
   /**
-   * Returns the data from a {@link InputStream} factory as a byte array.
-   *
-   * @param supplier the factory
-   * @throws IOException if an I/O error occurs
+   * Reads all bytes from an input stream into a byte array. The given
+   * expected size is used to create an initial byte array, but if the actual
+   * number of bytes read from the stream differs, the correct result will be
+   * returned anyway.
    */
-  public static byte[] toByteArray(
-      InputSupplier<? extends InputStream> supplier) throws IOException {
-    return asByteSource(supplier).read();
+  static byte[] toByteArray(
+      InputStream in, int expectedSize) throws IOException {
+    byte[] bytes = new byte[expectedSize];
+    int remaining = expectedSize;
+
+    while (remaining > 0) {
+      int off = expectedSize - remaining;
+      int read = in.read(bytes, off, remaining);
+      if (read == -1) {
+        // end of stream before reading expectedSize bytes
+        // just return the bytes read so far
+        return Arrays.copyOf(bytes, off);
+      }
+      remaining -= read;
+    }
+
+    // bytes is now full
+    int b = in.read();
+    if (b == -1) {
+      return bytes;
+    }
+
+    // the stream was longer, so read the rest normally
+    FastByteArrayOutputStream out = new FastByteArrayOutputStream();
+    out.write(b); // write the byte we read when testing for end of stream
+    copy(in, out);
+
+    byte[] result = new byte[bytes.length + out.size()];
+    System.arraycopy(bytes, 0, result, 0, bytes.length);
+    out.writeTo(result, bytes.length);
+    return result;
+  }
+
+  /**
+   * BAOS that provides limited access to its internal byte array.
+   */
+  private static final class FastByteArrayOutputStream
+      extends ByteArrayOutputStream {
+    /**
+     * Writes the contents of the internal buffer to the given array starting
+     * at the given offset. Assumes the array has space to hold count bytes.
+     */
+    void writeTo(byte[] b, int off) {
+      System.arraycopy(buf, 0, b, off, count);
+    }
   }
 
   /**
@@ -231,7 +227,7 @@ public final class ByteStreams {
    * bytes} array from the beginning.
    */
   public static ByteArrayDataInput newDataInput(byte[] bytes) {
-    return new ByteArrayDataInputStream(bytes);
+    return newDataInput(new ByteArrayInputStream(bytes));
   }
 
   /**
@@ -243,19 +239,27 @@ public final class ByteStreams {
    */
   public static ByteArrayDataInput newDataInput(byte[] bytes, int start) {
     checkPositionIndex(start, bytes.length);
-    return new ByteArrayDataInputStream(bytes, start);
+    return newDataInput(
+        new ByteArrayInputStream(bytes, start, bytes.length - start));
+  }
+
+  /**
+   * Returns a new {@link ByteArrayDataInput} instance to read from the given
+   * {@code ByteArrayInputStream}. The given input stream is not reset before
+   * being read from by the returned {@code ByteArrayDataInput}.
+   *
+   * @since 17.0
+   */
+  public static ByteArrayDataInput newDataInput(
+      ByteArrayInputStream byteArrayInputStream) {
+    return new ByteArrayDataInputStream(checkNotNull(byteArrayInputStream));
   }
 
   private static class ByteArrayDataInputStream implements ByteArrayDataInput {
     final DataInput input;
 
-    ByteArrayDataInputStream(byte[] bytes) {
-      this.input = new DataInputStream(new ByteArrayInputStream(bytes));
-    }
-
-    ByteArrayDataInputStream(byte[] bytes, int start) {
-      this.input = new DataInputStream(
-          new ByteArrayInputStream(bytes, start, bytes.length - start));
+    ByteArrayDataInputStream(ByteArrayInputStream byteArrayInputStream) {
+      this.input = new DataInputStream(byteArrayInputStream);
     }
 
     @Override public void readFully(byte b[]) {
@@ -385,7 +389,7 @@ public final class ByteStreams {
    * Returns a new {@link ByteArrayDataOutput} instance with a default size.
    */
   public static ByteArrayDataOutput newDataOutput() {
-    return new ByteArrayDataOutputStream();
+    return newDataOutput(new ByteArrayOutputStream());
   }
 
   /**
@@ -395,8 +399,31 @@ public final class ByteStreams {
    * @throws IllegalArgumentException if {@code size} is negative
    */
   public static ByteArrayDataOutput newDataOutput(int size) {
-    checkArgument(size >= 0, "Invalid size: %s", size);
-    return new ByteArrayDataOutputStream(size);
+    // When called at high frequency, boxing size generates too much garbage,
+    // so avoid doing that if we can.
+    if (size < 0) {
+      throw new IllegalArgumentException(String.format("Invalid size: %s", size));
+    }
+    return newDataOutput(new ByteArrayOutputStream(size));
+  }
+
+  /**
+   * Returns a new {@link ByteArrayDataOutput} instance which writes to the
+   * given {@code ByteArrayOutputStream}. The given output stream is not reset
+   * before being written to by the returned {@code ByteArrayDataOutput} and
+   * new data will be appended to any existing content.
+   *
+   * <p>Note that if the given output stream was not empty or is modified after
+   * the {@code ByteArrayDataOutput} is created, the contract for
+   * {@link ByteArrayDataOutput#toByteArray} will not be honored (the bytes
+   * returned in the byte array may not be exactly what was written via calls to
+   * {@code ByteArrayDataOutput}).
+   *
+   * @since 17.0
+   */
+  public static ByteArrayDataOutput newDataOutput(
+      ByteArrayOutputStream byteArrayOutputSteam) {
+    return new ByteArrayDataOutputStream(checkNotNull(byteArrayOutputSteam));
   }
 
   @SuppressWarnings("deprecation") // for writeBytes
@@ -405,14 +432,6 @@ public final class ByteStreams {
 
     final DataOutput output;
     final ByteArrayOutputStream byteArrayOutputSteam;
-
-    ByteArrayDataOutputStream() {
-      this(new ByteArrayOutputStream());
-    }
-
-    ByteArrayDataOutputStream(int size) {
-      this(new ByteArrayOutputStream(size));
-    }
 
     ByteArrayDataOutputStream(ByteArrayOutputStream byteArrayOutputSteam) {
       this.byteArrayOutputSteam = byteArrayOutputSteam;
@@ -645,22 +664,6 @@ public final class ByteStreams {
     }
   }
 
-  /** Returns the length of a supplied input stream, in bytes. */
-  public static long length(
-      InputSupplier<? extends InputStream> supplier) throws IOException {
-    return asByteSource(supplier).size();
-  }
-
-  /**
-   * Returns true if the supplied input streams contain the same bytes.
-   *
-   * @throws IOException if an I/O error occurs
-   */
-  public static boolean equal(InputSupplier<? extends InputStream> supplier1,
-      InputSupplier<? extends InputStream> supplier2) throws IOException {
-    return asByteSource(supplier1).contentEquals(asByteSource(supplier2));
-  }
-
   /**
    * Attempts to read enough bytes from the stream to fill the given byte array,
    * with the same behavior as {@link DataInput#readFully(byte[])}.
@@ -712,46 +715,53 @@ public final class ByteStreams {
    *     support skipping
    */
   public static void skipFully(InputStream in, long n) throws IOException {
-    long toSkip = n;
-    while (n > 0) {
-      long amt = in.skip(n);
-      if (amt == 0) {
-        // Force a blocking read to avoid infinite loop
-        if (in.read() == -1) {
-          long skipped = toSkip - n;
-          throw new EOFException("reached end of stream after skipping "
-              + skipped + " bytes; " + toSkip + " bytes expected");
-        }
-        n--;
-      } else {
-        n -= amt;
-      }
+    long skipped = skipUpTo(in, n);
+    if (skipped < n) {
+      throw new EOFException("reached end of stream after skipping "
+          + skipped + " bytes; " + n + " bytes expected");
     }
   }
 
   /**
-   * Process the bytes of a supplied stream
-   *
-   * @param supplier the input stream factory
-   * @param processor the object to which to pass the bytes of the stream
-   * @return the result of the byte processor
-   * @throws IOException if an I/O error occurs
+   * Discards up to {@code n} bytes of data from the input stream. This method
+   * will block until either the full amount has been skipped or until the end
+   * of the stream is reached, whichever happens first. Returns the total number
+   * of bytes skipped.
    */
-  public static <T> T readBytes(
-      InputSupplier<? extends InputStream> supplier,
-      ByteProcessor<T> processor) throws IOException {
-    checkNotNull(supplier);
-    checkNotNull(processor);
+  static long skipUpTo(InputStream in, final long n) throws IOException {
+    long totalSkipped = 0;
 
-    Closer closer = Closer.create();
-    try {
-      InputStream in = closer.register(supplier.getInput());
-      return readBytes(in, processor);
-    } catch (Throwable e) {
-      throw closer.rethrow(e);
-    } finally {
-      closer.close();
+    while (totalSkipped < n) {
+      long remaining = n - totalSkipped;
+
+      long skipped = skipSafely(in, remaining);
+
+      if (skipped == 0) {
+        // Do a buffered read since skipSafely could return 0 repeatedly, for example if
+        // in.available() always returns 0 (the default).
+        int skip = (int) Math.min(remaining, skipBuffer.length);
+        if ((skipped = in.read(skipBuffer, 0, skip)) == -1) {
+          // Reached EOF
+          break;
+        }
+      }
+
+      totalSkipped += skipped;
     }
+
+    return totalSkipped;
+  }
+
+  /**
+   * Attempts to skip up to {@code n} bytes from the given input stream, but not more than
+   * {@code in.available()} bytes. This prevents {@code FileInputStream} from skipping more bytes
+   * than actually remain in the file, something that it
+   * {@linkplain FileInputStream#skip(long) specifies} it can do in its Javadoc despite the fact
+   * that it is violating the contract of {@code InputStream.skip()}.
+   */
+  private static long skipSafely(InputStream in, long n) throws IOException {
+    int available = in.available();
+    return available == 0 ? 0 : in.skip(Math.min(available, n));
   }
 
   /**
@@ -774,22 +784,6 @@ public final class ByteStreams {
       read = input.read(buf);
     } while (read != -1 && processor.processBytes(buf, 0, read));
     return processor.getResult();
-  }
-
-  /**
-   * Computes the hash code of the data supplied by {@code supplier} using {@code
-   * hashFunction}.
-   *
-   * @param supplier the input stream factory
-   * @param hashFunction the hash function to use to hash the data
-   * @return the {@link HashCode} of all of the bytes in the input stream
-   * @throws IOException if an I/O error occurs
-   * @since 12.0
-   */
-  public static HashCode hash(
-      InputSupplier<? extends InputStream> supplier, HashFunction hashFunction)
-      throws IOException {
-    return asByteSource(supplier).hash(hashFunction);
   }
 
   /**
@@ -832,122 +826,5 @@ public final class ByteStreams {
       total += result;
     }
     return total;
-  }
-
-  /**
-   * Returns an {@link InputSupplier} that returns input streams from the
-   * an underlying supplier, where each stream starts at the given
-   * offset and is limited to the specified number of bytes.
-   *
-   * @param supplier the supplier from which to get the raw streams
-   * @param offset the offset in bytes into the underlying stream where
-   *     the returned streams will start
-   * @param length the maximum length of the returned streams
-   * @throws IllegalArgumentException if offset or length are negative
-   */
-  public static InputSupplier<InputStream> slice(
-      final InputSupplier<? extends InputStream> supplier,
-      final long offset,
-      final long length) {
-    return asInputSupplier(asByteSource(supplier).slice(offset, length));
-  }
-
-  /**
-   * Joins multiple {@link InputStream} suppliers into a single supplier.
-   * Streams returned from the supplier will contain the concatenated data from
-   * the streams of the underlying suppliers.
-   *
-   * <p>Only one underlying input stream will be open at a time. Closing the
-   * joined stream will close the open underlying stream.
-   *
-   * <p>Reading from the joined stream will throw a {@link NullPointerException}
-   * if any of the suppliers are null or return null.
-   *
-   * @param suppliers the suppliers to concatenate
-   * @return a supplier that will return a stream containing the concatenated
-   *     stream data
-   */
-  public static InputSupplier<InputStream> join(
-      final Iterable<? extends InputSupplier<? extends InputStream>> suppliers) {
-    checkNotNull(suppliers);
-    Iterable<ByteSource> sources = Iterables.transform(suppliers,
-        new Function<InputSupplier<? extends InputStream>, ByteSource>() {
-          @Override
-          public ByteSource apply(InputSupplier<? extends InputStream> input) {
-            return asByteSource(input);
-          }
-        });
-    return asInputSupplier(ByteSource.concat(sources));
-  }
-
-  /** Varargs form of {@link #join(Iterable)}. */
-  @SuppressWarnings("unchecked") // suppress "possible heap pollution" warning in JDK7
-  public static InputSupplier<InputStream> join(
-      InputSupplier<? extends InputStream>... suppliers) {
-    return join(Arrays.asList(suppliers));
-  }
-
-  // TODO(user): Remove these once Input/OutputSupplier methods are removed
-
-  /**
-   * Returns a view of the given {@code InputStream} supplier as a
-   * {@code ByteSource}.
-   *
-   * <p>This method is a temporary method provided for easing migration from
-   * suppliers to sources and sinks.
-   *
-   * @since 15.0
-   */
-  public static ByteSource asByteSource(
-      final InputSupplier<? extends InputStream> supplier) {
-    checkNotNull(supplier);
-    return new ByteSource() {
-      @Override
-      public InputStream openStream() throws IOException {
-        return supplier.getInput();
-      }
-
-      @Override
-      public String toString() {
-        return "ByteStreams.asByteSource(" + supplier + ")";
-      }
-    };
-  }
-
-  /**
-   * Returns a view of the given {@code OutputStream} supplier as a
-   * {@code ByteSink}.
-   *
-   * <p>This method is a temporary method provided for easing migration from
-   * suppliers to sources and sinks.
-   *
-   * @since 15.0
-   */
-  public static ByteSink asByteSink(
-      final OutputSupplier<? extends OutputStream> supplier) {
-    checkNotNull(supplier);
-    return new ByteSink() {
-      @Override
-      public OutputStream openStream() throws IOException {
-        return supplier.getOutput();
-      }
-
-      @Override
-      public String toString() {
-        return "ByteStreams.asByteSink(" + supplier + ")";
-      }
-    };
-  }
-
-  @SuppressWarnings("unchecked") // used internally where known to be safe
-  static <S extends InputStream> InputSupplier<S> asInputSupplier(
-      final ByteSource source) {
-    return (InputSupplier) checkNotNull(source);
-  }
-
-  @SuppressWarnings("unchecked") // used internally where known to be safe
-  static <S extends OutputStream> OutputSupplier<S> asOutputSupplier(
-      final ByteSink sink) {
-    return (OutputSupplier) checkNotNull(sink);
   }
 }

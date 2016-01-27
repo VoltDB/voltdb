@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 
 #include "expressions/functionexpression.h"
+#include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
 
 namespace voltdb {
@@ -32,9 +33,9 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
              throw SQLException(SQLException::dynamic_sql_error,
                                 "Must not ask  for object length on sql null object.");
         }
-        const int32_t valueLength = getObjectLength_withoutNull();
-        const char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
-        std::string valueStr(valueChars, valueLength);
+        int32_t length;
+        const char* buf = getObject_withoutNull(&length);
+        std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
         msgtext = msg_format_buffer;
@@ -76,9 +77,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-        const int32_t valueLength = strValue.getObjectLength_withoutNull();
-        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
-        std::string valueStr(valueChars, valueLength);
+        int32_t length;
+        const char* buf = strValue.getObject_withoutNull(&length);
+        std::string valueStr(buf, length);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
     throw SQLException(sqlstatecode, msg_format_buffer);
@@ -128,16 +129,6 @@ public:
         return m_child->hasParameter();
     }
 
-    virtual void substitute(const NValueArray &params) {
-        assert (m_child);
-
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        m_child->substitute(params);
-    }
-
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_child);
         return (m_child->eval(tuple1, tuple2)).callUnary<F>();
@@ -177,18 +168,6 @@ public:
         return false;
     }
 
-    virtual void substitute(const NValueArray &params) {
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        for (size_t i = 0; i < m_args.size(); i++) {
-            assert(m_args[i]);
-            VOLT_TRACE("Substituting parameters for arg at index %d...", static_cast<int>(i));
-            m_args[i]->substitute(params);
-        }
-    }
-
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         //TODO: Could make this vector a member, if the memory management implications
         // (of the NValue internal state) were clear -- is there a penalty for longer-lived
@@ -217,20 +196,22 @@ using namespace functionexpression;
 AbstractExpression*
 ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments) {
     AbstractExpression* ret = 0;
-    if (!arguments) {
+    assert(arguments);
+    size_t nArgs = arguments->size();
+    if (nArgs == 0) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
             ret = new ConstantFunctionExpression<FUNC_CURRENT_TIMESTAMP>();
             break;
-        default:
+        case FUNC_PI:
+            ret = new ConstantFunctionExpression<FUNC_PI>();
             break;
+        default:
+            return NULL;
         }
-        return ret;
+        delete arguments;
     }
-
-    size_t nArgs = arguments->size();
-    assert(nArgs != 0);
-    if (nArgs == 1) {
+    else if (nArgs == 1) {
         switch(functionId) {
         case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
@@ -252,6 +233,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_EXTRACT_DAY_OF_WEEK:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_WEEK>((*arguments)[0]);
+            break;
+        case FUNC_EXTRACT_WEEKDAY:
+            ret = new UnaryFunctionExpression<FUNC_EXTRACT_WEEKDAY>((*arguments)[0]);
             break;
         case FUNC_EXTRACT_DAY_OF_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_YEAR>((*arguments)[0]);
@@ -347,8 +331,56 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_ARRAY_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_VOLT_ARRAY_LENGTH>((*arguments)[0]);
             break;
+        case FUNC_VOLT_BITNOT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_BITNOT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_HEX:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_HEX>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_BIN:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_BIN>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINTFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINTFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGONFROMTEXT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGONFROMTEXT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_NUM_POINTS:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_NUM_POINTS>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LATITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LATITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POINT_LONGITUDE:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POINT_LONGITUDE>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_CENTROID:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_CENTROID>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_AREA:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_AREA>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_ASTEXT_GEOGRAPHY:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_ASTEXT_GEOGRAPHY>((*arguments)[0]);
+            break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
+            break;
+        case FUNC_LN:
+            ret = new UnaryFunctionExpression<FUNC_LN>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_VALIDATE_POLYGON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_VALIDATE_POLYGON>((*arguments)[0]);
+            break;
+        case FUNC_VOLT_POLYGON_INVALID_REASON:
+            ret = new UnaryFunctionExpression<FUNC_VOLT_POLYGON_INVALID_REASON>((*arguments)[0]);
             break;
         default:
             return NULL;
@@ -357,6 +389,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     } else {
         // GeneralFunctions defer deleting the arguments container until through with it.
         switch(functionId) {
+        case FUNC_BITAND:
+            ret = new GeneralFunctionExpression<FUNC_BITAND>(*arguments);
+            break;
+        case FUNC_BITOR:
+            ret = new GeneralFunctionExpression<FUNC_BITOR>(*arguments);
+            break;
+        case FUNC_BITXOR:
+            ret = new GeneralFunctionExpression<FUNC_BITXOR>(*arguments);
+            break;
         case FUNC_CONCAT:
             ret = new GeneralFunctionExpression<FUNC_CONCAT>(*arguments);
             break;
@@ -365,6 +406,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_LEFT:
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
+            break;
+        case FUNC_MOD:
+            ret = new GeneralFunctionExpression<FUNC_MOD>(*arguments);
+            break;
+        case FUNC_OVERLAY_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
             break;
         case FUNC_POSITION_CHAR:
             ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
@@ -375,26 +422,71 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_REPEAT:
             ret = new GeneralFunctionExpression<FUNC_REPEAT>(*arguments);
             break;
+        case FUNC_REPLACE:
+            ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
+            break;
         case FUNC_RIGHT:
             ret = new GeneralFunctionExpression<FUNC_RIGHT>(*arguments);
             break;
         case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
             break;
-        case FUNC_TRIM_CHAR:
-            ret = new GeneralFunctionExpression<FUNC_TRIM_CHAR>(*arguments);
+        case FUNC_TRIM_BOTH_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_BOTH_CHAR>(*arguments);
             break;
-        case FUNC_REPLACE:
-            ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
+        case FUNC_TRIM_LEADING_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_LEADING_CHAR>(*arguments);
             break;
-        case FUNC_OVERLAY_CHAR:
-            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
+        case FUNC_TRIM_TRAILING_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_TRAILING_CHAR>(*arguments);
             break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
+        case FUNC_VOLT_BIT_SHIFT_LEFT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_LEFT>(*arguments);
+            break;
+        case FUNC_VOLT_BIT_SHIFT_RIGHT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_BIT_SHIFT_RIGHT>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_YEAR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_YEAR>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_QUARTER:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_QUARTER>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MONTH:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MONTH>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_DAY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_DAY>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_HOUR:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_HOUR>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MINUTE:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MINUTE>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_SECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_SECOND>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MILLISECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MILLISECOND>(*arguments);
+            break;
+        case FUNC_VOLT_DATEADD_MICROSECOND:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DATEADD_MICROSECOND>(*arguments);
+            break;
         case FUNC_VOLT_FIELD:
             ret = new GeneralFunctionExpression<FUNC_VOLT_FIELD>(*arguments);
+            break;
+        case FUNC_VOLT_FORMAT_CURRENCY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
+            break;
+        case FUNC_VOLT_REGEXP_POSITION:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_REGEXP_POSITION>(*arguments);
+            break;
+        case FUNC_VOLT_SET_FIELD:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
             break;
         case FUNC_VOLT_SQL_ERROR:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
@@ -402,13 +494,25 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
             break;
+        case FUNC_VOLT_CONTAINS:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_CONTAINS>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POINT_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POINT_POINT>(*arguments);
+            break;
+        case FUNC_VOLT_DISTANCE_POLYGON_POINT:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_DISTANCE_POLYGON_POINT>(*arguments);
+            break;
         default:
             return NULL;
         }
     }
-    // May return null, leaving it to the caller (with more context) to generate an exception.
+    // This function may have explicitly returned null, earlier, leaving it to the caller
+    // (with more context?) to generate an exception.
+    // But having fallen through to this point indicates that
+    // a FunctionExpression was constructed.
+    assert(ret);
     return ret;
 }
 
 }
-

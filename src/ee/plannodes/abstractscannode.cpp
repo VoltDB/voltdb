@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,49 +45,14 @@
 
 #include "abstractscannode.h"
 
-#include "storage/table.h"
-#include "catalog/table.h"
-#include "catalog/column.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/TableCatalogDelegate.hpp"
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
-AbstractScanPlanNode::AbstractScanPlanNode(int32_t id)
-    : AbstractPlanNode(id), m_predicate(NULL)
-{
-    m_tcd = NULL;
-}
+AbstractScanPlanNode::~AbstractScanPlanNode() { }
 
-AbstractScanPlanNode::AbstractScanPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
-{
-    m_tcd = NULL;
-}
-
-AbstractScanPlanNode::~AbstractScanPlanNode()
-{
-    delete m_predicate;
-}
-
-void
-AbstractScanPlanNode::setPredicate(AbstractExpression* predicate)
-{
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
-    }
-    m_predicate = predicate;
-}
-
-AbstractExpression*
-AbstractScanPlanNode::getPredicate() const
-{
-    return m_predicate;
-}
-
-Table*
-AbstractScanPlanNode::getTargetTable() const
+Table* AbstractScanPlanNode::getTargetTable() const
 {
     if (m_tcd == NULL) {
         return NULL;
@@ -95,39 +60,37 @@ AbstractScanPlanNode::getTargetTable() const
     return m_tcd->getTable();
 }
 
-void
-AbstractScanPlanNode::setTargetTableDelegate(TableCatalogDelegate* tcd)
+std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const
 {
-    m_tcd = tcd;
-}
-
-string
-AbstractScanPlanNode::getTargetTableName() const
-{
-    return m_targetTableName;
-}
-
-void
-AbstractScanPlanNode::setTargetTableName(string table_name)
-{
-    m_targetTableName = table_name;
-}
-
-string
-AbstractScanPlanNode::debugInfo(const string &spacer) const
-{
-    ostringstream buffer;
-    buffer << spacer << "TargetTable[" << m_targetTableName << "]\n";
+    std::ostringstream buffer;
+    buffer << spacer << "TargetTable[" << m_target_table_name << "]\n";
     return buffer.str();
 }
 
-void
-AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    m_targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+    m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
 
-    if (obj.hasNonNullKey("PREDICATE")) {
-        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
+    m_isEmptyScan = obj.hasNonNullKey("PREDICATE_FALSE");
+
+    // Set the predicate (if any) only if it's not a trivial FALSE expression
+    if (!m_isEmptyScan) {
+        m_predicate.reset(loadExpressionFromJSONObject("PREDICATE", obj));
     }
+
     m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
+
+    if (m_isSubQuery) {
+        m_tcd = NULL;
+    } else {
+        VoltDBEngine* engine = ExecutorContext::getEngine();
+        m_tcd = engine->getTableDelegate(m_target_table_name);
+        if ( ! m_tcd) {
+            VOLT_ERROR("Failed to retrieve target table from execution engine for PlanNode '%s'",
+                       debug().c_str());
+            //TODO: throw something
+        }
+    }
 }
+
+} // namespace voltdb

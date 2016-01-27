@@ -24,23 +24,18 @@ A client is provided that runs various Java stored procedure files to:
 
 Export ------
 
-The auction example is also set up to demonstrate the
-ability for VoltDB to export live data from a running database. To run
-the auction example with export enabled, you must do the following:
+The auction example is set up to demonstrate the ability for VoltDB to export
+live data from a running database. To run the auction example, do the following:
 
-1. Edit deployment.xml and change enabled="false" to enabled="true" in
-   the <export> tag.
+1. Start two terminal windows in the auction directory.
 
-2. Start two terminal windows in the auction directory.
+2. In the first terminal window, issue the "run.sh server &" command to create
+   the database. 
+   
+3. Once the server finishes initializing, issue the "run.sh init" command to 
+   load the auction schema and stored procedures.
 
-3. In the first terminal window, issue the "run.sh catalog" command to compile
-   the Java source code and build the VoltDB application catalog jar for
-   the aution example.
-
-4. In the first terminal window, issue the "run.sh server" command to start
-   the auction database server.
-
-5. In the second terminal window, issue the "run.sh client" command to start
+4. In the second terminal window, issue the "run.sh client" command to start
    the auction client application.
 
 When you perform these actions, the auction client will run as usual. At

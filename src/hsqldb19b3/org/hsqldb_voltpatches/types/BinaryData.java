@@ -35,6 +35,9 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+// A VoltDB extension to support X'..' as integer literals
+import java.math.BigInteger;
+// End VoltDB extension
 
 import org.hsqldb_voltpatches.Error;
 import org.hsqldb_voltpatches.ErrorCode;
@@ -265,4 +268,49 @@ public class BinaryData implements BlobData {
     public boolean isBinary() {
         return true;
     }
+    // A VoltDB extension to allow X'..' as integer constants
+    /**
+     * Given a sequence of bytes that would otherwise be a
+     * VARBINARY constant, return a long value, with the
+     * understanding that the caller has determined that this
+     * value is in a numeric context.
+     *
+     * Returns true for a successful conversion and false otherwise.
+     *
+     * We assume that the bytes are representing a
+     * 64-bit two's complement integer:
+     * - a constant with no digits throws a "malformed numeric constant" exception
+     * - a constant with more than 16 digits throws a "malformed numeric constant" exception
+     * - a constant that is shorter than 16 digits is implicitly zero-extended
+     *   (i.e., constants with less than 16 digits are always positive)
+     *
+     * These are the VoltDB classes that handle hex literal constants:
+     *   voltdb.ParameterConverter
+     *   voltdb.expressions.ConstantValueExpression
+     * Each of these code paths need to handle hex literals in the same way.
+     *
+     * Note that sqlcmd must parse parameters to execute stored procedures and calls common code
+     * in SQLParser for handling hex literals.
+     * (VMC support for hex literals is still TBD at this time.)
+     *
+     * @return a long value
+     */
+    public long toLong() {
+        byte[] data = getBytes();
+        if (data == null || data.length <= 0 || data.length > 8) {
+            // Assume that we're in a numeric context and that the user
+            // made a typo entering a hex string.
+            throw Error.error(ErrorCode.X_42585); // malformed numeric constant
+        }
+
+        byte[] dataWithLeadingZeros = new byte[] {0, 0, 0, 0, 0, 0, 0, 0};
+        int lenDiff = 8 - data.length;
+        for (int j = lenDiff; j < 8; ++j) {
+            dataWithLeadingZeros[j] = data[j - lenDiff];
+        }
+
+        BigInteger bi = new BigInteger(dataWithLeadingZeros);
+        return bi.longValue();
+    }
+    // End VoltDB extension
 }

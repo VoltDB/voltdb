@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -25,6 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
@@ -81,6 +83,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
         resolveColumnIndexesUsingSchema(input_schema);
+
+        // Possible subquery expressions
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
     }
 
     /**
@@ -121,13 +129,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         NodeSchema new_schema = new NodeSchema();
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
-            if (col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_SUM ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MIN ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MAX ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_AVG)
-            {
+            if (col.getExpression().getExpressionType().isAggregateExpression()) {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
                                                          col.getTableAlias(),
@@ -148,6 +150,12 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         }
         m_outputSchema = new_schema;
         m_hasSignificantOutputSchema = true;
+
+        // Generate the output schema for subqueries
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
 
         return;
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -113,7 +113,7 @@ public class StatsProcOutputTable
         if (denom == 0L) {
             return 100L;
         } else {
-            return (100L * num / denom);
+            return Math.round(100.0 * num / denom);
         }
     }
 
@@ -161,7 +161,6 @@ public class StatsProcOutputTable
 
         int kB = 1024;
         int mB = 1024 * kB;
-        int gB = 1024 * mB;
 
         VoltTable result = TableShorthand.tableFromShorthand(
             tableName +

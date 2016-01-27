@@ -1,6 +1,7 @@
+import sys, os, subprocess
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +50,9 @@
         VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
                            'exclude heap dump file from collection',
                            default = False),
+        VOLT.IntegerOption(None, '--days', 'days',
+                           'number of days of files to collect (files included are log, crash files), Current day value is 1',
+                           default = 14)
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path', absolute = True)
@@ -56,5 +60,16 @@
 )
 
 def collect(runner):
-    runner.args.extend([runner.opts.voltdbroot, runner.opts.prefix, runner.opts.host, runner.opts.username, runner.opts.password, runner.opts.noprompt, runner.opts.dryrun, runner.opts.skipheapdump])
+    if int(runner.opts.days) == 0:
+	print >> sys.stderr, "ERROR: '0' is invalid entry for option --days"
+        sys.exit(-1)
+
+    os.environ["PATH"] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join("voltdb", "bin") in s)
+    checkFD = os.open(os.path.join(runner.opts.voltdbroot, "systemcheck"), os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
+    checkOutput = os.fdopen(checkFD, 'w')
+    subprocess.call("voltdb check", stdout=checkOutput, shell=True)
+    checkOutput.close()
+
+    runner.args.extend(['--voltdbroot='+runner.opts.voltdbroot, '--prefix='+runner.opts.prefix, '--host='+runner.opts.host, '--username='+runner.opts.username, '--password='+runner.opts.password,
+    '--noprompt='+str(runner.opts.noprompt), '--dryrun='+str(runner.opts.dryrun), '--skipheapdump='+str(runner.opts.skipheapdump), '--days='+str(runner.opts.days)])
     runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)

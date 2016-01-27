@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -95,7 +95,7 @@ public:
     }
 
     /*
-     * Confirm all actions were undone in the correct order.
+     * Confirm all actions were undone in FILO order.
      */
     void confirmUndoneActionHistoryOrder(std::vector<MockUndoActionHistory*> histories, int &expectedStartingIndex) {
         for (std::vector<MockUndoActionHistory*>::reverse_iterator i = histories.rbegin();
@@ -110,11 +110,11 @@ public:
     }
 
     /*
-     * Confirm all actions were released in the correct order
+     * Confirm all actions were released in FIFO order.
      */
     void confirmReleaseActionHistoryOrder(std::vector<MockUndoActionHistory*> histories, int &expectedStartingIndex) {
-        for (std::vector<MockUndoActionHistory*>::reverse_iterator i = histories.rbegin();
-             i != histories.rend();
+        for (std::vector<MockUndoActionHistory*>::iterator i = histories.begin();
+             i != histories.end();
              i++) {
             const MockUndoActionHistory *history = *i;
             ASSERT_TRUE(history->m_released);

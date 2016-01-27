@@ -26,11 +26,13 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+
+import javax.annotation_voltpatches.CheckReturnValue;
 
 /**
  * An object that measures elapsed time in nanoseconds. It is useful to measure
@@ -71,7 +73,6 @@ import java.util.concurrent.TimeUnit;
  * @author Kevin Bourrillion
  * @since 10.0
  */
-@Beta
 @GwtCompatible(emulated = true)
 public final class Stopwatch {
   private final Ticker ticker;
@@ -85,6 +86,7 @@ public final class Stopwatch {
    *
    * @since 15.0
    */
+  @CheckReturnValue
   public static Stopwatch createUnstarted() {
     return new Stopwatch();
   }
@@ -95,6 +97,7 @@ public final class Stopwatch {
    *
    * @since 15.0
    */
+  @CheckReturnValue
   public static Stopwatch createUnstarted(Ticker ticker) {
     return new Stopwatch(ticker);
   }
@@ -105,6 +108,7 @@ public final class Stopwatch {
    *
    * @since 15.0
    */
+  @CheckReturnValue
   public static Stopwatch createStarted() {
     return new Stopwatch().start();
   }
@@ -115,31 +119,16 @@ public final class Stopwatch {
    *
    * @since 15.0
    */
+  @CheckReturnValue
   public static Stopwatch createStarted(Ticker ticker) {
     return new Stopwatch(ticker).start();
   }
 
-  /**
-   * Creates (but does not start) a new stopwatch using {@link System#nanoTime}
-   * as its time source.
-   *
-   * @deprecated Use {@link Stopwatch#createUnstarted()} instead. This
-   *     constructor is scheduled to be removed in Guava release 17.0.
-   */
-  @Deprecated
-  public Stopwatch() {
-    this(Ticker.systemTicker());
+  Stopwatch() {
+    this.ticker = Ticker.systemTicker();
   }
 
-  /**
-   * Creates (but does not start) a new stopwatch, using the specified time
-   * source.
-   *
-   * @deprecated Use {@link Stopwatch#createUnstarted(Ticker)} instead. This
-   *     constructor is scheduled to be removed in Guava release 17.0.
-   */
-  @Deprecated
-  public Stopwatch(Ticker ticker) {
+  Stopwatch(Ticker ticker) {
     this.ticker = checkNotNull(ticker, "ticker");
   }
 
@@ -148,6 +137,7 @@ public final class Stopwatch {
    * and {@link #stop()} has not been called since the last call to {@code
    * start()}.
    */
+  @CheckReturnValue
   public boolean isRunning() {
     return isRunning;
   }
@@ -206,51 +196,24 @@ public final class Stopwatch {
    *
    * @since 14.0 (since 10.0 as {@code elapsedTime()})
    */
+  @CheckReturnValue
   public long elapsed(TimeUnit desiredUnit) {
     return desiredUnit.convert(elapsedNanos(), NANOSECONDS);
-  }
-
-  /**
-   * Returns the current elapsed time shown on this stopwatch, expressed
-   * in the desired time unit, with any fraction rounded down.
-   *
-   * <p>Note that the overhead of measurement can be more than a microsecond, so
-   * it is generally not useful to specify {@link TimeUnit#NANOSECONDS}
-   * precision here.
-   *
-   * @deprecated Use {@link Stopwatch#elapsed(TimeUnit)} instead. This method is
-   *     scheduled to be removed in Guava release 16.0.
-   */
-  @Deprecated
-  public long elapsedTime(TimeUnit desiredUnit) {
-    return elapsed(desiredUnit);
-  }
-
-  /**
-   * Returns the current elapsed time shown on this stopwatch, expressed
-   * in milliseconds, with any fraction rounded down. This is identical to
-   * {@code elapsed(TimeUnit.MILLISECONDS)}.
-   *
-   * @deprecated Use {@code stopwatch.elapsed(MILLISECONDS)} instead. This
-   *     method is scheduled to be removed in Guava release 16.0.
-   */
-  @Deprecated
-  public long elapsedMillis() {
-    return elapsed(MILLISECONDS);
   }
 
   /**
    * Returns a string representation of the current elapsed time.
    */
   @GwtIncompatible("String.format()")
-  @Override public String toString() {
+  @Override
+  public String toString() {
     long nanos = elapsedNanos();
 
     TimeUnit unit = chooseUnit(nanos);
     double value = (double) nanos / NANOSECONDS.convert(1, unit);
 
     // Too bad this functionality is not exposed as a regular method call
-    return String.format("%.4g %s", value, abbreviate(unit));
+    return String.format(Locale.ROOT, "%.4g %s", value, abbreviate(unit));
   }
 
   private static TimeUnit chooseUnit(long nanos) {

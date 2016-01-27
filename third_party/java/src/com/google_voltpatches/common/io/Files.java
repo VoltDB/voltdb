@@ -23,6 +23,7 @@ import static com.google_voltpatches.common.io.FileWriteMode.APPEND;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -33,8 +34,6 @@ import com.google_voltpatches.common.hash.HashFunction;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -128,6 +127,15 @@ public final class Files {
     }
 
     @Override
+    public Optional<Long> sizeIfKnown() {
+      if (file.isFile()) {
+        return Optional.of(file.length());
+      } else {
+        return Optional.absent();
+      }
+    }
+
+    @Override
     public long size() throws IOException {
       if (!file.isFile()) {
         throw new FileNotFoundException(file.toString());
@@ -137,59 +145,10 @@ public final class Files {
 
     @Override
     public byte[] read() throws IOException {
-      long size = file.length();
-      // some special files may return size 0 but have content
-      // read normally to be sure
-      if (size == 0) {
-        return super.read();
-      }
-
-      // can't initialize a large enough array
-      // technically, this could probably be Integer.MAX_VALUE - 5
-      if (size > Integer.MAX_VALUE) {
-        // OOME is what would be thrown if we tried to initialize the array
-        throw new OutOfMemoryError("file is too large to fit in a byte array: "
-            + size + " bytes");
-      }
-
-      // initialize the array to the current size of the file
-      byte[] bytes = new byte[(int) size];
-
       Closer closer = Closer.create();
       try {
-        InputStream in = closer.register(openStream());
-        int off = 0;
-        int read = 0;
-
-        // read until we've read size bytes or reached EOF
-        while (off < size
-            && ((read = in.read(bytes, off, (int) size - off)) != -1)) {
-          off += read;
-        }
-
-        if (off < size) {
-          // encountered EOF early; truncate the result
-          return Arrays.copyOf(bytes, off);
-        }
-
-        // otherwise, exactly size bytes were read
-
-        int b = in.read(); // check for EOF
-        if (b == -1) {
-          // EOF; the file did not change size, so return the original array
-          return bytes;
-        }
-
-        // the file got larger, so read the rest normally
-        InternalByteArrayOutputStream out
-            = new InternalByteArrayOutputStream();
-        out.write(b); // write the byte we read when testing for EOF
-        ByteStreams.copy(in, out);
-
-        byte[] result = new byte[bytes.length + out.size()];
-        System.arraycopy(bytes, 0, result, 0, bytes.length);
-        out.writeTo(result, bytes.length);
-        return result;
+        FileInputStream in = closer.register(openStream());
+        return readFile(in, in.getChannel().size());
       } catch (Throwable e) {
         throw closer.rethrow(e);
       } finally {
@@ -204,17 +163,23 @@ public final class Files {
   }
 
   /**
-   * BAOS subclass for direct access to its internal buffer.
+   * Reads a file of the given expected size from the given input stream, if
+   * it will fit into a byte array. This method handles the case where the file
+   * size changes between when the size is read and when the contents are read
+   * from the stream.
    */
-  private static final class InternalByteArrayOutputStream
-      extends ByteArrayOutputStream {
-    /**
-     * Writes the contents of the internal buffer to the given array starting
-     * at the given offset. Assumes the array has space to hold count bytes.
-     */
-    void writeTo(byte[] b, int off) {
-      System.arraycopy(buf, 0, b, off, count);
+  static byte[] readFile(
+      InputStream in, long expectedSize) throws IOException {
+    if (expectedSize > Integer.MAX_VALUE) {
+      throw new OutOfMemoryError("file is too large to fit in a byte array: "
+          + expectedSize + " bytes");
     }
+
+    // some special files may return size 0 but have content, so read
+    // the file normally in that case
+    return expectedSize == 0
+        ? ByteStreams.toByteArray(in)
+        : ByteStreams.toByteArray(in, (int) expectedSize);
   }
 
   /**
@@ -276,92 +241,10 @@ public final class Files {
     return asByteSink(file, modes).asCharSink(charset);
   }
 
-  /**
-   * Returns a factory that will supply instances of {@link FileInputStream}
-   * that read from a file.
-   *
-   * @param file the file to read from
-   * @return the factory
-   */
-  public static InputSupplier<FileInputStream> newInputStreamSupplier(
-      final File file) {
-    return ByteStreams.asInputSupplier(asByteSource(file));
-  }
-
-  /**
-   * Returns a factory that will supply instances of {@link FileOutputStream}
-   * that write to a file.
-   *
-   * @param file the file to write to
-   * @return the factory
-   */
-  public static OutputSupplier<FileOutputStream> newOutputStreamSupplier(
-      File file) {
-    return newOutputStreamSupplier(file, false);
-  }
-
-  /**
-   * Returns a factory that will supply instances of {@link FileOutputStream}
-   * that write to or append to a file.
-   *
-   * @param file the file to write to
-   * @param append if true, the encoded characters will be appended to the file;
-   *     otherwise the file is overwritten
-   * @return the factory
-   */
-  public static OutputSupplier<FileOutputStream> newOutputStreamSupplier(
-      final File file, final boolean append) {
-    return ByteStreams.asOutputSupplier(asByteSink(file, modes(append)));
-  }
-
   private static FileWriteMode[] modes(boolean append) {
     return append
         ? new FileWriteMode[]{ FileWriteMode.APPEND }
         : new FileWriteMode[0];
-  }
-
-  /**
-   * Returns a factory that will supply instances of
-   * {@link InputStreamReader} that read a file using the given character set.
-   *
-   * @param file the file to read from
-   * @param charset the charset used to decode the input stream; see {@link
-   *     Charsets} for helpful predefined constants
-   * @return the factory
-   */
-  public static InputSupplier<InputStreamReader> newReaderSupplier(File file,
-      Charset charset) {
-    return CharStreams.asInputSupplier(asCharSource(file, charset));
-  }
-
-  /**
-   * Returns a factory that will supply instances of {@link OutputStreamWriter}
-   * that write to a file using the given character set.
-   *
-   * @param file the file to write to
-   * @param charset the charset used to encode the output stream; see {@link
-   *     Charsets} for helpful predefined constants
-   * @return the factory
-   */
-  public static OutputSupplier<OutputStreamWriter> newWriterSupplier(File file,
-      Charset charset) {
-    return newWriterSupplier(file, charset, false);
-  }
-
-  /**
-   * Returns a factory that will supply instances of {@link OutputStreamWriter}
-   * that write to or append to a file using the given character set.
-   *
-   * @param file the file to write to
-   * @param charset the charset used to encode the output stream; see {@link
-   *     Charsets} for helpful predefined constants
-   * @param append if true, the encoded characters will be appended to the file;
-   *     otherwise the file is overwritten
-   * @return the factory
-   */
-  public static OutputSupplier<OutputStreamWriter> newWriterSupplier(File file,
-      Charset charset, boolean append) {
-    return CharStreams.asOutputSupplier(asCharSink(file, charset, modes(append)));
   }
 
   /**
@@ -392,19 +275,6 @@ public final class Files {
   }
 
   /**
-   * Copies to a file all bytes from an {@link InputStream} supplied by a
-   * factory.
-   *
-   * @param from the input factory
-   * @param to the destination file
-   * @throws IOException if an I/O error occurs
-   */
-  public static void copy(InputSupplier<? extends InputStream> from, File to)
-      throws IOException {
-    ByteStreams.asByteSource(from).copyTo(asByteSink(to));
-  }
-
-  /**
    * Overwrites a file with the contents of a byte array.
    *
    * @param from the bytes to write
@@ -413,19 +283,6 @@ public final class Files {
    */
   public static void write(byte[] from, File to) throws IOException {
     asByteSink(to).write(from);
-  }
-
-  /**
-   * Copies all bytes from a file to an {@link OutputStream} supplied by
-   * a factory.
-   *
-   * @param from the source file
-   * @param to the output factory
-   * @throws IOException if an I/O error occurs
-   */
-  public static void copy(File from, OutputSupplier<? extends OutputStream> to)
-      throws IOException {
-    asByteSource(from).copyTo(ByteStreams.asByteSink(to));
   }
 
   /**
@@ -456,22 +313,6 @@ public final class Files {
     checkArgument(!from.equals(to),
         "Source %s and destination %s must be different", from, to);
     asByteSource(from).copyTo(asByteSink(to));
-  }
-
-  /**
-   * Copies to a file all characters from a {@link Readable} and
-   * {@link Closeable} object supplied by a factory, using the given
-   * character set.
-   *
-   * @param from the readable supplier
-   * @param to the destination file
-   * @param charset the charset used to encode the output stream; see {@link
-   *     Charsets} for helpful predefined constants
-   * @throws IOException if an I/O error occurs
-   */
-  public static <R extends Readable & Closeable> void copy(
-      InputSupplier<R> from, File to, Charset charset) throws IOException {
-    CharStreams.asCharSource(from).copyTo(asCharSink(to, charset));
   }
 
   /**
@@ -518,22 +359,6 @@ public final class Files {
   private static void write(CharSequence from, File to, Charset charset,
       boolean append) throws IOException {
     asCharSink(to, charset, modes(append)).write(from);
-  }
-
-  /**
-   * Copies all characters from a file to a {@link Appendable} &
-   * {@link Closeable} object supplied by a factory, using the given
-   * character set.
-   *
-   * @param from the source file
-   * @param charset the charset used to decode the input stream; see {@link
-   *     Charsets} for helpful predefined constants
-   * @param to the appendable supplier
-   * @throws IOException if an I/O error occurs
-   */
-  public static <W extends Appendable & Closeable> void copy(File from,
-      Charset charset, OutputSupplier<W> to) throws IOException {
-    asCharSource(from, charset).copyTo(CharStreams.asCharSink(to));
   }
 
   /**
@@ -655,8 +480,10 @@ public final class Files {
   }
 
   /**
-   * Moves the file from one path to another. This method can rename a file or
-   * move it to a different directory, like the Unix {@code mv} command.
+   * Moves a file from one path to another. This method can rename a file
+   * and/or move it to a different directory. In either case {@code to} must
+   * be the target path for the file itself; not just the new name for the
+   * file or the path to the new parent directory.
    *
    * @param from the source file
    * @param to the destination file
@@ -744,7 +571,7 @@ public final class Files {
    */
   public static <T> T readLines(File file, Charset charset,
       LineProcessor<T> callback) throws IOException {
-    return CharStreams.readLines(newReaderSupplier(file, charset), callback);
+    return asCharSource(file, charset).readLines(callback);
   }
 
   /**
@@ -760,7 +587,7 @@ public final class Files {
    */
   public static <T> T readBytes(File file, ByteProcessor<T> processor)
       throws IOException {
-    return ByteStreams.readBytes(newInputStreamSupplier(file), processor);
+    return asByteSource(file).read(processor);
   }
 
   /**

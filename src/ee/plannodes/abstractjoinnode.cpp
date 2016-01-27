@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,54 +45,45 @@
 
 #include "abstractjoinnode.h"
 
+#include "common/TupleSchema.h"
 #include "expressions/abstractexpression.h"
 
-#include <stdexcept>
+#include "boost/foreach.hpp"
 
-using namespace std;
-using namespace voltdb;
+#include <sstream>
 
-AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
-{
-}
+namespace voltdb {
 
-AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
-{
-}
+AbstractJoinPlanNode::AbstractJoinPlanNode() { }
 
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
-    delete m_preJoinPredicate;
-    delete m_joinPredicate;
-    delete m_wherePredicate;
+    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+        delete scol;
+    }
+
+    TupleSchema::freeTupleSchema(m_tupleSchemaPreAgg);
 }
 
-JoinType AbstractJoinPlanNode::getJoinType() const
-{
-    return m_joinType;
+void AbstractJoinPlanNode::getOutputColumnExpressions(
+        std::vector<AbstractExpression*>& outputExpressions) const {
+    std::vector<SchemaColumn*> outputSchema;
+    if (m_outputSchemaPreAgg.size() > 0) {
+        outputSchema = m_outputSchemaPreAgg;
+    } else {
+        outputSchema = getOutputSchema();
+    }
+    size_t schemaSize = outputSchema.size();
+
+    for (int i = 0; i < schemaSize; i++) {
+        outputExpressions.push_back(outputSchema[i]->getExpression());
+    }
 }
 
-AbstractExpression* AbstractJoinPlanNode::getPreJoinPredicate() const
+std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
 {
-    return m_preJoinPredicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
-{
-    return m_joinPredicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
-{
-    return m_wherePredicate;
-}
-
-string AbstractJoinPlanNode::debugInfo(const string& spacer) const
-{
-    ostringstream buffer;
-    buffer << spacer << "JoinType[" << m_joinType << "]\n";
+    std::ostringstream buffer;
+    buffer << spacer << "JoinType[" << joinToString(m_joinType) << "]\n";
     if (m_preJoinPredicate != NULL)
     {
         buffer << spacer << "Pre-Join Predicate\n";
@@ -116,19 +107,23 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
-    loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
-    loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
-    loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
-}
+    m_preJoinPredicate.reset(loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj));
+    m_joinPredicate.reset(loadExpressionFromJSONObject("JOIN_PREDICATE", obj));
+    m_wherePredicate.reset(loadExpressionFromJSONObject("WHERE_PREDICATE", obj));
 
-
-void
-AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate)
-{
-    if (obj.hasNonNullKey(predicateType)) {
-        predicate = AbstractExpression::buildExpressionTree(obj.valueForKey(predicateType));
+    if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
+        }
+        m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
     }
     else {
-        predicate = NULL;
+        m_tupleSchemaPreAgg = NULL;
     }
+
 }
+
+} // namespace voltdb

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -100,7 +100,7 @@ public class TestPlansMatView extends PlannerTestCase {
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
         explainedFragment = pns.get(0).toExplainPlanString();
-        assertTrue(explainedFragment.contains(" using \"ENG4826_VR_COUNT\""));
+        assertTrue(explainedFragment.contains("using its primary key index"));
 
         pns = compileToFragments("SELECT * FROM VR WHERE V_D2 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
@@ -118,7 +118,7 @@ public class TestPlansMatView extends PlannerTestCase {
                                  "ORDER BY CNT DESC LIMIT 10;");
         assertEquals(1, pns.size());
         explainedFragment = pns.get(0).toExplainPlanString();
-        assertTrue(explainedFragment.contains(" using \"ENG4826_VP_COUNT\""));
+        assertTrue(explainedFragment.contains("using its primary key index"));
 
         pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D2 = 1 " +
                                  "ORDER BY CNT DESC LIMIT 10;");
@@ -162,6 +162,107 @@ public class TestPlansMatView extends PlannerTestCase {
         System.out.println(pns.get(0).toExplainPlanString());
         System.out.println(pns.get(1).toExplainPlanString());
 
+    }
+
+    public void testFixedENG8559ExistsPartitionedWithSubqueryNPE() {
+        System.out.println("Running testFixedENG8559ExistsPartitionedWithSubqueryNPE:");
+        List<AbstractPlanNode> pns;
+
+        try {
+            pns = compileToFragments("SELECT * FROM P X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.VAL1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM R Y WHERE Y.VAL1 = X.SUM_V1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM R X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.VAL1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM P Y WHERE Y.VAL1 = X.SUM_V1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VNP Y WHERE Y.SUM_V1 = X.SUM_V1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM VP X WHERE EXISTS (SELECT * FROM VP Y WHERE Y.SUM_V1 = X.SUM_V1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM VP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");
+            //* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            //* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
+
+        try {
+            pns = compileToFragments("SELECT * FROM VNP X WHERE EXISTS (SELECT * FROM VR Y WHERE Y.SUM_V2 = X.SUM_V1)");
+            /* enable to debug */ System.out.println(pns.get(0).toExplainPlanString());
+            /* enable to debug */ System.out.println(pns.get(1).toExplainPlanString());
+            fail("unexpected success for partitioned view query with subquery.");
+        }
+        catch (PlanningErrorException pex) {
+            assertTrue(pex.getMessage().contains(
+                    "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables."
+                    ));
+        }
     }
 
 }

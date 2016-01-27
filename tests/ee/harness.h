@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -230,23 +230,17 @@ do { \
 #define ASSERT_GT(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>, one, two)
 #define ASSERT_GE(one, two) STUPIDUNIT_MAKE_ASSERT_MACRO(>=, one, two)
 
-#define ASSERT_TRUE(value) \
-do { \
-    if (!(value)) { \
-        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
-        fail(__FILE__, __LINE__, "Expected true; " #value " is false"); \
-        return; \
-    } \
-} while (0)
-#define ASSERT_FALSE(value) \
-do { \
-    if ((value)) { \
-        STUPIDUNIT_ASSERT_BREAKPOINT_CODE \
-        fail(__FILE__, __LINE__, "Expected false; " #value " is true"); \
-        return; \
-    } \
-} while (0)
+#define ASSERT_TRUE_WITH_MESSAGE(value, msg)    \
+    do {                                        \
+        if (!(value)) {                         \
+            STUPIDUNIT_ASSERT_BREAKPOINT_CODE   \
+                fail(__FILE__, __LINE__, msg);  \
+            return;                             \
+        }                                       \
+    } while (0)
 
+#define ASSERT_TRUE(value) ASSERT_TRUE_WITH_MESSAGE(value, "Expected true; " #value " is false")
+#define ASSERT_FALSE(value) ASSERT_TRUE_WITH_MESSAGE(!(value), "Expected false; " #value " is true")
 
 namespace stupidunit {
 

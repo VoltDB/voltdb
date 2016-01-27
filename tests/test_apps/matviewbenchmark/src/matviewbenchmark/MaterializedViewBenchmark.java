@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,13 +24,19 @@
 package matviewbenchmark;
 
 import java.io.FileWriter;
-import java.io.IOException;
-import java.util.concurrent.CountDownLatch;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
 
-import org.voltdb.*;
-import org.voltdb.client.*;
+import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.NullCallback;
 
 public class MaterializedViewBenchmark {
 
@@ -47,11 +53,17 @@ public class MaterializedViewBenchmark {
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
-    double insert_throughput;
-    double insert_execute;
+    double insertThroughput;
+    double insertExecute;
 
-    double delete_throughput;
-    double delete_execute;
+    double updateGroupThroughput;
+    double updateGroupExecute;
+
+    double updateValueThroughput;
+    double updateValueExecute;
+
+    double deleteThroughput;
+    double deleteExecute;
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -73,7 +85,7 @@ public class MaterializedViewBenchmark {
         int warmup = 100000;
 
         @Option(desc = "Number of groupings for materialized view (0 for 1:1 group to id ratio).")
-        int group = 0;
+        int group = 5000;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
@@ -94,6 +106,10 @@ public class MaterializedViewBenchmark {
         }
     }
 
+    /**
+     * Override for the ClientStatusListenerExt class to exit the test in error if the connection is lost
+     * before the test finishes.
+     */
     class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
@@ -104,6 +120,10 @@ public class MaterializedViewBenchmark {
         }
     }
 
+    /**
+     * The constructor method for the MaterializedViewBenchmark class.
+     * @param config MatViewConfig object containing the configuration options.
+     */
     public MaterializedViewBenchmark(MatViewConfig config) {
         this.config = config;
 
@@ -116,17 +136,20 @@ public class MaterializedViewBenchmark {
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        insert_throughput = 0;
-        insert_execute = 0;
-        delete_throughput = 0;
-        delete_execute = 0;
+        insertThroughput = 0;
+        insertExecute = 0;
+        updateGroupThroughput = 0;
+        updateGroupExecute = 0;
+        updateValueThroughput = 0;
+        updateValueExecute = 0;
+        deleteThroughput = 0;
+        deleteExecute = 0;
     }
 
     /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
      * able to connect.
-     *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
     void connectToOneServerWithRetry(String server) {
@@ -148,9 +171,8 @@ public class MaterializedViewBenchmark {
     /**
      * Connect to a set of servers in parallel. Each will retry until
      * connection. This call will block until all have connected.
-     *
      * @param servers A comma separated list of servers using the hostname:port
-     * syntax (where :port is optional).
+     *                syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
@@ -203,7 +225,6 @@ public class MaterializedViewBenchmark {
         System.out.println("");
     }
 
-
     /**
      * Prints the results and statistics about performance.
      * @param procedure The name of the stored procedure that was tested.
@@ -238,6 +259,7 @@ public class MaterializedViewBenchmark {
      * Prints the results and statistics about performance.
      * @param procedure The name of the stored procedure that was tested.
      *        fw        File writer object to write stats to.
+     *        suffix    Label for the row in the csv file.
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults(String procedure, FileWriter fw, String suffix) throws Exception {
@@ -270,47 +292,245 @@ public class MaterializedViewBenchmark {
                                 stats.getStartTimestamp(),
                                 stats.getTxnThroughput(),
                                 execTimeInMicroSec));
+    }
 
-        // Expecting the custom insert/delete procedure names ex. ids_insert
-        if (procedure.split("_")[1].equals("insert")) {
-            if (insert_throughput > 0) {
-                insert_throughput = (((stats.getTxnThroughput() - insert_throughput) /
-                                      stats.getTxnThroughput()) * 100);
-                insert_execute = (((insert_execute - execTimeInMicroSec) /
-                                   execTimeInMicroSec) * 100);
-                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                        "Insert Diff",
-                                        stats.getStartTimestamp(),
-                                        insert_throughput,
-                                        insert_execute));
-            } else {
-                insert_throughput = (double)stats.getTxnThroughput();
-                insert_execute = execTimeInMicroSec;
+    private boolean isMinMatViewCase(String matView) {
+        return matView.toLowerCase().endsWith("minmatview") ||
+               matView.toLowerCase().endsWith("minmatviewopt") ||
+               matView.toLowerCase().endsWith("minmatviewbestopt");
+    }
+
+    /**
+     * Run one phase of the benchmark
+     * @param matView Materialized view benchmark name.
+     *        fw      File writer object to write stats to.
+     * @throws Exception if anything unexpected happens.
+     */
+    public void runPhase(String matView, FileWriter fw) throws Exception {
+        String systemStr = "", csvStr = "", procStr = "";
+
+        switch (matView) {
+            case "matView":
+                systemStr = "w/";
+                csvStr = "w";
+                procStr = "idsWithMatView";
+                break;
+            case "noMatView":
+                systemStr = "w/o";
+                csvStr = "wo";
+                procStr = "ids";
+                break;
+            case "minMatView":
+                systemStr = "w/ min";
+                csvStr = "w min";
+                procStr = "idsWithMinMatView";
+                break;
+            case "minMatViewOpt":
+                systemStr = "w/ min opt";
+                csvStr = "w min opt";
+                procStr = "idsWithMinMatViewOpt";
+                break;
+            case "4MinMatView":
+                systemStr = "4mins";
+                csvStr = "4mins";
+                procStr = "idsWith4MinMatView";
+                break;
+            case "4MinMatViewOpt":
+                systemStr = "4mins opt";
+                csvStr = "4mins opt";
+                procStr = "idsWith4MinMatViewOpt";
+                break;
+            case "MultiGroupsMinMatView":
+                systemStr = "multi groups min";
+                csvStr = "2g";
+                procStr = "idsWithMultiGroupsMinMatView";
+                break;
+            case "MultiGroupsMinMatViewOpt":
+                systemStr = "multi groups min opt";
+                csvStr = "2g opt";
+                procStr = "idsWithMultiGroupsMinMatViewOpt";
+                break;
+            case "MultiGroupsMinMatViewBestOpt":
+                systemStr = "multi groups min best opt";
+                csvStr = "2g b opt";
+                procStr = "idsWithMultiGroupsMinMatViewBestOpt";
+                break;
+            default:
+                throw new RuntimeException("Benchmark " + matView + " not found!");
+        }
+
+        // apprunner has a file name length limit
+        assert(csvStr.length() <= 9);
+
+        int grp = 1;
+
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+
+        // Run the benchmark for the requested duration.
+        System.out.println("\n\nInserting into table " + systemStr + " materialized view...\n");
+
+        if (config.group > 0) {
+            for (int i=0; i<config.txn; i++){
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
+                            procStr + "_insert",
+                            i,
+                            grp,
+                            i, -i, i, -i);
+                } else if (systemStr.startsWith("multi")) {
+                    client.callProcedure(new NullCallback(),
+                            procStr + "_insert",
+                            i,
+                            grp, grp,
+                            i);
+                } else {
+                    client.callProcedure(new NullCallback(),
+                            procStr + "_insert",
+                            i,
+                            grp,
+                            i);
+                }
+                if (grp == config.group) {
+                    grp = 1;
+                } else {
+                    grp++;
+                }
             }
         } else {
-            if (delete_throughput > 0) {
-                delete_throughput = (((stats.getTxnThroughput() - delete_throughput) /
-                                      stats.getTxnThroughput()) * 100.0);
-                delete_execute = (((delete_execute - execTimeInMicroSec) /
-                                   execTimeInMicroSec) * 100);
-                fw.append(String.format("%s,%d,-1,%.2f,0,0,0,%.2f,0,0,0,0,0,0\n",
-                                        "Delete Diff",
-                                        stats.getStartTimestamp(),
-                                        delete_throughput,
-                                        delete_execute));
-            } else {
-                delete_throughput = (double)stats.getTxnThroughput();
-                delete_execute = execTimeInMicroSec;
+            for (int i=0; i<config.txn; i++){
+                if (systemStr.startsWith("4")) {
+                    client.callProcedure(new NullCallback(),
+                            procStr + "_insert",
+                            i,
+                            i,
+                            i, -i, i, -i);
+                } else if (systemStr.startsWith("multi")) {
+                    client.callProcedure(new NullCallback(),
+                            procStr + "_insert",
+                            i,
+                            grp, grp,
+                            i);
+                } else {
+                    client.callProcedure(new NullCallback(),
+                            procStr + "_insert",
+                            i,
+                            i,
+                            i);
+                }
             }
+        }
+        timer.cancel();
+        client.drain();
+
+        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+            printResults(procStr + "_insert");
+        } else {
+            printResults(procStr + "_insert", fw, "Insert " + csvStr + " MV");
+        }
+        System.out.print(HORIZONTAL_RULE);
+
+        if ( ! isMinMatViewCase(matView) ) {
+            // grp is initialized to 2 for updating the grouping column to (grouping column = grouping column + 1)
+            grp = 2;
+
+            fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
+
+            benchmarkStartTS = System.currentTimeMillis();
+            schedulePeriodicStats();
+
+            System.out.println("\n\nUpdating grouping column in table " + systemStr + " materialized view...\n");
+
+            if (config.group > 0) {
+                for (int i=0; i<config.txn; i++){
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_group_id_update",
+                                         grp,
+                                         i);
+                    if (grp == (config.group + 1)) {
+                        grp = 2;
+                    } else {
+                        grp++;
+                    }
+                }
+            } else {
+                for (int i=0; i<config.txn; i++){
+                    client.callProcedure(new NullCallback(),
+                                         procStr + "_group_id_update",
+                                         (i + 1),
+                                         i);
+                }
+            }
+            timer.cancel();
+            client.drain();
+
+            if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+                printResults(procStr + "_group_id_update");
+            } else {
+                printResults(procStr + "_group_id_update", fw, "Update Grp " + csvStr + " MV");
+            }
+            System.out.print(HORIZONTAL_RULE);
+
+            fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
+
+            benchmarkStartTS = System.currentTimeMillis();
+            schedulePeriodicStats();
+
+            System.out.println("\n\nUpdating aggregated column in table " + systemStr + " materialized view...\n");
+
+            for (int i=0; i<config.txn; i++){
+                client.callProcedure(new NullCallback(),
+                                     procStr + "_value_update",
+                                     (i + 1),
+                                     i);
+            }
+            timer.cancel();
+            client.drain();
+
+            if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+                printResults(procStr + "_value_update");
+            } else {
+                printResults(procStr + "_value_update", fw, "Update Sum " + csvStr + " MV");
+            }
+            System.out.print(HORIZONTAL_RULE);
+        }
+
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+
+        benchmarkStartTS = System.currentTimeMillis();
+        schedulePeriodicStats();
+
+        int numDeletes = config.txn;
+        if (systemStr.startsWith("multi")) {
+            // when the deletion with multi groups benchmarks are running fast, we can get rid of this limit
+            numDeletes = 10000;
+        }
+        System.out.println("\n\nDeleting " + numDeletes + " rows from table " + systemStr + " materialized view...\n");
+
+        for (int i=0; i<numDeletes; i++){
+            client.callProcedure(new NullCallback(),
+                                 procStr + "_delete",
+                                 i);
+        }
+        timer.cancel();
+        client.drain();
+
+        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
+            printResults(procStr + "_delete");
+        } else {
+            printResults(procStr + "_delete", fw, "Delete " + csvStr + " MV");
         }
     }
 
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
-     *
-     * @param configPath  path to configuration file
-     *
      * @throws Exception
      */
     public void runBenchmark() throws Exception {
@@ -335,11 +555,53 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "ids_insert",
                                      i,
+                                     i,
                                      i);
                 client.callProcedure(new NullCallback(),
                                      "idsWithMatView_insert",
                                      i,
+                                     i,
                                      i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatView_insert",
+                                     i,
+                                     i,
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatViewOpt_insert",
+                                     i,
+                                     i,
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatView_insert",
+                                     i,
+                                     i,
+                                     i, i, i, i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatViewOpt_insert",
+                                     i,
+                                     i,
+                                     i, i, i, i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWith4MinMatViewOpt_insert",
+                                    i,
+                                    i,
+                                    i, i, i, i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatView_insert",
+                                    i,
+                                    i, i,
+                                    i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatViewOpt_insert",
+                                    i,
+                                    i, i,
+                                    i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatViewBestOpt_insert",
+                                    i,
+                                    i, i,
+                                    i);
             }
             client.drain();
             for (int i=0; i<config.warmup; i++){
@@ -349,138 +611,62 @@ public class MaterializedViewBenchmark {
                 client.callProcedure(new NullCallback(),
                                      "idsWithMatView_delete",
                                      i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWithMinMatViewOpt_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatView_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                     "idsWith4MinMatViewOpt_delete",
+                                     i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatView_delete",
+                                    i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatViewOpt_delete",
+                                    i);
+                client.callProcedure(new NullCallback(),
+                                    "idsWithMultiGroupsMinMatViewBestOpt_delete",
+                                    i);
             }
             client.drain();
         }
 
-        int grp = 1;
         FileWriter fw = null;
         if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
             fw = new FileWriter(config.statsfile);
         }
 
-        // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
-
-        // print periodic statistics to the console
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-
-        // Run the benchmark for the requested duration.
         System.out.println("\nRunning benchmark...\n");
-        System.out.println("\n\nInserting into table w/ materialized view...\n");
 
-        if (config.group > 0) {
-            for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMatView_insert",
-                                     i,
-                                     grp);
-                if (grp == config.group) {
-                    grp = 1;
-                } else {
-                    grp++;
-                }
-            }
-        } else {
-            for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     "idsWithMatView_insert",
-                                     i,
-                                     i);
-            }
-        }
-        timer.cancel();
-        client.drain();
+        runEachBenchmark(fw, "matView", "noMatView");
+        runEachBenchmark(fw, "minMatView", "minMatViewOpt");
+        runEachBenchmark(fw, "4MinMatView", "4MinMatViewOpt");
+        runEachBenchmark(fw, "MultiGroupsMinMatView", "MultiGroupsMinMatViewOpt", "MultiGroupsMinMatViewBestOpt");
 
-        grp = 1;
-
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults("idsWithMatView_insert");
-        } else {
-            printResults("idsWithMatView_insert", fw, "Insert w MV");
-        }
-        System.out.print(HORIZONTAL_RULE);
-
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-
-        System.out.println("\n\nDeleting from table w/ materialized view...\n");
-        for (int i=0; i<config.txn; i++){
-            client.callProcedure(new NullCallback(),
-                                 "idsWithMatView_delete",
-                                 i);
-        }
-        timer.cancel();
-        client.drain();
-
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults("idsWithMatView_delete");
-        } else {
-            printResults("idsWithMatView_delete", fw, "Delete w MV");
-        }
-        System.out.print(HORIZONTAL_RULE);
-
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-        System.out.println("\n\nInserting into table w/o materialized view...\n");
-        if (config.group > 0) {
-            for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     "ids_insert",
-                                     i,
-                                     grp);
-                if (grp == config.group) {
-                    grp = 1;
-                } else {
-                    grp++;
-                }
-            }
-        } else {
-            for (int i=0; i<config.txn; i++){
-                client.callProcedure(new NullCallback(),
-                                     "ids_insert",
-                                     i,
-                                     i);
-            }
-        }
-        timer.cancel();
-        client.drain();
-
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults("ids_insert");
-        } else {
-            printResults("ids_insert", fw, "Insert wo MV");
-        }
-        System.out.print(HORIZONTAL_RULE);
-
-        benchmarkStartTS = System.currentTimeMillis();
-        schedulePeriodicStats();
-        System.out.println("\n\nDeleting from table w/o materialized view...\n");
-        for (int i=0; i<config.txn; i++){
-            client.callProcedure(new NullCallback(),
-                                 "ids_delete",
-                                 i);
-        }
-        timer.cancel();
-        client.drain();
-
-        if ((config.statsfile == null) || (config.statsfile.length() == 0)) {
-            printResults("ids_delete");
-        } else {
-            printResults("ids_delete", fw, "Delete wo MV");
+        benchmarkActive = false;
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
             fw.close();
         }
-        benchmarkActive = false;
 
         // close down the client connections
         client.close();
     }
 
+    private void runEachBenchmark(FileWriter fw, String... names) throws Exception {
+        insertThroughput = insertExecute = deleteThroughput = deleteExecute = 0;
+        for (String name: names) {
+            runPhase(name, fw);
+            System.out.print(HORIZONTAL_RULE);
+        }
+    }
+
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
-     *
      * @param args Command line arguments.
      * @throws Exception if anything goes wrong.
      */

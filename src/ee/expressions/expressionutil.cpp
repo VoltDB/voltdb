@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -76,8 +76,131 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
+/** Parse JSON parameters to create a subquery expression */
+static AbstractExpression*
+subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
+    int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
+    std::vector<int> paramIdxs;
+    if (obj.hasNonNullKey("PARAM_IDX")) {
+        PlannerDomValue params = obj.valueForKey("PARAM_IDX");
+        int paramSize = params.arrayLen();
+        paramIdxs.reserve(paramSize);
+        if (args == NULL || args->size() != paramSize) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "subqueryFactory: parameter indexes/tve count mismatch");
+        }
+        for (int i = 0; i < paramSize; ++i) {
+            int paramIdx = params.valueAtIndex(i).asInt();
+            paramIdxs.push_back(paramIdx);
+        }
+    }
+    std::vector<int> otherParamIdxs;
+    if (obj.hasNonNullKey("OTHER_PARAM_IDX")) {
+        PlannerDomValue otherParams = obj.valueForKey("OTHER_PARAM_IDX");
+        int otherParamSize = otherParams.arrayLen();
+        otherParamIdxs.reserve(otherParamSize);
+        otherParamIdxs.reserve(otherParamSize);
+        for (int i = 0; i < otherParamSize; ++i) {
+            int paramIdx = otherParams.valueAtIndex(i).asInt();
+            otherParamIdxs.push_back(paramIdx);
+        }
+    }
+    return new SubqueryExpression(subqueryType, subqueryId, paramIdxs, otherParamIdxs, args);
+}
+
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
+static AbstractExpression*
+subqueryComparisonFactory(PlannerDomValue obj,
+            ExpressionType c,
+            AbstractExpression *l,
+            AbstractExpression *r)
+{
+    QuantifierType quantifier = QUANTIFIER_TYPE_NONE;
+    if (obj.hasNonNullKey("QUANTIFIER")) {
+        quantifier = static_cast<QuantifierType>(obj.valueForKey("QUANTIFIER").asInt());
+    }
+
+    SubqueryExpression *l_subquery =
+        dynamic_cast<SubqueryExpression*>(l);
+
+    SubqueryExpression *r_subquery =
+        dynamic_cast<SubqueryExpression*>(r);
+
+    // OK, here we go
+    if (l_subquery != NULL && r_subquery != NULL) {
+        switch (c) {
+        case (EXPRESSION_TYPE_COMPARE_EQUAL):
+            return new VectorComparisonExpression<CmpEq, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+            return new VectorComparisonExpression<CmpNe, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+            return new VectorComparisonExpression<CmpLt, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+            return new VectorComparisonExpression<CmpGt, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+            return new VectorComparisonExpression<CmpLte, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+            return new VectorComparisonExpression<CmpGte, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+            return new VectorComparisonExpression<CmpNotDistinct, TupleExtractor, TupleExtractor>(c, l, r, quantifier);
+        default:
+            char message[256];
+            snprintf(message, 256, "Invalid ExpressionType '%s' called"
+                " for VectorComparisonExpression",
+                expressionToString(c).c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+    } else if (l_subquery != NULL) {
+        switch (c) {
+        case (EXPRESSION_TYPE_COMPARE_EQUAL):
+            return new VectorComparisonExpression<CmpEq, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+            return new VectorComparisonExpression<CmpNe, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+            return new VectorComparisonExpression<CmpLt, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+            return new VectorComparisonExpression<CmpGt, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+            return new VectorComparisonExpression<CmpLte, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+            return new VectorComparisonExpression<CmpGte, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+            return new VectorComparisonExpression<CmpNotDistinct, TupleExtractor, NValueExtractor>(c, l, r, quantifier);
+        default:
+            char message[256];
+            snprintf(message, 256, "Invalid ExpressionType '%s' called"
+                " for VectorComparisonExpression",
+                expressionToString(c).c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+    } else {
+        assert(r_subquery != NULL);
+        switch (c) {
+        case (EXPRESSION_TYPE_COMPARE_EQUAL):
+            return new VectorComparisonExpression<CmpEq, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTEQUAL):
+            return new VectorComparisonExpression<CmpNe, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_LESSTHAN):
+            return new VectorComparisonExpression<CmpLt, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_GREATERTHAN):
+            return new VectorComparisonExpression<CmpGt, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
+            return new VectorComparisonExpression<CmpLte, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
+            return new VectorComparisonExpression<CmpGte, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+                return new VectorComparisonExpression<CmpNotDistinct, NValueExtractor, TupleExtractor>(c, l, r, quantifier);
+        default:
+            char message[256];
+            snprintf(message, 256, "Invalid ExpressionType '%s' called"
+                " for VectorComparisonExpression",
+                expressionToString(c).c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+    }
+}
+
 static AbstractExpression*
 getGeneral(ExpressionType c,
            AbstractExpression *l,
@@ -102,6 +225,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpLike>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new ComparisonExpression<CmpIn>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+        return new ComparisonExpression<CmpNotDistinct>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -135,6 +260,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_IN):
         return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+        return new InlinedComparisonExpression<CmpNotDistinct, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
@@ -146,9 +273,10 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
 /** convert the enumerated value type into a concrete c type for the
  * comparison helper templates. */
 AbstractExpression *
-ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
+ExpressionUtil::comparisonFactory(PlannerDomValue obj, ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
+
     // more specialization available?
     ConstantValueExpression *l_const =
       dynamic_cast<ConstantValueExpression*>(lc);
@@ -171,6 +299,16 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
         return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
     } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
+    }
+
+    SubqueryExpression *l_subquery =
+        dynamic_cast<SubqueryExpression*>(lc);
+
+    SubqueryExpression *r_subquery =
+        dynamic_cast<SubqueryExpression*>(rc);
+
+    if (l_subquery != NULL || r_subquery != NULL) {
+        return subqueryComparisonFactory(obj, et, lc, rc);
     }
 
     //okay, still getTypedValue is beneficial.
@@ -208,6 +346,10 @@ operatorFactory(ExpressionType et,
 
      case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
          ret = new OperatorIsNullExpression(lc);
+         break;
+
+     case (EXPRESSION_TYPE_OPERATOR_EXISTS):
+         ret = new OperatorExistsExpression(lc);
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
@@ -299,6 +441,9 @@ constantValueFactory(PlannerDomValue obj,
     case VALUE_TYPE_DECIMAL:
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
         break;
+    case VALUE_TYPE_BOOLEAN:
+        newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
+        break;
     default:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "constantValueFactory: Unrecognized value"
@@ -337,16 +482,11 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
 
     // verify input
     if (columnIndex < 0) {
-        char message[100]; // enough to hold all numbers up to 64-bits
-        std::string tableName = "";
-        if (tableIdx != 0) {
-            // join inner table
-            tableName = " inner";
-        }
-        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table", columnIndex, tableName.c_str());
-
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                std::string(message));
+        std::ostringstream message;
+        message << "tupleValueFactory: invalid column_idx " << columnIndex <<
+                " for " << ((tableIdx == 0) ? "" : "inner ") << "table\nStack trace:\n" <<
+                StackTrace::stringStackTrace();
+        throw UnexpectedEEException(message.str());
     }
 
     return new TupleValueExpression(tableIdx, columnIndex);
@@ -365,6 +505,24 @@ ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, Ab
         return NULL;
     }
 
+}
+
+static void raiseFunctionFactoryError(const std::string& nameString, int functionId,
+                  const std::vector<AbstractExpression*>* args)
+{
+    char fn_message[1024];
+    if (args) {
+        snprintf(fn_message, sizeof(fn_message),
+             "Internal Error: SQL function '%s' with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
+             nameString.c_str(), functionId, (int)args->size());
+    }
+    else {
+        snprintf(fn_message, sizeof(fn_message),
+             "Internal Error: SQL function '%s' with ID (%d) was serialized without its required parameters list.",
+             nameString.c_str(), functionId);
+    }
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
 }
 
 
@@ -397,6 +555,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_MOD):
     case (EXPRESSION_TYPE_OPERATOR_NOT):
     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
+    case (EXPRESSION_TYPE_OPERATOR_EXISTS):
         ret = operatorFactory(et, lc, rc);
     break;
 
@@ -409,7 +568,8 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
     case (EXPRESSION_TYPE_COMPARE_IN):
-        ret = comparisonFactory( et, lc, rc);
+    case (EXPRESSION_TYPE_COMPARE_NOTDISTINCT):
+        ret = comparisonFactory(obj, et, lc, rc);
     break;
 
     // Conjunctions
@@ -423,7 +583,10 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         // add the function id
         int functionId = obj.valueForKey("FUNCTION_ID").asInt();
 
-        ret = functionFactory(functionId, args);
+        if (args) {
+            ret = functionFactory(functionId, args);
+        }
+
         if ( ! ret) {
             std::string nameString;
             if (obj.hasNonNullKey("NAME")) {
@@ -432,18 +595,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
             else {
                 nameString = "?";
             }
-
-            char aliasBuffer[256];
-            if (obj.hasNonNullKey("ALIAS")) {
-                std::string aliasString = obj.valueForKey("ALIAS").asStr();
-                snprintf(aliasBuffer, sizeof(aliasBuffer), " aliased to '%s'", aliasString.c_str());
-            }
-
-            char fn_message[1024];
-            snprintf(fn_message, sizeof(fn_message),
-                     "SQL function '%s'%s with ID (%d) with (%d) parameters is not implemented in VoltDB (or may have been incorrectly parsed)",
-                     nameString.c_str(), aliasBuffer, functionId, (int)args->size());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+            raiseFunctionFactoryError(nameString, functionId, args);
         }
     }
     break;
@@ -474,6 +626,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
         ret = new TupleAddressExpression();
         break;
+    case (EXPRESSION_TYPE_VALUE_SCALAR):
+        ret = new ScalarValueExpression(lc);
+        break;
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
         break;
@@ -483,6 +638,13 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
         ret = new OperatorAlternativeExpression(lc, rc);
         break;
+
+    // Subquery
+    case (EXPRESSION_TYPE_ROW_SUBQUERY):
+    case (EXPRESSION_TYPE_SELECT_SUBQUERY):
+        ret = subqueryFactory(et, obj, args);
+        break;
+
         // must handle all known expressions in this factory
     default:
 
@@ -531,6 +693,25 @@ ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractEx
     return ret;
 }
 
+void
+ExpressionUtil::extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds)
+{
+    if (expr == NULL)
+    {
+        return;
+    }
+    if(expr->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE)
+    {
+        const TupleValueExpression* tve = dynamic_cast<const TupleValueExpression*>(expr);
+        assert(tve != NULL);
+        columnIds.push_back(tve->getColumnId());
+        return;
+    }
+    // Recurse
+    ExpressionUtil::extractTupleValuesColumnIdx(expr->getLeft(), columnIds);
+    ExpressionUtil::extractTupleValuesColumnIdx(expr->getRight(), columnIds);
+}
+
 void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
 {
     PlannerDomRoot domRoot(jsonarraystring.c_str());
@@ -540,6 +721,12 @@ void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& 
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(exprValue);
         indexed_exprs.push_back(expr);
     }
+}
+
+AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& jsonstring)
+{
+    PlannerDomRoot domRoot(jsonstring.c_str());
+    return AbstractExpression::buildExpressionTree(domRoot.rootObject());
 }
 
 }

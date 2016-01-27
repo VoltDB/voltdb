@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,7 +123,7 @@ public class StandaloneExportGeneration implements Generation {
         m_directory = generationDirectory;
     }
 
-    public boolean isDiskBased() {
+    public boolean isContinueingGeneration() {
         return m_diskBased;
     }
 
@@ -220,7 +220,7 @@ public class StandaloneExportGeneration implements Generation {
             File adFile,
             Set<Integer> partitions) throws IOException {
         m_numSources++;
-        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile);
+        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile, m_diskBased);
         partitions.add(source.getPartitionId());
         m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +

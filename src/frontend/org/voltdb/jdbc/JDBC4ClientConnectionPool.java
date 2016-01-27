@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,6 @@
 package org.voltdb.jdbc;
 
 import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Provides support for database connection pooling, allowing for optimal application performance.
@@ -31,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 2.0
  */
 public class JDBC4ClientConnectionPool {
-    private static final ConcurrentHashMap<String, JDBC4PerfCounterMap> Statistics = new ConcurrentHashMap<String, JDBC4PerfCounterMap>();
     private static final HashMap<String, JDBC4ClientConnection> ClientConnections = new HashMap<String, JDBC4ClientConnection>();
 
     /**
@@ -104,101 +102,6 @@ public class JDBC4ClientConnectionPool {
             if (connection.users == 0)
                 ClientConnections.remove(connection.key);
         }
-    }
-
-    /**
-     * Gets the global performance statistics for a connection. The statistics are pulled across the
-     * entire pool for connections with the same parameters as the given connection.
-     *
-     * @param connection
-     *            the connection from which to retrieve statistics.
-     * @return the counter map aggregated across all the connections in the pool with the same
-     *         parameters as the provided connection object.
-     * @see #getStatistics(JDBC4ClientConnection connection)
-     * @see #getStatistics(String servers, int port)
-     * @see #getStatistics(String[] servers, int port)
-     * @see #getStatistics(String servers, int port, String user, String password, boolean
-     *      isHeavyWeight, int maxOutstandingTxns)
-     * @see #getStatistics(String[] servers, int port, String user, String password, boolean
-     *      isHeavyWeight, int maxOutstandingTxns)
-     */
-    public static JDBC4PerfCounterMap getStatistics(JDBC4ClientConnection connection) {
-        return getStatistics(connection.keyBase);
-    }
-
-    /**
-     * Gets the global performance statistics for a connection with the given parameters. The
-     * statistics are pulled across the entire pool for connections with the same parameters as
-     * provided.
-     *
-     * @param servers
-     *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
-     * @return the counter map aggregated across all the connections in the pool with the same
-     *         parameters as provided.
-     * @see #getStatistics(JDBC4ClientConnection connection)
-     * @see #getStatistics(String servers, int port)
-     * @see #getStatistics(String servers, int port, String user, String password, boolean
-     *      isHeavyWeight, int maxOutstandingTxns)
-     * @see #getStatistics(String[] servers, int port, String user, String password, boolean
-     *      isHeavyWeight, int maxOutstandingTxns)
-     */
-    public static JDBC4PerfCounterMap getStatistics(String[] servers) {
-        return getStatistics(getClientConnectionKeyBase(servers, "", "", false, 0));
-    }
-
-    /**
-     * Gets the global performance statistics for a connection with the given parameters. The
-     * statistics are pulled across the entire pool for connections with the same parameters as
-     * provided.
-     *
-     * @param servers
-     *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
-     * @param user
-     *            the user name to use when connecting to the server(s).
-     * @param password
-     *            the password to use when connecting to the server(s).
-     * @param isHeavyWeight
-     *            the flag indicating callback processes on this connection will be heavy (long
-     *            running callbacks).
-     * @param maxOutstandingTxns
-     *            the number of transactions the client application may push against a specific
-     *            connection before getting blocked on back-pressure.
-     * @return the counter map aggregated across all the connections in the pool with the same
-     *         parameters as provided.
-     * @see #getStatistics(JDBC4ClientConnection connection)
-     * @see #getStatistics(String servers, int port)
-     * @see #getStatistics(String[] servers, int port)
-     * @see #getStatistics(String servers, int port, String user, String password, boolean
-     *      isHeavyWeight, int maxOutstandingTxns)
-     */
-    public static JDBC4PerfCounterMap getStatistics(String[] servers, String user,
-            String password, boolean isHeavyWeight, int maxOutstandingTxns) {
-        return getStatistics(getClientConnectionKeyBase(servers, user, password,
-                isHeavyWeight, maxOutstandingTxns));
-    }
-
-    /**
-     * Gets the global performance statistics for a connection with the given base hash/key. The
-     * statistics are pulled across the entire pool for connections with the same parameters as
-     * provided.
-     *
-     * @param clientConnectionKeyBase
-     *            the base hash/key identifying the connections from which statistics will be
-     *            pulled.
-     * @return the counter map aggregated across all the connections in the pool with the same
-     *         parameters as provided.
-     */
-    protected static JDBC4PerfCounterMap getStatistics(String clientConnectionKeyBase) {
-        // Admited: could get a little race condition at the very beginning, but all that'll happen
-        // is that we'll lose a handful of tracking event, a loss far outweighed by overall reduced
-        // contention.
-        if (!Statistics.containsKey(clientConnectionKeyBase))
-            Statistics.put(clientConnectionKeyBase, new JDBC4PerfCounterMap());
-        return Statistics.get(clientConnectionKeyBase);
     }
 
     /**

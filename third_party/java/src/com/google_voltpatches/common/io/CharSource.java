@@ -18,6 +18,9 @@ package com.google_voltpatches.common.io;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
+import com.google_voltpatches.common.annotations.Beta;
+import com.google_voltpatches.common.base.Ascii;
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.AbstractIterator;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -60,7 +63,12 @@ import javax.annotation_voltpatches.Nullable;
  * @since 14.0
  * @author Colin Decker
  */
-public abstract class CharSource implements InputSupplier<Reader> {
+public abstract class CharSource {
+
+  /**
+   * Constructor for use by subclasses.
+   */
+  protected CharSource() {}
 
   /**
    * Opens a new {@link Reader} for reading from this source. This method should return a new,
@@ -71,21 +79,6 @@ public abstract class CharSource implements InputSupplier<Reader> {
    * @throws IOException if an I/O error occurs in the process of opening the reader
    */
   public abstract Reader openStream() throws IOException;
-
-  /**
-   * This method is a temporary method provided for easing migration from suppliers to sources and
-   * sinks.
-   *
-   * @since 15.0
-   * @deprecated This method is only provided for temporary compatibility with the
-   *     {@link InputSupplier} interface and should not be called directly. Use {@link #openStream}
-   *     instead.
-   */
-  @Override
-  @Deprecated
-  public final Reader getInput() throws IOException {
-    return openStream();
-  }
 
   /**
    * Opens a new {@link BufferedReader} for reading from this source. This method should return a
@@ -100,6 +93,71 @@ public abstract class CharSource implements InputSupplier<Reader> {
     return (reader instanceof BufferedReader)
         ? (BufferedReader) reader
         : new BufferedReader(reader);
+  }
+
+  /**
+   * Returns the size of this source in chars, if the size can be easily determined without
+   * actually opening the data stream.
+   *
+   * <p>The default implementation returns {@link Optional#absent}. Some sources, such as a
+   * {@code CharSequence}, may return a non-absent value. Note that in such cases, it is
+   * <i>possible</i> that this method will return a different number of chars than would be
+   * returned by reading all of the chars.
+   *
+   * <p>Additionally, for mutable sources such as {@code StringBuilder}s, a subsequent read
+   * may return a different number of chars if the contents are changed.
+   *
+   * @since 19.0
+   */
+  @Beta
+  public Optional<Long> lengthIfKnown() {
+    return Optional.absent();
+  }
+
+  /**
+   * Returns the length of this source in chars, even if doing so requires opening and traversing
+   * an entire stream. To avoid a potentially expensive operation, see {@link #lengthIfKnown}.
+   *
+   * <p>The default implementation calls {@link #lengthIfKnown} and returns the value if present.
+   * If absent, it will fall back to a heavyweight operation that will open a stream,
+   * {@link Reader#skip(long) skip} to the end of the stream, and return the total number of chars
+   * that were skipped.
+   *
+   * <p>Note that for sources that implement {@link #lengthIfKnown} to provide a more efficient
+   * implementation, it is <i>possible</i> that this method will return a different number of chars
+   * than would be returned by reading all of the chars.
+   *
+   * <p>In either case, for mutable sources such as files, a subsequent read may return a different
+   * number of chars if the contents are changed.
+   *
+   * @throws IOException if an I/O error occurs in the process of reading the length of this source
+   * @since 19.0
+   */
+  @Beta
+  public long length() throws IOException {
+    Optional<Long> lengthIfKnown = lengthIfKnown();
+    if (lengthIfKnown.isPresent()) {
+      return lengthIfKnown.get();
+    }
+
+    Closer closer = Closer.create();
+    try {
+      Reader reader = closer.register(openStream());
+      return countBySkipping(reader);
+    } catch (Throwable e) {
+      throw closer.rethrow(e);
+    } finally {
+      closer.close();
+    }
+  }
+
+  private long countBySkipping(Reader reader) throws IOException {
+    long count = 0;
+    long read;
+    while ((read = reader.skip(Long.MAX_VALUE)) != 0) {
+      count += read;
+    }
+    return count;
   }
 
   /**
@@ -170,7 +228,7 @@ public abstract class CharSource implements InputSupplier<Reader> {
    *
    * @throws IOException if an I/O error occurs in the process of reading from this source
    */
-  public @Nullable String readFirstLine() throws IOException {
+  @Nullable public String readFirstLine() throws IOException {
     Closer closer = Closer.create();
     try {
       BufferedReader reader = closer.register(openBufferedStream());
@@ -210,13 +268,51 @@ public abstract class CharSource implements InputSupplier<Reader> {
   }
 
   /**
-   * Returns whether the source has zero chars. The default implementation is to open a stream and
-   * check for EOF.
+   * Reads lines of text from this source, processing each line as it is read using the given
+   * {@link LineProcessor processor}. Stops when all lines have been processed or the processor
+   * returns {@code false} and returns the result produced by the processor.
+   *
+   * <p>Like {@link BufferedReader}, this method breaks lines on any of {@code \n}, {@code \r} or
+   * {@code \r\n}, does not include the line separator in the lines passed to the {@code processor}
+   * and does not consider there to be an extra empty line at the end if the content is terminated
+   * with a line separator.
+   *
+   * @throws IOException if an I/O error occurs in the process of reading from this source or if
+   *     {@code processor} throws an {@code IOException}
+   * @since 16.0
+   */
+  @Beta
+  public <T> T readLines(LineProcessor<T> processor) throws IOException {
+    checkNotNull(processor);
+
+    Closer closer = Closer.create();
+    try {
+      Reader reader = closer.register(openStream());
+      return CharStreams.readLines(reader, processor);
+    } catch (Throwable e) {
+      throw closer.rethrow(e);
+    } finally {
+      closer.close();
+    }
+  }
+
+  /**
+   * Returns whether the source has zero chars. The default implementation returns true if
+   * {@link #lengthIfKnown} returns zero, falling back to opening a stream and checking
+   * for EOF if the length is not known.
+   *
+   * <p>Note that, in cases where {@code lengthIfKnown} returns zero, it is <i>possible</i> that
+   * chars are actually available for reading. This means that a source may return {@code true} from
+   * {@code isEmpty()} despite having readable content.
    *
    * @throws IOException if an I/O error occurs
    * @since 15.0
    */
   public boolean isEmpty() throws IOException {
+    Optional<Long> lengthIfKnown = lengthIfKnown();
+    if (lengthIfKnown.isPresent() && lengthIfKnown.get() == 0L) {
+      return true;
+    }
     Closer closer = Closer.create();
     try {
       Reader reader = closer.register(openStream());
@@ -327,6 +423,16 @@ public abstract class CharSource implements InputSupplier<Reader> {
       return seq.length() == 0;
     }
 
+    @Override
+    public long length() {
+      return seq.length();
+    }
+
+    @Override
+    public Optional<Long> lengthIfKnown() {
+      return Optional.of((long) seq.length());
+    }
+
     /**
      * Returns an iterable over the lines in the string. If the string ends in
      * a newline, a final empty string is not included to match the behavior of
@@ -367,9 +473,18 @@ public abstract class CharSource implements InputSupplier<Reader> {
     }
 
     @Override
+    public <T> T readLines(LineProcessor<T> processor) throws IOException {
+      for (String line : lines()) {
+        if (!processor.processLine(line)) {
+          break;
+        }
+      }
+      return processor.getResult();
+    }
+
+    @Override
     public String toString() {
-      CharSequence shortened = (seq.length() <= 15) ? seq : seq.subSequence(0, 12) + "...";
-      return "CharSource.wrap(" + shortened + ")";
+      return "CharSource.wrap(" + Ascii.truncate(seq, 30, "...") + ")";
     }
   }
 
@@ -408,6 +523,28 @@ public abstract class CharSource implements InputSupplier<Reader> {
         }
       }
       return true;
+    }
+
+    @Override
+    public Optional<Long> lengthIfKnown() {
+      long result = 0L;
+      for (CharSource source : sources) {
+        Optional<Long> lengthIfKnown = source.lengthIfKnown();
+        if (!lengthIfKnown.isPresent()) {
+          return Optional.absent();
+        }
+        result += lengthIfKnown.get();
+      }
+      return Optional.of(result);
+    }
+
+    @Override
+    public long length() throws IOException {
+      long result = 0L;
+      for (CharSource source : sources) {
+        result += source.length();
+      }
+      return result;
     }
 
     @Override

@@ -1,0 +1,269 @@
+
+drop table t if exists;
+Command succeeded.
+
+drop table t2 if exists;
+Command succeeded.
+
+create table t ( c integer, d varchar(4) );
+Command succeeded.
+
+create procedure p as
+    select * from t where d between ? and ?;
+Command succeeded.
+
+create table t2 ( c integer, d varchar(4), e varchar(4) );
+Command succeeded.
+
+exec T.insert 1,'a';
+(Returned 1 rows in #.##s)
+
+execute T.insert 2 ab;
+(Returned 1 rows in #.##s)
+
+exec T.insert 3 'abc';
+(Returned 1 rows in #.##s)
+
+execute T.insert,4,abcd;
+(Returned 1 rows in #.##s)
+
+ exec T.insert 11, 'a';
+(Returned 1 rows in #.##s)
+
+  execute T.insert 12 ab;
+(Returned 1 rows in #.##s)
+
+exec    T.insert 13 , 'abc';
+(Returned 1 rows in #.##s)
+
+execute  T.insert  ,  14  ,  abcd;
+(Returned 1 rows in #.##s)
+
+	exec T.insert 21, 'a';
+(Returned 1 rows in #.##s)
+
+  execute T.insert	22	ab;
+(Returned 1 rows in #.##s)
+
+exec 	  T.insert 23	,	'abc';
+(Returned 1 rows in #.##s)
+
+execute		T.insert		,		24		,		abcd;
+(Returned 1 rows in #.##s)
+
+exec    T.insert 31,  'a z';
+(Returned 1 rows in #.##s)
+
+execute T.insert 32   ' ab';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 33 , 'abc ';
+(Returned 1 rows in #.##s)
+
+ exec   T.insert 41,  'a;z';
+(Returned 1 rows in #.##s)
+
+execute T.insert 42   ';ab';
+(Returned 1 rows in #.##s)
+
+EXEC    T.insert 43 , 'abc;';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 51,  'a,z';
+(Returned 1 rows in #.##s)
+
+execute T.insert 52   ',ab';
+(Returned 1 rows in #.##s)
+
+EXECUTE T.insert 53 , 'abc,';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 61,  ' ,;';
+(Returned 1 rows in #.##s)
+
+execute T.insert 62   '; ,';
+(Returned 1 rows in #.##s)
+
+EXECUTE T.insert 63 , ';,  ';
+(Returned 1 rows in #.##s)
+
+EXECUTE T.insert 71 ,
+ ';,  ';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 81,  'x''';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 82,  '''y';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 83,  '''z''';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 84,  ''' ''';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 85,  '" "';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 86,  ''' "';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 87,  ''' "';
+(Returned 1 rows in #.##s)
+
+exec    T2.insert 88,  ''' '  ' ''';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 91,  '( )';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 92,  ')';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 93,  '"(';
+(Returned 1 rows in #.##s)
+
+exec    T.insert 94,  '''()';
+(Returned 1 rows in #.##s)
+
+exec    T2.insert 95,  '('  ')';
+(Returned 1 rows in #.##s)
+
+exec p 'abc'    'abd';
+C   D    
+--- -----
+  3 abc  
+  4 abcd 
+ 13 abc  
+ 14 abcd 
+ 23 abc  
+ 24 abcd 
+ 33 abc  
+ 43 abc; 
+ 53 abc, 
+
+(Returned 9 rows in #.##s)
+
+exec p 'abc'    'abd''';
+C   D    
+--- -----
+  3 abc  
+  4 abcd 
+ 13 abc  
+ 14 abcd 
+ 23 abc  
+ 24 abcd 
+ 33 abc  
+ 43 abc; 
+ 53 abc, 
+
+(Returned 9 rows in #.##s)
+
+exec p ''' abc' 'abd ''';
+C   D    
+--- -----
+  1 a    
+  2 ab   
+  3 abc  
+  4 abcd 
+ 11 a    
+ 12 ab   
+ 13 abc  
+ 14 abcd 
+ 21 a    
+ 22 ab   
+ 23 abc  
+ 24 abcd 
+ 31 a z  
+ 33 abc  
+ 41 a;z  
+ 42 ;ab  
+ 43 abc; 
+ 51 a,z  
+ 52 ,ab  
+ 53 abc, 
+ 62 ; ,  
+ 63 ;,   
+ 71 ;,   
+ 82 'y   
+ 83 'z'  
+ 91 ( )  
+ 92 )    
+ 94 '()  
+
+(Returned 28 rows in #.##s)
+
+exec p '((' '))';
+C   D 
+--- --
+ 92 ) 
+
+(Returned 1 rows in #.##s)
+
+exec p ( );
+C   D   
+--- ----
+ 91 ( ) 
+ 92 )   
+
+(Returned 2 rows in #.##s)
+
+select * from t order by c;
+C   D    
+--- -----
+  1 a    
+  2 ab   
+  3 abc  
+  4 abcd 
+ 11 a    
+ 12 ab   
+ 13 abc  
+ 14 abcd 
+ 21 a    
+ 22 ab   
+ 23 abc  
+ 24 abcd 
+ 31 a z  
+ 32  ab  
+ 33 abc  
+ 41 a;z  
+ 42 ;ab  
+ 43 abc; 
+ 51 a,z  
+ 52 ,ab  
+ 53 abc, 
+ 61  ,;  
+ 62 ; ,  
+ 63 ;,   
+ 71 ;,   
+ 81 x'   
+ 82 'y   
+ 83 'z'  
+ 84 ' '  
+ 85 " "  
+ 86 ' "  
+ 87 ' "  
+ 91 ( )  
+ 92 )    
+ 93 "(   
+ 94 '()  
+
+(Returned 36 rows in #.##s)
+
+select * from t2 order by c;
+C   D   E  
+--- --- ---
+ 88 '    ' 
+ 95 (   )  
+
+(Returned 2 rows in #.##s)
+
+drop table t2;
+Command succeeded.
+
+drop procedure p;
+Command succeeded.
+
+drop table t;
+Command succeeded.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,7 +46,6 @@
 #ifndef HSTORESEQSCANNODE_H
 #define HSTORESEQSCANNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
@@ -54,32 +53,15 @@ namespace voltdb {
 class AbstractExpression;
 
 /**
- *
+ * Seqential scan plan node
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
-   public:
-        SeqScanPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            // Do nothing
-        }
-        SeqScanPlanNode() : AbstractScanPlanNode() {
-            // Do nothing
-        }
+public:
+    SeqScanPlanNode()  { }
+    ~SeqScanPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        /*
-         * If the output table needs to be cleared then this SeqScanNode is for an executor that created
-         * its own output table rather then forwarding a reference to the persistent table being scanned.
-         * It still isn't necessarily safe to delete the output table since an inline projection node/executor
-         * may have created the table (and will also delete it) so check if there is an inline projection node.
-         *
-         * This is a fragile approach to determining whether or not to delete the output table. Maybe
-         * it is safer to have the inline nodes be deleted first and set the output table of the
-         * enclosing plannode to NULL so the delete can be safely repeated.
-         */
-        ~SeqScanPlanNode();
-
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }
-
-        std::string debugInfo(const std::string &spacer) const;
 };
 
 }

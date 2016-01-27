@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,7 +41,7 @@ class AddDropTableTest : public Test {
   public:
     AddDropTableTest()
         : m_clusterId(0), m_databaseId(0), m_siteId(0), m_partitionId(0),
-          m_hostId(101), m_hostName("host101")
+          m_hostId(101), m_hostName("host101"), m_drClusterId(0)
     {
         m_engine = new VoltDBEngine();
 
@@ -58,7 +58,9 @@ class AddDropTableTest : public Test {
                              m_partitionId,
                              m_hostId,
                              m_hostName,
-                             DEFAULT_TEMP_TABLE_MEMORY);
+                             m_drClusterId,
+                             DEFAULT_TEMP_TABLE_MEMORY,
+                             false);
         m_engine->updateHashinator( HASHINATOR_LEGACY,
                                    (char*)&partitionCount,
                                     NULL,
@@ -66,8 +68,9 @@ class AddDropTableTest : public Test {
 
         std::string initialCatalog =
           "add / clusters cluster\n"
-          "add /clusters[cluster] databases database\n"
-          "add /clusters[cluster]/databases[database] programs program\n";
+          "add /clusters#cluster databases database\n"
+          "set /clusters#cluster/databases#database isActiveActiveDRed false\n"
+          "add /clusters#cluster/databases#database programs program\n";
 
         bool loadResult = m_engine->loadCatalog( -2, initialCatalog);
         ASSERT_TRUE(loadResult);
@@ -84,43 +87,43 @@ class AddDropTableTest : public Test {
     std::string tableACmds()
     {
         return
-          "add /clusters[cluster]/databases[database] tables tableA\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA] type 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA] isreplicated false\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA] partitioncolumn 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA] estimatedtuplecount 0\n"
-          "add /clusters[cluster]/databases[database]/tables[tableA] columns A\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA]/columns[A] index 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA]/columns[A] type 5\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA]/columns[A] size 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA]/columns[A] nullable false\n"
-          "set /clusters[cluster]/databases[database]/tables[tableA]/columns[A] name \"A\"";
+          "add /clusters#cluster/databases#database tables tableA\n"
+          "set /clusters#cluster/databases#database/tables#tableA type 0\n"
+          "set /clusters#cluster/databases#database/tables#tableA isreplicated false\n"
+          "set /clusters#cluster/databases#database/tables#tableA partitioncolumn 0\n"
+          "set /clusters#cluster/databases#database/tables#tableA estimatedtuplecount 0\n"
+          "add /clusters#cluster/databases#database/tables#tableA columns A\n"
+          "set /clusters#cluster/databases#database/tables#tableA/columns#A index 0\n"
+          "set /clusters#cluster/databases#database/tables#tableA/columns#A type 5\n"
+          "set /clusters#cluster/databases#database/tables#tableA/columns#A size 0\n"
+          "set /clusters#cluster/databases#database/tables#tableA/columns#A nullable false\n"
+          "set /clusters#cluster/databases#database/tables#tableA/columns#A name \"A\"";
     }
 
     std::string tableADeleteCmd()
     {
-        return "delete /clusters[cluster]/databases[database] tables tableA";
+        return "delete /clusters#cluster/databases#database tables tableA";
     }
 
     std::string tableBCmds()
     {
         return
-          "add /clusters[cluster]/databases[database] tables tableB\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB] type 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB] isreplicated false\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB] partitioncolumn 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB] estimatedtuplecount 0\n"
-          "add /clusters[cluster]/databases[database]/tables[tableB] columns A\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB]/columns[A] index 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB]/columns[A] type 5\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB]/columns[A] size 0\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB]/columns[A] nullable false\n"
-          "set /clusters[cluster]/databases[database]/tables[tableB]/columns[A] name \"A\"";
+          "add /clusters#cluster/databases#database tables tableB\n"
+          "set /clusters#cluster/databases#database/tables#tableB type 0\n"
+          "set /clusters#cluster/databases#database/tables#tableB isreplicated false\n"
+          "set /clusters#cluster/databases#database/tables#tableB partitioncolumn 0\n"
+          "set /clusters#cluster/databases#database/tables#tableB estimatedtuplecount 0\n"
+          "add /clusters#cluster/databases#database/tables#tableB columns A\n"
+          "set /clusters#cluster/databases#database/tables#tableB/columns#A index 0\n"
+          "set /clusters#cluster/databases#database/tables#tableB/columns#A type 5\n"
+          "set /clusters#cluster/databases#database/tables#tableB/columns#A size 0\n"
+          "set /clusters#cluster/databases#database/tables#tableB/columns#A nullable false\n"
+          "set /clusters#cluster/databases#database/tables#tableB/columns#A name \"A\"";
     }
 
     std::string tableBDeleteCmd()
     {
-        return "delete /clusters[cluster]/databases[database] tables tableB";
+        return "delete /clusters#cluster/databases#database tables tableB";
     }
 
 
@@ -131,6 +134,7 @@ class AddDropTableTest : public Test {
     CatalogId m_partitionId;
     CatalogId m_hostId;
     std::string m_hostName;
+    CatalogId m_drClusterId;
     VoltDBEngine *m_engine;
     char *m_resultBuffer;
     char *m_exceptionBuffer;
@@ -207,7 +211,7 @@ TEST_F(AddDropTableTest, DetectDeletedTable)
     found = false;
     while (delIter != deletions.end()) {
         string item = *delIter;
-        if (item == "/clusters[cluster]/databases[database]/tables[tableA]") {
+        if (item == "/clusters#cluster/databases#database/tables#tableA") {
             found = true;
         }
         ++delIter;
@@ -270,7 +274,7 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
     delIter = deletions.begin();
     while (delIter != deletions.end()) {
         string path = *delIter;
-        ASSERT_EQ(path, "/clusters[cluster]/databases[database]/tables[tableA]");
+        ASSERT_EQ(path, "/clusters#cluster/databases#database/tables#tableA");
         ++delIter;
     }
     catalog->purgeDeletions();
@@ -284,7 +288,7 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
     delIter = deletions.begin();
     while (delIter != deletions.end()) {
         string path = *delIter;
-        ASSERT_EQ(path, "/clusters[cluster]/databases[database]/tables[tableB]");
+        ASSERT_EQ(path, "/clusters#cluster/databases#database/tables#tableB");
         ++delIter;
     }
     catalog->purgeDeletions();
@@ -460,45 +464,6 @@ TEST_F(AddDropTableTest, StatsWithDropTable)
     statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
     ASSERT_TRUE(statresult == 1);
 }
-
-/*
- * Test on engine.
- * Remove a non-existent table.
- */
-TEST_F(AddDropTableTest, BadDropTable)
-{
-    bool result;
-    result = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(result);
-
-    try {
-        result = m_engine->updateCatalog( 1, tableBDeleteCmd());
-        ASSERT_TRUE(false);
-    }
-    catch (SerializableEEException ex) {
-        ASSERT_TRUE(true);
-    }
-}
-
-/*
- * Test on engine.
- * Add a table twice.
- */
-TEST_F(AddDropTableTest, BadAddTable)
-{
-    bool result;
-    result = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(result);
-
-    try {
-        result = m_engine->updateCatalog( 1, tableACmds());
-        ASSERT_TRUE(false);
-    }
-    catch (SerializableEEException ex) {
-        ASSERT_TRUE(true);
-    }
-}
-
 
 int main() {
     return TestSuite::globalInstance()->runAll();

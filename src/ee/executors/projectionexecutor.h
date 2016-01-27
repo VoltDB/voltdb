@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -75,7 +75,6 @@ class ProjectionExecutor : public AbstractExecutor {
 
     private:
         TempTable* output_table;
-        Table* input_table;
         int m_columnCount;
         boost::shared_array<int> all_tuple_array_ptr;
         int* all_tuple_array;

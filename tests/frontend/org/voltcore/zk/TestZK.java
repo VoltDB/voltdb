@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -36,13 +36,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.zookeeper_voltpatches.*;
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.junit.After;
 import org.junit.Before;
@@ -389,17 +391,17 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector3.isLeader());
 
         // 2 should become the leader
-        elector1.shutdown();
+        elector1.shutdown(); zk.close();
         assertTrue(sem2.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector2.isLeader());
         assertEquals(0, sem3.availablePermits());
 
         // 3 should become the leader now
-        elector2.shutdown();
+        elector2.shutdown(); zk2.close();
         assertTrue(sem3.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector3.isLeader());
 
-        elector3.shutdown();
+        elector3.shutdown(); zk3.close();
     }
 
     @Test
@@ -458,16 +460,16 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector4.isLeader());
 
         // 4 should become the leader
-        elector3.shutdown();
-        elector2.shutdown();
-        elector1.shutdown();
+        elector3.shutdown(); zk3.close();
+        elector2.shutdown(); zk2.close();
+        elector1.shutdown(); zk.close();
 
 
         assertTrue(sem4.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector4.isLeader());
 
         // cleanup.
-        elector4.shutdown();
+        elector4.shutdown(); zk4.close();
     }
 
     @Test
@@ -535,10 +537,10 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector7.isLeader());
 
         // 4 should become the leader
-        elector6.shutdown();
-        elector4.shutdown();
-        elector2.shutdown();
-        elector0.shutdown();
+        elector6.shutdown(); zk6.close();
+        elector4.shutdown(); zk4.close();
+        elector2.shutdown(); zk2.close();
+        elector0.shutdown(); zk0.close();
 
         assertTrue(sem1.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector1.isLeader());
@@ -546,14 +548,14 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector5.isLeader());
         assertFalse(elector7.isLeader());
 
-        elector5.shutdown();
-        elector3.shutdown();
-        elector1.shutdown();
+        elector5.shutdown(); zk5.close();
+        elector3.shutdown(); zk3.close();
+        elector1.shutdown(); zk1.close();
         assertTrue(sem7.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector7.isLeader());
 
         // cleanup.
-        elector7.shutdown();
+        elector7.shutdown(); zk7.close();
     }
 
 
@@ -588,17 +590,17 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector3.isLeader());
 
         // 1 is still the leader
-        elector2.shutdown();
+        elector2.shutdown(); zk2.close();
         assertTrue(elector1.isLeader());
         assertFalse(elector3.isLeader());
 
         // 3 should become the leader now
-        elector1.shutdown();
+        elector1.shutdown(); zk.close();
         assertTrue(sem3.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector3.isLeader());
         assertEquals(0, sem3.availablePermits());
 
-        elector3.shutdown();
+        elector3.shutdown(); zk3.close();
     }
 
     @Test

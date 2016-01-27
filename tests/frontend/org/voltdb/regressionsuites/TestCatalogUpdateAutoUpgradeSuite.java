@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -232,6 +232,8 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
 
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
+        // Add an import of an exact class match here to trigger ENG-6611 on auto-catalog-recompile
+        project.addLiteralSchema("import class org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;");
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
         upgradeCatalogBasePath = Configuration.getPathToCatalogForTest("catalogupdate-for-upgrade");

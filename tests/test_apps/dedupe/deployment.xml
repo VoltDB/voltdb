@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="4" sitesperhost="2" kfactor="1" />
+    <cluster hostcount="4" sitesperhost="2" kfactor="1" schema="catalog" />
     <paths>
         <voltdbroot path="/tmp/tmc" />
     </paths>

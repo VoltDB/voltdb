@@ -22,7 +22,6 @@ import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.SortedMap;
 
@@ -51,17 +50,18 @@ import javax.annotation_voltpatches.Nullable;
  *
  * @author Mike Bostock
  * @author Louis Wasserman
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
 public abstract class ForwardingSortedMap<K, V> extends ForwardingMap<K, V>
     implements SortedMap<K, V> {
-  // TODO(user): identify places where thread safety is actually lost
+  // TODO(lowasser): identify places where thread safety is actually lost
 
   /** Constructor for use by subclasses. */
   protected ForwardingSortedMap() {}
 
-  @Override protected abstract SortedMap<K, V> delegate();
+  @Override
+  protected abstract SortedMap<K, V> delegate();
 
   @Override
   public Comparator<? super K> comparator() {
@@ -127,7 +127,9 @@ public abstract class ForwardingSortedMap<K, V> extends ForwardingMap<K, V>
    *
    * @since 7.0
    */
-  @Override @Beta protected boolean standardContainsKey(@Nullable Object key) {
+  @Override
+  @Beta
+  protected boolean standardContainsKey(@Nullable Object key) {
     try {
       // any CCE will be caught
       @SuppressWarnings("unchecked")
@@ -144,43 +146,6 @@ public abstract class ForwardingSortedMap<K, V> extends ForwardingMap<K, V>
   }
 
   /**
-   * A sensible definition of {@link #remove} in terms of the {@code
-   * iterator()} of the {@code entrySet()} of {@link #tailMap}. If you override
-   * {@link #tailMap}, you may wish to override {@link #remove} to forward
-   * to this implementation.
-   *
-   * @since 7.0
-   * @deprecated This implementation is extremely awkward, is rarely worthwhile,
-   * and has been discovered to interact badly with
-   * http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6467933 in Java 6
-   * when used with certain null-friendly comparators.  It is scheduled for
-   * deletion in Guava 16.0.
-   */
-  @Deprecated
-  @Override @Beta protected V standardRemove(@Nullable Object key) {
-    try {
-      // any CCE will be caught
-      @SuppressWarnings("unchecked")
-      SortedMap<Object, V> self = (SortedMap<Object, V>) this;
-      Iterator<Entry<Object, V>> entryIterator =
-          self.tailMap(key).entrySet().iterator();
-      if (entryIterator.hasNext()) {
-        Entry<Object, V> ceilingEntry = entryIterator.next();
-        if (unsafeCompare(ceilingEntry.getKey(), key) == 0) {
-          V value = ceilingEntry.getValue();
-          entryIterator.remove();
-          return value;
-        }
-      }
-    } catch (ClassCastException e) {
-      return null;
-    } catch (NullPointerException e) {
-      return null;
-    }
-    return null;
-  }
-
-  /**
    * A sensible default implementation of {@link #subMap(Object, Object)} in
    * terms of {@link #headMap(Object)} and {@link #tailMap(Object)}. In some
    * situations, you may wish to override {@link #subMap(Object, Object)} to
@@ -188,7 +153,8 @@ public abstract class ForwardingSortedMap<K, V> extends ForwardingMap<K, V>
    *
    * @since 7.0
    */
-  @Beta protected SortedMap<K, V> standardSubMap(K fromKey, K toKey) {
+  @Beta
+  protected SortedMap<K, V> standardSubMap(K fromKey, K toKey) {
     checkArgument(unsafeCompare(fromKey, toKey) <= 0, "fromKey must be <= toKey");
     return tailMap(fromKey).headMap(toKey);
   }

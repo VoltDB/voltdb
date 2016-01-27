@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,36 +18,33 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-
-import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.collect.Maps;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.messaging.DumpMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.VoltTableUtil;
+
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.Maps;
 
 public class MpTransactionState extends TransactionState
 {
@@ -104,7 +101,7 @@ public class MpTransactionState extends TransactionState
     void restart()
     {
         // The poisoning path will, unfortunately, set this to true.  Need to undo that.
-        m_needsRollback = false;
+        setNeedsRollback(false);
         // Also need to make sure that we get the original invocation in the first fragment
         // since some masters may not have seen it.
         m_haveDistributedInitTask = false;
@@ -163,7 +160,7 @@ public class MpTransactionState extends TransactionState
                 task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
             }
 
-            if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
+            if (ProcedureInvocationType.isDeprecatedInternalDRType(m_initiationMsg.getStoredProcedureInvocation().getType())) {
                 task.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
             }
 
@@ -314,7 +311,7 @@ public class MpTransactionState extends TransactionState
             throw new RuntimeException(e);
         }
         if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
-            m_needsRollback = true;
+            setNeedsRollback(true);
             if (msg.getException() != null) {
                 throw msg.getException();
             } else {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.SortedMap;
@@ -32,6 +33,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -59,11 +61,17 @@ public class CatalogContext {
     public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
+    private final byte[] catalogHash;
     private final long catalogCRC;
+    private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
+    // Default procs are loaded on the fly
+    // The DPM knows which default procs COULD EXIST
+    //  and also how to get SQL for them.
+    public final DefaultProcedureManager m_defaultProcs;
 
     /*
      * Planner associated with this catalog version.
@@ -72,39 +80,45 @@ public class CatalogContext {
     public final PlannerTool m_ptool;
 
     // PRIVATE
-    //private final String m_path;
     private final InMemoryJarfile m_jarfile;
+
+    // Some people may be interested in the JAXB rather than the raw deployment bytes.
+    private DeploymentType m_memoizedDeployment;
 
     public CatalogContext(
             long transactionId,
             long uniqueId,
             Catalog catalog,
             byte[] catalogBytes,
-            byte[] deploymentHash,
-            int version,
-            long prevCRC) {
+            byte[] deploymentBytes,
+            int version)
+    {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
-        if (catalog == null)
+        if (catalog == null) {
             throw new RuntimeException("Can't create CatalogContext with null catalog.");
+        }
 
-        //m_path = pathToCatalogJar;
-        long tempCRC = 0;
+        assert(deploymentBytes != null);
+        if (deploymentBytes == null) {
+            throw new RuntimeException("Can't create CatalogContext with null deployment bytes.");
+        }
+
+        assert(catalogBytes != null);
         if (catalogBytes != null) {
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
-                tempCRC = m_jarfile.getCRC();
+                catalogCRC = m_jarfile.getCRC();
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            catalogCRC = tempCRC;
+            this.catalogHash = m_jarfile.getSha1Hash();
         }
         else {
-            m_jarfile = null;
-            catalogCRC = prevCRC;
+            throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
         }
 
         this.catalog = catalog;
@@ -113,9 +127,15 @@ public class CatalogContext {
         procedures = database.getProcedures();
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
-        this.deploymentHash = deploymentHash;
-        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
-        m_ptool = new PlannerTool(cluster, database, version);
+
+        this.deploymentBytes = deploymentBytes;
+        this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
+        m_memoizedDeployment = null;
+
+        m_defaultProcs = new DefaultProcedureManager(database);
+
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
+        m_ptool = new PlannerTool(cluster, database, catalogHash);
         catalogVersion = version;
 
         if (procedures != null) {
@@ -128,18 +148,21 @@ public class CatalogContext {
         }
     }
 
+    public Cluster getCluster() {
+        return cluster;
+    }
+
     public CatalogContext update(
             long txnId,
             long uniqueId,
             byte[] catalogBytes,
             String diffCommands,
             boolean incrementVersion,
-            byte[] deploymentHash)
+            byte[] deploymentBytes)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
         int incValue = incrementVersion ? 1 : 0;
-        byte[] realDepCRC = deploymentHash != null ? deploymentHash : this.deploymentHash;
         // If there's no new catalog bytes, preserve the old one rather than
         // bashing it
         byte[] bytes = catalogBytes;
@@ -151,15 +174,19 @@ public class CatalogContext {
                 hostLog.fatal(e.getMessage());
             }
         }
+        // Ditto for the deploymentBytes
+        byte[] depbytes = deploymentBytes;
+        if (depbytes == null) {
+            depbytes = this.deploymentBytes;
+        }
         CatalogContext retval =
             new CatalogContext(
                     txnId,
                     uniqueId,
                     newCatalog,
                     bytes,
-                    realDepCRC,
-                    catalogVersion + incValue,
-                    catalogCRC);
+                    depbytes,
+                    catalogVersion + incValue);
         return retval;
     }
 
@@ -197,6 +224,29 @@ public class CatalogContext {
             return null;
         }
         return m_jarfile.getFullJarBytes();
+    }
+
+    /**
+     * Get the JAXB XML Deployment object, which is memoized
+     */
+    public DeploymentType getDeployment()
+    {
+        if (m_memoizedDeployment == null) {
+            m_memoizedDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+            // This should NEVER happen
+            if (m_memoizedDeployment == null) {
+                VoltDB.crashLocalVoltDB("The internal deployment bytes are invalid.  This should never occur; please contact VoltDB support with your logfiles.");
+            }
+        }
+        return m_memoizedDeployment;
+    }
+
+    /**
+     * Get the XML Deployment bytes
+     */
+    public byte[] getDeploymentBytes()
+    {
+        return deploymentBytes;
     }
 
     /**
@@ -298,13 +348,6 @@ public class CatalogContext {
 
     public byte[] getCatalogHash()
     {
-        byte[] catalogHash = null;
-        try {
-            // IZZY: memoize the catalog hash in the catalog context sometime, maybe
-            catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(getCatalogJarBytes());
-        } catch (IOException ioe) {
-            // Should never happen
-        }
         return catalogHash;
     }
 }

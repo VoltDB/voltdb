@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -31,6 +31,11 @@ import datetime
 from sys import maxint
 from voltdbclient import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
+# Need these to print non-ascii characters:
+import codecs
+import sys
+UTF8Writer = codecs.getwriter('utf8')
+sys.stdout = UTF8Writer(sys.stdout)
 
 COUNT = 2                       # number of random values to generate by default
 ALLOW_SELF_JOIN = True
@@ -52,8 +57,8 @@ class IntValueGenerator:
         self.__nullpct = 0
 
     def set_min_max(self, min, max):
-        self.__min = min
-        self.__max = max
+        self.__min = int(min)
+        self.__max = int(max)
 
     def set_nullpct(self, nullpct):
         self.__nullpct = nullpct
@@ -140,11 +145,184 @@ class DecimalValueGenerator:
                 yield decimal.Decimal(str(random.random() * 100.00))
 
 
+class PointValueGenerator:
+    """This generates (random) point (GEOGRAPHY_POINT) values.
+    """
+    DIGITS_BEYOND_DECIMAL_POINT = 2
+
+    def __init__(self):
+        decimal.getcontext().prec = PointValueGenerator.DIGITS_BEYOND_DECIMAL_POINT
+        self.__nullpct = 0
+        # By default, random points can be anywhere on Earth
+        self.set_min_max(-180.0, 180.0, -90.0, 90.0)
+
+    def set_min_max(self, longmin, longmax, latmin=None, latmax=None):
+        self.__longmin  = float(longmin)
+        self.__longdiff = float(longmax) - self.__longmin
+        if latmin is not None:
+            self.__latmin = float(latmin)
+        else:
+            self.__latmin = self.__longmin
+        if latmax is not None:
+            self.__latdiff = float(latmax) - self.__latmin
+        else:
+            self.__latdiff = float(longmax) - self.__latmin
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
+
+    def generate_values(self, count):
+        for i in xrange(count):
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                longitude = round(self.__longmin + (self.__longdiff * random.random()),
+                                  PointValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
+                latitude  = round(self.__latmin  + (self.__latdiff  * random.random()),
+                                  PointValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
+                yield "pointFromText('POINT ("+str(longitude)+" "+str(latitude)+")')"
+
+
+class PolygonValueGenerator:
+    """This generates (random) polygon (GEOGRAPHY) values.
+    """
+    DIGITS_BEYOND_DECIMAL_POINT = 2
+
+    def __init__(self):
+        decimal.getcontext().prec = PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT
+        self.__nullpct = 0
+        # A negative value indicates a random number of holes (interior rings),
+        # with the number of holes ranging between 0 and the absolute value of
+        # the given number; so, in this case, -4 means between 0 and 4 holes.
+        self.__num_holes = -4
+        # By default, polygons are restricted to be somewhere within Colorado,
+        # since it has a nice, square-ish shape; and a polygon with random
+        # vertices covering the entire Earth would not make a lot of sense.
+        # (Note: this an approximate version of Colorado, since it does not
+        # take into account that latitude lines are not great circles.)
+        self.set_min_max(-109.05, -102.05, 37.0, 41.0)
+
+    def set_min_max(self, longmin, longmax, latmin=None, latmax=None):
+        self.__longmin = float(longmin)
+        self.__longmax = float(longmax)
+        if latmin is not None:
+            self.__latmin = float(latmin)
+        else:
+            self.__latmin = self.__longmin
+        if latmax is not None:
+            self.__latmax = float(latmax)
+        else:
+            self.__latmax = self.__longmax
+
+    def set_nullpct(self, nullpct):
+        self.__nullpct = nullpct
+
+    def set_num_holes(self, num_holes):
+        self.__num_holes = num_holes
+
+    def generate_vertex(self, longmin, longmax, latmin, latmax):
+        """Generates a point that can be used as the vertex of a polygon, at a
+           random location in between the specified minimum and maximum longitude
+           and latitude values.
+        """
+        longitude = round(longmin + ((longmax - longmin) * random.random()),
+                          PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
+        latitude  = round(latmin  + (( latmax -  latmin) * random.random()),
+                          PolygonValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
+        return str(longitude)+" "+str(latitude)
+
+    def generate_loop(self, longmin, longmax, latmin, latmax, clockwise=False):
+        """Generates a loop, which can be used as the exterior ring or an interior
+           ring (i.e., a hole) of a polygon, with between 4 and 8 vertices, at
+           random locations in between the specified minimum and maximum longitude
+           and latitude values; clockwise=True should be used if and only if
+           this is an interior ring.
+        """
+        # Divide the specified region up into a 3x3 grid of 9 roughly equal spaces,
+        # like a tic-tac-toe board, but leave out the middle space, which can be
+        # used later for holes, if this is an exterior ring. Start in the lower left
+        # space (or "octant", since there are 8 of them without the middle), and
+        # move counter-clockwise (the default) or clockwise until you reach the
+        # lower left space again. In the corner spaces, you always choose a random
+        # vertex; but the "middle" spaces are optional: you randomly decide (50-50)
+        # whether to specify a vertex there or not.
+        octants = [[1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]]
+        if clockwise:
+            octants.reverse()
+        long_delta = (longmax - longmin) / 3.0
+        lat_delta  = (latmax  - latmin ) / 3.0
+        first_and_last_vertex = self.generate_vertex(longmin, longmin+long_delta, latmin, latmin+lat_delta)
+        loop = '(' + first_and_last_vertex + ', '
+        for oct in range(len(octants)):
+            i, j = octants[oct][0], octants[oct][1]
+            # vertices in the "middle" octants are optional (unlike the corners)
+            if i == 1 or j == 1 and random.randint(0, 100) < 50:
+                continue
+            loop += self.generate_vertex(longmin+i*long_delta, longmin+(i+1)*long_delta,
+                                         latmin+j*lat_delta, latmin+(j+1)*lat_delta) + ', '
+        return loop + first_and_last_vertex + ')'
+
+    def generate_values(self, count):
+        """Generates a polygon, whose first loop is always a counter-clockwise
+           exterior ring, with vertices at random locations in between the
+           specified minimum and maximum longitude and latitude values; there
+           may or may not be additional loops which represent clockwise interior
+           rings, i.e., holes. Holes are specified as being within one of 4
+           quadrants of the middle "space" (see generate_loop above) of the
+           exterior ring. More than 4 holes is not recommended, as they will
+           likely start to overlap, causing an invalid polygon.
+        """
+        quadrants = [[0, 0], [1, 0], [1, 1], [0, 1]]
+        for i in xrange(count):
+            if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
+                yield None
+            else:
+                polygon = "polygonFromText('POLYGON (" + self.generate_loop(self.__longmin, self.__longmax,
+                                                                            self.__latmin, self.__latmax)
+                num_holes = self.__num_holes
+                if num_holes < 0:
+                    num_holes = random.randint(0, -num_holes)
+                if num_holes:
+                    long_delta = (self.__longmax - self.__longmin) / 6.0
+                    lat_delta  = (self.__latmax  - self.__latmin ) / 6.0
+                    longmin    = self.__longmin + 2*long_delta
+                    latmin     = self.__latmin  + 2*lat_delta
+                for h in range(num_holes):
+                    i, j = quadrants[h%4][0], quadrants[h%4][1]
+                    polygon += ', ' + self.generate_loop(longmin+i*long_delta, longmin+(i+1)*long_delta,
+                                                         latmin+j*lat_delta, latmin+(j+1)*lat_delta, True)
+                yield polygon + ")')"
+
+
 class StringValueGenerator:
     """This generates strings.
     """
 
+    # Define the ASCII-only alphabet, to be used to generate strings
     ALPHABET = u"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    # For the extended, non-ASCII alphabet, add the letter e with various accents
+    EXTENDED_ALPHABET = ALPHABET + u'\u00e9\u00e8\u00ea\u00eb'
+    # Add some (upper & lower case) Greek characters (that do not resemble Latin letters)
+    EXTENDED_ALPHABET += u'\u0393\u0394\u03b1\u03b2'
+    # Add some (upper & lower case) Cyrillic (e.g. Russian) characters (that do not resemble Latin letters)
+    EXTENDED_ALPHABET += u'\u0429\u042F\u0449\u044F'
+    # Add some Japanese characters (which together mean 'frog')
+    EXTENDED_ALPHABET += u'\u30ab\u30a8\u30eb'
+    # Add some (simplified) Chinese characters (which together mean 'frog')
+    EXTENDED_ALPHABET += u'\u9752\u86d9'
+    # Initial, default value
+    __ascii_only = False
+
+    @staticmethod
+    def set_ascii_only(ascii_only):
+        StringValueGenerator.__ascii_only = ascii_only
+
+    @staticmethod
+    def get_alphabet():
+        if StringValueGenerator.__ascii_only:
+            return StringValueGenerator.ALPHABET
+        else:
+            return StringValueGenerator.EXTENDED_ALPHABET
 
     def __init__(self):
         self.__nullpct = 0
@@ -152,9 +330,9 @@ class StringValueGenerator:
     def set_nullpct(self, nullpct):
         self.__nullpct = nullpct
 
-    def generate_values(self, count, length = 17):
+    def generate_values(self, count, length = 14):
         for i in xrange(count):
-            list = [random.choice(StringValueGenerator.ALPHABET) for y in xrange(length)]
+            list = [random.choice(StringValueGenerator.get_alphabet()) for y in xrange(length)]
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:
@@ -252,15 +430,19 @@ class BaseGenerator:
     #                   |       |             |
     TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
     #                   |       |             |                      |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+)?\s*" \
-                      r"(:(?P<min>(-?\d*)),(?P<max>(-?\d*)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
-    #                         |                |                             |                   |
-    #                         |                |                             |       end of [] attribute section
-    NULL_PCT_PATTERN_GROUP  =                                               "nullpct" # optional null percentage
-    #                         |                |
-    MAX_VALUE_PATTERN_GROUP =                 "max" # optional max (only for numeric values)
+    MIN_VALUE_PATTERN_GROUP =                                                                          "min" # optional min (only for numeric values)
+    #                   |       |             |                      |                                  |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" r"(:(?P<min>(-?\d*\.?\d*))," \
+                      r"(?P<max>(-?\d*\.?\d*))(,(?P<latmin>(-?\d*\.?\d*)),(?P<latmax>(-?\d*\.?\d*)))?)?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
+    #                         |                     |                         |                                        |                    |
+    #                         |                     |                         |                                        |       end of [] attribute section
+    NULL_PCT_PATTERN_GROUP  =                                                                                         "nullpct" # optional null percentage
+    #                         |                     |                         |
+    MAX_LAT_PATTERN_GROUP   =                                                "latmax" # optional latitude max (only for geo values)
+    #                         |                     |
+    MIN_LAT_PATTERN_GROUP   =                      "latmin" # optional latitude min (only for geo values)
     #                         |
-    MIN_VALUE_PATTERN_GROUP ="min" # optional min (only for numeric values)
+    MAX_VALUE_PATTERN_GROUP ="max" # optional max (only for numeric values)
 
     # A simpler pattern with no group capture is used to find recurrences of (references to) definition
     # patterns elsewhere in the statement, identified by label.
@@ -275,6 +457,19 @@ class BaseGenerator:
     #                          |      |    |  |     final ']' required
     #                          |      |    |  |     |
     __RECURRENCE_TEMPLATE = r"(%s|__)\[\s*#%s[^\]]*\]"
+
+    # List of column names for Geo types, i.e., point and polygon (GEOGRAPHY_POINT and GEOGRAPHY),
+    # which may need to be wrapped in AsText(...)
+    __GEO_COLUMN_NAMES    = ['PT1', 'PT2', 'PT3', 'POLY1', 'POLY2', 'POLY3']
+    # List of possible prefixes for those column names, i.e., either a table name alias with '.',
+    # nothing at all; the empty one (no table name prefix) must be last
+    __GEO_COLUMN_PREFIXES = ['A.', 'B.', 'LHS.', '']
+    # List of Geo functions, which indicate that the Geo column is already appropriately
+    # wrapped, so you don't need to add AsText(...)
+    __GEO_FUNCTION_NAMES  = ['AREA', 'ASTEXT', 'CAST', 'CENTROID', 'CONTAINS', 'COUNT', 'DISTANCE', 'ISVALID',
+                             'ISINVALIDREASON', 'LATITUDE', 'LONGITUDE', 'NUMINTERIORRINGS', 'NUMPOINTS']
+    # Similar list, of Geo functions with two arguments
+    __GEO_FUNCS_W2_ARGS   = ['CONTAINS', 'DISTANCE']
 
     @classmethod
     def _expr_builder(cls, tag):
@@ -291,6 +486,59 @@ class BaseGenerator:
         """
         for i in self.next_param():
             yield statement.replace(self.__fn, i)
+
+    @classmethod
+    def wrap_astext_around_geo_columns_in_fragment(cls, statement_fragment):
+        """ In the specified partial SQL statement, or fragment, wrap AsText(...)
+            around Geo types (point and polygon, i.e., GEOGRAPHY_POINT and
+            GEOGRAPHY), but only if it is not already wrapped in one of the
+            Geo functions, e.g., AsText(PT1), LONGITUDE(PT1), AREA(POLY1),
+            DISTANCE(PT2,POLY3), etc.
+        """
+        result = statement_fragment
+        statement_fragment_upper = statement_fragment.upper().replace(' ', '')
+        for col in BaseGenerator.__GEO_COLUMN_NAMES:
+            if col in statement_fragment_upper:
+                found = False
+                for tbl in BaseGenerator.__GEO_COLUMN_PREFIXES:
+                    # Do not sub for empty column prefix (i.e., table
+                    # name), if already handled a non-empty one
+                    if found and not tbl:
+                        break
+                    if tbl+col in statement_fragment_upper:
+                        found = True
+                        if not any(f+'('+tbl+col in statement_fragment_upper for f in BaseGenerator.__GEO_FUNCTION_NAMES) and \
+                           not any(f+'('+t+c+','+tbl+col in statement_fragment_upper for f in BaseGenerator.__GEO_FUNCS_W2_ARGS
+                                for t in BaseGenerator.__GEO_COLUMN_PREFIXES for c in BaseGenerator.__GEO_COLUMN_NAMES):
+                            result = result.replace(tbl+col, 'AsText('+tbl+col+')')
+                            print "Modified fragment  : ", result
+        return result
+
+
+    @classmethod
+    def wrap_astext_around_geo_columns(cls, statement):
+        """ Cannot compare Geo types (point and polygon, i.e., GEOGRAPHY_POINT
+            and GEOGRAPHY) against PostGIS, so, in a SELECT statement, we have
+            to get them in text form, instead; e.g., replace 'PT1' with
+            AsText(PT1) or 'A.POLY1' with AsText(A.POLY1), but only in the part
+            of a SELECT statement before 'FROM', or after 'ORDER BY', and only
+            if it is not already wrapped in one of the Geo functions, e.g.,
+            AsText(PT1), LONGITUDE(PT1), AREA(POLY1), DISTANCE(PT2,POLY3), etc.
+        """
+        result = statement
+        statement_upper = statement.upper()
+        if statement_upper.startswith('SELECT') and any(x in statement for x in BaseGenerator.__GEO_COLUMN_NAMES):
+            from_index = statement_upper.find(' FROM ')
+            if from_index > 0:
+                before_from = statement[0:from_index]
+                after_from  = statement[from_index:]
+                result = BaseGenerator.wrap_astext_around_geo_columns_in_fragment(before_from) + after_from
+            order_by_index = result.upper().find(' ORDER BY ')
+            if order_by_index > 0:
+                before_order_by = result[0:order_by_index]
+                after_order_by  = result[order_by_index:]
+                result = before_order_by + BaseGenerator.wrap_astext_around_geo_columns_in_fragment(after_order_by)
+        return result
 
     @classmethod
     def prepare_generators(cls, statement, schema, generator_types):
@@ -338,7 +586,11 @@ class BaseGenerator:
                                                                                       field_map):
                     yield complete_statement
         else:
-            yield stmt # saw the last generator, statement should be complete
+            # Saw the last generator, statement should be complete; now, make
+            # sure Geo column types (point and polygon, i.e., GEOGRAPHY_POINT
+            # and GEOGRAPHY) are not in a SELECT list (or ORDER BY) without
+            # AsText, or some other function, wrapped around them
+            yield BaseGenerator.wrap_astext_around_geo_columns(stmt)
 
 
     def prepare_fields(self, statement):
@@ -446,11 +698,37 @@ class ColumnGenerator(BaseGenerator):
             self.__supertype = ""
 
     def configure_from_schema(self, schema, prior_generators):
-        """ Get matcing column values fom schema
+        """ Get matching column values from schema
         """
         self.values = schema.get_typed_columns(self.__supertype)
         self.prior_generator = prior_generators.get("variable")
         prior_generators["variable"] = self # new variable generator at the head of the chain
+        return prior_generators
+
+
+class SymbolGenerator(BaseGenerator):
+    """This replaces occurrences of token _symbol with a piece of text, such as a function name
+       or a comparison operator.
+       Within a statement, intended occurrences of the same symbol must use the same '#label'.
+       Attributes only matter on the first occurrence of "_symbol" for a given label.
+       As a convenience, forward references can use the __[#label] syntax instead of _symbol[#label]
+       to defer locking in attribute settings until a later _symbol occurrence.
+    """
+
+    def __init__(self):
+        BaseGenerator.__init__(self, "_symbol")
+
+    def prepare_params(self, attribute_groups):
+        self.__symbol = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
+        if not self.__symbol:
+            self.__symbol = ""
+
+    def configure_from_schema(self, schema, prior_generators):
+        """ Get matching text values; does not actually use the schema.
+        """
+        self.values.append(self.__symbol)
+        self.prior_generator = prior_generators.get("symbol")
+        prior_generators["symbol"] = self # new symbol generator at the head of the chain
         return prior_generators
 
 
@@ -467,7 +745,9 @@ class ConstantGenerator(BaseGenerator):
              "string": StringValueGenerator,
              "varbinary": VarbinaryValueGenerator,
              "decimal": DecimalValueGenerator,
-             "timestamp": TimestampValueGenerator}
+             "timestamp": TimestampValueGenerator,
+             "point": PointValueGenerator,
+             "polygon": PolygonValueGenerator}
 
     def __init__(self):
         BaseGenerator.__init__(self, "_value")
@@ -480,13 +760,18 @@ class ConstantGenerator(BaseGenerator):
             print "Generator parse error -- invalid type"
             assert self.__type
 
-        min = attribute_groups[BaseGenerator.MIN_VALUE_PATTERN_GROUP]
-        max = attribute_groups[BaseGenerator.MAX_VALUE_PATTERN_GROUP]
+        min    = attribute_groups[BaseGenerator.MIN_VALUE_PATTERN_GROUP]
+        max    = attribute_groups[BaseGenerator.MAX_VALUE_PATTERN_GROUP]
+        latmin = attribute_groups[BaseGenerator.MIN_LAT_PATTERN_GROUP]
+        latmax = attribute_groups[BaseGenerator.MAX_LAT_PATTERN_GROUP]
 
         self.__value_generator = ConstantGenerator.TYPES[self.__type]()
 
-        if min != None and max != None:
-            self.__value_generator.set_min_max(int(min), int(max))
+        if min is not None and max is not None:
+            if latmin is not None and latmax is not None:
+                self.__value_generator.set_min_max(min, max, latmin, latmax)
+            else:
+                self.__value_generator.set_min_max(min, max)
 
         nullpct = attribute_groups[BaseGenerator.NULL_PCT_PATTERN_GROUP]
         if nullpct:
@@ -498,7 +783,12 @@ class ConstantGenerator(BaseGenerator):
             if i == None:
                 i = u"NULL"
             elif isinstance(i, basestring):
-                i = u"'%s'" % (i)
+                # Points and polygon values do not want extra single-quotes around them
+                if i.startswith('pointFromText(') or i.startswith('polygonFromText('):
+                    i = u"%s" % (i)
+                # Varchar values do want single-quotes around them
+                else:
+                    i = u"'%s'" % (i)
             elif isinstance(i, float):
                 i = u"%.20e" % (i)
             yield unicode(i)
@@ -576,7 +866,10 @@ class Schema:
         "float":     ("float",        "numeric", ""),
         "decimal":   ("decimal",      "numeric", ""),
         "string":    ("string",    "nonnumeric", ""),
+        "varbinary": ("varbinary", "nonnumeric", ""),
         "timestamp": ("timestamp", "nonnumeric", ""),
+        "point":     ("point",   "geo", "nonnumeric", ""),
+        "polygon":   ("polygon", "geo", "nonnumeric", ""),
     }
 
     TYPE_NAMES = {
@@ -586,8 +879,11 @@ class Schema:
         FastSerializer.VOLTTYPE_BIGINT:    "int64",
         FastSerializer.VOLTTYPE_FLOAT:     "float",
         FastSerializer.VOLTTYPE_STRING:    "string",
+        FastSerializer.VOLTTYPE_VARBINARY: "varbinary",
         FastSerializer.VOLTTYPE_DECIMAL:   "decimal",
         FastSerializer.VOLTTYPE_TIMESTAMP: "timestamp",
+        FastSerializer.VOLTTYPE_GEOGRAPHY_POINT: "point",
+        FastSerializer.VOLTTYPE_GEOGRAPHY: "polygon",
     }
 
     def __init__(self, **kwargs):
@@ -600,6 +896,7 @@ class Schema:
         self.__col_by_type = {}
         self.__col_by_type[""] = {}
         self.__col_by_type["int"] = {}
+        self.__col_by_type["geo"] = {}
         self.__col_by_type["numeric"] = {}
         self.__col_by_type["nonnumeric"] = {}
         for code, supertype in Schema.TYPE_NAMES.iteritems():
@@ -775,7 +1072,8 @@ class Template:
 
 
 class SQLGenerator:
-    def __init__(self, catalog, template, subversion_generation):
+    def __init__(self, catalog, template, subversion_generation, ascii_only):
+        StringValueGenerator.set_ascii_only(ascii_only)
         self.__subversion_generation = subversion_generation
         # Reset the counters
         IdGenerator.initialize(0)
@@ -792,8 +1090,11 @@ class SQLGenerator:
 
         self.__statements = self.__template.get_statements()
 
+        self.__min_statements_per_pattern = sys.maxint
+        self.__max_statements_per_pattern = -1
+        self.__num_insert_statements      = 0
 
-    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, ConstantGenerator, IdGenerator)
+    GENERATOR_TYPES = (TableGenerator, ColumnGenerator, SymbolGenerator, ConstantGenerator, IdGenerator)
 
     UNRESOLVED_PUNCTUATION = re.compile(r'[][#@]') # Literally, ']', '[', '#', or '@'.
     UNRESOLVED_GENERATOR = re.compile(r'(^|\W)[_]')
@@ -835,11 +1136,31 @@ class SQLGenerator:
                 if self.__subversion_generation and re.match("(?i)\s*SELECT", i):
                     results += 1
                     yield 'SELECT * FROM (' + i + ') subquery'
+                if (i.upper().startswith('INSERT')):
+                    self.__num_insert_statements += 1
 
             if results == 0:
                 print 'Template "%s" failed to yield SQL statements' % s
-            elif summarize_successes:
-                print 'Template "%s" yielded (%d) SQL statements' % (s, results)
+            if summarize_successes:
+                print '%d SQL statements generated by template:  "%s"' % (results, s)
+
+            self.__min_statements_per_pattern = min(self.__min_statements_per_pattern, results)
+            self.__max_statements_per_pattern = max(self.__max_statements_per_pattern, results)
+
+    def min_statements_per_pattern(self):
+        if (self.__min_statements_per_pattern == sys.maxint):  # initial value
+            return -1  # indicates no patterns have been used to generate SQL statements
+        else:
+            return self.__min_statements_per_pattern
+
+    def max_statements_per_pattern(self):
+        return self.__max_statements_per_pattern
+
+    def num_insert_statements(self):
+        return self.__num_insert_statements
+
+    def num_patterns(self):
+        return len(self.__statements)
 
 if __name__ == "__main__":
     # run the SQLGenerator in a test mode that simply prints its results

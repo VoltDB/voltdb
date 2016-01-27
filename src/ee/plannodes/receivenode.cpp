@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,53 +45,22 @@
 
 #include "receivenode.h"
 
-#include "storage/table.h"
-
 #include <sstream>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
-ReceivePlanNode::ReceivePlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    // Do nothing
-}
+PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
-ReceivePlanNode::ReceivePlanNode() : AbstractPlanNode()
+std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {
-    // Do nothing
+    std::ostringstream buffer;
+    AbstractReceivePlanNode::schemaDebugInfo(buffer, getOutputSchema(), "Incoming", spacer);
+    return buffer.str();
 }
 
-ReceivePlanNode::~ReceivePlanNode()
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
 }
 
-PlanNodeType
-ReceivePlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_RECEIVE;
-}
-string
-ReceivePlanNode::debugInfo(const string& spacer) const
-{
-    ostringstream buffer;
-    buffer << spacer << "Incoming Table Columns["
-           << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
-    {
-        SchemaColumn* col = getOutputSchema()[ctr];
-        buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << col->getColumnName() << " : ";
-        buffer << "size=" << col->getExpression()->getValueSize() << " : ";
-        buffer << "type=" << col->getExpression()->getValueType() << "\n";
-    }
-    return (buffer.str());
-}
 
-void
-ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
-    // This space intentionally left blank.
-}
+} // namespace voltdb

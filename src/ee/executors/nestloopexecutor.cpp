@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,6 +50,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "executors/aggregateexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
@@ -58,6 +59,7 @@
 #include "storage/tableiterator.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/limitnode.h"
+#include "plannodes/aggregatenode.h"
 
 #ifdef VOLT_DEBUG_ENABLED
 #include <ctime>
@@ -79,12 +81,17 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
+    assert(m_tmpOutputTable);
+
     // NULL tuple for outer join
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_table = node->getInputTables()[1];
+        Table* inner_table = node->getInputTable(1);
         assert(inner_table);
         m_null_tuple.init(inner_table->schema());
     }
+
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(m_abstractNode);
 
     return true;
 }
@@ -95,19 +102,15 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
-    assert(node->getInputTables().size() == 2);
-
-    Table* output_table_ptr = node->getOutputTable();
-    assert(output_table_ptr);
+    assert(node->getInputTableCount() == 2);
 
     // output table must be a temp table
-    TempTable* output_table = dynamic_cast<TempTable*>(output_table_ptr);
-    assert(output_table);
+    assert(m_tmpOutputTable);
 
-    Table* outer_table = node->getInputTables()[0];
+    Table* outer_table = node->getInputTable();
     assert(outer_table);
 
-    Table* inner_table = node->getInputTables()[1];
+    Table* inner_table = node->getInputTable(1);
     assert(inner_table);
 
     VOLT_TRACE ("input table left:\n %s", outer_table->debug().c_str());
@@ -118,7 +121,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *preJoinPredicate = node->getPreJoinPredicate();
     if (preJoinPredicate) {
-        preJoinPredicate->substitute(params);
         VOLT_TRACE ("Pre Join predicate: %s", preJoinPredicate == NULL ?
                     "NULL" : preJoinPredicate->debug(true).c_str());
     }
@@ -127,7 +129,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *joinPredicate = node->getJoinPredicate();
     if (joinPredicate) {
-        joinPredicate->substitute(params);
         VOLT_TRACE ("Join predicate: %s", joinPredicate == NULL ?
                     "NULL" : joinPredicate->debug(true).c_str());
     }
@@ -136,7 +137,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *wherePredicate = node->getWherePredicate();
     if (wherePredicate) {
-        wherePredicate->substitute(params);
         VOLT_TRACE ("Where predicate: %s", wherePredicate == NULL ?
                     "NULL" : wherePredicate->debug(true).c_str());
     }
@@ -154,23 +154,32 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
-    TableTuple outer_tuple(node->getInputTables()[0]->schema());
-    TableTuple inner_tuple(node->getInputTables()[1]->schema());
-    TableTuple &joined = output_table->tempTuple();
-    TableTuple null_tuple = m_null_tuple;
+    TableTuple outer_tuple(node->getInputTable(0)->schema());
+    TableTuple inner_tuple(node->getInputTable(1)->schema());
+    const TableTuple& null_tuple = m_null_tuple.tuple();
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     int tuple_ctr = 0;
     int tuple_skipped = 0;
-    ProgressMonitorProxy pmp(m_engine, this, inner_table);
+    ProgressMonitorProxy pmp(m_engine, this);
 
+    TableTuple join_tuple;
+    if (m_aggExec != NULL) {
+        VOLT_TRACE("Init inline aggregate...");
+        const TupleSchema * aggInputSchema = node->getTupleSchemaPreAgg();
+        join_tuple = m_aggExec->p_execute_init(params, &pmp, aggInputSchema, m_tmpOutputTable);
+    } else {
+        join_tuple = m_tmpOutputTable->tempTuple();
+    }
+
+    bool earlyReturned = false;
     while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
         pmp.countdownProgress();
 
         // populate output table's temp tuple with outer table's values
         // probably have to do this at least once - avoid doing it many
         // times per outer tuple
-        joined.setNValues(0, outer_tuple, 0, outer_cols);
+        join_tuple.setNValues(0, outer_tuple, 0, outer_cols);
 
         // did this loop body find at least one match for this tuple?
         bool match = false;
@@ -196,17 +205,26 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                         }
                         ++tuple_ctr;
                         // Matched! Complete the joined tuple with the inner column values.
-                        joined.setNValues(outer_cols, inner_tuple, 0, inner_cols);
-                        output_table->insertTupleNonVirtual(joined);
-                        pmp.countdownProgress();
+                        join_tuple.setNValues(outer_cols, inner_tuple, 0, inner_cols);
+                        if (m_aggExec != NULL) {
+                            if (m_aggExec->p_execute_tuple(join_tuple)) {
+                                // Get enough rows for LIMIT
+                                earlyReturned = true;
+                                break;
+                            }
+                        } else {
+                            m_tmpOutputTable->insertTempTuple(join_tuple);
+                            pmp.countdownProgress();
+                        }
                     }
                 }
-            }
-        }
+            } // END INNER WHILE LOOP
+        } // END IF PRE JOIN CONDITION
+
         //
         // Left Outer Join
         //
-        if ((limit == -1 || tuple_ctr < limit) && join_type == JOIN_TYPE_LEFT && !match) {
+        if (join_type == JOIN_TYPE_LEFT && !match && (limit == -1 || tuple_ctr < limit)) {
             // Still needs to pass the filter
             if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
                 // Check if we have to skip this tuple because of offset
@@ -215,12 +233,31 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     continue;
                 }
                 ++tuple_ctr;
-                joined.setNValues(outer_cols, null_tuple, 0, inner_cols);
-                output_table->insertTupleNonVirtual(joined);
-                pmp.countdownProgress();
+                join_tuple.setNValues(outer_cols, null_tuple, 0, inner_cols);
+                if (m_aggExec != NULL) {
+                    if (m_aggExec->p_execute_tuple(join_tuple)) {
+                        earlyReturned = true;
+                    }
+                } else {
+                    m_tmpOutputTable->insertTempTuple(join_tuple);
+                    pmp.countdownProgress();
+                }
             }
+        } // END IF LEFT OUTER JOIN
+
+        if (earlyReturned) {
+            // Get enough rows for LIMIT inlined with aggregation
+            break;
         }
+
+    } // END OUTER WHILE LOOP
+
+    if (m_aggExec != NULL) {
+        m_aggExec->p_execute_finish();
     }
+
+    cleanupInputTempTable(inner_table);
+    cleanupInputTempTable(outer_table);
 
     return (true);
 }

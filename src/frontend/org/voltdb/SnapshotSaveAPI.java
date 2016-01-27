@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,9 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -56,6 +53,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -90,9 +89,17 @@ public class SnapshotSaveAPI
 
     /*
      * Ugh!, needs to be visible to all the threads doing the snapshot,
-     * pbulished under the snapshot create lock.
+     * published under the snapshot create lock.
      */
     private static Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
+    private static Map<Integer, TupleStreamStateInfo> drTupleStreamInfo;
+
+    /*
+     * Double ugh!, remote DC unique ids get used the same way as the export IDs, end up going into ZK
+     * so that they can be retrieved by the SnapshotCompletionInterest code. Rejoin
+     * needs to get these numbers to initialize the last received IDs
+     */
+    private static Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds;
 
     /**
      * The only public method: do all the work to start a snapshot.
@@ -120,6 +127,17 @@ public class SnapshotSaveAPI
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
         final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
+        JSONObject jsData = null;
+        if (data != null && !data.isEmpty()) {
+            try {
+                jsData = new JSONObject(data);
+            }
+            catch (JSONException e) {
+                SNAP_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
+                        e);
+            }
+        }
+        final JSONObject finalJsData = jsData;
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -129,8 +147,8 @@ public class SnapshotSaveAPI
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrierActualAction.set(new Runnable() {
                 @Override
                 public void run() {
-                    Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
-                    partitionTransactionIds = m_partitionLastSeenTransactionIds;
+                    Map<Integer, Long> partitionTransactionIds = m_partitionLastSeenTransactionIds;
+
                     SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                     partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
@@ -152,16 +170,20 @@ public class SnapshotSaveAPI
                         }
                     }
                     exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
+                    drTupleStreamInfo = SnapshotSiteProcessor.getDRTupleStreamStateInfo();
+                    remoteDCLastIds = VoltDB.instance().getConsumerDRGateway().getLastReceivedBinaryLogIds();
                     createSetupIv2(
                             file_path,
                             file_nonce,
                             format,
                             multiPartTxnId,
                             partitionTransactionIds,
-                            data,
+                            remoteDCLastIds,
+                            finalJsData,
                             context,
                             result,
                             exportSequenceNumbers,
+                            drTupleStreamInfo,
                             context.getSiteTrackerForSnapshot(),
                             hashinatorData,
                             timestamp);
@@ -174,10 +196,10 @@ public class SnapshotSaveAPI
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
-            SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
-            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
-                    TxnEgo.getPartitionId(partitionTxnId));
-            m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
+            SnapshotSiteProcessor.populateSequenceNumbersForExecutionSite(context);
+            Integer partitionId = TxnEgo.getPartitionId(partitionTxnId);
+            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " + TxnEgo.getPartitionId(partitionTxnId));
+            m_partitionLastSeenTransactionIds.put(partitionId, partitionTxnId);
         }
 
         boolean runPostTasks = false;
@@ -228,10 +250,12 @@ public class SnapshotSaveAPI
                                 format,
                                 taskList,
                                 multiPartTxnId,
-                                exportSequenceNumbers);
+                                exportSequenceNumbers,
+                                drTupleStreamInfo,
+                                remoteDCLastIds);
                     }
 
-                    if (m_deferredSetupFuture != null) {
+                    if (m_deferredSetupFuture != null && taskList != null) {
                         // Add a listener to the deferred setup so that it can kick off the snapshot
                         // task once the setup is done.
                         m_deferredSetupFuture.addListener(new Runnable() {
@@ -249,7 +273,7 @@ public class SnapshotSaveAPI
                                 context.getSiteSnapshotConnection().startSnapshotWithTargets(
                                         deferredSnapshotSetup.getPlan().getSnapshotDataTargets());
                             }
-                        }, MoreExecutors.sameThreadExecutor());
+                        }, CoreUtils.SAMETHREADEXECUTOR);
                     }
                 }
             } finally {
@@ -267,6 +291,14 @@ public class SnapshotSaveAPI
                     CoreUtils.throwableToString(e));
             earlyResultTable = result;
         } catch (BrokenBarrierException e) {
+            result.addRow(
+                    context.getHostId(),
+                    hostname,
+                    "",
+                    "FAILURE",
+                    CoreUtils.throwableToString(e));
+            earlyResultTable = result;
+        } catch (IllegalArgumentException e) {
             result.addRow(
                     context.getHostId(),
                     hostname,
@@ -441,24 +473,15 @@ public class SnapshotSaveAPI
     private void createSetupIv2(
             final String file_path, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
-            String data, final SystemProcedureExecutionContext context,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
+            JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
     {
-        JSONObject jsData = null;
-        if (data != null && !data.isEmpty()) {
-            try {
-                jsData = new JSONObject(data);
-            }
-            catch (JSONException e) {
-                SNAP_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
-                        e);
-            }
-        }
-
         SnapshotWritePlan plan;
         if (format == SnapshotFormat.NATIVE) {
             plan = new NativeSnapshotWritePlan();
@@ -476,8 +499,8 @@ public class SnapshotSaveAPI
             throw new RuntimeException("BAD BAD BAD");
         }
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
-                partitionTransactionIds, jsData, context, result, exportSequenceNumbers, tracker,
-                hashinatorData, timestamp);
+                partitionTransactionIds, remoteDCLastIds, jsData, context, result, exportSequenceNumbers, drTupleStreamInfo,
+                tracker, hashinatorData, timestamp);
         m_deferredSetupFuture =
                 VoltDB.instance().submitSnapshotIOWork(
                         new DeferredSnapshotSetup(plan, deferredSetup, txnId, partitionTransactionIds));

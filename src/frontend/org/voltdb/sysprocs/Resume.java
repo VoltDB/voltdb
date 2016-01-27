@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,10 +21,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -60,7 +60,7 @@ public class Resume extends VoltSystemProcedure
             try {
                 VoltDB.instance().getHostMessenger().getZK().setData(
                         VoltZK.operationMode,
-                        OperationMode.RUNNING.toString().getBytes("UTF-8"), -1);
+                        OperationMode.RUNNING.getBytes(), -1);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

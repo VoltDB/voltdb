@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,8 +22,8 @@
 package org.voltdb.catalog;
 
 import java.util.Iterator;
-import java.util.TreeMap;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 
 /**
  * A safe interface to a generic map of CatalogType instances. It is safe
@@ -36,17 +36,44 @@ import java.util.Map.Entry;
  */
 public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
-    TreeMap<String, T> m_items = new TreeMap<String, T>();
+    TreeMap<String, T> m_items = null;
     Class<T> m_cls;
     Catalog m_catalog;
     CatalogType m_parent;
-    String m_path;
+    String m_name;
+    String m_cachedPath = null;
+    boolean m_hasComputedOrder = false;
+    int m_depth;
 
-    CatalogMap(Catalog catalog, CatalogType parent, String path, Class<T> cls) {
-        this.m_catalog = catalog;
-        this.m_parent = parent;
-        this.m_path = path;
-        this.m_cls = cls;
+    CatalogMap(Catalog catalog, CatalogType parent, String name, Class<T> cls, int depth) {
+        m_catalog = catalog;
+        m_parent = parent;
+        m_name = name;
+        m_cls = cls;
+        m_depth = depth;
+        if (depth <= 3) {
+            m_cachedPath = getPath();
+        }
+    }
+
+    public String getPath() {
+        if (m_cachedPath != null) {
+            return m_cachedPath;
+        }
+        // if parent is the catalog root, don't add an extra slash to the existing one
+        return m_parent == m_catalog ? ("/" + m_name) : (m_parent.getCatalogPath() + "/" + m_name);
+    }
+
+    public void getPath(StringBuilder sb) {
+        if (m_cachedPath != null) {
+            sb.append(m_cachedPath);
+            return;
+        }
+        // if parent is the catalog root, don't add an extra slash to the existing one
+        if (m_parent != m_catalog) {
+            sb.append(m_parent.getCatalogPath()).append('/');
+        }
+        sb.append(m_name);
     }
 
     /**
@@ -55,10 +82,12 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T get(String name) {
+        if (m_items == null) return null;
         return m_items.get(name.toUpperCase());
     }
 
     public T getExact(String name) {
+        if (m_items == null) return null;
         return m_items.get(name);
     }
 
@@ -68,6 +97,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T getIgnoreCase(String name) {
+        if (m_items == null) return null;
         return m_items.get(name.toUpperCase());
     }
 
@@ -76,6 +106,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The number of items in the map
      */
     public int size() {
+        if (m_items == null) return 0;
         return m_items.size();
     }
 
@@ -84,6 +115,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return A boolean indicating whether the map is empty
      */
     public boolean isEmpty() {
+        if (m_items == null) return true;
         return (m_items.size() == 0);
     }
 
@@ -91,7 +123,11 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * Get an iterator for the items in the map
      * @return The iterator for the items in the map
      */
+    @Override
     public Iterator<T> iterator() {
+        if (m_items == null) {
+            m_items = new TreeMap<String, T>();
+        }
         return m_items.values().iterator();
     }
 
@@ -104,21 +140,23 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     public T add(String name) {
         try {
+            if (m_items == null) {
+                m_items = new TreeMap<String, T>();
+            }
+
             String mapKey = name.toUpperCase();
-            if (m_items.containsKey(mapKey))
+            if (m_items.containsKey(mapKey)) {
                 throw new CatalogException("Catalog item '" + mapKey + "' already exists for " + m_parent);
+            }
 
             T x = m_cls.newInstance();
-            String childPath = m_path + "[" + name + "]";
-            x.setBaseValues(m_catalog, m_parent, childPath, name);
-            x.m_parentMap = this;
+            x.setBaseValues(this, name);
+            x.initChildMaps();
 
             m_items.put(mapKey, x);
 
-            // assign a relative index to every child item
-            int index = 1;
-            for (Entry<String, T> e : m_items.entrySet()) {
-                e.getValue().m_relativeIndex = index++;
+            if (m_hasComputedOrder) {
+                recomputeRelativeIndexes();
             }
 
             return x;
@@ -134,8 +172,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     public void delete(String name) {
         try {
             String mapKey = name.toUpperCase();
-            if (m_items.containsKey(mapKey) == false)
+            if ((m_items == null) || (m_items.containsKey(mapKey) == false)) {
                 throw new CatalogException("Catalog item '" + mapKey + "' doesn't exists in " + m_parent);
+            }
 
             m_items.remove(mapKey);
 
@@ -160,8 +199,15 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
     @SuppressWarnings("unchecked")
     void copyFrom(CatalogMap<? extends CatalogType> catalogMap) {
         CatalogMap<T> castedMap = (CatalogMap<T>) catalogMap;
+        m_hasComputedOrder = castedMap.m_hasComputedOrder;
+        if (castedMap.m_items == null) {
+            return;
+        }
+        if (m_items == null) {
+            m_items = new TreeMap<String, T>();
+        }
         for (Entry<String, T> e : castedMap.m_items.entrySet()) {
-            m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, m_parent));
+            m_items.put(e.getKey(), (T) e.getValue().deepCopy(m_catalog, this));
         }
     }
 
@@ -183,6 +229,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (other.size() != size())
             return false;
 
+        if (m_items == null) {
+            return (other.m_items == null) || (other.m_items.size() == 0);
+        }
+
         for (Entry<String, T> e : m_items.entrySet()) {
             assert(e.getValue() != null);
             T type = other.get(e.getKey());
@@ -197,6 +247,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
     @Override
     public int hashCode() {
+        if (m_items == null) return 0;
+
         // based on implementation of equals
         int result = size();
 
@@ -211,6 +263,17 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             }
         }
         return result;
+    }
+
+    void recomputeRelativeIndexes() {
+        if (m_items == null) return;
+
+        // assign a relative index to every child item
+        int index = 1;
+        for (Entry<String, T> e : m_items.entrySet()) {
+            e.getValue().m_relativeIndex = index++;
+        }
+        m_hasComputedOrder = true;
     }
 
 }

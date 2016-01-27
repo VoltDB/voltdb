@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,9 +62,9 @@ public:
      */
     static ElasticHashinator* newInstance(const char *config, int32_t *configPtr, uint32_t tokenCount) {
         if (configPtr == NULL) {
-            ReferenceSerializeInput countInput(config, 4);
+            ReferenceSerializeInputBE countInput(config, 4);
             int numEntries = countInput.readInt();
-            ReferenceSerializeInput entryInput(&config[sizeof(int32_t)], numEntries * (sizeof(int32_t) + sizeof(int32_t)));
+            ReferenceSerializeInputBE entryInput(&config[sizeof(int32_t)], numEntries * (sizeof(int32_t) + sizeof(int32_t)));
             int32_t *tokens = new int32_t[numEntries * 2];
             for (int ii = 0; ii < numEntries; ii++) {
                 const int32_t token = entryInput.readInt();

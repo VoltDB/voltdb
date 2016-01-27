@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -97,6 +97,11 @@ public abstract class BuildDirectoryUtils {
     public static String getBuildDirectoryPath() {
         String envPath = System.getenv("TEST_DIR");
         if (envPath != null) {
+            File path = new File(envPath);
+            path.mkdirs();
+            if (!path.exists() || !path.isDirectory() || !path.canRead() || !path.canWrite() || !path.canExecute()) {
+                throw new RuntimeException("Could not create test directory");
+            }
             return envPath;
         } else {
             return ".";

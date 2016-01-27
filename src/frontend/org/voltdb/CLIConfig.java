@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,11 +26,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
+import org.apache.commons_voltpatches.cli.CommandLine;
+import org.apache.commons_voltpatches.cli.CommandLineParser;
+import org.apache.commons_voltpatches.cli.HelpFormatter;
+import org.apache.commons_voltpatches.cli.Options;
+import org.apache.commons_voltpatches.cli.PosixParser;
 
 public abstract class CLIConfig {
 

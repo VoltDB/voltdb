@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,18 @@ import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
  *  <p>
  *  A <code>Client</code> that connects to one or more nodes in a volt cluster
  *  and provides methods for invoking stored procedures and receiving
- *  responses.
+ *  responses.</p>
+ *
+ *  <p>Each client instance is backed by a single thread that is responsible for writing requests and reading responses
+ *  from the network as well as invoking callbacks for stored procedures that are invoked asynchronously. There is
+ *  an upper limit on the capacity of a single client instance and it may be necessary to use a pool of instances
+ *  to get the best throughput and latency. If a heavyweight client instance is requested it will be backed by
+ *  multiple threads, but under the current implementation it is better to us multiple single threaded instances</p>
+ *
+ *  <p>Because callbacks are invoked directly on the network thread the performance of the client is sensitive to the
+ *  amount of work and blocking done in callbacks. If there is any question about whether callbacks will block
+ *  or take a long time then an application should have callbacks hand off processing to an application controlled
+ *  thread pool.
  *  </p>
  */
 public interface Client {
@@ -82,7 +93,10 @@ public interface Client {
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * <p>Asynchronously invoke a replicated procedure. If there is backpressure
+     * <p>Asynchronously invoke a replicated procedure, by providing a callback that will be invoked by the single
+     * thread backing the client instance when the procedure invocation receives a response.
+     * See the {@link Client} class documentation for information on the negative performance impact of slow or
+     * blocking callbacks. If there is backpressure
      * this call will block until the invocation is queued. If configureBlocking(false) is invoked
      * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
      *
@@ -94,6 +108,48 @@ public interface Client {
      * @throws IOException if there is a Java network or connection problem.
      */
     public boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
+    throws IOException, NoConnectionsException;
+
+    /**
+     * <p>Synchronously invoke a procedure with timeout. Blocks until a result is available. A {@link ProcCallException}
+     * is thrown if the response is anything other then success.</p>
+     *
+     * <p>WARNING: Use of a queryTimeout value that is greater than the global timeout value for your VoltDB configuration
+     * will temporarily override that safeguard. Currently, non-privileged users (requiring only SQLREAD permissions)
+     * can invoke this method, potentially degrading system performance with an uncontrolled long-running procedure.</p>
+     *
+     * @param queryTimeout query batch timeout setting in milliseconds of queries in a batch for read only procedures.
+     * @param procName <code>class</code> name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return {@link ClientResponse} instance of procedure call results.
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public ClientResponse callProcedureWithTimeout(int queryTimeout, String procName, Object... parameters)
+    throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * <p>Asynchronously invoke a replicated procedure with timeout, by providing a callback that will be invoked by
+     * the single thread backing the client instance when the procedure invocation receives a response.
+     * See the {@link Client} class documentation for information on the negative performance impact of slow or
+     * blocking callbacks. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
+     *
+     * <p>WARNING: Use of a queryTimeout value that is greater than the global timeout value for your VoltDB configuration
+     * will temporarily override that safeguard. Currently, non-privileged users (requiring only SQLREAD permissions)
+     * can invoke this method, potentially degrading system performance with an uncontrolled long-running procedure.</p>
+     *
+     * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
+     * @param queryTimeout query batch timeout setting in milliseconds of queries in a batch for read only procedures.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param parameters vararg list of procedure's parameter values.
+     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public boolean callProcedureWithTimeout(ProcedureCallback callback, int queryTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException;
 
     /**
@@ -182,6 +238,51 @@ public interface Client {
                                             File deploymentPath)
     throws IOException, NoConnectionsException;
 
+    /**
+     * <p>Synchronously invokes UpdateClasses procedure. Blocks until a
+     * result is available. A {@link ProcCallException} is thrown if the
+     * response is anything other then success.</p>
+     *
+     * <p>This method is a convenience method that is equivalent to reading a jarfile containing
+     * to be added/updated into a byte array in Java code, then calling
+     * {@link #callProcedure(String, Object...)}
+     * with "@UpdateClasses" as the procedure name, followed by the bytes of the jarfile
+     * and a string containing a comma-separates list of classes to delete from the catalog.</p>
+     *
+     * @param jarPath Path to the jar file containing new/updated classes.
+     * @param classesToDelete comma-separated list of classes to delete.
+     * @return {@link ClientResponse} instance of procedure call results.
+     * @throws IOException If the files cannot be serialized or if there is a Java network error.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws ProcCallException on any VoltDB specific failure.
+     */
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+    throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * <p>Asynchronously invokes UpdateClasses procedure. Does not
+     * guarantee that the invocation is actually queued. If there is
+     * backpressure on all connections to the cluster then the invocation will
+     * not be queued. Check the return value to determine if queuing actually
+     * took place.</p>
+     *
+     * <p>This method is a convenience method that is equivalent to reading a jarfile containing
+     * to be added/updated into a byte array in Java code, then calling
+     * {@link #callProcedure(ProcedureCallback, String, Object...)}
+     * with "@UpdateClasses" as the procedure name, followed by the bytes of the jarfile
+     * and a string containing a comma-separates list of classes to delete from the catalog.</p>
+     *
+     * @param callback ProcedureCallback that will be invoked with procedure results.
+     * @param jarPath Path to the jar file containing new/updated classes.  May be null.
+     * @param classesToDelete comma-separated list of classes to delete.  May be null.
+     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
+     * @throws IOException If the files cannot be serialized or if there is a Java network error.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     */
+    public boolean updateClasses(ProcedureCallback callback,
+                                 File jarPath,
+                                 String classesToDelete)
+    throws IOException, NoConnectionsException;
 
     /**
      * <p>Block the current thread until all queued stored procedure invocations have received responses
@@ -299,7 +400,7 @@ public interface Client {
      * <li>99.9-percentile round trip latency estimate in ms.</li>
      * <li>99.99-percentile round trip latency estimate in ms.</li>
      * <li>99.999-percentile round trip latency estimate in ms.</li>
-     * </ol></p>
+     * </ol>
      *
      * @param stats {@link ClientStats} instance with relevant stats.
      * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
@@ -314,9 +415,11 @@ public interface Client {
      *
      * @param tableName Name of table that bulk inserts are to be applied to.
      * @param maxBatchSize Batch size to collect for the table before pushing a bulk insert.
+     * @param upsert set to true if want upsert instead of insert
      * @param blfcb Callback procedure used for notification of failed inserts.
      * @return instance of VoltBulkLoader
      * @throws Exception if tableName can't be found in the catalog.
      */
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception;
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception;
 }

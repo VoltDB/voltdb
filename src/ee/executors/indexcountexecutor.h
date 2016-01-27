@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -36,6 +36,7 @@ class TempTable;
 class PersistentTable;
 class AbstractExpression;
 class IndexCountPlanNode;
+struct IndexCursor;
 
 class IndexCountExecutor : public AbstractExecutor
 {
@@ -49,8 +50,6 @@ public:
 private:
     bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-
-    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.

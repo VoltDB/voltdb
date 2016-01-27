@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import java.sql.Struct;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
@@ -43,9 +44,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
     public static final String COMMIT_THROW_EXCEPTION = "jdbc.committhrowexception";
     public static final String ROLLBACK_THROW_EXCEPTION = "jdbc.rollbackthrowexception";
+    public static final String QUERYTIMEOUT_UNIT = "jdbc.querytimeout.unit";
 
     protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
+    protected TimeUnit queryTimeOutUnit = TimeUnit.SECONDS;
     private boolean isClosed = false;
     private Properties props;
     private boolean autoCommit = true;
@@ -55,6 +58,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         this.NativeConnection = connection;
         this.props = props;
         this.User = this.props.getProperty("user", "");
+        if (this.props.getProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "Seconds").equalsIgnoreCase("milliseconds")) {
+            this.queryTimeOutUnit = TimeUnit.MILLISECONDS;
+        }
     }
 
     private void checkClosed() throws SQLException
@@ -315,7 +321,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     @Override
     public boolean isValid(int timeout) throws SQLException
     {
-        return isClosed;
+        return !isClosed;
     }
 
     // Converts the given SQL statement into the system's native SQL grammar.
@@ -477,7 +483,9 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setReadOnly(boolean readOnly) throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        if (!Boolean.parseBoolean(props.getProperty("enableSetReadOnly","false"))){
+            throw SQLError.noSupport();
+        }
     }
 
     // Creates an unnamed savepoint in the current transaction and returns the new Savepoint object that represents it.
@@ -544,34 +552,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         return this.NativeConnection.getClientStatsContext();
     }
 
-    // IVoltDBConnection extended method
-    // Return global performance statistics for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounterMap getStatistics()
-    {
-        return this.NativeConnection.getStatistics();
-    }
-
-    // Return performance statistics for a specific procedure, for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounter getStatistics(String procedure)
-    {
-        return this.NativeConnection.getStatistics(procedure);
-    }
-
-    // Return performance statistics for a list of procedures, for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounter getStatistics(String... procedures)
-    {
-        return this.NativeConnection.getStatistics(procedures);
-    }
-
     // Save statistics to a file
-    @Deprecated
     @Override
-    public void saveStatistics(String file) throws IOException
+    public void saveStatistics(ClientStats stats, String file) throws IOException
     {
-        this.NativeConnection.saveStatistics(file);
+        this.NativeConnection.saveStatistics(stats, file);
     }
 
     public void setSchema(String schema) throws SQLException {

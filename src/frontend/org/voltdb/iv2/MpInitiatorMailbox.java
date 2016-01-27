@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -86,7 +86,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, final String whoami) {
         RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
-            FutureTask<RepairAlgo> ft = new FutureTask(new Callable<RepairAlgo>() {
+            FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
                 @Override
                 public RepairAlgo call() throws Exception {
                     RepairAlgo ra = new MpPromoteAlgo( survivors.get(), MpInitiatorMailbox.this, whoami);

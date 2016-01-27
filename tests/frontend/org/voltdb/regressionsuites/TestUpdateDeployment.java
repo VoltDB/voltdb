@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -266,11 +266,47 @@ public class TestUpdateDeployment extends RegressionSuite {
             }
         }
         assertTrue(found);
-        assertEquals(10, timeout);
+        assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
 
         // Verify that table A exists
         ClientResponse response = client3.callProcedure("@AdHoc", "insert into NEWTABLE values (100);");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+    }
+
+    public void testUpdateSchemaModificationIsBlacklisted() throws Exception
+    {
+        System.out.println("\n\n-----\n testUpdateSchemaModificationIsBlacklisted \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml");
+        // Try to change the schem setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        System.out.println(cb.getResponse().getStatusString());
+        assertTrue(cb.getResponse().getStatusString().contains("May not dynamically modify"));
+    }
+
+    public void testUpdateSecurityNoUsers() throws Exception
+    {
+        System.out.println("\n\n-----\n testUpdateSecurityNoUsers \n-----\n\n");
+        Client client = getClient();
+        loadSomeData(client, 0, 10);
+        client.drain();
+        assertTrue(callbackSuccess);
+
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-security-no-users.xml");
+        // Try to change the schem setting
+        SyncCallback cb = new SyncCallback();
+        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        cb.waitForResponse();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
+        System.out.println(cb.getResponse().getStatusString());
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
     }
 
     private void deleteDirectory(File dir) {
@@ -373,6 +409,30 @@ public class TestUpdateDeployment extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+
+        // A deployment change that changes the schema change mechanism
+        config = new LocalCluster("catalogupdate-cluster-change_schema_update.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setUseDDLSchema(true);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml"));
+
+        // A deployment change that changes the schema change mechanism
+        config = new LocalCluster("catalogupdate-security-no-users.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSecurityEnabled(true, false);
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-security-no-users.xml"));
 
         return builder;
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,7 +33,6 @@ import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
@@ -355,55 +354,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assert(caught);
     }
 
-    public void testJoinOrder() throws Exception {
-        if (isHSQL() || isValgrind() || VoltCompiler.DEBUG_VERIFY_CATALOG) {
-            // This test is disabled for verifycatalog until join order is supported in the DDL and explain plan
-            return;
-        }
-
-        Client client = getClient();
-
-        VoltTable[] results = null;
-        int nextId = 0;
-        for (int mb = 0; mb < 25; mb += 5) {
-            results = client.callProcedure("InsertLotsOfData", 0, nextId).getResults();
-            assertEquals(1, results.length);
-            assertTrue(nextId < results[0].asScalarLong());
-            nextId = (int) results[0].asScalarLong();
-            System.err.println("Inserted " + (mb + 5) + "mb");
-        }
-
-        for (int ii = 0; ii < 1000; ii++) {
-            client.callProcedure("T1.insert", ii);
-        }
-        client.callProcedure("T2.insert", 0);
-
-        //Right join order
-        client.callProcedure("SelectWithJoinOrder", 0);
-
-        //Wrong join order
-        boolean exception = false;
-        try {
-            client.callProcedure("SelectWithJoinOrder", 1);
-        } catch (Exception e) {
-            exception = true;
-        }
-        assertTrue(exception);
-
-        //Right join order
-        client.callProcedure("SelectRightOrder");
-
-        exception = false;
-        try {
-            client.callProcedure("SelectWrongOrder");
-        } catch (Exception e) {
-            exception = true;
-        }
-        assertTrue(exception);
-
-
-    }
-
     public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
 
@@ -451,14 +401,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
-        if (!VoltCompiler.DEBUG_VERIFY_CATALOG) {
-            // JOIN ORDER is disabled for verifycatalog until it is supported in the DDL and explain plan
-            project.addProcedures(PROCEDURES);
-            project.addStmtProcedure("SelectRightOrder",
-                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
-            project.addStmtProcedure("SelectWrongOrder",
-                    "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
-        }
+        project.addProcedures(PROCEDURES);
 
         boolean success;
 

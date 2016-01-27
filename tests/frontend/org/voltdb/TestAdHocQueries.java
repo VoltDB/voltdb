@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,6 +39,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
@@ -348,9 +349,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         return spResult;
     }
 
-    String m_catalogJar = "adhoc.jar";
-    String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
-    String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+    public static String m_catalogJar = "adhoc.jar";
+    public static String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
+    public static String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
     @Test
     public void testSimple() throws Exception {
@@ -429,6 +430,33 @@ public class TestAdHocQueries extends AdHocQueryTester {
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
             assertEquals(1, result.getRowCount());
             //System.out.println(result.toString());
+
+            // test wasNull asScalarLong
+            long value;
+            boolean wasNull;
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as tinyInt) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_TINYINT, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as smallInt) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_SMALLINT, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as integer) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_INTEGER, value);
+            assertEquals(true, wasNull);
+
+            result = env.m_client.callProcedure("@AdHoc", "select top 1 cast(null as bigint) from BLAH").getResults()[0];
+            value = result.asScalarLong();
+            wasNull = result.wasNull();
+            assertEquals(VoltType.NULL_BIGINT, value);
+            assertEquals(true, wasNull);
         }
         finally {
             env.tearDown();
@@ -532,6 +560,100 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    private void verifyIncorrectParameterMessage(TestEnv env, String adHocQuery, Object[] params) {
+        int expected = 0;
+        for (int i=0; i < adHocQuery.length(); i++ ) {
+            if (adHocQuery.charAt(i) == '?' ) {
+                expected++;
+            }
+        }
+        String errorMsg = String.format("Incorrect number of parameters passed: expected %d, passed %d",
+                expected, params.length);
+        try {
+            switch (params.length) {
+            case 1:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0]);
+                break;
+            case 2:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1]);
+                break;
+            case 3:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1], params[2]);
+                break;
+            case 4:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1], params[2], params[3]);
+                break;
+            case 5:
+                env.m_client.callProcedure("@AdHoc", adHocQuery, params[0], params[1], params[2], params[3], params[4]);
+                break;
+            default:
+                // guard against other number of parameters tests
+                fail("This test does not support other than 1-5 parameters!");
+            }
+
+            // expecting failure above
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(errorMsg));
+        }
+    }
+
+    @Test
+    public void testAdHocWithParamsNegative() throws Exception {
+        System.out.println("Starting testAdHocWithParamsNegative cases");
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        String adHocQuery;
+
+        try {
+            env.setUp();
+
+            // no constants
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = ? and a2 = ?;";
+            verifyIncorrectParameterMessage(env, adHocQuery, new Integer[]{1});
+            verifyIncorrectParameterMessage(env, adHocQuery, new Integer[]{1, 1, 1});
+
+            // mix question mark and constants
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = ? and a2 = 'a2' and a3 = 'a3';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1", "a2"});
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1", "a2", "a3"});
+
+            // constants only
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a2"});
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a2", "a3"});
+
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1' and a2 = 'a2';";
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1"});
+            verifyIncorrectParameterMessage(env, adHocQuery, new String[]{"a1", "a2"});
+
+            //
+            // test batch with extra parameter call
+            //
+            String errorMsg = AsyncCompilerAgent.AdHocErrorResponseMessage;
+            // test batch question mark parameter guards
+
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = 'a2';";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
+                fail();
+            } catch (Exception ex) {
+                assertEquals(errorMsg, ex.getMessage());
+            }
+
+            adHocQuery = "SELECT * FROM AAA WHERE a1 = 'a1'; SELECT * FROM AAA WHERE a2 = ?;";
+            try {
+                env.m_client.callProcedure("@AdHoc", adHocQuery, "a2");
+                fail();
+            } catch (Exception ex) {
+                assertEquals(errorMsg, ex.getMessage());
+            }
+        }
+        finally {
+            env.tearDown();
+            System.out.println("Ending testAdHocWithParamsNegative cases");
+        }
+    }
+
     @Test
     public void testAdHocBatches() throws Exception {
         TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
@@ -619,11 +741,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                      WHERE STAFF.EMPNUM = WORKS.EMPNUM);";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on subquery");
+                fail("did not fail on subquery In/Exists");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+                assertTrue(pcex.getMessage().indexOf("Subquery expressions are only supported in SELECT statements") > 0);
             }
+
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
                     "           FROM STAFF \n" +
                     "           WHERE NOT EXISTS (SELECT * FROM WORKS \n" +
@@ -631,11 +754,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "                ORDER BY EMPNUM;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on exists clause");
             }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+            catch (Exception ex) {
+                fail("did fail on exists clause");
             }
+
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
                     "          WHERE STAFF.EMPNUM IN \n" +
@@ -648,11 +771,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     "";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on subquery");
             }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
+            catch (Exception ex) {
+                fail("did fail on subquery");
             }
+
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
                     "         WHERE 'Tampa' NOT BETWEEN CITY AND 'Vienna' \n" +
@@ -664,61 +787,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
             }
-            adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on invalid ");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
-            adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on invalid SQL verb");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
             adHocQuery = "ROLLBACK;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
                 fail("did not fail on invalid SQL verb");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
-            adHocQuery = "DROP TABLE PROJ;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on invalid SQL verb");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
-            adHocQuery = "PARTITION TABLE PROJ ON COLUMN PNUM;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail with unexpected token");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("unexpected token: PARTITION") > 0);
-            }
-            adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail with unexpected token");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("unexpected token: AS") > 0);
-            }
-            adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail with unexpected token");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("unexpected token: FROM") > 0);
+                assertTrue(pcex.getMessage().indexOf("this type of sql statement is not supported") > 0);
             }
         }
         finally {
@@ -839,7 +914,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     /**
      * Test environment with configured schema and server.
      */
-    private static class TestEnv {
+    public static class TestEnv {
 
         final VoltProjectBuilder m_builder;
         LocalCluster m_cluster;

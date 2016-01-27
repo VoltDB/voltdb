@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,36 +47,33 @@
 #define HSTORESCANNODE_H
 
 #include "abstractplannode.h"
-#include "expressions/abstractexpression.h"
-#include "storage/TableCatalogDelegate.hpp"
 
-namespace voltdb
-{
+#include "expressions/abstractexpression.h"
+
+namespace voltdb {
+
+class TableCatalogDelegate;
 
 class AbstractScanPlanNode : public AbstractPlanNode
 {
 public:
-    virtual ~AbstractScanPlanNode();
+    ~AbstractScanPlanNode();
+    std::string debugInfo(const std::string& spacer) const;
 
     Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd);
+    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
 
-    std::string getTargetTableName() const;
-    void setTargetTableName(std::string name);
+    std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
+    AbstractExpression* getPredicate() const { return m_predicate.get(); }
 
-    void setPredicate(AbstractExpression* predicate);
-    AbstractExpression* getPredicate() const;
+    bool isSubQuery() const { return m_isSubQuery; }
 
-    bool isSubQuery() const {
-        return m_isSubQuery;
-    }
-
-    virtual std::string debugInfo(const std::string& spacer) const;
+    bool isEmptyScan() const { return m_isEmptyScan; }
 
 protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
-    AbstractScanPlanNode(int32_t id);
-    AbstractScanPlanNode();
+    AbstractScanPlanNode() { }
+
+    void loadFromJSONObject(PlannerDomValue obj);
 
     // Target Table
     // These tables are different from the input and the output tables
@@ -84,16 +81,18 @@ protected:
     // apply them to the target table
     // The results of the operations will be written to the the output table
     //
-    std::string m_targetTableName;
+    std::string m_target_table_name;
     TableCatalogDelegate* m_tcd;
     //
     // This is the predicate used to filter out tuples during the scan
     //
-    AbstractExpression* m_predicate;
+    boost::scoped_ptr<AbstractExpression> m_predicate;
     // True if this scan represents a sub query
     bool m_isSubQuery;
+    // True if this scan has a predicate that always evaluates to FALSE
+    bool m_isEmptyScan;
 };
 
-}
+} // namespace voltdb
 
 #endif

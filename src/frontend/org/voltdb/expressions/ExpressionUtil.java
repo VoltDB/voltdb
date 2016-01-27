@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,11 +22,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -82,7 +86,8 @@ public abstract class ExpressionUtil {
         } else {
             ret.setRight(stack.pop());
         }
-        return ret;
+        // Simplify combined expression if possible
+        return ExpressionUtil.evaluateExpression(ret);
     }
 
     /**
@@ -227,7 +232,9 @@ public abstract class ExpressionUtil {
      * @return Both expressions passed in combined by an And conjunction.
      */
     public static AbstractExpression combine(AbstractExpression left, AbstractExpression right) {
-        return new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
+        AbstractExpression retval = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
+        // Simplify combined expression if possible
+        return ExpressionUtil.evaluateExpression(retval);
     }
 
     /**
@@ -243,9 +250,7 @@ public abstract class ExpressionUtil {
         if (input == null)
         {
             return tves;
-        }
-        if (input instanceof TupleValueExpression)
-        {
+        } else if (input instanceof TupleValueExpression) {
             tves.add((TupleValueExpression) input);
             return tves;
         }
@@ -259,6 +264,18 @@ public abstract class ExpressionUtil {
             }
         }
         return tves;
+    }
+
+    /**
+     * A convenience wrapper around AbstractExpression.findAllExpressionsOfClass
+     * Recursively walk an expression and return a list of all the expressions
+     * of a given type it contains.
+     */
+    public static List<AbstractExpression> findAllExpressionsOfClass(AbstractExpression input, Class< ? extends AbstractExpression> aeClass) {
+        if (input == null) {
+            return new ArrayList<AbstractExpression>();
+        }
+        return input.findAllSubexpressionsOfClass(aeClass);
     }
 
     /**
@@ -302,6 +319,8 @@ public abstract class ExpressionUtil {
         } else if (exprType == ExpressionType.CONJUNCTION_OR) {
             assert(expr.m_left != null && expr.m_right != null);
             return isNullRejectingExpression(expr.m_left, tableAlias) && isNullRejectingExpression(expr.m_right, tableAlias);
+        } else if (exprType == ExpressionType.COMPARE_NOTDISTINCT) {
+            return false;
         } else if (exprType == ExpressionType.OPERATOR_NOT) {
             assert(expr.m_left != null);
             // "NOT ( P and Q )" is as null-rejecting as "NOT P or NOT Q"
@@ -358,6 +377,49 @@ public abstract class ExpressionUtil {
         }
     }
 
+    /**
+     *  Given two equal length lists of the expressions build a combined equivalence expression
+     *  (le1, le2,..., leN) (re1, re2,..., reN) =>
+     *  (le1=re1) AND (le2=re2) AND .... AND (leN=reN)
+     *
+     * @param leftExprs
+     * @param rightExprs
+     * @return AbstractExpression
+     */
+    public static AbstractExpression buildEquavalenceExpression(Collection<AbstractExpression> leftExprs, Collection<AbstractExpression> rightExprs) {
+        assert(leftExprs.size() == rightExprs.size());
+        Iterator<AbstractExpression> leftIt = leftExprs.iterator();
+        Iterator<AbstractExpression> rightIt = rightExprs.iterator();
+        AbstractExpression result = null;
+        while (leftIt.hasNext() && rightIt.hasNext()) {
+            AbstractExpression leftExpr = leftIt.next();
+            AbstractExpression rightExpr = rightIt.next();
+            AbstractExpression eqaulityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL, leftExpr, rightExpr);
+            if (result == null) {
+                result = eqaulityExpr;
+            } else {
+                result = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, result, eqaulityExpr);
+            }
+        }
+        return result;
+    }
+
+    /**
+     *  Return true/false whether an expression contains any aggregate expression
+     *
+     * @param expr
+     * @return true is expression contains an aggregate subexpression
+     */
+    public static boolean containsAggregateExpression(AbstractExpression expr) {
+        AbstractExpression.SubexprFinderPredicate pred = new AbstractExpression.SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                return expr.getExpressionType().isAggregateExpression();
+            }
+        };
+        return expr.hasAnySubexpressionWithPredicate(pred);
+    }
+
     private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {
         assert(expr != null);
         List<TupleValueExpression> tves = getTupleValueExpressions(expr);
@@ -371,5 +433,210 @@ public abstract class ExpressionUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Resolve the column indexes from all subqueries that are part of this expression
+     * @param expr
+     * @param db
+     */
+    public static void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
+        if (subqueryExpressions.isEmpty()) {
+            return;
+        }
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).resolveColumnIndexes();
+        }
+    }
+
+    /**
+     * Generate the output schemas for the subquery expression nodes
+     * @param expr
+     * @param db
+     */
+    public static void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        }
+    }
+    /**
+     * Traverse this expression tree.  Where we find a SelectSubqueryExpression, wrap it
+     * in a ScalarValueExpression if its parent is not one of:
+     * - comparison (=, !=, <, etc)
+     * - operator exists
+     * @param expr   - the expression that may contain subqueries that need to be wrapped
+     * @return the expression with subqueries wrapped where needed
+     */
+    public static AbstractExpression wrapScalarSubqueries(AbstractExpression expr) {
+        return wrapScalarSubqueriesHelper(null, expr);
+    }
+
+    private static AbstractExpression wrapScalarSubqueriesHelper(AbstractExpression parentExpr, AbstractExpression expr) {
+
+        // Bottom-up recursion.  Proceed to the children first.
+        AbstractExpression leftChild = expr.getLeft();
+        if (leftChild != null) {
+            AbstractExpression newLeft = wrapScalarSubqueriesHelper(expr, leftChild);
+            if (newLeft != leftChild) {
+                expr.setLeft(newLeft);
+            }
+        }
+
+        AbstractExpression rightChild = expr.getRight();
+        if (rightChild != null) {
+            AbstractExpression newRight = wrapScalarSubqueriesHelper(expr, rightChild);
+            if (newRight != rightChild) {
+                expr.setRight(newRight);
+            }
+        }
+
+        // Let's not forget the args, which may also contain subqueries.
+        List<AbstractExpression> args = expr.getArgs();
+        if (args != null) {
+            for (int i = 0; i < args.size(); ++i) {
+                AbstractExpression arg = args.get(i);
+                AbstractExpression newArg = wrapScalarSubqueriesHelper(expr, arg);
+                if (newArg != arg) {
+                    expr.setArgAtIndex(i, newArg);
+                }
+            }
+        }
+
+        if (expr instanceof SelectSubqueryExpression
+                && subqueryRequiresScalarValueExpressionFromContext(parentExpr)) {
+            expr = addScalarValueExpression((SelectSubqueryExpression)expr);
+        }
+        return expr;
+    }
+
+    /**
+     * Return true if we must insert a ScalarValueExpression between a subquery
+     * and its parent expression.
+     * @param parentExpr  the parent expression of a subquery
+     * @return true if the parent expression is not a comparison, EXISTS operator, or
+     *   a scalar value expression
+     */
+    private static boolean subqueryRequiresScalarValueExpressionFromContext(AbstractExpression parentExpr) {
+        if (parentExpr == null) {
+            // No context: we are a top-level expression.  E.g, an item on the
+            // select list.  In this case, assume the expression must be scalar.
+            return true;
+        }
+
+        // Exists and comparison operators can handle non-scalar subqueries.
+        if (parentExpr.getExpressionType() == ExpressionType.OPERATOR_EXISTS
+                || parentExpr instanceof ComparisonExpression) {
+            return false;
+        }
+
+        // There is already a ScalarValueExpression above the subquery.
+        if (parentExpr instanceof ScalarValueExpression) {
+            return false;
+        }
+
+        // By default, assume that the subquery must produce a single value.
+        return true;
+    }
+
+    /**
+     * Add a ScalarValueExpression on top of the SubqueryExpression
+     * @param expr - subquery expression
+     * @return ScalarValueExpression
+     */
+    private static AbstractExpression addScalarValueExpression(SelectSubqueryExpression expr) {
+        if (expr.getSubqueryScan().getOutputSchema().size() != 1) {
+            throw new PlanningErrorException("Scalar subquery can have only one output column");
+        }
+
+        expr.changeToScalarExprType();
+
+        AbstractExpression scalarExpr = new ScalarValueExpression();
+        scalarExpr.setLeft(expr);
+        scalarExpr.setValueType(expr.getValueType());
+        scalarExpr.setValueSize(expr.getValueSize());
+        return scalarExpr;
+    }
+
+    /**
+     * Evaluate/reduce/simplify an input expression at the compilation time
+     *
+     * @param expr Original Expression
+     * @return AbstractExpression
+     */
+    public static AbstractExpression evaluateExpression(AbstractExpression expr) {
+        if (expr == null) {
+            return null;
+        }
+
+        // Evaluate children first
+        expr.setLeft(evaluateExpression(expr.getLeft()));
+        expr.setRight(evaluateExpression(expr.getRight()));
+
+        // Evaluate self
+        if (ExpressionType.CONJUNCTION_AND == expr.getExpressionType()) {
+            if (ExpressionType.VALUE_CONSTANT == expr.getLeft().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
+                    return expr.getRight();
+                } else {
+                    return expr.getLeft();
+                }
+            }
+            if (ExpressionType.VALUE_CONSTANT == expr.getRight().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getRight())) {
+                    return expr.getLeft();
+                } else {
+                    return expr.getRight();
+                }
+            }
+        } else if (ExpressionType.CONJUNCTION_OR == expr.getExpressionType()) {
+            if (ExpressionType.VALUE_CONSTANT == expr.getLeft().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getLeft())) {
+                    return expr.getLeft();
+                } else {
+                    return expr.getRight();
+                }
+            }
+            if (ExpressionType.VALUE_CONSTANT == expr.getRight().getExpressionType()) {
+                if (ConstantValueExpression.isBooleanTrue(expr.getRight())) {
+                    return expr.getRight();
+                } else {
+                    return expr.getLeft();
+                }
+            }
+        } else if (ExpressionType.OPERATOR_NOT == expr.getExpressionType()) {
+            AbstractExpression leftExpr = expr.getLeft();
+            // function expressions can also return boolean. So the left child expression
+            // can be expression which are not constant value expressions, so don't
+            // evaluate every left child expr as constant value expression
+            if ((VoltType.BOOLEAN == leftExpr.getValueType()) &&
+                    (leftExpr instanceof ConstantValueExpression)) {
+                if (ConstantValueExpression.isBooleanTrue(leftExpr)) {
+                    return ConstantValueExpression.getFalse();
+                } else {
+                    return ConstantValueExpression.getTrue();
+                }
+            } else if (ExpressionType.OPERATOR_NOT == leftExpr.getExpressionType()) {
+                return leftExpr.getLeft();
+            } else if (ExpressionType.CONJUNCTION_OR == leftExpr.getExpressionType()) {
+                // NOT (.. OR .. OR ..) => NOT(..) AND NOT(..) AND NOT(..)
+                AbstractExpression l = new OperatorExpression(ExpressionType.OPERATOR_NOT, leftExpr.getLeft(), null);
+                AbstractExpression r = new OperatorExpression(ExpressionType.OPERATOR_NOT, leftExpr.getRight(), null);
+                leftExpr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, l, r);
+                return evaluateExpression(leftExpr);
+            }
+            // NOT (expr1 AND expr2) => (NOT expr1) || (NOT expr2)
+            // The above case is probably not interesting to do for short circuit purpose
+        }
+        return expr;
     }
 }

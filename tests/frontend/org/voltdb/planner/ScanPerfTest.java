@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -134,7 +134,7 @@ public class ScanPerfTest extends TestCase {
         LocalCluster cluster = null;
         Client client = null;
 
-        VoltTable pTable = TableHelper.quickTable("P (ID:BIGINT-N, VALUE:BIGINT-N) P(ID)");
+        VoltTable pTable = TableHelper.quickTable("P (ID:BIGINT-N, VALUE:BIGINT-N) PK(ID)");
 
         // build and compile a catalog
         System.out.println("Compiling catalog.");

@@ -207,6 +207,7 @@ public class ExpressionLogical extends Expression {
         return new ExpressionLogical(OpTypes.AND, e1, e2);
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -364,6 +365,7 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -454,13 +456,13 @@ public class ExpressionLogical extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
         }
 
-        if (nodes[LEFT] != null) {
+        if (nodes.length > LEFT && nodes[LEFT] != null) {
             sb.append(" arg1=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
         }
 
-        if (nodes[RIGHT] != null) {
+        if (nodes.length > RIGHT && nodes[RIGHT] != null) {
             sb.append(" arg2=[");
             sb.append(nodes[RIGHT].describe(session, blanks + 1));
             sb.append(']');
@@ -469,6 +471,7 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -634,9 +637,24 @@ public class ExpressionLogical extends Expression {
 
         if (nodes[LEFT].opType == OpTypes.ROW
                 || nodes[RIGHT].opType == OpTypes.ROW) {
+            // A VoltDB extension to allow row subqueries (C1, C2) = (SELECT C1, C2 FROM ...)
+            if (nodes[RIGHT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[RIGHT].subQuery != null);
+                if (nodes[LEFT].nodes.length != nodes[RIGHT].subQuery.getTable().columnCount) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].opType == OpTypes.TABLE_SUBQUERY) {
+                assert(nodes[LEFT].subQuery != null);
+                if (nodes[LEFT].subQuery.getTable().columnCount != nodes[RIGHT].nodes.length) {
+                    throw Error.error(ErrorCode.X_42564);
+                }
+            } else if (nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            /* Disable 3 lines ...
             if (nodes[LEFT].opType != OpTypes.ROW
                     || nodes[RIGHT].opType != OpTypes.ROW
                     || nodes[LEFT].nodes.length != nodes[RIGHT].nodes.length) {
+            ... disabled 3 lines. */
+            // End of VoltDB extension
                 throw Error.error(ErrorCode.X_42564);
             }
 
@@ -659,6 +677,10 @@ public class ExpressionLogical extends Expression {
                                            nodes[RIGHT])) {
 
                     // compatibility for scalars only
+                // A VoltDB extension to support X'..' as numeric literals
+                } else if (voltConvertBinaryIntegerLiteral(session, nodes[LEFT],
+                            nodes[RIGHT])) {
+                    // End VoltDB extension
                 } else {
                     throw Error.error(ErrorCode.X_42562);
                 }
@@ -803,6 +825,21 @@ public class ExpressionLogical extends Expression {
             if (type == null) {
                 type = nodes[RIGHT].nodeDataTypes[i];
             }
+            // A VoltDB extension to support "IN ?"
+            else if (i == 0 && degree == 1 &&
+                    nodes[RIGHT].opType == OpTypes.DYNAMIC_PARAM &&
+                    nodes[RIGHT].nodeDataTypes != null &&
+                    nodes[RIGHT].nodeDataTypes.length == 1 &&
+                    nodes[RIGHT].nodeDataTypes[0] == null) {
+                if (type.isIntegralType()) {
+                    // promote parameter type to vector of BIGINT regardless of exact LHS integer scale.
+                    nodes[RIGHT].nodeDataTypes[0] = Type.SQL_BIGINT;
+                }
+                else {
+                    nodes[RIGHT].nodeDataTypes[0] = type;
+                }
+            }
+            // End of VoltDB extension to support "IN ?"
 
             if (type == null) {
                 throw Error.error(ErrorCode.X_42567);
@@ -816,6 +853,7 @@ public class ExpressionLogical extends Expression {
         resolveTypesForAllAny(session);
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -825,8 +863,8 @@ public class ExpressionLogical extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -924,7 +962,7 @@ public class ExpressionLogical extends Expression {
                 if (exprSubType == OpTypes.ANY_QUANTIFIED
                         || exprSubType == OpTypes.ALL_QUANTIFIED) {
                     return testAllAnyCondition(
-                        session, (Object[]) nodes[LEFT].getRowValue(session));
+                        session, nodes[LEFT].getRowValue(session));
                 }
 
                 Object o1 = nodes[LEFT].getValue(session);
@@ -1001,8 +1039,8 @@ public class ExpressionLogical extends Expression {
             return null;
         }
 
-        Object[] leftList  = (Object[]) left;
-        Object[] rightList = (Object[]) right;
+        Object[] leftList  = left;
+        Object[] rightList = right;
 
         for (int i = 0; i < nodes[LEFT].nodes.length; i++) {
             if (leftList[i] == null) {
@@ -1463,6 +1501,7 @@ public class ExpressionLogical extends Expression {
         ((ExpressionLogical) nodes[RIGHT]).distributeOr();
     }
 
+    @Override
     Expression getIndexableExpression(RangeVariable rangeVar) {
 
         switch (opType) {
@@ -1684,4 +1723,26 @@ public class ExpressionLogical extends Expression {
 
         return true;
     }
+    // A VoltDB extension to support X'..' as numeric literals
+    /**
+     * If one child is an integer, and the other is a VARBINARY literal, try to convert the
+     * literal to an integer.
+     */
+    private boolean voltConvertBinaryIntegerLiteral(Session session, Expression lhs, Expression rhs) {
+        Expression nonIntegralExpr;
+        int whichChild;
+        if (lhs.dataType.isIntegralType()) {
+            nonIntegralExpr = rhs;
+            whichChild = RIGHT;
+        }
+        else if (rhs.dataType.isIntegralType()) {
+            nonIntegralExpr = lhs;
+            whichChild = LEFT;
+        } else {
+            return false;
+        }
+
+        return ExpressionValue.voltMutateToBigintType(nonIntegralExpr, this, whichChild);
+    }
+    // End VoltDB extension
 }

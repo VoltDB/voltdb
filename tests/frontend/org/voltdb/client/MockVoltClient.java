@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -59,6 +59,7 @@ import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
@@ -72,7 +73,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         super();
     }
 
-    ProcedureCallback m_callback = null;
+    ProcedureCallback m_lastCallback = null;
+    LinkedBlockingQueue<ProcedureCallback> m_callbacks = new LinkedBlockingQueue<ProcedureCallback>();
     boolean m_nextReturn = true;
 
     @Override
@@ -258,7 +260,8 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
-        m_callback = callback;
+        m_lastCallback = callback;
+        m_callbacks.add(callback);
         if (originalTxnId <= lastOrigTxnId)
         {
             origTxnIdOrderCorrect = false;
@@ -271,10 +274,20 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return m_nextReturn;
     }
 
+
     public void pokeLastCallback(final byte status, final String message) throws Exception
     {
         ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
-        m_callback.clientCallback(clientResponse);
+        m_lastCallback.clientCallback(clientResponse);
+    }
+
+    public void pokeAllPendingCallbacks(final byte status, final String message) throws Exception
+    {
+        ClientResponse clientResponse = new ClientResponseImpl(status, new VoltTable[0], message);
+        ProcedureCallback callback = null;
+        while ((callback = m_callbacks.poll()) != null) {
+            callback.clientCallback(clientResponse);
+        }
     }
 
     public void setNextReturn(boolean retval)
@@ -322,7 +335,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     @Override
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -334,6 +346,42 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     @Override
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) {
         return null;
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize,
+            boolean upsert, BulkLoaderFailureCallBack blfcb) throws Exception {
+        return null;
+    }
+
+    @Override
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+            throws IOException, NoConnectionsException, ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean updateClasses(ProcedureCallback callback, File jarPath,
+            String classesToDelete) throws IOException, NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+
+    @Override
+    public ClientResponse callProcedureWithTimeout(int batchTimeout, String procName, Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean callProcedureWithTimeout(ProcedureCallback callback,
+            int batchTimeout, String procName, Object... parameters)
+            throws IOException, NoConnectionsException {
+        // TODO Auto-generated method stub
+        return false;
     }
 
 }

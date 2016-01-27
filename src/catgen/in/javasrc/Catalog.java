@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,12 @@
 
 package org.voltdb.catalog;
 
-import java.util.HashMap;
+import java.io.IOException;
+import java.io.StringReader;
+
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
+import com.google_voltpatches.common.io.LineReader;
 
 /**
  * The root class in the Catalog hierarchy, which is essentially a tree of
@@ -30,7 +35,12 @@ import java.util.HashMap;
  */
 public class Catalog extends CatalogType {
 
-    private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
+    public static final char MAP_SEPARATOR = '#';
+
+    //private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
+    //private final PatriciaTrie<CatalogType> m_pathCache = new PatriciaTrie<>();
+    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8).build();
+
     private CatalogType m_prevUsedPath = null;
 
     CatalogMap<Cluster> m_clusters;
@@ -39,10 +49,34 @@ public class Catalog extends CatalogType {
      * Create a new Catalog hierarchy.
      */
     public Catalog() {
-        setBaseValues(this, null, "/", "catalog");
-        m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class);
-        m_childCollections.put("clusters", m_clusters);
+        setBaseValues(null, "catalog");
+        m_clusters = new CatalogMap<Cluster>(this, this, "clusters", Cluster.class, 1);
         m_relativeIndex = 1;
+    }
+
+    @Override
+    void initChildMaps() {
+        // never called on the root catalog object
+    }
+
+    @Override
+    public Catalog getCatalog() {
+        return this;
+    }
+
+    @Override
+    public String getCatalogPath() {
+        return "/";
+    }
+
+    @Override
+    public void getCatalogPath(StringBuilder sb) {
+        sb.append('/');
+    }
+
+    @Override
+    public CatalogType getParent() {
+        return null;
     }
 
     /**
@@ -53,48 +87,55 @@ public class Catalog extends CatalogType {
      */
     public void execute(final String commands) {
 
-        int ctr = 0;
-        for (String line : commands.split("\n")) {
-            try {
-                if (line.length() > 0) executeOne(line);
-            }
-            catch (Exception ex) {
-                String msg = "Invalid catalog command on line " + ctr + "\n" +
-                    "Contents: '" + line + "'\n";
-                ex.printStackTrace();
-                throw new RuntimeException(msg, ex);
+        LineReader lines = new LineReader(new StringReader(commands));
 
+        int ctr = 0;
+        String line = null;
+        try {
+            while ((line = lines.readLine()) != null) {
+                try {
+                    if (line.length() > 0) executeOne(line);
+                }
+                catch (Exception ex) {
+                    String msg = "Invalid catalog command on line " + ctr + "\n" +
+                        "Contents: '" + line + "'\n";
+                    throw new RuntimeException(msg, ex);
+                }
+                ctr++;
             }
-            ctr++;
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 
     void executeOne(String stmt) {
-        stmt = stmt.trim();
-
         // command comes before the first space (add or set)
-        int pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String cmd = stmt.substring(0, pos);
-        stmt = stmt.substring(pos + 1);
+
+        int pos = 0;
+        while (Character.isWhitespace(stmt.charAt(pos))) {
+            ++pos;
+        }
+        char cmd = stmt.charAt(pos++);
+        while (stmt.charAt(pos++) != ' ');
 
         // ref to a catalog node between first two spaces
-        pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String ref = stmt.substring(0, pos);
-        stmt = stmt.substring(pos + 1);
+        int refStart = pos;
+        while (stmt.charAt(pos++) != ' ');
+        String ref = stmt.substring(refStart, pos - 1);
 
         // spaces 2 & 3 separate the two arguments
-        pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String arg1 = stmt.substring(0, pos);
-        String arg2 = stmt.substring(pos + 1);
+        int argStart = pos;
+        while (stmt.charAt(pos++) != ' ');
+        String arg1 = stmt.substring(argStart, pos - 1);
+        String arg2 = stmt.substring(pos);
 
         // resolve the ref to a node in the catalog
         CatalogType resolved = null;
-        if (ref.equals("$PREV")) {
-            if (m_prevUsedPath == null)
+        if (ref.startsWith("$")) { // $PREV
+            if (m_prevUsedPath == null) {
                 throw new CatalogException("$PREV reference was not preceded by a cached reference.");
+            }
             resolved = m_prevUsedPath;
         }
         else {
@@ -106,56 +147,66 @@ public class Catalog extends CatalogType {
         }
 
         // run either command
-        if (cmd.equals("add")) {
-            resolved.addChild(arg1, arg2);
+        if (cmd == 'a') { // add
+            resolved.getCollection(arg1).add(arg2);
         }
-        else if (cmd.equals("delete")) {
-            resolved.delete(arg1, arg2);
-            String toDelete = ref + "/" + arg1 + "[" + arg2 + "]";
-            CatalogType thing = m_pathCache.remove(toDelete);
-            if (thing == null) {
-                throw new CatalogException("Unable to find reference to delete: " + toDelete);
-            }
+        else if (cmd == 'd') { // delete
+            resolved.getCollection(arg1).delete(arg2);
+            String toDelete = ref + "/" + arg1 + MAP_SEPARATOR + arg2;
+            m_pathCache.invalidate(toDelete);
         }
-        else if (cmd.equals("set")) {
+        else if (cmd == 's') { // set
             resolved.set(arg1, arg2);
         }
     }
 
     CatalogType getItemForRef(final String ref) {
         // if it's a path
-        return m_pathCache.get(ref);
+        CatalogType retval = null; // m_pathCache.getIfPresent(ref);
+        if (retval == null) {
+            retval = getItemForPath(ref);
+        }
+        //m_pathCache.put(ref, retval);
+        return retval;
     }
 
-    CatalogType getItemForPath(CatalogType parent, final String path) {
-        // remove the starting slash
-        String realpath = path;
-        if (path.startsWith("/"))
-            realpath = path.substring(1);
+    CatalogType getItemForPath(final String path) {
+        // check the cache
+        CatalogType retval = m_pathCache.getIfPresent(path);
+        if (retval != null) return retval;
 
-        String[] parts = realpath.split("/", 2);
-        // root case
-        if (parts[0].length() == 0)
-            return this;
-        // child of root
-        if (parts.length == 1)
-            return getItemForPathPart(parent, parts[0]);
+        int index = path.lastIndexOf('/');
+        if (index == -1) {
+            return getItemForPathPart(this, path);
+        }
 
         // recursive case
-        CatalogType nextParent = getItemForPathPart(parent, parts[0]);
-        if (nextParent == null)
-            throw new CatalogException("couldn't find next child in path.");
-        return getItemForPath(nextParent, parts[1]);
+        String immediateParentPath = path.substring(0, index);
+        String subPath = path.substring(index);
+
+        CatalogType immediateParent = getItemForPath(immediateParentPath);
+        if (immediateParent == null) {
+            return null;
+        }
+        // cache all parents
+        m_pathCache.put(immediateParentPath, immediateParent);
+
+        return getItemForPathPart(immediateParent, subPath);
     }
 
     CatalogType getItemForPathPart(CatalogType parent, String path) {
-        String[] parts = path.split("\\[", 2);
-        parts[1] = parts[1].split("\\]", 2)[0];
-        return parent.getChild(parts[0], parts[1]);
-    }
+        if (path.length() == 0) return parent;
 
-    void registerGlobally(CatalogType x) {
-        m_pathCache.put(x.m_path, x);
+        boolean hasStartSlash = path.charAt(0) == '/';
+
+        if ((path.length() == 1) && hasStartSlash) return parent;
+
+        int index = path.lastIndexOf(MAP_SEPARATOR);
+
+        String collection = path.substring(hasStartSlash ? 1 : 0, index);
+        String name = path.substring(index + 1, path.length());
+
+        return parent.getCollection(collection).get(name);
     }
 
     /**
@@ -180,17 +231,70 @@ public class Catalog extends CatalogType {
         copy.m_relativeIndex = 1;
         copy.m_clusters.copyFrom(m_clusters);
 
-
         return copy;
-    }
-
-    @Override
-    void update() {
-        // does nothing
     }
 
     /** GETTER: The set of the clusters in this catalog */
     public CatalogMap<Cluster> getClusters() {
         return m_clusters;
+    }
+
+    @Override
+    public String[] getFields() {
+        return new String[] {};
+    }
+
+    @Override
+    String[] getChildCollections() {
+        return new String[] { "clusters" };
+    }
+
+    @Override
+    public Object getField(String field) {
+        switch (field) {
+        case "clusters":
+            return getClusters();
+        default:
+            throw new CatalogException(String.format("Unknown field: %s in class %s",
+                    field, getClass().getSimpleName()));
+        }
+    }
+
+    @Override
+    void set(String field, String value) {
+        throw new CatalogException("No fields to set in Catalog base object.");
+    }
+
+    @Override
+    void copyFields(CatalogType obj) {
+        // no fields to copy
+        // also not used as Catalog overrides the calling method of CatalogType
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        // this isn't really the convention for null handling
+        if ((obj == null) || (obj.getClass().equals(getClass()) == false))
+            return false;
+
+        // Do the identity check
+        if (obj == this)
+            return true;
+
+        // this is safe because of the class check
+        // it is also known that the childCollections var will be the same
+        //  from the class check
+        Catalog other = (Catalog) obj;
+
+        // are the fields / children the same? (deep compare)
+        if ((m_clusters == null) != (other.m_clusters == null)) return false;
+        if ((m_clusters != null) && !m_clusters.equals(other.m_clusters)) return false;
+
+        return true;
+    }
+
+    @Override
+    void writeCreationCommand(StringBuilder sb) {
+        return;
     }
 }

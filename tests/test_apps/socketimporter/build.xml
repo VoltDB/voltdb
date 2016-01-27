@@ -1,0 +1,45 @@
+<!-- Simple build file to build socket stream importer -->
+<project name="socketstream" basedir="." default="client">
+
+    <property name="src.dir"     value="${basedir}/src"/>
+    <property name="clientsrc.dir"     value="${basedir}/client"/>
+
+    <property name="build.dir"   value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
+    <property name="jar.dir"     value="${basedir}"/>
+    <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
+    <property name="log.dir"     value="${basedir}/log"/>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${log.dir}"/>
+        <delete dir="${voltdbroot.dir}"/>
+        <delete dir="${basedir}/felix-cache"/>
+        <delete file="${jar.dir}/${ant.project.name}-client.jar"/>
+        <delete file="${basedir}/catalog-report.html"/>
+    </target>
+
+    <path id="build-classpath">
+       <fileset dir="${basedir}/../../../voltdb">
+         <include name="voltdbclient*.jar"/>
+       </fileset>
+       <fileset dir="${basedir}/../../../lib">
+         <include name="commons-lang3*.jar"/>
+       </fileset>
+    </path>
+
+    <target name="client-compile">
+        <mkdir dir="${clientclasses.dir}"/>
+        <javac target="1.7" source="1.7" debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="client" depends="client-compile">
+        <mkdir dir="${jar.dir}"/>
+        <jar destfile="${jar.dir}/${ant.project.name}-client.jar" basedir="${clientclasses.dir}">
+        </jar>
+    </target>
+
+</project>

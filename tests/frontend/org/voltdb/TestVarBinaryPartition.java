@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -80,20 +80,33 @@ public class TestVarBinaryPartition extends TestCase {
             client = ClientFactory.createClient();
             client.createConnection("localhost");
 
-            ClientResponse resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);" );
-            assert( resp.getResults().length == 1 );
+            ClientResponse resp;
+            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);");
+            assertEquals(1, resp.getResults()[0].asScalarLong());
             resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('80',3);" );
-            assert( resp.getResults().length == 1 );
+            assertEquals(1, resp.getResults()[0].asScalarLong());
             resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('8081828384858687888990',4);" );
-            assert( resp.getResults().length == 1 );
+            assertEquals(1, resp.getResults()[0].asScalarLong());
 
             Random rand = new Random();
             for( int i = 0; i < 1000; i++ ){
-                byte[] b = new byte[rand.nextInt(128)];
-                rand.nextBytes(b);
-                String hexString = Encoder.hexEncode(b);
-                resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ("+"'"+hexString+"'"+",5);" );
-                assert( resp.getResults().length == 1 );
+                byte[] bytes = new byte[rand.nextInt(128)];
+                rand.nextBytes(bytes);
+                // Just to mix things up, alternate methods of INSERT among
+                // literal hex string, hex string parameter, and byte[] parameter.
+                if ( i % 2 == 0 ) {
+                    String hexString = Encoder.hexEncode(bytes);
+                    if ( i % 4 == 0 ) {
+                        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('" + hexString + "',5);" );
+                    } else {
+                        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?,5);", hexString);
+                    }
+                } else {
+                    resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (?,5);", bytes);
+                }
+                assertEquals(1, resp.getResults()[0].asScalarLong());
             }
+            resp =  client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;");
+            assertEquals(3 + 1000, resp.getResults()[0].asScalarLong());
     }
 }

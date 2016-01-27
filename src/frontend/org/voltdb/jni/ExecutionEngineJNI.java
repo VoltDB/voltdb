@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,6 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -117,8 +116,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int partitionId,
             final int hostId,
             final String hostname,
+            final int drClusterId,
             final int tempTableMemory,
-            final HashinatorConfig hashinatorConfig)
+            final HashinatorConfig hashinatorConfig,
+            final boolean createDrReplicatedStream)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -142,7 +143,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     partitionId,
                     hostId,
                     getStringBytes(hostname),
+                    drClusterId,
                     tempTableMemory * 1024 * 1024,
+                    createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
@@ -221,10 +224,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    public void loadCatalog(long timestamp, final String serializedCatalog) throws EEException {
+    protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
-        errorCode = nativeLoadCatalog(pointer, timestamp, getStringBytes(serializedCatalog));
+        errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
     }
@@ -241,14 +244,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
-    private static byte[] getStringBytes(String string) {
-        try {
-            return string.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-           throw new AssertionError(e);
-        }
-    }
-
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
      */
@@ -258,8 +253,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
-            final long spHandle, final long lastCommittedSpHandle,
-            long uniqueId, final long undoToken) throws EEException
+            final long txnId,
+            final long spHandle,
+            final long lastCommittedSpHandle,
+            long uniqueId,
+            final long undoToken) throws EEException
     {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
@@ -313,6 +311,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     numFragmentIds,
                     planFragmentIds,
                     inputDepIds,
+                    txnId,
                     spHandle,
                     lastCommittedSpHandle,
                     uniqueId,
@@ -373,8 +372,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table,
-        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations,
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long spHandle,
+        final long lastCommittedSpHandle,
+        final long uniqueId,
+        boolean returnUniqueViolations,
+        boolean shouldDRStream,
         long undoToken) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
@@ -388,7 +391,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //Clear is destructive, do it before the native call
         deserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, lastCommittedTxnId, returnUniqueViolations, undoToken);
+                                              txnId, spHandle, lastCommittedSpHandle, uniqueId,
+                                              returnUniqueViolations, shouldDRStream, undoToken);
         checkErrorCode(errorCode);
 
         try {
@@ -465,7 +469,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void toggleProfiler(final int toggle) {
         nativeToggleProfiler(pointer, toggle);
-        return;
     }
 
     @Override
@@ -486,7 +489,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public boolean setLogLevels(final long logLevels) throws EEException {
-        return nativeSetLogLevels( pointer, logLevels);
+        return nativeSetLogLevels(pointer, logLevels);
     }
 
     @Override
@@ -561,7 +564,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long tableHashCode(int tableId) {
-        return nativeTableHashCode( pointer, tableId);
+        return nativeTableHashCode(pointer, tableId);
     }
 
     @Override
@@ -601,6 +604,17 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
+    public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+                               int remoteClusterId, long undoToken) throws EEException
+    {
+        long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
+        if (rowCount < 0) {
+            throwExceptionForError((int)rowCount);
+        }
+        return rowCount;
+    }
+
+    @Override
     public long getThreadLocalPoolAllocations() {
         return nativeGetThreadLocalPoolAllocations();
     }
@@ -616,21 +630,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
-        clearPsetAndEnsureCapacity(8 + task.length);
-
-        byte retval[] = null;
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
         try {
-            psetBuffer.putLong(taskType.taskId);
-            psetBuffer.put(task);
+            psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();
-            nativeExecuteTask(pointer);
+            final int errorCode = nativeExecuteTask(pointer);
+            checkErrorCode(errorCode);
             return (byte[])deserializer.readArray(byte.class);
         } catch (IOException e) {
             Throwables.propagate(e);
         }
-        return retval;
+        return null;
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
+        clearPsetAndEnsureCapacity(8 + requiredCapacity);
+        psetBuffer.position(8);
+        return psetBuffer;
     }
 }

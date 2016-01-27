@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,7 +55,7 @@ class CSVFileReader implements Runnable {
     private static final Map<VoltType, String> m_blankStrings = new EnumMap<VoltType, String>(VoltType.class);
     private static final VoltLogger m_log = new VoltLogger("CSVLOADER");
     private final CSVDataLoader m_loader;
-    private final CSVLoaderErrorHandler m_errHandler;
+    private final BulkLoaderErrorHandler m_errHandler;
     private final VoltType[] m_columnTypes;
     private final int m_columnCount;
 
@@ -77,8 +77,7 @@ class CSVFileReader implements Runnable {
         m_listReader = reader;
     }
 
-    public CSVFileReader(CSVDataLoader loader, CSVLoaderErrorHandler errorHandler)
-    {
+    public CSVFileReader(CSVDataLoader loader, BulkLoaderErrorHandler errorHandler)    {
         m_loader = loader;
         m_errHandler = errorHandler;
         m_columnTypes = m_loader.getColumnTypes();
@@ -113,15 +112,15 @@ class CSVFileReader implements Runnable {
                 }
                 m_totalRowCount.incrementAndGet();
 
-                if (lineList.size() == 0) {
+                if (lineList.isEmpty()) {
                     continue;
                 }
 
                 String[] lineValues = lineList.toArray(new String[0]);
                 String lineCheckResult;
                 if ((lineCheckResult = checkparams_trimspace(lineValues)) != null) {
-                    final CSVLineWithMetaData metaData =
-                            new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
+                    final RowWithMetaData metaData
+                            = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                     m_totalLineCount.get() + 1);
                     if (m_errHandler.handleError(metaData, null, lineCheckResult)) {
                         break;
@@ -129,15 +128,15 @@ class CSVFileReader implements Runnable {
                     continue;
                 }
 
-                CSVLineWithMetaData lineData =
-                        new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
+                RowWithMetaData lineData
+                        = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                 m_listReader.getLineNumber());
                 m_loader.insertRow(lineData, lineValues);
             } catch (SuperCsvException e) {
                 //Catch rows that can not be read by superCSV m_listReader.
                 // e.g. items without quotes when strictquotes is enabled.
-                final CSVLineWithMetaData metaData =
-                        new CSVLineWithMetaData(m_listReader.getUntokenizedRow(),
+                final RowWithMetaData metaData
+                        = new RowWithMetaData(m_listReader.getUntokenizedRow(),
                                 m_totalLineCount.get() + 1);
                 if (m_errHandler.handleError(metaData, null, e.getMessage())) {
                     break;
@@ -184,8 +183,14 @@ class CSVFileReader implements Runnable {
                 } else {
                     lineValues[i] = lineValues[i].trim();
                 }
+
+                if(!m_config.customNullString.isEmpty()){
+                    if(lineValues[i].equals(m_config.customNullString)){
+                        lineValues[i] = null;
+                    }
+                }
                 // treat NULL, \N and "\N" as actual null value
-                if (lineValues[i].equals("NULL")
+                else if (lineValues[i].equals("NULL")
                         || lineValues[i].equals(Constants.CSV_NULL)
                         || lineValues[i].equals(Constants.QUOTED_CSV_NULL)) {
                     lineValues[i] = null;

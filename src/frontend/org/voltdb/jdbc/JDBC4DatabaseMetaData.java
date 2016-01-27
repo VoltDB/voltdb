@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -614,7 +614,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        return "ABS,CEILING,EXP,FLOOR,POWER,SQRT";
+        return "ABS,BITAND,BITNOT,BITOR,BIT_SHIFT_LEFT,BIT_SHIFT_RIGHT,BITXOR,CEILING,EXP,FLOOR,LN,LOG,PI,POWER,SQRT";
     }
 
     // Retrieves a description of the given table's primary key columns.
@@ -754,8 +754,10 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getStringFunctions() throws SQLException
     {
         checkClosed();
-        return "CHAR,CHAR_LENGTH,CONCAT,LEFT,LOWER,OCTET_LENGTH,OVERLAY,POSITION," +
-                "REPEAT,REPLACE,RIGHT,SPACE,SUBSTRING,TRIM,UPPER";
+        // TODO: find a more suitable place for COALESCE
+        return "BIN,COALESCE,CHAR,CHAR_LENGTH,CONCAT,FORMAT_CURRENCY,HEX,INSERT,LCASE,LEFT,LOWER,LTRIM," +
+               "OCTET_LENGTH,OVERLAY,POSITION,REGEXP_POSITION,REPEAT,REPLACE,RIGHT,RTRIM,SPACE,SUBSTRING,SUBSTR,"+
+               "TRIM,UCASE,UPPER";
     }
 
     // Retrieves a description of the table hierarchies defined in a particular schema in this database.
@@ -880,7 +882,9 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getTimeDateFunctions() throws SQLException
     {
         checkClosed();
-        return "";
+        return "CURRENT_TIMESTAMP,DATEADD,DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,EXTRACT,FROM_UNIXTIME,HOUR," +
+               "MINUT,MONTH,NOW,QUARTER,SECOND,SINCE_EPOCH,TO_TIMESTAMP,TRUNCATE,WEEK,WEEKOFYEAR,"+
+               "WEEKDAY,YEAR";
     }
 
     // Retrieves a description of all the data types supported by this database.
@@ -1199,10 +1203,44 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
 
     // Retrieves whether this database supports the JDBC scalar function CONVERT for conversions between the JDBC types fromType and toType.
     @Override
-    public boolean supportsConvert(int fromType, int toType) throws SQLException
-    {
+    public boolean supportsConvert(int fromType, int toType) throws SQLException {
         checkClosed();
-        return false;
+        switch (fromType) {
+        /*
+         * ALL types can be converted to VARCHAR /VoltType.String
+         */
+        case java.sql.Types.VARCHAR:
+        case java.sql.Types.VARBINARY:
+        case java.sql.Types.TIMESTAMP:
+            switch (toType) {
+            case java.sql.Types.VARCHAR:
+                return true;
+
+            default:
+                return false;
+            }
+        case java.sql.Types.TINYINT:
+        case java.sql.Types.SMALLINT:
+        case java.sql.Types.INTEGER:
+        case java.sql.Types.BIGINT:
+        case java.sql.Types.FLOAT:
+        case java.sql.Types.DECIMAL:
+            switch (toType) {
+            case java.sql.Types.VARCHAR:
+            case java.sql.Types.TINYINT:
+            case java.sql.Types.SMALLINT:
+            case java.sql.Types.INTEGER:
+            case java.sql.Types.BIGINT:
+            case java.sql.Types.FLOAT:
+            case java.sql.Types.DECIMAL:
+                return true;
+
+            default:
+                return false;
+            }
+        default:
+            return false;
+        }
     }
 
     // Retrieves whether this database supports the ODBC Core SQL grammar.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.zip.DeflaterOutputStream;
@@ -34,6 +33,10 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.xerial.snappy.Snappy;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public final class CompressionService {
 
@@ -71,9 +74,10 @@ public final class CompressionService {
     /*
      * The executor service is only used if the VoltDB computation service is not available.
      */
-    private static final ExecutorService m_executor =
+    private static final ListeningExecutorService m_executor = MoreExecutors.listeningDecorator(
             Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()),
-                                         CoreUtils.getThreadFactory("Compression service thread"));
+                                         CoreUtils.getThreadFactory("Compression service thread"))
+            );
 
     private static IOBuffers getBuffersForCompression(int length, boolean inputNotUsed) {
         IOBuffers buffers = m_buffers.get();
@@ -356,10 +360,10 @@ public final class CompressionService {
         });
     }
 
-    public static <T> Future<T> submitCompressionTask(Callable<T> task) {
+    public static <T> ListenableFuture<T> submitCompressionTask(Callable<T> task) {
         VoltDBInterface instance = VoltDB.instance();
         if (VoltDB.instance() != null) {
-            ExecutorService es = instance.getComputationService();
+            ListeningExecutorService es = instance.getComputationService();
             if (es != null) {
                 return es.submit(task);
             }

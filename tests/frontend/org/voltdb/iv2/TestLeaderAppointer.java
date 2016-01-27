@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,13 +30,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
@@ -58,12 +60,13 @@ public class TestLeaderAppointer extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 1;
     private ClusterConfig m_config = null;
-    private List<Integer> m_hostIds;
+    private Set<Integer> m_hostIds;
+    private Map<Integer, String> m_hostGroups;
     private MpInitiator m_mpi = null;
     private HostMessenger m_hm = null;
     private ZooKeeper m_zk = null;
     private LeaderCache m_cache = null;
-    private AtomicBoolean m_newAppointee = new AtomicBoolean(false);
+    private final AtomicBoolean m_newAppointee = new AtomicBoolean(false);
 
     private LeaderAppointer m_dut = null;
 
@@ -108,9 +111,11 @@ public class TestLeaderAppointer extends ZKTestBase {
 
         m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(m_config.getPartitionCount()));
-        m_hostIds = new ArrayList<Integer>();
+        m_hostIds = Sets.newTreeSet();
+        m_hostGroups = Maps.newHashMap();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
+            m_hostGroups.put(i, "0");
         }
         when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
         m_mpi = mock(MpInitiator.class);
@@ -126,20 +131,20 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
                 null, false,
-                m_config.getTopology(m_hostIds), m_mpi, stats);
+                m_config.getTopology(m_hostGroups), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
     void addReplica(int partitionId, long HSId) throws KeeperException, InterruptedException, Exception
     {
         LeaderElector.createParticipantNode(m_zk,
-                LeaderElector.electionDirForPartition(partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partitionId),
                 Long.toString(HSId), null);
     }
 
     void deleteReplica(int partitionId, long HSId) throws KeeperException, InterruptedException
     {
-        String dir = LeaderElector.electionDirForPartition(partitionId);
+        String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partitionId);
         List<String> children = m_zk.getChildren(dir, false);
         for (String child : children) {
             if (LeaderElector.getPrefixFromChildName(child).equals(Long.toString(HSId))) {
@@ -274,8 +279,8 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostIds), m_mpi,
-                                    new KSafetyStats());
+                                    m_config.getTopology(m_hostGroups), m_mpi,
+                                    new KSafetyStats(), false);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
         boolean threw = false;
@@ -494,7 +499,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         assertFalse(VoltDB.wasCrashCalled);
 
         // Create a partition dir
-        LeaderElector.createRootIfNotExist(m_zk, LeaderElector.electionDirForPartition(2));
+        LeaderElector.createRootIfNotExist(m_zk, LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, 2));
         Thread.sleep(500); // I'm evil
         assertFalse(VoltDB.wasCrashCalled);
 
@@ -537,5 +542,51 @@ public class TestLeaderAppointer extends ZKTestBase {
         while (!VoltDB.wasCrashCalled) {
             Thread.yield();
         }
+    }
+
+    @Test
+    public void testFailureDuringSyncSnapshot() throws Exception
+    {
+        configure(2, 2, 1, false);
+        Thread dutthread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    m_dut.acceptPromotion();
+                } catch (Exception e) {
+                }
+            }
+        };
+        dutthread.start();
+        // Need to sleep so we don't write to ZK before the LeaderAppointer appears or we'll crash
+        Thread.sleep(1000);
+        addReplica(0, 0L);
+        addReplica(0, 1L);
+        addReplica(1, 2L);
+        addReplica(1, 3L);
+        waitForAppointee(1);
+        registerLeader(0, m_cache.pointInTimeCache().get(0));
+        registerLeader(1, m_cache.pointInTimeCache().get(1));
+        dutthread.join();
+        // kill the appointer and delete one of the leaders
+        m_dut.shutdown();
+        deleteReplica(0, m_cache.pointInTimeCache().get(0));
+        // create a new appointer and start it up with expectSyncSnapshot=true
+        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
+                                    m_config.getReplicationFactor(), false,
+                                    null, false,
+                                    m_config.getTopology(m_hostGroups), m_mpi,
+                                    new KSafetyStats(), true);
+        m_dut.onReplayCompletion();
+        m_newAppointee.set(false);
+        VoltDB.ignoreCrash = true;
+        boolean threw = false;
+        try {
+            m_dut.acceptPromotion();
+        } catch (ExecutionException e) {
+            threw = true;
+        }
+        assertTrue(threw);
+        assertTrue(VoltDB.wasCrashCalled);
     }
 }

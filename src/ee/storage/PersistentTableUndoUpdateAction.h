@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,8 +20,8 @@
 
 #include "common/UndoAction.h"
 #include "common/NValue.hpp"
+#include "common/types.h"
 #include "storage/persistenttable.h"
-
 
 namespace voltdb {
 
@@ -30,10 +30,10 @@ public:
 
     inline PersistentTableUndoUpdateAction(char* oldTuple, char* newTuple,
                                            std::vector<char*> const & oldObjects, std::vector<char*> const & newObjects,
-                                           PersistentTableSurgeon *table, bool revertIndexes)
+                                           PersistentTableSurgeon *table, bool revertIndexes, size_t drMark)
       : m_oldTuple(oldTuple), m_newTuple(newTuple),
         m_table(table), m_revertIndexes(revertIndexes),
-        m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects)
+        m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects), m_drMark(drMark)
     { }
 
     /*
@@ -45,6 +45,7 @@ public:
     {
         m_table->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
         NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
+        m_table->DRRollback(m_drMark, rowCostForDRRecord(DR_RECORD_UPDATE));
     }
 
     /*
@@ -63,6 +64,7 @@ private:
     bool const m_revertIndexes;
     std::vector<char*> const m_oldUninlineableColumns;
     std::vector<char*> const m_newUninlineableColumns;
+    size_t const m_drMark;
 };
 
 }

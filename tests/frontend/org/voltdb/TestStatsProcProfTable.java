@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,11 +150,11 @@ public class TestStatsProcProfTable {
         ResultRow result[] = {
             //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
             new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
-            new ResultRow(1371587140278L, "A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
+            new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUp(dut, data);
-        validateEmGood("testAllZeros", dut, result);
+        validateEmGood("testMultipleProcs", dut, result);
     }
 
 
@@ -172,11 +172,11 @@ public class TestStatsProcProfTable {
         ResultRow result[] = {
             //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
             new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
-            new ResultRow(1371587140278L, "A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
+            new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUp(dut, data);
-        validateEmGood("testAllZeros", dut, result);
+        validateEmGood("testSiteDedupe", dut, result);
     }
 
     @Test
@@ -191,12 +191,31 @@ public class TestStatsProcProfTable {
             new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
         };
         ResultRow result[] = {
-            //               TS/         Proc /wtd/ invok/avg/ min/max/fail/abort
-            new ResultRow(1371587140278L, "B", 96L, 300L, 3L, 1L, 5L, 54L, 51L),
+            //               TS/         Proc /wtd/ invok/avg/ min/max/abort/fail
+            new ResultRow(1371587140278L, "B", 97L, 300L, 3L, 1L, 5L, 54L, 51L),
             new ResultRow(1371587140278L, "A", 3L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUpNoDedup(dut, data);
-        validateEmGood("testAllZeros", dut, result);
+        validateEmGood("testSiteNoDedupe", dut, result);
+    }
+
+    @Test
+    public void testRounding() throws Exception {
+        // need to not double count invocations at replicas, but do look at
+        // min, max, avg, fail, abort
+        ProcProfRow data[] = {
+            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+            new ProcProfRow(1371587140278L, "B", 0L, 10000000L, 2L, 5L, 4L, 17L, 18L),
+            new ProcProfRow(1371587140278L, "A", 0L, 1L, 10L, 20L, 30L, 0L, 18L)
+        };
+        ResultRow result[] = {
+            //               TS/         Proc /wtd/ invok/avg/ min/max/fail/abort
+            new ResultRow(1371587140278L, "B", 100L, 10000000L, 4L, 2L, 5L, 18L, 17L),
+            new ResultRow(1371587140278L, "A", 0L, 1L, 30L, 10L, 20L, 18L, 0L)
+        };
+        StatsProcProfTable dut = new StatsProcProfTable();
+        loadEmUp(dut, data);
+        validateEmGood("testRounding", dut, result);
     }
 }

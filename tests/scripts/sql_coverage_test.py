@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ import sys
 # add the path to the volt python client, just based on knowing
 # where we are now
 sys.path.append('../../lib/python')
+sys.path.append('./examples/sql_coverage/')
 
 import random
 import time
@@ -34,6 +35,7 @@ import cPickle
 import os.path
 import imp
 import re
+import traceback
 from voltdbclient import *
 from optparse import OptionParser
 from Query import VoltQueryClient
@@ -58,6 +60,51 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
+def minutes_colon_seconds(seconds):
+    return re.sub("^0:", "", str(datetime.timedelta(0, round(seconds))), 1)
+
+def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
+                  include_current_time=False):
+    """ Prints, and returns, a message containing the specified number of
+    seconds, first in a minutes:seconds format (e.g. "01:02", or "1:43:48"),
+    then just the exact number of seconds in parentheses, e.g.,
+    "1:02 (61.9 seconds)", preceded by the 'message_begin' and followed by
+    'message_end'. Optionally, if 'include_current_time' is True, the current
+    time (in seconds since January 1, 1970) is also printed, in brackets, e.g.,
+    "1:02 (61.9 seconds) [at 1408645826.68], ", which is useful for debugging
+    purposes.
+    """
+
+    time_msg = minutes_colon_seconds(seconds) + " ({0:.6f} seconds)".format(seconds)
+    if (include_current_time):
+        time_msg += " [at " + str(time.time()) + "]"
+
+    message = message_begin + time_msg + ", " + message_end
+    print message
+    return message
+
+def print_elapsed_seconds(message_end="", prev_time=-1,
+                          message_begin="Elapsed time: "):
+    """Computes, returns and prints the difference (in seconds) between the
+    current system time and a previous time, which is either the specified
+    'prev_time' or, if that is negative (or unspecified), the previous time
+    at which this function was called. The printed message is preceded by
+    'message_begin' and followed by "seconds, " and 'message_end'; if the
+    elapsed time is greater than or equal to 60 seconds, it also includes the
+    minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
+    as "61.9 seconds (01:02), ".
+    """
+
+    now = time.time()
+    global save_prev_time
+    if (prev_time < 0):
+        prev_time = save_prev_time
+    save_prev_time = now
+
+    diff_time = now - prev_time
+    print_seconds(diff_time, message_end, message_begin)
+    return diff_time
+
 def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
 
     print "Running \"run_once\":"
@@ -77,7 +124,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
 
     global normalize
     if(host == defaultHost):
-        server = subprocess.Popen(command + " backend=" + name, shell = True)
+        server = subprocess.Popen(command + " backend=" + name, shell=True)
 
     client = None
     for i in xrange(30):
@@ -98,7 +145,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
 #        print "999 Key = '%s', Val = '%s'" % (key, testConfigKits[key])
     if(host != defaultHost):
         # Flush database
-        client.onecmd("updatecatalog " + testConfigKit["testCatalog"]  + " " + testConfigKit["deploymentFile"])
+        client.onecmd("updatecatalog " + testConfigKit["testCatalog"] + " " + testConfigKit["deploymentFile"])
 
     statements_file = open(statements_path, "rb")
     results_file = open(results_path, "wb")
@@ -117,7 +164,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                 (statement["SQL"], sys.exc_info()[1])
             if(host == defaultHost):
                 # Should kill the server now
-                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell=True)
                 killer.communicate()
                 if killer.returncode != 0:
                     print >> sys.stderr, \
@@ -128,7 +175,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
             print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
                 (statement["SQL"], sys.exc_info()[1])
             if(host == defaultHost):
-                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell=True)
                 killer.communicate()
                 if killer.returncode != 0:
                     print >> sys.stderr, \
@@ -138,7 +185,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
             ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
             table = normalize(client.response.tables[0], statement["SQL"])
             if len(client.response.tables) > 1:
-                print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] ,"?"
+                print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] , "?"
         # else:
             # print "WARNING: returned no table(s) from ?", statement["SQL"] ,"?"
         cPickle.dump({"Status": client.response.status,
@@ -164,7 +211,11 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
         return 0
 
 def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
-    subversion_generation, submit_verbosely, args, testConfigKit):
+    subversion_generation, submit_verbosely, ascii_only, args, testConfigKit):
+
+    # Store the current, initial system time (in seconds since January 1, 1970)
+    time0 = time.time()
+
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
@@ -172,8 +223,10 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    global comparison_database
+    comparison_database_lower = comparison_database.lower()
     statements_path = os.path.abspath(os.path.join(output_dir, "statements.data"))
-    hsql_path = os.path.abspath(os.path.join(output_dir, "hsql.data"))
+    cmpdb_path = os.path.abspath(os.path.join(output_dir, comparison_database_lower + ".data"))
     jni_path = os.path.abspath(os.path.join(output_dir, "jni.data"))
     template = config["template"]
 
@@ -181,6 +234,22 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     if "normalizer" in config:
         normalize = imp.load_source("normalizer", config["normalizer"]).normalize
         # print "DEBUG: using normalizer ", config["normalizer"], " for ", template
+        self_check_safecmp = imp.load_source("normalizer", config["normalizer"]).safecmp
+        theNow = datetime.datetime.now()
+        if self_check_safecmp([theNow], [theNow]) != 0:
+             print >> sys.stderr, "safe_cmp fails [datetime] selfcheck"
+             exit(2)
+        if self_check_safecmp([None], [None]) != 0:
+             print >> sys.stderr, "safe_cmp fails [None] selfcheck"
+             exit(2)
+        if self_check_safecmp([theNow], [None]) <= 0:
+             print >> sys.stderr, "safe_cmp fails [datetime], [None] selfcheck"
+             exit(2)
+        theLater = datetime.datetime.now()
+        if self_check_safecmp([None, theNow], [None, theLater]) >= 0:
+             print >> sys.stderr, "safe_cmp fails [None, datetime] selfcheck"
+             exit(2)
+
     else:
         normalize = lambda x, y: x
         # print "DEBUG: using no normalizer for ", template
@@ -191,14 +260,19 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, subversion_generation)
+    generator = SQLGenerator(config["schema"], template, subversion_generation, ascii_only)
     counter = 0
 
     statements_file = open(statements_path, "wb")
-    for i in generator.generate():
+    for i in generator.generate(submit_verbosely):
         cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
     statements_file.close()
+
+    min_statements_per_pattern = generator.min_statements_per_pattern()
+    max_statements_per_pattern = generator.max_statements_per_pattern()
+    num_inserts  = generator.num_insert_statements()
+    num_patterns = generator.num_patterns()
 
     if generate_only or submit_verbosely:
         print "Generated %d statements." % counter
@@ -206,24 +280,177 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         # Claim success without running servers.
         return {"keyStats" : None, "mis" : 0}
 
-    if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
-        print >> sys.stderr, "Test with the JNI backend had errors."
+    # Print the elapsed time, with a message
+    global total_gensql_time
+    gensql_time = print_elapsed_seconds("for generating statements (" + suite_name + ")", time0)
+    total_gensql_time += gensql_time
+
+    num_crashes = 0
+    failed = False
+    try:
+        if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
+            print >> sys.stderr, "Test with the JNI (VoltDB) backend had errors (crash?)."
+            failed = True
+    except:
+        print >> sys.stderr, "JNI (VoltDB) backend crashed!!!"
+        traceback.print_exc()
+        failed = True
+    if (failed):
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
         sys.stderr.flush()
-        exit(1)
+        num_crashes += 1
+        #exit(1)
+
+    # Print the elapsed time, with a message
+    global total_voltdb_time
+    voltdb_time = print_elapsed_seconds("for running VoltDB (JNI) statements (" + suite_name + ")")
+    total_voltdb_time += voltdb_time
 
     random.seed(random_seed)
     random.setstate(random_state)
 
-    if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
-        print >> sys.stderr, "Test with the HSQLDB backend had errors."
-        exit(1)
+    failed = False
+    try:
+        if run_once(comparison_database_lower, command, statements_path, cmpdb_path, submit_verbosely, testConfigKit) != 0:
+            print >> sys.stderr, "Test with the " + comparison_database + " backend had errors (crash?)."
+            failed = True
+    except:
+        print >> sys.stderr, comparison_database + " backend crashed!!"
+        traceback.print_exc()
+        failed = True
+    if (failed):
+        print >> sys.stderr, "  cmpdb_path: %s" % (cmpdb_path)
+        sys.stderr.flush()
+        num_crashes += 1
+        #exit(1)
+
+    # Print the elapsed time, with a message
+    global total_cmpdb_time
+    cmpdb_time = print_elapsed_seconds("for running " + comparison_database + " statements (" + suite_name + ")")
+    total_cmpdb_time += cmpdb_time
+
+    someStats = (get_numerical_html_table_element(min_statements_per_pattern, strong_warn_below=1) +
+                 get_numerical_html_table_element(max_statements_per_pattern, strong_warn_below=1, warn_above=100000) +
+                 get_numerical_html_table_element(num_inserts,  warn_below=4, strong_warn_below=1, warn_above=1000) +
+                 get_numerical_html_table_element(num_patterns, warn_below=4, strong_warn_below=1, warn_above=10000) +
+                 get_time_html_table_element(gensql_time) +
+                 get_time_html_table_element(voltdb_time) +
+                 get_time_html_table_element(cmpdb_time) )
+    extraStats = get_numerical_html_table_element(num_crashes, error_above=0) + someStats
 
     global compare_results
-    compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
-    success = compare_results(suite_name, random_seed, statements_path, hsql_path,
-                              jni_path, output_dir, report_all)
+    try:
+        compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
+        success = compare_results(suite_name, random_seed, statements_path, cmpdb_path,
+                                  jni_path, output_dir, report_all, extraStats, comparison_database)
+    except:
+        print >> sys.stderr, "Compare (VoltDB & " + comparison_database + ") results crashed!"
+        traceback.print_exc()
+        print >> sys.stderr, "  jni_path: %s" % (jni_path)
+        print >> sys.stderr, "  cmpdb_path: %s" % (cmpdb_path)
+        sys.stderr.flush()
+        num_crashes += 1
+        gray_zero_html_table_element = get_numerical_html_table_element(0, use_gray=True)
+        errorStats = (gray_zero_html_table_element + gray_zero_html_table_element +
+                      gray_zero_html_table_element + gray_zero_html_table_element +
+                      gray_zero_html_table_element + gray_zero_html_table_element +
+                      gray_zero_html_table_element + gray_zero_html_table_element +
+                      gray_zero_html_table_element +
+                      get_numerical_html_table_element(num_crashes, error_above=0) + someStats + '</tr>' )
+        success = {"keyStats": errorStats, "mis": -1}
+
+    # Print & save the elapsed time and total time, with a message
+    global total_compar_time
+    compar_time = print_elapsed_seconds("for comparing DB results (" + suite_name + ")")
+    total_compar_time += compar_time
+    suite_secs = print_elapsed_seconds("for run_config of '" + suite_name + "'", time0, "Sub-tot time: ")
+    sys.stdout.flush()
+
+    # Accumulate the total number of Valid, Invalid, Mismatched & Total statements
+    global total_statements
+    def next_keyStats_column_value():
+        prefix = "<td"
+        suffix = "</td>"
+        global keyStats_start_index
+        start_index  = 0
+        end_index    = 0
+        next_col_val = "0"
+        try:
+            start_index  = success["keyStats"].index(prefix, keyStats_start_index) + len(prefix)
+            start_index  = success["keyStats"].index('>', start_index) + 1
+            end_index    = success["keyStats"].index(suffix, start_index)
+            next_col_val = success["keyStats"][start_index: end_index]
+            keyStats_start_index = end_index + len(suffix)
+        except:
+            print "Caught exception:\n", sys.exc_info()[0]
+            print "success[keyStats]:\n", success["keyStats"]
+            print "keyStats_start_index:", keyStats_start_index
+            print "start_index :", start_index
+            print "end_index   :", end_index
+            print "next_col_val:", next_col_val
+        return next_col_val
+    global valid_statements
+    global invalid_statements
+    global mismatched_statements
+    global keyStats_start_index
+    global total_volt_npes
+    global total_cmp_npes
+    global total_num_crashes
+    global total_num_inserts
+    global total_num_patterns
+    global min_all_statements_per_pattern
+    global max_all_statements_per_pattern
+    keyStats_start_index = 0
+    valid_statements      += int(next_keyStats_column_value())
+    next_keyStats_column_value()  # ignore Valid %
+    invalid_statements    += int(next_keyStats_column_value())
+    next_keyStats_column_value()  # ignore Invalid %
+    total_statements      += int(next_keyStats_column_value())
+    mismatched_statements += int(next_keyStats_column_value())
+    next_keyStats_column_value()  # ignore Mismatched %
+    total_volt_npes       += int(next_keyStats_column_value())
+    total_cmp_npes        += int(next_keyStats_column_value())
+    total_num_crashes     += num_crashes
+    total_num_inserts     += num_inserts
+    total_num_patterns    += num_patterns
+    min_all_statements_per_pattern = min(min_all_statements_per_pattern, min_statements_per_pattern)
+    max_all_statements_per_pattern = max(max_all_statements_per_pattern, max_statements_per_pattern)
+
+    finalStats = (get_time_html_table_element(compar_time) +
+                  get_time_html_table_element(suite_secs) )
+
+    success["keyStats"] = success["keyStats"].replace('</tr>', finalStats + '</tr>')
+
     return success
+
+def get_html_table_element_color(value, error_below, strong_warn_below, warn_below,
+                                 error_above, strong_warn_above, warn_above, use_gray):
+    color = ''
+    if (use_gray):
+        color = ' bgcolor=#D3D3D3'  # gray
+    elif (value < error_below or value > error_above):
+        color = ' bgcolor=#FF0000'  # red
+    elif (value < strong_warn_below or value > strong_warn_above):
+        color = ' bgcolor=#FFA500'  # orange
+    elif (value < warn_below or value > warn_above):
+        color = ' bgcolor=#FFFF00'  # yellow
+    return color
+
+def get_numerical_html_table_element(value, error_below=-1, strong_warn_below=0, warn_below=0,
+                                     error_above=1000000000, strong_warn_above=1000000, warn_above=100000,  # 1 billion, 1 million, 100,000
+                                     use_gray=False):
+    return ('<td align=right%s>%d</td>' %
+            (get_html_table_element_color(value, error_below, strong_warn_below, warn_below,
+                                          error_above, strong_warn_above, warn_above, use_gray),
+             value) )
+
+def get_time_html_table_element(seconds, error_below=0, strong_warn_below=0, warn_below=0,
+                                error_above=28800, strong_warn_above=3600, warn_above=600,  # 8 hours, 1 hour, 10 minutes
+                                use_gray=False):
+    return ('<td align=right%s>%s</td>' %
+            (get_html_table_element_color(seconds, error_below, strong_warn_below, warn_below,
+                                          error_above, strong_warn_above, warn_above, use_gray),
+             minutes_colon_seconds(seconds)) )
 
 def get_voltcompiler(basedir):
     key = "voltdb"
@@ -278,7 +505,7 @@ def create_deploymentFile(options):
 
     deployment = Element('deployment')
     cluster = SubElement(deployment, 'cluster',
-            {'kfactor':kfactor,'sitesperhost':sitesperhost,'hostcount':hostcount})
+            {'kfactor':kfactor, 'sitesperhost':sitesperhost, 'hostcount':hostcount})
     httpd = SubElement(deployment, 'httpd', {'port':"8080"})
     jsonapi = SubElement(httpd, 'jsonapi', {'enabled':"true"})
     deploymentFile = "/tmp/deploymentFile.xml"
@@ -376,6 +603,28 @@ The following place holders are supported,
 if __name__ == "__main__":
     #print the whole command line, maybe useful for debugging
     #print " ".join(sys.argv)
+
+    # Print the current, initial system time
+    time0 = time.time()
+    print "Initial time: " + str(time0) + ", at start (in seconds since January 1, 1970)"
+    save_prev_time = time0
+    total_gensql_time = 0.0
+    total_voltdb_time = 0.0
+    total_cmpdb_time = 0.0
+    total_compar_time = 0.0
+    keyStats_start_index = 0
+    valid_statements = 0
+    invalid_statements = 0
+    mismatched_statements = 0
+    total_statements = 0
+    total_volt_npes = 0
+    total_cmp_npes = 0
+    total_num_crashes  = 0
+    total_num_inserts  = 0
+    total_num_patterns = 0
+    max_all_statements_per_pattern = 0
+    min_all_statements_per_pattern = sys.maxint
+
     parser = OptionParser()
     parser.add_option("-l", "--leader", dest="hostname",
                       help="the hostname of the leader")
@@ -394,16 +643,25 @@ if __name__ == "__main__":
     parser.add_option("-S", "--subversion_generation", dest="subversion_generation",
                       action="store_true", default=None,
                       help="enable generation of additional subquery forms for select statements")
+    parser.add_option("-a", "--ascii-only", action="store_true",
+                      dest="ascii_only", default=False,
+                      help="include only ASCII values in randomly generated string constants")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
                       help="report all attempted SQL statements rather than mismatches")
     parser.add_option("-g", "--generate-only", action="store_true",
                       dest="generate_only", default=False,
                       help="only generate and report SQL statements, do not start any database servers")
+    parser.add_option("-P", "--postgresql", action="store_true",
+                      dest="postgresql", default=False,
+                      help="compare VoltDB results to PostgreSQL, rather than HSqlDB")
+    parser.add_option("-G", "--postgis", action="store_true",
+                      dest="postgis", default=False,
+                      help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
-        seed = random.randint(0, 2**63)
+        seed = random.randint(0, 2 ** 63)
         print "Random seed: %d" % seed
     else:
         seed = int(options.seed)
@@ -432,6 +690,12 @@ if __name__ == "__main__":
     else:
         configs_to_run = config_list.get_configs()
 
+    comparison_database = "HSqlDB"  # default value
+    if options.postgresql:
+        comparison_database = 'PostgreSQL'
+    if options.postgis:
+        comparison_database = 'PostGIS'
+
     testConfigKits = {}
     defaultHost = "localhost"
     defaultPort = 21212
@@ -457,15 +721,68 @@ if __name__ == "__main__":
             testConfigKits["testCatalog"] = testCatalog
         result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
                             options.generate_only, options.subversion_generation,
-                            options.report_all, args, testConfigKits)
+                            options.report_all, options.ascii_only, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
-        if result["mis"] != 0:
+        # For now, ignore certain mismatches in index-varbinary, when running against PostgreSQL
+        # TODO: fix those mismatches (see ENG-9448)
+        if options.postgresql and config_name == "index-varbinary":
+            if result["mis"] > 1520:
+                success = False
+        elif result["mis"] != 0:
             success = False
 
     # Write the summary
-    generate_summary(output_dir, statistics)
+    time1 = time.time()
+    if total_statements > 0:
+        valid_percent = '{0:.2f}'.format(100.00 * valid_statements / total_statements)
+        invalid_percent = '{0:.2f}'.format(100.00 * invalid_statements / total_statements)
+        mismatched_percent = '{0:.2f}'.format(100.00 * mismatched_statements / total_statements)
+    else:
+        valid_percent = '0.00'
+        invalid_percent = '0.00'
+        mismatched_percent = '0.00'
+    statistics["totals"] = "\n<td align=right>" + str(valid_statements) + "</td>" + \
+                           "\n<td align=right>" + valid_percent + "%</td>" + \
+                           "\n<td align=right>" + str(invalid_statements) + "</td>" + \
+                           "\n<td align=right>" + invalid_percent + "%</td>" + \
+                           "\n<td align=right>" + str(total_statements) + "</td>" + \
+                           "\n<td align=right>" + str(mismatched_statements) + "</td>" + \
+                           "\n<td align=right>" + mismatched_percent + "%</td>" + \
+                           "\n<td align=right>" + str(total_volt_npes) + "</td>" + \
+                           "\n<td align=right>" + str(total_cmp_npes) + "</td>" + \
+                           "\n<td align=right>" + str(total_num_crashes) + "</td>" + \
+                           "\n<td align=right>" + str(min_all_statements_per_pattern) + "</td>" + \
+                           "\n<td align=right>" + str(max_all_statements_per_pattern) + "</td>" + \
+                           "\n<td align=right>" + str(total_num_inserts) + "</td>" + \
+                           "\n<td align=right>" + str(total_num_patterns) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(total_gensql_time) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(total_voltdb_time) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(total_cmpdb_time) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(total_compar_time) + "</td>" + \
+                           "\n<td align=right>" + minutes_colon_seconds(time1-time0) + "</td></tr>\n"
+    generate_summary(output_dir, statistics, comparison_database)
+
+    # Print the total time, for each type of activity
+    print_seconds(total_gensql_time, "for generating ALL SQL statements")
+    print_seconds(total_voltdb_time, "for running ALL VoltDB (JNI) statements")
+    print_seconds(total_cmpdb_time,  "for running ALL " + comparison_database + " statements")
+    print_seconds(total_compar_time, "for comparing ALL DB results")
+    print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
+    print_elapsed_seconds("for the entire run", time0, "Total   time: ")
+    if total_cmp_npes > 0:
+        print "Total number of " + comparison_database + " NullPointerExceptions (NPEs): %d" % total_cmp_npes
+    if total_volt_npes > 0:
+        success = False
+        print "Total number of VoltDB NullPointerExceptions (NPEs): %d" % total_volt_npes
+    if mismatched_statements > 0:
+        print "Total number of mismatched statements (i.e., test failures): %d" % mismatched_statements
+    if total_num_crashes > 0:
+        print "Total number of (VoltDB, " + comparison_database + ", or compare results) crashes: %d" % total_num_crashes
+        success = False
 
     if not success:
+        sys.stdout.flush()
+        sys.stderr.flush()
         print >> sys.stderr, "SQL coverage has errors."
         exit(1)

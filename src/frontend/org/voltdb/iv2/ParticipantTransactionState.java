@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,17 @@ public class ParticipantTransactionState extends TransactionState
     ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
         super(null, notice);
+    }
+
+    /**
+     * This constructor is only reserved for BorrowTransactionState, which is read only now.
+     * @param txnId
+     * @param notice
+     * @param readOnly
+     */
+    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice, boolean readOnly)
+    {
+        super(null, notice, readOnly);
     }
 
     @Override

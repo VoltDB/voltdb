@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -23,9 +23,32 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import decimal
-import re
 import math
+import re
+import types
+
 from SQLCoverageReport import generate_html_reports
+
+# A compare function which can handle datetime to None comparisons
+# -- where the standard cmp gets a TypeError.
+def safecmp(x, y):
+    # iterate over lists -- just like cmp does,
+    # but compare in a way that avoids a TypeError
+    # when a None value and datetime are corresponding members of the list.
+    for (xn, yn) in zip(x, y):
+        if xn is None:
+            if yn is None:
+                continue
+            return -1
+        if yn is None:
+            return 1
+        rn = cmp(xn, yn)
+        if rn:
+            return rn  # return first difference
+    # With all elements the same, return 0
+    # unless one list is longer, but even that is not an expected local
+    # use case
+    return cmp(len(x), len(y))
 
 # lame, but it matches at least up to 6 ORDER BY columns
 __EXPR = re.compile(r"ORDER BY\s(\w+\.(?P<column_1>\w+)(\s+\w+)?)"
@@ -91,57 +114,41 @@ def normalize_values(tuples, columns):
             else:
                 tuples[i] = normalize_value(tuples[i], columns[i].type)
 
-def filter_sorted(row, sorted_cols):
+def project_sorted(row, sorted_cols):
     """Extract the values in the ORDER BY columns from a row.
     """
+    return [ row[col] for col in sorted_cols ]
 
-    ret = []
-
-    if not sorted_cols:
-        return ret
-
-    for i in sorted_cols:
-        ret.append(row[i])
-
-    return ret
-
-def extract_key(sorted_cols, row):
+def project_unsorted(row, sorted_cols):
     """Extract the values in the non-ORDERBY columns from a row.
     """
+    return [ row[col] for col in xrange(len(row)) if col not in sorted_cols ]
 
-    k = []
-    for i in xrange(len(row)):
-        if i not in sorted_cols:
-            k.append(row[i])
-    return k
-
-def sort(l, sorted_cols):
+def sort(rows, sorted_cols):
     """Two steps:
-
         1. find the subset of rows which have the same values in the ORDER BY
         columns.
         2. sort them on the rest of the columns.
     """
+    if not sorted_cols:
+        rows.sort(cmp=safecmp)
+        return
 
     begin = 0
-    end = 0                     # exclusive
     prev = None
-    key = lambda x: extract_key(sorted_cols, x)
+    unsorteds = lambda row: project_unsorted(row, sorted_cols)
 
-    for i in xrange(len(l)):
-        if not sorted_cols:
-            l[:] = sorted(l, cmp=cmp, key=key)
-            return
-
-        tmp = filter_sorted(l[i], sorted_cols)
+    for i in xrange(len(rows)):
+        tmp = project_sorted(rows[i], sorted_cols)
         if prev != tmp:
-            if prev is not None:
-                end = i
-                l[begin:end] = sorted(l[begin:end], cmp=cmp, key=key)
+            if prev:
+                # sort a complete "group" with matching ORDER BY values
+                rows[begin:i] = sorted(rows[begin:i], cmp=safecmp, key=unsorteds)
             prev = tmp
             begin = i
 
-    l[begin:] = sorted(l[begin:], cmp=cmp, key=key)
+    # sort final "group"
+    rows[begin:] = sorted(rows[begin:], cmp=safecmp, key=unsorteds)
 
 def parse_sql(x):
     """Finds if the SQL statement contains ORDER BY command.
@@ -158,7 +165,6 @@ def parse_sql(x):
 def normalize(table, sql):
     """Normalizes the result tuples of ORDER BY statements.
     """
-
     normalize_values(table.tuples, table.columns)
 
     sort_cols = parse_sql(sql)
@@ -175,6 +181,7 @@ def normalize(table, sql):
 
     return table
 
-def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all):
-    return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all)
+def compare_results(suite, seed, statements_path, hsql_path, jni_path,
+                    output_dir, report_all, extra_stats, comparison_database):
+    return generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
+                                 output_dir, report_all, extra_stats, comparison_database)

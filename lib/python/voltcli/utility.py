@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -225,6 +225,9 @@ def abort(*msgs, **kwargs):
         warning('Bad keyword(s) passed to abort(): %s' % ' '.join(bad_keywords))
     return_code = kwargs.get('return_code', 1)
     error(*msgs)
+    # Return code must be 0-255 for shell.
+    if return_code != 0:
+        return_code = 1
     sys.exit(return_code)
 
 #===============================================================================
@@ -422,26 +425,93 @@ def format_volt_tables(table_list, caption_list = None, headings = True):
     return '\n\n'.join(output)
 
 #===============================================================================
+def quote_shell_arg(arg):
+#===============================================================================
+    """
+    Return an argument with quotes added as needed.
+    """
+    sarg = str(arg)
+    if len(sarg) == 0 or len(sarg.split()) > 1:
+        return '"%s"' % sarg
+    return sarg
+
+#===============================================================================
+def unquote_shell_arg(arg):
+#===============================================================================
+    """
+    Return an argument with quotes removed if present.
+    """
+    sarg = str(arg)
+    if len(sarg) == 0:
+        return sarg
+    quote_char = sarg[-1]
+    if quote_char not in ('"', "'"):
+        return sarg
+    # Deal with a starting quote that might not be at the beginning
+    if sarg[0] == quote_char:
+        return sarg[1:-1]
+    pos = sarg.find(quote_char)
+    if pos == len(sarg) - 1:
+        # No first quote, don't know what else to do but return as is
+        return sarg
+    return sarg[:pos] + sarg[pos+1:-1]
+
+#===============================================================================
+def quote_shell_args(*args_in):
+#===============================================================================
+    """
+    Return a list of arguments that are quoted as needed.
+    """
+    return [quote_shell_arg(arg) for arg in args_in]
+
+#===============================================================================
+def unquote_shell_args(*args_in):
+#===============================================================================
+    """
+    Return a list of arguments with quotes removed when present.
+    """
+    return [unquote_shell_arg(arg) for arg in args_in]
+
+#===============================================================================
+def join_shell_cmd(cmd, *args):
+#===============================================================================
+    """
+    Join shell command and arguments into one string.
+    Add quotes as appropriate.
+    """
+    return ' '.join(quote_shell_args(cmd, *args))
+
+#===============================================================================
 def run_cmd(cmd, *args):
 #===============================================================================
     """
     Run external program without capturing or suppressing output and check return code.
     """
-    fullcmd = cmd
-    for arg in args:
-        sarg = str(arg)
-        if len(sarg) == 0 or len(sarg.split()) > 1:
-            fullcmd += ' "%s"' % sarg
-        else:
-            fullcmd += ' %s' % sarg
+    fullcmd = join_shell_cmd(cmd, *args)
     if Global.dryrun_enabled:
-        sys.stdout.write('%s\n' % fullcmd)
+        sys.stdout.write('Run: %s\n' % fullcmd)
     else:
         if Global.verbose_enabled:
             verbose_info('Run: %s' % fullcmd)
         retcode = os.system(fullcmd)
         if retcode != 0:
             abort(return_code=retcode)
+
+#===============================================================================
+def exec_cmd(cmd, *args):
+#===============================================================================
+    """
+    Run external program by replacing the current (Python) process.
+    """
+    display_cmd = join_shell_cmd(cmd, *args)
+    if Global.dryrun_enabled:
+        sys.stdout.write('Exec: %s\n' % display_cmd)
+    else:
+        if Global.verbose_enabled:
+            verbose_info('Exec: %s' % display_cmd)
+        # Need to strip out quotes because the shell won't be doing it for us.
+        cmd_and_args = unquote_shell_args(cmd, *args)
+        os.execvp(cmd, cmd_and_args)
 
 #===============================================================================
 def pipe_cmd(*args):
@@ -457,6 +527,24 @@ def pipe_cmd(*args):
         proc.stdout.close()
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
+
+#===============================================================================
+def daemon_file_name(base_name=None, host=None, instance=None):
+#===============================================================================
+    """
+    Build a daemon output file name using optional base name, host, and instance.
+    """
+    names = []
+    if not base_name is None:
+        names.append(base_name)
+    if not host is None:
+        names.append(host.replace(':', '_'))
+    if not names:
+        names.append('server')
+    if not instance is None:
+        names.append('_%d' % instance)
+    daemon_name = ''.join(names)
+    return daemon_name
 
 #===============================================================================
 class Daemonizer(daemon.Daemon):
@@ -750,6 +838,46 @@ def merge_java_options(*opts):
             else:
                 ret_opts.append(opt)
     return ret_opts
+
+#===============================================================================
+def get_java_version():
+#===============================================================================
+    """
+    Assumes caller has already run "find_in_path(java)" so we know it can be checked.
+    """
+    try:
+        proc = subprocess.Popen(['java', '-version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        out, err = proc.communicate()
+        if "1.8" in out:
+            return "1.8"
+        elif "1.7" in out:
+            return "1.7"
+        else:
+            return ""
+    except (OSError):
+        return ""
+
+#===============================================================================
+def is_pro_version(voltdb_jar):
+#===============================================================================
+    """
+    Assumes caller has already run "find_in_path(jar)" so we know it can be checked.
+    The jar is already validated as present before this is called.
+    """
+    try:
+        zf = zipfile.ZipFile(voltdb_jar, 'r')
+    except (IOError, OSError), e:
+        print 'Error reading zip file "%s".' % voltdb_jar, e
+        return False
+    try:
+        for ze in zf.infolist():
+            if "org/voltdb/CommandLogImpl.class" == ze.filename:
+                return True
+        return False
+    except (OSError):
+        return False
+    finally:
+        zf.close()
 
 #===============================================================================
 def kwargs_merge_list(kwargs, name, *args):

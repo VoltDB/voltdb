@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,135 +48,38 @@
 #include "storage/table.h"
 
 using namespace std;
-using namespace voltdb;
 
-ProjectionPlanNode::ProjectionPlanNode(CatalogId id) : AbstractPlanNode(id)
+namespace voltdb {
+
+ProjectionPlanNode::~ProjectionPlanNode() { }
+
+PlanNodeType ProjectionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_PROJECTION; }
+
+std::string ProjectionPlanNode::debugInfo(const string& spacer) const
 {
-    // Do nothing
-}
-
-ProjectionPlanNode::ProjectionPlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
-
-ProjectionPlanNode::~ProjectionPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType
-ProjectionPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_PROJECTION;
-}
-
-void
-ProjectionPlanNode::setOutputColumnNames(vector<string>& names)
-{
-    m_outputColumnNames = names;
-}
-
-vector<string>&
-ProjectionPlanNode::getOutputColumnNames()
-{
-    return m_outputColumnNames;
-}
-
-const vector<string>&
-ProjectionPlanNode::getOutputColumnNames() const
-{
-    return m_outputColumnNames;
-}
-
-void
-ProjectionPlanNode::setOutputColumnTypes(vector<ValueType>& types)
-{
-    m_outputColumnTypes = types;
-}
-
-vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes()
-{
-    return m_outputColumnTypes;
-}
-
-const vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes() const
-{
-    return m_outputColumnTypes;
-}
-
-
-void ProjectionPlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
-{
-    m_outputColumnSizes = sizes;
-
-}
-
-vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes()
-{
-    return m_outputColumnSizes;
-}
-
-const vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes() const
-{
-    return m_outputColumnSizes;
-}
-
-void
-ProjectionPlanNode::setOutputColumnExpressions(vector<AbstractExpression*>& exps)
-{
-    m_outputColumnExpressions = exps;
-}
-
-vector<AbstractExpression*>&
-ProjectionPlanNode::getOutputColumnExpressions()
-{
-    return m_outputColumnExpressions;
-}
-
-const vector<AbstractExpression*>&
-ProjectionPlanNode::getOutputColumnExpressions() const
-{
-    return m_outputColumnExpressions;
-}
-
-string
-ProjectionPlanNode::debugInfo(const string& spacer) const
-{
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "Projection Output["
            << m_outputColumnNames.size() << "]:\n";
-    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << m_outputColumnNames[ctr] << " : ";
         buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
         buffer << "type=" << getTypeName(m_outputColumnTypes[ctr]) << "\n";
-        if (m_outputColumnExpressions[ctr] != NULL)
-        {
+        if (m_outputColumnExpressions[ctr] != NULL) {
             buffer << m_outputColumnExpressions[ctr]->debug(spacer + "   ");
         }
-        else
-        {
+        else {
             buffer << spacer << "  " << "<NULL>" << "\n";
         }
     }
     return buffer.str();
 }
 
-
-void
-ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    // XXX-IZZY move this to init at some point
-    for (int ii = 0; ii < getOutputSchema().size(); ii++)
-    {
-        SchemaColumn* outputColumn = getOutputSchema()[ii];
+    const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    for (int ii = 0; ii < outputSchema.size(); ii++) {
+        SchemaColumn* outputColumn = outputSchema[ii];
         m_outputColumnNames.push_back(outputColumn->getColumnName());
         AbstractExpression* expr = outputColumn->getExpression();
         m_outputColumnTypes.push_back(expr->getValueType());
@@ -184,3 +87,5 @@ ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
         m_outputColumnExpressions.push_back(expr);
     }
 }
+
+} // namespace voltdb

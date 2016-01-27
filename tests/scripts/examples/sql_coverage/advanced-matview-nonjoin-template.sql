@@ -1,10 +1,10 @@
-INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16 null20], _value[int16])
+INSERT INTO @dmltable VALUES (_id, _value[byte], _value[byte], _value[byte null20], _value[byte])
 INSERT INTO @dmltable VALUES (_id, 1010, 1010, 1010, 1010)
 INSERT INTO @dmltable VALUES (_id, 1020, 1020, 1020, 1020)
 
 INSERT INTO @dmltable VALUES (_id, -1010, 1010, 1010, 1010)
 INSERT INTO @dmltable VALUES (_id, -1020, 1020, 1020, 1020)
-INSERT INTO @dmltable VALUES (_id, _value[int16], _value[int16], _value[int16], _value[int16])
+INSERT INTO @dmltable VALUES (_id, _value[byte], _value[byte], _value[byte], _value[byte])
 
 <basic-select.sql>
 

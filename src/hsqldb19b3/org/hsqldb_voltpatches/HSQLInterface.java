@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,18 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
 
+import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class is built to create a single in-memory database
@@ -36,6 +43,9 @@ import org.hsqldb_voltpatches.result.Result;
  * </ul>
  */
 public class HSQLInterface {
+    private VoltLogger m_logger = new VoltLogger("HSQLDB_COMPILER");
+
+    static public String XML_SCHEMA_NAME = "databaseschema";
     /**
      * Naming conventions for unnamed indexes and constraints
      */
@@ -86,9 +96,14 @@ public class HSQLInterface {
     }
 
     Session sessionProxy;
+    // Keep track of the previous XML for each table in the schema
+    Map<String, VoltXMLElement> lastSchema = new TreeMap<>();
+    // empty schema for cloning and for null diffs
+    final VoltXMLElement emptySchema = new VoltXMLElement(XML_SCHEMA_NAME);
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
+        emptySchema.attributes.put("name", XML_SCHEMA_NAME);
         this.sessionProxy = sessionProxy;
     }
 
@@ -121,12 +136,125 @@ public class HSQLInterface {
         // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
         // This ensures that all VoltDB data paths use the same timezone for representing time.
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
-        sessionProxy.executeDirectStatement("SET SESSION TIME ZONE INTERVAL '00:00' HOUR TO MINUTE;");
 
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
 
         return new HSQLInterface(sessionProxy);
+    }
+
+    /**
+     * Modify the current schema with a SQL DDL command and get the
+     * diff which represents the changes.
+     *
+     * Note that you have to be consistent WRT case for the expected names.
+     *
+     * @param expectedTableAffected The name of the table affected by this DDL
+     * or null if unknown
+     * @param expectedIndexAffected The name of the index affected by this DDL
+     * or null if table is known instead
+     * @param ddl The SQL DDL statement to be run.
+     * @return the "diff" of the before and after trees for the affected table
+     * @throws HSQLParseException Throws exception if SQL parse error is
+     * encountered.
+     */
+    public VoltXMLDiff runDDLCommandAndDiff(HSQLDDLInfo stmtInfo,
+                                            String ddl)
+                                            throws HSQLParseException
+    {
+        // name of the table we're going to have to diff (if any)
+        String expectedTableAffected = null;
+
+        // If we fail to pre-process a statement, then we want to fail, but we're
+        // still going to run the statement through HSQL to get its error message.
+        // This variable helps us make sure we don't fail to preprocess and then
+        // succeed at runnign the statement through HSQL.
+        boolean expectFailure = false;
+
+        // If cascade, we're going to need to look for any views that might have
+        // gotten deleted. So get a list of all tables and views that existed before
+        // we run the ddl, then we'll do a comparison later.
+        Set<String> existingTableNames = null;
+
+        if (stmtInfo != null) {
+            if (stmtInfo.cascade) {
+                existingTableNames = getTableNames();
+            }
+
+            // we either have an index name or a table/view name, but not both
+            if (stmtInfo.noun == HSQLDDLInfo.Noun.INDEX) {
+                if (stmtInfo.verb == HSQLDDLInfo.Verb.CREATE) {
+                    expectedTableAffected = stmtInfo.secondName;
+                }
+                else {
+                    expectedTableAffected = tableNameForIndexName(stmtInfo.name);
+                }
+            }
+            else {
+                expectedTableAffected = stmtInfo.name;
+            }
+
+            // Note that we're assuming ifexists can't happen with "create"
+            expectFailure = (expectedTableAffected == null) && !stmtInfo.ifexists;
+        }
+        else {
+            expectFailure = true;
+        }
+
+        runDDLCommand(ddl);
+
+        // If we expect to fail, but the statement above didn't bail...
+        // (Shouldn't get here ever I think)
+        if (expectFailure) {
+            throw new HSQLParseException("Unable to plan statement due to VoltDB DDL pre-processing error");
+        }
+        // sanity checks for non-failure
+        assert(stmtInfo != null);
+
+        // get old and new XML representations for the affected table
+        VoltXMLElement tableXMLNew = null, tableXMLOld = null;
+        if (expectedTableAffected != null) {
+            tableXMLNew = getXMLForTable(expectedTableAffected);
+            tableXMLOld = lastSchema.get(expectedTableAffected);
+        }
+
+        // valid reasons for tableXMLNew to be null are DROP IF EXISTS and not much else
+        if (tableXMLNew == null) {
+            tableXMLNew = emptySchema;
+        }
+
+        // the old table can be null for CREATE TABLE of for IF EXISTS stuff
+        if (tableXMLOld == null) {
+            tableXMLOld = emptySchema;
+        }
+
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(tableXMLOld, tableXMLNew);
+
+        // now find any views that might be missing and make sure the diff reflects that
+        // they're gone
+        if (stmtInfo.cascade) {
+            Set<String> finalTableNames = getTableNames();
+            for (String tableName : existingTableNames) {
+                if (!finalTableNames.contains(tableName)) {
+                    tableName = tableName.toLowerCase();
+                    tableXMLOld = lastSchema.get(tableName).children.get(0);
+                    lastSchema.remove(tableName);
+                    if (tableName.equals(expectedTableAffected)) {
+                        continue;
+                    }
+                    diff.m_removedElements.add(tableXMLOld);
+                }
+            }
+        }
+
+        // this is a hack to allow the diff-apply-er to accept a diff that has no order
+        diff.m_elementOrder.clear();
+
+        // remember the current schema
+        if (expectedTableAffected != null) {
+            lastSchema.put(expectedTableAffected, tableXMLNew.duplicate());
+        }
+        return diff;
     }
 
     /**
@@ -202,6 +330,19 @@ public class HSQLInterface {
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);
+       if (m_logger.isDebugEnabled()) {
+           try {
+               /*
+                * Sometimes exceptions happen.
+                */
+               m_logger.debug(String.format("SQL: %s\n", sql));;
+               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
+               m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+           } catch (Exception ex) {
+               System.out.printf("Exception: %s\n", ex.getMessage());
+               ex.printStackTrace(System.out);
+           }
+        }
 
         // this releases some small memory hsql uses that builds up over time if not
         // cleared
@@ -218,14 +359,14 @@ public class HSQLInterface {
     }
 
     /**
-     * Recursively find all in-lists found in the XML and munge them into the
+     * Recursively find all in-lists, subquery, row comparisons found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
+     * @throws HSQLParseException
      */
-    private void fixupInStatementExpressions(VoltXMLElement expr) {
+    private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
             inFixup(expr);
-            // can return because in can't be nested
-            return;
+            // can't return because in with subquery can be nested
         }
 
         // recursive hunt
@@ -238,8 +379,9 @@ public class HSQLInterface {
      * Find in-expressions in fresh-off-the-hsql-boat Volt XML. Is this fake XML
      * representing an in-list in the weird table/row way that HSQL generates
      * in-list expressions. Used by {@link this#fixupInStatementExpressions(VoltXMLElement)}.
+     * @throws HSQLParseException
      */
-    private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) {
+    private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) throws HSQLParseException {
         if (!expr.name.equals("operation")) {
             return false;
         }
@@ -248,7 +390,7 @@ public class HSQLInterface {
             return false;
         }
 
-        // see if the children are "row" and "table".
+        // see if the children are "row" and "table" or "tablesubquery".
         int rowCount = 0;
         int tableCount = 0;
         int valueCount = 0;
@@ -263,6 +405,10 @@ public class HSQLInterface {
                 valueCount++;
             }
         }
+        //  T.C     IN (SELECT ...) => row       equal                  tablesubquery => IN
+        //  T.C     =  (SELECT ...) => columnref equal                  tablesubquery
+        //  (C1,C2)  IN (SELECT ...) => row       equal/anyqunatified    tablesubquery
+        //  (C1, C2) =  (SELECT ...) => row       equal                  tablesubquery
         if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0)) {
             assert rowCount == 1;
             assert tableCount + valueCount == 1;
@@ -275,7 +421,7 @@ public class HSQLInterface {
     /**
      * Take an equality-test expression that represents in-list
      * and munge it into the simpler thing we want to output
-     * to the ParsedExrpession classes.
+     * to the AbstractParsedStmt for its AbstractExpression classes.
      */
     private void inFixup(VoltXMLElement inElement) {
         // make this an in expression
@@ -284,6 +430,7 @@ public class HSQLInterface {
 
         VoltXMLElement rowElem = null;
         VoltXMLElement tableElem = null;
+        VoltXMLElement subqueryElem = null;
         VoltXMLElement valueElem = null;
         for (VoltXMLElement child : inElement.children) {
             if (child.name.equals("row")) {
@@ -292,11 +439,13 @@ public class HSQLInterface {
             else if (child.name.equals("table")) {
                 tableElem = child;
             }
+            else if (child.name.equals("tablesubquery")) {
+                subqueryElem = child;
+            }
             else if (child.name.equals("value")) {
                 valueElem = child;
             }
         }
-        assert(rowElem.children.size() == 1);
 
         VoltXMLElement inlist;
         if (tableElem != null) {
@@ -307,15 +456,18 @@ public class HSQLInterface {
                 assert(child.children.size() == 1);
                 inlist.children.addAll(child.children);
             }
-        }
-        else {
+        } else if (subqueryElem != null) {
+            inlist = subqueryElem;
+        } else {
             assert valueElem != null;
             inlist = valueElem;
         }
 
+        assert(rowElem != null);
+        assert(inlist != null);
         inElement.children.clear();
-        // short out the row expression
-        inElement.children.addAll(rowElem.children);
+        // add the row
+        inElement.children.add(rowElem);
         // add the inlist
         inElement.children.add(inlist);
     }
@@ -326,22 +478,55 @@ public class HSQLInterface {
      */
     @SuppressWarnings("unused")
     private void printTables() {
-        String schemaName = null;
         try {
-            schemaName = sessionProxy.getSchemaName(null);
+            String schemaName = sessionProxy.getSchemaName(null);
+            System.out.println("*** Tables For Schema: " + schemaName + " ***");
         } catch (HsqlException e) {
             e.printStackTrace();
         }
-        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
-
-        System.out.println("*** Tables For Schema: " + schemaName + " ***");
 
         // load all the tables
-        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        HashMappedList hsqlTables = getHSQLTables();
         for (int i = 0; i < hsqlTables.size(); i++) {
             Table table = (Table) hsqlTables.get(i);
             System.out.println(table.getName().name);
         }
+    }
+
+    /**
+     * @return The set of all table/view names in the schema.
+     */
+    private Set<String> getTableNames() {
+        Set<String> names = new HashSet<>();
+
+        // load all the tables
+        HashMappedList hsqlTables = getHSQLTables();
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            names.add(table.getName().name);
+        }
+
+        return names;
+    }
+
+    /**
+     * Find the table that owns a particular index by name (or null if no match).
+     * Case insensitive with whatever performance cost that implies.
+     */
+    String tableNameForIndexName(String indexName) {
+        // the schema manager has a map of indexes by name
+        // if this shows up on profiles, you can try to use that, but beware
+        // the case insensitivity going on here
+        HashMappedList hsqlTables = getHSQLTables();
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            for (Index index : table.getIndexList()) {
+                if (index.getName().name.equalsIgnoreCase(indexName)) {
+                    return table.getName().name.toLowerCase();
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -351,8 +536,48 @@ public class HSQLInterface {
      * @throws HSQLParseException
      */
     public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
-        VoltXMLElement xml = new VoltXMLElement("databaseschema");
+        VoltXMLElement xml = emptySchema.duplicate();
 
+        // load all the tables
+        HashMappedList hsqlTables = getHSQLTables();
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+            assert(vxmle != null);
+            xml.children.add(vxmle);
+        }
+
+        return xml;
+    }
+
+    /**
+     * Get an serialized XML representation of the a particular table.
+     */
+    public VoltXMLElement getXMLForTable(String tableName) throws HSQLParseException {
+        VoltXMLElement xml = emptySchema.duplicate();
+
+        // search all the tables XXX probably could do this non-linearly,
+        //  but i don't know about case-insensitivity yet
+        HashMappedList hsqlTables = getHSQLTables();
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            String candidateTableName = table.getName().name;
+
+            // found the table of interest
+            if (candidateTableName.equalsIgnoreCase(tableName)) {
+                VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+                assert(vxmle != null);
+                xml.children.add(vxmle);
+                return xml;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * This code was repeated a lot so I factored it out.
+     */
+    private HashMappedList getHSQLTables() {
         String schemaName = null;
         try {
             schemaName = sessionProxy.getSchemaName(null);
@@ -361,15 +586,8 @@ public class HSQLInterface {
         }
         SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
 
-        // load all the tables
-        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
-        for (int i = 0; i < hsqlTables.size(); i++) {
-            Table table = (Table) hsqlTables.get(i);
-            VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
-            xml.children.add(vxmle);
-            assert(vxmle != null);
-        }
-
-        return xml;
+        // search all the tables XXX probably could do this non-linearly,
+        //  but i don't know about case-insensitivity yet
+        return schemaManager.getTables(schemaName);
     }
 }

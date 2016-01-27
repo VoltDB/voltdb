@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -103,6 +103,8 @@ public class AsyncBenchmark {
         LOADMULTIPARTITIONTABLEREP
     }
 
+    // using insert for @Load*Table
+    static final byte upsertMode = (byte )0;
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE = "----------" + "----------"
             + "----------" + "----------" + "----------" + "----------"
@@ -672,11 +674,11 @@ public class AsyncBenchmark {
                         switch (tc) {
                         case LOADSINGLEPARTITIONTABLEPTN:
                             client.callProcedure(new SequenceCallback(),
-                                    "@LoadSinglepartitionTable", "LIKE_COUNTERS_PTN", vt0);
+                                    "@LoadSinglepartitionTable", "LIKE_COUNTERS_PTN", upsertMode, vt0);
                             break;
                         case LOADMULTIPARTITIONTABLEREP:
                             client.callProcedure(new SequenceCallback(),
-                                    "@LoadMultipartitionTable", "LIKE_COUNTERS_REP", vt0);
+                                    "@LoadMultipartitionTable", "LIKE_COUNTERS_REP", upsertMode, vt0);
                             break;
                         }
                     }

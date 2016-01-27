@@ -1,0 +1,1 @@
+[(inline batch delimited by 'EOF' in (standard input)):3]: DDL Error: "object name already exists: T in statement [create table t (i integer)]"

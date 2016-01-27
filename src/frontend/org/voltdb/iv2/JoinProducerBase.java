@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -172,9 +172,10 @@ public abstract class JoinProducerBase extends SiteTasker {
     // Completed all criteria: Kill the watchdog and inform the site.
     protected void setJoinComplete(SiteProcedureConnection siteConnection,
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                     Map<Integer, Long> drSequenceNumbers,
                                      boolean requireExistingSequenceNumbers)
     {
-        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
+        siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, drSequenceNumbers, requireExistingSequenceNumbers);
     }
 
     protected void registerSnapshotMonitor(String nonce) {

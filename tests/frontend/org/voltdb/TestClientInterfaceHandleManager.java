@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,6 +43,7 @@ public class TestClientInterfaceHandleManager {
                 new ClientInterfaceHandleManager(
                         false,
                         mockConnection,
+                        null,
                         AdmissionControlGroup.getDummy());
 
         long handle = dut.getHandle(true, 7, 31337, 10, 10l, "foo", 0, false, false);
@@ -70,6 +71,7 @@ public class TestClientInterfaceHandleManager {
                 new ClientInterfaceHandleManager(
                         false,
                         mockConnection,
+                        null,
                         AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
@@ -94,6 +96,7 @@ public class TestClientInterfaceHandleManager {
                 new ClientInterfaceHandleManager(
                         false,
                         mockConnection,
+                        null,
                         AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         // Add 10 handles

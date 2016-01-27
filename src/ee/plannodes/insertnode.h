@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,32 +47,59 @@
 #define HSTOREINSERTNODE_H
 
 #include <sstream>
+#include <vector>
 #include "abstractoperationnode.h"
 
 namespace voltdb {
+
+class VoltDBEngine;
+class Pool;
 
 /**
  *
  */
 class InsertPlanNode : public AbstractOperationPlanNode {
-    public:
-        InsertPlanNode(CatalogId id) : AbstractOperationPlanNode(id) {
-            // Do nothing
-        }
-        InsertPlanNode() : AbstractOperationPlanNode() {
-            // Do nothing
-        }
+public:
+    InsertPlanNode()
+        : AbstractOperationPlanNode()
+        , m_multiPartition(false)
+        , m_fieldMap()
+        , m_isUpsert(false)
+        , m_sourceIsPartitioned(false) {
+    }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INSERT); }
+    PlanNodeType getPlanNodeType() const;
 
-        bool isMultiPartition() { return m_multiPartition; }
+    bool isMultiPartition() const { return m_multiPartition; }
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
+    bool isUpsert() const { return m_isUpsert; }
 
-        bool m_multiPartition;
+    bool sourceIsPartitioned() const { return m_sourceIsPartitioned; }
+
+    bool isMultiRowInsert() const {
+        // Materialize nodes correspond to INSERT INTO ... VALUES syntax.
+        // Otherwise this may be a multi-row insert via INSERT INTO ... SELECT.
+        return m_children[0]->getPlanNodeType() != PLAN_NODE_TYPE_MATERIALIZE;
+    }
+
+    void initTupleWithDefaultValues(VoltDBEngine* engine,
+                                    Pool* pool,
+                                    const std::set<int>& fieldsExplicitlySet,
+                                    TableTuple& templateTuple,
+                                    std::vector<int> &nowFields);
+
+    const std::vector<int>& getFieldMap() const { return m_fieldMap; }
+
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
+
+private:
+    bool m_multiPartition;
+    std::vector<int> m_fieldMap;
+    bool m_isUpsert;
+    bool m_sourceIsPartitioned;
 };
 
-}
+} // namespace voltdb
 
 #endif

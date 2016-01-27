@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,46 +43,43 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "abstractoperationnode.h"
+
 #include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "storage/table.h"
-#include "catalog/table.h"
+#include "execution/VoltDBEngine.h"
+#include "storage/TableCatalogDelegate.hpp"
 
-using namespace std;
-using namespace voltdb;
+#include <sstream>
 
-AbstractOperationPlanNode::~AbstractOperationPlanNode()
+namespace voltdb {
+
+AbstractOperationPlanNode::~AbstractOperationPlanNode() { }
+
+Table* AbstractOperationPlanNode::getTargetTable() const
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-string AbstractOperationPlanNode::getTargetTableName() const {
-    return target_table_name;
-}
-Table* AbstractOperationPlanNode::getTargetTable() const {
     if (m_tcd == NULL) {
         return NULL;
     }
-    return (m_tcd->getTable());
-}
-void AbstractOperationPlanNode::setTargetTableDelegate(TableCatalogDelegate * table) {
-    m_tcd = table;
-}
-void AbstractOperationPlanNode::setTargetTableName(string name) {
-    this->target_table_name = name;
+    return m_tcd->getTable();
 }
 
-
-string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
-    ostringstream buffer;
-    buffer << spacer << "TargetTable[" << this->target_table_name << "]\n";
-    return (buffer.str());
+std::string AbstractOperationPlanNode::debugInfo(const std::string &spacer) const
+{
+    std::ostringstream buffer;
+    buffer << spacer << "TargetTable[" << m_target_table_name << "]\n";
+    return buffer.str();
 }
 
-void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    m_target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    m_tcd = engine->getTableDelegate(m_target_table_name);
+    if ( ! m_tcd) {
+        VOLT_ERROR("Failed to retrieve target table from execution engine for PlanNode '%s'",
+                   debug().c_str());
+        //TODO: throw something
+    }
 }
+
+} // namespace voltdb

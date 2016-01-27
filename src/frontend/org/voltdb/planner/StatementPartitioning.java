@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 
 /**
@@ -139,6 +140,18 @@ public class StatementPartitioning implements Cloneable{
      */
     private String m_fullColumnName;
 
+    private boolean m_joinValid = true;
+
+    /** Most of the time DML on a replicated table for a plan that is executed
+     * as single-partition is a bad idea, and the planner will refuse to do it.
+     * However, sometimes we want to bypass this rule; for example, when planning
+     * the DELETE statement executed when LIMIT PARTITION ROWS is about to be violated.
+     * In this special case, the statement is being planned, for simplicity, as if for
+     * single-partition execution, since it never requires a coordinator fragment,
+     * but it will only ever be executed in the context of a replicated table MP insert
+     * on ALL partitions.*/
+    private boolean m_isReplicatedDmlToRunOnAllPartitions = false;
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -160,6 +173,12 @@ public class StatementPartitioning implements Cloneable{
         return new StatementPartitioning(true, /* default to MP */ false);
     }
 
+    /** See comment for m_singlePartitionReplicatedDMLAllowed, above. */
+    public static StatementPartitioning partitioningForRowLimitDelete() {
+        StatementPartitioning partitioning = forceSP();
+        partitioning.m_isReplicatedDmlToRunOnAllPartitions = true;
+        return partitioning;
+    }
 
     public boolean isInferred() {
         return m_inferPartitioning;
@@ -181,6 +200,25 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * Returns true if the expression can be used to restrict plan execution to a single partition.
+     * For now this is anything other than a constant or parameter.  (In the future, one could
+     * imagine evaluating expressions like sqrt(8 * 8) and the like during planning)
+     *
+     * @param expr  The expression to consider
+     * @return      true or false
+     */
+    private static boolean isUsefulPartitioningExpression(AbstractExpression expr) {
+        if (expr instanceof ParameterValueExpression) {
+            return true;
+        }
+        if (expr instanceof ConstantValueExpression) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @param string table.column name of a(nother) equality-filtered partitioning column
      * @param constExpr -- a constant/parameter-based expression that equality-filters the partitioning column
      */
@@ -198,6 +236,13 @@ public class StatementPartitioning implements Cloneable{
         }
     }
 
+    /**
+     * For a multi-partition statement that can definitely be run SP, this is a constant partitioning key value
+     * inferred from the analysis (suitable for hashinating).
+     * If null, SP may not be safe, or the partitioning may be based on something less obvious like a parameter or constant expression.
+     *
+     * @return  an instance of String or an instance of container class Long
+     */
     public Object getInferredPartitioningValue() {
         return m_inferredValue;
     }
@@ -225,12 +270,15 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
-     * Returns true if there exists a single partition expression
+     * Returns true if partitioning inference has been requested, and
+     * at least one of the following is true:
+     *    - We are not doing DML on a replicated table, OR
+     *    - There is a single useful partitioning expression
      */
     public boolean isInferredSingle() {
         return m_inferPartitioning &&
                 (((m_countOfIndependentlyPartitionedTables == 0) && ! m_isDML)  ||
-                        (m_inferredExpression.size() == 1));
+                        (singlePartitioningExpression() != null));
     }
 
     /**
@@ -250,10 +298,22 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
-     * smart accessor - only returns a value if it was unique
+     * smart accessor - only returns a value if it was unique and is useful
      * @return
      */
     public AbstractExpression singlePartitioningExpression() {
+        AbstractExpression e = singlePartitioningExpressionForReport();
+        if (e != null && isUsefulPartitioningExpression(e)) {
+            return e;
+        }
+        return null;
+    }
+
+    /**
+     * smart accessor - only returns a value if it was unique.
+     * @return
+     */
+    public AbstractExpression singlePartitioningExpressionForReport() {
         if (m_inferredExpression.size() == 1) {
             return m_inferredExpression.iterator().next();
         }
@@ -298,6 +358,13 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * Accessor
+     */
+    public boolean isReplicatedDmlToRunOnAllPartitions() {
+        return m_isReplicatedDmlToRunOnAllPartitions;
+    }
+
+    /**
      * Given the query's list of tables and its collection(s) of equality-filtered columns and their equivalents,
      * determine whether all joins involving partitioned tables can be executed locally on a single partition.
      * This is only the case when they include equality comparisons between partition key columns.
@@ -313,13 +380,19 @@ public class StatementPartitioning implements Cloneable{
      *         -- partitioned tables that aren't joined or filtered by the same value.
      *         The caller can raise an alarm if there is more than one.
      */
-    public int analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
+    public void analyzeForMultiPartitionAccess(Collection<StmtTableScan> collection,
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
         int unfilteredPartitionKeyCount = 0;
 
+        // reset this flag to forget the last result of the multiple partition access path.
+        // AdHoc with parameters will call this function at least two times
+        // By default this flag should be true.
+        m_joinValid = true;
+        boolean subqueryHasReceiveNode = false;
+        boolean hasPartitionedTableJoin = false;
         // Iterate over the tables to collect partition columns.
         for (StmtTableScan tableScan : collection) {
             // Replicated tables don't need filter coverage.
@@ -338,6 +411,35 @@ public class StatementPartitioning implements Cloneable{
             if (tableScan instanceof StmtSubqueryScan) {
                 StmtSubqueryScan subScan = (StmtSubqueryScan) tableScan;
                 subScan.promoteSinglePartitionInfo(valueEquivalence, eqSets);
+                CompiledPlan subqueryPlan = subScan.getBestCostPlan();
+                if (( ! subScan.canRunInOneFragment()) ||
+                        ((subqueryPlan != null) &&
+                         subqueryPlan.rootPlanGraph.hasAnyNodeOfClass(AbstractReceivePlanNode.class))) {
+                    if (subqueryHasReceiveNode) {
+                        // Has found another subquery with receive node on the same level
+                        // Not going to support this kind of subquery join with 2 fragment plan.
+                        m_joinValid = false;
+
+                        // Still needs to count the independent partition tables
+                        break;
+                    }
+                    subqueryHasReceiveNode = true;
+
+                    if (subScan.isTableAggregate()) {
+                        // Partition Table Aggregate only return one aggregate row.
+                        // It has been marked with receive node, any join or processing based on
+                        // this table aggregate subquery should be done on coordinator.
+                        // Joins: has to be replicated table
+                        // Any process based on this subquery should require 1 fragment only.
+                        continue;
+                    }
+                } else {
+                    // this subquery partition table without receive node
+                    hasPartitionedTableJoin = true;
+                }
+            } else {
+                // This table is a partition table
+                hasPartitionedTableJoin = true;
             }
 
             boolean unfiltered = true;
@@ -359,9 +461,19 @@ public class StatementPartitioning implements Cloneable{
             if (unfiltered) {
                 ++unfilteredPartitionKeyCount;
             }
-        }
+        } // end for each table StmtTableScan in the collection
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
+        if (m_countOfIndependentlyPartitionedTables > 1) {
+            m_joinValid = false;
+        }
+
+        // This is the case that subquery with receive node join with another partition table
+        // on outer level. Not going to support this kind of join.
+        if (subqueryHasReceiveNode && hasPartitionedTableJoin) {
+            m_joinValid = false;
+        }
+
         if ((unfilteredPartitionKeyCount == 0) && (eqSets.size() == 1)) {
             for (Set<AbstractExpression> partitioningValues : eqSets) {
                 for (AbstractExpression constExpr : partitioningValues) {
@@ -376,8 +488,10 @@ public class StatementPartitioning implements Cloneable{
                 }
             }
         }
+    }
 
-        return m_countOfIndependentlyPartitionedTables;
+    public boolean isJoinValid() {
+        return m_joinValid;
     }
 
     private static boolean canCoverPartitioningColumn(TupleValueExpression candidatePartitionKey,
@@ -422,6 +536,30 @@ public class StatementPartitioning implements Cloneable{
         }
         // Initial guess -- as if no equality filters.
         m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
+    }
+
+    /**
+     * Sometimes when we fail to plan a statement, we try again with different inputs
+     * using the same StatementPartitioning object.  In this case, it's incumbent on
+     * callers to reset the cached analysis state set by calling this method.
+     *
+     * TODO: one could imagine separating this class into two classes:
+     * - One for partitioning context (such as AdHoc, stored proc, row limit delete
+     *   trigger), which is immutable
+     * - One to capture the results of partitioning analysis, which can be GC'd when no
+     *   longer needed
+     * This might avoid some of the pitfalls of reused stateful objects.
+     *   */
+    public void resetAnalysisState() {
+        m_countOfIndependentlyPartitionedTables = -1;
+        m_countOfPartitionedTables = -1;
+        m_fullColumnName = null;
+        m_inferredExpression.clear();
+        m_inferredParameterIndex = -1;
+        m_inferredValue = null;
+        m_isDML = false;
+        m_joinValid = true;
+        m_partitionColForDML = null;
     }
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,9 +17,12 @@
 
 package org.voltdb.export;
 
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 
 /**
  * Interface ExportManager imposes on processors.
@@ -46,8 +49,14 @@ public interface ExportDataProcessor  {
 
     /**
      * Inform the processor that initialization is complete; commence work.
+     * @param startup wait or not for the {@link #startPolling()} invocation
      */
-    public void readyForData();
+    public void readyForData(boolean startup);
+
+    /**
+     * Allows processor to initiate polling
+     */
+    public void startPolling();
 
     /**
      * Queue a work message to the processor's mailbox.
@@ -63,5 +72,12 @@ public interface ExportDataProcessor  {
      * Pass processor specific processor configuration properties
      * @param config an instance of {@linkplain Properties}
      */
-    public void setProcessorConfig( Properties config);
+    public void setProcessorConfig(Map<String, Pair<Properties, Set<String>>> config);
+
+    /**
+     * Pass processor specific processor configuration properties for checking
+     * @param config an instance of {@linkplain Properties}
+     */
+    public void checkProcessorConfig(Properties config);
+
 }

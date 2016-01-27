@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,10 +21,12 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  *
@@ -161,6 +163,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
             case DECIMAL:
                 stringer.value(m_value);
                 break;
+            case BOOLEAN:
+                stringer.value(Boolean.valueOf(m_value));
+                break;
             default:
                 throw new JSONException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + m_valueType);
             }
@@ -197,7 +202,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
             // For now, for partitioning purposes, leave constants for string columns as they are,
             // and process matches for integral columns via constant-to-string-to-bigInt conversion.
             String stringValue = ((ConstantValueExpression) constExpr).getValue();
-            if (voltType.isInteger()) {
+            if (voltType.isBackendIntegerType()) {
                 try {
                     return new Long(stringValue);
                 } catch (NumberFormatException nfe) {
@@ -211,6 +216,26 @@ public class ConstantValueExpression extends AbstractValueExpression {
         return null;
     }
 
+    /**
+     * This method will alter the type of this constant expression based on the context
+     * in which it appears.  For example, each constant in the value list of an INSERT
+     * statement will be refined to the type of the column in the table being inserted into.
+     *
+     * Here is a summary of the rules used to convert types here:
+     * - VARCHAR literals may be reinterpreted as (depending on the type needed):
+     *   - VARBINARY (string is required to have an even number of hex digits)
+     *   - TIMESTAMP (string must have timestamp format)
+     *   - Some numeric type (any of the four integer types, DECIMAL or FLOAT)
+     *
+     * In addition, if this object is a VARBINARY constant (e.g., X'00abcd') and we need
+     * an integer constant, (any of TINYINT, SMALLINT, INTEGER or BIGINT),
+     * we interpret the hex digits as a 64-bit signed integer.  If there are fewer than 16 hex digits,
+     * the most significant bits are assumed to be zeros.  So for example, X'FF' appearing where we want a
+     * TINYINT would be out-of-range, since it's 255 and not -1.
+     *
+     * There is corresponding code for handling integer hex literals in ParameterConverter for parameters,
+     * and in HSQL's ExpressionValue class.
+     */
     @Override
     public void refineValueType(VoltType neededType, int neededSize)
     {
@@ -284,8 +309,17 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (neededType == VoltType.TIMESTAMP) {
             if (m_valueType == VoltType.STRING) {
                 try {
-                    // Convert date value in whatever format is supported by TimeStampType
-                    // into VoltDB native microsecond count.
+                    // Convert date value in whatever format is supported by
+                    // TimeStampType into VoltDB native microsecond count.
+                    // TODO: Should datetime string be supported as the new
+                    // canonical internal format for timestamp constants?
+                    // Historically, the long micros value made sense because
+                    // it was initially the only way and later the most
+                    // direct way to initialize timestamp values in the EE.
+                    // But now that long value can not be used to "explain"
+                    // an expression as a valid SQL timestamp value for DDL
+                    // round trips, forcing a reverse conversion back through
+                    // TimeStampType to a datetime string.
                     TimestampType ts = new TimestampType(m_value);
                     m_value = String.valueOf(ts.getTime());
                 }
@@ -302,7 +336,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
             }
         }
 
-        if ((neededType == VoltType.FLOAT) || (neededType == VoltType.DECIMAL)) {
+        if ((neededType == VoltType.FLOAT || neededType == VoltType.DECIMAL)
+                && getValueType() != VoltType.VARBINARY) {
             if (m_valueType == null ||
                     (m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric())) {
                 try {
@@ -318,11 +353,17 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return;
         }
 
-        if (neededType.isInteger()) {
+        if (neededType.isBackendIntegerType()) {
             long value = 0;
             try {
-                value = Long.parseLong(getValue());
-            } catch (NumberFormatException nfe) {
+                if (getValueType() == VoltType.VARBINARY) {
+                    value = SQLParser.hexDigitsToLong(getValue());
+                    setValue(Long.toString(value));
+                }
+                else {
+                    value = Long.parseLong(getValue());
+                }
+            } catch (SQLParser.Exception | NumberFormatException exc) {
                 throw new PlanningErrorException("Value (" + getValue() +
                                                  ") has an invalid format for a constant " +
                                                  neededType.toSQLString() + " value");
@@ -378,13 +419,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
             return;
         }
-        if (columnType.isInteger()) {
-            try {
-                Long.parseLong(getValue());
-            } catch (NumberFormatException e) {
-                //TODO: Or DECIMAL? Either is OK for integer comparison, but math gets different results?
-                columnType = VoltType.FLOAT;
-            }
+        if (columnType.isBackendIntegerType()) {
+            columnType = VoltTypeUtil.getNumericLiteralType(columnType, getValue());
+
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
         }
@@ -398,6 +435,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
         if (m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // By default, constants should be treated as DECIMAL other than FLOAT to preserve the precision
+        // However, the range of DECIMAL of our implementation is small
         m_valueType = VoltType.FLOAT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
@@ -428,10 +467,87 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String unused) {
+        if (m_isNull) {
+            return "NULL";
+        }
         if (m_valueType == VoltType.STRING) {
             return "'" + m_value + "'";
+        }
+        if (m_valueType == VoltType.TIMESTAMP) {
+            try {
+                // Convert the datetime value in its canonical internal form,
+                // currently a count of epoch microseconds,
+                // through TimeStampType into a timestamp string.
+                long micros = Long.valueOf(m_value);
+                TimestampType ts = new TimestampType(micros);
+                return "'" + ts.toString() + "'";
+            }
+            // It couldn't be converted to timestamp.
+            catch (IllegalArgumentException e) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") has an invalid format for a constant " +
+                                                 VoltType.TIMESTAMP.toSQLString() + " value");
+
+            }
+
         }
         return m_value;
     }
 
+    /**
+     * Create a new CVE for a given type and value
+     * @param dataType
+     * @param value
+     * @return
+     */
+    public static ConstantValueExpression makeExpression(VoltType dataType, String value) {
+        ConstantValueExpression constantExpr = new ConstantValueExpression();
+        constantExpr.setValueType(dataType);
+        constantExpr.setValue(value);
+        return constantExpr;
+    }
+
+    /**
+     * Create TRUE CVE
+     * @return
+     */
+    public static ConstantValueExpression getTrue() {
+        return makeExpression(VoltType.BOOLEAN, Boolean.TRUE.toString());
+    }
+
+    /**
+     * Create FALSE CVE
+     * @return
+     */
+   public static ConstantValueExpression getFalse() {
+        return makeExpression(VoltType.BOOLEAN, Boolean.FALSE.toString());
+    }
+
+   /**
+    * Return true if and only if an input expression's type is boolean and value is "true"
+    * @param expr
+    * @return
+    */
+   public static boolean isBooleanTrue(AbstractExpression expr) {
+       return isBooleanValue(expr, Boolean.TRUE);
+   }
+
+   /**
+    * Return true if and only if an input expression's type is boolean and value is "false"
+    * @param expr
+    * @return
+    */
+   public static boolean isBooleanFalse(AbstractExpression expr) {
+       return isBooleanValue(expr, Boolean.FALSE);
+   }
+
+   private static boolean isBooleanValue(AbstractExpression expr, Boolean value) {
+       if (expr instanceof ConstantValueExpression) {
+           ConstantValueExpression cve = (ConstantValueExpression) expr;
+           if (VoltType.BOOLEAN == cve.getValueType()) {
+               return value.toString().equals(cve.getValue());
+           }
+       }
+       return false;
+   }
 }

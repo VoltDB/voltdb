@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
@@ -80,8 +81,21 @@ public class ReplaySequencer
     private class ReplayEntry {
         Long m_sentinalTxnId = null;
         FragmentTaskMessage m_firstFragment = null;
+        CompleteTransactionMessage m_lastFragment = null;
 
-        private Deque<VoltMessage> m_blockedMessages = new ArrayDeque<VoltMessage>();
+        /**
+         * Queue up all sp invocations in this queue before the {@link CompleteTransactionMessage} for
+         * this entry's transaction is received
+         */
+        private Deque<VoltMessage> m_blockedMessages = new LinkedList<VoltMessage>();
+
+        /**
+         * If required queue up all this transaction MP fragments in this queue. Move all the
+         * blocked SP invocations here once the {@link CompleteTransactionMessage} for this
+         * entry's transaction is received
+         */
+        private Deque<VoltMessage> m_sequencedMessages = new LinkedList<VoltMessage>();
+
         private boolean m_servedFragment = false;
 
         boolean isReady()
@@ -94,47 +108,96 @@ public class ReplaySequencer
             return m_sentinalTxnId != null;
         }
 
+        /**
+         * Queue it up in the {@link ReplayEntry#m_blockedMessages} queue
+         * before the {@link CompleteTransactionMessage} for this entry's transaction is received.
+         * Otherwise add it straight to the {@link ReplayEntry#m_sequencedMessages} queue.
+         *
+         * @param m an SP invocation message
+         */
         void addBlockedMessage(VoltMessage m)
         {
-            m_blockedMessages.addLast(m);
+            if (m_lastFragment == null)
+            {
+                m_blockedMessages.addLast(m);
+            }
+            else
+            {
+                m_sequencedMessages.addLast(m);
+            }
+        }
+
+        /**
+         * If not already done, drain all blocked sps in to the sequenced queue
+         * @param msg a {@link CompleteTransactionMessage}
+         */
+        void markLastFragment(CompleteTransactionMessage msg)
+        {
+            if (m_lastFragment == null)
+            {
+                m_lastFragment = msg;
+
+                Iterator<VoltMessage> blocked = m_blockedMessages.iterator();
+                while (blocked.hasNext())
+                {
+                    m_sequencedMessages.addLast(blocked.next());
+                    blocked.remove();
+                }
+            }
+        }
+
+        void addFragmentMessage(VoltMessage m)
+        {
+            m_sequencedMessages.addLast(m);
+        }
+
+        void addCompletedMessage(CompleteTransactionMessage msg)
+        {
+            m_sequencedMessages.addLast(msg);
+            markLastFragment(msg);
         }
 
         VoltMessage poll()
         {
-            if (isReady()) {
-               if(!m_servedFragment && m_firstFragment != null) {
-                   m_servedFragment = true;
-                   return m_firstFragment;
-               }
-               else {
-                   return m_blockedMessages.poll();
-               }
+            if (!isReady()) return null;
+
+            if (!m_servedFragment)
+            {
+                m_servedFragment = true;
+                return m_firstFragment;
             }
-            else {
-                return null;
+            else
+            {
+                return m_sequencedMessages.poll();
             }
         }
 
         VoltMessage drain()
         {
-            if(!m_servedFragment && m_firstFragment != null) {
+            if(!m_servedFragment && m_firstFragment != null)
+            {
                 m_servedFragment = true;
                 return m_firstFragment;
             }
-            else {
+            else if (!m_sequencedMessages.isEmpty())
+            {
+                return m_sequencedMessages.poll();
+            }
+            else
+            {
                 return m_blockedMessages.poll();
             }
         }
 
         boolean isEmpty() {
-            return isReady() && m_servedFragment && m_blockedMessages.isEmpty();
+            return isReady() && m_servedFragment && m_sequencedMessages.isEmpty() && m_blockedMessages.isEmpty();
         }
 
         @Override
         public String toString()
         {
             return String.format("(SENTINEL TXNID: %d (%s), %d BLOCKED MESSAGES, %s)\n%s",
-                                 m_sentinalTxnId, TxnEgo.txnIdToString(m_sentinalTxnId),
+                                 m_sentinalTxnId, m_sentinalTxnId != null ? TxnEgo.txnIdToString(m_sentinalTxnId) : "",
                                  m_blockedMessages.size(),
                                  m_servedFragment ? "SERVED FRAGMENT" : "",
                                  m_firstFragment);
@@ -330,16 +393,20 @@ public class ReplaySequencer
                 assert(found.isReady());
             }
             else {
-                found.addBlockedMessage(ftm);
+                found.addFragmentMessage(ftm);
             }
         }
         else if (in instanceof CompleteTransactionMessage) {
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)in;
             // already sequenced
             if (inTxnId <= m_lastPolledFragmentTxnId) {
+                if (found != null && found.m_firstFragment != null) {
+                    found.markLastFragment(ctm);
+                }
                 return false;
             }
             if (found != null && found.m_firstFragment != null) {
-                found.addBlockedMessage(in);
+                found.addCompletedMessage(ctm);
             }
             else {
                 // Always expect to see the fragment first, but there are places in the protocol

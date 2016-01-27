@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -135,7 +135,7 @@ class JavaRunner(object):
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
-        java_args.append('-Djava.library.path="%s"' % os.environ['VOLTDB_VOLTDB'])
+        java_args.append('-Djava.library.path=default')
         java_args.extend(('-classpath', classpath))
         java_args.append(java_class)
         for arg in args:
@@ -143,9 +143,13 @@ class JavaRunner(object):
                 java_args.append(arg)
         daemonizer = utility.kwargs_get(kwargs, 'daemonizer')
         if daemonizer:
-            # Does not return if successful.
+            # Run as a daemon process. Does not return.
             daemonizer.start_daemon(*java_args)
+        elif utility.kwargs_get_boolean(kwargs, 'exec'):
+            # Replace the current process. Does not return.
+            utility.exec_cmd(*java_args)
         else:
+            # Run as a sub-process. Returns when the sub-process exits.
             return utility.run_cmd(*java_args)
 
     def compile(self, outdir, *srcfiles):
@@ -155,8 +159,7 @@ class JavaRunner(object):
         self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-        utility.run_cmd('javac', '-target', '1.7', '-source', '1.7',
-                          '-classpath', self.classpath, '-d', outdir, *srcfiles)
+        utility.run_cmd('javac', '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
 class VerbRunner(object):
@@ -426,15 +429,10 @@ class VerbRunner(object):
         """
         Initialize daemon keyword arguments.
         """
-        # Build the name, using the host option if available.
-        names = []
-        if name:
-            names.append(name)
-        if hasattr(self.opts, 'host'):
-            names.append(self.opts.host.replace(':', '_'))
-        if not names:
-            names.append('server')
-        daemon_name = ''.join(names)
+        daemon_name = utility.daemon_file_name(
+            base_name=name,
+            host=getattr(self.opts, 'host', None),
+            instance=getattr(self.opts, 'instance', None))
         # Default daemon output directory to the state directory, which is
         # frequently set to ~/.<command_name>.
         daemon_output = output
@@ -466,6 +464,28 @@ class VerbRunner(object):
         if required:
             utility.abort('Resource file "%s" is missing.' % name)
         return None
+
+    def voltdb_connect(self, host, port, username=None, password=None):
+        """
+        Create a VoltDB client connection.
+        """
+        self.voltdb_disconnect()
+        try:
+            kwargs = {}
+            if username:
+                kwargs['username'] = username
+                if password:
+                    kwargs['password'] = password
+            self.client = FastSerializer(host, port, **kwargs)
+        except Exception, e:
+            utility.abort(e)
+
+    def voltdb_disconnect(self):
+        """
+        Close a VoltDB client connection.
+        """
+        if self.client:
+            self.client.close()
 
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
@@ -564,7 +584,7 @@ class VOLT(object):
         self.utility = utility
 
 #===============================================================================
-def load_verbspace(command_name, command_dir, config, version, description, package):
+def load_verbspace(command_name, command_dir, config, version, description, package, pro_version):
 #===============================================================================
     """
     Build a verb space by searching for source files with verbs in this source
@@ -606,7 +626,7 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs)
+    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs, pro_version)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -632,13 +652,15 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
+        verstr = '%%prog version %s Enterprise Edition' % verbspace.version \
+            if verbspace.pro_version else '%%prog version %s' % verbspace.version
         cli.CLIParser.__init__(self, environment.command_name,
                                      verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
                                                 base_cli_spec.description)),
-                                     '%%prog version %s' % verbspace.version)
+                                     verstr)
 
 #===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
@@ -697,7 +719,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,
-                                   description, package)
+                                   description, package, environment.pro_version)
 
         # Make internal commands available to user commands via runner.verbspace().
         internal_verbspaces = {}

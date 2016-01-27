@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,20 +43,23 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "sendnode.h"
-#include "common/serializeio.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-std::string SendPlanNode::debugInfo(const std::string &spacer) const {
+SendPlanNode::~SendPlanNode() { }
+
+PlanNodeType SendPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SEND; }
+
+std::string SendPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
     buffer << spacer << "SendNode\n";
     return (buffer.str());
 }
 
-void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-}
+void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) { }
 
-}
+} // namespace voltdb

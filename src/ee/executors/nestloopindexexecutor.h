@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -57,6 +57,7 @@ namespace voltdb {
 
 class NestLoopIndexPlanNode;
 class IndexScanPlanNode;
+class AggregateExecutorBase;
 class PersistentTable;
 class Table;
 class TempTable;
@@ -74,42 +75,26 @@ class NestLoopIndexExecutor : public AbstractExecutor
 {
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-        index_values_backing_store(NULL)
-    {
-        node = NULL;
-        inline_node = NULL;
-        output_table = NULL;
-        inner_table = NULL;
-        index = NULL;
-        outer_table = NULL;
-        m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    }
+        : AbstractExecutor(engine, abstract_node)
+        , m_indexNode(NULL)
+        , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
+    { }
 
     ~NestLoopIndexExecutor();
-
-    void updateTargetTableAndIndex();
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    NestLoopIndexPlanNode* node;
-    IndexScanPlanNode* inline_node;
+    IndexScanPlanNode* m_indexNode;
     IndexLookupType m_lookupType;
-    TempTable* output_table;
-    PersistentTable* inner_table;
-    TableIndex *index;
-    TableTuple index_values;
-    Table* outer_table;
-    JoinType join_type;
+    JoinType m_joinType;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
-
-    //So valgrind doesn't report the data as lost.
-    char *index_values_backing_store;
+    StandAloneTupleStorage m_indexValues;
+    AggregateExecutorBase* m_aggExec;
 };
 
 }

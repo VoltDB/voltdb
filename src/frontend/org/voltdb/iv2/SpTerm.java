@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,22 +17,20 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
-import com.google_voltpatches.common.base.Supplier;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
+import com.google_voltpatches.common.base.Supplier;
 
 public class SpTerm implements Term
 {
@@ -85,7 +83,7 @@ public class SpTerm implements Term
     {
         try {
             Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
-                    LeaderElector.electionDirForPartition(m_partitionId),
+                    LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                     m_replicasChangeHandler);
             m_babySitter = pair.getFirst();
         }

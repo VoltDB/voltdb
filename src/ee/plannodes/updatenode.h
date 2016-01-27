@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,9 +46,6 @@
 #ifndef HSTOREUPDATENODE_H
 #define HSTOREUPDATENODE_H
 
-#include <vector>
-#include "common/common.h"
-#include "common/debuglog.h"
 #include "abstractoperationnode.h"
 
 namespace voltdb {
@@ -57,26 +54,18 @@ namespace voltdb {
  *
  */
 class UpdatePlanNode : public AbstractOperationPlanNode {
-    public:
-        UpdatePlanNode(CatalogId id) : AbstractOperationPlanNode(id), m_updatesIndexes(false) {
-            // Do nothing
-        }
-        UpdatePlanNode() : AbstractOperationPlanNode(), m_updatesIndexes(false) {
-            // Do nothing
-        }
+public:
+    UpdatePlanNode() : m_updatesIndexes(false) { }
+    PlanNodeType getPlanNodeType() const;
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UPDATE); }
+    bool doesUpdateIndexes() { return m_updatesIndexes; }
 
-        std::string debugInfo(const std::string &spacer) const;
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        bool doesUpdateIndexes() { return m_updatesIndexes; }
-
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-
-        bool m_updatesIndexes;
+    bool m_updatesIndexes;
 };
 
-}
+} // namespace voltdb
 
 #endif

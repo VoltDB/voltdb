@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,6 +31,9 @@ import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.ScalarValueExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -60,8 +63,10 @@ public enum ExpressionType {
         // explicitly cast left as right (right is integer in ValueType enum)
     OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
         // logical not
-    OPERATOR_IS_NULL               (OperatorExpression.class, 9, "IS NULL"),
-        // unary null evaluation
+    OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL"),
+    // unary null evaluation
+    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS"),
+    // unary exists evaluation
 
     // ----------------------------
     // Binary Comparison
@@ -80,8 +85,11 @@ public enum ExpressionType {
         // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE"),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_IN                 (InComparisonExpression.class, 17, "IN"),
+    COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
         // IN operator. left IN right. right must be VectorValue
+    // value 18 is assigned to OPERATOR_EXISTS
+    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT"),
+        // Not distinct operator between left and right
 
     // ----------------------------
     // Conjunction Operator
@@ -97,6 +105,7 @@ public enum ExpressionType {
     VALUE_TUPLE                  (TupleValueExpression.class, 32, "<column>"),
     VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33, "<address>"),
     VALUE_VECTOR                (VectorValueExpression.class, 35, "<vector>"),
+    VALUE_SCALAR                (ScalarValueExpression.class, 36, "<scalar>"),
 
     // ----------------------------
     // Aggregate
@@ -107,6 +116,9 @@ public enum ExpressionType {
     AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN"),
     AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX"),
     AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
+    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT"),
+    AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
+    AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
 
     // ----------------------------
     // Function
@@ -125,8 +137,14 @@ public enum ExpressionType {
     // Internals added for CASE WHEN expression.
     // -----------------------------
     OPERATOR_CASE_WHEN       (OperatorExpression.class,  300, "CASEWHEN"),
-    OPERATOR_ALTERNATIVE     (OperatorExpression.class,  301, "ALTERNATIVE")
-    ;
+    OPERATOR_ALTERNATIVE     (OperatorExpression.class,  301, "ALTERNATIVE"),
+
+    // -----------------------------
+    // Subquery
+    // -----------------------------
+    ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
+    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
+;
 
     private final int m_value;
     private final String m_symbol;
@@ -190,4 +208,7 @@ public enum ExpressionType {
         return m_symbol;
     }
 
+    public boolean isAggregateExpression() {
+        return getExpressionClass() == AggregateExpression.class;
+    }
 }

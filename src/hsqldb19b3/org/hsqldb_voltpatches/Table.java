@@ -287,13 +287,15 @@ public class Table extends TableBase implements SchemaObject {
                                          this, true);
     }
 
+    @Override
     public int getType() {
         return SchemaObject.TABLE;
     }
 
     /**
-     *  Returns the HsqlName object fo the table
+     *  Returns the HsqlName object for the table
      */
+    @Override
     public final HsqlName getName() {
         return tableName;
     }
@@ -301,6 +303,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the catalog name or null, depending on a database property.
      */
+    @Override
     public HsqlName getCatalogName() {
         return database.getCatalogName();
     }
@@ -308,14 +311,17 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the schema name.
      */
+    @Override
     public HsqlName getSchemaName() {
         return tableName.schema;
     }
 
+    @Override
     public Grantee getOwner() {
         return tableName.schema.owner;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -331,6 +337,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -347,6 +354,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public void compile(Session session) {}
 
     String[] getSQL(OrderedHashSet resolved, OrderedHashSet unresolved) {
@@ -422,6 +430,7 @@ public class Table extends TableBase implements SchemaObject {
         return array;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -532,6 +541,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Used to create row id's
      */
+    @Override
     public int getId() {
         return tableName.hashCode();
     }
@@ -1043,15 +1053,19 @@ public class Table extends TableBase implements SchemaObject {
             // A VoltDB extension to support indexed expressions and assume unique attribute
             Expression[] exprArr = idx.getExpressions();
             boolean assumeUnique = idx.isAssumeUnique();
+            Expression predicate = idx.getPredicate();
             // End of VoltDB extension
             idx = tn.createIndexStructure(idx.getName(), colarr,
                                           idx.getColumnDesc(), null,
                                           idx.isUnique(), idx.isConstraint(),
                                           idx.isForward());
 
-            // A VoltDB extension to support indexed expressions and assume unique attribute
+            // A VoltDB extension to support indexed expressions and assume unique attribute and partial indexes
             if (exprArr != null) {
                 idx = idx.withExpressions(adjustExprs(exprArr, colIndex, adjust));
+            }
+            if (predicate != null) {
+                idx = idx.withPredicate(adjustExpr(predicate, colIndex, adjust));
             }
             idx = idx.setAssumeUnique(assumeUnique);
             // End of VoltDB extension
@@ -1957,7 +1971,7 @@ public class Table extends TableBase implements SchemaObject {
 
                 for (int j = 0; j < constraints.length; j++) {
                     constraints[j].checkCheckConstraint(session, this,
-                                                        (Object) data[i]);
+                                                        data[i]);
                 }
             }
 
@@ -2250,7 +2264,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav   = result.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2299,7 +2313,7 @@ public class Table extends TableBase implements SchemaObject {
         int             count = 0;
 
         while (nav.hasNext()) {
-            insertSys(store, (Object[]) nav.getNext());
+            insertSys(store, nav.getNext());
 
             count++;
         }
@@ -2316,7 +2330,7 @@ public class Table extends TableBase implements SchemaObject {
         RowSetNavigator nav = ins.initialiseNavigator();
 
         while (nav.hasNext()) {
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             Object[] newData =
                 (Object[]) ArrayUtil.resizeArrayIfDifferent(data,
                     getColumnCount());
@@ -2603,6 +2617,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(Session session) {
 
         super.clearAllData(session);
@@ -2612,6 +2627,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(PersistentStore store) {
 
         super.clearAllData(store);
@@ -2647,6 +2663,16 @@ public class Table extends TableBase implements SchemaObject {
         return exprArr;
     }
 
+    /** Index expressions as exported to VoltDB are "column name based" not "column index based",
+     *  so they are not thrown off by column re-numbering.
+     *  VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
+     *  This stubbed pass-through method is here in case that someday changes in a way that would require
+     *  processing of the expression trees.
+     */
+    private Expression adjustExpr(Expression expr, int colIndex, int adjust) {
+        return expr;
+    }
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -2667,17 +2693,24 @@ public class Table extends TableBase implements SchemaObject {
 
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
+        // Hacky, need a "name" for the diffing stuff to work correctly
+        // See VoltXMLElement.java for further explanation of TEH HORROR
+        columns.attributes.put("name", "columns");
         table.children.add(columns);
         int[] columnIndices = getColumnMap();
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
             VoltXMLElement colChild = column.voltGetColumnXML(session);
+            colChild.attributes.put("index", Integer.toString(i));
             columns.children.add(colChild);
             assert(colChild != null);
         }
 
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
+        // Hacky, need a "name" for the diffing stuff to work correctly
+        // See VoltXMLElement.java for further explanation of TEH HORROR
+        indexes.attributes.put("name", "indexes");
         table.children.add(indexes);
         for (Index index : indexList) {
             VoltXMLElement indexChild = index.voltGetIndexXML(session, tableName);
@@ -2688,6 +2721,9 @@ public class Table extends TableBase implements SchemaObject {
 
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
+        // Hacky, need a "name" for the diffing stuff to work correctly
+        // See VoltXMLElement.java for further explanation of TEH HORROR
+        constraints.attributes.put("name", "constraints");
         table.children.add(constraints);
         List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
         for (Constraint constraint : getConstraints()) {
@@ -2742,6 +2778,20 @@ public class Table extends TableBase implements SchemaObject {
         addIndex(newExprIndex);
         return newExprIndex;
     } /* createAndAddExprIndexStructure */
+
+    // A VoltDB extension to support LIMIT PARTITION ROWS
+    Constraint getLimitConstraint() {
+        Constraint result = null;
+        for (Constraint constraint : getConstraints()) {
+            if (constraint.getConstraintType() == Constraint.LIMIT) {
+                // We're assuming only one LIMIT constraint at the moment
+                result = constraint;
+                break;
+            }
+        }
+        return result;
+    }
+    // End of VoltDB extension
 
     /* (non-Javadoc)
      * @see java.lang.Object#toString()

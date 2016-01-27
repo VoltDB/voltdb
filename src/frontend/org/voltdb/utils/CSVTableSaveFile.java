@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -114,8 +114,11 @@ public class CSVTableSaveFile {
                     Pair<Integer, byte[]> p = VoltTableUtil.toCSV( vt, m_delimiter, null, lastNumCharacters);
                     lastNumCharacters = p.getFirst();
                     byte csvBytes[] = p.getSecond();
-                    m_availableBytes.addAndGet(csvBytes.length);
-                    m_available.offer(csvBytes);
+                    // should not insert empty byte[] if not last ConverterThread
+                    if (csvBytes.length > 0) {
+                        m_availableBytes.addAndGet(csvBytes.length);
+                        m_available.offer(csvBytes);
+                    }
                 } finally {
                     c.discard();
                 }

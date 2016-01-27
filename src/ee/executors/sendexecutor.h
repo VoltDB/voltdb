@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -61,7 +61,6 @@ public:
     SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode)
     {
-        m_inputTable = NULL;
         m_engine = engine;
     }
 
@@ -71,7 +70,6 @@ protected:
     bool p_execute(const NValueArray &params);
 
 private:
-    Table* m_inputTable;
     VoltDBEngine *m_engine;
 };
 

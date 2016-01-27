@@ -1,0 +1,58 @@
+
+drop table t if exists;
+Command succeeded.
+
+drop table s if exists;
+Command succeeded.
+
+FILE -batch ./scripts/batching/file_batch_positive.sqlfile
+
+create table t (
+  i integer not null primary key,
+  vc varchar(32)
+);
+create index my_idx_t on t (vc);
+partition table t on column i;
+
+create table s (
+  i integer not null primary key,
+  vcc varchar(255)
+);
+create index my_idx_s on s (vcc);
+partition table s on column i;
+
+Batch command succeeded.
+
+insert into t values (0, 'cats');
+(Returned 1 rows in #.##s)
+
+insert into t values (1, 'dogs');
+(Returned 1 rows in #.##s)
+
+insert into s values (2, 'aardvarks');
+(Returned 1 rows in #.##s)
+
+insert into s values (3, 'platypii');
+(Returned 1 rows in #.##s)
+
+select * from t order by i;
+I  VC   
+-- -----
+ 0 cats 
+ 1 dogs 
+
+(Returned 2 rows in #.##s)
+
+select * from s order by i;
+I  VCC       
+-- ----------
+ 2 aardvarks 
+ 3 platypii  
+
+(Returned 2 rows in #.##s)
+
+drop table t;
+Command succeeded.
+
+drop table s;
+Command succeeded.

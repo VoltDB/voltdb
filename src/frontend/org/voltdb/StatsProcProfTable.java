@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -119,7 +119,7 @@ public class StatsProcProfTable {
         if (denom == 0L) {
             return 100L;
         }
-        return (100L * nom / denom);
+        return Math.round(100.0 * nom / denom);
     }
 
     // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.

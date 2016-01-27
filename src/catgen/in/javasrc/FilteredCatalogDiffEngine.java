@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,8 +31,8 @@ package org.voltdb.catalog;
  */
 public class FilteredCatalogDiffEngine extends CatalogDiffEngine {
 
-    public FilteredCatalogDiffEngine(Catalog prev, Catalog next) {
-        super(prev, next);
+    public FilteredCatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
+        super(prev, next, forceVerbose);
     }
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -840,7 +840,7 @@ public class ExportOnServerVerifier {
             FileReader fr = new FileReader(file);
             BufferedReader br = new BufferedReader(fr);
             final String firstLine = br.readLine();
-            if (firstLine.contains("PRIVATE KEY")) {
+            if (firstLine != null && firstLine.contains("PRIVATE KEY")) {
                 m_jsch.addIdentity(file.getAbsolutePath());
             }
         }
@@ -1480,7 +1480,8 @@ public class ExportOnServerVerifier {
     {
         if (row.length < 29)
         {
-            System.err.println("ERROR: Unexpected number of columns for the following row:\n\t" + Arrays.toString(row));
+            System.err.println("ERROR: Unexpected number of columns for the following row:\n\t Expected 29, Found: "
+                    + row.length + "Row:" + Arrays.toString(row));
             return new ValidationErr("number of columns", row.length, 29);
         }
 
@@ -1630,7 +1631,7 @@ public class ExportOnServerVerifier {
     }
 
     public static ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
-        System.err.println("ERROR: " + msg + " " + val + " " + exp);
+        System.err.println("ERROR: " + msg + "Value:" + val + "\nExpected:" + exp);
         return new ValidationErr(msg, val, exp);
     }
 

@@ -1,0 +1,8 @@
+# Expected User-defined Stored Procedures: (when running the default GEB VMC
+# test server; see ../../server/run_voltdb_server.sh)
+CountPartitionedTable
+CountPartitionedTableByGroup
+CountReplicatedTable
+CountReplicatedTableByGroup
+InsertPartitionedTableZeroes
+InsertReplicatedTableZeroes

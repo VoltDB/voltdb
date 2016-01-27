@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <commandlog enabled="false" />
+    <import>
+        <configuration module="kafkastream.jar" type="custom" enabled="true">
+	    <property name="brokers">volt15a.voltdb.lan:9092,volt15b.voltdb.lan:9092,volt15d.voltdb.lan:9092</property>
+	    <property name="topics">replicated-import</property>
+<!--
+	    <property name="brokers">kafka2</property>
+	    <property name="topics">bar2</property>
+-->
+	    <property name="groupid">replicatedimport</property>
+            <property name="procedure">importTable.insert</property>
+        </configuration>
+    </import>
+</deployment>

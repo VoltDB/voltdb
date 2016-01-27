@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,13 +37,14 @@ package genqa;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.Random;
 
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.jdbc.IVoltDBConnection;
 
@@ -54,6 +55,8 @@ public class JDBCBenchmark
 
     // Reference to the database connection we will use in them main thread
     private static Connection Con;
+    private static ClientStatsContext periodicStatsContext;
+    private static long benchmarkStartTS;
 
     // Class for each thread that will be run in parallel, performing JDBC requests against the VoltDB server
     private static class ClientThread implements Runnable
@@ -108,6 +111,22 @@ public class JDBCBenchmark
                 try { con.close(); } catch (Exception x) {}
             }
         }
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public static synchronized void printStatistics() {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
 
     // Application entry point
@@ -184,16 +203,17 @@ public class JDBCBenchmark
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
+            final ClientStatsContext fullStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+            periodicStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+            benchmarkStartTS = System.currentTimeMillis();
+
             // Create a Timer task to display performance data on the procedure
             Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
+            TimerTask statsPrinting = new TimerTask() {
                 @Override
-                public void run()
-                {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics(procedure)); } catch(Exception x) {}
-                }
-            }
+                public void run() { printStatistics(); }
+            };
+            timer.scheduleAtFixedRate(statsPrinting
             , displayInterval*1000l
             , displayInterval*1000l
             );
@@ -242,10 +262,10 @@ public class JDBCBenchmark
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics(procedure).toString(false));
+            System.out.print(fullStatsContext.getStatsForProcedure(procedure).toString());
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(csv);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(fullStatsContext.getStats(), csv);
 
             Con.close();
 

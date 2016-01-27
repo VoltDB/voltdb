@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,47 +47,41 @@
 #define HSTOREOPERATIONNODE_H
 
 #include "abstractplannode.h"
-#include "storage/TableCatalogDelegate.hpp"
+#include "storage/TableCatalogDelegate.hpp" // DEPRECATED
 
 namespace voltdb {
 
 class Table;
+class TableCatalogDelegate;
 
 /**
  *
  */
 class AbstractOperationPlanNode : public AbstractPlanNode {
-    public:
-        virtual ~AbstractOperationPlanNode();
-        Table* getTargetTable() const;
-        void setTargetTableDelegate(TableCatalogDelegate * tcd);
+public:
+    ~AbstractOperationPlanNode();
+    std::string debugInfo(const std::string &spacer) const;
 
-        std::string getTargetTableName() const;
-        void setTargetTableName(std::string name);
+    Table* getTargetTable() const;
+    void setTargetTableDelegate(TableCatalogDelegate * tcd) { m_tcd = tcd; }
+    std::string getTargetTableName() const { return m_target_table_name; }
 
-        virtual std::string debugInfo(const std::string &spacer) const;
+protected:
+    AbstractOperationPlanNode()
+        : m_tcd(NULL)
+        , m_target_table_name("NOT SPECIFIED")
+    { }
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
-            m_tcd = NULL;
-            target_table_name = "NOT_SPECIFIED";
-        }
-        AbstractOperationPlanNode() : AbstractPlanNode() {
-            m_tcd = NULL;
-            target_table_name = "NOT SPECIFIED";
-        }
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        //
-        // Target Table
-        // These tables are different from the input and the output tables
-        // The plannode can read in tuples from the input table(s) and apply them to the target table
-        // The results of the operations will be written to the the output table
-        //
-        std::string target_table_name;
-        TableCatalogDelegate * m_tcd;
+    // Target Table
+    // These tables are different from the input and the output tables
+    // The plannode can read in tuples from the input table(s) and apply them to the target table
+    // The results of the operations will be written to the the output table
+    TableCatalogDelegate * m_tcd;
+    std::string m_target_table_name;
 };
 
-}
+} // namespace voltdb
 
 #endif

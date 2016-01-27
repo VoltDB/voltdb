@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@
 #include "storage/tableiterator.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
-#include "common/DefaultTupleSerializer.h"
 
 /*
  * A log of changes to tuple data that has already been sent to a recovering
@@ -90,8 +89,6 @@ private:
      * Phase 3 is to ship deletes
      */
     RecoveryMsgType m_recoveryPhase;
-
-    DefaultTupleSerializer m_serializer;
 };
 }
 #endif /* RECOVERYCONTEXT_H_ */

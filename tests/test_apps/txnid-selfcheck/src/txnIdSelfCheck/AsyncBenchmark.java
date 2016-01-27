@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -88,15 +88,6 @@ public class AsyncBenchmark {
     long benchmarkStartTS;
 
     final TxnIdPayloadProcessor processor;
-    // For retry connections
-    final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
 
     final AtomicLong previousReplicated = new AtomicLong(0);
     final AtomicBoolean shutdown = new AtomicBoolean(false);
@@ -181,38 +172,6 @@ public class AsyncBenchmark {
     }
 
     /**
-     * Remove the client from the list if connection is broken.
-     */
-    class StatusListener extends ClientStatusListenerExt {
-        private Client client;
-
-        public void setClient(Client client) {
-            this.client = client;
-        }
-
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            if (shutdown.get()) {
-                return;
-            }
-
-            // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                log.warn(String.format("Connection to %s:%d was lost.", hostname, port));
-            }
-
-            // setup for retry
-            final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-            es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(client, server);
-                }
-            });
-        }
-    }
-
-    /**
      * Constructor for benchmark instance.
      * Configures VoltDB client and prints configuration.
      *
@@ -231,8 +190,8 @@ public class AsyncBenchmark {
     }
 
     Client createClient(int serverCount) {
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "");
+        clientConfig.setReconnectOnConnectionLoss(true);
         if (config.autotune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
@@ -241,7 +200,6 @@ public class AsyncBenchmark {
             clientConfig.setMaxTransactionsPerSecond(config.ratelimit / serverCount);
         }
         Client client = ClientFactory.createClient(clientConfig);
-        statusListener.setClient(client);
 
         return client;
     }
@@ -535,7 +493,6 @@ public class AsyncBenchmark {
         timer.cancel();
 
         shutdown.set(true);
-        es.shutdownNow();
 
         // block until all outstanding txns return
         for (Client client : clients) {

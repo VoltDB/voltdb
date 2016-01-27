@@ -1,0 +1,23 @@
+# Expected System Stored Procedures: (when running any VoltDB server;
+# this list does not change)
+@Explain
+@ExplainProc
+@Pause
+@Quiesce
+@Resume
+@Shutdown
+@SnapshotDelete
+@SnapshotRestore
+@SnapshotRestore
+@SnapshotSave
+@SnapshotSave
+@SnapshotScan
+@SnapshotStatus
+@Statistics
+@SystemCatalog
+@SystemInformation
+@UpdateApplicationCatalog
+@UpdateLogging
+@Promote
+@ValidatePartitioning
+@GetPartitionKeys

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,7 @@ namespace voltdb {
 /*
  * Prepare a recovery message for reading.
  */
-RecoveryProtoMsg::RecoveryProtoMsg(ReferenceSerializeInput *in) :
+RecoveryProtoMsg::RecoveryProtoMsg(ReferenceSerializeInputBE *in) :
         m_in(in),  m_type(static_cast<RecoveryMsgType>(in->readByte())),
         m_tableId(in->readInt()) {
     assert(m_in);
@@ -54,7 +54,7 @@ uint32_t RecoveryProtoMsg::totalTupleCount() {
     return m_totalTupleCount;
 }
 
-ReferenceSerializeInput* RecoveryProtoMsg::stream() {
+ReferenceSerializeInputBE* RecoveryProtoMsg::stream() {
     return m_in;
 }
 }

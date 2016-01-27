@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -83,54 +83,57 @@ abstract public class ProcedureTask extends TransactionTask
                                 + m_procName + "\n"
                                 + result.toString()));
             }
-            if (callerParams != null) {
-                ClientResponseImpl cr = null;
-                ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
-                if (runner == null) {
-                    String error =
+            if (callerParams == null) {
+                return response;
+            }
+
+            ClientResponseImpl cr = null;
+            ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
+            if (runner == null) {
+                String error =
                         "Procedure " + m_procName + " is not present in the catalog. "  +
-                        "This can happen if a catalog update removing the procedure occurred " +
-                        "after the procedure was submitted " +
-                        "but before the procedure was executed.";
-                    RateLimitedLogger.tryLogForMessage(
-                            error + " This log message is rate limited to once every 60 seconds.",
-                            System.currentTimeMillis(),
-                            60, TimeUnit.SECONDS,
-                            hostLog,
-                            Level.WARN);
-                    response.setResults(
-                            new ClientResponseImpl(
+                                "This can happen if a catalog update removing the procedure occurred " +
+                                "after the procedure was submitted " +
+                                "but before the procedure was executed.";
+                RateLimitedLogger.tryLogForMessage(
+                        System.currentTimeMillis(),
+                        60, TimeUnit.SECONDS,
+                        hostLog,
+                        Level.WARN, error + " %s", "This log message is rate limited to once every 60 seconds.");
+                response.setResults(
+                        new ClientResponseImpl(
                                 ClientResponse.UNEXPECTED_FAILURE,
                                 new VoltTable[]{},
                                 error));
-                    return response;
+                return response;
+            }
+
+            // Check partitioning of single-partition and n-partition transactions.
+            if (runner.checkPartition(m_txnState, siteConnection.getCurrentHashinator())) {
+                runner.setupTransaction(m_txnState);
+
+                // execute the procedure
+                cr = runner.call(callerParams);
+
+                m_txnState.setHash(cr.getHash());
+                //Don't pay the cost of returning the result tables for a replicated write
+                //With reads don't apply the optimization just in case
+                //                    if (!task.shouldReturnResultTables() && !task.isReadOnly()) {
+                //                        cr.dropResultTable();
+                //                    }
+
+                response.setResults(cr);
+                // record the results of write transactions to the transaction state
+                // this may be used to verify the DR replica cluster gets the same value
+                // skip for multi-partition txns because only 1 of k+1 partitions will
+                //  have the real results
+                if ((!task.isReadOnly()) && task.isSinglePartition()) {
+                    m_txnState.storeResults(cr);
                 }
-
-                // Check partitioning of single-partition and n-partition transactions.
-                if (runner.checkPartition(m_txnState, siteConnection.getCurrentHashinator())) {
-                    runner.setupTransaction(m_txnState);
-                    cr = runner.call(callerParams);
-
-                    m_txnState.setHash(cr.getHash());
-                    //Don't pay the cost of returning the result tables for a replicated write
-                    //With reads don't apply the optimization just in case
-//                    if (!task.shouldReturnResultTables() && !task.isReadOnly()) {
-//                        cr.dropResultTable();
-//                    }
-
-                    response.setResults(cr);
-                    // record the results of write transactions to the transaction state
-                    // this may be used to verify the DR replica cluster gets the same value
-                    // skip for multi-partition txns because only 1 of k+1 partitions will
-                    //  have the real results
-                    if ((!task.isReadOnly()) && task.isSinglePartition()) {
-                        m_txnState.storeResults(cr);
-                    }
-                } else {
-                    // mis-partitioned invocation, reject it and let the ClientInterface restart it
-                    response.setMispartitioned(true, task.getStoredProcedureInvocation(),
-                                               TheHashinator.getCurrentVersionedConfig());
-                }
+            } else {
+                // mis-partitioned invocation, reject it and let the ClientInterface restart it
+                response.setMispartitioned(true, task.getStoredProcedureInvocation(),
+                        TheHashinator.getCurrentVersionedConfig());
             }
         }
         catch (final ExpectedProcedureException e) {

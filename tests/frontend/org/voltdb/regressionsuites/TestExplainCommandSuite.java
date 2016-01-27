@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -85,7 +85,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             System.out.println(vt);
             String sql = (String) vt.get(0, VoltType.STRING );
             String plan = (String) vt.get(1, VoltType.STRING );
-            assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?);" ));
+            assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
             assertTrue( plan.contains( "INSERT into \"T1\"" ));
             assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
         }

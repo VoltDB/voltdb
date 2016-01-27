@@ -33,7 +33,6 @@ package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
-import org.hsqldb_voltpatches.types.NumberType;
 import org.hsqldb_voltpatches.store.ValuePool;
 
 /**
@@ -64,10 +63,12 @@ public class ExpressionAggregate extends Expression {
         nodes               = e.nodes;
     }
 
+    @Override
     boolean isSelfAggregate() {
         return true;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb   = new StringBuffer(64);
@@ -80,6 +81,11 @@ public class ExpressionAggregate extends Expression {
                 sb.append(' ').append(Tokens.T_COUNT).append('(');
                 break;
 
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT :
+                sb.append(' ').append(Tokens.T_APPROX_COUNT_DISTINCT).append('(');
+                break;
+            // End of VoltDB extension
             case OpTypes.SUM :
                 sb.append(' ').append(Tokens.T_SUM).append('(');
                 sb.append(left).append(')');
@@ -137,6 +143,7 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -153,6 +160,11 @@ public class ExpressionAggregate extends Expression {
                 sb.append("COUNT ");
                 break;
 
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT :
+                sb.append("APPROX_COUNT_DISTINCT ");
+                break;
+            // End of VoltDB extension
             case OpTypes.SUM :
                 sb.append("SUM ");
                 break;
@@ -194,7 +206,7 @@ public class ExpressionAggregate extends Expression {
                 break;
         }
 
-        if (nodes[LEFT] != null) {
+        if (nodes.length > LEFT && nodes[LEFT] != null) {
             sb.append(" arg1=[");
             sb.append(nodes[LEFT].describe(session, blanks + 1));
             sb.append(']');
@@ -203,6 +215,7 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -215,6 +228,7 @@ public class ExpressionAggregate extends Expression {
         return unresolvedSet;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -230,6 +244,7 @@ public class ExpressionAggregate extends Expression {
         dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
     }
 
+    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -272,8 +287,14 @@ public class ExpressionAggregate extends Expression {
     public Object getAggregatedValue(Session session, Object currValue) {
 
         if (currValue == null) {
+            // A VoltDB extension APPROX_COUNT_DISTINCT
+            return opType == OpTypes.COUNT || opType == OpTypes.APPROX_COUNT_DISTINCT ?
+                    ValuePool.INTEGER_0: null;
+            /* disable 2 lines...
             return opType == OpTypes.COUNT ? ValuePool.INTEGER_0
                                            : null;
+            ...disabled 2 lines */
+            // End of VoltDB extension
         }
 
         return ((SetFunction) currValue).getValue();

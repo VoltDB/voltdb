@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -183,6 +183,9 @@ namespace voltdb {
 
     private:
         rapidjson::Document m_document;
+        // For safety, undefine expensive copy and assignment.
+        PlannerDomRoot(const PlannerDomRoot& other);
+        PlannerDomRoot& operator=(const PlannerDomRoot& other);
     };
 }
 

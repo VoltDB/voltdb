@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,8 +29,8 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
@@ -41,40 +41,44 @@ import org.voltdb.plannodes.SchemaColumn;
  */
 public class StmtSubqueryScan extends StmtTableScan {
     // Sub-Query
-    private final AbstractParsedStmt m_subquery;
-    private ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
+    private final AbstractParsedStmt m_subqueryStmt;
+    private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
+    private final Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
 
     private StatementPartitioning m_subqueriesPartitioning = null;
 
+    private boolean m_failedSingleFragmentTest = false;
+
+    private boolean m_tableAggregateSubquery = false;
+
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
-    public StmtSubqueryScan(AbstractParsedStmt subquery, String tableAlias) {
-        super(tableAlias);
-        m_subquery = subquery;
+    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
+        m_subqueryStmt = subqueryStmt;
+
         // A union or other set operator uses the output columns of its left-most leaf child statement.
-        while (subquery instanceof ParsedUnionStmt) {
-            assert( ! ((ParsedUnionStmt)subquery).m_children.isEmpty());
-            subquery = ((ParsedUnionStmt)subquery).m_children.get(0);
+        while (subqueryStmt instanceof ParsedUnionStmt) {
+            assert( ! ((ParsedUnionStmt)subqueryStmt).m_children.isEmpty());
+            subqueryStmt = ((ParsedUnionStmt)subqueryStmt).m_children.get(0);
         }
-        assert (subquery instanceof ParsedSelectStmt);
+        assert (subqueryStmt instanceof ParsedSelectStmt);
 
         int i = 0;
-        for (ParsedColInfo col: ((ParsedSelectStmt)subquery).displayColumns()) {
+        for (ParsedColInfo col: ((ParsedSelectStmt)subqueryStmt).displayColumns()) {
             String colAlias = col.alias == null? col.columnName : col.alias;
             SchemaColumn scol = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, col.expression);
             m_outputColumnList.add(scol);
             m_outputColumnIndexMap.put(colAlias, i);
             i++;
         }
-
     }
 
-    public StatementPartitioning getPartitioningForStatement() {
-        return m_subqueriesPartitioning;
+    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias) {
+        this(subqueryStmt, tableAlias, 0);
     }
 
     public void setSubqueriesPartitioning(StatementPartitioning subqueriesPartitioning) {
@@ -93,15 +97,14 @@ public class StmtSubqueryScan extends StmtTableScan {
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence,
             Set< Set<AbstractExpression> > eqSets)
     {
-        StatementPartitioning stmtPartitioning = getPartitioningForStatement();
-
-        if (stmtPartitioning.getCountOfPartitionedTables() == 0 ||
-            stmtPartitioning.requiresTwoFragments()) {
+        assert(m_subqueriesPartitioning != null);
+        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0 ||
+                m_subqueriesPartitioning.requiresTwoFragments()) {
             return;
         }
-        // this sub-query is single partitioned query on partitioned tables
-        // promoting the single partition express up the its parent level
-        AbstractExpression spExpr = stmtPartitioning.singlePartitioningExpression();
+        // This subquery is a single partitioned query on partitioned tables
+        // promoting the single partition expression up to its parent level.
+        AbstractExpression spExpr = m_subqueriesPartitioning.singlePartitioningExpression();
 
         for (SchemaColumn col: m_partitioningColumns) {
             AbstractExpression tveKey = col.getExpression();
@@ -158,9 +161,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         assert(m_subqueriesPartitioning != null);
 
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
-            for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
-                List<SchemaColumn> scols;
-                scols = tableScan.getPartitioningColumns();
+            for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
+                List<SchemaColumn> scols = tableScan.getPartitioningColumns();
                 addPartitioningColumns(scols);
             }
         }
@@ -216,10 +218,8 @@ public class StmtSubqueryScan extends StmtTableScan {
      */
     @Override
     public boolean getIsReplicated() {
-        boolean isReplicated = true;
-        for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
-            isReplicated = isReplicated && tableScan.getIsReplicated();
-            if ( ! isReplicated) {
+        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
+            if ( ! tableScan.getIsReplicated()) {
                 return false;
             }
         }
@@ -228,7 +228,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
     public List<StmtTargetTableScan> getAllTargetTables() {
         List <StmtTargetTableScan> stmtTables = new ArrayList<StmtTargetTableScan>();
-        for (StmtTableScan tableScan : m_subquery.m_tableAliasMap.values()) {
+        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
             if (tableScan instanceof StmtTargetTableScan) {
                 stmtTables.add((StmtTargetTableScan)tableScan);
             } else {
@@ -247,8 +247,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         return noIndexesSupportedOnSubqueryScans;
     }
 
-    public AbstractParsedStmt getSubquery() {
-        return m_subquery;
+    public AbstractParsedStmt getSubqueryStmt() {
+        return m_subqueryStmt;
     }
 
     public CompiledPlan getBestCostPlan() {
@@ -273,9 +273,120 @@ public class StmtSubqueryScan extends StmtTableScan {
         SchemaColumn schemaCol = m_outputColumnList.get(idx.intValue());
 
         expr.setColumnIndex(idx.intValue());
-        expr.setValueType(schemaCol.getType());
-        expr.setValueSize(schemaCol.getSize());
-        expr.setInBytes(schemaCol.getExpression().getInBytes());
+        expr.setTypeSizeBytes(schemaCol.getType(), schemaCol.getSize(),
+                schemaCol.getExpression().getInBytes());
+
     }
 
+    /**
+     * Some subquery results can only be joined with a partitioned table after
+     * it finishes some work on the coordinator. With the 2 fragment plan limit,
+     * those queries can not be supported.
+     * Other than that case, the planner will typically have added a
+     * send/receive pair to the subquery plan that is actually only suitable to
+     * a stand-alone plan. This function distinguishes subqueries that should NOT
+     * have a send/receive pair.
+     * @param root
+     * @return true if there is no aspect to the plan that requires execution on the coordinator.
+     */
+    public boolean canRunInOneFragment() {
+        assert(m_subqueriesPartitioning != null);
+        assert(m_subqueryStmt != null);
+
+        if (m_subqueriesPartitioning.getCountOfPartitionedTables() == 0) {
+            return true;
+        }
+
+        // recursive check for its nested subqueries that require coordination
+        // of their results.
+        if (failsSingleFragmentTest()) {
+            return false;
+        }
+
+        // Tentative assignment in case of early return.
+        // This gets immediately reset if it passes all the tests.
+        m_failedSingleFragmentTest = true;
+
+        if (m_subqueryStmt instanceof ParsedUnionStmt) {
+            // Union are just returned
+            return false;
+        }
+
+        if ( ! (m_subqueryStmt instanceof ParsedSelectStmt)) {
+            throw new PlanningErrorException("Unsupported subquery found in FROM clause:" + m_subqueryStmt.toString());
+        }
+
+        ParsedSelectStmt selectStmt = (ParsedSelectStmt)m_subqueryStmt;
+
+        // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
+        // we should get rid of the receive node. I (--paul) don't know what this means.
+        if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinctWithGroupBy()) {
+            return false;
+        }
+
+        // If the query uses the partitioned materialized view table with the
+        // need to Re-aggregate, then we can not get rid of the receive node.
+        // This is also caught in StatementPartitioning when analyzing the join criteria,
+        // because it contains a partitioned view that does not have a partition column.
+        if (selectStmt.m_mvFixInfo.needed()) {
+            return false;
+        }
+
+        // Table aggregate cases should not get rid of the receive node
+        if (selectStmt.hasAggregateOrGroupby()) {
+            if (!selectStmt.isGrouped()) {
+                m_tableAggregateSubquery = true;
+                return false;
+            }
+            // For group by queries, there are two cases on group by columns.
+            // (1) Does not contain a partition column:
+            // If joined with a partitioned table in the parent query, it will
+            // violate the partitioned table join criteria.
+            // Detect case (1) to mark receive node.
+            if (! selectStmt.hasPartitionColumnInGroupby()) {
+                return false;
+            }
+        }
+        // Now. If this sub-query joins with a partitioned table in the parent statement,
+        // push the join down by removing the send/receive plan node pair.
+        m_failedSingleFragmentTest = false;
+        return true;
+    }
+
+    public boolean failsSingleFragmentTest() {
+        if (m_failedSingleFragmentTest) {
+            return true;
+        }
+        for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
+            if (tableScan instanceof StmtSubqueryScan) {
+                StmtSubqueryScan subScan = (StmtSubqueryScan)tableScan;
+                if (subScan.failsSingleFragmentTest()) {
+                    // Cache known test failures on parent subqueries.
+                    m_failedSingleFragmentTest = true;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean isTableAggregate() {
+        return m_tableAggregateSubquery;
+    }
+
+    /** Produce a tuple value expression for a column produced by this subquery */
+    public TupleValueExpression getOutputExpression(int index) {
+        SchemaColumn schemaCol = m_outputColumnList.get(index);
+        TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
+                schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);
+        return tve;
+    }
+
+    public List<SchemaColumn> getOutputSchema() {
+        return m_outputColumnList;
+    }
+
+    public String calculateContentDeterminismMessage() {
+        return m_subqueryStmt.calculateContentDeterminismMessage();
+    }
 }

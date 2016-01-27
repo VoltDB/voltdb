@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,6 @@
 #include <sstream>
 
 using namespace voltdb;
-using namespace std;
 
 class TestProxy : public LogProxy
 {
@@ -73,13 +72,10 @@ public:
 
 TEST_F(TempTableLimitsTest, CheckLogLatch)
 {
-    TestProxy* proxy =
-        dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
+    TestProxy* proxy = dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
     proxy->reset();
 
-    TempTableLimits dut;
-    dut.setLogThreshold(1024 * 5);
-    dut.setMemoryLimit(1024 * 10);
+    TempTableLimits dut(1024 * 10, 1024 * 5); // Set 10K hard limit, 5K warn level
     // check that bump over threshold gets us logged
     dut.increaseAllocated(1024 * 6);
     EXPECT_EQ(proxy->lastLoggerId, LOGGERID_SQL);
@@ -100,21 +96,16 @@ TEST_F(TempTableLimitsTest, CheckLogLatch)
 
 TEST_F(TempTableLimitsTest, CheckLimitException)
 {
-    TestProxy* proxy =
-        dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
+    TestProxy* proxy = dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
     proxy->reset();
 
-    TempTableLimits dut;
-    dut.setLogThreshold(-1);
-    dut.setMemoryLimit(1024 * 10);
+    TempTableLimits dut(1024 * 10); // Set 10K hard limit, but no warn level.
     dut.increaseAllocated(1024 * 6);
     bool threw = false;
-    try
-    {
+    try {
         dut.increaseAllocated(1024 * 6);
     }
-    catch (SQLException& sqle)
-    {
+    catch (SQLException& sqle) {
         threw = true;
     }
     EXPECT_TRUE(threw);
@@ -125,17 +116,16 @@ TEST_F(TempTableLimitsTest, CheckLimitException)
     // And check that we can dip below and rethrow
     dut.reduceAllocated(1024 * 6);
     threw = false;
-    try
-    {
+    try {
         dut.increaseAllocated(1024 * 6);
     }
-    catch (SQLException& sqle)
-    {
+    catch (SQLException& sqle) {
         threw = true;
     }
     EXPECT_TRUE(threw);
 }
 
-int main() {
+int main()
+{
     return TestSuite::globalInstance()->runAll();
 }

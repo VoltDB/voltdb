@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,10 @@ import java.util.Set;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 
+/**
+ * An object of class SubqueryLeafNode is a leaf in a join expression tree
+ * which corresponds to a subquery.
+ */
 public class SubqueryLeafNode extends JoinNode{
 
     private final StmtSubqueryScan m_subqueryScan;

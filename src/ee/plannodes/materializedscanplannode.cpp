@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,37 +15,38 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sstream>
 #include "materializedscanplannode.h"
-#include "common/common.h"
+
 #include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-    MaterializedScanPlanNode::~MaterializedScanPlanNode() {
-        delete getOutputTable();
-        setOutputTable(NULL);
-
-        if (m_tableRowsExpression) {
-            delete m_tableRowsExpression;
-        }
-    }
-
-    std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const {
-        std::ostringstream buffer;
-        buffer << spacer << "MATERERIALIZED SCAN Expression: <NULL>";
-        return (buffer.str());
-    }
-
-    void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-        PlannerDomValue rowExpressionObj = obj.valueForKey("TABLE_DATA");
-        assert(!m_tableRowsExpression);
-        m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);
-        if (obj.hasNonNullKey("SORT_DIRECTION")) {
-            std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
-            m_sortDirection = stringToSortDirection(sortDirectionString);
-        }
-    }
-
+MaterializedScanPlanNode::~MaterializedScanPlanNode()
+{
+    delete m_tableRowsExpression;
 }
+
+PlanNodeType MaterializedScanPlanNode::getPlanNodeType() const
+{ return PLAN_NODE_TYPE_MATERIALIZEDSCAN; }
+
+std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const {
+    std::ostringstream buffer;
+    buffer << spacer << "MATERERIALIZED SCAN Expression: <NULL>";
+    return buffer.str();
+}
+
+void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    PlannerDomValue rowExpressionObj = obj.valueForKey("TABLE_DATA");
+    assert(!m_tableRowsExpression);
+    m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);
+    m_sortDirection = SORT_DIRECTION_TYPE_ASC;
+    if (obj.hasNonNullKey("SORT_DIRECTION")) {
+        std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
+        m_sortDirection = stringToSortDirection(sortDirectionString);
+    }
+}
+
+} // namespace voltdb

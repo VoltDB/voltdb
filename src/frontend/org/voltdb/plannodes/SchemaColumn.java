@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -99,24 +99,27 @@ public class SchemaColumn
             if (tableAlias.equals(m_tableAlias)) {
                 sameTable = true;
             }
-        } else  if (m_tableName.equals(tableName)) {
+        } else if (m_tableName.equals(tableName)) {
             sameTable = true;
         }
-        if (sameTable == true) {
-            String columnName = sc.getColumnName();
-            String columnAlias = sc.getColumnAlias();
 
-            if (columnName != null && !columnName.equals("")) {
-                if (columnName.equals(m_columnName)) {
-                    // Next line is not true according to current VoltDB's logic
-                    //assert(m_columnAlias.equals(columnAlias));
-                    return true;
-                }
+        if (! sameTable) {
+            return false;
+        }
+
+        String columnName = sc.getColumnName();
+        String columnAlias = sc.getColumnAlias();
+
+        if (columnName != null && !columnName.equals("")) {
+            if (columnName.equals(m_columnName)) {
+                // Next line is not true according to current VoltDB's logic
+                //assert(m_columnAlias.equals(columnAlias));
+                return true;
             }
-            else if (columnAlias != null && !columnAlias.equals("")) {
-                if (columnAlias.equals(m_columnAlias)) {
-                    return true;
-                }
+        }
+        else if (columnAlias != null && !columnAlias.equals("")) {
+            if (columnAlias.equals(m_columnAlias)) {
+                return true;
             }
         }
 
@@ -151,9 +154,8 @@ public class SchemaColumn
         {
             new_exp = new TupleValueExpression(m_tableName, m_tableAlias, m_columnName, m_columnAlias);
             // XXX not sure this is right
-            new_exp.setValueType(m_expression.getValueType());
-            new_exp.setValueSize(m_expression.getValueSize());
-            new_exp.setInBytes(m_expression.getInBytes());
+            new_exp.setTypeSizeBytes(m_expression.getValueType(), m_expression.getValueSize(),
+                    m_expression.getInBytes());
         }
         return new SchemaColumn(m_tableName, m_tableAlias, m_columnName, m_columnAlias,
                                 new_exp);

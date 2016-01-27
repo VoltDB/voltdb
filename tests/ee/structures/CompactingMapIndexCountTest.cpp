@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -63,8 +63,8 @@ public:
     ~CompactingMapTest() {
     }
 
-    void print(voltdb::CompactingMap<int, int, IntComparator, true> &m) {
-        voltdb::CompactingMap<int, int, IntComparator, true>::iterator iter;
+    void print(voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true> &m) {
+        voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true>::iterator iter;
 
         printf(" compactmap [ ");
         for (iter = m.begin(); !iter.isEnd(); iter.moveNext()) {
@@ -104,7 +104,7 @@ public:
      */
     void verifyIterators(std::multimap<std::string, std::string> &stl,
                          std::multimap<std::string, std::string>::iterator &stli,
-                         voltdb::CompactingMap<std::string, std::string, StringComparator, true>::iterator &volti,
+                         voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator, true>::iterator &volti,
                          std::string val, int *chainCounter)
     {
         std::vector<std::string> stlv;
@@ -149,10 +149,10 @@ public:
 
 TEST_F(CompactingMapTest, SimpleUniqueRank) {
     // Start the counting index feature
-    voltdb::CompactingMap<int, int, IntComparator, true> volt(true, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true> volt(true, IntComparator());
     ASSERT_TRUE(volt.verify());
 
-    voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true>::iterator volti;
     bool sucess;
     int64_t rankasc;
 
@@ -180,11 +180,11 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
 
     std::map<int,int> stl;
     // Start the counting index feature
-    voltdb::CompactingMap<int, int, IntComparator, true> volt(true, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true> volt(true, IntComparator());
     ASSERT_TRUE(volt.verify());
 
     std::map<int,int>::const_iterator stli;
-    voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true>::iterator volti;
 
     srand(0);
     for (int i = 0; i < ITERATIONS; i++) {
@@ -266,9 +266,9 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
 
 TEST_F(CompactingMapTest, SimpleMultiRank) {
     // Start the counting index feature
-    voltdb::CompactingMap<int, int, IntComparator, true> volt(false, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true> volt(false, IntComparator());
     ASSERT_TRUE(volt.verify());
-    voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator, true>::iterator volti;
     bool sucess;
     int64_t rankasc, rankupper;
 
@@ -322,10 +322,10 @@ TEST_F(CompactingMapTest, RandomMultiRank) {
 
     std::multimap<std::string, std::string> stl;
     // Start the counting index feature
-    voltdb::CompactingMap<std::string, std::string, StringComparator, true> volt(false, StringComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator, true> volt(false, StringComparator());
 
     std::multimap<std::string, std::string>::iterator stli;
-    voltdb::CompactingMap<std::string, std::string, StringComparator, true>::iterator volti;
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator, true>::iterator volti;
 
     srand(0);
 
@@ -477,7 +477,7 @@ TEST_F(CompactingMapTest, RandomMultiRank) {
         //
         else if (op == EQ_RANGE) {
             std::pair<std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> stli_pair;
-            std::pair<voltdb::CompactingMap<std::string, std::string, StringComparator, true>::iterator, voltdb::CompactingMap<std::string, std::string, StringComparator, true>::iterator> volti_pair;
+            std::pair<voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator, true>::iterator, voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator, true>::iterator> volti_pair;
             stli_pair = stl.equal_range(val);
             volti_pair = volt.equalRange(val);
 

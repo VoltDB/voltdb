@@ -33,43 +33,43 @@ import java.nio.charset.Charset;
  * @author Kevin Bourrillion
  */
 abstract class AbstractStreamingHashFunction implements HashFunction {
-  @Override public <T> HashCode hashObject(T instance, Funnel<? super T> funnel) {
+  @Override
+  public <T> HashCode hashObject(T instance, Funnel<? super T> funnel) {
     return newHasher().putObject(instance, funnel).hash();
   }
 
-  /**
-   * @deprecated Use {@link AbstractStreamingHashFunction#hashUnencodedChars} instead.
-   */
-  @Deprecated
-  @Override public HashCode hashString(CharSequence input) {
-    return hashUnencodedChars(input);
-  }
-
-  @Override public HashCode hashUnencodedChars(CharSequence input) {
+  @Override
+  public HashCode hashUnencodedChars(CharSequence input) {
     return newHasher().putUnencodedChars(input).hash();
   }
 
-  @Override public HashCode hashString(CharSequence input, Charset charset) {
+  @Override
+  public HashCode hashString(CharSequence input, Charset charset) {
     return newHasher().putString(input, charset).hash();
   }
 
-  @Override public HashCode hashInt(int input) {
+  @Override
+  public HashCode hashInt(int input) {
     return newHasher().putInt(input).hash();
   }
 
-  @Override public HashCode hashLong(long input) {
+  @Override
+  public HashCode hashLong(long input) {
     return newHasher().putLong(input).hash();
   }
 
-  @Override public HashCode hashBytes(byte[] input) {
+  @Override
+  public HashCode hashBytes(byte[] input) {
     return newHasher().putBytes(input).hash();
   }
 
-  @Override public HashCode hashBytes(byte[] input, int off, int len) {
+  @Override
+  public HashCode hashBytes(byte[] input, int off, int len) {
     return newHasher().putBytes(input, off, len).hash();
   }
 
-  @Override public Hasher newHasher(int expectedInputSize) {
+  @Override
+  public Hasher newHasher(int expectedInputSize) {
     Preconditions.checkArgument(expectedInputSize >= 0);
     return newHasher();
   }
@@ -117,9 +117,8 @@ abstract class AbstractStreamingHashFunction implements HashFunction {
       checkArgument(bufferSize % chunkSize == 0);
 
       // TODO(user): benchmark performance difference with longer buffer
-      this.buffer = ByteBuffer
-          .allocate(bufferSize + 7) // always space for a single primitive
-          .order(ByteOrder.LITTLE_ENDIAN);
+      // always space for a single primitive
+      this.buffer = ByteBuffer.allocate(bufferSize + 7).order(ByteOrder.LITTLE_ENDIAN);
       this.bufferSize = bufferSize;
       this.chunkSize = chunkSize;
     }
@@ -183,15 +182,6 @@ abstract class AbstractStreamingHashFunction implements HashFunction {
       return this;
     }
 
-    /**
-     * @deprecated Use {@link AbstractStreamingHasher#putUnencodedChars} instead.
-     */
-    @Deprecated
-    @Override
-    public final Hasher putString(CharSequence charSequence) {
-      return putUnencodedChars(charSequence);
-    }
-
     @Override
     public final Hasher putUnencodedChars(CharSequence charSequence) {
       for (int i = 0; i < charSequence.length(); i++) {
@@ -199,6 +189,16 @@ abstract class AbstractStreamingHashFunction implements HashFunction {
       }
       return this;
     }
+
+    /*
+     * Note: hashString(CharSequence, Charset) is intentionally not overridden.
+     *
+     * While intuitively, using CharsetEncoder to encode the CharSequence directly to the buffer
+     * (or even to an intermediate buffer) should be considerably more efficient than potentially
+     * copying the CharSequence to a String and then calling getBytes(Charset) on that String, in
+     * reality there are optimizations that make the getBytes(Charset) approach considerably faster,
+     * at least for commonly used charsets like UTF-8.
+     */
 
     @Override
     public final Hasher putByte(byte b) {

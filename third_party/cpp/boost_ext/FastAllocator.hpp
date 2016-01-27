@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -111,7 +111,7 @@ public:
         }
         const pointer ret = (n == 1) ?
                 static_cast<pointer>(
-                        ThreadLocalPool::getExact(sizeof(T))->malloc()) :
+                        ThreadLocalPool::allocateExactSizedObject(sizeof(T))) :
                         reinterpret_cast<pointer>(new char[sizeof(T) * n]);
         if (ret == 0) {
             boost::throw_exception(std::bad_alloc());
@@ -124,8 +124,7 @@ public:
     }
 
     pointer allocate() {
-        boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
-        const pointer ret = pool->malloc();
+        const pointer ret = ThreadLocalPool::allocateExactSizedObject(sizeof(T));
         if (ret == 0) {
             boost::throw_exception(std::bad_alloc());
         }
@@ -137,8 +136,9 @@ public:
             return;
         }
         if (n == 1) {
-            ThreadLocalPool::getExact(sizeof(T))->free(ptr);
-        } else {
+            ThreadLocalPool::freeExactSizedObject(sizeof(T), ptr);
+        }
+        else {
             delete [] reinterpret_cast<const char*>(ptr);
         }
     }
@@ -147,8 +147,7 @@ public:
         if (ptr == NULL) {
             return;
         }
-        boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
-        pool->free(ptr);
+        ThreadLocalPool::freeExactSizedObject(sizeof(T), ptr);
     }
 };
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,11 +63,13 @@ public:
                                                  AbstractExpression* lc, AbstractExpression* rc,
                                                  const std::vector<AbstractExpression*>* arguments);
 
-    static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
+    static AbstractExpression* comparisonFactory(PlannerDomValue obj,ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
     static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 
     static void loadIndexedExprsFromJson(std::vector<voltdb::AbstractExpression*>& indexed_exprs,
                                          const std::string& jsonarraystring);
+
+    static AbstractExpression* loadExpressionFromJson(const std::string& jsonstring);
 
     /** If the passed vector contains only TupleValueExpression, it
      * returns ColumnIds of them, otherwise NULL.*/
@@ -78,6 +80,10 @@ public:
      * returns ParamIds of them, otherwise NULL.*/
     static boost::shared_array<int>
     convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
+
+    /** Returns ColumnIds of TupleValueExpression expressions from passed axpression.*/
+    static void
+    extractTupleValuesColumnIdx(const AbstractExpression* expr, std::vector<int> &columnIds);
 
     // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
     static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);

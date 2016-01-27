@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -27,6 +28,8 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.Language;
+import org.voltdb.compiler.PlannerTool;
+import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
 
@@ -38,12 +41,17 @@ public class LoadedProcedureSet {
 
     // user procedures.
     ImmutableMap<String, ProcedureRunner> procs = ImmutableMap.<String, ProcedureRunner>builder().build();
+    // cached default procs
+    Map<String, ProcedureRunner> m_defaultProcCache = new HashMap<>();
 
     // map of sysproc fragment ids to system procedures.
     final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
         new HashMap<Long, ProcedureRunner>();
 
     final ProcedureRunnerFactory m_runnerFactory;
+    CatalogSpecificPlanner m_csp = null;
+    PlannerTool m_plannerTool = null;
+    DefaultProcedureManager m_defaultProcManager = null;
     final long m_siteId;
     final int m_siteIndex;
     final SiteProcedureConnection m_site;
@@ -71,18 +79,25 @@ public class LoadedProcedureSet {
     public void loadProcedures(
             CatalogContext catalogContext,
             BackendTarget backendTarget,
-            CatalogSpecificPlanner csp) {
+            CatalogSpecificPlanner csp)
+    {
+        // default proc caches clear on catalog update
+        m_defaultProcCache.clear();
+
+        m_defaultProcManager = catalogContext.m_defaultProcs;
+        m_csp = csp;
+        m_plannerTool = catalogContext.m_ptool;
         m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder =
-                loadProceduresFromCatalog(catalogContext, backendTarget, csp);
-        loadSystemProcedures(catalogContext, backendTarget, csp, builder);
+                loadProceduresFromCatalog(catalogContext, backendTarget);
+        loadSystemProcedures(catalogContext, backendTarget, builder);
         procs = builder.build();
+
     }
 
     private ImmutableMap.Builder<String, ProcedureRunner> loadProceduresFromCatalog(
             CatalogContext catalogContext,
-            BackendTarget backendTarget,
-            CatalogSpecificPlanner csp) {
+            BackendTarget backendTarget) {
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
@@ -137,7 +152,7 @@ public class LoadedProcedureSet {
             }
 
             assert(procedure != null);
-            runner = m_runnerFactory.create(procedure, proc, csp);
+            runner = m_runnerFactory.create(procedure, proc, m_csp);
             builder.put(proc.getTypeName().intern(), runner);
         }
         return builder;
@@ -158,7 +173,6 @@ public class LoadedProcedureSet {
     private void loadSystemProcedures(
             CatalogContext catalogContext,
             BackendTarget backendTarget,
-            CatalogSpecificPlanner csp,
             ImmutableMap.Builder<String, ProcedureRunner> builder) {
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
@@ -170,41 +184,69 @@ public class LoadedProcedureSet {
 
             final String className = sysProc.getClassname();
             Class<?> procClass = null;
-            try {
-                procClass = catalogContext.classForProcedure(className);
-            }
-            catch (final ClassNotFoundException e) {
-                if (sysProc.commercial) {
-                    continue;
+
+            // this check is for sysprocs that don't have a procedure class
+            if (className != null) {
+                try {
+                    procClass = catalogContext.classForProcedure(className);
                 }
-                hostLog.l7dlog(
-                        Level.WARN,
-                        LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex },
-                        e);
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
+                catch (final ClassNotFoundException e) {
+                    if (sysProc.commercial) {
+                        continue;
+                    }
+                    hostLog.l7dlog(
+                            Level.WARN,
+                            LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex },
+                            e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
 
-            try {
-                procedure = (VoltSystemProcedure) procClass.newInstance();
-            }
-            catch (final InstantiationException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex }, e);
-            }
-            catch (final IllegalAccessException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex }, e);
-            }
+                try {
+                    procedure = (VoltSystemProcedure) procClass.newInstance();
+                }
+                catch (final InstantiationException e) {
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex }, e);
+                }
+                catch (final IllegalAccessException e) {
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex }, e);
+                }
 
-            runner = m_runnerFactory.create(procedure, proc, csp);
-            procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
-            builder.put(entry.getKey().intern(), runner);
+                runner = m_runnerFactory.create(procedure, proc, m_csp);
+                procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
+                builder.put(entry.getKey().intern(), runner);
+            }
         }
     }
 
     public ProcedureRunner getProcByName(String procName)
     {
-        return procs.get(procName);
+        // Check the procs from the catalog
+        ProcedureRunner pr = procs.get(procName);
+
+        // if not there, check the default proc cache
+        if (pr == null) {
+            pr = m_defaultProcCache.get(procName);
+        }
+
+        // if not in the cache, compile the full default proc and put it in the cache
+        if (pr == null) {
+            Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
+            if (catProc != null) {
+                String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
+                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
+                VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+                pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                // this will ensure any created fragment tasks know to load the plans
+                // for this plan-on-the-fly procedure
+                pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());
+                m_defaultProcCache.put(procName, pr);
+            }
+        }
+
+        // return what we got, hopefully not null
+        return pr;
     }
 }

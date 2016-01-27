@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,17 +17,20 @@
 
 package org.voltdb;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -35,14 +38,22 @@ import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final String JSON_PARTITION_PARAMETER = "partitionParameter";
     public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
     public static final String JSON_SINGLE_PARTITION = "singlePartition";
     public static final String JSON_READ_ONLY = "readOnly";
+    public static final String JSON_PARTITION_COLUMN = "partitionColumn";
+    public static final String JSON_SOURCE_TABLE = "sourceTable";
+    public static final String JSON_LIMIT_PARTITION_ROWS_DELETE_STMT = "limitPartitionRowsDeleteStmt";
+    public static final String JSON_DRED_TABLE = "drEnabled";
+    public static final String JSON_ERROR = "error";
 
     static public final ColumnInfo[] TABLE_SCHEMA =
         new ColumnInfo[] {
@@ -55,7 +66,7 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("TYPE_SCHEM", VoltType.STRING),
                           new ColumnInfo("TYPE_NAME", VoltType.STRING),
                           new ColumnInfo("SELF_REFERENCING_COL_NAME", VoltType.STRING),
-                          new ColumnInfo("REF_GENERATION", VoltType.STRING),
+                          new ColumnInfo("REF_GENERATION", VoltType.STRING)
                          };
 
     static public final ColumnInfo[] COLUMN_SCHEMA =
@@ -171,10 +182,26 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("NUM_PREC_RADIX", VoltType.INTEGER)
         };
 
-    JdbcDatabaseMetaDataGenerator(Catalog catalog)
+    static public final ColumnInfo[] CLASS_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("CLASS_NAME", VoltType.STRING),
+            new ColumnInfo("VOLT_PROCEDURE", VoltType.TINYINT),
+            new ColumnInfo("ACTIVE_PROC", VoltType.TINYINT)
+        };
+
+    static public final ColumnInfo[] CONFIG_SCHEMA =
+        new ColumnInfo[] {
+            new ColumnInfo("CONFIG_NAME", VoltType.STRING),
+            new ColumnInfo("CONFIG_VALUE", VoltType.STRING),
+            new ColumnInfo("CONFIG_DESCRIPTION", VoltType.STRING)
+        };
+
+    JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
+        m_defaultProcs = defaultProcs;
         m_database = m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        m_jarfile = jarfile;
     }
 
     public VoltTable getMetaData(String selector)
@@ -208,6 +235,16 @@ public class JdbcDatabaseMetaDataGenerator
         {
             result = getTypeInfo();
         }
+        // This selector is not part of the JDBC standard, but we pile on here
+        // because it's a convenient way to get information about the application
+        else if (selector.equalsIgnoreCase("CLASSES"))
+        {
+            result = getClasses();
+        }
+        else if (selector.equalsIgnoreCase("CONFIG"))
+        {
+            result = getConfigs();
+        }
         return result;
     }
 
@@ -218,12 +255,15 @@ public class JdbcDatabaseMetaDataGenerator
         {
             type = "VIEW";
         }
-        else if (m_database.getConnectors() != null &&
-                 m_database.getConnectors().get("0") != null &&
-                 m_database.getConnectors().get("0").getTableinfo() != null &&
-                 m_database.getConnectors().get("0").getTableinfo().getIgnoreCase(table.getTypeName()) != null)
+        else if (m_database.getConnectors() != null)
         {
-            type = "EXPORT";
+            for (Connector conn : m_database.getConnectors()) {
+                 if (conn.getTableinfo() != null &&
+                         conn.getTableinfo().getIgnoreCase(table.getTypeName()) != null) {
+                     type = "EXPORT";
+                     break;
+                 }
+            }
         }
         return type;
     }
@@ -233,12 +273,50 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(TABLE_SCHEMA);
         for (Table table : m_database.getTables())
         {
-            // REMARKS and all following columns are always null for us.
+            String type = getTableType(table);
+            Column partColumn;
+            if (type.equals("VIEW")) {
+                partColumn = table.getMaterializer().getPartitioncolumn();
+            }
+            else {
+                partColumn = table.getPartitioncolumn();
+            }
+
+            String remark = null;
+            try {
+                JSONObject jsObj = new JSONObject();
+
+                if (partColumn != null) {
+                    jsObj.put(JSON_PARTITION_COLUMN, partColumn.getName());
+                    if (type.equals("VIEW")) {
+                        jsObj.put(JSON_SOURCE_TABLE, table.getMaterializer().getTypeName());
+                    }
+                }
+
+                String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(table);
+                if (deleteStmt != null) {
+                    jsObj.put(JSON_LIMIT_PARTITION_ROWS_DELETE_STMT, deleteStmt);
+                }
+
+                if (table.getIsdred()) {
+                    jsObj.put(JSON_DRED_TABLE, "true");
+                }
+
+                remark = jsObj.length() > 0 ? jsObj.toString() : null;
+
+            } catch (JSONException e) {
+                hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                        "@SystemCatalog procedure call. This error will not affect your database's " +
+                        "operation. Please contact VoltDB support with your log files and a " +
+                        "description of what you were doing when this error occured.", e);
+                remark = "{\"" + JSON_ERROR + "\":\"" + e.getMessage() + "\"}";
+            }
+
             results.addRow(null,
                            null, // no schema name
                            table.getTypeName(),
-                           getTableType(table),
-                           null, // REMARKS
+                           type,
+                           remark, // REMARKS
                            null, // unused TYPE_CAT
                            null, // unused TYPE_SCHEM
                            null, // unused TYPE_NAME
@@ -500,7 +578,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedures()
     {
         VoltTable results = new VoltTable(PROCEDURES_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             String remark = null;
             try {
@@ -513,12 +603,11 @@ public class JdbcDatabaseMetaDataGenerator
                 }
                 remark = jsObj.toString();
             } catch (JSONException e) {
-                e.printStackTrace();
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                e.printStackTrace(pw);
-                pw.flush();
-                remark = sw.toString();
+                hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                             "@SystemCatalog procedure call. This error will not affect your database's " +
+                             "operation. Please contact VoltDB support with your log files and a " +
+                             "description of what you were doing when this error occured.", e);
+                remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
             }
             results.addRow(
                            null,
@@ -602,7 +691,19 @@ public class JdbcDatabaseMetaDataGenerator
     VoltTable getProcedureColumns()
     {
         VoltTable results = new VoltTable(PROCEDURECOLUMNS_SCHEMA);
-        for (Procedure proc : m_database.getProcedures())
+
+        // merge catalog and default procedures
+        SortedSet<Procedure> procedures = new TreeSet<>();
+        for (Procedure proc : m_database.getProcedures()) {
+            procedures.add(proc);
+        }
+        if (m_defaultProcs != null) {
+            for (Procedure proc : m_defaultProcs.m_defaultProcMap.values()) {
+                procedures.add(proc);
+            }
+        }
+
+        for (Procedure proc : procedures)
         {
             for (ProcParameter param : proc.getParameters())
             {
@@ -667,6 +768,44 @@ public class JdbcDatabaseMetaDataGenerator
         return results;
     }
 
+    VoltTable getClasses()
+    {
+        VoltTable results = new VoltTable(CLASS_SCHEMA);
+        for (String classname : m_jarfile.getLoader().getClassNames()) {
+            try {
+                Class<?> clazz = m_jarfile.getLoader().loadClass(classname);
+                boolean isProc = VoltProcedure.class.isAssignableFrom(clazz);
+                boolean isActive = false;
+                if (isProc) {
+                    for (Procedure proc : m_database.getProcedures()) {
+                        if (proc.getClassname().equals(clazz.getCanonicalName())) {
+                            isActive = true;
+                            break;
+                        }
+                    }
+                }
+                results.addRow(classname, isProc ? 1 : 0, isActive ? 1 : 0);
+            }
+            catch (Exception e) {
+                // if we can't load a class from the jarfile, just pretend it doesn't
+                // exist.  Other checks when we actually load the classes should
+                // ensure that we don't end up in this state.
+            }
+        }
+        return results;
+    }
+
+    VoltTable getConfigs()
+    {
+        VoltTable results = new VoltTable(CONFIG_SCHEMA);
+        for (DatabaseConfiguration conf : DatabaseConfiguration.configurationList) {
+            results.addRow(conf.getName(), conf.getValue(m_database), conf.getDescription());
+        }
+        return results;
+    }
+
     private final Catalog m_catalog;
+    private final DefaultProcedureManager m_defaultProcs;
     private final Database m_database;
+    private final InMemoryJarfile m_jarfile;
 }

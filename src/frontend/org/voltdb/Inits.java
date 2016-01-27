@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,8 +44,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
+import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
@@ -112,7 +114,7 @@ public class Inits {
 
     Inits(RealVoltDB rvdb, int threadCount) {
         m_rvdb = rvdb;
-        m_config = rvdb.m_config;
+        m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
         if (m_config.m_startAction.doesRejoin()) {
@@ -121,7 +123,7 @@ public class Inits {
             m_isRejoin = false;
         }
         m_threadCount = threadCount;
-        m_deployment = rvdb.m_deployment;
+        m_deployment = rvdb.m_catalogContext.getDeployment();
 
         // find all the InitWork subclasses using reflection and load them up
         Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
@@ -307,17 +309,16 @@ public class Inits {
                     long catalogTxnId;
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
-                    byte[] catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
+                    // Need to get the deployment bytes from the starter catalog context
+                    byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
 
                     // publish the catalog bytes to ZK
-                    CatalogUtil.uploadCatalogToZK(
+                    CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,
-                            catalogHash,
                             catalogBytes,
-                            // The deployment hash was generated for the starter catalog, reuse it
-                            m_rvdb.m_catalogContext.deploymentHash);
+                            deploymentBytes);
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
@@ -349,46 +350,51 @@ public class Inits {
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, null);
                 }
-            } while (catalogStuff == null);
+            } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
+            String serializedCatalog = null;
+            byte[] catalogJarBytes = catalogStuff.catalogBytes;
             try {
-                Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
-                m_rvdb.m_serializedCatalog = loadResults.getFirst();
+                Pair<InMemoryJarfile, String> loadResults =
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
+                serializedCatalog =
+                    CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
+                catalogJarBytes = loadResults.getFirst().getFullJarBytes();
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(m_rvdb.m_serializedCatalog);
+            catalog.execute(serializedCatalog);
+            serializedCatalog = null;
+
+            String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
+            if (result != null) {
+                VoltDB.crashLocalVoltDB(result);
+            }
 
             // note if this fails it will print an error first
-            try {
-                //This is where we compile real catalog and create runtime catalog context. To validate deployment
-                //we compile and create a starter context which uses a placeholder catalog.
-                long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, false);
-                if (result < 0) {
-                    hostLog.fatal("Error parsing deployment file");
-                    VoltDB.crashLocalVoltDB("Error parsing deployment file");
-                }
-            } catch (Exception e) {
-                hostLog.fatal("Error parsing deployment file", e);
-                VoltDB.crashLocalVoltDB("Error parsing deployment file", true, e);
+            // This is where we compile real catalog and create runtime
+            // catalog context. To validate deployment we compile and create
+            // a starter context which uses a placeholder catalog.
+            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            if (result != null) {
+                VoltDB.crashLocalVoltDB(result);
             }
 
             try {
-                m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        catalogStuff.bytes,
-                        // Our starter catalog has set the deployment hash, just yoink it out for now
-                        m_rvdb.m_catalogContext.deploymentHash,
-                        catalogStuff.version, -1);
+                        catalogJarBytes,
+                        // Our starter catalog has set the deployment stuff, just yoink it out for now
+                        m_rvdb.m_catalogContext.getDeploymentBytes(),
+                        catalogStuff.version);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }
@@ -429,20 +435,27 @@ public class Inits {
 
         @Override
         public void run() {
+            final org.voltdb.catalog.CommandLog logConfig = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+            assert logConfig != null;
 
-            boolean logEnabled = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
-
-            if (logEnabled) {
+            if (logConfig.getEnabled()) {
                 if (m_config.m_isEnterprise) {
                     try {
                         Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.CommandLogImpl",
                                                                    "Command logging", false);
                         if (loggerClass != null) {
-                            m_rvdb.m_commandLog = (CommandLog)loggerClass.newInstance();
+                            final Constructor<?> constructor = loggerClass.getConstructor(boolean.class,
+                                                                                          int.class,
+                                                                                          int.class,
+                                                                                          String.class,
+                                                                                          String.class);
+                            m_rvdb.m_commandLog = (CommandLog) constructor.newInstance(logConfig.getSynchronous(),
+                                                                                       logConfig.getFsyncinterval(),
+                                                                                       logConfig.getMaxtxns(),
+                                                                                       logConfig.getLogpath(),
+                                                                                       logConfig.getInternalsnapshotpath());
                         }
-                    } catch (InstantiationException e) {
-                        VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
-                    } catch (IllegalAccessException e) {
+                    } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
                     }
                 }
@@ -455,12 +468,15 @@ public class Inits {
         }
 
         //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPort, boolean findAny, boolean mustListen) {
+        private void setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, boolean mustListen) {
 
             boolean success = false;
+            int httpPort = httpPortStart;
             for (; true; httpPort++) {
                 try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort);
+                    m_rvdb.m_adminListener = new HTTPAdminListener(
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen
+                            );
                     success = true;
                     break;
                 } catch (Exception e1) {
@@ -474,12 +490,13 @@ public class Inits {
                 }
             }
             if (!success) {
-                m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
-                        + String.valueOf(httpPort - 1);
+                m_rvdb.m_httpPortExtraLogMessage = String.format(
+                        "HTTP service unable to bind to ports %d through %d",
+                        httpPortStart, httpPort - 1);
                 if (mustListen) {
                     System.exit(-1);
                 }
-                m_config.m_httpPort = -1;
+                m_config.m_httpPort = Constants.HTTP_PORT_DISABLED;
                 return;
             }
             m_config.m_httpPort = httpPort;
@@ -498,14 +515,14 @@ public class Inits {
                 }
             }
             // if set by cli use that.
-            if (m_config.m_httpPort != Integer.MAX_VALUE) {
+            if (m_config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
                 setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
                 // if not set by the user, just find a free port
-            } else if (httpPort == 0) {
-                // if not set by the user, start at 8080
-                httpPort = 8080;
+            } else if (httpPort == Constants.HTTP_PORT_AUTO) {
+                // if not set scan for an open port starting with the default
+                httpPort = VoltDB.DEFAULT_HTTP_PORT;
                 setupHttpServer("", httpPort, true, false);
-            } else if (httpPort != -1) {
+            } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
                     return;
                 }
@@ -540,34 +557,6 @@ public class Inits {
                 adminPort = m_config.m_adminPort;
             // other places might use config to figure out the port
             m_config.m_adminPort = adminPort;
-        }
-    }
-
-    /**
-     * Set the port used for replication.
-     * Command line is highest precedence, followed by deployment xml,
-     * finally followed by the default value of 5555.
-     *
-     */
-    class PickReplicationPort extends InitWork {
-        PickReplicationPort() {
-        }
-
-        @Override
-        public void run() {
-            int replicationPort = VoltDB.DEFAULT_DR_PORT;
-
-            if (m_deployment.getReplication() != null) {
-                // set the replication port from the deployment file
-                replicationPort = m_deployment.getReplication().getPort();
-            }
-
-            // allow command line override
-            if (m_config.m_drAgentPortStart > 0)
-                replicationPort = m_config.m_drAgentPortStart;
-
-            // other places use config to figure out the port
-            m_config.m_drAgentPortStart = replicationPort;
         }
     }
 
@@ -641,6 +630,22 @@ public class Inits {
                         );
             } catch (Throwable t) {
                 VoltDB.crashLocalVoltDB("Error setting up export", true, t);
+            }
+        }
+    }
+
+    class InitImport extends InitWork {
+        InitImport() {
+            dependsOn(LoadCatalog.class);
+        }
+
+        @Override
+        public void run() {
+            // Let the Import system read its configuration from the catalog.
+            try {
+                ImportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_rvdb.m_messenger);
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Error setting up import", true, t);
             }
         }
     }
@@ -721,7 +726,6 @@ public class Inits {
                 }
 
                 m_rvdb.m_globalServiceElector.registerService(m_rvdb.m_restoreAgent);
-                m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
 

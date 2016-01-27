@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -240,7 +241,8 @@ public class SnapshotDeleteAgent extends OpsAgent
                 if (!pathname.getName().endsWith(".vpt") &&
                     !pathname.getName().endsWith(".digest") &&
                     !pathname.getName().endsWith(".jar") &&
-                    !pathname.getName().endsWith(".hash")) {
+                    !pathname.getName().endsWith(SnapshotUtil.HASH_EXTENSION) &&
+                    !pathname.getName().endsWith(SnapshotUtil.COMPLETION_EXTENSION)) {
                     return false;
                 }
 

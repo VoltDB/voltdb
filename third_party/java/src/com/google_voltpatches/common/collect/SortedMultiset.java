@@ -23,10 +23,13 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NavigableSet;
+import java.util.Set;
 
 /**
  * A {@link Multiset} which maintains the ordering of its elements, according to
- * either their natural order or an explicit {@link Comparator}. In all cases,
+ * either their natural order or an explicit {@link Comparator}. This order is
+ * reflected when iterating over the sorted multiset, either directly, or through
+ * its {@code elementSet} or {@code entrySet} views.  In all cases,
  * this implementation uses {@link Comparable#compareTo} or
  * {@link Comparator#compare} instead of {@link Object#equals} to determine
  * equivalence of instances.
@@ -37,7 +40,7 @@ import java.util.NavigableSet;
  * specified in terms of {@link Object#equals}.
  * 
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/NewCollectionTypesExplained#Multiset">
+ * "https://github.com/google/guava/wiki/NewCollectionTypesExplained#multiset">
  * {@code Multiset}</a>.
  * 
  * @author Louis Wasserman
@@ -81,7 +84,17 @@ public interface SortedMultiset<E> extends SortedMultisetBridge<E>, SortedIterab
    * 
    * @since 14.0 (present with return type {@code SortedSet} since 11.0)
    */
-  @Override NavigableSet<E> elementSet();
+  @Override
+  NavigableSet<E> elementSet();
+  
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The {@code entrySet}'s iterator returns entries in ascending element
+   * order according to the this multiset's comparator.
+   */
+  @Override
+  Set<Entry<E>> entrySet();
 
   /**
    * {@inheritDoc}
@@ -89,7 +102,8 @@ public interface SortedMultiset<E> extends SortedMultisetBridge<E>, SortedIterab
    * <p>The iterator returns the elements in ascending order according to this
    * multiset's comparator.
    */
-  @Override Iterator<E> iterator();
+  @Override
+  Iterator<E> iterator();
 
   /**
    * Returns a descending view of this multiset. Modifications made to either
@@ -122,8 +136,8 @@ public interface SortedMultiset<E> extends SortedMultisetBridge<E>, SortedIterab
    * {@code tailMultiset(lowerBound, lowerBoundType).headMultiset(upperBound,
    * upperBoundType)}.
    */
-  SortedMultiset<E> subMultiset(E lowerBound, BoundType lowerBoundType,
-      E upperBound, BoundType upperBoundType);
+  SortedMultiset<E> subMultiset(
+      E lowerBound, BoundType lowerBoundType, E upperBound, BoundType upperBoundType);
 
   /**
    * Returns a view of this multiset restricted to the elements greater than

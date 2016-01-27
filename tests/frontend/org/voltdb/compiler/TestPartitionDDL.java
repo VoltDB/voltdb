@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -339,29 +339,5 @@ public class TestPartitionDDL extends TestCase {
 
         // PARTITION from XML.
         tester.partitioned(new PartitionXML("books", "cash"));
-    }
-
-    public void testRedundant() {
-        Tester tester = new Tester();
-
-        // PARTITION from both XML and DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionXML("books", "cash"),
-                new PartitionDDL("books", "cash"));
-
-        // PARTITION and REPLICATE from both XML and DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionXML("books", "cash"),
-                new ReplicateDDL("books"));
-
-        // PARTITION and REPLICATE from DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionDDL("books", "cash"),
-                new ReplicateDDL("books"));
-
-        // PARTITION twice from DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionDDL("books", "cash"),
-                new PartitionDDL("books", "cash"));
     }
 }

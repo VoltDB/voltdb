@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,8 +26,6 @@ package org.voltdb.types;
 import java.security.MessageDigest;
 import java.util.Arrays;
 
-import junit.framework.TestCase;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -41,6 +39,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestBlobType extends TestCase {
     public void testVarbinary() throws Exception {
@@ -185,20 +185,19 @@ public class TestBlobType extends TestCase {
         }
     }
 
-    public void testIndexRejection() throws Exception {
+    public void testIndexBlobCompile() throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
-            "b varbinary(256) default null, " +
-            "PRIMARY KEY(ival));\n" +
-            "create index idx on blah (ival,b);";
+            "b varbinary(256) default null); " +
+            "create index idx on blah (b);";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest.jar"), 1, 1, 0);
-        assertFalse(success);
+        assertTrue(success);
     }
 
     public void testTPCCCustomerLookup() throws Exception {

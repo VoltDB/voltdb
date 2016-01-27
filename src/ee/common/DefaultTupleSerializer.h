@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,10 @@ namespace voltdb {
 class ReferenceSerializeOutput;
 class TupleSchema;
 
+/**
+ * DefaultTupleSerializer provides delegate methods to serialize only visible columns
+ * of the given tuple. It also gives corresponding max serialization size for buffer allocation.
+ */
 class DefaultTupleSerializer : public TupleSerializer {
 public:
     /**
@@ -34,7 +38,7 @@ public:
     /**
      * Calculate the maximum size of a serialized tuple based upon the schema of the table/tuple
      */
-    int getMaxSerializedTupleSize(const TupleSchema *schema);
+    size_t getMaxSerializedTupleSize(const TupleSchema *schema);
 
     virtual ~DefaultTupleSerializer() {}
 };

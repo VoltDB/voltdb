@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -181,7 +181,7 @@ public abstract class JoinNode implements Cloneable {
     /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
-    public AbstractExpression getAllInnerJoinFilters() {
+    public AbstractExpression getAllFilters() {
         ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
         ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
@@ -492,5 +492,17 @@ public abstract class JoinNode implements Cloneable {
     @SuppressWarnings("static-method")
     public StmtTableScan getTableScan() {
         return null;
+    }
+
+    private String m_contentDeterminismMessage = null;
+
+    public String getContentDeterminismMessage() {
+        return m_contentDeterminismMessage;
+    }
+
+    public void updateContentDeterminismMessage(String msg) {
+        if (m_contentDeterminismMessage == null) {
+            m_contentDeterminismMessage = msg;
+        }
     }
 }

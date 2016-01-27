@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,6 +63,7 @@ import junit.framework.TestCase;
 
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.EstTimeUpdater;
+import org.voltdb.AdmissionControlGroup;
 
 public class TestNIOWriteStream extends TestCase {
 
@@ -97,7 +98,8 @@ public class TestNIOWriteStream extends TestCase {
 
     @Override
     public void setUp() {
-        pool = new NetworkDBBPool();
+        //Use low size for each buffer in pool
+        pool = new NetworkDBBPool(64, 4);
     }
 
     @Override
@@ -110,20 +112,26 @@ public class TestNIOWriteStream extends TestCase {
      * bytes from the buffer.
      */
     private static class MockChannel implements GatheringByteChannel {
-        MockChannel(int behavior) {
+        MockChannel(int behavior, int closeafter) {
             m_behavior = behavior;
+            this.closeAfter = closeafter;
         }
-
-        private boolean wroteSizeZero = false;
+        private int writeCount = 0;
+        private final int closeAfter;
         private boolean didOversizeWrite = false;
         private boolean wrotePartial = false;
+        public boolean m_open = true;
+
+        public int m_behavior;
+        public static int SINK = 0;     // accept all data
+        public static int FULL = 1;     // accept no data
+        public static int PARTIAL = 2;  // accept some data
 
         @Override
         public int write(ByteBuffer src) throws IOException {
             if (!m_open) throw new IOException();
-
-            if (!src.hasRemaining()) {
-                wroteSizeZero = true;
+            if (closeAfter > 0 && ++writeCount >= closeAfter) {
+                m_open = false;
             }
 
             if (!src.isDirect()) {
@@ -156,6 +164,9 @@ public class TestNIOWriteStream extends TestCase {
         @Override
         public long write(ByteBuffer src[]) throws IOException {
             if (!m_open) throw new IOException();
+            if (closeAfter > 0 && ++writeCount >= closeAfter) {
+                m_open = false;
+            }
 
             if (m_behavior == SINK) {
                 int remaining = src[0].remaining();
@@ -189,12 +200,6 @@ public class TestNIOWriteStream extends TestCase {
             return m_open;
         }
 
-        public boolean m_open = true;
-
-        public int m_behavior;
-        public static int SINK = 0;     // accept all data
-        public static int FULL = 1;     // accept no data
-        public static int PARTIAL = 2;  // accept some data
         @Override
         public long write(ByteBuffer[] srcs, int offset, int length)
                 throws IOException {
@@ -205,7 +210,7 @@ public class TestNIOWriteStream extends TestCase {
 
 
     public void testSink() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.SINK);
+        MockChannel channel = new MockChannel(MockChannel.SINK, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
@@ -226,7 +231,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testFull() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.FULL);
+        MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
@@ -254,7 +259,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testPartial() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.PARTIAL);
+        MockChannel channel = new MockChannel(MockChannel.PARTIAL, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
         assertTrue(wstream.isEmpty());
@@ -296,7 +301,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testClosed() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.FULL);
+        MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
@@ -326,8 +331,51 @@ public class TestNIOWriteStream extends TestCase {
 
     }
 
+    public void testClosedWithBackPressure() throws IOException {
+        MockChannel channel = new MockChannel(MockChannel.SINK, 1);
+        MockPort port = new MockPort();
+        AdmissionControlGroup acg = new AdmissionControlGroup(2, 1024);
+        NIOWriteStream wstream = new NIOWriteStream(port, null, null, acg);
+
+        ByteBuffer tmp = ByteBuffer.allocate(6);
+        tmp.put((byte)1);
+        tmp.put((byte)2);
+        tmp.put((byte)3);
+        tmp.put((byte)4);
+        tmp.put((byte)5);
+        tmp.put((byte)6);
+        tmp.flip();
+        ByteBuffer tmp2 = ByteBuffer.allocate(4);
+        tmp2.put((byte)1);
+        tmp2.put((byte)2);
+        tmp2.put((byte)3);
+        tmp2.put((byte)4);
+        tmp2.flip();
+        wstream.enqueue(tmp);
+        wstream.enqueue(tmp2);
+        assertTrue(port.checkWriteSet());
+
+        boolean threwException = false;
+        try {
+            wstream.swapAndSerializeQueuedWrites(pool);
+            //First write will succeed leaving 2 in first buffer and 4 in next
+            wstream.drainTo( channel);
+        } catch (IOException e) {
+            threwException = true;
+        }
+        assertTrue(threwException);
+        //Since ACG limit is 2 bytes we should be in backpressure.
+        assertTrue(acg.hasBackPressure());
+        assertEquals(6, acg.getPendingBytes());
+        wstream.shutdown();
+        //We should be out of backpressure.
+        assertFalse(acg.hasBackPressure());
+        //acg pending bytes must be 0
+        assertEquals(0, acg.getPendingBytes());
+    }
+
     public void testLargeNonDirectWrite() throws IOException {
-        MockChannel channel = new MockChannel(MockChannel.SINK);
+        MockChannel channel = new MockChannel(MockChannel.SINK, 0);
         MockPort port = new MockPort();
         NIOWriteStream wstream = new NIOWriteStream(port);
 
@@ -345,7 +393,7 @@ public class TestNIOWriteStream extends TestCase {
         EstTimeUpdater.pause = true;
         Thread.sleep(10);
         try {
-            final MockChannel channel = new MockChannel(MockChannel.SINK);
+            final MockChannel channel = new MockChannel(MockChannel.SINK, 0);
             MockPort port = new MockPort();
             NIOWriteStream wstream = new NIOWriteStream(port);
 
@@ -381,7 +429,7 @@ public class TestNIOWriteStream extends TestCase {
     }
 
     public void testQueueMonitor() throws Exception {
-        final MockChannel channel = new MockChannel(MockChannel.FULL);
+        final MockChannel channel = new MockChannel(MockChannel.FULL, 0);
         MockPort port = new MockPort();
         final AtomicLong queue = new AtomicLong();
         NIOWriteStream wstream = new NIOWriteStream(port, null, null, new QueueMonitor() {

@@ -17,7 +17,7 @@
 package com.google_voltpatches.common.net;
 
 import com.google_voltpatches.common.annotations.Beta;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.hash.Hashing;
 import com.google_voltpatches.common.io.ByteStreams;
@@ -29,6 +29,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Locale;
 
 import javax.annotation_voltpatches.Nullable;
 
@@ -150,8 +151,7 @@ public final class InetAddresses {
 
     // The argument was malformed, i.e. not an IP string literal.
     if (addr == null) {
-      throw new IllegalArgumentException(
-          String.format("'%s' is not an IP string literal.", ipString));
+      throw formatIllegalArgumentException("'%s' is not an IP string literal.", ipString);
     }
 
     return bytesToInetAddress(addr);
@@ -319,7 +319,7 @@ public final class InetAddresses {
    * Convert a byte array into an InetAddress.
    *
    * {@link InetAddress#getByAddress} is documented as throwing a checked
-   * exception "if IP address if of illegal length."  We replace it with
+   * exception "if IP address is of illegal length."  We replace it with
    * an unchecked exception, for use by callers who already know that addr
    * is an array of length 4 or 16.
    *
@@ -498,8 +498,7 @@ public final class InetAddresses {
     // Parse the address, and make sure the length/version is correct.
     byte[] addr = ipStringToBytes(ipString);
     if (addr == null || addr.length != expectBytes) {
-      throw new IllegalArgumentException(
-          String.format("Not a valid URI IP literal: '%s'", hostAddr));
+      throw formatIllegalArgumentException("Not a valid URI IP literal: '%s'", hostAddr);
     }
 
     return bytesToInetAddress(addr);
@@ -645,9 +644,9 @@ public final class InetAddresses {
           "port '%s' is out of range (0 <= port <= 0xffff)", port);
       Preconditions.checkArgument((flags >= 0) && (flags <= 0xffff),
           "flags '%s' is out of range (0 <= flags <= 0xffff)", flags);
-      
-      this.server = Objects.firstNonNull(server, ANY4);
-      this.client = Objects.firstNonNull(client, ANY4);
+
+      this.server = MoreObjects.firstNonNull(server, ANY4);
+      this.client = MoreObjects.firstNonNull(client, ANY4);
       this.port = port;
       this.flags = flags;
     }
@@ -804,8 +803,7 @@ public final class InetAddresses {
       return getTeredoInfo(ip).getClient();
     }
 
-    throw new IllegalArgumentException(
-        String.format("'%s' has no embedded IPv4 address.", toAddrString(ip)));
+    throw formatIllegalArgumentException("'%s' has no embedded IPv4 address.", toAddrString(ip));
   }
 
   /**
@@ -969,6 +967,29 @@ public final class InetAddresses {
   }
 
   /**
+   * Returns a new InetAddress that is one less than the passed in address.
+   * This method works for both IPv4 and IPv6 addresses.
+   *
+   * @param address the InetAddress to decrement
+   * @return a new InetAddress that is one less than the passed in address
+   * @throws IllegalArgumentException if InetAddress is at the beginning of its range
+   * @since 18.0
+   */
+  public static InetAddress decrement(InetAddress address) {
+    byte[] addr = address.getAddress();
+    int i = addr.length - 1;
+    while (i >= 0 && addr[i] == (byte) 0x00) {
+      addr[i] = (byte) 0xff;
+      i--;
+    }
+
+    Preconditions.checkArgument(i >= 0, "Decrementing %s would wrap.", address);
+
+    addr[i]--;
+    return bytesToInetAddress(addr);
+  }
+
+  /**
    * Returns a new InetAddress that is one more than the passed in address.
    * This method works for both IPv4 and IPv6 addresses.
    *
@@ -1007,5 +1028,10 @@ public final class InetAddresses {
       }
     }
     return true;
+  }
+
+  private static IllegalArgumentException formatIllegalArgumentException(
+      String format, Object... args) {
+    return new IllegalArgumentException(String.format(Locale.ROOT, format, args));
   }
 }

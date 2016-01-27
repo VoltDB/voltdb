@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,6 +59,11 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        return getHostnameOrIP();
+    }
+
+    @Override
     public int getRemotePort() {
         throw new UnsupportedOperationException();
     }
@@ -71,6 +76,11 @@ public class MockConnection implements Connection {
     @Override
     public long connectionId() {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        return connectionId();
     }
 
     @Override

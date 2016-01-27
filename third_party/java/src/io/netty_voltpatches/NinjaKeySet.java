@@ -91,14 +91,17 @@ public final class NinjaKeySet extends AbstractSet<SelectionKey> {
 
     public static NinjaKeySet instrumentSelector(Selector selector) {
         try {
+
             NinjaKeySet selectedKeySet = new NinjaKeySet();
+
+            if (!supported) return selectedKeySet;
 
             Class<?> selectorImplClass =
                     Class.forName("sun.nio.ch.SelectorImpl", false, ClassLoader.getSystemClassLoader());
 
             // Ensure the current selector implementation is what we can instrument.
             if (!selectorImplClass.isAssignableFrom(selector.getClass())) {
-                return null;
+                return selectedKeySet;
             }
 
             Field selectedKeysField = selectorImplClass.getDeclaredField("selectedKeys");
@@ -122,7 +125,11 @@ public final class NinjaKeySet extends AbstractSet<SelectionKey> {
         try {
             Selector s = Selector.open();
             try {
-                if (instrumentSelector(s) != null) {
+                Class<?> selectorImplClass =
+                        Class.forName("sun.nio.ch.SelectorImpl", false, ClassLoader.getSystemClassLoader());
+
+                // Ensure the current selector implementation is what we can instrument.
+                if (selectorImplClass.isAssignableFrom(s.getClass())) {
                     supportedTemp = true;
                 }
             } finally {

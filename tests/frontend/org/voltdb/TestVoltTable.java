@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,19 +27,26 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-
-import junit.framework.TestCase;
+import java.util.Random;
 
 import org.json_voltpatches.JSONException;
+import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
+
+import junit.framework.TestCase;
 
 public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
     private VoltTable t;
     private VoltTable t2;
+
+    private static final GeographyValue GEOG_VALUE = GeographyValue.fromWKT("POLYGON((0 0, 0 1, -1 1, -1 0, 0 0))");
+    private static final GeographyPointValue GEOG_PT_VALUE = GeographyPointValue.fromWKT("POINT(-122.0264 36.9719)");
 
     @Override
     public void setUp() {
@@ -73,6 +80,8 @@ public class TestVoltTable extends TestCase {
                 new TimestampType(99),
                 new BigDecimal(7654321)
                         .setScale(VoltDecimalHelper.kDefaultScale),
+                GEOG_VALUE,
+                GEOG_PT_VALUE,
                 new Object(), };
 
         for (Object o : primitives) {
@@ -546,6 +555,88 @@ public class TestVoltTable extends TestCase {
         assertTrue(t2.getRowCount() == 0);
     }
 
+    public void testGeographies() {
+        VoltTable vt = new VoltTable(new ColumnInfo("gg", VoltType.GEOGRAPHY));
+        addAllPrimitives(vt, new Class[] {GeographyValue.class});
+
+        VoltTable vtCopy = roundTrip(vt);
+
+        assertEquals(2, vt.getRowCount());
+        assertEquals(2, vtCopy.getRowCount());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        assertNull(vt.getGeographyValue(0));
+        assertNull(vtCopy.getGeographyValue(0));
+        assertNull(vt.get(0, VoltType.GEOGRAPHY));
+        assertTrue(vt.wasNull());
+        assertTrue(vtCopy.wasNull());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        String wkt = GEOG_VALUE.toString();
+        assertEquals(wkt, vt.getGeographyValue(0).toString());
+        assertEquals(wkt, vtCopy.getGeographyValue(0).toString());
+        assertEquals(wkt, vt.getGeographyValue("gg").toString());
+        assertEquals(wkt, vt.get(0, VoltType.GEOGRAPHY).toString());
+
+        byte[] raw = vt.getRaw(0);
+        // Raw bytes does not include the length prefix
+        assertEquals(GEOG_VALUE.getLengthInBytes(), raw.length - 4);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
+        assertFalse(vt.advanceRow());
+        assertFalse(vtCopy.advanceRow());
+    }
+
+    public void testGeographyPoints() {
+        VoltTable vt = new VoltTable(new ColumnInfo("pt", VoltType.GEOGRAPHY_POINT));
+        addAllPrimitives(vt, new Class[] {GeographyPointValue.class});
+
+        VoltTable vtCopy = roundTrip(vt);
+
+        assertEquals(2, vt.getRowCount());
+        assertEquals(2, vtCopy.getRowCount());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        assertNull(vt.getGeographyPointValue(0));
+        assertNull(vtCopy.getGeographyPointValue(0));
+        assertNull(vt.get(0, VoltType.GEOGRAPHY_POINT));
+        assertTrue(vt.wasNull());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        String wkt = GEOG_PT_VALUE.toString();
+        assertEquals(wkt, vt.getGeographyPointValue(0).toString());
+        assertEquals(wkt, vtCopy.getGeographyPointValue(0).toString());
+        assertEquals(wkt, vt.getGeographyPointValue("pt").toString());
+        assertEquals(wkt, vt.get(0, VoltType.GEOGRAPHY_POINT).toString());
+
+        byte[] raw = vt.getRaw(0);
+        assertEquals(GeographyPointValue.getLengthInBytes(), raw.length);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
+        assertFalse(vt.advanceRow());
+        assertFalse(vtCopy.advanceRow());
+    }
+
     // At least check that NULL_VALUEs of one type get interpreted as NULL
     // if we attempt to put them into a column of a different type
     public void testNulls() {
@@ -884,23 +975,26 @@ public class TestVoltTable extends TestCase {
         // Set the default timezone since we're using a timestamp type.  Eliminate test flakeyness.
         VoltDB.setDefaultTimezone();
 
-        VoltTable table = new VoltTable(
-                new ColumnInfo("tinyint", VoltType.TINYINT), new ColumnInfo(
-                        "smallint", VoltType.SMALLINT), new ColumnInfo(
-                        "integer", VoltType.INTEGER), new ColumnInfo("bigint",
-                        VoltType.BIGINT), new ColumnInfo("float",
-                        VoltType.FLOAT), new ColumnInfo("string",
-                        VoltType.STRING), new ColumnInfo("varbinary",
-                        VoltType.VARBINARY), new ColumnInfo("timestamp",
-                        VoltType.TIMESTAMP), new ColumnInfo("decimal",
-                        VoltType.DECIMAL));
+        VoltTable table = new VoltTable(new ColumnInfo("tinyint",   VoltType.TINYINT),
+                                        new ColumnInfo("smallint",  VoltType.SMALLINT),
+                                        new ColumnInfo("integer",   VoltType.INTEGER),
+                                        new ColumnInfo("bigint",    VoltType.BIGINT),
+                                        new ColumnInfo("float",     VoltType.FLOAT),
+                                        new ColumnInfo("string",    VoltType.STRING),
+                                        new ColumnInfo("varbinary", VoltType.VARBINARY),
+                                        new ColumnInfo("timestamp", VoltType.TIMESTAMP),
+                                        new ColumnInfo("decimal",   VoltType.DECIMAL));
 
         // add a row of nulls the hard way
-        table.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
-                VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,
-                VoltType.NULL_FLOAT, VoltType.NULL_STRING_OR_VARBINARY,
-                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_TIMESTAMP,
-                VoltType.NULL_DECIMAL);
+        table.addRow(VoltType.NULL_TINYINT,
+                     VoltType.NULL_SMALLINT,
+                     VoltType.NULL_INTEGER,
+                     VoltType.NULL_BIGINT,
+                     VoltType.NULL_FLOAT,
+                     VoltType.NULL_STRING_OR_VARBINARY,
+                     VoltType.NULL_STRING_OR_VARBINARY,
+                     VoltType.NULL_TIMESTAMP,
+                     VoltType.NULL_DECIMAL);
 
         // add a row of nulls the easy way
         table.addRow(null, null, null, null, null, null, null, null, null);
@@ -926,8 +1020,100 @@ public class TestVoltTable extends TestCase {
             System.out.println("Expected output:");
             System.out.println(expected);
         }
-
         assertTrue(formatted_string.equals(expected));
+
+
+        table = new VoltTable(new ColumnInfo("bigint",          VoltType.BIGINT),
+                              new ColumnInfo("geography",       VoltType.GEOGRAPHY),
+                              new ColumnInfo("geography_point", VoltType.GEOGRAPHY_POINT),
+                              new ColumnInfo("timestamp", VoltType.TIMESTAMP));
+        table.addRow(VoltType.NULL_BIGINT, VoltType.NULL_GEOGRAPHY, VoltType.NULL_POINT, VoltType.NULL_TIMESTAMP);
+        table.addRow(null, null, null, null);
+        table.addRow(123456789,
+                     new GeographyValue("POLYGON (( 1.1  9.9, " +
+                                                  "-9.1  9.9, " +
+                                                  "-9.1 -9.9, " +
+                                                  " 9.1 -9.9, " +
+                                                  " 1.1  9.9))"),
+                     new GeographyPointValue(-179.0, -89.9),
+                     new TimestampType(-1));
+        formatted_string = table.toFormattedString();
+        expected =
+"bigint     geography                                                    geography_point       timestamp                  \n" +
+"---------- ------------------------------------------------------------ --------------------- ---------------------------\n" +
+"      NULL NULL                                                         NULL                  NULL                       \n" +
+"      NULL NULL                                                         NULL                  NULL                       \n" +
+" 123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))  POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
+            System.out.println(formatted_string);
+            System.out.println("Expected output: (length: " + expected.length() + ")");
+            System.out.println(expected);
+        }
+        assertTrue(formatted_string.equals(expected));
+
+
+        // row with a polygon that max's output column width for geopgraphy column
+        table.addRow(1234567890,
+                    new GeographyValue("POLYGON (( 179.1  89.9, " +
+                                                 "-179.1  89.9, " +
+                                                 "-179.1 -89.9, " +
+                                                 " 179.1 -89.9, " +
+                                                 " 179.1  89.9))"),
+                    new GeographyPointValue(-179.0, -89.9),
+                    new TimestampType(0));
+        formatted_string = table.toFormattedString();
+        expected =
+"bigint      geography                                                                   geography_point       timestamp                  \n" +
+"----------- --------------------------------------------------------------------------- --------------------- ---------------------------\n" +
+"       NULL NULL                                                                        NULL                  NULL                       \n" +
+"       NULL NULL                                                                        NULL                  NULL                       \n" +
+"  123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
+" 1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
+            System.out.println(formatted_string);
+            System.out.println("Expected output: (length: " + expected.length() + ")");
+            System.out.println(expected);
+        }
+        assertTrue(formatted_string.equals(expected));
+
+
+        // row with a polygon that goes beyond max aligned display limit for polygon. This will result in
+        // other columns following to appear further away from their original column
+        table.addRow(12345678901L,
+                new GeographyValue("POLYGON (( 179.12  89.9, " +
+                                             "-179.12  89.9, " +
+                                             "-179.1  -89.9, " +
+                                             " 179.1  -89.9, " +
+                                             "   0     0," +
+                                             "  1.123  1.11," +
+                                             " 179.12  89.9))"),
+                new GeographyPointValue(0, 0),
+                new TimestampType(99));
+        formatted_string = table.toFormattedString();
+        expected =
+"bigint       geography                                                                   geography_point       timestamp                  \n" +
+"------------ --------------------------------------------------------------------------- --------------------- ---------------------------\n" +
+"        NULL NULL                                                                        NULL                  NULL                       \n" +
+"        NULL NULL                                                                        NULL                  NULL                       \n" +
+"   123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
+"  1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n" +
+" 12345678901 POLYGON ((179.12 89.9, -179.12 89.9, -179.1 -89.9, 179.1 -89.9, 0.0 0.0, 1.123 1.11, 179.12 89.9)) POINT (0.0 0.0)       1970-01-01 00:00:00.000099 \n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
+            System.out.println(formatted_string);
+            System.out.println("Expected output: (length: " + expected.length() + ")");
+            System.out.println(expected);
+        }
+        assertTrue(formatted_string.equals(expected));
+
     }
 
     @SuppressWarnings("deprecation")
@@ -952,6 +1138,13 @@ public class TestVoltTable extends TestCase {
 
         // add a row of nulls the easy way
         t1.addRow(null, null, null, null, null, null, null, null, null);
+
+        // add a row with all defaults
+        t1.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
+                VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,
+                VoltType.NULL_FLOAT, VoltType.NULL_STRING_OR_VARBINARY,
+                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_TIMESTAMP,
+                VoltType.NULL_DECIMAL);
 
         // add a row of actual data
         t1.addRow(123, 12345, 1234567, 12345678901L, 1.234567, "aabbcc",
@@ -991,4 +1184,251 @@ public class TestVoltTable extends TestCase {
                 .getLong(schema.length - 1));
     }
 
+    @SuppressWarnings("deprecation")
+    public void testBlittingAddRowSuccess() throws IOException {
+        int rowCount = 100;
+        int numberOfPartitions = 20;
+        Random r = new Random(0);
+
+        for (int j = 0; j < 10; j++) {
+            TableHelper th = new TableHelper();
+            VoltTable t = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t, rowCount, 500);
+
+            t.resetRowPosition();
+            // create a table for each partition
+            VoltTable[] partitioned_tables = new VoltTable[numberOfPartitions];
+            for (int i = 0; i < partitioned_tables.length; i++) {
+                partitioned_tables[i] =
+                        t.clone((int) ((PrivateVoltTableFactory.getUnderlyingBufferSize(t) /
+                                numberOfPartitions) * 1.5));
+            }
+
+            // split the input table into per-partition units
+            while (t.advanceRow()) {
+                int partition = 0;
+                partition = r.nextInt(numberOfPartitions);
+                // this adds the active row of loadedTable
+                //partitioned_tables[partition].addRowIdenticalSchema(t);
+                partitioned_tables[partition].add(t);
+            }
+
+            // merge the tables
+            VoltTable t2 = t.clone(100);
+            for (VoltTable pt : partitioned_tables) {
+                pt.resetRowPosition();
+                while (pt.advanceRow()) {
+                    t2.add(pt);
+                }
+            }
+
+            assertTrue(t2.equals(t));
+        }
+    }
+
+    public void testSchemaChangeAddRow() {
+        int rowCount = 100;
+        Random r = new Random(0);
+
+        for (int j = 0; j < 100; j++) {
+            TableHelper th = new TableHelper();
+            VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t1, rowCount, 500);
+
+            // get the schema of the first table
+            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[t1.getColumnCount()];
+            for (int i = 0; i < columns.length; i++) {
+                columns[i] = new VoltTable.ColumnInfo(t1.getColumnName(i), t1.getColumnType(i));
+            }
+
+            // make a few random column changes that are compatible (numbers only)
+            for (int i = 0; i < 5; i++) {
+                int randCol = r.nextInt(columns.length);
+                VoltType ct1 = t1.getColumnType(randCol);
+                if ((ct1 == VoltType.TINYINT) || (ct1 == VoltType.INTEGER) || (ct1 == VoltType.SMALLINT)) {
+                    columns[randCol] = new VoltTable.ColumnInfo(columns[randCol].name, VoltType.BIGINT);
+                }
+            }
+
+            // make a second empty table with the incompatible schema
+            VoltTable t2 = new VoltTable(columns);
+
+            t1.resetRowPosition();
+            while (t1.advanceRow()) {
+                t2.add(t1);
+            }
+
+            // compare formatted strings (imperfect)
+            String t1s = t1.toFormattedString();
+            String t2s = t2.toFormattedString();
+            assertTrue(t1s.equals(t2s));
+        }
+    }
+
+    public void testBadAddRow() {
+        int rowCount = 10;
+        Random r = new Random(0);
+
+        for (int j = 0; j < 75; j++) {
+            TableHelper th = new TableHelper();
+            VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t1, rowCount, 500);
+
+            // get the schema of the first table
+            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[t1.getColumnCount()];
+            for (int i = 0; i < columns.length; i++) {
+                columns[i] = new VoltTable.ColumnInfo(t1.getColumnName(i), t1.getColumnType(i));
+            }
+
+            // make a random column incompatible
+            int randCol = r.nextInt(columns.length);
+            VoltType ct1 = t1.getColumnType(randCol);
+            if ((ct1 == VoltType.VARBINARY) || (ct1 == VoltType.STRING)) {
+                columns[randCol] = new VoltTable.ColumnInfo(columns[randCol].name, VoltType.TINYINT);
+            }
+            else {
+                columns[randCol] = new VoltTable.ColumnInfo(columns[randCol].name, VoltType.VARBINARY);
+            }
+
+            // make a second empty table with the incompatible schema
+            VoltTable t2 = new VoltTable(columns);
+
+            t1.resetRowPosition();
+            while (t1.advanceRow()) {
+                try {
+                    // add a random row successfully every other row
+                    th.randomFill(t2, 1, 10);
+                    // - except small chance of overflow too due to large string
+                    if (r.nextInt(20) == 0) {
+                        th.randomFill(t2, 1, 2048 * 1024);
+                    }
+                    // add a bad row from t1
+                    t2.add(t1);
+
+                    // only check if the twiddled column was non-null
+                    Object valueOfInterest = t1.get(randCol, t1.getColumnType(randCol));
+                    if ((valueOfInterest != null) && (t1.wasNull() == false)) {
+                        fail();
+                    }
+                }
+                catch (Exception e) {
+                    // two cases where we might fail and it's ok
+                    boolean tooBig = e instanceof VoltOverflowException;
+                    boolean nonNull = t1.get(randCol, t1.getColumnType(randCol)) != null;
+                    assertTrue(tooBig || nonNull);
+                }
+            }
+
+            // this should bomb if the data is invalid because it scans every value
+            t2.toJSONString();
+        }
+    }
+
+    public void testFetchRowPerformance() {
+        final int ROW_COUNT = 100000;
+
+        TableHelper th = new TableHelper();
+        RandomTable rt = th.getTotallyRandomTable("FOO");
+        th.randomFill(rt.table, ROW_COUNT, 128);
+        assertTrue(rt.table.getRowCount() == ROW_COUNT);
+        VoltTable t = rt.table;
+
+        System.out.println("Iterating with fetchRow()...");
+        long t0 = System.nanoTime();
+
+        t.resetRowPosition();
+        for (int i=0; i < ROW_COUNT; i++) {
+            t.fetchRow(i);
+        }
+
+        System.out.println("Iterating with advanceRow()...");
+
+        long t1 = System.nanoTime();
+
+        t.resetRowPosition();
+        while (t.advanceRow()) {
+            t.advanceRow();
+        }
+
+        long t2 = System.nanoTime();
+
+        long fetchRowTime = t1-t0;
+        System.out.println("Took "+ fetchRowTime + " nanos to call fetchRow() for " + ROW_COUNT + " rows");
+
+        long advanceRowTime = t2-t1;
+        System.out.println("Took "+ advanceRowTime + " nanos to call advanceRow() for " + ROW_COUNT + " rows");
+
+        // this is a super loose bound just to check that the time isn't n^2
+        assertTrue(fetchRowTime < (advanceRowTime * 20));
+    }
+
+    public void testFetchRowAccuracy() {
+        final int ROW_COUNT = 10000;
+
+        TableHelper th = new TableHelper();
+        RandomTable rt = th.getTotallyRandomTable("FOO");
+        th.randomFill(rt.table, ROW_COUNT, 128);
+        assertTrue(rt.table.getRowCount() == ROW_COUNT);
+        VoltTable t = rt.table;
+
+        Object[] results = new Object[ROW_COUNT];
+
+        // cache all the answers and check that incrementing fetchrow and advancerow agree
+        t.resetRowPosition();
+        int i = 0;
+        while (t.advanceRow()) {
+            VoltTableRow r = t.fetchRow(i);
+
+            Object lhs = r.get(0, r.getColumnType(0));
+            Object rhs = t.get(0, t.getColumnType(0));
+            if (lhs == null) {
+                assert(rhs == null);
+            }
+            else {
+                assertTrue(lhs.equals(rhs));
+            }
+
+            results[i++] = lhs;
+        }
+
+        // match cached answers to random fetchrow requests
+        Random rand = new Random();
+        for (i = 0; i < 1000; i++) {
+            int randIndex = rand.nextInt(ROW_COUNT);
+            VoltTableRow r = t.fetchRow(randIndex);
+
+            Object lhs = r.get(0, r.getColumnType(0));
+            Object rhs = results[randIndex];
+            if (lhs == null) {
+                assert(rhs == null);
+            }
+            else {
+                assertTrue(lhs.equals(rhs));
+            }
+        }
+
+        // verify nothing gets hosed if you work out of bounds
+        for (i = 0; i < 1000; i++) {
+            // add some range on either end so we fetch rows out of bounds
+            int randIndex = rand.nextInt(ROW_COUNT * 3 / 2) - (ROW_COUNT / 4);
+
+            try {
+                VoltTableRow r = t.fetchRow(randIndex);
+                assertTrue(randIndex >= 0);
+                assertTrue(randIndex < ROW_COUNT);
+
+                Object lhs = r.get(0, r.getColumnType(0));
+                Object rhs = results[randIndex];
+                if (lhs == null) {
+                    assert(rhs == null);
+                }
+                else {
+                    assertTrue(lhs.equals(rhs));
+                }
+            }
+            catch (Exception e) {
+                assertTrue((randIndex < 0) || (randIndex >= ROW_COUNT));
+            }
+        }
+    }
 }

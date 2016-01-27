@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -42,32 +42,28 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "unionnode.h"
+
+#include "common/SerializableEEException.h"
 
 #include <sstream>
 
-#include "unionnode.h"
-#include "common/common.h"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
-
-using namespace std;
-
 namespace voltdb {
 
-UnionPlanNode::~UnionPlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+UnionPlanNode::~UnionPlanNode() { }
 
-std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
-    ostringstream buffer;
+PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
+
+std::string UnionPlanNode::debugInfo(const std::string &spacer) const
+{
+    std::ostringstream buffer;
     buffer << spacer << "UnionType[" << m_unionType << "]\n";
-    return string(buffer.str());
+    return buffer.str();
 }
 
 void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
+    std::string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
     if (unionTypeStr == "UNION") {
         m_unionType = UNION_TYPE_UNION;
     } else if (unionTypeStr == "UNION_ALL") {
@@ -90,4 +86,4 @@ void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
     }
 }
 
-}
+} // namespace voltdb

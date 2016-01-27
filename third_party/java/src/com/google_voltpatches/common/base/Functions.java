@@ -25,6 +25,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import java.io.Serializable;
 import java.util.Map;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -33,14 +34,15 @@ import javax.annotation_voltpatches.Nullable;
  * <p>All methods return serializable functions as long as they're given serializable parameters.
  * 
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/FunctionalExplained">the use of {@code
+ * "https://github.com/google/guava/wiki/FunctionalExplained">the use of {@code
  * Function}</a>.
  *
  * @author Mike Bostock
  * @author Jared Levy
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
+@CheckReturnValue
 public final class Functions {
   private Functions() {}
 
@@ -62,18 +64,20 @@ public final class Functions {
 
     @Override
     public String apply(Object o) {
-      checkNotNull(o);  // eager for GWT.
+      checkNotNull(o); // eager for GWT.
       return o.toString();
     }
 
-    @Override public String toString() {
-      return "toString";
+    @Override
+    public String toString() {
+      return "Functions.toStringFunction()";
     }
   }
 
   /**
    * Returns the identity function.
    */
+  // implementation is "fully variant"; E has become a "pass-through" type
   @SuppressWarnings("unchecked")
   public static <E> Function<E, E> identity() {
     return (Function<E, E>) IdentityFunction.INSTANCE;
@@ -89,14 +93,20 @@ public final class Functions {
       return o;
     }
 
-    @Override public String toString() {
-      return "identity";
+    @Override
+    public String toString() {
+      return "Functions.identity()";
     }
   }
 
   /**
    * Returns a function which performs a map lookup. The returned function throws an {@link
-   * IllegalArgumentException} if given a key that does not exist in the map.
+   * IllegalArgumentException} if given a key that does not exist in the map. See also {@link
+   * #forMap(Map, Object)}, which returns a default value in this case.
+   *
+   * <p>Note: if {@code map} is a {@link com.google_voltpatches.common.collect.BiMap BiMap} (or can be one), you
+   * can use {@link com.google_voltpatches.common.collect.Maps#asConverter Maps.asConverter} instead to get a
+   * function that also supports reverse conversion.
    */
   public static <K, V> Function<K, V> forMap(Map<K, V> map) {
     return new FunctionForMapNoDefault<K, V>(map);
@@ -116,7 +126,8 @@ public final class Functions {
       return result;
     }
 
-    @Override public boolean equals(@Nullable Object o) {
+    @Override
+    public boolean equals(@Nullable Object o) {
       if (o instanceof FunctionForMapNoDefault) {
         FunctionForMapNoDefault<?, ?> that = (FunctionForMapNoDefault<?, ?>) o;
         return map.equals(that.map);
@@ -124,12 +135,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return map.hashCode();
     }
 
-    @Override public String toString() {
-      return "forMap(" + map + ")";
+    @Override
+    public String toString() {
+      return "Functions.forMap(" + map + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -138,7 +151,7 @@ public final class Functions {
   /**
    * Returns a function which performs a map lookup with a default value. The function created by
    * this method returns {@code defaultValue} for all inputs that do not belong to the map's key
-   * set.
+   * set. See also {@link #forMap(Map)}, which throws an exception in this case.
    *
    * @param map source map that determines the function behavior
    * @param defaultValue the value to return for inputs that aren't map keys
@@ -164,7 +177,8 @@ public final class Functions {
       return (result != null || map.containsKey(key)) ? result : defaultValue;
     }
 
-    @Override public boolean equals(@Nullable Object o) {
+    @Override
+    public boolean equals(@Nullable Object o) {
       if (o instanceof ForMapWithDefault) {
         ForMapWithDefault<?, ?> that = (ForMapWithDefault<?, ?>) o;
         return map.equals(that.map) && Objects.equal(defaultValue, that.defaultValue);
@@ -172,12 +186,15 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return Objects.hashCode(map, defaultValue);
     }
 
-    @Override public String toString() {
-      return "forMap(" + map + ", defaultValue=" + defaultValue + ")";
+    @Override
+    public String toString() {
+      // TODO(cpovirk): maybe remove "defaultValue=" to make this look like the method call does
+      return "Functions.forMap(" + map + ", defaultValue=" + defaultValue + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -210,7 +227,8 @@ public final class Functions {
       return g.apply(f.apply(a));
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof FunctionComposition) {
         FunctionComposition<?, ?, ?> that = (FunctionComposition<?, ?, ?>) obj;
         return f.equals(that.f) && g.equals(that.g);
@@ -218,12 +236,15 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return f.hashCode() ^ g.hashCode();
     }
 
-    @Override public String toString() {
-      return g.toString() + "(" + f.toString() + ")";
+    @Override
+    public String toString() {
+      // TODO(cpovirk): maybe make this look like the method call does ("Functions.compose(...)")
+      return g + "(" + f + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -252,7 +273,8 @@ public final class Functions {
       return predicate.apply(t);
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof PredicateFunction) {
         PredicateFunction<?> that = (PredicateFunction<?>) obj;
         return predicate.equals(that.predicate);
@@ -260,12 +282,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return predicate.hashCode();
     }
 
-    @Override public String toString() {
-      return "forPredicate(" + predicate + ")";
+    @Override
+    public String toString() {
+      return "Functions.forPredicate(" + predicate + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -293,7 +317,8 @@ public final class Functions {
       return value;
     }
 
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof ConstantFunction) {
         ConstantFunction<?> that = (ConstantFunction<?>) obj;
         return Objects.equal(value, that.value);
@@ -301,12 +326,14 @@ public final class Functions {
       return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return (value == null) ? 0 : value.hashCode();
     }
 
-    @Override public String toString() {
-      return "constant(" + value + ")";
+    @Override
+    public String toString() {
+      return "Functions.constant(" + value + ")";
     }
 
     private static final long serialVersionUID = 0;
@@ -332,11 +359,13 @@ public final class Functions {
       this.supplier = checkNotNull(supplier);
     }
 
-    @Override public T apply(@Nullable Object input) {
+    @Override
+    public T apply(@Nullable Object input) {
       return supplier.get();
     }
     
-    @Override public boolean equals(@Nullable Object obj) {
+    @Override
+    public boolean equals(@Nullable Object obj) {
       if (obj instanceof SupplierFunction) {
         SupplierFunction<?> that = (SupplierFunction<?>) obj;
         return this.supplier.equals(that.supplier);
@@ -344,12 +373,14 @@ public final class Functions {
       return false;
     }
     
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       return supplier.hashCode();
     }
     
-    @Override public String toString() {
-      return "forSupplier(" + supplier + ")";
+    @Override
+    public String toString() {
+      return "Functions.forSupplier(" + supplier + ")";
     }
     
     private static final long serialVersionUID = 0;

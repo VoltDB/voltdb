@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,8 +47,14 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         m_date = (Date) date.clone();
     }
 
-    private static long microsFromJDBCformat(String param) {
-        java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
+    private static long microsFromJDBCformat(String param){
+        java.sql.Timestamp sqlTS;
+        if (param.length() == 10) {
+            sqlTS = java.sql.Timestamp.valueOf(param + " 00:00:00.000");
+        }
+        else {
+            sqlTS = java.sql.Timestamp.valueOf(param);
+        }
 
         final long timeInMillis = sqlTS.getTime();
         final long fractionalSecondsInNanos = sqlTS.getNanos();

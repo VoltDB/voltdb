@@ -379,7 +379,7 @@ public class ClientCnxn {
 
         String hostsList[] = hosts.split(",");
         for (String host : hostsList) {
-            int port = 2181;
+            int port = 7181;
             int pidx = host.lastIndexOf(':');
             if (pidx >= 0) {
                 // otherwise : is at the end of the string, ignore

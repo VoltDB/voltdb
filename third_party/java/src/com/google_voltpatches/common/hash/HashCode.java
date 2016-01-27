@@ -24,8 +24,8 @@ import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.UnsignedInts;
 
 import java.io.Serializable;
-import java.security.MessageDigest;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -40,11 +40,18 @@ public abstract class HashCode {
   HashCode() {}
 
   /**
+   * Returns the number of bits in this hash code; a positive multiple of 8.
+   */
+  @CheckReturnValue
+  public abstract int bits();
+
+  /**
    * Returns the first four bytes of {@linkplain #asBytes() this hashcode's bytes}, converted to
    * an {@code int} value in little-endian order.
    *
    * @throws IllegalStateException if {@code bits() < 32}
    */
+  @CheckReturnValue
   public abstract int asInt();
 
   /**
@@ -53,6 +60,7 @@ public abstract class HashCode {
    *
    * @throws IllegalStateException if {@code bits() < 64}
    */
+  @CheckReturnValue
   public abstract long asLong();
 
   /**
@@ -62,6 +70,7 @@ public abstract class HashCode {
    *
    * @since 14.0 (since 11.0 as {@code Hashing.padToLong(HashCode)})
    */
+  @CheckReturnValue
   public abstract long padToLong();
 
   /**
@@ -70,7 +79,41 @@ public abstract class HashCode {
    * returned by this method.
    */
   // TODO(user): consider ByteString here, when that is available
+  @CheckReturnValue
   public abstract byte[] asBytes();
+
+  /**
+   * Copies bytes from this hash code into {@code dest}.
+   *
+   * @param dest the byte array into which the hash code will be written
+   * @param offset the start offset in the data
+   * @param maxLength the maximum number of bytes to write
+   * @return the number of bytes written to {@code dest}
+   * @throws IndexOutOfBoundsException if there is not enough room in {@code dest}
+   */
+  public int writeBytesTo(byte[] dest, int offset, int maxLength) {
+    maxLength = Ints.min(maxLength, bits() / 8);
+    Preconditions.checkPositionIndexes(offset, offset + maxLength, dest.length);
+    writeBytesToImpl(dest, offset, maxLength);
+    return maxLength;
+  }
+
+  abstract void writeBytesToImpl(byte[] dest, int offset, int maxLength);
+
+  /**
+   * Returns a mutable view of the underlying bytes for the given {@code HashCode} if it is a
+   * byte-based hashcode. Otherwise it returns {@link HashCode#asBytes}. Do <i>not</i> mutate this
+   * array or else you will break the immutability contract of {@code HashCode}.
+   */
+  byte[] getBytesInternal() {
+    return asBytes();
+  }
+
+  /**
+   * Returns whether this {@code HashCode} and that {@code HashCode} have the same value, given that
+   * they have the same number of bits.
+   */
+  abstract boolean equalsSameBits(HashCode that);
 
   /**
    * Creates a 32-bit {@code HashCode} representation of the given int value. The underlying bytes
@@ -78,6 +121,7 @@ public abstract class HashCode {
    *
    * @since 15.0 (since 12.0 in HashCodes)
    */
+  @CheckReturnValue
   public static HashCode fromInt(int hash) {
     return new IntHashCode(hash);
   }
@@ -97,10 +141,11 @@ public abstract class HashCode {
     @Override
     public byte[] asBytes() {
       return new byte[] {
-          (byte) hash,
-          (byte) (hash >> 8),
-          (byte) (hash >> 16),
-          (byte) (hash >> 24)};
+        (byte) hash,
+        (byte) (hash >> 8),
+        (byte) (hash >> 16),
+        (byte) (hash >> 24)
+      };
     }
 
     @Override
@@ -118,6 +163,18 @@ public abstract class HashCode {
       return UnsignedInts.toLong(hash);
     }
 
+    @Override
+    void writeBytesToImpl(byte[] dest, int offset, int maxLength) {
+      for (int i = 0; i < maxLength; i++) {
+        dest[offset + i] = (byte) (hash >> (i * 8));
+      }
+    }
+
+    @Override
+    boolean equalsSameBits(HashCode that) {
+      return hash == that.asInt();
+    }
+
     private static final long serialVersionUID = 0;
   }
 
@@ -127,6 +184,7 @@ public abstract class HashCode {
    *
    * @since 15.0 (since 12.0 in HashCodes)
    */
+  @CheckReturnValue
   public static HashCode fromLong(long hash) {
     return new LongHashCode(hash);
   }
@@ -146,14 +204,15 @@ public abstract class HashCode {
     @Override
     public byte[] asBytes() {
       return new byte[] {
-          (byte) hash,
-          (byte) (hash >> 8),
-          (byte) (hash >> 16),
-          (byte) (hash >> 24),
-          (byte) (hash >> 32),
-          (byte) (hash >> 40),
-          (byte) (hash >> 48),
-          (byte) (hash >> 56)};
+        (byte) hash,
+        (byte) (hash >> 8),
+        (byte) (hash >> 16),
+        (byte) (hash >> 24),
+        (byte) (hash >> 32),
+        (byte) (hash >> 40),
+        (byte) (hash >> 48),
+        (byte) (hash >> 56)
+      };
     }
 
     @Override
@@ -171,6 +230,18 @@ public abstract class HashCode {
       return hash;
     }
 
+    @Override
+    void writeBytesToImpl(byte[] dest, int offset, int maxLength) {
+      for (int i = 0; i < maxLength; i++) {
+        dest[offset + i] = (byte) (hash >> (i * 8));
+      }
+    }
+
+    @Override
+    boolean equalsSameBits(HashCode that) {
+      return hash == that.asLong();
+    }
+
     private static final long serialVersionUID = 0;
   }
 
@@ -180,6 +251,7 @@ public abstract class HashCode {
    *
    * @since 15.0 (since 12.0 in HashCodes)
    */
+  @CheckReturnValue
   public static HashCode fromBytes(byte[] bytes) {
     checkArgument(bytes.length >= 1, "A HashCode must contain at least 1 byte.");
     return fromBytesNoCopy(bytes.clone());
@@ -212,8 +284,10 @@ public abstract class HashCode {
 
     @Override
     public int asInt() {
-      checkState(bytes.length >= 4,
-          "HashCode#asInt() requires >= 4 bytes (it only has %s bytes).", bytes.length);
+      checkState(
+          bytes.length >= 4,
+          "HashCode#asInt() requires >= 4 bytes (it only has %s bytes).",
+          bytes.length);
       return (bytes[0] & 0xFF)
           | ((bytes[1] & 0xFF) << 8)
           | ((bytes[2] & 0xFF) << 16)
@@ -222,8 +296,10 @@ public abstract class HashCode {
 
     @Override
     public long asLong() {
-      checkState(bytes.length >= 8,
-          "HashCode#asLong() requires >= 8 bytes (it only has %s bytes).", bytes.length);
+      checkState(
+          bytes.length >= 8,
+          "HashCode#asLong() requires >= 8 bytes (it only has %s bytes).",
+          bytes.length);
       return padToLong();
     }
 
@@ -236,13 +312,33 @@ public abstract class HashCode {
       return retVal;
     }
 
+    @Override
+    void writeBytesToImpl(byte[] dest, int offset, int maxLength) {
+      System.arraycopy(bytes, 0, dest, offset, maxLength);
+    }
+
+    @Override
+    byte[] getBytesInternal() {
+      return bytes;
+    }
+
+    @Override
+    boolean equalsSameBits(HashCode that) {
+      // We don't use MessageDigest.isEqual() here because its contract does not guarantee
+      // constant-time evaluation (no short-circuiting).
+      if (this.bytes.length != that.getBytesInternal().length) {
+        return false;
+      }
+
+      boolean areEqual = true;
+      for (int i = 0; i < this.bytes.length; i++) {
+        areEqual &= (this.bytes[i] == that.getBytesInternal()[i]);
+      }
+      return areEqual;
+    }
+
     private static final long serialVersionUID = 0;
   }
-
-  /**
-   * Returns the number of bits in this hash code; a positive multiple of 8.
-   */
-  public abstract int bits();
 
   /**
    * Creates a {@code HashCode} from a hexadecimal ({@code base 16}) encoded string. The string must
@@ -254,11 +350,14 @@ public abstract class HashCode {
    *
    * @since 15.0
    */
+  @CheckReturnValue
   public static HashCode fromString(String string) {
-    checkArgument(string.length() >= 2,
-        "input string (%s) must have at least 2 characters", string);
-    checkArgument(string.length() % 2 == 0,
-        "input string (%s) must have an even number of characters", string);
+    checkArgument(
+        string.length() >= 2, "input string (%s) must have at least 2 characters", string);
+    checkArgument(
+        string.length() % 2 == 0,
+        "input string (%s) must have an even number of characters",
+        string);
 
     byte[] bytes = new byte[string.length() / 2];
     for (int i = 0; i < string.length(); i += 2) {
@@ -280,31 +379,17 @@ public abstract class HashCode {
   }
 
   /**
-   * Copies bytes from this hash code into {@code dest}.
+   * Returns {@code true} if {@code object} is a {@link HashCode} instance with the identical byte
+   * representation to this hash code.
    *
-   * @param dest the byte array into which the hash code will be written
-   * @param offset the start offset in the data
-   * @param maxLength the maximum number of bytes to write
-   * @return the number of bytes written to {@code dest}
-   * @throws IndexOutOfBoundsException if there is not enough room in {@code dest}
+   * <p>Security note:</p> this method uses a constant-time (not short-circuiting) implementation
+   * to protect against <a href="http://en.wikipedia.org/wiki/Timing_attack">timing attacks</a>.
    */
-  public final int writeBytesTo(byte[] dest, int offset, int maxLength) {
-    maxLength = Ints.min(maxLength, bits() / 8);
-    Preconditions.checkPositionIndexes(offset, offset + maxLength, dest.length);
-    // TODO(user): Consider avoiding the array creation in asBytes() by stepping through
-    // the bytes individually.
-    byte[] hash = asBytes();
-    System.arraycopy(hash, 0, dest, offset, maxLength);
-    return maxLength;
-  }
-
   @Override
   public final boolean equals(@Nullable Object object) {
     if (object instanceof HashCode) {
       HashCode that = (HashCode) object;
-      // Undocumented: this is a non-short-circuiting equals(), in case this is a cryptographic
-      // hash code, in which case we don't want to leak timing information
-      return MessageDigest.isEqual(this.asBytes(), that.asBytes());
+      return bits() == that.bits() && equalsSameBits(that);
     }
     return false;
   }
@@ -322,7 +407,7 @@ public abstract class HashCode {
       return asInt();
     }
     // If we have less than 4 bytes, use them all.
-    byte[] bytes = asBytes();
+    byte[] bytes = getBytesInternal();
     int val = (bytes[0] & 0xFF);
     for (int i = 1; i < bytes.length; i++) {
       val |= ((bytes[i] & 0xFF) << (i * 8));
@@ -343,7 +428,7 @@ public abstract class HashCode {
    */
   @Override
   public final String toString() {
-    byte[] bytes = asBytes();
+    byte[] bytes = getBytesInternal();
     StringBuilder sb = new StringBuilder(2 * bytes.length);
     for (byte b : bytes) {
       sb.append(hexDigits[(b >> 4) & 0xf]).append(hexDigits[b & 0xf]);

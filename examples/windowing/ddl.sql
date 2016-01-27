@@ -4,7 +4,8 @@ CREATE TABLE timedata
 (
   uuid VARCHAR(36) NOT NULL,
   val BIGINT NOT NULL,
-  update_ts TIMESTAMP NOT NULL
+  update_ts TIMESTAMP NOT NULL,
+  CONSTRAINT PK_timedate PRIMARY KEY (uuid, update_ts)
 );
 
 -- Partition this table to get parallelism.
@@ -32,18 +33,14 @@ AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
    FROM timedata
    GROUP BY TRUNCATE(SECOND, update_ts);
 
+-- Update classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES windowing-procs.jar;
+
 -- stored procedures
-CREATE PROCEDURE FROM CLASS windowing.DeleteAfterDate;
-PARTITION PROCEDURE DeleteAfterDate ON TABLE timedata COLUMN uuid;
-
-CREATE PROCEDURE FROM CLASS windowing.DeleteOldestToTarget;
-PARTITION PROCEDURE DeleteOldestToTarget ON TABLE timedata COLUMN uuid;
-
-CREATE PROCEDURE FROM CLASS windowing.InsertAndDeleteAfterDate;
-PARTITION PROCEDURE InsertAndDeleteAfterDate ON TABLE timedata COLUMN uuid;
-
-CREATE PROCEDURE FROM CLASS windowing.InsertAndDeleteOldestToTarget;
-PARTITION PROCEDURE InsertAndDeleteOldestToTarget ON TABLE timedata COLUMN uuid;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.DeleteAfterDate;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.DeleteOldestToTarget;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.InsertAndDeleteAfterDate;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.InsertAndDeleteOldestToTarget;
 
 -- Find the average value over all tuples across all partitions for the last
 -- N seconds, where N is a parameter the user supplies.
@@ -54,12 +51,12 @@ PARTITION PROCEDURE InsertAndDeleteOldestToTarget ON TABLE timedata COLUMN uuid;
 -- 150k rows. In this case, it needs to scan 1 row per second times the number of
 -- partitions, or 40 rows. That's a tremendous advantage of pre-aggregating the
 -- table sums and counts by second.
-CREATE PROCEDURE windowing.Average AS
+CREATE PROCEDURE Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second
-    WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
+    WHERE second_ts >= DATEADD(SECOND, CAST(? as INTEGER), NOW);
 
 -- Find the maximum value across all rows and partitions.
-CREATE PROCEDURE windowing.MaxValue AS
+CREATE PROCEDURE MaxValue AS
     SELECT MAX(val)
     FROM timedata;

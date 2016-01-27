@@ -1,0 +1,211 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * 'Software'), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+//import org.apache.tools.ant.taskdefs.condition.Os
+//import org.apache.commons.io.FileUtils
+//import org.apache.commons.lang3.StringEscapeUtils
+ 
+apply plugin: 'groovy'
+//apply plugin: 'java'
+
+// Possible future work: download Chrome driver & PhantomJS automatically
+//apply from: "src/resources/Downloads.gradle"
+//apply from: "src/resources/GetPropertyValues.gradle"
+
+// The browser-drivers to use
+ext.drivers = ["firefox", "chrome", "phantomjs", "ie", "safari", "htmlunit"]
+
+repositories {
+    mavenCentral()
+    //jcenter()
+}
+/*
+buildscript {
+    repositories {
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        //classpath "commons-io:commons-io:2.4"
+        //classpath "commons-lang3:commons-lang3:3.3.2"
+        classpath 'org.apache.commons:commons-lang3:3.0'
+    }
+}
+*/
+
+// Returns the specified project property value, if it is defined; otherwise,
+// returns the specified default value
+def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
+    if (project.hasProperty(projectPropertyName)) {
+        return project.getProperties()[projectPropertyName]
+    } else {
+        return defaultValue
+    }
+}
+
+//ext { phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1") }
+
+dependencies {
+    def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.12.2")
+    def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.47.1")
+    def phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1")
+
+    // GEB & Spock
+    testCompile "org.gebish:geb-spock:$gebVersion"
+    testCompile "org.spockframework:spock-core:$spockVersion"
+    testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
+
+    // Print (GEB, Spock, Selenium, PhantomJS/Ghost Driver) versions being used:
+    println "Running with:\nGEB version     : " + gebVersion
+    println "Spock version   : " + spockVersion
+    println "Selenium version: " + seleniumVersion
+    println "PhantomJS (Ghost Driver) version: " + phantomjsVersion
+
+    // Apache commons (needed by HtmlUnitDriver?)
+    //classpath "commons-lang3:commons-lang3:3.3.2"
+    //classpath 'org.apache.commons:commons-lang3:3.0'
+
+    // Selenium Drivers
+    println "Allowed browser-drivers (some work better than others):\n" + drivers
+    drivers.each { driver ->
+        if (driver == "phantomjs") {
+            // TODO: switch back to the official 'com.github.detro' version
+            // (commented out below), after issue
+            // http://code.google.com/p/selenium/issues/detail?id=8102 is fixed
+            testCompile "com.codeborne:phantomjsdriver:$phantomjsVersion"
+            //testCompile "com.github.detro:phantomjsdriver:$phantomjsVersion"
+/*
+        } else if (driver == "htmlunit") {
+            testCompile "org.seleniumhq.selenium:selenium-htmlunit-driver:$seleniumVersion" {
+                exclude 'xml-apis'
+            }
+*/
+        } else {
+            testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
+        }
+    }
+
+    // Include class files needed by (FullDdlSqlTest) tests
+    compile files('../../../obj/release/test')
+    compile files('../../../obj/release/clientobj')
+    compile files('../../../obj/release/prod')
+    compile files('../../../lib/commons-lang3-3.0.jar')
+    //compile files('../../../obj/release/testprocs')
+}
+
+sourceSets {
+    test {
+        groovy {
+            srcDir 'src/pages'
+            srcDir 'src/tests'
+        }
+        resources {
+            srcDir 'src/resources'
+        }
+    }
+}
+
+drivers.each { driver ->
+    task "${driver}Test"(type: Test) {
+        reports.html.destination = reporting.file("$name/tests")
+        reports.junitXml.destination = file("$buildDir/test-results/$name")
+
+        systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
+        systemProperty "geb.env", driver
+
+        // Set various system properties, either to project property values
+        // set on the command line (via -P), or to their default values; for
+        // example, to set 'url', use: -Purl=http://my.web.site/
+        systemProperty "geb.build.baseUrl", getProjectPropertyOrDefaultValue("url", "http://localhost:8080/")
+        systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
+        systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
+        systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
+        // System properties specific to SqlQueriesTest or FullDdlSqlTest
+        systemProperty "sqlTests", getProjectPropertyOrDefaultValue("sqlTests", null)
+        systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
+        // System properties specific to SqlQueriesTest
+        systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
+        systemProperty "testTables", getProjectPropertyOrDefaultValue("testTables", "PARTITIONED_TABLE,REPLICATED_TABLE")
+        systemProperty "testViews", getProjectPropertyOrDefaultValue("testViews", null)
+        systemProperty "insertJson", getProjectPropertyOrDefaultValue("insertJson", false)
+    }
+}
+/*
+chromeTest {
+    dependsOn unzipChromeDriver
+
+    def chromedriverFilename = Os.isFamily(Os.FAMILY_WINDOWS) ? "chromedriver.exe" : "chromedriver"
+    systemProperty "webdriver.chrome.driver", new File(unzipChromeDriver.outputs.files.singleFile, chromedriverFilename).absolutePath
+}
+*/
+/*
+// Special set-up for running PhantomJs (headless) browser...
+task downloadPhantomJs {
+//    def phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.9.8")
+
+    def osFilenamePart
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        osFilenamePart = "windows.zip"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        osFilenamePart = "macosx.zip"
+    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+        osFilenamePart = Os.isArch("amd64") ? "linux-x86_64.tar.bz2" : "linux-i686.tar.bz2"
+    }
+
+    def filename = "phantomjs-$phantomjsVersion-$osFilenamePart"
+    def outputFile = file("$buildDir/webdriver/$filename")
+    inputs.property("phantomjsVersion", phantomjsVersion)
+    outputs.file(outputFile)
+
+    doLast {
+        FileUtils.copyURLToFile(new URL("https://bitbucket.org/ariya/phantomjs/downloads/$filename"), outputFile)
+    }
+}
+
+task unzipPhantomJs(type: Copy) {
+    def outputDir = file("$buildDir/webdriver/phantomjs")
+    dependsOn downloadPhantomJs
+    outputs.dir(outputDir)
+
+    def archive = downloadPhantomJs.outputs.files.singleFile
+
+    from(Os.isFamily(Os.FAMILY_MAC) || Os.isFamily(Os.FAMILY_WINDOWS) ? zipTree(archive) : tarTree(archive))
+    into(outputDir)
+    eachFile { FileCopyDetails fcp ->
+        fcp.relativePath = new RelativePath(!fcp.directory, *fcp.relativePath.segments[1..-1])
+    }
+}
+
+phantomJsTest {
+    dependsOn unzipPhantomJs
+
+    def phantomJsFilename = Os.isFamily(Os.FAMILY_WINDOWS) ? "phantomjs.exe" : "bin/phantomjs"
+    systemProperty "phantomjs.binary.path", new File(unzipPhantomJs.outputs.files.singleFile, phantomJsFilename).absolutePath
+}
+
+test {
+    dependsOn drivers.collect { tasks["${it}Test"] }
+    enabled = false
+}
+*/

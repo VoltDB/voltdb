@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,10 +25,10 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -53,7 +53,7 @@ import org.voltdb.rejoin.TaskLog;
  */
 abstract public class Scheduler implements InitiatorMessageHandler
 {
-    protected static VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // A null task that unblocks the site task queue, used during shutdown
     static final SiteTasker m_nullTask = new SiteTasker() {
@@ -155,6 +155,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_lock = o;
     }
 
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener) {
+        // Durability Listeners should never be assigned to the MP Scheduler
+        assert false;
+    }
+
     /**
      * Update last seen txnIds in the replay sequencer. This is used on MPI repair.
      * @param message
@@ -166,19 +171,19 @@ abstract public class Scheduler implements InitiatorMessageHandler
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
-        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
+        boolean drV1 = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDRv1()));
 
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
-        boolean replay = commandLog || sentinel || dr;
+        boolean replay = commandLog || sentinel || drV1;
 
-        assert(!(commandLog && dr));
+        assert(!(commandLog && drV1));
 
         if (commandLog || sentinel) {
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
         }
-        else if (dr) {
+        else if (drV1) {
             sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
         }
 
@@ -199,6 +204,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters);
 
+    @Override
     abstract public void deliver(VoltMessage message);
 
     abstract public void enableWritingIv2FaultLog();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,12 +61,10 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true, since statement does not produce a query result
+     * @return Force subclasses to assess determinism (INSERT INTO ... SELECT may be nondeterministic)
      */
     @Override
-    public boolean isOrderDeterministic() {
-        return true;
-    }
+    public abstract boolean isOrderDeterministic();
 
     /**
      * @return the target_table_name

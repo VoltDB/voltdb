@@ -16,7 +16,6 @@
 
 package com.google_voltpatches.common.cache;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -36,15 +35,9 @@ import java.util.concurrent.ExecutionException;
  * <p>When evaluated as a {@link Function}, a cache yields the same result as invoking
  * {@link #getUnchecked}.
  *
- * <p>Note that while this class is still annotated as {@link Beta}, the API is frozen from a
- * consumer's standpoint. In other words existing methods are all considered {@code non-Beta} and
- * won't be changed without going through an 18 month deprecation cycle; however new methods may be
- * added at any time.
- *
  * @author Charles Fry
  * @since 11.0
  */
-@Beta
 @GwtCompatible
 public interface LoadingCache<K, V> extends Cache<K, V>, Function<K, V> {
 
@@ -67,7 +60,7 @@ public interface LoadingCache<K, V> extends Cache<K, V>, Function<K, V> {
    *
    * @throws ExecutionException if a checked exception was thrown while loading the value. ({@code
    *     ExecutionException} is thrown <a
-   *     href="http://code.google.com/p/guava-libraries/wiki/CachesExplained#Interruption">even if
+   *     href="https://github.com/google/guava/wiki/CachesExplained#interruption">even if
    *     computation was interrupted by an {@code InterruptedException}</a>.)
    * @throws UncheckedExecutionException if an unchecked exception was thrown while loading the
    *     value
@@ -118,7 +111,7 @@ public interface LoadingCache<K, V> extends Cache<K, V>, Function<K, V> {
    *
    * @throws ExecutionException if a checked exception was thrown while loading the value. ({@code
    *     ExecutionException} is thrown <a
-   *     href="http://code.google.com/p/guava-libraries/wiki/CachesExplained#Interruption">even if
+   *     href="https://github.com/google/guava/wiki/CachesExplained#interruption">even if
    *     computation was interrupted by an {@code InterruptedException}</a>.)
    * @throws UncheckedExecutionException if an unchecked exception was thrown while loading the
    *     values
@@ -128,13 +121,13 @@ public interface LoadingCache<K, V> extends Cache<K, V>, Function<K, V> {
   ImmutableMap<K, V> getAll(Iterable<? extends K> keys) throws ExecutionException;
 
   /**
-   * Discouraged. Provided to satisfy the {@code Function} interface; use {@link #get} or
-   * {@link #getUnchecked} instead.
-   *
+   * @deprecated Provided to satisfy the {@code Function} interface; use {@link #get} or
+   *     {@link #getUnchecked} instead.
    * @throws UncheckedExecutionException if an exception was thrown while loading the value. (As
    *     described in the documentation for {@link #getUnchecked}, {@code LoadingCache} should be
    *     used as a {@code Function} only with cache loaders that throw only unchecked exceptions.)
    */
+  @Deprecated
   @Override
   V apply(K key);
 

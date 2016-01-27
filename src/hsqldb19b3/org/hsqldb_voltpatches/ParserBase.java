@@ -666,6 +666,9 @@ public class ParserBase {
 
         // aggregates
         expressionTypeMap.put(Tokens.COUNT, OpTypes.COUNT);
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        expressionTypeMap.put(Tokens.APPROX_COUNT_DISTINCT, OpTypes.APPROX_COUNT_DISTINCT);
+        // End of VoltDB extension
         expressionTypeMap.put(Tokens.MAX, OpTypes.MAX);
         expressionTypeMap.put(Tokens.MIN, OpTypes.MIN);
         expressionTypeMap.put(Tokens.SUM, OpTypes.SUM);
@@ -787,4 +790,9 @@ public class ParserBase {
         }
     }
     /**********************************************************************/
+    // A VoltDB extension to make it easier to see SQL statement being parsed in the debugger
+    public String toString() {
+        return "A subclass of ParserBase parsing <<" + scanner.sqlString + ">>";
+    }
+    // End of VoltDB extension
 }

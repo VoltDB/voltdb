@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -72,12 +72,12 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         // Just copy the table schema of our input table
         //
-        assert(node->getInputTables().size() == 1);
+        assert(node->getInputTableCount() == 1);
         node->
             setOutputTable(TableFactory::
                            getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
+                                              node->getInputTable()->name(),
+                                              node->getInputTable(),
                                               limits));
     }
     return true;
@@ -90,7 +90,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     //
@@ -125,6 +125,8 @@ LimitExecutor::p_execute(const NValueArray &params)
             return false;
         }
     }
+
+    cleanupInputTempTable(input_table);
 
     return true;
 }

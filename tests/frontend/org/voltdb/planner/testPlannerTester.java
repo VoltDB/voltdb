@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,7 +33,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 public class testPlannerTester extends PlannerTestCase {
@@ -44,8 +43,8 @@ public class testPlannerTester extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(testPlannerTester.class.getResource("testplans-plannerTester-ddl.sql"),
                     "testplans-plannerTester-ddl", true);
-        m_currentDir = new File(".").getCanonicalPath();
-        m_homeDir = System.getProperty("user.home");
+        m_currentDir = new File(".").getCanonicalPath() + "/";
+        m_homeDir = System.getProperty("user.home") + "/";
     }
 
     /// Unit test some of the techniques used by plannerTester
@@ -54,70 +53,72 @@ public class testPlannerTester extends PlannerTestCase {
         pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
 
         ArrayList<AbstractScanPlanNode> collected = pn.getScanNodeList();
-        System.out.println( collected );
-        System.out.println( collected.size() );
-        for( AbstractPlanNode n : collected ) {
-            System.out.println( n.toExplainPlanString() );
+        System.out.println(collected);
+        System.out.println(collected.size());
+        for (AbstractPlanNode n : collected) {
+            System.out.println(n.toExplainPlanString());
         }
-        assertTrue( collected.size() == 1 );
+        assertTrue(collected.size() == 1);
         JSONObject j;
         try {
-            j = new JSONObject( collected.get(0).toJSONString() );
+            j = new JSONObject(collected.get(0).toJSONString());
             System.out.println(j.getString("PLAN_NODE_TYPE"));
-            assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("INDEXSCAN")  );
-        } catch (JSONException e) {
+            assertTrue(j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("INDEXSCAN"));
+        }
+        catch (JSONException e) {
             e.printStackTrace();
         }
     }
 
     public void testReAttachFragments() {
         try {
-            plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+            plannerTester.setUpForTest(m_currentDir +
+                    "tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                     "testplans-plannerTester-ddl");
             List<AbstractPlanNode> pnList = plannerTester.testCompile("select * from l, t where t.a=l.a limit ?;");
-            System.out.println( pnList.size() );
-            System.out.println( pnList.get(0).toExplainPlanString() );
+            System.out.println(pnList.size());
+            System.out.println(pnList.get(0).toExplainPlanString());
 
-            assert( pnList.size() == 2 );
-            assert( pnList.get(1) instanceof SendPlanNode );
-            if ( pnList.get(0).reattachFragment( ( SendPlanNode )pnList.get(1) ) ) {
+            assert(pnList.size() == 2);
+            assert(pnList.get(1) instanceof SendPlanNode);
+            if (pnList.get(0).reattachFragment((SendPlanNode)pnList.get(1))) {
                 AbstractPlanNode pn = pnList.get(0);
-                System.out.println( pn.toExplainPlanString() );
-                assertTrue( pn.toExplainPlanString().contains("SEND PARTITION RESULTS TO COORDINATOR"));
+                System.out.println(pn.toExplainPlanString());
+                assertTrue(pn.toExplainPlanString().contains("SEND PARTITION RESULTS TO COORDINATOR"));
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     public void testWriteAndLoad() throws Exception {
         AbstractPlanNode pn = null;
-        String path = m_homeDir+"/";
-        plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+        plannerTester.setUpForTest(m_currentDir +
+                "tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                 "testplans-plannerTester-ddl");
         List<AbstractPlanNode> pnList = plannerTester.testCompile("select * from l, t where t.a=l.a limit ?;");
 
-        System.out.println( pnList.size() );
+        System.out.println(pnList.size());
 
-        assert( pnList.get(1) instanceof SendPlanNode );
-        pnList.get(0).reattachFragment( (SendPlanNode) pnList.get(1) );
+        assert(pnList.get(1) instanceof SendPlanNode);
+        pnList.get(0).reattachFragment((SendPlanNode) pnList.get(1));
         pn = pnList.get(0);
-        System.out.println( pn.toJSONString() );
-        System.out.println( pn.toExplainPlanString() );
-        plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
+        System.out.println(pn.toJSONString());
+        System.out.println(pn.toExplainPlanString());
+        plannerTester.writePlanToFile(pn, m_homeDir, "prettyJson.txt", "");
 
         ArrayList<String> getsql = new ArrayList<String>();
-        PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
-        System.out.println( pnt.toJSONString() );
-        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+        AbstractPlanNode pn2 = plannerTester.loadPlanFromFile(m_homeDir + "prettyJson.txt", getsql);
+        System.out.println(pn2.toExplainPlanString());
         ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
-        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeList();
-        assertTrue( list1.size() == list2.size() );
-        for( int i = 0; i < list1.size(); i++ ) {
+        ArrayList<AbstractPlanNode> list2 = pn2.getPlanNodeList();
+        assertTrue(list1.size() == list2.size());
+        for (int i = 0; i < list1.size(); i++) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
             Map<PlanNodeType, AbstractPlanNode> inlineNodes2 = list2.get(i).getInlinePlanNodes();
-            if(  inlineNodes1 != null ) {
-                assertTrue( inlineNodes1.size() == inlineNodes2.size() );
+            if (inlineNodes1 != null) {
+                assertTrue(inlineNodes1.size() == inlineNodes2.size());
             }
         }
     }
@@ -126,25 +127,24 @@ public class testPlannerTester extends PlannerTestCase {
         AbstractPlanNode pn = null;
         pn = compile("select * from l, t where l.b=t.b limit ?;");
 
-        String path = m_homeDir+"/";
-        plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+        plannerTester.setUpForTest(m_currentDir +
+                "tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                 "testplans-plannerTester-ddl");
-        System.out.println( pn.toExplainPlanString() );
-        System.out.println( pn.toJSONString() );
-        plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
+        System.out.println(pn.toExplainPlanString());
+        System.out.println(pn.toJSONString());
+        plannerTester.writePlanToFile(pn, m_homeDir, "prettyJson.txt", "");
 
-        ArrayList<String> getsql = new ArrayList<String>();
-        PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
-        System.out.println( pnt.toJSONString() );
-        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+        ArrayList<String> getsql = new ArrayList<>();
+        AbstractPlanNode pn2 = plannerTester.loadPlanFromFile(m_homeDir + "prettyJson.txt", getsql);
+        System.out.println(pn2.toExplainPlanString());
         ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
-        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeList();
-        assertTrue( list1.size() == list2.size() );
-        for( int i = 0; i < list1.size(); i++ ) {
+        ArrayList<AbstractPlanNode> list2 = pn2.getPlanNodeList();
+        assertTrue(list1.size() == list2.size());
+        for (int i = 0; i < list1.size(); i++) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
             Map<PlanNodeType, AbstractPlanNode> inlineNodes2 = list2.get(i).getInlinePlanNodes();
-            if(  inlineNodes1 != null ) {
-                assertTrue( inlineNodes1.size() == inlineNodes2.size() );
+            if (inlineNodes1 != null) {
+                assertTrue(inlineNodes1.size() == inlineNodes2.size());
             }
         }
     }
@@ -156,43 +156,43 @@ public class testPlannerTester extends PlannerTestCase {
 
         ArrayList<AbstractPlanNode> pnlist = pn1.getPlanNodeList();
 
-        System.out.println( pn1.toExplainPlanString() );
-        System.out.println( pnlist.size() );
-        for( int i = 0; i<pnlist.size(); i++ ){
-            System.out.println( pnlist.get(i).toJSONString() );
+        System.out.println(pn1.toExplainPlanString());
+        System.out.println(pnlist.size());
+        for (int i = 0; i < pnlist.size(); i++) {
+            System.out.println(pnlist.get(i).toJSONString());
         }
-        assertTrue( pnlist.size() == 6 );
+        assertTrue(pnlist.size() == 6);
     }
 
     public void testScanDiff()
     {
-        assertTrue( compileDiffMatchPattern("select * from t where a = ?;",
+        assertTrue(compileDiffMatchPattern("select * from t where a = ?;",
                                             "select * from l,t where l.a = t.a order by b limit ?;",
                                             "Scan time diff :",
                                             "(1 => 2)",
                                             "Table diff at leaf 0:",
                                             "(INDEXSCAN on T => INDEXSCAN on L)",
                                             "Table diff at leaf 1:",
-                                            "([] => INDEXSCAN on T)") );
+                                            "([] => INDEXSCAN on T)"));
     }
 
     /// Unit test plannerTester as a plan diff engine.
     public void testJoinDiff()
     {
-        assertTrue( compileDiffMatchPattern("select count(*) from t;",
+        assertTrue(compileDiffMatchPattern("select count(*) from t;",
                                             "select * from l,t where l.a = t.a order by b limit ?;",
                                             "Join Node List diff:",
-                                            "([] => NESTLOOPINDEX[5])") );
-        assertTrue( compileDiffMatchPattern("select * from l, t where t.a=l.a;",
+                                            "([] => NESTLOOPINDEX[5])"));
+        assertTrue(compileDiffMatchPattern("select * from l, t where t.a=l.a;",
                                             "select * from l, t where t.b=l.b order by a limit ?;",
                                             "Join Node Type diff:",
-                                            "(NESTLOOPINDEX[3] => NESTLOOP[5])") );
+                                            "(NESTLOOPINDEX[3] => NESTLOOP[5])"));
     }
 
     /// Unit test plannerTester as a plan diff engine.
     public void testPlanNodeAndInlinePositionDiff()
     {
-        assertTrue( compileDiffMatchPattern("select * from l order by a;",
+        assertTrue(compileDiffMatchPattern("select * from l order by a;",
                                             "select * from l order by a limit ?;",
                                             "ORDERBY diff:",
                                             "([3] => [4])",
@@ -203,13 +203,13 @@ public class testPlannerTester extends PlannerTestCase {
                                             "LIMIT diff:" ,
                                             "([] => [2])",
                                             "Inline PROJECTION diff:",
-                                            "([INDEXSCAN[4]] => [INDEXSCAN[5]])") );
+                                            "([INDEXSCAN[4]] => [INDEXSCAN[5]])"));
     }
 
     /// Unit test plannerTester as a plan diff engine.
     public void testComprehensiveDiff()
     {
-        assertTrue( compileDiffMatchPattern("select * from l, t where t.a=l.a;",
+        assertTrue(compileDiffMatchPattern("select * from l, t where t.a=l.a;",
                                             "select * from l, t where t.b=l.b order by a limit ?;",
                                             "Table diff at leaf 0:",
                                             "(INDEXSCAN on L => SEQSCAN on T)",
@@ -235,21 +235,21 @@ public class testPlannerTester extends PlannerTestCase {
                                             "Inline PROJECTION diff:",
                                             "([INDEXSCAN[4]] => [SEQSCAN[6], INDEXSCAN[7]])",
                                             "Join Node Type diff:",
-                                            "(NESTLOOPINDEX[3] => NESTLOOP[5])") );
+                                            "(NESTLOOPINDEX[3] => NESTLOOP[5])"));
     }
 
-    public boolean compileDiffMatchPattern( String sql1, String sql2, String... patterns)
+    public boolean compileDiffMatchPattern(String sql1, String sql2, String... patterns)
     {
         AbstractPlanNode pn1 = compile(sql1);
         AbstractPlanNode pn2 = compile(sql2);
-        plannerTester.diff( pn1, pn2, true );
+        plannerTester.diff(pn1, pn2, true);
         int numMatched = 0;
-        for( String str : plannerTester.m_diffMessages ) {
+        for (String str : plannerTester.m_diffMessages) {
             String[] splits = str.split("\n");
             for (String split : splits) {
                 int wasMatched = numMatched;
-                for( String pattern : patterns ) {
-                    if( split.trim().equals( pattern ) ) {
+                for (String pattern : patterns) {
+                    if (split.trim().equals(pattern)) {
                         numMatched++;
                         break;
                     }
@@ -259,7 +259,7 @@ public class testPlannerTester extends PlannerTestCase {
                 }
             }
         }
-        return ( numMatched == patterns.length );
+        return (numMatched == patterns.length);
     }
 
 }

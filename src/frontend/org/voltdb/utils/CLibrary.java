@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,9 +18,9 @@ package org.voltdb.utils;
 
 import org.voltcore.logging.VoltLogger;
 import com.sun.jna.Native;
-import sun.misc.SharedSecrets;
 
-import java.io.FileDescriptor;
+import java.util.Arrays;
+import java.util.List;
 
 public class CLibrary {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -35,6 +35,11 @@ public class CLibrary {
     public static final class Rlimit extends  com.sun.jna.Structure {
         public long rlim_cur = 0;
         public long rlim_max = 0;
+
+        @Override
+        protected List getFieldOrder() {
+            return Arrays.asList("rlim_cur", "rlim_max");
+        }
     }
 
     public static final int RLIMIT_NOFILE_LINUX = 7;

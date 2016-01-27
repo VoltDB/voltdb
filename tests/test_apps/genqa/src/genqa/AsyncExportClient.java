@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -213,6 +213,7 @@ public class AsyncExportClient
         final int latencyTarget;
         final String [] parsedServers;
         final String procedure;
+        final boolean exportGroups;
 
         ConnectionConfig( AppHelper apph) {
             displayInterval = apph.longValue("displayinterval");
@@ -225,6 +226,7 @@ public class AsyncExportClient
             latencyTarget   = apph.intValue("latencytarget");
             procedure       = apph.stringValue("procedure");
             parsedServers   = servers.split(",");
+            exportGroups    = apph.booleanValue("exportgroups");
         }
     }
 
@@ -245,15 +247,6 @@ public class AsyncExportClient
 
     // Test startup time
     private static long benchmarkStartTS;
-
-    private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
 
     // Statistics manager objects from the client
     private static ClientStatsContext periodicStatsContext;
@@ -284,7 +277,8 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "Swap catalogs from the client", "true")
+                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
+                .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .setArguments(args)
             ;
 
@@ -376,7 +370,12 @@ public class AsyncExportClient
             waitForStreamedAllocatedMemoryZero(clientRef.get());
             System.out.println("Writing export count as: " + TrackingResults.get(0));
             //Write to export table to get count to be expected on other side.
-            clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            if (config.exportGroups) {
+                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
+            }
+            else {
+                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            }
             writer.close(true);
 
             // Now print application results:
@@ -475,8 +474,8 @@ public class AsyncExportClient
     }
 
     static Client createClient() {
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "");
+        clientConfig.setReconnectOnConnectionLoss(true);
         if (config.autoTune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
@@ -491,34 +490,6 @@ public class AsyncExportClient
         fullStatsContext = client.createStatsContext();
 
         return client;
-    }
-
-    /**
-     * Remove the client from the list if connection is broken.
-     */
-    static class StatusListener extends ClientStatusListenerExt {
-
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            if (shutdown.get()) {
-                return;
-            }
-
-            // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-            }
-
-            // setup for retry
-            final String server = hostname;
-            final int finalPort = port;
-            es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server, finalPort);
-                }
-            });
-        }
     }
 
     /**
@@ -558,9 +529,19 @@ public class AsyncExportClient
         boolean passed = false;
 
         VoltTable stats = null;
-        System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        try {
+            System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        } catch (Exception ex) {
+        }
         while (true) {
-            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            try {
+                stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            } catch (Exception ex) {
+            }
+            if (stats == null) {
+                Thread.sleep(5000);
+                continue;
+            }
             boolean passedThisTime = true;
             while (stats.advanceRow()) {
                 String ttype = stats.getString("TABLE_TYPE");

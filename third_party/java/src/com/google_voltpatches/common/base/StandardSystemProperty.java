@@ -19,6 +19,9 @@ package com.google_voltpatches.common.base;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 
+import javax.annotation_voltpatches.CheckReturnValue;
+import javax.annotation_voltpatches.Nullable;
+
 /**
  * Represents a {@linkplain System#getProperties() standard system property}.
  *
@@ -27,6 +30,7 @@ import com.google_voltpatches.common.annotations.GwtIncompatible;
  */
 @Beta
 @GwtIncompatible("java.lang.System#getProperty")
+@CheckReturnValue
 public enum StandardSystemProperty {
 
   /** Java Runtime Environment version. */
@@ -130,6 +134,7 @@ public enum StandardSystemProperty {
    * Returns the current value for this system property by delegating to
    * {@link System#getProperty(String)}.
    */
+  @Nullable
   public String value() {
     return System.getProperty(key);
   }
@@ -137,7 +142,8 @@ public enum StandardSystemProperty {
   /**
    * Returns a string representation of this system property.
    */
-  @Override public String toString() {
+  @Override
+  public String toString() {
     return key() + "=" + value();
   }
 }

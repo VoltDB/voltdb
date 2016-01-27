@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -79,7 +79,7 @@ protected:
         out->writeTextString(TEXT);
     }
 
-    void readTestSuite(SerializeInput* in) {
+    void readTestSuite(SerializeInputBE* in) {
         EXPECT_EQ(true, in->readBool());
         EXPECT_EQ(false, in->readBool());
         EXPECT_EQ(numeric_limits<int8_t>::min(), in->readByte());
@@ -102,17 +102,17 @@ TEST_F(SerializeIOTest, ReadWrite) {
     CopySerializeOutput out;
     writeTestSuite(&out);
 
-    ReferenceSerializeInput in(out.data(), out.size());
+    ReferenceSerializeInputBE in(out.data(), out.size());
     readTestSuite(&in);
 
-    CopySerializeInput in2(out.data(), out.size());
+    CopySerializeInputBE in2(out.data(), out.size());
     memset(const_cast<char*>(out.data()), 0, out.size());
     readTestSuite(&in2);
 }
 
 TEST_F(SerializeIOTest, Unread) {
     static const char data[] = { 1, 2, 3, 4};
-    ReferenceSerializeInput in(data, sizeof(data));
+    ReferenceSerializeInputBE in(data, sizeof(data));
     EXPECT_EQ(0x01020304, in.readInt());
     // Read the int again
     in.unread(sizeof(int32_t));

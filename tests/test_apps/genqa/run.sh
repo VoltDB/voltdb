@@ -2,6 +2,8 @@
 
 APPNAME="genqa"
 APPNAME2="genqa2"
+APPNAME3="eggenqa"
+APPNAME4="eggenqa2"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -15,6 +17,10 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
+elif [ -d "$VOLTDB_BIN/../voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 else
     VOLTDB_LIB="`pwd`/../../../lib"
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
@@ -24,11 +30,13 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+    \ls -1 /home/opt/kafka/libs/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 
 # ZK Jars needed to compile kafka verifier. Apprunner uses a nfs shared path.
 ZKCP=${ZKLIB:-"/home/opt/kafka/libs"}
-CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar"
+RBMQ=${RBMQLIB:-"/home/opt/rabbitmq"}
+CLASSPATH="$CLASSPATH:$ZKCP/zkclient-0.3.jar:$ZKCP/zookeeper-3.3.4.jar:$RBMQ/rabbitmq.jar"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -40,7 +48,7 @@ CLIENTLOG="clientlog"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME2.jar $APPNAME3.jar $APPNAME4.jar voltdbroot voltdbroot
     rm -f $VOLTDB_LIB/extension/customexport.jar
 }
 
@@ -61,8 +69,10 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
-    $VOLTDB compile --classpath obj -o $APPNAME2.jar -p project2.xml
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql
+    $VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql
+    $VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
@@ -85,6 +95,13 @@ function server-kafka() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create -d deployment-kafka.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
+function server-rabbitmq() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create -d deployment-rabbitmq.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
 # run the voltdb server locally with mysql connector
@@ -239,8 +256,12 @@ function export-on-server-verify() {
 
 function export-kafka-server-verify() {
     java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/kafka/libs/zkclient-0.3.jar:/home/opt/kafka/libs/zookeeper-3.3.4.jar \
-        genqa.ExportKafkaOnServerVerifier kafka1:9092 kafka1:7181 voltdbexportEXPORT_PARTITIONED_TABLE \
-        4 $CLIENTLOG
+        genqa.ExportKafkaOnServerVerifier kafka2:2181 voltdbexport
+}
+
+function export-rabbitmq-verify() {
+    java -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx512m -classpath obj:$CLASSPATH:obj:/home/opt/rabbitmq/rabbitmq-client-3.3.4.jar \
+        genqa.ExportRabbitMQVerifier kafka1 test test systest
 }
 
 function help() {

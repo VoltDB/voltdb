@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,9 @@ public interface SnapshotCompletionInterest {
         public final boolean didSucceed;
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
+        public final Map<Integer, Long> drSequenceNumbers;
+        public final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds;
+        public final int drVersion;
 
         public SnapshotCompletionEvent(
                 String path,
@@ -43,7 +46,10 @@ public interface SnapshotCompletionInterest {
                 final boolean truncationSnapshot,
                 final boolean didSucceed,
                 final String requestId,
-                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
+                final Map<Integer, Long> drSequenceNumbers,
+                final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
+                final int drVersion) {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
@@ -52,6 +58,23 @@ public interface SnapshotCompletionInterest {
             this.didSucceed = didSucceed;
             this.requestId = requestId;
             this.exportSequenceNumbers = exportSequenceNumbers;
+            this.drSequenceNumbers = drSequenceNumbers;
+            this.remoteDCLastIds = remoteDCLastIds;
+            this.drVersion = drVersion;
+        }
+
+        // Factory method for simplified instances used in testing,
+        // to avoid repeating this long series of dummy-valued initializers.
+        public static SnapshotCompletionEvent newInstanceForTest(
+                String path,
+                String nonce,
+                long multipartTxnId,
+                Map<Integer, Long> partitionTxnIds,
+                boolean truncationSnapshot,
+                int drVersion) {
+            return new SnapshotCompletionEvent(
+                    path, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
+                    true, "", null, null, null, drVersion);
         }
     }
 

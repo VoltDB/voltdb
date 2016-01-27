@@ -648,7 +648,7 @@ public class JSONObject {
      *
      * @return An iterator of the keys.
      */
-    public Iterator keys() {
+    public Iterator<String> keys() {
         return this.map.keySet().iterator();
     }
 
@@ -1510,6 +1510,7 @@ public class JSONObject {
       * @param object The object to wrap
       * @return The wrapped value
       */
+     @SuppressWarnings("rawtypes")
      static Object wrap(Object object) {
          try {
              if (object == null) {
@@ -1534,11 +1535,13 @@ public class JSONObject {
              if (object instanceof Map) {
                  return new JSONObject((Map)object);
              }
-             Package objectPackage = object.getClass().getPackage();
-             String objectPackageName = ( objectPackage != null ? objectPackage.getName() : "" );
-             if (objectPackageName.startsWith("java.") ||
-                     objectPackageName.startsWith("javax.") ||
-                     object.getClass().getClassLoader() == null) {
+             String checkPrefix = object.getClass().getName();
+             if (checkPrefix.lastIndexOf('.') == -1) {
+                 checkPrefix = "";
+             }
+             if (   checkPrefix.startsWith("java.") ||
+                    checkPrefix.startsWith("javax.") ||
+                    object.getClass().getClassLoader() == null) {
                  return object.toString();
              }
              return new JSONObject(object);
@@ -1546,7 +1549,6 @@ public class JSONObject {
              return null;
          }
      }
-
 
      /**
       * Write the contents of the JSONObject as JSON text to a writer.

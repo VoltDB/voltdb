@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,16 @@ public class CatalogUpgradeTools
         String[] bi = getBuildInfoLines(memCatalog);
         bi[0] = bi[0].substring(0, bi[0].lastIndexOf('.'));
         memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
+    }
+
+    public static void dorkDowngradeVersion(String srcJar, String dstJar, String buildstring)
+        throws Exception
+    {
+        InMemoryJarfile memCatalog = CatalogUpgradeTools.loadFromPath(srcJar);
+        String[] bi = getBuildInfoLines(memCatalog);
+        bi[0] = buildstring;
+        memCatalog.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, StringUtils.join(bi, '\n').getBytes());
+        memCatalog.writeToFile(new File(dstJar));
     }
 
     /**

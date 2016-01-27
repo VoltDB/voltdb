@@ -15,8 +15,7 @@ VOTER_BASE=$VOLTDB_BASE/examples/voter
 FILES="\
 src
 ddl.sql
-deployment.xml
-project.xml"
+deployment.xml"
 
 function clean() {
     rm -Rf $FILES
@@ -45,7 +44,7 @@ if [ $# -gt 1 ]; then bash runexample.sh help; exit; fi
 
 
 # If clean then clean the run.sh stuff, then call clean
-if [ $1 = 'clean' ]
+if [ "$1" = "clean" ]
 then
     clean
     bash runexample.sh clean
@@ -53,14 +52,27 @@ then
     exit
 fi
 
-#Otherwise - copy the rest of voter 
+#Otherwise - copy the rest of voter
 copyvoter
 #Copy the AdHocBenchmark.java from her to src
 cp -p AdHocBenchmark.java src/voter/
 
 #If adhoc, run it otherwise call into the original run.sh
-if [ $1 = 'adhoc' ]
+if [ "$1" = "adhoc" ]
 then
+    (cat adhoc-quiet.input | sqlcmd > /dev/null) || exit 1
+    bash runexample.sh srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.AdHocBenchmark \
+        --displayinterval=5 \
+        --warmup=5 \
+        --duration=12 \
+        --servers=localhost:21212 \
+        --contestants=6 \
+        --maxvotes=2
+elif [ "$1" = "adhoc-logged" ]
+then
+    (cat adhoc-noisy.input | sqlcmd > /dev/null) || exit 1
     bash runexample.sh srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AdHocBenchmark \

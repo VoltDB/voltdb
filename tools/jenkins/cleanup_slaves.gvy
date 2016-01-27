@@ -107,7 +107,11 @@ for (slave in jenkins.slaves)
       }
       else {
         println("  DELETE: $d");
+        try {
           d.deleteRecursive();
+        } catch (ex) {
+          println ("    ERROR: " + ex);
+        }
       }
     }
   }

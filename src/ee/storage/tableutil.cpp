@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -59,16 +59,48 @@ namespace voltdb {
 
 bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out)
 {
-    voltdb::Table* table2 = const_cast<voltdb::PersistentTable*>(table);
+    voltdb::PersistentTable* table2 = const_cast<voltdb::PersistentTable*>(table);
     int cnt = (int)table->visibleTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
-        TableIterator it = table2->iterator();
-        while (it.next(out)) {
+        JumpingTableIterator* it = table2->makeJumpingIterator();
+        while (it->hasNextBlock() && it->getTuplesInNextBlock() <= idx) {
+            idx -= it->getTuplesInNextBlock();
+            it->nextBlock();
+        }
+        while (it->next(out)) {
             if (idx-- == 0) {
+                delete it;
                 return true;
             }
         }
+        delete it;
+        throwFatalException("Unable to retrieve a random tuple."
+                "Iterated entire table below active tuple count but ran out of tuples");
+    }
+    return false;
+}
+
+bool tableutil::getLastTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out)
+{
+    voltdb::PersistentTable* table2 = const_cast<voltdb::PersistentTable*>(table);
+    int cnt = (int)table->visibleTupleCount();
+    if (cnt > 0) {
+        int idx = cnt-1;
+        JumpingTableIterator* it = table2->makeJumpingIterator();
+        while (it->hasNextBlock() && it->getTuplesInNextBlock() <= idx) {
+            idx -= it->getTuplesInNextBlock();
+            it->nextBlock();
+        }
+        while (it->next(out)) {
+            if (idx-- == 0) {
+                voltdb::TableTuple tmp;
+                assert(!it->next(tmp));
+                delete it;
+                return true;
+            }
+        }
+        delete it;
         throwFatalException("Unable to retrieve a random tuple."
                 "Iterated entire table below active tuple count but ran out of tuples");
     }
@@ -81,7 +113,7 @@ void tableutil::setRandomTupleValues(Table* table, TableTuple *tuple)
     assert(tuple);
     for (int col_ctr = 0, col_cnt = table->columnCount(); col_ctr < col_cnt; col_ctr++) {
         const TupleSchema::ColumnInfo *columnInfo = table->schema()->getColumnInfo(col_ctr);
-        NValue value = getRandomValue(columnInfo->getVoltType());
+        NValue value = getRandomValue(columnInfo->getVoltType(), columnInfo->length);
 
         tuple->setNValue(col_ctr, value);
 

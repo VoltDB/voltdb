@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@
     "basic-compoundex": {"schema": "schema.py",
                          "ddl": "compoundex-DDL.sql",
                          "template": "compound.sql",
-                         "normalizer": "normalizer.py"},
+                         "normalizer": "nulls-lowest-normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, DISABLING
 # also, the generator fails to generates statements for:
 # Template "SELECT * FROM _table WHERE (_variable _cmp _value[int64]) _logic (_variable _cmp _variable)" failed to yield SQL statements
@@ -64,6 +64,10 @@
                            "ddl": "index-DDL.sql",
                            "template": "basic-joins.sql",
                            "normalizer": "normalizer.py"},
+     "basic-index-joins_extra": {"schema": "index-join-schema.py",
+                                 "ddl": "index-DDL.sql",
+                                 "template": "basic-index-joins.sql",
+                                 "normalizer": "normalizer.py"},
      "basic-compoundex-joins": {"schema": "schema.py",
                                 "ddl": "compoundex-DDL.sql",
                                 "template": "basic-joins.sql",
@@ -85,25 +89,25 @@
     "advanced-joins": {"schema": "schema.py",
                        "ddl": "DDL.sql",
                        "template": "advanced-joins.sql",
-                       "normalizer": "normalizer.py"},
+                       "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-index-joins": {"schema": "schema.py",
                              "ddl": "index-DDL.sql",
                              "template": "advanced-joins.sql",
-                             "normalizer": "normalizer.py"},
+                             "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-subq-joins": {"schema": "schema.py",
                             "ddl": "DDL.sql",
                             "template": "advanced-subq-joins.sql",
-                            "normalizer": "normalizer.py"},
-    "advanced-repl-subq-joins": {"schema": "repl-schema.py",
-                                 "ddl": "repl-DDL.sql",
-                                 "template": "advanced-subq-joins.sql",
+                            "normalizer": "nulls-lowest-normalizer.py"},
+    "advanced-subq-part-joins": {"schema": "schema.py",
+                                 "ddl": "subq-part-DDL.sql",
+                                 "template": "advanced-subq-part-joins.sql",
                                  "normalizer": "normalizer.py"},
     "advanced-compoundex-joins": {"schema": "schema.py",
                                   "ddl": "compoundex-DDL.sql",
                                   "template": "advanced-joins.sql",
-                                  "normalizer": "normalizer.py"},
-    "advanced-matview-repl-subq-nonjoin": {"schema": "matview-repl-schema.py",
-                                 "ddl": "matview-repl-DDL.sql",
-                                 "template": "advanced-matview-repl-subq-nonjoin.sql",
-                                 "normalizer": "normalizer.py"},
+                                  "normalizer": "nulls-lowest-normalizer.py"},
+    "advanced-matview-subq-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
+                                 "ddl": "matview-DDL.sql",
+                                 "template": "advanced-matview-subq-nonjoin.sql",
+                                 "normalizer": "nulls-lowest-normalizer.py"},
 }

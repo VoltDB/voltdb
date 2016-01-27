@@ -16,8 +16,8 @@
 
 package com.google_voltpatches.common.collect;
 
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
@@ -41,22 +41,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation_voltpatches.Nullable;
 
 /**
- * A comparator, with additional methods to support common operations. This is
- * an "enriched" version of {@code Comparator}, in the same sense that {@link
- * FluentIterable} is an enriched {@link Iterable}.
+ * A comparator, with additional methods to support common operations. This is an "enriched"
+ * version of {@code Comparator}, in the same sense that {@link FluentIterable} is an enriched
+ * {@link Iterable}.
+ *
+ * <h3>Three types of methods</h3>
+ *
+ * Like other fluent types, there are three types of methods present: methods for <i>acquiring</i>,
+ * <i>chaining</i>, and <i>using</i>.
+ *
+ * <h4>Acquiring</h4>
  *
  * <p>The common ways to get an instance of {@code Ordering} are:
  *
  * <ul>
- * <li>Subclass it and implement {@link #compare} instead of implementing
- *     {@link Comparator} directly
- * <li>Pass a <i>pre-existing</i> {@link Comparator} instance to {@link
- *     #from(Comparator)}
+ * <li>Subclass it and implement {@link #compare} instead of implementing {@link Comparator}
+ *     directly
+ * <li>Pass a <i>pre-existing</i> {@link Comparator} instance to {@link #from(Comparator)}
  * <li>Use the natural ordering, {@link Ordering#natural}
  * </ul>
  *
- * <p>Then you can use the <i>chaining</i> methods to get an altered version of
- * that {@code Ordering}, including:
+ * <h4>Chaining</h4>
+ *
+ * <p>Then you can use the <i>chaining</i> methods to get an altered version of that {@code
+ * Ordering}, including:
  *
  * <ul>
  * <li>{@link #reverse}
@@ -65,8 +73,10 @@ import javax.annotation_voltpatches.Nullable;
  * <li>{@link #nullsFirst} / {@link #nullsLast}
  * </ul>
  *
- * <p>Finally, use the resulting {@code Ordering} anywhere a {@link Comparator}
- * is required, or use any of its special operations, such as:</p>
+ * <h4>Using</h4>
+ *
+ * <p>Finally, use the resulting {@code Ordering} anywhere a {@link Comparator} is required, or use
+ * any of its special operations, such as:</p>
  *
  * <ul>
  * <li>{@link #immutableSortedCopy}
@@ -74,18 +84,49 @@ import javax.annotation_voltpatches.Nullable;
  * <li>{@link #min} / {@link #max}
  * </ul>
  *
+ * <h3>Understanding complex orderings</h3>
+ *
+ * <p>Complex chained orderings like the following example can be challenging to understand.
+ * <pre>   {@code
+ *
+ *   Ordering<Foo> ordering =
+ *       Ordering.natural()
+ *           .nullsFirst()
+ *           .onResultOf(getBarFunction)
+ *           .nullsLast();}</pre>
+ *
+ * Note that each chaining method returns a new ordering instance which is backed by the previous
+ * instance, but has the chance to act on values <i>before</i> handing off to that backing
+ * instance. As a result, it usually helps to read chained ordering expressions <i>backwards</i>.
+ * For example, when {@code compare} is called on the above ordering:
+ *
+ * <ol>
+ * <li>First, if only one {@code Foo} is null, that null value is treated as <i>greater</i>
+ * <li>Next, non-null {@code Foo} values are passed to {@code getBarFunction} (we will be
+ *     comparing {@code Bar} values from now on)
+ * <li>Next, if only one {@code Bar} is null, that null value is treated as <i>lesser</i>
+ * <li>Finally, natural ordering is used (i.e. the result of {@code Bar.compareTo(Bar)} is
+ *     returned)
+ * </ol>
+ *
+ * <p>Alas, {@link #reverse} is a little different. As you read backwards through a chain and
+ * encounter a call to {@code reverse}, continue working backwards until a result is determined,
+ * and then reverse that result.
+ *
+ * <h3>Additional notes</h3>
+ *
  * <p>Except as noted, the orderings returned by the factory methods of this
  * class are serializable if and only if the provided instances that back them
  * are. For example, if {@code ordering} and {@code function} can themselves be
  * serialized, then {@code ordering.onResultOf(function)} can as well.
  *
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/OrderingExplained">
+ * "https://github.com/google/guava/wiki/OrderingExplained">
  * {@code Ordering}</a>.
  *
  * @author Jesse Wilson
  * @author Kevin Bourrillion
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
 public abstract class Ordering<T> implements Comparator<T> {
@@ -110,9 +151,10 @@ public abstract class Ordering<T> implements Comparator<T> {
 
   /**
    * Returns an ordering based on an <i>existing</i> comparator instance. Note
-   * that there's no need to create a <i>new</i> comparator just to pass it in
-   * here; simply subclass {@code Ordering} and implement its {@code compare}
-   * method directly instead.
+   * that it is unnecessary to create a <i>new</i> anonymous inner class
+   * implementing {@code Comparator} just to pass it in here. Instead, simply
+   * subclass {@code Ordering} and implement its {@code compare} method
+   * directly.
    *
    * @param comparator the comparator that defines the order
    * @return comparator itself if it is already an {@code Ordering}; otherwise
@@ -131,7 +173,8 @@ public abstract class Ordering<T> implements Comparator<T> {
    * @deprecated no need to use this
    */
   @GwtCompatible(serializable = true)
-  @Deprecated public static <T> Ordering<T> from(Ordering<T> ordering) {
+  @Deprecated
+  public static <T> Ordering<T> from(Ordering<T> ordering) {
     return checkNotNull(ordering);
   }
 
@@ -185,8 +228,7 @@ public abstract class Ordering<T> implements Comparator<T> {
    *     {@link Object#equals(Object)}) are present among the method arguments
    */
   @GwtCompatible(serializable = true)
-  public static <T> Ordering<T> explicit(
-      T leastValue, T... remainingValuesInOrder) {
+  public static <T> Ordering<T> explicit(T leastValue, T... remainingValuesInOrder) {
     return explicit(Lists.asList(leastValue, remainingValuesInOrder));
   }
 
@@ -215,6 +257,8 @@ public abstract class Ordering<T> implements Comparator<T> {
    * is expected.
    *
    * <p>The returned comparator is serializable.
+   *
+   * @since 13.0
    */
   @GwtCompatible(serializable = true)
   @SuppressWarnings("unchecked")
@@ -258,19 +302,24 @@ public abstract class Ordering<T> implements Comparator<T> {
     static final Ordering<Object> ARBITRARY_ORDERING = new ArbitraryOrdering();
   }
 
-  @VisibleForTesting static class ArbitraryOrdering extends Ordering<Object> {
+  @VisibleForTesting
+  static class ArbitraryOrdering extends Ordering<Object> {
+
     @SuppressWarnings("deprecation") // TODO(kevinb): ?
     private Map<Object, Integer> uids =
-        Platform.tryWeakKeys(new MapMaker()).makeComputingMap(
-            new Function<Object, Integer>() {
-              final AtomicInteger counter = new AtomicInteger(0);
-              @Override
-              public Integer apply(Object from) {
-                return counter.getAndIncrement();
-              }
-            });
+        Platform.tryWeakKeys(new MapMaker())
+            .makeComputingMap(
+                new Function<Object, Integer>() {
+                  final AtomicInteger counter = new AtomicInteger(0);
 
-    @Override public int compare(Object left, Object right) {
+                  @Override
+                  public Integer apply(Object from) {
+                    return counter.getAndIncrement();
+                  }
+                });
+
+    @Override
+    public int compare(Object left, Object right) {
       if (left == right) {
         return 0;
       } else if (left == null) {
@@ -292,7 +341,8 @@ public abstract class Ordering<T> implements Comparator<T> {
       return result;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "Ordering.arbitrary()";
     }
 
@@ -365,7 +415,7 @@ public abstract class Ordering<T> implements Comparator<T> {
   public <F> Ordering<F> onResultOf(Function<F, ? extends T> function) {
     return new ByFunctionOrdering<F, T>(function, this);
   }
-  
+
   <T2 extends T> Ordering<Map.Entry<T2, ?>> onKeys() {
     return onResultOf(Maps.<T2>keyFunction());
   }
@@ -382,8 +432,7 @@ public abstract class Ordering<T> implements Comparator<T> {
    * the same component comparators.
    */
   @GwtCompatible(serializable = true)
-  public <U extends T> Ordering<U> compound(
-      Comparator<? super U> secondaryComparator) {
+  public <U extends T> Ordering<U> compound(Comparator<? super U> secondaryComparator) {
     return new CompoundOrdering<U>(this, checkNotNull(secondaryComparator));
   }
 
@@ -403,8 +452,7 @@ public abstract class Ordering<T> implements Comparator<T> {
    * @param comparators the comparators to try in order
    */
   @GwtCompatible(serializable = true)
-  public static <T> Ordering<T> compound(
-      Iterable<? extends Comparator<? super T>> comparators) {
+  public static <T> Ordering<T> compound(Iterable<? extends Comparator<? super T>> comparators) {
     return new CompoundOrdering<T>(comparators);
   }
 
@@ -440,7 +488,8 @@ public abstract class Ordering<T> implements Comparator<T> {
   // Regular instance methods
 
   // Override to add @Nullable
-  @Override public abstract int compare(@Nullable T left, @Nullable T right);
+  @Override
+  public abstract int compare(@Nullable T left, @Nullable T right);
 
   /**
    * Returns the least of the specified values according to this ordering. If
@@ -507,8 +556,7 @@ public abstract class Ordering<T> implements Comparator<T> {
    * @throws ClassCastException if the parameters are not <i>mutually
    *     comparable</i> under this ordering.
    */
-  public <E extends T> E min(
-      @Nullable E a, @Nullable E b, @Nullable E c, E... rest) {
+  public <E extends T> E min(@Nullable E a, @Nullable E b, @Nullable E c, E... rest) {
     E minSoFar = min(min(a, b), c);
 
     for (E r : rest) {
@@ -583,8 +631,7 @@ public abstract class Ordering<T> implements Comparator<T> {
    * @throws ClassCastException if the parameters are not <i>mutually
    *     comparable</i> under this ordering.
    */
-  public <E extends T> E max(
-      @Nullable E a, @Nullable E b, @Nullable E c, E... rest) {
+  public <E extends T> E max(@Nullable E a, @Nullable E b, @Nullable E c, E... rest) {
     E maxSoFar = max(max(a, b), c);
 
     for (E r : rest) {
@@ -644,7 +691,7 @@ public abstract class Ordering<T> implements Comparator<T> {
    */
   public <E extends T> List<E> leastOf(Iterator<E> elements, int k) {
     checkNotNull(elements);
-    checkArgument(k >= 0, "k (%s) must be nonnegative", k);
+    checkNonnegative(k, "k");
 
     if (k == 0 || !elements.hasNext()) {
       return ImmutableList.of();
@@ -734,8 +781,7 @@ public abstract class Ordering<T> implements Comparator<T> {
     // We can't use ImmutableList; we have to be null-friendly!
   }
 
-  private <E extends T> int partition(
-      E[] values, int left, int right, int pivotIndex) {
+  private <E extends T> int partition(E[] values, int left, int right, int pivotIndex) {
     E pivotValue = values[pivotIndex];
 
     values[pivotIndex] = values[right];
@@ -791,49 +837,56 @@ public abstract class Ordering<T> implements Comparator<T> {
   }
 
   /**
-   * Returns a copy of the given iterable sorted by this ordering. The input is
-   * not modified. The returned list is modifiable, serializable, and has random
-   * access.
+   * Returns a <b>mutable</b> list containing {@code elements} sorted by this
+   * ordering; use this only when the resulting list may need further
+   * modification, or may contain {@code null}. The input is not modified. The
+   * returned list is serializable and has random access.
    *
    * <p>Unlike {@link Sets#newTreeSet(Iterable)}, this method does not discard
    * elements that are duplicates according to the comparator. The sort
    * performed is <i>stable</i>, meaning that such elements will appear in the
-   * resulting list in the same order they appeared in the input.
+   * returned list in the same order they appeared in {@code elements}.
    *
-   * @param iterable the elements to be copied and sorted
-   * @return a new list containing the given elements in sorted order
+   * <p><b>Performance note:</b> According to our
+   * benchmarking
+   * on Open JDK 7, {@link #immutableSortedCopy} generally performs better (in
+   * both time and space) than this method, and this method in turn generally
+   * performs better than copying the list and calling {@link
+   * Collections#sort(List)}.
    */
-  public <E extends T> List<E> sortedCopy(Iterable<E> iterable) {
+  public <E extends T> List<E> sortedCopy(Iterable<E> elements) {
     @SuppressWarnings("unchecked") // does not escape, and contains only E's
-    E[] array = (E[]) Iterables.toArray(iterable);
+    E[] array = (E[]) Iterables.toArray(elements);
     Arrays.sort(array, this);
     return Lists.newArrayList(Arrays.asList(array));
   }
 
   /**
-   * Returns an <i>immutable</i> copy of the given iterable sorted by this
+   * Returns an <b>immutable</b> list containing {@code elements} sorted by this
    * ordering. The input is not modified.
    *
    * <p>Unlike {@link Sets#newTreeSet(Iterable)}, this method does not discard
    * elements that are duplicates according to the comparator. The sort
    * performed is <i>stable</i>, meaning that such elements will appear in the
-   * resulting list in the same order they appeared in the input.
+   * returned list in the same order they appeared in {@code elements}.
    *
-   * @param iterable the elements to be copied and sorted
-   * @return a new immutable list containing the given elements in sorted order
-   * @throws NullPointerException if {@code iterable} or any of its elements is
-   *     null
+   * <p><b>Performance note:</b> According to our
+   * benchmarking
+   * on Open JDK 7, this method is the most efficient way to make a sorted copy
+   * of a collection.
+   *
+   * @throws NullPointerException if any of {@code elements} (or {@code
+   *     elements} itself) is null
    * @since 3.0
    */
-  public <E extends T> ImmutableList<E> immutableSortedCopy(
-      Iterable<E> iterable) {
+  public <E extends T> ImmutableList<E> immutableSortedCopy(Iterable<E> elements) {
     @SuppressWarnings("unchecked") // we'll only ever have E's in here
-    E[] elements = (E[]) Iterables.toArray(iterable);
-    for (E e : elements) {
+    E[] array = (E[]) Iterables.toArray(elements);
+    for (E e : array) {
       checkNotNull(e);
     }
-    Arrays.sort(elements, this);
-    return ImmutableList.asImmutableList(elements);
+    Arrays.sort(array, this);
+    return ImmutableList.asImmutableList(array);
   }
 
   /**

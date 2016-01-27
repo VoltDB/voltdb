@@ -317,6 +317,11 @@ public class RangeVariableResolver {
         int idx2  = rangeVarSet.getIndex(e2.getRangeVariable());
         int index = idx1 > idx2 ? idx1
                                 : idx2;
+        // BEGIN Cherry-picked code change from hsqldb-2.3.2
+        if (idx1 == -1 || idx2 == -1) {
+            return;
+        }
+        // END Cherry-picked code change from hsqldb-2.3.2
 
         array[index].add(new ExpressionLogical(e1, e2));
     }

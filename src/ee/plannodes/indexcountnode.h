@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,73 +19,59 @@
 #ifndef HSTOREINDEXCOUNTNODE_H
 #define HSTOREINDEXCOUNTNODE_H
 
-#include <string>
 #include "abstractscannode.h"
-#include "common/ValueFactory.hpp"
 
 namespace voltdb {
-
-class AbstractExpression;
 
 /**
  *
  */
 class IndexCountPlanNode : public AbstractScanPlanNode {
-    public:
-        IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id)
-        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+public:
+    IndexCountPlanNode()
+        : m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
         , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_skip_null_predicate(NULL)
-        {}
+    { }
+    ~IndexCountPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        IndexCountPlanNode() : AbstractScanPlanNode()
-        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_skip_null_predicate(NULL)
-        {}
+    IndexLookupType getLookupType() const { return m_lookup_type; }
 
-        ~IndexCountPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
+    IndexLookupType getEndType() const { return m_end_type; }
 
-        IndexLookupType getLookupType() const { return m_lookup_type; }
+    const std::string& getTargetIndexName() const { return m_target_index_name; }
 
-        IndexLookupType getEndType() const { return m_end_type; }
+    const std::vector<AbstractExpression*>& getEndKeyExpressions() const
+    { return m_endkey_expressions; }
 
-        const std::string& getTargetIndexName() const { return m_target_index_name; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
+    { return m_searchkey_expressions; }
 
-        const std::vector<AbstractExpression*>& getEndKeyExpressions() const
-        { return m_endkey_expressions; }
+    AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate.get(); }
 
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-        { return m_searchkey_expressions; }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        AbstractExpression* getSkipNullPredicate() const
-        { return m_skip_null_predicate; }
+    // This is the id of the index to reference during execution
+    std::string m_target_index_name;
 
-        std::string debugInfo(const std::string &spacer) const;
+    // TODO: Document
+    OwningExpressionVector m_searchkey_expressions;
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
+    // TODO: Document
+    OwningExpressionVector m_endkey_expressions;
 
-        // This is the id of the index to reference during execution
-        std::string m_target_index_name;
+    // Index Lookup Type
+    IndexLookupType m_lookup_type;
 
-        // TODO: Document
-        std::vector<AbstractExpression*> m_searchkey_expressions;
+    // Index Lookup End Type
+    IndexLookupType m_end_type;
 
-        // TODO: Document
-        std::vector<AbstractExpression*> m_endkey_expressions;
-
-        // Index Lookup Type
-        IndexLookupType m_lookup_type;
-
-        // Index Lookup End Type
-        IndexLookupType m_end_type;
-
-        // count null row predicate for edge cases: reverse scan or underflow case
-        AbstractExpression* m_skip_null_predicate;
+    // count null row predicate for edge cases: reverse scan or underflow case
+    boost::scoped_ptr<AbstractExpression> m_skip_null_predicate;
 };
 
-}
+} // namespace voltdb
 
 #endif

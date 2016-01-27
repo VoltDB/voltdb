@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,33 +18,21 @@
 #ifndef HSTORETABLECOUNTNODE_H
 #define HSTORETABLECOUNTNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
-
-class AbstractExpression;
 
 /**
  *
  */
 class TableCountPlanNode : public AbstractScanPlanNode {
 public:
-    TableCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-        // Do nothing
-    }
-    TableCountPlanNode() : AbstractScanPlanNode() {
-        // Do nothing
-    }
-
+    TableCountPlanNode() { }
     ~TableCountPlanNode();
-
-    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_TABLECOUNT); }
-
+    PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
-
 };
 
-}
+} // namespace voltdb
 
 #endif

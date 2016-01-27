@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -159,8 +159,9 @@ public class TestIndexScanCountSuite extends RegressionSuite {
 
         table = client.callProcedure("@Explain","SELECT COUNT(ID) FROM TU1 WHERE POINTS < -1").getResults()[0];
         String explainPlan = table.toString();
-        assertFalse(explainPlan.contains("INDEX COUNT"));
-        assertTrue(explainPlan.contains("INDEX SCAN"));
+        // Before ENG-6131 is fixed the plan should have INDEX SCAN and not have INDEX COUNT
+        assertTrue(explainPlan.contains("INDEX COUNT"));
+        assertFalse(explainPlan.contains("INDEX SCAN"));
 
 
         table = client.callProcedure("@AdHoc","SELECT (COUNT(ID) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
@@ -444,6 +445,25 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         callAdHocFilterWithExpectedCount(client,"TU5", "ID = 2 AND POINTS > 0.5", 0);
     }
 
+    public void testENG6131CountDistinctConstant() throws Exception {
+        Client client = getClient();
+        client.callProcedure("TU3.insert", 1, 1, 123);
+        client.callProcedure("TU3.insert", 2, 2, 123);
+        client.callProcedure("TU3.insert", 3, 3, 123);
+        client.callProcedure("TU3.insert", 4, 6, 123);
+        client.callProcedure("TU3.insert", 5, 8, 123);
+        client.callProcedure("TU3.insert", 6, 1, 456);
+        client.callProcedure("TU3.insert", 7, 2, 456);
+        client.callProcedure("TU3.insert", 8, 3, 456);
+        client.callProcedure("TU3.insert", 9, 6, 456);
+        client.callProcedure("TU3.insert", 10, 8, 456);
+
+        client.callProcedure("TU3.insert", 11, null, 123);
+        client.callProcedure("TU3.insert", 12, null, 456);
+
+        callWithExpectedCount(client, 1, "ENG_6131", 123, 2);
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -486,6 +506,8 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?");
         project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
         project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
+
+        project.addStmtProcedure("ENG_6131", "SELECT COUNT(DISTINCT 1) FROM TU3 WHERE TEL = ? AND POINTS > ? ");
         boolean success;
 
         /////////////////////////////////////////////////////////////

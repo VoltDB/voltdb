@@ -23,6 +23,13 @@ CREATE TABLE score
 );
 PARTITION TABLE score ON COLUMN user_id;
 
+CREATE TABLE C (
+ ID            INTEGER NOT NULL,
+ DEPT          INTEGER NOT NULL,
+ NAME          VARCHAR(20),
+);
+PARTITION TABLE C ON COLUMN dept;
+
 CREATE INDEX IDX_User_Id ON score(user_id);
 CREATE INDEX IDX_score_date ON score (score_date, user_id);
 CREATE INDEX IDX_score_value_user ON score (score_value, user_id);
@@ -31,4 +38,13 @@ CREATE PROCEDURE GetTopScores AS
  SELECT user_id, score_value 
  FROM score WHERE score_date > ? AND score_date <= ? 
  ORDER BY score_value DESC, user_id DESC LIMIT ?;
+ 
+-- This is used to test "V IN (subquery with limits)"
+CREATE TABLE R1 (
+  ID INTEGER NOT NULL,
+  DESC VARCHAR(300),
+  NUM INTEGER,
+  RATIO FLOAT,
+  PRIMARY KEY (ID)
+);
  

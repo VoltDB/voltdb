@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,38 +43,37 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
 #include "seqscannode.h"
-#include "common/common.h"
+
 #include "expressions/abstractexpression.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-/*
- * If the output table needs to be cleared then this SeqScanNode is for an executor that created
- * its own output table rather then forwarding a reference to the persistent table being scanned.
- * When the output table is a temp table, it is safe to delete it.
- */
-SeqScanPlanNode::~SeqScanPlanNode() {
-    // this check is the same as when the temp table is created in seqscanexecutor
-    if (getPredicate() != NULL || getInlinePlanNodes().size() > 0) {
-        delete getOutputTable();
-        setOutputTable(NULL);
+SeqScanPlanNode::~SeqScanPlanNode()
+{
+    // This is opposite the check that controls when the temp table is created in seqscanexecutor.
+    // So, even if there is a temp table to be freed, it belongs to a subquery, so drop this
+    // reference to it to prevent double-delete by AbstractPlanNode.
+    if (getPredicate() == NULL && getInlinePlanNodes().size() == 0) {
+        clearOutputTableReference();
     }
 }
 
-std::string SeqScanPlanNode::debugInfo(const std::string &spacer) const {
+PlanNodeType SeqScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SEQSCAN; }
+
+std::string SeqScanPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
-    buffer << this->AbstractScanPlanNode::debugInfo(spacer);
-    buffer << spacer << "Scan Expression: ";
+    buffer << AbstractScanPlanNode::debugInfo(spacer);
+    buffer << spacer << "Scan Predicate: ";
     if (m_predicate != NULL) {
         buffer << "\n" << m_predicate->debug(spacer);
     } else {
         buffer << "<NULL>\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
-}
+} // namespace voltdb

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -425,6 +425,11 @@ public class VoltPort implements Connection
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        return getHostnameOrIP();
+    }
+
+    @Override
     public String getHostnameAndIPAndPort() {
         return m_remoteHostAndAddressAndPort;
     }
@@ -442,6 +447,11 @@ public class VoltPort implements Connection
     @Override
     public long connectionId() {
         return m_handler.connectionId();
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        return connectionId();
     }
 
     @Override

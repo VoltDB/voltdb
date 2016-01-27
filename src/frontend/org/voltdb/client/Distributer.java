@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +45,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
-import com.google_voltpatches.common.collect.ImmutableList;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -78,7 +78,7 @@ class Distributer {
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
-    static final long USE_DEFAULT_TIMEOUT = 0;
+    static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -166,7 +166,9 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                return;
+            }
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -204,11 +206,8 @@ class Distributer {
                 return;
             }
 
-            //Slow path, god knows why it didn't succeed, could be a bug. Don't firehose attempts.
+            //Slow path, god knows why it didn't succeed, server could be paused and in admin mode. Don't firehose attempts.
             if (response.getStatus() != ClientResponse.SUCCESS && !m_ex.isShutdown()) {
-                System.err.println("Error response received subscribing to topology updates.\n " +
-                                   "Performance may be reduced on topology updates. Error was \"" +
-                                    response.getStatusString() + "\"");
                 //Retry on the off chance that it will work the Nth time, or work at a different node
                 m_ex.schedule(new Runnable() {
                     @Override
@@ -239,7 +238,9 @@ class Distributer {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            if (clientResponse.getStatus() != ClientResponse.SUCCESS) return;
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                return;
+            }
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
@@ -371,7 +372,7 @@ class Distributer {
             assert(callback != null);
 
             //How long from the starting point in time to wait to get this stuff done
-            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
+            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
 
             //Trigger the timeout at this point in time no matter what
             final long timeoutTime = nowNanos + timeoutNanos;
@@ -421,7 +422,9 @@ class Distributer {
             //Check for disconnect
             if (!m_isConnected) {
                 //Check if the disconnect or expiration already handled the callback
-                if (m_callbacks.remove(handle) == null) return;
+                if (m_callbacks.remove(handle) == null) {
+                    return;
+                }
                 final ClientResponse r = new ClientResponseImpl(
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
                         "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
@@ -474,7 +477,9 @@ class Distributer {
             final CallbackBookeeping cb = m_callbacks.remove(handle);
 
             //It was handled during the race
-            if (cb == null) return;
+            if (cb == null) {
+                return;
+            }
 
             final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
 
@@ -581,6 +586,9 @@ class Distributer {
                 e1.printStackTrace();
             }
 
+            // track the timestamp of the most recent read on this connection
+            m_lastResponseTimeNanos = nowNanos;
+
             final long handle = response.getClientHandle();
 
             // handle ping response and get out
@@ -602,9 +610,6 @@ class Distributer {
 
                 return;
             }
-
-            // track the timestamp of the most recent read on this connection
-            m_lastResponseTimeNanos = nowNanos;
 
             //Race with expiration thread to be the first to remove the callback
             //from the map and process it
@@ -704,7 +709,9 @@ class Distributer {
                 for (Pair<Integer, NodeConnection[]> entry : entriesToRewrite) {
                     m_partitionReplicas.remove(entry.getFirst());
                     NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
-                    if (survivors.length == 0) break;
+                    if (survivors.length == 0) {
+                        break;
+                    }
                     int zz = 0;
                     for (int ii = 0; ii < entry.getSecond().length; ii++) {
                         if (entry.getSecond()[ii] != this) {
@@ -735,12 +742,19 @@ class Distributer {
                     !m_ex.isShutdown()) {
                     //Don't subscribe to a new node immediately
                     //to somewhat prevent a thundering herd
-                    m_ex.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            subscribeToNewNode();
-                        }
-                    }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS), TimeUnit.MILLISECONDS);
+                    try {
+                        m_ex.schedule(new Runnable() {
+                            @Override
+                            public void run() {
+                                subscribeToNewNode();
+                            }
+                        }, new Random().nextInt(RESUBSCRIPTION_DELAY_MS),
+                                TimeUnit.MILLISECONDS);
+                    } catch (RejectedExecutionException ree) {
+                        // this is for race if m_ex shuts down in the middle of schedule
+                        return;
+                    }
+
                 }
             }
 
@@ -752,7 +766,9 @@ class Distributer {
                 ") was lost before a response was received");
             for (Map.Entry<Long, CallbackBookeeping> e : m_callbacks.entrySet()) {
                 //Check for race with other threads
-                if (m_callbacks.remove(e.getKey()) == null) continue;
+                if (m_callbacks.remove(e.getKey()) == null) {
+                    continue;
+                }
                 final CallbackBookeeping callBk = e.getValue();
                 try {
                     callBk.callback.clientCallback(r);
@@ -828,9 +844,13 @@ class Distributer {
              * more prompt. Spinning sucks!
              */
             if (more) {
-                if (Thread.interrupted()) throw new InterruptedException();
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
                 LockSupport.parkNanos(TimeUnit.MICROSECONDS.toNanos(sleep));
-                if (Thread.interrupted()) throw new InterruptedException();
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
                 if (sleep < 5000) {
                     sleep += 500;
                 }
@@ -865,19 +885,18 @@ class Distributer {
         m_subject = subject;
     }
 
-    void createConnection(String host, String program, String password, int port)
+    void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
-        byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
-        createConnectionWithHashedCredentials(host, program, hashedPassword, port);
+        byte hashedPassword[] = ConnectionUtil.getHashedPassword(scheme, password);
+        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
     }
 
-    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
+    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject);
-        InetSocketAddress address = new InetSocketAddress(host, port);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
@@ -957,7 +976,7 @@ class Distributer {
                     serializeSPI(spi),
                     new SubscribeCallback(),
                     true,
-                    USE_DEFAULT_TIMEOUT);
+                    USE_DEFAULT_CLIENT_TIMEOUT);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special cased handling
@@ -967,7 +986,7 @@ class Distributer {
                     serializeSPI(spi),
                     new TopoUpdateCallback(),
                     true,
-                    USE_DEFAULT_TIMEOUT);
+                    USE_DEFAULT_CLIENT_TIMEOUT);
 
             //Don't need to retrieve procedure updates every time we do a new subscription
             //since catalog changes aren't correlated with node failure the same way topo is
@@ -980,7 +999,7 @@ class Distributer {
                         serializeSPI(spi),
                         new ProcUpdateCallback(),
                         true,
-                        USE_DEFAULT_TIMEOUT);
+                        USE_DEFAULT_CLIENT_TIMEOUT);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -1210,7 +1229,9 @@ class Distributer {
 
         for (NodeConnection conn : m_connections) {
             Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
-            if (perConnIOStats == null) continue;
+            if (perConnIOStats == null) {
+                continue;
+            }
 
             long read = perConnIOStats.getSecond()[0];
             long write = perConnIOStats.getSecond()[2];
@@ -1374,7 +1395,6 @@ class Distributer {
         pi.flattenToBuffer(buf);
         buf.flip();
         return buf;
-
     }
 
     long getProcedureTimeoutNanos() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -133,7 +133,6 @@ private:
     ValueType m_targetType;
 };
 
-
 class OperatorAlternativeExpression : public AbstractExpression {
 public:
     OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)
@@ -235,6 +234,21 @@ class OperatorExpression : public AbstractExpression {
     }
 private:
     OPER oper;
+};
+
+class OperatorExistsExpression : public AbstractExpression {
+  public:
+    OperatorExistsExpression(AbstractExpression *left)
+        : AbstractExpression(EXPRESSION_TYPE_OPERATOR_EXISTS, left, NULL)
+    {
+    }
+
+    NValue
+    eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
+
+    std::string debugInfo(const std::string &spacer) const {
+        return (spacer + "OperatorExistsExpression");
+    }
 };
 
 

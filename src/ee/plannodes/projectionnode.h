@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,41 +46,36 @@
 #ifndef HSTOREPROJECTIONNODE_H
 #define HSTOREPROJECTIONNODE_H
 
-#include "expressions/abstractexpression.h"
 #include "plannodes/abstractplannode.h"
 
-namespace voltdb
-{
+#include "expressions/abstractexpression.h"
+
+namespace voltdb {
 
 class ProjectionPlanNode : public AbstractPlanNode
 {
- public:
-    ProjectionPlanNode(CatalogId id);
-    ProjectionPlanNode();
-    virtual ~ProjectionPlanNode();
+public:
+    ProjectionPlanNode() { }
+    ~ProjectionPlanNode();
 
-    virtual PlanNodeType getPlanNodeType() const;
+    PlanNodeType getPlanNodeType() const;
 
-    void setOutputColumnNames(std::vector<std::string>& names);
-    std::vector<std::string>& getOutputColumnNames();
-    const std::vector<std::string>& getOutputColumnNames() const;
+    const std::vector<std::string>& getOutputColumnNames() const
+    { return m_outputColumnNames; }
 
-    void setOutputColumnTypes(std::vector<ValueType>& types);
-    std::vector<ValueType>& getOutputColumnTypes();
-    const std::vector<ValueType>& getOutputColumnTypes() const;
+    const std::vector<ValueType>& getOutputColumnTypes() const
+    { return m_outputColumnTypes; }
 
-    void setOutputColumnSizes(std::vector<int32_t>& sizes);
-    std::vector<int32_t>& getOutputColumnSizes();
-    const std::vector<int32_t>& getOutputColumnSizes() const;
+    const std::vector<int32_t>& getOutputColumnSizes() const
+    { return m_outputColumnSizes; }
 
-    void setOutputColumnExpressions(std::vector<AbstractExpression*>& exps);
-    std::vector<AbstractExpression*>& getOutputColumnExpressions();
-    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const;
+    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const
+    { return m_outputColumnExpressions; }
 
     std::string debugInfo(const std::string& spacer) const;
 
- protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
     //
     // The node must define what the columns in the output table are
     // going to look like
@@ -99,6 +94,6 @@ class ProjectionPlanNode : public AbstractPlanNode
     std::vector<AbstractExpression*> m_outputColumnExpressions;
 };
 
-}
+} // namespace voltdb
 
 #endif

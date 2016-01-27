@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,12 +39,23 @@ public class ProcedureInvocation {
     private final long m_originalUniqueId;
     private final ProcedureInvocationType m_type;
 
+    private int m_batchTimeout;
+
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(-1, -1, handle, procName, parameters);
     }
 
+    public ProcedureInvocation(long handle, int batchTimeout, String procName, Object... parameters) {
+        this(-1, -1, handle, batchTimeout, procName, parameters);
+    }
+
     ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
                         String procName, Object... parameters) {
+        this(originalTxnId, originalUniqueId, handle, BatchTimeoutOverrideType.NO_TIMEOUT, procName, parameters);
+    }
+
+    ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
+            int batchTimeout, String procName, Object... parameters) {
         super();
         m_originalTxnId = originalTxnId;
         m_originalUniqueId = originalUniqueId;
@@ -56,10 +67,16 @@ public class ProcedureInvocation {
 
         // auto-set the type if both txn IDs are set
         if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
-            m_type = ProcedureInvocationType.ORIGINAL;
+            if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
+                m_type = ProcedureInvocationType.VERSION1;
+            } else {
+                m_type = ProcedureInvocationType.ORIGINAL;
+            }
         } else {
             m_type = ProcedureInvocationType.REPLICATED;
         }
+
+        m_batchTimeout = batchTimeout;
     }
 
     /** return the clientHandle value */
@@ -75,8 +92,18 @@ public class ProcedureInvocation {
         try {
             m_procNameBytes = m_procName.getBytes("UTF-8");
         } catch (Exception e) {/*No UTF-8? Really?*/}
+
+        int timeoutSize = 0;
+        if (m_type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
+            // Adding 1 for NO_BATCH_TIMEOUT/HAS_BATCH_TIMEOUT flag.
+            // In the most common case, the default value, BatchTimeoutType.NO_BATCH_TIMEOUT, does not get serialized.
+            timeoutSize = 1 + (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4);
+        }
+        // 16 is the size of the m_originalTxnId and m_originalUniqueId values
+        // that are required by DR internal invocations prior to DR v2.
         int size =
-            1 + (m_type == ProcedureInvocationType.REPLICATED ? 16 : 0) +
+            1 + (ProcedureInvocationType.isDeprecatedInternalDRType(m_type)? 16 : 0) +
+            timeoutSize +
             m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
         return size;
     }
@@ -91,10 +118,20 @@ public class ProcedureInvocation {
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(m_type.getValue());//Version
-        if (m_type == ProcedureInvocationType.REPLICATED) {
+        if (ProcedureInvocationType.isDeprecatedInternalDRType(m_type)) {
             buf.putLong(m_originalTxnId);
             buf.putLong(m_originalUniqueId);
         }
+
+        if (m_type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
+            if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
+                buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
+            } else {
+                buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
+                buf.putInt(m_batchTimeout);
+            }
+        }
+
         SerializationHelper.writeVarbinary(m_procNameBytes, buf);
         buf.putLong(m_clientHandle);
         m_parameters.flattenToBuffer(buf);

@@ -5,7 +5,9 @@ CREATE TABLE R1 (
 );
 CREATE TABLE R2 (
 	A INTEGER NOT NULL,
-	C INTEGER NOT NULL
+	C INTEGER NOT NULL,
+	D INTEGER NOT NULL,
+	E INTEGER NOT NULL
 );
 
 CREATE INDEX A_ON_R2 ON R2(A);
@@ -14,6 +16,22 @@ CREATE TABLE R3 (
 	A INTEGER NOT NULL,
 	C INTEGER NOT NULL
 );
+
+CREATE TABLE R4 (
+	A INTEGER NOT NULL,
+	C INTEGER NOT NULL
+	,CONSTRAINT R4_PK_TREE PRIMARY KEY(A)
+);
+
+CREATE INDEX IDX_R4_C ON R4(C);
+
+CREATE TABLE R5 (
+	A INTEGER NOT NULL,
+	C INTEGER NOT NULL
+	,CONSTRAINT R5_PK_TREE PRIMARY KEY(A,C)
+);
+CREATE INDEX EXPR_INDEX_ON_R5 ON R5(ABS(A - C));
+
 
 CREATE TABLE P1 (
 	A INTEGER NOT NULL,
@@ -49,20 +67,56 @@ PARTITION TABLE P4 ON COLUMN A;
 
 
 --- ENG-6276
-CREATE TABLE SR4 (  
-ID INTEGER DEFAULT 0 NOT NULL,  
-DESC VARCHAR(20),  
-NUM INTEGER,  
+CREATE TABLE SR4 (
+ID INTEGER DEFAULT 0 NOT NULL,
+DESC VARCHAR(20),
+NUM INTEGER,
 RATIO FLOAT,
-CONSTRAINT SR4_PK_TREE PRIMARY KEY (ID) ); 
+CONSTRAINT SR4_PK_TREE PRIMARY KEY (ID) );
 
-CREATE TABLE SP4 (  
-ID INTEGER DEFAULT 0 NOT NULL,  
-DESC VARCHAR(20),  
-NUM INTEGER,  
+CREATE TABLE SP4 (
+ID INTEGER DEFAULT 0 NOT NULL,
+DESC VARCHAR(20),
+NUM INTEGER,
 RATIO FLOAT,
-CONSTRAINT SP4_PK_TREE PRIMARY KEY (ID) ); 
+CONSTRAINT SP4_PK_TREE PRIMARY KEY (ID) );
 PARTITION TABLE SP4 ON COLUMN ID;
 
+--- ENG-7770
+CREATE TABLE pgr
+(
+    utc_timestamp bigint,
+    s int not null,
+    count_for_day int
+);
+partition table pgr on column s;
+
+CREATE VIEW user_heat AS
+SELECT s,
+((EXTRACT(HOUR FROM to_timestamp(second, utc_timestamp))*60)) AS hotspot_hm,
+COUNT(*) heat
+FROM pgr
+GROUP BY s, hotspot_hm;
 
 
+--- ENG-8264
+create table stores (
+    type_id integer,
+    zipcode integer,
+    franchise_id integer,
+    number integer
+);
+
+create table store_types (
+    category varchar(50),
+    name varchar(50),
+    type_id integer
+);
+
+CREATE PROCEDURE FRANCHISES_BY_NAMED_CATEGORY AS
+    select franchise_id,
+           count(*) as stores_in_category,
+           (select category from store_types where type_id = stores.type_id) as store_category
+    from stores
+    group by franchise_id,
+    type_id;

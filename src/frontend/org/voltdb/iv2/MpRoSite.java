@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,10 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PostGISBackend;
+import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
@@ -39,11 +42,13 @@ import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -51,7 +56,7 @@ import org.voltdb.exceptions.EEException;
 
 /**
  * An implementation of Site which provides only the functionality
- * necessary to run read-only multipartition transactions.  A pool
+ * necessary to run read-only multi-partition transactions.  A pool
  * of these will be used to run multiple read-only transactions
  * concurrently.
  */
@@ -72,8 +77,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
-    // Still need m_hsql here.
-    HsqlBackend m_hsql;
+    // Still need m_non_voltdb_backend (formerly m_hsql) here
+    NonVoltDBBackend m_non_voltdb_backend;
 
     // Current catalog
     volatile CatalogContext m_context;
@@ -89,9 +94,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     {
         throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
     }
-
-    // Advanced in complete transaction.
-    private long m_currentTxnId = Long.MIN_VALUE;
 
     SiteProcedureConnection getSiteProcedureConnection()
     {
@@ -133,6 +135,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public int getClusterId()
+        {
+            return getCorrespondingClusterId();
+        }
+
+        @Override
         public int getHostId() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -149,7 +157,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public byte[] getCatalogHash() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            // AdHoc invocations need to be able to check the hash of the current catalog
+            // against the hash of the catalog they were planned against.
+            return m_context.getCatalogHash();
         }
 
         @Override
@@ -221,12 +231,22 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                 List<DBBPool.BBContainer> outputBuffers)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
+        @Override
+        public Procedure ensureDefaultProcLoaded(String procName) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
     };
 
     /** Create a new RO MP execution site */
@@ -242,7 +262,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_partitionId = partitionId;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_currentTxnId = Long.MIN_VALUE;
     }
 
     /** Update the loaded procedures. */
@@ -255,11 +274,17 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     void initialize()
     {
         if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
+            m_non_voltdb_backend = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
         }
+        else if (m_backend == BackendTarget.POSTGRESQL_BACKEND) {
+            m_non_voltdb_backend = PostgreSQLBackend.initializePostgreSQLBackend(m_context);
+        }
+        else if (m_backend == BackendTarget.POSTGIS_BACKEND) {
+            m_non_voltdb_backend = PostGISBackend.initializePostGISBackend(m_context);
+        }
         else {
-            m_hsql = null;
+            m_non_voltdb_backend = null;
         }
     }
 
@@ -272,9 +297,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             while (m_shouldContinue) {
                 // Normal operation blocks the site thread on the sitetasker queue.
                 SiteTasker task = m_scheduler.take();
-                if (task instanceof TransactionTask) {
-                    m_currentTxnId = ((TransactionTask)task).getTxnId();
-                }
                 task.run(getSiteProcedureConnection());
             }
         }
@@ -309,8 +331,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     void shutdown()
     {
-        if (m_hsql != null) {
-            HsqlBackend.shutdownInstance();
+        if (m_non_voltdb_backend != null) {
+            m_non_voltdb_backend.shutdownInstance();
         }
     }
 
@@ -336,15 +358,22 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public byte[] loadTable(long txnId, String clusterName, String databaseName,
-            String tableName, VoltTable data, boolean returnUniqueViolations,
+    public int getCorrespondingClusterId()
+    {
+        return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public byte[] loadTable(long txnId, long spHandle, long unqiueId, String clusterName, String databaseName,
+            String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream,
             boolean undo) throws VoltAbortException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public byte[] loadTable(long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations,
+    public byte[] loadTable(long txnId, long spHandle, long uniqueId, int tableId, VoltTable data, boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -392,13 +421,25 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public HsqlBackend getHsqlBackendIfExists()
+    public NonVoltDBBackend getNonVoltDBBackendIfExists()
     {
-        return m_hsql;
+        return m_non_voltdb_backend;
     }
 
     @Override
     public long[] getUSOForExportTable(String signature)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public TupleStreamStateInfo getDRTupleStreamStateInfo()
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
@@ -447,15 +488,23 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public VoltTable[] executePlanFragments(int numFragmentIds,
-            long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
+    public VoltTable[] executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            String[] sqlTexts,
+            long txnId,
+            long spHandle,
+            long uniqueId,
+            boolean readOnly)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -514,5 +563,25 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte log[]) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public void setBatchTimeout(int batchTimeout) {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public int getBatchTimeout() {
+        throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 }

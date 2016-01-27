@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,6 +34,7 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 
 //@ProcInfo
 //(
@@ -55,6 +56,7 @@ public class PutMp extends VoltProcedure
     // Inserts a key/value pair
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
 
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(String key, byte[] value)
     {
         long putCounter = 0;
@@ -83,7 +85,7 @@ public class PutMp extends VoltProcedure
             putCounter++;
             bb.putLong(0, putCounter);
             voltQueueSQL(updateStmt, bb.array(), key);
-            voltQueueSQL(exportStmt, queryresults[0].getString(0), queryresults[0].getVarbinary(1), getTransactionTime(), getVoltPrivateRealTransactionIdDontUseMe(), getSeededRandomNumberGenerator().nextDouble());
+            voltQueueSQL(exportStmt, queryresults[0].getString(0), queryresults[0].getVarbinary(1), getTransactionTime(), DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this), getSeededRandomNumberGenerator().nextDouble());
         }
         voltExecuteSQL(true);
         VoltTable t[] = new VoltTable[1];

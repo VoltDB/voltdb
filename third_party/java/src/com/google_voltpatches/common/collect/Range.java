@@ -18,18 +18,15 @@ package com.google_voltpatches.common.collect;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Equivalence;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Predicate;
 
 import java.io.Serializable;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Set;
 import java.util.SortedSet;
 
 import javax.annotation_voltpatches.Nullable;
@@ -107,7 +104,7 @@ import javax.annotation_voltpatches.Nullable;
  * <h3>Further reading</h3>
  *
  * <p>See the Guava User Guide article on
- * <a href="http://code.google.com/p/guava-libraries/wiki/RangesExplained">{@code Range}</a>.
+ * <a href="https://github.com/google/guava/wiki/RangesExplained">{@code Range}</a>.
  *
  * @author Kevin Bourrillion
  * @author Gregory Kick
@@ -117,42 +114,35 @@ import javax.annotation_voltpatches.Nullable;
 @SuppressWarnings("rawtypes")
 public final class Range<C extends Comparable> implements Predicate<C>, Serializable {
 
-  private static final Function<Range, Cut> LOWER_BOUND_FN = new Function<Range, Cut>() {
-    @Override
-    public Cut apply(Range range) {
-      return range.lowerBound;
-    }
-  };
+  private static final Function<Range, Cut> LOWER_BOUND_FN =
+      new Function<Range, Cut>() {
+        @Override
+        public Cut apply(Range range) {
+          return range.lowerBound;
+        }
+      };
 
   @SuppressWarnings("unchecked")
   static <C extends Comparable<?>> Function<Range<C>, Cut<C>> lowerBoundFn() {
     return (Function) LOWER_BOUND_FN;
   }
 
-  private static final Function<Range, Cut> UPPER_BOUND_FN = new Function<Range, Cut>() {
-    @Override
-    public Cut apply(Range range) {
-      return range.upperBound;
-    }
-  };
+  private static final Function<Range, Cut> UPPER_BOUND_FN =
+      new Function<Range, Cut>() {
+        @Override
+        public Cut apply(Range range) {
+          return range.upperBound;
+        }
+      };
 
   @SuppressWarnings("unchecked")
   static <C extends Comparable<?>> Function<Range<C>, Cut<C>> upperBoundFn() {
     return (Function) UPPER_BOUND_FN;
   }
 
-  static final Ordering<Range<?>> RANGE_LEX_ORDERING = new Ordering<Range<?>>() {
-    @Override
-    public int compare(Range<?> left, Range<?> right) {
-      return ComparisonChain.start()
-          .compare(left.lowerBound, right.lowerBound)
-          .compare(left.upperBound, right.upperBound)
-          .result();
-    }
-  };
+  static final Ordering<Range<?>> RANGE_LEX_ORDERING = new RangeLexOrdering();
 
-  static <C extends Comparable<?>> Range<C> create(
-      Cut<C> lowerBound, Cut<C> upperBound) {
+  static <C extends Comparable<?>> Range<C> create(Cut<C> lowerBound, Cut<C> upperBound) {
     return new Range<C>(lowerBound, upperBound);
   }
 
@@ -188,8 +178,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    *     upper}
    * @since 14.0
    */
-  public static <C extends Comparable<?>> Range<C> closedOpen(
-      C lower, C upper) {
+  public static <C extends Comparable<?>> Range<C> closedOpen(C lower, C upper) {
     return create(Cut.belowValue(lower), Cut.belowValue(upper));
   }
 
@@ -201,8 +190,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    *     upper}
    * @since 14.0
    */
-  public static <C extends Comparable<?>> Range<C> openClosed(
-      C lower, C upper) {
+  public static <C extends Comparable<?>> Range<C> openClosed(C lower, C upper) {
     return create(Cut.aboveValue(lower), Cut.aboveValue(upper));
   }
 
@@ -220,12 +208,10 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
     checkNotNull(lowerType);
     checkNotNull(upperType);
 
-    Cut<C> lowerBound = (lowerType == BoundType.OPEN)
-        ? Cut.aboveValue(lower)
-        : Cut.belowValue(lower);
-    Cut<C> upperBound = (upperType == BoundType.OPEN)
-        ? Cut.belowValue(upper)
-        : Cut.aboveValue(upper);
+    Cut<C> lowerBound =
+        (lowerType == BoundType.OPEN) ? Cut.aboveValue(lower) : Cut.belowValue(lower);
+    Cut<C> upperBound =
+        (upperType == BoundType.OPEN) ? Cut.belowValue(upper) : Cut.aboveValue(upper);
     return create(lowerBound, upperBound);
   }
 
@@ -255,8 +241,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    *
    * @since 14.0
    */
-  public static <C extends Comparable<?>> Range<C> upTo(
-      C endpoint, BoundType boundType) {
+  public static <C extends Comparable<?>> Range<C> upTo(C endpoint, BoundType boundType) {
     switch (boundType) {
       case OPEN:
         return lessThan(endpoint);
@@ -293,8 +278,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    *
    * @since 14.0
    */
-  public static <C extends Comparable<?>> Range<C> downTo(
-      C endpoint, BoundType boundType) {
+  public static <C extends Comparable<?>> Range<C> downTo(C endpoint, BoundType boundType) {
     switch (boundType) {
       case OPEN:
         return greaterThan(endpoint);
@@ -329,7 +313,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
     return closed(value, value);
   }
 
-   /**
+  /**
    * Returns the minimal range that
    * {@linkplain Range#contains(Comparable) contains} all of the given values.
    * The returned range is {@linkplain BoundType#CLOSED closed} on both ends.
@@ -340,8 +324,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    * @throws NullPointerException if any of {@code values} is null
    * @since 14.0
    */
-  public static <C extends Comparable<?>> Range<C> encloseAll(
-      Iterable<C> values) {
+  public static <C extends Comparable<?>> Range<C> encloseAll(Iterable<C> values) {
     checkNotNull(values);
     if (values instanceof ContiguousSet) {
       return ((ContiguousSet<C>) values).range();
@@ -361,12 +344,13 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
   final Cut<C> upperBound;
 
   private Range(Cut<C> lowerBound, Cut<C> upperBound) {
-    if (lowerBound.compareTo(upperBound) > 0 || lowerBound == Cut.<C>aboveAll()
+    this.lowerBound = checkNotNull(lowerBound);
+    this.upperBound = checkNotNull(upperBound);
+    if (lowerBound.compareTo(upperBound) > 0
+        || lowerBound == Cut.<C>aboveAll()
         || upperBound == Cut.<C>belowAll()) {
       throw new IllegalArgumentException("Invalid range: " + toString(lowerBound, upperBound));
     }
-    this.lowerBound = checkNotNull(lowerBound);
-    this.upperBound = checkNotNull(upperBound);
   }
 
   /**
@@ -450,10 +434,12 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
   }
 
   /**
-   * Equivalent to {@link #contains}; provided only to satisfy the {@link Predicate} interface. When
-   * using a reference of type {@code Range}, always invoke {@link #contains} directly instead.
+   * @deprecated Provided only to satisfy the {@link Predicate} interface; use {@link #contains}
+   *     instead.
    */
-  @Override public boolean apply(C input) {
+  @Deprecated
+  @Override
+  public boolean apply(C input) {
     return contains(input);
   }
 
@@ -597,33 +583,6 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
   }
 
   /**
-   * Returns an {@link ContiguousSet} containing the same values in the given domain
-   * {@linkplain Range#contains contained} by this range.
-   *
-   * <p><b>Note:</b> {@code a.asSet(d).equals(b.asSet(d))} does not imply {@code a.equals(b)}! For
-   * example, {@code a} and {@code b} could be {@code [2..4]} and {@code (1..5)}, or the empty
-   * ranges {@code [3..3)} and {@code [4..4)}.
-   *
-   * <p><b>Warning:</b> Be extremely careful what you do with the {@code asSet} view of a large
-   * range (such as {@code Range.greaterThan(0)}). Certain operations on such a set can be
-   * performed efficiently, but others (such as {@link Set#hashCode} or {@link
-   * Collections#frequency}) can cause major performance problems.
-   *
-   * <p>The returned set's {@link Object#toString} method returns a short-hand form of the set's
-   * contents, such as {@code "[1..100]}"}.
-   *
-   * @throws IllegalArgumentException if neither this range nor the domain has a lower bound, or if
-   *     neither has an upper bound
-   * @deprecated Use {@code ContiguousSet.create(range, domain)}. To be removed in Guava 16.0.
-   */
-  @Beta
-  @GwtCompatible(serializable = false)
-  @Deprecated
-  public ContiguousSet<C> asSet(DiscreteDomain<C> domain) {
-    return ContiguousSet.create(this, domain);
-  }
-
-  /**
    * Returns the canonical form of this range in the given domain. The canonical form has the
    * following properties:
    *
@@ -661,17 +620,18 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    * Similarly, empty ranges are not equal unless they have exactly the same representation, so
    * {@code [3..3)}, {@code (3..3]}, {@code (4..4]} are all unequal.
    */
-  @Override public boolean equals(@Nullable Object object) {
+  @Override
+  public boolean equals(@Nullable Object object) {
     if (object instanceof Range) {
       Range<?> other = (Range<?>) object;
-      return lowerBound.equals(other.lowerBound)
-          && upperBound.equals(other.upperBound);
+      return lowerBound.equals(other.lowerBound) && upperBound.equals(other.upperBound);
     }
     return false;
   }
 
   /** Returns a hash code for this range. */
-  @Override public int hashCode() {
+  @Override
+  public int hashCode() {
     return lowerBound.hashCode() * 31 + upperBound.hashCode();
   }
 
@@ -679,7 +639,8 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
    * Returns a string representation of this range, such as {@code "[3..5)"} (other examples are
    * listed in the class documentation).
    */
-  @Override public String toString() {
+  @Override
+  public String toString() {
     return toString(lowerBound, upperBound);
   }
 
@@ -709,6 +670,22 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
   @SuppressWarnings("unchecked") // this method may throw CCE
   static int compareOrThrow(Comparable left, Comparable right) {
     return left.compareTo(right);
+  }
+
+  /**
+   * Needed to serialize sorted collections of Ranges.
+   */
+  private static class RangeLexOrdering extends Ordering<Range<?>> implements Serializable {
+
+    @Override
+    public int compare(Range<?> left, Range<?> right) {
+      return ComparisonChain.start()
+          .compare(left.lowerBound, right.lowerBound)
+          .compare(left.upperBound, right.upperBound)
+          .result();
+    }
+
+    private static final long serialVersionUID = 0;
   }
 
   private static final long serialVersionUID = 0;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,7 +32,6 @@ import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -65,12 +64,12 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(pn.getChild(0).getChild(0) instanceof NestLoopPlanNode);
         assertEquals(4, pn.getOutputSchema().getColumns().size());
 
-        pn = compile("select A,C,D FROM R1 JOIN R2 ON R1.C = R2.C");
+        pn = compile("select R1.A,R1.C,D FROM R1 JOIN R2 ON R1.C = R2.C");
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertEquals(3, pn.getOutputSchema().getColumns().size());
 
-        pn = compile("select A,C,D FROM R1 JOIN R2 USING(C)");
+        pn = compile("select R1.A,C,R1.D FROM R1 JOIN R2 USING(C)");
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertEquals(3, pn.getOutputSchema().getColumns().size());
@@ -91,11 +90,6 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(pn.getOutputSchema().getColumns().get(0).getTableName().equalsIgnoreCase("R1"));
         assertTrue("R2".equalsIgnoreCase(table) || "R1".equalsIgnoreCase(table));
 
-        // Column from USING expression can not have qualifier in the SELECT clause
-        failToCompile("select R1.C FROM R1 JOIN R2 USING(C)",
-                      "user lacks privilege or object not found: R1.C");
-        failToCompile("select R2.C FROM R1 JOIN R2 USING(C)",
-                      "user lacks privilege or object not found: R2.C");
         failToCompile("select R2.C FROM R1 JOIN R2 USING(X)",
                       "user lacks privilege or object not found: X");
         failToCompile("select R2.C FROM R1 JOIN R2 ON R1.X = R2.X",
@@ -123,15 +117,16 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
         assertEquals(1, pn.getOutputSchema().getColumns().size());
 
-        pn = compile("select C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A");
+        pn = compile("select C FROM R1 INNER JOIN R2 USING (C), R3_NOC WHERE R1.A = R3_NOC.A");
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         assertTrue(n.getChild(0) instanceof NestLoopIndexPlanNode);
         assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
         assertEquals(1, pn.getOutputSchema().getColumns().size());
-
-        failToCompile("select C, R3.C FROM R1 INNER JOIN R2 USING (C) INNER JOIN R3 ON R1.C = R3.C",
-                      "user lacks privilege or object not found: R1.C");
+        // Here C could be the C from USING(C), which would be R1.C or R2.C, or else
+        // R3.C.  Either is possible, and this is ambiguous.
+        failToCompile("select C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A",
+                      "Column \"C\" is ambiguous");
     }
 
     public void testScanJoinConditions() {
@@ -158,8 +153,13 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof AbstractJoinPlanNode);
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
-        assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
-        assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        if (p.getLeft().getExpressionType() == ExpressionType.COMPARE_EQUAL) {
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        } else {
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
+        }
         assertNull(((AbstractScanPlanNode)n.getChild(0)).getPredicate());
         assertNull(((AbstractScanPlanNode)n.getChild(1)).getPredicate());
 
@@ -179,8 +179,13 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof AbstractJoinPlanNode);
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
-        assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
-        assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        if (ExpressionType.COMPARE_EQUAL == p.getLeft().getExpressionType()) {
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getRight().getExpressionType());
+        } else {
+            assertEquals(ExpressionType.COMPARE_LESSTHAN, p.getLeft().getExpressionType());
+            assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
+        }
         assertNull(((AbstractScanPlanNode)n.getChild(0)).getPredicate());
         assertNull(((AbstractScanPlanNode)n.getChild(1)).getPredicate());
 
@@ -254,7 +259,8 @@ public class TestPlansJoin extends PlannerTestCase {
     public void testDisplayColumnFromUsingCondition() {
         AbstractPlanNode pn = compile("select  max(A) FROM R1 JOIN R2 USING(A)");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof AggregatePlanNode);
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
+        assertTrue(pn instanceof NestLoopPlanNode);
         NodeSchema ns = pn.getOutputSchema();
         for (SchemaColumn sc : ns.getColumns()) {
             AbstractExpression e = sc.getExpression();
@@ -263,18 +269,9 @@ public class TestPlansJoin extends PlannerTestCase {
             assertNotSame(-1, tve.getColumnIndex());
         }
 
-        pn = compile("select  distinct(A) FROM R1 JOIN R2 USING(A)");
+        pn = compile("select distinct(A) FROM R1 JOIN R2 USING(A)");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        ns = pn.getOutputSchema();
-        for (SchemaColumn sc : ns.getColumns()) {
-            AbstractExpression e = sc.getExpression();
-            assertTrue(e instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) e;
-            assertNotSame(-1, tve.getColumnIndex());
-        }
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof DistinctPlanNode);
+        assertTrue(pn instanceof NestLoopPlanNode);
         ns = pn.getOutputSchema();
         for (SchemaColumn sc : ns.getColumns()) {
             AbstractExpression e = sc.getExpression();
@@ -763,7 +760,11 @@ public class TestPlansJoin extends PlannerTestCase {
         nl = (NestLoopPlanNode) n;
         p = nl.getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
-        assertEquals(ExpressionType.CONJUNCTION_OR, p.getLeft().getExpressionType());
+        if (ExpressionType.CONJUNCTION_OR == p.getLeft().getExpressionType()) {
+            assertEquals(ExpressionType.CONJUNCTION_OR, p.getLeft().getExpressionType());
+        } else {
+            assertEquals(ExpressionType.CONJUNCTION_OR, p.getRight().getExpressionType());
+        }
         assertNull(nl.getWherePredicate());
         assertEquals(2, nl.getChildCount());
         c0 = (SeqScanPlanNode) nl.getChild(0);
@@ -981,7 +982,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
     }
 
-    public void XXX() {
+    public void testDistributedInnerOuterTable() {
         // Distributed Outer table
         List<AbstractPlanNode> lpn;
         AbstractPlanNode pn;
@@ -1086,12 +1087,6 @@ public class TestPlansJoin extends PlannerTestCase {
                      "VoltDB does not support full outer joins");
        failToCompile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C",
                      "VoltDB does not support full outer joins");
-       // OUTER JOIN with >5 tables.
-       failToCompile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A",
-                     "join of > 5 tables was requested without specifying a join order");
-       // INNER JOIN with >5 tables.
-       failToCompile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C",
-                     "join of > 5 tables was requested without specifying a join order");
    }
 
 
@@ -1203,18 +1198,50 @@ public class TestPlansJoin extends PlannerTestCase {
        assertEquals(ex instanceof OperatorExpression, true);
    }
 
-   public void testTry() {
-       AbstractPlanNode pn, n;
-       AbstractExpression ex;
+   public void testMoreThan5TableJoins() {
+       // INNER JOIN with >5 tables.
+       compile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C");
 
-       pn = compile("select b.A, a.* FROM R3 a RIGHT OUTER JOIN R3 b ON b.A = a.A AND b.C = a.C WHERE a.C IS NULL");
-//       pn = compile("select b.A, a.* FROM R1 a LEFT OUTER JOIN R4 b ON b.A = a.A AND b.C = a.C AND a.D = b.D WHERE b.A IS NULL");
-       //* enable for debug */ System.out.println(pn.toExplainPlanString());System.out.println(pn.toExplainPlanString());
-       n = pn.getChild(0).getChild(0);
-       assertTrue(n instanceof NestLoopIndexPlanNode);
-       assertEquals(((NestLoopIndexPlanNode) n).getJoinType(), JoinType.LEFT);
-       ex = ((NestLoopIndexPlanNode) n).getWherePredicate();
-       assertEquals(ex instanceof OperatorExpression, true);
+       // OUTER JOIN with >5 tables.
+       compile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A");
+   }
+
+   public void testAmbigousIdentifierInSelectList() throws Exception {
+       // Simple ambiguous column reference.
+       failToCompile("select A, C from R1, R2;", "Column \"A\" is ambiguous.  It's in tables: R1, R2");
+       // Ambiguous reference in an arithmetic expression.
+       failToCompile("select A + C from R1, R2;", "Column \"A\" is ambiguous.  It's in tables: R1, R2");
+       failToCompile("select sqrt(A) from R1, R2;", "Column \"A\" is ambiguous.  It's in tables: R1, R2");
+       // Ambiguous reference in a where clause.
+       failToCompile("select NOTC from R1, R3_NOC where A > 100;", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       failToCompile("select NOTC from R1, R3_NOC where A > sqrt(NOTC);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       // Ambiguous reference to an unconstrained column in a join.  That is,
+       // C is in both R1 and R3, R1 and R3 are joined together, but not on C.
+       // Note that we test above for a similar case, with three joined tables.
+       failToCompile("select C from R1 inner join R3 USING(A);", "Column \"C\" is ambiguous.  It's in tables: R1, R3");
+       failToCompile("select C from R1 inner join R3 using(C), R2;", "Column \"C\" is ambiguous.  It's in tables: USING(C), R2");
+       // Ambiguous references in group by expressions.
+       failToCompile("select NOTC from R1, R3_NOC group by A;", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       failToCompile("select NOTC from R1, R3_NOC group by sqrt(A);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       // Ambiguous references in subqueries.
+       failToCompile("select ALPHA from (select SQRT(A) as ALPHA from R1) as S1, (select SQRT(C) as ALPHA from R1) as S2;",
+                     "Column \"ALPHA\" is ambiguous.  It's in tables: S1, S2");
+       failToCompile("select ALPHA from (select SQRT(A), SQRT(C) from R1, R3) as S1, (select SQRT(C) as ALPHA from R1) as S2;",
+                     "Column \"A\" is ambiguous.  It's in tables: R1, R3");
+       failToCompile("select C from R1 inner join R2 using(C), R3 where R1.A = R3.A;",
+                     "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
+       failToCompile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 ON C=R3.A;",
+                     "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
+       // This is not actually an ambiguous query.  This is actually ok.
+       compile("select * from R2 where A in (select A from R1);");
+       compile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 USING(C);");
+       // This one is ok too.  There are several common columns in R2, R1.  But they
+       // are fully qualified as R1.A, R2.A and so forth when * is expanded.
+       compile("select * from R2, R1");
+       compile("SELECT R1.C FROM R1 INNER JOIN R2 USING (C), R3");
+       compile("SELECT R2.C FROM R1 INNER JOIN R2 USING (C), R3");
+       compile("SELECT R1.C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A");
+       compile("SELECT R3.C, R1.C FROM R1 INNER JOIN R2 USING(C), R3;");
    }
 
     @Override

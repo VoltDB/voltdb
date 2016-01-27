@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,13 +23,19 @@
 
 package org.voltdb.utils;
 
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.primitives.Ints;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.CoreUtils.RetryException;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -77,6 +83,37 @@ public class TestMiscUtils {
     {
         zipKeysAndValuesAndCheck(new int[] {},
                                  new int[] {});
+    }
+
+    @Test
+    public void testZip()
+    {
+        // equal length
+        zipDequesAndCheck(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+                          Arrays.asList(1, 3, 5, 7, 9),
+                          Arrays.asList(2, 4, 6, 8, 10));
+
+        // first is longer
+        zipDequesAndCheck(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 9),
+                          Arrays.asList(1, 3, 5, 7, 9),
+                          Arrays.asList(2, 4, 6));
+
+        // second is longer
+        zipDequesAndCheck(Arrays.asList(1, 2, 3, 4, 5, 6, 8, 10),
+                          Arrays.asList(1, 3, 5),
+                          Arrays.asList(2, 4, 6, 8, 10));
+
+        // more than two
+        zipDequesAndCheck(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9),
+                          Arrays.asList(1, 4, 7),
+                          Arrays.asList(2, 5, 8),
+                          Arrays.asList(3, 6, 9));
+
+        // empty deque
+        zipDequesAndCheck(Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+                          Arrays.asList(1, 3, 5, 7, 9),
+                          new ArrayList<Integer>(),
+                          Arrays.asList(2, 4, 6, 8, 10));
     }
 
     @Test
@@ -154,5 +191,16 @@ public class TestMiscUtils {
                 assertTrue(map.get(keys[0]).contains(values[i]));
             }
         }
+    }
+
+    @SafeVarargs
+    private static void zipDequesAndCheck(List<Integer> expectedResult, List<Integer>...deques)
+    {
+        List<Deque<Integer>> input = Lists.newArrayList();
+        for (List<Integer> deque : deques) {
+            input.add(new ArrayDeque<Integer>(deque));
+        }
+
+        assertEquals(expectedResult, MiscUtils.zip(input));
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -66,32 +66,23 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           TempTableLimits* limits)
 {
     VOLT_TRACE("init Send Executor");
-
-    SendPlanNode* node = dynamic_cast<SendPlanNode*>(abstractNode);
-    assert(node);
-    assert(node->getInputTables().size() == 1);
-    m_inputTable = node->getInputTables()[0];
-    assert(m_inputTable);
-
-    //
-    // Just pass our input table on through...
-    //
-    node->setOutputTable(node->getInputTables()[0]);
-
+    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    assert(m_abstractNode->getInputTableCount() == 1);
     return true;
 }
 
 bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
 
-    assert(m_inputTable);
-    //m_inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
+    Table* inputTable = m_abstractNode->getInputTable();
+    assert(inputTable);
+    //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
-    if (!m_engine->send(m_inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
+    if (!m_engine->send(inputTable)) {
+        VOLT_ERROR("Failed to send table '%s'", inputTable->name().c_str());
         return false;
     }
-    VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
+    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
 
     return true;
 }

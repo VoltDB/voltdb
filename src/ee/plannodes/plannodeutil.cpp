@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,7 +49,6 @@
 #include "common/FatalException.hpp"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
-#include "plannodes/distinctnode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/indexcountnode.h"
 #include "plannodes/tablecountnode.h"
@@ -57,6 +56,7 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/materializenode.h"
 #include "plannodes/materializedscanplannode.h"
+#include "plannodes/mergereceivenode.h"
 #include "plannodes/nestloopnode.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/projectionnode.h"
@@ -64,9 +64,9 @@
 #include "plannodes/receivenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
+#include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
-#include "plannodes/upsertnode.h"
 
 #include <sstream>
 
@@ -111,6 +111,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::MaterializedScanPlanNode();
             break;
         // ------------------------------------------------------------------
+        // TupleScanPlanNode
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_TUPLESCAN):
+            ret = new voltdb::TupleScanPlanNode();
+            break;
+        // ------------------------------------------------------------------
         // NestLoop
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_NESTLOOP):
@@ -141,16 +147,11 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::DeletePlanNode();
             break;
         // ------------------------------------------------------------------
-        // Upsert
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_UPSERT):
-            ret = new voltdb::UpsertPlanNode();
-            break;
-        // ------------------------------------------------------------------
         // Aggregate
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
         case (voltdb::PLAN_NODE_TYPE_AGGREGATE):
+        case (voltdb::PLAN_NODE_TYPE_PARTIALAGGREGATE):
             ret = new voltdb::AggregatePlanNode(type);
             break;
         // ------------------------------------------------------------------
@@ -190,16 +191,16 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::LimitPlanNode();
             break;
         // ------------------------------------------------------------------
-        // Distinct
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_DISTINCT):
-            ret = new voltdb::DistinctPlanNode();
-            break;
-        // ------------------------------------------------------------------
         // Receive
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_RECEIVE):
             ret = new voltdb::ReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // Merge Receive
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_MERGERECEIVE):
+            ret = new voltdb::MergeReceivePlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

@@ -1,104 +1,111 @@
-begin CatalogInteger   "Wrapper for an integer so it can be in a list."
-  int value            "Integer Value"
-end
-
-begin Cluster           "A set of connected hosts running one or more database application contexts"
-  Database* databases   "The set of databases the cluster is running"
-  Deployment* deployment "Storage for settings passed in on deployment"
-  int localepoch        "The number of seconds since the epoch that we're calling our local epoch"
-  bool securityEnabled  "Whether security and authentication should be enabled/disabled"
-  int httpdportno       "The port number httpd will listen on. A 0 value implies 8080."
-  bool jsonapi          "Is the http/json interface enabled?"
-  bool networkpartition "Is network partition detection enabled?"
-  string voltRoot "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
-  string exportOverflow "Directory where export data should overflow to"
+begin Cluster                      "A set of connected hosts running one or more database application contexts"
+  Database* databases              "The set of databases the cluster is running"
+  Deployment* deployment           "Storage for settings passed in on deployment"
+  int localepoch                   "The number of seconds since the epoch that we're calling our local epoch"
+  bool securityEnabled             "Whether security and authentication should be enabled/disabled"
+  int httpdportno                  "The port number httpd will listen on. A 0 value implies 8080."
+  bool jsonapi                     "Is the http/json interface enabled?"
+  bool networkpartition            "Is network partition detection enabled?"
+  string voltRoot                  "Directory tree where snapshots, ppd snapshots, export data etc. will be output to"
+  string exportOverflow            "Directory where export data should overflow to"
+  string drOverflow                "Directory where DR data should overflow to"
   SnapshotSchedule* faultSnapshots "Configuration for snapshots generated in response to faults."
-  int adminport         "The port number of the admin port"
-  bool adminstartup     "Does the server start in admin mode?"
-  CommandLog* logconfig "Command log configuration"
-  int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
+  int adminport                    "The port number of the admin port"
+  bool adminstartup                "Does the server start in admin mode?"
+  CommandLog* logconfig            "Command log configuration"
+  int heartbeatTimeout             "How long to wait, in seconds, between messages before deciding a host is dead"
+  bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
+  bool drConsumerEnabled           "Manage whether this consumer cluster will pull local DR transactions"
+  bool drProducerEnabled           "Manage whether this producer cluster will log and distribute local DR transactions"
+  int drClusterId                  "Unique inter-cluster ID used to distinguish DR clusters"
+  int drProducerPort               "DR port the this producer cluster will listen on (change only when !drProdEnabled)"
+  string drMasterHost              "Hostname[:port] of producer cluster this consumer cluster will get transactions from"
+  int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers"
 end
 
-begin Deployment   "Run-time deployment settings"
-  int hostcount    "The number of hosts in the cluster"
-  int kfactor      "The required k-safety factor"
-  int sitesperhost "The number of execution sites per host"
+begin Deployment javaonly         "Run-time deployment settings"
+  int hostcount                   "The number of hosts in the cluster"
+  int kfactor                     "The required k-safety factor"
+  int sitesperhost                "The number of execution sites per host"
   Systemsettings* systemsettings  "Values from the systemsettings element"
 end
 
-begin Systemsettings  "Container for deployment systemsettings element"
-  int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
-  int snapshotpriority "The priority of snapshot work"
-  int elasticPauseTime "Maximum pause time for rebalancing"
-  int elasticThroughput "Target throughput in megabytes for elasticity"
+begin Systemsettings javaonly "Container for deployment systemsettings element"
+  int temptablemaxsize        "The maximum allocation size for temp tables in the EE"
+  int snapshotpriority        "The priority of snapshot work"
+  int elasticduration         "Maximum duration time for rebalancing"
+  int elasticthroughput       "Target throughput in megabytes for elasticity"
+  int querytimeout            "The maximum latency for a query batch before timing out"
 end
 
-begin Database          "A set of schema, procedures and other metadata that together comprise an application"
-  string     schema     "Full SQL DDL for the database's schema"
-  User*      users      "The set of users"
-  Group*     groups     "The set of groups"
-  Table*     tables     "The set of Tables for the database"
-  Program*   programs   "The set of programs allowed to access this database"
-  Procedure* procedures "The set of stored procedures/transactions for this database"
-  Connector* connectors  "Export connector configuration"
+begin Database                       "A set of schema, procedures and other metadata that together comprise an application"
+  string     schema                  "Full SQL DDL for the database's schema"
+  User*      users                   "The set of users"
+  Group*     groups                  "The set of groups"
+  Table*     tables                  "The set of Tables for the database"
+  Program*   programs                "The set of programs allowed to access this database"
+  Procedure* procedures              "The set of stored procedures/transactions for this database"
+  Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
-  string securityprovider "The security provider used to authenticate users"
+  bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
+  string securityprovider            "The security provider used to authenticate users"
 end
 
-begin CommandLog "Configuration for a command log"
-  bool enabled "Is command logging enabled"
-  bool synchronous "Should commands be executed only once durable"
-  int fsyncInterval "How often commands should be written to disk"
-  int maxTxns "How many txns waiting to go to disk should trigger a flush"
-  int logSize "Size of the command log in megabytes"
-  string logPath "Directory to store log files"
+begin CommandLog javaonly     "Configuration for a command log"
+  bool enabled                "Is command logging enabled"
+  bool synchronous            "Should commands be executed only once durable"
+  int fsyncInterval           "How often commands should be written to disk"
+  int maxTxns                 "How many txns waiting to go to disk should trigger a flush"
+  int logSize                 "Size of the command log in megabytes"
+  string logPath              "Directory to store log files"
   string internalSnapshotPath "Directory to store internal snapshots for the command log"
 end
 
-begin ConnectorTableInfo      "Per-export connector table configuration"
-  Table? table                "Reference to the table being appended"
-  bool appendOnly             "DEPRECATED: True if this table is an append-only table for export."
+begin ConnectorTableInfo    "Per-export connector table configuration"
+  Table? table              "Reference to the table being appended"
+  bool appendOnly           "DEPRECATED: True if this table is an append-only table for export."
 end
 
-begin ConnectorProperty              "Connector configuration property"
-  string name                        "Configuration property name"
-  string value                       "Configuration property value"
+begin ConnectorProperty    "Connector configuration property"
+  string name              "Configuration property name"
+  string value             "Configuration property value"
 end
 
-begin Connector                      "Export connector"
-  string loaderclass                 "The class name of the connector"
-  bool enabled                       "Is the connector enabled"
-  ConnectorTableInfo* tableInfo      "Per table configuration"
-  ConnectorProperty* config          "Connector configuration properties"
+begin Connector                 "Export connector"
+  string loaderclass            "The class name of the connector"
+  bool enabled                  "Is the connector enabled"
+  ConnectorTableInfo* tableInfo "Per table configuration"
+  ConnectorProperty* config     "Connector configuration properties"
 end
 
-begin Group
+begin Group javaonly
   UserRef* users
-  bool sysproc      "Can invoke system procedures"
-  bool defaultproc  "Can invoke default procedures"
-  bool adhoc        "Can invoke the adhoc system procedure
+  bool admin            "Can perform all database operations"
+  bool defaultproc      "Can invoke default procedures"
+  bool defaultprocread  "Can invoke read-only default procedures"
+  bool sql              "Can invoke the adhoc system procedures"
+  bool sqlread          "Can invoke read-only adhoc system procedures"
+  bool allproc          "Can invoke any user defined procedures"
 end
 
-begin GroupRef
+begin GroupRef javaonly
   Group? group
 end
 
-begin UserRef
+begin UserRef javaonly
   User? user
 end
 
-begin User
+begin User javaonly
   GroupRef* groups
-  bool sysproc          "Can invoke system procedures"
-  bool defaultproc      "Can invoke default procedures"
-  bool adhoc            "Can invoke the adhoc system procedure
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
+  string sha256ShadowPassword "SHA-256 double hashed hex encoded version of the password"
 end
 
-begin Program "The name of a program with access (effectively a username for an app server)"
+begin Program javaonly "The name of a program with access (effectively a username for an app server)"
 end
 
-begin Procedure             "A stored procedure (transaction) in the system"
+begin Procedure javaonly    "A stored procedure (transaction) in the system"
   string classname          "The full class name for the Java class for this procedure"
   UserRef* authUsers        "Users authorized to invoke this procedure"
   GroupRef* authGroups      "Groups authorized to invoke this procedure"
@@ -118,38 +125,41 @@ begin Procedure             "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
 end
 
-begin Table                   "A table (relation) in the database"
-  Column* columns             "The set of columns in the table"
-  Index* indexes              "The set of indexes on the columns in the table"
-  Constraint* constraints     "The set of constraints on the table"
-  bool isreplicated           "Is the table replicated?"
-  Column? partitioncolumn     "On which column is the table partitioned"
-  int estimatedtuplecount     "A rough estimate of the number of tuples in the table; used for planning"
-  MaterializedViewInfo* views "Information about materialized views based on this table's content"
-  Table? materializer         "If this is a materialized view, this field stores the source table"
-  string signature            "Catalog version independent signature of the table consisting of name and schema"
-  int tuplelimit              "A maximum number of rows in a table"
+begin Table                        "A table (relation) in the database"
+  Column* columns                  "The set of columns in the table"
+  Index* indexes                   "The set of indexes on the columns in the table"
+  Constraint* constraints          "The set of constraints on the table"
+  bool isreplicated                "Is the table replicated?"
+  Column? partitioncolumn          "On which column is the table partitioned"
+  int estimatedtuplecount          "A rough estimate of the number of tuples in the table; used for planning"
+  MaterializedViewInfo* views      "Information about materialized views based on this table's content"
+  Table? materializer              "If this is a materialized view, this field stores the source table"
+  string signature                 "Catalog version independent signature of the table consisting of name and schema"
+  int tuplelimit                   "A maximum number of rows in a table"
+  bool isDRed                      "Is this table DRed?"
+  Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
 end
 
-begin MaterializedViewInfo "Information used to build and update a materialized view"
+begin MaterializedViewInfo          "Information used to build and update a materialized view"
   Table? dest                       "The table which will be updated when the source table is updated"
   ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
   string predicate                  "A filtering predicate"
   string groupbyExpressionsJson     "A serialized representation of the groupby expression trees"
   string aggregationExpressionsJson "A serialized representation of the aggregation expression trees"
-  string indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
+  IndexRef* indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
+  Statement* fallbackQueryStmts      "Statements to search for mview min/max fallback value"
 end
 
-begin AuthProgram "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
+begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
 end
 
-begin ProcParameter "Metadata for a parameter to a stored procedure"
-  int type          "The data type for the parameter (int/float/date/etc)"
-  bool isarray      "Is the parameter an array of value"
-  int index         "The index of the parameter within the list of parameters for the stored procedure"
+begin ProcParameter javaonly "Metadata for a parameter to a stored procedure"
+  int type                   "The data type for the parameter (int/float/date/etc)"
+  bool isarray               "Is the parameter an array of value"
+  int index                  "The index of the parameter within the list of parameters for the stored procedure"
 end
 
-begin Statement             "A parameterized SQL statement embedded in a stored procedure"
+begin Statement           "A parameterized SQL statement embedded in a stored procedure"
   string sqltext            "The text of the sql statement"
   int querytype             ""
   bool readonly             "Can the statement modify any data?"
@@ -158,21 +168,22 @@ begin Statement             "A parameterized SQL statement embedded in a stored 
   bool iscontentdeterministic "Is the result of this statement deterministic not accounting for row order"
   bool isorderdeterministic "Is the result of this statement deterministic even accounting for row order"
   string nondeterminismdetail "Explanation for any non-determinism in the statement result"
-  bool batched              ""
-  int paramnum              ""
   StmtParameter* parameters "The set of parameters to this SQL statement"
   PlanFragment* fragments   "The set of plan fragments used to execute this statement"
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
+  string tablesread         "A CSV list of tables this statement reads"
+  string tablesupdated      "A CSV list of tables this statement may update"
+  string indexesused        "A CSV list of indexes this statement may use”
+  string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
 end
 
-begin StmtParameter            "A parameter for a parameterized SQL statement"
+begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
   int sqltype                  "The SQL type of the parameter (int/float/date/etc)"
   int javatype                 "The Java class of the parameter (int/float/date/etc)"
   bool isarray                 "Is the parameter an array of value"
   int index                    "The index of the parameter in the set of statement parameters"
-  ProcParameter? procparameter "Reference back to original input parameter"
 end
 
 begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
@@ -183,18 +194,23 @@ begin PlanFragment               "Instructions to the executor to execute part o
   string planhash                "SHA-1 Hash of the plan assumed to be unique"
 end
 
-begin Index          "A index structure on a database table's columns"
-  bool unique        "May the index contain duplicate keys?"
-  bool assumeUnique  "User allow unique index on partition table without including partition key?"
-  bool countable     "Index counter feature"
-  int type           "What data structure is the index using and what kinds of keys does it support?"
-  ColumnRef* columns "Columns referenced by the index"
+begin Index              "A index structure on a database table's columns"
+  bool unique            "May the index contain duplicate keys?"
+  bool assumeUnique      "User allow unique index on partition table without including partition key?"
+  bool countable         "Index counter feature"
+  int type               "What data structure is the index using and what kinds of keys does it support?"
+  ColumnRef* columns     "Columns referenced by the index"
   string expressionsjson "A serialized representation of the optional expression trees"
+  string predicatejson   "A serialized representation of the optional predicate for partial indexes"
 end
 
-begin ColumnRef  "A reference to a table column"
-  int index      "The index within the set"
-  Column? column "The table column being referenced"
+begin ColumnRef    "A reference to a table column"
+  int index        "The index within the set"
+  Column? column   "The table column being referenced"
+end
+
+begin IndexRef     "A reference to an index"
+  string name      "The name of the index referenced"
 end
 
 begin Constraint            "A constraint on a database table"
@@ -224,7 +240,7 @@ begin Column                    "A table column"
   bool inbytes                  "If a varchar column and size was specified in bytes"
 end
 
-begin SnapshotSchedule          "A schedule for the database to follow when creating automated snapshots"
+begin SnapshotSchedule javaonly "A schedule for the database to follow when creating automated snapshots"
   bool enabled                  "Is this auto snapshot schedule enabled?"
   string frequencyUnit          "Unit of time frequency is specified in"
   int frequencyValue            "Frequency in some unit"

@@ -17,3 +17,8 @@ INSERT INTO R1 VALUES (1020, 'desc_1020', 1020, 1020.5)
   SELECT _variable[#same] FROM _table _setop  SELECT __[#same] FROM _table   _setop SELECT __[#same] FROM _table
 ( SELECT _variable[#same] FROM _table _setop  SELECT __[#same] FROM _table ) _setop SELECT __[#same] FROM _table
   SELECT _variable[#same] FROM _table _setop (SELECT __[#same] FROM _table   _setop SELECT __[#same] FROM _table )
+
+-- Order by
+  SELECT _variable[#same] as tag FROM _table _setop  SELECT __[#same] FROM _table ORDER BY tag
+  SELECT _variable[#same] as tag FROM _table _setop  SELECT __[#same] FROM _table ORDER BY tag LIMIT 3 OFFSET 1
+  SELECT ABS(_variable[#same]) as tag FROM _table _setop  SELECT __[#same] FROM _table ORDER BY tag

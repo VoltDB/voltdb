@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -54,27 +54,19 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     protected String m_pathToDeployment;
     private File m_pathToVoltRoot = null;
     private EEProcess m_siteProcess = null;
+    private int m_adminPort;
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
     {
         assert(jarFileName != null);
         assert(siteCount > 0);
-        final String buildType = System.getenv().get("BUILD");
         m_jarFileName = Configuration.getPathToCatalogForTest(jarFileName);
         m_siteCount = siteCount;
-        if (buildType == null) {
-            m_target = target;
+        if (LocalCluster.isMemcheckDefined() && target.equals(BackendTarget.NATIVE_EE_JNI)) {
+            m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         } else {
-            if (buildType.startsWith("memcheck")) {
-                if (target.equals(BackendTarget.NATIVE_EE_JNI)) {
-                    m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
-                } else {
-                    m_target = target;//For memcheck
-                }
-            } else {
-                m_target = target;
-            }
+            m_target = target;
         }
     }
 
@@ -107,7 +99,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, true, snapshotPath, ppdPrefix);
+                                     null, 0, true, snapshotPath, ppdPrefix);
         m_pathToDeployment = builder.getPathToDeployment();
         m_pathToVoltRoot = builder.getPathToVoltRoot();
 
@@ -124,11 +116,17 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
+        m_adminPort = adminPort;
         m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup);
+                                     adminPort, adminOnStartup, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
+    }
+
+    @Override
+    public int getListenerCount() {
+        return 1;
     }
 
     @Override
@@ -146,6 +144,13 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         if (m_server == null)
             return null;
         return "localhost";
+    }
+
+    @Override
+    public String getAdminAddress(int hostId) {
+        if (m_server == null)
+            return null;
+        return "localhost:" + m_adminPort;
     }
 
     @Override
@@ -223,6 +228,12 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
     }
+
+    @Override
+    public boolean isDebug() {
+        return LocalCluster.isDebugDefined();
+    }
+
     @Override
     public void startUp() {
         startUp(true);
@@ -242,5 +253,10 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public File[] getPathInSubroots(File path) throws IOException {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int getLogicalPartitionCount() {
+        return 1;
     }
 }

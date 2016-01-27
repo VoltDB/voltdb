@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -42,20 +42,44 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "insertnode.h"
 
 #include <sstream>
-#include "insertnode.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
 
 namespace voltdb {
 
-void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+PlanNodeType InsertPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INSERT; }
+
+void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     AbstractOperationPlanNode::loadFromJSONObject(obj);
-
     m_multiPartition = obj.valueForKey("MULTI_PARTITION").asBool();
+    if (obj.hasNonNullKey("FIELD_MAP")) {
+        PlannerDomValue fieldMap = obj.valueForKey("FIELD_MAP");
+        for (int i = 0; i < fieldMap.arrayLen(); ++i) {
+          m_fieldMap.push_back(fieldMap.valueAtIndex(i).asInt());
+        }
+    }
+    m_isUpsert = false;
+    if (obj.hasNonNullKey("UPSERT")) {
+        m_isUpsert = true;
+    }
+    m_sourceIsPartitioned = false;
+    if (obj.hasNonNullKey("SOURCE_IS_PARTITIONED")) {
+        m_sourceIsPartitioned = true;
+    }
 }
 
+void InsertPlanNode::initTupleWithDefaultValues(VoltDBEngine* engine,
+                                                Pool *pool,
+                                                const std::set<int>& fieldsExplicitlySet,
+                                                TableTuple& templateTuple,
+                                                std::vector<int>& nowFields) {
+    m_tcd->initTupleWithDefaultValues(pool,
+                                      engine->getCatalogTable(getTargetTableName()),
+                                      fieldsExplicitlySet,
+                                      templateTuple,
+                                      nowFields);
 }
+
+} // namespace voltdb

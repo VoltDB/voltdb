@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,28 +54,21 @@ namespace voltdb {
  *
  */
 class UnionPlanNode : public AbstractPlanNode {
-    public:
-        UnionPlanNode(CatalogId id) : AbstractPlanNode(id), m_unionType(UNION_TYPE_NOUNION) {
-            // Do nothing
-        }
-        UnionPlanNode() : AbstractPlanNode(), m_unionType(UNION_TYPE_NOUNION) {
-            // Do nothing
-        }
-        ~UnionPlanNode();
+public:
+    UnionPlanNode() : m_unionType(UNION_TYPE_NOUNION) { }
+    ~UnionPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UNION); }
+    UnionType getUnionType() const { return m_unionType; }
 
-        UnionType getUnionType() const { return m_unionType; }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        std::string debugInfo(const std::string &spacer) const;
-
-    protected:
-        void loadFromJSONObject(PlannerDomValue obj);
-
-    private:
-       UnionType m_unionType;
+private:
+   UnionType m_unionType;
 };
 
-}
+} // namespace voltdb
 
 #endif

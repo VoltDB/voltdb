@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -32,6 +31,8 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -92,8 +93,8 @@ rely on the garbage collector.
  * sequential access of data. Example:</p>
  *
  * <code>
- * while (table.advanceRow()) {<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(table.getLong(7));<br/>
+ * while (table.advanceRow()) {<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(table.getLong(7));<br>
  * }
  * </code>
  *
@@ -104,10 +105,10 @@ rely on the garbage collector.
  * Example:</p>
  *
  * <code>
- * VoltTable t = new VoltTable(<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col1", VoltType.BIGINT),<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col2", VoltType.STRING));<br/>
- * t.addRow(15, "sampleString");<br/>
+ * VoltTable t = new VoltTable(<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col1", VoltType.BIGINT),<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col2", VoltType.STRING));<br>
+ * t.addRow(15, "sampleString");<br>
  * t.addRow(-9, "moreData");
  * </code>
  */
@@ -128,17 +129,17 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     static final Charset METADATA_ENCODING = Constants.US_ASCII_ENCODING;
     static final Charset ROWDATA_ENCODING = Constants.UTF8ENCODING;
 
-    static final AtomicInteger expandCountDouble = new AtomicInteger(0);
-
     boolean m_readOnly = false;
     int m_rowStart = -1; // the beginning of the row data (points to before the row count int)
     int m_rowCount = -1;
     int m_colCount = -1;
 
-    // kept around if provided for schema enforcement - only really used for test code
-    ColumnInfo[] m_originalColumnInfos = null;
-    // used for test code that generates schema from tables
-    String m_name = null;
+    // non-positive value that probably shouldn't be -1 to avoid off-by-one errors
+    private static final int NO_MEMOIZED_ROW_OFFSET = Integer.MIN_VALUE;
+
+    // memoized offsets used when users iterate rows with fetchrow()
+    private int m_memoizedRowOffset = NO_MEMOIZED_ROW_OFFSET;
+    private int m_memoizedBufferOffset;
 
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
@@ -152,8 +153,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * Primarily used to construct in the constructor {@link VoltTable#VoltTable(ColumnInfo...)}
      * and {@link VoltTable#VoltTable(ColumnInfo[], int)}.</p>
      *
-     * <p>Example:<br/>
-     * <tt>VoltTable t = new VoltTable(<br/>
+     * <p>Example:<br>
+     * <tt>VoltTable t = new VoltTable(<br>
      * &nbsp;&nbsp;&nbsp;&nbsp;new ColumnInfo("foo", VoltType.INTEGER),
      * new ColumnInfo("bar", VoltType.STRING));</tt>
      * </p>
@@ -171,7 +172,42 @@ public final class VoltTable extends VoltTableRow implements JSONString {
          * supported (such as {@link VoltType#INVALID} or {@link VoltType#NUMERIC}.
          */
         public ColumnInfo(String name, VoltType type) {
-            this.name = name; this.type = type;
+            this.name = name;
+            this.type = type;
+            // if you're using this constructor, the values below probably
+            // will never be used, but they *are* final.
+            size = VoltType.MAX_VALUE_LENGTH;
+            nullable = true;
+            unique = false;
+            defaultValue = NO_DEFAULT_VALUE;
+        }
+
+        /**
+         * Construct an immutable <tt>ColumnInfo</tt> instance with extra metadata
+         * for tests.
+         *
+         * @param name The name of the column (ASCII).
+         * @param type The type of the column. Note that not all types are
+         * supported (such as {@link VoltType#INVALID} or {@link VoltType#NUMERIC}.
+         * @param size How big should the column be (for strings or binary)
+         * @param nullable Is the column nullable.
+         * @param unique Is the column unique? (implies index creation)
+         * @param defaultValue Default value for column (non string types will be
+         * converted from strings - varbinary must be hex-encoded).
+         */
+        ColumnInfo(String name,
+                   VoltType type,
+                   int size,
+                   boolean nullable,
+                   boolean unique,
+                   String defaultValue)
+        {
+            this.name = name;
+            this.type = type;
+            this.size = size;
+            this.nullable = nullable;
+            this.unique = unique;
+            this.defaultValue = defaultValue;
         }
 
         /**
@@ -183,16 +219,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         ColumnInfo(JSONObject jsonCol) throws JSONException {
             this.name = jsonCol.getString(JSON_NAME_KEY);
             this.type = VoltType.get((byte) jsonCol.getInt(JSON_TYPE_KEY));
+            size = VoltType.MAX_VALUE_LENGTH;
+            nullable = true;
+            unique = false;
+            defaultValue = NO_DEFAULT_VALUE;
         }
 
+        /**
+         * Basically just suppress CloneNotSupportedException.
+         */
         @Override
         public ColumnInfo clone() {
             try {
                 return (ColumnInfo) super.clone();
             } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
                 assert(false);
-                return null;
+                throw new RuntimeException(e);
             }
         }
 
@@ -200,21 +242,106 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         final String name;
         final VoltType type;
 
-        // data below not exposed publicly / not serialized
-        int size = VoltType.MAX_VALUE_LENGTH;
-        boolean nullable = true;
-        boolean unique = false;
-        int pkeyIndex = -1; // -1 when not part of pkey
-        String defaultValue = NO_DEFAULT_VALUE;
+        // data below not exposed publicly / not serialized / used for test
+        final int size;
+        final boolean nullable;
+        final boolean unique;
+        final String defaultValue;
 
         // pick a random string as sigil for no default
         static final String NO_DEFAULT_VALUE = "!@#$%^&*(!@#$%^&*(";
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#hashCode()
+         */
+        @Override
+        public int hashCode() {
+            throw new RuntimeException("Didn't expect you to hash this.");
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#equals(java.lang.Object)
+         */
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof VoltTable.ColumnInfo)) {
+                return false;
+            }
+            VoltTable.ColumnInfo other = (VoltTable.ColumnInfo) obj;
+
+            if (nullable != other.nullable) return false;
+            if (unique != other.unique) return false;
+            if (defaultValue != other.defaultValue) return false;
+            if (size != other.size) return false;
+            if (type != other.type) return false;
+            return name.equals(other.name);
+        }
     }
+
+    /**
+     * Class to hold additional information and constraints for test code.
+     * Basically, a table in a test that has this extra data could re-create
+     * it's own DDL. Or it could be randomly filled with data that would be
+     * safe to insert into a table in a running VoltDB cluster (unique columns,
+     * string size limits, etc...).
+     *
+     */
+    static class ExtraMetadata {
+        // kept around if provided for schema enforcement - only really used for test code
+        final ColumnInfo[] originalColumnInfos;
+        // next two used for test code that generates schema from tables
+        final String name;
+        int partitionColIndex; // -1 means replicated
+        int[] pkeyIndexes;
+
+        ExtraMetadata(String name,
+                      int partitionColIndex,
+                      int[] pkeyIndexes,
+                      ColumnInfo... originalColumnInfos)
+        {
+            this.name = name;
+            this.partitionColIndex = partitionColIndex;
+            this.pkeyIndexes = pkeyIndexes.clone();
+            this.originalColumnInfos = originalColumnInfos.clone();
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#clone()
+         */
+        @Override
+        protected Object clone() {
+            try {
+                ExtraMetadata cloned = (ExtraMetadata) super.clone();
+                for (int i = 0; i < originalColumnInfos.length; i++) {
+                    cloned.originalColumnInfos[i] = originalColumnInfos[i].clone();
+                }
+                return cloned;
+            }
+            // should never happen
+            catch (CloneNotSupportedException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+
+        }
+    }
+    final ExtraMetadata m_extraMetadata;
 
     /**
      * Do nothing constructor that does no initialization or allocation.
      */
-    VoltTable() {}
+    VoltTable() {
+        // m_extraMetadata is final and must be set to null
+        this((ExtraMetadata) null);
+    }
+
+    /**
+     * Do nothing constructor that does no initialization or allocation.
+     * Does copy over existing values for m_extraMetadata.
+     */
+    VoltTable(ExtraMetadata extraMetadata) {
+        m_extraMetadata = extraMetadata;
+    }
 
     /**
      * Create a table from an existing backing buffer.
@@ -223,6 +350,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @param readOnly Can this table be changed?
      */
     VoltTable(ByteBuffer backing, boolean readOnly) {
+        // no test metadata when creating tables from buffers
+        m_extraMetadata = null;
+
         m_buffer = backing;
 
         // rowstart represents and offset to the start of row data,
@@ -249,7 +379,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @param columnCount The number of columns in the array to use.
      */
     public VoltTable(ColumnInfo[] columns, int columnCount) {
-        initializeFromColumns(columns, columnCount);
+        this(null, columns, columnCount);
     }
 
     /**
@@ -259,7 +389,23 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * in the desired order.
      */
     public VoltTable(ColumnInfo[] columns) {
-        initializeFromColumns(columns, columns.length);
+        this(null, columns, columns.length);
+    }
+
+    /**
+     * Given a column and an array of columns, return a new array of columns with the
+     * single guy prepended onto the others. This function is used in the constructor
+     * below so that one constructor can call another without breaking Java rules about
+     * chained constructors being the first thing called.
+     */
+    private static ColumnInfo[] prependColumn(ColumnInfo firstColumn, ColumnInfo[] columns) {
+        int allLen = 1 + columns.length;
+        ColumnInfo[] allColumns = new ColumnInfo[allLen];
+        allColumns[0] = firstColumn;
+        for (int i = 0; i < columns.length; i++) {
+            allColumns[i+1] = columns[i];
+        }
+        return allColumns;
     }
 
     /**
@@ -272,22 +418,20 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * in the desired order (can be empty).
      */
     public VoltTable(ColumnInfo firstColumn, ColumnInfo... columns) {
-        int allLen = 1 + columns.length;
-        ColumnInfo[] allColumns = new ColumnInfo[allLen];
-        allColumns[0] = firstColumn;
-        for (int i = 0; i < columns.length; i++) {
-            allColumns[i+1] = columns[i];
-        }
-        initializeFromColumns(allColumns, allLen);
+        this(prependColumn(firstColumn, columns));
     }
 
-    private void initializeFromColumns(ColumnInfo[] columns, int columnCount) {
+    /**
+     * Constructor that allows for setting extra metadata for test purposes.
+     * extraMetadata param can be null.
+     */
+    VoltTable(ExtraMetadata extraMetadata, ColumnInfo[] columns, int columnCount) {
+        // memoize any provided extra metadata for test
+        m_extraMetadata = extraMetadata;
+
         // allocate a 1K table backing for starters
         int allocationSize = 1024;
         m_buffer = ByteBuffer.allocate(allocationSize);
-
-        // save these around for tests that use them for schema checking during addRow
-        m_originalColumnInfos = columns;
 
         // while not successful at initializing,
         //  use a bigger and bigger backing
@@ -435,6 +579,30 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             retval.m_activeRowIndex = m_activeRowIndex;
             return retval;
         }
+
+        @Override
+        byte[] getSchemaString() {
+            // just get the schema string from the table for this row
+            return VoltTable.this.getSchemaString();
+        }
+    }
+
+    // memo-ize response
+    byte[] m_schemaString = null;
+    @Override
+    byte[] getSchemaString() {
+        // return memo-ized response
+        if (m_schemaString != null) {
+            return m_schemaString;
+        }
+
+        // just read the bytes for column types from the buffer into an array
+        m_schemaString = new byte[m_colCount];
+        int pos = m_buffer.position();
+        m_buffer.position(4 + 1 + 2); //headerLength + status code + column count
+        m_buffer.get(m_schemaString);
+        m_buffer.position(pos);
+        return m_schemaString;
     }
 
     /**
@@ -473,65 +641,57 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
     // package-private methods to get constraint for test code
     final boolean getColumnNullable(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].nullable;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].nullable;
         }
         return true;
     }
 
     // package-private methods to get constraint for test code
     final int getColumnMaxSize(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].size;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].size;
         }
         return VoltType.MAX_VALUE_LENGTH;
     }
 
     // package-private methods to get constraint for test code
     final int getColumnPkeyIndex(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].pkeyIndex;
+        if (m_extraMetadata != null) {
+            for (int i = 0; i < m_extraMetadata.pkeyIndexes.length; i++) {
+                if (m_extraMetadata.pkeyIndexes[i] == index) {
+                    return i;
+                }
+            }
         }
         return -1;
     }
 
     // package-private methods to get constraint for test code
     final int[] getPkeyColumnIndexes() {
-        if (m_originalColumnInfos != null) {
-            int pkeyCount = 0;
-            for (ColumnInfo colInfo : m_originalColumnInfos) {
-                if (colInfo.pkeyIndex != -1) {
-                    pkeyCount++;
-                }
+        if (m_extraMetadata != null) {
+            if (m_extraMetadata.pkeyIndexes != null) {
+                return m_extraMetadata.pkeyIndexes;
             }
-            int[] retval = new int[pkeyCount];
-            for (int i = 0; i < m_originalColumnInfos.length; i++) {
-                if (m_originalColumnInfos[i].pkeyIndex != -1) {
-                    retval[m_originalColumnInfos[i].pkeyIndex] = i;
-                }
-            }
-            return retval;
         }
         return new int[0];
     }
 
     // package-private methods to get constraint for test code
     final boolean getColumnUniqueness(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].unique;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].unique;
         }
         return false;
     }
 
     // package-private methods to get constraint for test code
     final String getColumnDefaultValue(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].defaultValue;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].defaultValue;
         }
         return null;
     }
-
-
 
     @Override
     public final int getColumnIndex(String name) {
@@ -558,18 +718,257 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final VoltTableRow fetchRow(int index) {
         assert(verifyTableInvariants());
+
+        // check bounds
         if ((index < 0) || (index >= m_rowCount)) {
             throw new IndexOutOfBoundsException("index = " + index + "; rows = " + m_rowCount);
         }
 
-        int pos = m_rowStart + 4;
-        for (int i = 0; i < index; i++) {
-            // add 4 bytes as the row size is non-inclusive
-            pos += m_buffer.getInt(pos) + 4;
+        // if no memoized value or looking in front of the memoized value, reset
+        if ((m_memoizedRowOffset == NO_MEMOIZED_ROW_OFFSET) || (index < m_memoizedRowOffset)) {
+            m_memoizedRowOffset = 0; m_memoizedBufferOffset = m_rowStart + ROW_COUNT_SIZE;
         }
-        Row retval = new Row(pos + 4);
+
+        while (m_memoizedRowOffset < index) {
+            // add 4 bytes as the row size is non-inclusive
+            m_memoizedBufferOffset += m_buffer.getInt(m_memoizedBufferOffset) + ROW_HEADER_SIZE;
+            m_memoizedRowOffset++;
+        }
+        Row retval = new Row(m_memoizedBufferOffset + ROW_HEADER_SIZE);
         retval.m_activeRowIndex = index;
         return retval;
+    }
+
+    /**
+     * Internal method to add a single value to a table, shared by the multiple
+     * ways to add rows.
+     */
+    private void addColumnValue(Object value, VoltType columnType, int col) {
+        // schema checking code that is used for some tests
+        boolean allowNulls = true;
+        int maxColSize = VoltType.MAX_VALUE_LENGTH;
+        if (m_extraMetadata != null) {
+            allowNulls = m_extraMetadata.originalColumnInfos[col].nullable;
+            maxColSize = m_extraMetadata.originalColumnInfos[col].size;
+        }
+
+        if (VoltType.isNullVoltType(value))
+        {
+            // schema checking code that is used for some tests
+            // alllowNulls should always be true in production
+            if (allowNulls == false) {
+                throw new IllegalArgumentException(
+                        String.format("Column %s at index %d doesn't allow NULL values.",
+                        getColumnName(col), col));
+            }
+
+            switch (columnType) {
+            case TINYINT:
+                m_buffer.put(VoltType.NULL_TINYINT);
+                break;
+            case SMALLINT:
+                m_buffer.putShort(VoltType.NULL_SMALLINT);
+                break;
+            case INTEGER:
+                m_buffer.putInt(VoltType.NULL_INTEGER);
+                break;
+            case TIMESTAMP:
+                m_buffer.putLong(VoltType.NULL_BIGINT);
+                break;
+            case BIGINT:
+                m_buffer.putLong(VoltType.NULL_BIGINT);
+                break;
+            case FLOAT:
+                m_buffer.putDouble(VoltType.NULL_FLOAT);
+                break;
+            case STRING:
+            case GEOGRAPHY:
+            case VARBINARY:
+                m_buffer.putInt(NULL_STRING_INDICATOR);
+                break;
+            case GEOGRAPHY_POINT:
+                GeographyPointValue.serializeNull(m_buffer);
+                break;
+            case DECIMAL:
+                VoltDecimalHelper.serializeNull(m_buffer);
+                break;
+
+            default:
+                throw new VoltTypeException("Unsupported type: " +
+                        columnType);
+            }
+        }
+        else {
+
+            // Allow implicit conversions across all numeric types
+            // except BigDecimal and anything else. Require BigDecimal
+            // and reject Long128. Convert byte[] to VoltType.STRING.
+            // Allow longs to be converted to VoltType.TIMESTAMPS.
+
+            // In all error paths, catch ClassCastException
+            // and VoltTypeException to restore
+            // the correct table state.
+            // XXX consider adding a fast path that checks for
+            // equivalent types of input and column
+
+            try {
+                switch (columnType) {
+                case TINYINT:
+                    if (value instanceof BigDecimal) {
+                        throw new ClassCastException();
+                    }
+                    final Number n1 = (Number) value;
+                    if (columnType.wouldCastOverflow(n1))
+                    {
+                        throw new VoltTypeException("Cast of " +
+                                n1.doubleValue() +
+                                " to " +
+                                columnType.toString() +
+                                " would overflow");
+                    }
+                    m_buffer.put(n1.byteValue());
+                    break;
+                case SMALLINT:
+                    if (value instanceof BigDecimal) {
+                        throw new ClassCastException();
+                    }
+                    final Number n2 = (Number) value;
+                    if (columnType.wouldCastOverflow(n2))
+                    {
+                        throw new VoltTypeException("Cast to " +
+                                columnType.toString() +
+                                " would overflow");
+                    }
+                    m_buffer.putShort(n2.shortValue());
+                    break;
+                case INTEGER:
+                    if (value instanceof BigDecimal) {
+                        throw new ClassCastException();
+                    }
+                    final Number n3 = (Number) value;
+                    if (columnType.wouldCastOverflow(n3))
+                    {
+                        throw new VoltTypeException("Cast to " +
+                                columnType.toString() +
+                                " would overflow");
+                    }
+                    m_buffer.putInt(n3.intValue());
+                    break;
+                case BIGINT:
+                    if (value instanceof BigDecimal) {
+                        throw new ClassCastException();
+                    }
+                    final Number n4 = (Number) value;
+                    if (columnType.wouldCastOverflow(n4))
+                    {
+                        throw new VoltTypeException("Cast to " +
+                                columnType.toString() +
+                                " would overflow");
+                    }
+                    m_buffer.putLong(n4.longValue());
+                    break;
+
+                case FLOAT:
+                    if (value instanceof BigDecimal) {
+                        throw new ClassCastException();
+                    }
+                    final Number n5 = (Number) value;
+                    if (columnType.wouldCastOverflow(n5))
+                    {
+                        throw new VoltTypeException("Cast to " +
+                                columnType.toString() +
+                                " would overflow");
+                    }
+                    m_buffer.putDouble(n5.doubleValue());
+                    break;
+
+                case STRING: {
+                    // Accept byte[] and String
+                    if (value instanceof byte[]) {
+                        if (((byte[]) value).length > maxColSize)
+                            throw new VoltOverflowException(
+                                    "Value in VoltTable.addRow(...) larger than allowed max " +
+                                            VoltType.humanReadableSize(maxColSize));
+
+                        // bytes MUST be a UTF-8 encoded string.
+                        assert(testForUTF8Encoding((byte[]) value));
+                        writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
+                    }
+                    else {
+                        if (((String) value).length() > maxColSize)
+                            throw new VoltOverflowException(
+                                    "Value in VoltTable.addRow(...) larger than allowed max " +
+                                            VoltType.humanReadableSize(maxColSize));
+
+                        writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
+                    }
+                    break;
+                }
+
+                case VARBINARY: {
+                    // Accept byte[] and String (hex-encoded)
+                    if (value instanceof String) {
+                        value = Encoder.hexDecode((String) value);
+                    }
+                    if (value instanceof byte[]) {
+                        if (((byte[]) value).length > maxColSize)
+                            throw new VoltOverflowException(
+                                    "Value in VoltTable.addRow(...) larger than allowed max " +
+                                            VoltType.humanReadableSize(maxColSize));
+                        writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
+                    }
+                    else {
+                        throw new ClassCastException();
+                    }
+                    break;
+                }
+
+                case GEOGRAPHY: {
+                    GeographyValue gv = (GeographyValue)value;
+                    m_buffer.putInt(gv.getLengthInBytes());
+                    gv.flattenToBuffer(m_buffer);
+                    break;
+                }
+
+                case GEOGRAPHY_POINT: {
+                    GeographyPointValue pt = (GeographyPointValue)value;
+                    pt.flattenToBuffer(m_buffer);
+                    break;
+                }
+
+                case TIMESTAMP: {
+                    if (value instanceof BigDecimal) {
+                        throw new ClassCastException();
+                    }
+                    long micros;
+                    // Accept long and TimestampType and any kind of Date
+                    if (value instanceof java.util.Date ||
+                            value instanceof TimestampType) {
+                         micros = ParameterSet.timestampToMicroseconds(value);
+                    } else {
+                        micros = ((Number) value).longValue();
+                    }
+                    m_buffer.putLong(micros);
+                    break;
+                }
+
+                case DECIMAL: {
+                    // Only accept BigDecimal; rely on class cast exception for error path
+                    VoltDecimalHelper.serializeBigDecimal( (BigDecimal)value, m_buffer);
+                    break;
+                }
+
+                default:
+                    throw new VoltTypeException("Unsupported type: " + columnType);
+                }
+            }
+            catch (ClassCastException cce) {
+                throw new VoltTypeException("Value for column " + col + " (" +
+                        getColumnName(col) + ") is type " +
+                        value.getClass().getSimpleName() + " when type " + columnType +
+                        " was expected.");
+            }
+        }
     }
 
     /**
@@ -580,15 +979,109 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final void add(VoltTableRow row) {
         assert(verifyTableInvariants());
-        final Object[] values = new Object[m_colCount];
-        for (int i = 0; i < m_colCount; i++) {
-            try {
-                values[i] = row.get(i, getColumnType(i));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        if (m_readOnly) {
+            throw new IllegalStateException("Table is read-only. Make a copy before changing.");
         }
-        addRow(values);
+        if (m_colCount == 0) {
+            throw new IllegalStateException("Table has no columns defined");
+        }
+        if (row.getColumnCount() != m_colCount) {
+            throw new IllegalArgumentException(row.getColumnCount() + " arguments but table has " + m_colCount + " columns");
+        }
+
+        // memoize the start of this row in case we roll back
+        final int pos = m_buffer.position();
+
+        try {
+            // Allow the buffer to grow to max capacity
+            m_buffer.limit(m_buffer.capacity());
+
+            byte[] inboundSchemaString = row.getSchemaString();
+            byte[] mySchemaString = getSchemaString();
+
+            // The way this works is that when two schema strings are found to have
+            // the same value, the target table's reference is pointed at the source
+            // table's reference. This allows the copying of multiple rows from one
+            // table to another to only do a deep comparison once, and to do reference
+            // equivalence checks for subsequent rows.
+            boolean canDoRawCopy = (inboundSchemaString == mySchemaString) ||
+                    Arrays.equals(inboundSchemaString, mySchemaString);
+
+            if (canDoRawCopy) {
+                // make them the same object if equal for faster comparison next time
+                m_schemaString = inboundSchemaString;
+
+                // raw blit the row (assume the row is valid with proper length)
+                ByteBuffer rawRow = row.getRawRow();
+                m_buffer.put(rawRow);
+            }
+            else {
+                // advance the row size value
+                m_buffer.position(pos + 4);
+
+                for (int i = 0; i < m_colCount; i++) {
+                    VoltType inboundType = row.getColumnType(i);
+                    VoltType outboundType = getColumnType(i);
+
+                    if (inboundType == outboundType) {
+                        byte[] raw = row.getRaw(i);
+                        m_buffer.put(raw);
+                    }
+                    else {
+                        Object inboundValue = row.get(i, inboundType);
+                        addColumnValue(inboundValue, outboundType, i);
+                    }
+                }
+
+                final int rowsize = m_buffer.position() - pos - 4;
+                assert(rowsize >= 0);
+
+                // check for too big rows
+                if (rowsize > VoltTableRow.MAX_TUPLE_LENGTH) {
+                    throw new VoltOverflowException(
+                            "Table row total length larger than allowed max " + VoltTableRow.MAX_TUPLE_LENGTH_STR);
+                }
+
+                // buffer overflow is caught and handled below.
+                m_buffer.putInt(pos, rowsize);
+            }
+
+            // constrain buffer limit back to the new position
+            m_buffer.limit(m_buffer.position());
+
+            // increment the rowcount in the member var and in the buffer
+            m_rowCount++;
+            m_buffer.putInt(m_rowStart, m_rowCount);
+        }
+        catch (VoltTypeException vte)
+        {
+            // revert the row size advance and any other
+            // buffer additions
+            m_buffer.position(pos);
+            throw vte;
+        }
+        catch (BufferOverflowException e) {
+            m_buffer.position(pos);
+            expandBuffer();
+            add(row);
+        }
+        // row was too big, reset and rethrow
+        catch (VoltOverflowException e) {
+            m_buffer.position(pos);
+            throw e;
+        }
+        catch (IllegalArgumentException e) {
+            // if this was thrown because of a lack of space
+            // then grow the buffer
+            // the number 32 was picked out of a hat ( maybe a bug if str > 32 )
+            if (m_buffer.limit() - m_buffer.position() < 32) {
+                m_buffer.position(pos);
+                expandBuffer();
+                add(row);
+            }
+            else throw e;
+        }
+        assert(verifyTableInvariants());
     }
 
     /**
@@ -598,12 +1091,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      *         between an input value and the corresponding column
      */
     public final void addRow(Object... values) {
+        assert(verifyTableInvariants());
         if (m_readOnly) {
             throw new IllegalStateException("Table is read-only. Make a copy before changing.");
         }
-        assert(verifyTableInvariants());
         if (m_colCount == 0) {
-            throw new IllegalStateException("table has no columns defined");
+            throw new IllegalStateException("Table has no columns defined");
         }
         if (values.length != m_colCount) {
             throw new IllegalArgumentException(values.length + " arguments but table has " + m_colCount + " columns");
@@ -626,222 +1119,19 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 Object value = values[col];
                 VoltType columnType = VoltType.get(m_buffer.get(typePos + col));
 
-                // schema checking code that is used for some tests
-                boolean allowNulls = true;
-                int maxColSize = VoltType.MAX_VALUE_LENGTH;
-                if (m_originalColumnInfos != null) {
-                    allowNulls = m_originalColumnInfos[col].nullable;
-                    maxColSize = m_originalColumnInfos[col].size;
-                }
-
-                try
-                {
-                    if (VoltType.isNullVoltType(value))
-                    {
-                        // schema checking code that is used for some tests
-                        // alllowNulls should always be true in production
-                        if (allowNulls == false) {
-                            throw new IllegalArgumentException(
-                                    String.format("Column %s at index %d doesn't allow NULL values.",
-                                    getColumnName(col), col));
-                        }
-
-                        switch (columnType) {
-                        case TINYINT:
-                            m_buffer.put(VoltType.NULL_TINYINT);
-                            break;
-                        case SMALLINT:
-                            m_buffer.putShort(VoltType.NULL_SMALLINT);
-                            break;
-                        case INTEGER:
-                            m_buffer.putInt(VoltType.NULL_INTEGER);
-                            break;
-                        case TIMESTAMP:
-                            m_buffer.putLong(VoltType.NULL_BIGINT);
-                            break;
-                        case BIGINT:
-                            m_buffer.putLong(VoltType.NULL_BIGINT);
-                            break;
-                        case FLOAT:
-                            m_buffer.putDouble(VoltType.NULL_FLOAT);
-                            break;
-                        case STRING:
-                            m_buffer.putInt(NULL_STRING_INDICATOR);
-                            break;
-                        case VARBINARY:
-                            m_buffer.putInt(NULL_STRING_INDICATOR);
-                            break;
-                        case DECIMAL:
-                            VoltDecimalHelper.serializeNull(m_buffer);
-                            break;
-
-                        default:
-                            throw new VoltTypeException("Unsupported type: " +
-                                    columnType);
-                        }
-                    } else {
-
-                        // Allow implicit conversions across all numeric types
-                        // except BigDecimal and anything else. Require BigDecimal
-                        // and reject Long128. Convert byte[] to VoltType.STRING.
-                        // Allow longs to be converted to VoltType.TIMESTAMPS.
-
-                        // In all error paths, catch ClassCastException
-                        // and VoltTypeException to restore
-                        // the correct table state.
-                        // XXX consider adding a fast path that checks for
-                        // equivalent types of input and column
-
-                        switch (columnType) {
-                        case TINYINT:
-                            if (value instanceof BigDecimal)
-                                throw new ClassCastException();
-                            final Number n1 = (Number) value;
-                            if (columnType.wouldCastOverflow(n1))
-                            {
-                                throw new VoltTypeException("Cast of " +
-                                        n1.doubleValue() +
-                                        " to " +
-                                        columnType.toString() +
-                                        " would overflow");
-                            }
-                            m_buffer.put(n1.byteValue());
-                            break;
-                        case SMALLINT:
-                            if (value instanceof BigDecimal)
-                                throw new ClassCastException();
-                            final Number n2 = (Number) value;
-                            if (columnType.wouldCastOverflow(n2))
-                            {
-                                throw new VoltTypeException("Cast to " +
-                                        columnType.toString() +
-                                        " would overflow");
-                            }
-                            m_buffer.putShort(n2.shortValue());
-                            break;
-                        case INTEGER:
-                            if (value instanceof BigDecimal)
-                                throw new ClassCastException();
-                            final Number n3 = (Number) value;
-                            if (columnType.wouldCastOverflow(n3))
-                            {
-                                throw new VoltTypeException("Cast to " +
-                                        columnType.toString() +
-                                        " would overflow");
-                            }
-                            m_buffer.putInt(n3.intValue());
-                            break;
-                        case BIGINT:
-                            if (value instanceof BigDecimal)
-                                throw new ClassCastException();
-                            final Number n4 = (Number) value;
-                            if (columnType.wouldCastOverflow(n4))
-                            {
-                                throw new VoltTypeException("Cast to " +
-                                        columnType.toString() +
-                                        " would overflow");
-                            }
-                            m_buffer.putLong(n4.longValue());
-                            break;
-
-                        case FLOAT:
-                            if (value instanceof BigDecimal)
-                                throw new ClassCastException();
-                            final Number n5 = (Number) value;
-                            if (columnType.wouldCastOverflow(n5))
-                            {
-                                throw new VoltTypeException("Cast to " +
-                                        columnType.toString() +
-                                        " would overflow");
-                            }
-                            m_buffer.putDouble(n5.doubleValue());
-                            break;
-
-                        case STRING: {
-                            // Accept byte[] and String
-                            if (value instanceof byte[]) {
-                                if (((byte[]) value).length > maxColSize)
-                                    throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " +
-                                                    VoltType.humanReadableSize(maxColSize));
-
-                                // bytes MUST be a UTF-8 encoded string.
-                                assert(testForUTF8Encoding((byte[]) value));
-                                writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
-                            }
-                            else {
-                                if (((String) value).length() > maxColSize)
-                                    throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " +
-                                                    VoltType.humanReadableSize(maxColSize));
-
-                                writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
-                            }
-                            break;
-                        }
-
-                        case VARBINARY: {
-                            // Accept byte[] and String (hex-encoded)
-                            if (value instanceof String) {
-                                value = Encoder.hexDecode((String) value);
-                            }
-                            if (value instanceof byte[]) {
-                                if (((byte[]) value).length > maxColSize)
-                                    throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " +
-                                                    VoltType.humanReadableSize(maxColSize));
-                                writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
-                            }
-                            break;
-                        }
-
-                        case TIMESTAMP: {
-                            if (value instanceof BigDecimal) {
-                                throw new ClassCastException();
-                            }
-                            long micros;
-                            // Accept long and TimestampType and any kind of Date
-                            if (value instanceof java.util.Date ||
-                                    value instanceof TimestampType) {
-                                 micros = ParameterSet.timestampToMicroseconds(value);
-                            } else {
-                                micros = ((Number) value).longValue();
-                            }
-                            m_buffer.putLong(micros);
-                            break;
-                        }
-
-                        case DECIMAL: {
-                            // Only accept BigDecimal; rely on class cast exception for error path
-                            VoltDecimalHelper.serializeBigDecimal( (BigDecimal)value, m_buffer);
-                            break;
-                        }
-
-                        default:
-                            throw new VoltTypeException("Unsupported type: " + columnType);
-                        }
-                    }
-                }
-                catch (VoltTypeException vte)
-                {
-                    // revert the row size advance and any other
-                    // buffer additions
-                    m_buffer.position(pos);
-                    throw vte;
-                }
-                catch (ClassCastException cce) {
-                    // revert any added tuples and strings
-                    m_buffer.position(pos);
-                    throw new VoltTypeException("Value for column " + col + " (" +
-                            getColumnName(col) + ") is type " +
-                            value.getClass().getSimpleName() + " when type " + columnType +
-                            " was expected.");
-                }
+                addColumnValue(value, columnType, col);
             }
 
-            m_rowCount++;
-            m_buffer.putInt(m_rowStart, m_rowCount);
+            //
+            // Note, there is some near-identical code in both row add methods.
+            // [ add(..) and addRow(..) ]
+            // If you change code below here, change it in the other method too.
+            // (It would be nice to re-factor, but I couldn't make a clean go at
+            //  it quickly - Hugg)
+            //
+
             final int rowsize = m_buffer.position() - pos - 4;
+            assert(rowsize >= 0);
 
             // check for too big rows
             if (rowsize > VoltTableRow.MAX_TUPLE_LENGTH) {
@@ -849,27 +1139,43 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         "Table row total length larger than allowed max " + VoltTableRow.MAX_TUPLE_LENGTH_STR);
             }
 
-            // constrain buffer limit back to the new position
-            m_buffer.limit(m_buffer.position());
-            assert(rowsize >= 0);
             // buffer overflow is caught and handled below.
             m_buffer.putInt(pos, rowsize);
+
+            m_rowCount++;
+            m_buffer.putInt(m_rowStart, m_rowCount);
+        }
+        catch (VoltTypeException vte)
+        {
+            // revert the row size advance and any other
+            // buffer additions
+            m_buffer.position(pos);
+            throw vte;
         }
         catch (BufferOverflowException e) {
             m_buffer.position(pos);
             expandBuffer();
             addRow(values);
         }
+        // row was too big, reset and rethrow
+        catch (VoltOverflowException e) {
+            m_buffer.position(pos);
+            throw e;
+        }
         catch (IllegalArgumentException e) {
+            m_buffer.position(pos);
             // if this was thrown because of a lack of space
             // then grow the buffer
             // the number 32 was picked out of a hat ( maybe a bug if str > 32 )
             if (m_buffer.limit() - m_buffer.position() < 32) {
-                m_buffer.position(pos);
                 expandBuffer();
                 addRow(values);
             }
             else throw e;
+        }
+        finally {
+            // constrain buffer limit back to the new position
+            m_buffer.limit(m_buffer.position());
         }
 
         assert(verifyTableInvariants());
@@ -888,6 +1194,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     /**
      * Tables containing a single row and a single integer column can be read using this convenience
      * method.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
      * @return The integer row value.
      */
     public final long asScalarLong() {
@@ -904,13 +1212,21 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         final VoltType colType = getColumnType(0);
         switch (colType) {
         case TINYINT:
-            return m_buffer.get(m_rowStart + 8);
+            final byte tinyInt = m_buffer.get(m_rowStart + 8);
+            m_wasNull = (tinyInt == VoltType.NULL_TINYINT);
+            return tinyInt;
         case SMALLINT:
-            return m_buffer.getShort(m_rowStart + 8);
+            final short smallInt = m_buffer.getShort(m_rowStart + 8);
+            m_wasNull = (smallInt == VoltType.NULL_SMALLINT);
+            return smallInt;
         case INTEGER:
-            return m_buffer.getInt(m_rowStart + 8);
+            final int integer = m_buffer.getInt(m_rowStart + 8);
+            m_wasNull = (integer == VoltType.NULL_INTEGER);
+            return integer;
         case BIGINT:
-            return m_buffer.getLong(m_rowStart + 8);
+            final long bigInt = m_buffer.getLong(m_rowStart + 8);
+            m_wasNull = (bigInt == VoltType.NULL_BIGINT);
+            return bigInt;
         default:
             throw new IllegalStateException(
                     "table must contain exactly 1 integral value; column 1 is type = " + colType.name());
@@ -1014,6 +1330,24 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                         buffer.append(bd.toString());
                     }
                     break;
+                case GEOGRAPHY_POINT:
+                    GeographyPointValue pt = r.getGeographyPointValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(pt.toString());
+                    }
+                    break;
+                case GEOGRAPHY:
+                    GeographyValue gv = r.getGeographyValue(i);
+                    if (r.wasNull()) {
+                        buffer.append("NULL");
+                    }
+                    else {
+                        buffer.append(gv.toString());
+                    }
+                    break;
                 default:
                     // should not get here ever
                     throw new IllegalStateException("Table column had unexpected type.");
@@ -1037,104 +1371,125 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public String toFormattedString() {
 
         final int MAX_PRINTABLE_CHARS = 30;
-        final String ELIPSIS = "...";
+        // chose print width for geography column such that it can print polygon in
+        // aligned manner with geography column for a polygon up to:
+        // a polygon composed of 4 vertices + 1 repeat vertex,
+        // one ring, each coordinate of vertex having 5 digits space including the sign of lng/lat
+        final int MAX_PRINTABLE_CHARS_GEOGRAPHY = 74;
+
+        final String ELLIPSIS = "...";
+        final String DECIMAL_FORMAT = "%01.12f";
 
         StringBuffer sb = new StringBuffer();
 
-        int columnCount = this.getColumnCount();
+        int columnCount = getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
+        // start with minimum padding based on length of column names. this gets
+        // increased later as needed
         for (int i = 0; i < columnCount; i++) {
-            padding[i] = this.getColumnName(i).length(); // min value to be increased later
+            padding[i] = getColumnName(i).length(); // min value to be increased later
         }
-        this.resetRowPosition();
+        resetRowPosition();
 
-        // Compute the padding needed for each column of the table (note must
+        // Compute the padding needed for each column of the table (note: must
         // visit every row)
-        while (this.advanceRow()) {
+        while (advanceRow()) {
             for (int i = 0; i < columnCount; i++) {
-                Object v = this.get(i, this.getColumnType(i));
-                if (this.wasNull()) {
-                    v = "NULL";
+                VoltType colType = getColumnType(i);
+                Object value = get(i, colType);
+                int width;
+                if (wasNull()) {
+                    width = 4;
                 }
-                int len = 0; // length
-                if (this.getColumnType(i) == VoltType.VARBINARY && !this.wasNull()) {
-                    len = ((byte[]) v).length * 2;
-                } else {
-                    len = v.toString().length();
+                else if (colType == VoltType.DECIMAL) {
+                    BigDecimal bd = (BigDecimal) value;
+                    String valueStr = String.format(DECIMAL_FORMAT, bd.doubleValue());
+                    width = valueStr.length();
                 }
                 // crop long strings and such
-                if (len > MAX_PRINTABLE_CHARS) {
-                    len = MAX_PRINTABLE_CHARS;
+                else {
+                    if (colType == VoltType.VARBINARY) {
+                        width = ((byte[]) value).length * 2;
+                    }
+                    else {
+                        width = value.toString().length();
+                    }
+                    if ( ((colType == VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS_GEOGRAPHY)) ||
+                         ((colType != VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS)) ) {
+                        width = (colType == VoltType.GEOGRAPHY) ? MAX_PRINTABLE_CHARS_GEOGRAPHY : MAX_PRINTABLE_CHARS;
+                    }
                 }
 
-                // compute the max for each column
-                if (len > padding[i]) {
-                    padding[i] = len;
+                // Adjust the max width for each column
+                if (width > padding[i]) {
+                    padding[i] = width;
                 }
             }
         }
 
-        // Determine the formatting string for each column
+        String pad = ""; // no pad before first column header.
         for (int i = 0; i < columnCount; i++) {
             padding[i] += 1;
-            fmt[i] = "%1$"
-                    + ((this.getColumnType(i) == VoltType.STRING
-                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
-                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                    + padding[i] + "s";
-        }
+            // Determine the formatting string for each column
+            VoltType colType = getColumnType(i);
+            String justification = (colType.isVariableLength() ||
+                    colType == VoltType.TIMESTAMP ||
+                    colType == VoltType.GEOGRAPHY_POINT) ? "-" : "";
+            fmt[i] = "%1$" + justification + padding[i] + "s";
 
-        // Create the column headers
-        for (int i = 0; i < columnCount; i++) {
-            sb.append(String.format("%1$-" + padding[i] + "s",
-                    this.getColumnName(i)));
-            if (i < columnCount - 1) {
-                sb.append(" ");
+            // Serialize the column headers
+            sb.append(pad).append(String.format("%1$-" + padding[i] + "s",
+                    getColumnName(i)));
+            pad = " ";
             }
-        }
         sb.append("\n");
 
-        // Create the separator between the column headers and the rows of data
+        // Serialize the separator between the column headers and the rows of data
+        pad = "";
         for (int i = 0; i < columnCount; i++) {
             char[] underline_array = new char[padding[i]];
             Arrays.fill(underline_array, '-');
-            sb.append(new String(underline_array));
-            if (i < columnCount - 1) {
-                sb.append(" ");
-            }
+            sb.append(pad).append(new String(underline_array));
+            pad = " ";
         }
         sb.append("\n");
 
-        // Now display each row of data.
-        this.resetRowPosition();
-        while (this.advanceRow()) {
+        // Serialize each formatted row of data.
+        resetRowPosition();
+        while (advanceRow()) {
+            pad = "";
             for (int i = 0; i < columnCount; i++) {
-                Object value = this.get(i, this.getColumnType(i));
+                VoltType colType = getColumnType(i);
+                Object value = get(i, colType);
                 String valueStr;
-                if (this.wasNull()) {
+                if (wasNull()) {
                     valueStr = "NULL";
                 }
-                else if (this.getColumnType(i) == VoltType.VARBINARY) {
-                    valueStr = Encoder.hexEncode((byte[]) value);
+                else if (colType == VoltType.DECIMAL) {
+                    BigDecimal bd = (BigDecimal) value;
+                    valueStr = String.format(DECIMAL_FORMAT, bd.doubleValue());
                 }
+                else {
+                    if (colType == VoltType.VARBINARY) {
+                    valueStr = Encoder.hexEncode((byte[]) value);
+                        // crop long varbinaries
+                        if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                            valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELLIPSIS.length()) + ELLIPSIS;
+                }
+                    }
                 else {
                     valueStr = value.toString();
                 }
-                // truncate long values
-                if ((this.getColumnType(i) == VoltType.VARBINARY) && (valueStr.length() > MAX_PRINTABLE_CHARS)) {
-                    valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELIPSIS.length()) + ELIPSIS;
                 }
-                sb.append(String.format(fmt[i], valueStr));
-                if (i < columnCount - 1) {
-                    sb.append(" ");
+                sb.append(pad).append(String.format(fmt[i], valueStr));
+                pad = " ";
                 }
-            }
             sb.append("\n");
         }
 
         // Idempotent. Reset the row position for the next guy...
-        this.resetRowPosition();
+        resetRowPosition();
 
         return sb.toString();
     }
@@ -1334,22 +1689,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final VoltTable clone(int extraBytes) {
         assert(verifyTableInvariants());
-        final VoltTable cloned = new VoltTable();
+        // share the immutable metadata if it's present for tests
+        final VoltTable cloned = new VoltTable(m_extraMetadata);
         cloned.m_colCount = m_colCount;
         cloned.m_rowCount = 0;
         cloned.m_rowStart = m_rowStart;
-
-        // copy this metadata if it's present for tests
-        // note the nullness of m_name implies nullness of other test-related metadata
-        if (m_name != null) {
-            cloned.m_name = m_name;
-            if (m_originalColumnInfos != null) {
-                cloned.m_originalColumnInfos = new ColumnInfo[m_originalColumnInfos.length];
-                for (int i = 0; i < m_originalColumnInfos.length; i++) {
-                    cloned.m_originalColumnInfos[i] = m_originalColumnInfos[i].clone();
-                }
-            }
-        }
 
         final int pos = m_buffer.position();
         m_buffer.position(0);

@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -32,6 +32,7 @@ from voltdbclient import *
 from voltcli import cli
 from voltcli import environment
 from voltcli import utility
+from voltcli import checkconfig
 
 #===============================================================================
 class BaseVerb(object):
@@ -343,9 +344,10 @@ class VerbSpace(object):
     """
     Manages a collection of Verb objects that support a particular CLI interface.
     """
-    def __init__(self, name, version, description, VOLT, scan_dirs, verbs):
+    def __init__(self, name, version, description, VOLT, scan_dirs, verbs, pro_version):
         self.name        = name
         self.version     = version
+        self.pro_version       = pro_version
         self.description = description.strip()
         self.VOLT        = VOLT
         self.scan_dirs   = scan_dirs
@@ -373,7 +375,8 @@ class JavaBundle(object):
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
            cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
-           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
+           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'),
+           cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'))
 
     def start(self, verb, runner):
         pass
@@ -404,7 +407,9 @@ class ServerBundle(JavaBundle):
                  supports_daemon=False,
                  daemon_name=None,
                  daemon_description=None,
-                 daemon_output=None):
+                 daemon_output=None,
+                 supports_multiple_daemons=False,
+                 check_environment_config=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -415,13 +420,24 @@ class ServerBundle(JavaBundle):
         self.daemon_name = daemon_name
         self.daemon_description = daemon_description
         self.daemon_output = daemon_output
+        self.supports_multiple_daemons = supports_multiple_daemons
+        self.check_environment_config = check_environment_config
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
+	verb.add_options(
+            cli.StringListOption(None, '--ignore', 'skip_requirements',
+                             '''requirements to skip when start voltdb:
+			     thp - Checking for Transparent Huge Pages (THP) has been disabled.  Use of THP can cause VoltDB to run out of memory. Do not disable this check on production systems.''',
+                             default = None))
         verb.add_options(
             cli.StringOption('-d', '--deployment', 'deployment',
                              'specify the location of the deployment file',
                              default = None))
+        verb.add_options(
+            cli.StringOption('-g', '--placement-group', 'placementgroup',
+                             'placement group',
+                             default = '0'))
         if self.default_host:
             verb.add_options(cli.StringOption('-H', '--host', 'host',
                 'HOST[:PORT] (default HOST=localhost, PORT=3021)',
@@ -442,17 +458,39 @@ class ServerBundle(JavaBundle):
             verb.add_options(
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
+            if self.supports_multiple_daemons:
+                # Keep the -I/--instance option hidden for now.
+                verb.add_options(
+                    cli.IntegerOption('-I', '--instance', 'instance',
+                                  #'specify an instance number for multiple servers on the same host'))
+                                  None))
 
     def go(self, verb, runner):
-        if self.subcommand == 'create':
+        if self.check_environment_config:
+            incompatible_options = checkconfig.test_hard_requirements()
+            for k,v in  incompatible_options.items():
+                state = v[0]
+                if state == 'PASS' :
+                    pass
+                elif state == "WARN":
+                    utility.warning(v[1])
+                elif state == 'FAIL' :
+                    if k in checkconfig.skippableRequirements.keys() and runner.opts.skip_requirements and checkconfig.skippableRequirements[k] in runner.opts.skip_requirements:
+                        utility.warning(v[1])
+                    else:
+                        utility.abort(v[1])
+                else:
+                    utility.error(v[1])
+        final_args = None
+        if self.subcommand in ('create', 'recover'):
             if runner.opts.replica:
-                self.subcommand = 'replica'
+                final_args = [self.subcommand, 'replica']
         if self.supports_live:
             if runner.opts.block:
                 final_args = [self.subcommand]
             else:
                 final_args = ['live', self.subcommand]
-        else:
+        elif final_args == None:
             final_args = [self.subcommand]
         if self.safemode_available:
             if runner.opts.safemode:
@@ -467,6 +505,8 @@ class ServerBundle(JavaBundle):
 
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
+        if runner.opts.placementgroup:
+            final_args.extend(['placementgroup', runner.opts.placementgroup])
         if runner.opts.host:
             final_args.extend(['host', runner.opts.host])
         else:
@@ -489,6 +529,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['zkport', runner.opts.zkport])
         if runner.opts.externalinterface:
             final_args.extend(['externalinterface', runner.opts.externalinterface])
+        if runner.opts.publicinterface:
+            final_args.extend(['publicinterface', runner.opts.publicinterface])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}
@@ -501,6 +543,9 @@ class ServerBundle(JavaBundle):
             runner.setup_daemon_kwargs(kwargs, name=self.daemon_name,
                                                description=daemon_description,
                                                output=self.daemon_output)
+        else:
+            # Replace the Python process.
+            kwargs['exec'] = True
         self.run_java(verb, runner, *final_args, **kwargs)
 
     def stop(self, verb, runner):
@@ -547,18 +592,13 @@ class BaseClientBundle(ConnectionBundle):
         ConnectionBundle.__init__(self, default_port = default_port, min_count = 1, max_count = 1)
 
     def start(self, verb, runner):
-        try:
-            kwargs = {}
-            if runner.opts.username:
-                kwargs['username'] = runner.opts.username
-                if runner.opts.password:
-                    kwargs['password'] = runner.opts.password
-            runner.client = FastSerializer(runner.opts.host.host, runner.opts.host.port, **kwargs)
-        except Exception, e:
-            utility.abort(e)
+        runner.voltdb_connect(runner.opts.host.host,
+                              runner.opts.host.port,
+                              username=runner.opts.username,
+                              password=runner.opts.password)
 
     def stop(self, verb, runner):
-        runner.client.close()
+        runner.voltdb_disconnect()
 
 #===============================================================================
 class ClientBundle(BaseClientBundle):

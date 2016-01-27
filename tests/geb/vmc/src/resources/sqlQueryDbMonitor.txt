@@ -1,0 +1,12 @@
+#create
+CREATE TABLE LINA (
+   LINA_NUMBER integer NOT NULL,
+   LINA_NAME varchar(50) NOT NULL,
+   CONSTRAINT PK_LINA PRIMARY KEY (LINA_NUMBER)
+);
+
+#delete
+DROP TABLE lina
+
+#name
+lina

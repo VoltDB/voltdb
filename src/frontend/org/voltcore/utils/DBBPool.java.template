@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,11 @@ import org.voltcore.logging.VoltLogger;
 import sun.misc.Cleaner;
 import sun.nio.ch.DirectBuffer;
 
+#ifndef NO_MEMCHECK
+import java.util.List;
+import java.util.ArrayList;
+#endif
+
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
  * allocated with
@@ -46,7 +51,6 @@ public final class DBBPool {
         final String msg = "Strict java memory checking is enabled, don't do release builds " +
                      "or performance runs with this enabled. Invoke \"ant clean\" and \"ant -Djmemcheck=NO_MEMCHECK\" to disable.";
         HOST.warn(msg);
-        System.err.println(msg);
     }
 #endif
 
@@ -67,6 +71,9 @@ public final class DBBPool {
 #ifndef NO_MEMCHECK
         private volatile Throwable m_freeThrowable;
         private final Throwable m_allocationThrowable;
+        private List<String> m_tags = null;
+#else
+        private boolean m_previouslyFreed = false;
 #endif
 
         public BBContainer(ByteBuffer b) {
@@ -107,10 +114,19 @@ public final class DBBPool {
                 System.err.println("Use was by:");
                 Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
                 t.printStackTrace();
+                if (isTagged()) {
+                    for (String tag: m_tags) {
+                        System.err.println(tag);
+                    }
+                }
                 HOST.fatal("Use after free in DBBPool");
                 HOST.fatal("Free was by:", m_freeThrowable);
                 HOST.fatal("Use was by:", t);
                 System.exit(-1);
+            }
+#else
+            if (m_previouslyFreed) {
+                crash("Use after free in DBBPool", true, null);
             }
 #endif
         }
@@ -125,6 +141,11 @@ public final class DBBPool {
                     System.err.println("Current free was by:");
                     Throwable t = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
                     t.printStackTrace();
+                    if (isTagged()) {
+                        for (String tag: m_tags) {
+                            System.err.println(tag);
+                        }
+                    }
                     HOST.fatal("Double free in DBBPool");
                     HOST.fatal("Original free was by:", m_freeThrowable);
                     HOST.fatal("Current free was by:", t);
@@ -132,8 +153,42 @@ public final class DBBPool {
                 }
                 m_freeThrowable = new Throwable("\"" + Thread.currentThread().getName() + "\" at " + System.currentTimeMillis());
             }
+#else
+            if (m_previouslyFreed) {
+                crash("Double free in DBBPool", true, null);
+            }
+            m_previouslyFreed = true;
 #endif
             return b;
+        }
+
+        public final void tag(final String tag) {
+#ifndef NO_MEMCHECK
+            StringBuilder sb = new StringBuilder(1024);
+            sb.append("<<TAG:").append(m_tags.size()).append(">> ");
+            sb.append(tag).append("\n");
+            sb.append(CoreUtils.throwableToString(new Throwable()));
+            synchronized(this) {
+                if (m_tags == null) {
+                    m_tags = new ArrayList<String>();
+                }
+                m_tags.add(sb.toString());
+            }
+#endif
+        }
+
+        public final void addToTagTrail(final String tag) {
+#ifndef NO_MEMCHECK
+            if (isTagged()) tag(tag);
+#endif
+        }
+
+        public boolean isTagged() {
+#ifndef NO_MEMCHECK
+            return m_tags != null && !m_tags.isEmpty();
+#else
+            return false;
+#endif
         }
 
 #ifndef NO_MEMCHECK
@@ -142,6 +197,11 @@ public final class DBBPool {
             if (m_freeThrowable == null) {
                 System.err.println("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:");
                 m_allocationThrowable.printStackTrace();
+                if (isTagged()) {
+                    for (String tag: m_tags) {
+                        System.err.println(tag);
+                    }
+                }
                 HOST.fatal("BBContainer " + Integer.toHexString(this.hashCode()) + " was never discarded allocated by:", m_allocationThrowable);
                 System.exit(-1);
             }
@@ -293,31 +353,48 @@ public final class DBBPool {
     private static final NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
             new NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>>();
 
-    /*
-     * Allocate a DirectByteBuffer from a global lock free pool
+    /**
+     * Find the closest power of 2 that's larger than or equal to the requested capacity.
+     * @return 0 if the requested capacity is 0, the requested capacity itself if the
+     * next power of 2 overflows, or the next power of 2.
+     */
+    static int roundToClosestPowerOf2(int capacity) {
+        if (capacity == 0) return 0;
+        else if (capacity == 1) return 2;
+
+        final int result = Integer.highestOneBit(capacity - 1) << 1;
+        return result < 0 ? capacity : result;
+    }
+
+    /**
+     * Allocate a DirectByteBuffer from a global lock free pool. The allocated buffer may
+     * have a capacity larger than the requested size. The limit will be set to the requested
+     * size.
      */
     public static BBContainer allocateDirectAndPool(final Integer capacity) {
-        ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(capacity);
+        final int bucket = roundToClosestPowerOf2(capacity);
+        ConcurrentLinkedQueue<BBContainer> pooledBuffers = m_pooledBuffers.get(bucket);
         if (pooledBuffers == null) {
             pooledBuffers = new ConcurrentLinkedQueue<BBContainer>();
-            if (m_pooledBuffers.putIfAbsent(capacity, pooledBuffers) == null) {
-                pooledBuffers = m_pooledBuffers.get(capacity);
+            if (m_pooledBuffers.putIfAbsent(bucket, pooledBuffers) != null) {
+                pooledBuffers = m_pooledBuffers.get(bucket);
             }
         }
 
         BBContainer cont = pooledBuffers.poll();
         if (cont == null) {
-            cont = allocateDirect(capacity);
+            cont = allocateDirect(bucket);
         }
         final BBContainer origin = cont;
         cont = new BBContainer(origin.b()) {
             @Override
             public void discard() {
-                final ByteBuffer b = checkDoubleFree();
-                m_pooledBuffers.get(b.capacity()).offer(origin);
+                checkDoubleFree();
+                m_pooledBuffers.get(bucket).offer(origin);
             }
         };
         cont.b().clear();
+        cont.b().limit(capacity);
         return cont;
     }
 
@@ -391,25 +468,31 @@ public final class DBBPool {
                 logDeallocation(buf.capacity());
                 DBBPool.cleanByteBuffer(buf);
             } catch (Throwable e) {
-                // The client code doesn't want to link to the VoltDB class, so this hack was born.
-                // It should be temporary as the goal is to remove client code dependency on
-                // DBBPool in the medium term.
-                try {
-                    Class<?> vdbClz = Class.forName("org.voltdb.VoltDB");
-                    Method m = vdbClz.getMethod("crashLocalVoltDB", String.class, boolean.class, Throwable.class);
-                    m.invoke(null, "Failed to deallocate direct byte buffer", false, e);
-                } catch (Exception ignored) {
-                    System.err.println("Failed to deallocate direct byte buffer");
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
+                crash("Failed to deallocate direct byte buffer", false, e);
             }
+        }
+    }
+
+    private static void crash(String msg, boolean stackTrace, Throwable e) {
+        // The client code doesn't want to link to the VoltDB class, so this hack was born.
+        // It should be temporary as the goal is to remove client code dependency on
+        // DBBPool in the medium term.
+        try {
+            Class<?> vdbClz = Class.forName("org.voltdb.VoltDB");
+            Method m = vdbClz.getMethod("crashLocalVoltDB", String.class, boolean.class, Throwable.class);
+            m.invoke(null, msg, stackTrace, e);
+        } catch (Exception ignored) {
+            HOST.fatal(msg, ignored);
+            System.err.println(msg);
+            e.printStackTrace();
+            System.exit(-1);
         }
     }
 
     public static void registerUnsafeMemory(long pointer) {
 #ifdef MEMCHECK_FULL
         m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" registered " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+        m_deletedStuff.remove(pointer);
 #endif
     }
 #ifdef MEMCHECK_FULL
@@ -464,6 +547,7 @@ public final class DBBPool {
 #ifdef MEMCHECK_FULL
         final long pointer = retcont.address();
         m_allocatedStuff.put(pointer, new Throwable("Thread \"" + Thread.currentThread().getName() + "\" allocated " + Long.toHexString(pointer) + " here at " + System.currentTimeMillis()));
+        m_deletedStuff.remove(pointer);
 #endif
         return retcont;
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -72,11 +72,12 @@
 #include "catalog/database.h"
 #include "catalog/constraint.h"
 
+
 using namespace std;
 using namespace voltdb;
 
-#define NUM_OF_COLUMNS 5
-#define NUM_OF_INDEXES 2
+#define NUM_OF_COLUMNS 4
+#define NUM_OF_INDEXES 3
 #define NUM_OF_TUPLES 10 //must be multiples of 2 for Update test.
 
 //
@@ -84,69 +85,145 @@ using namespace voltdb;
 // This is useful because it will allow us to check different types and other
 // configurations without having to dig down into the code
 //
-ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
-                                                    VALUE_TYPE_BIGINT,
-                                                    VALUE_TYPE_BIGINT,
-                                                    VALUE_TYPE_BIGINT,
-                                                    VALUE_TYPE_BIGINT };
-int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 8, 8, 8, 8, 8};
-bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { true, true, true, true, true };
+ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_INTEGER,
+                                                    VALUE_TYPE_VARCHAR,
+                                                    VALUE_TYPE_VARCHAR,
+                                                    VALUE_TYPE_INTEGER };
+int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 4, 8, 8, 4};
+bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { false, true, true, false };
 
 class ExecutionEngineTest : public Test {
     public:
         ExecutionEngineTest() {
             srand((unsigned int)time(NULL));
-            catalog_string = "add / clusters cluster"
-                "\nadd /clusters[cluster] databases database"
-                "\nset /clusters[cluster]/databases[database] schema \"435245415445205441424C452057415245484F5553452028575F494420494E54454745522044454641554C5420273027204E4F54204E554C4C2C0A575F4E414D452056415243484152283136292044454641554C54204E554C4C2C0A5052494D415259204B45592028575F4944290A293B0A20435245415445205441424C452053544F434B2028535F495F494420494E5445474552204E4F54204E554C4C2C0A535F575F494420494E5445474552204E4F54204E554C4C2C0A535F5155414E5449545920494E5445474552204E4F54204E554C4C2C0A5052494D415259204B45592028535F495F4944290A293B0A20\""
-                "\nadd /clusters[cluster]/databases[database] programs program"
-                "\nadd /clusters[cluster]/databases[database] tables WAREHOUSE"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] type 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] isreplicated false"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] partitioncolumn 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE] estimatedtuplecount 0"
-                "\nadd /clusters[cluster]/databases[database]/tables[WAREHOUSE] columns W_ID"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] index 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_ID] name \"W_ID\""
-                "\nadd /clusters[cluster]/databases[database]/tables[WAREHOUSE] columns W_NAME"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] index 1"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] type 9"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] size 16"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] nullable true"
-                "\nset /clusters[cluster]/databases[database]/tables[WAREHOUSE]/columns[W_NAME] name \"W_NAME\""
-                "\nadd /clusters[cluster]/databases[database] tables STOCK"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] type 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] isreplicated false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] partitioncolumn 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK] estimatedtuplecount 0"
-                "\nadd /clusters[cluster]/databases[database]/tables[STOCK] columns S_I_ID"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] index 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_I_ID] name \"S_I_ID\""
-                "\nadd /clusters[cluster]/databases[database]/tables[STOCK] columns S_W_ID"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] index 1"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_W_ID] name \"S_W_ID\""
-                "\nadd /clusters[cluster]/databases[database]/tables[STOCK] columns S_QUANTITY"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] index 2"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] type 5"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] size 0"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] name \"S_QUANTITY\"";
+            catalog_string =
+                    "add / clusters cluster"
+                    "\nset /clusters#cluster localepoch 1199145600"
+                    "\nadd /clusters#cluster databases database"
+                    "\nset /clusters#cluster/databases#database schema \"eJydUVuOw0AI+9/TMMYwM59tOrn/kWqiSlW7UbdaRRoID9sAPcBgCzJgehvBrfz0Ht07c89bRgcMA2bT5nuGk4TpXYXCzghVc3GPiq8IIW5Ct6jam9gQU5mrKie2B2rm7DhwV7ZCVkdWLZ2jLIY3hw88e7Zsrx09FUF6jrK/O/pFLJpN2ln1f6p+9Mkv5bNyYccErD9Fdy7UZHv0cJgYrb7qxPTrD19WXISUF1qmhLeEhghOjSBBXYJVc0CeH+B8+SdE0r+ksMl+Q4tPtKekmu/kZhV9v8o/tuAf5XxPewcEnpp/\""
+                    "\nset $PREV isActiveActiveDRed false"
+                    "\nset $PREV securityprovider \"hash\""
+                    "\nadd /clusters#cluster/databases#database groups administrator"
+                    "\nset /clusters#cluster/databases#database/groups#administrator admin true"
+                    "\nadd /clusters#cluster/databases#database groups user"
+                    "\nset /clusters#cluster/databases#database/groups#user admin false"
+                    "\nadd /clusters#cluster/databases#database tables CUSTOMER"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER isreplicated false"
+                    "\nset $PREV partitioncolumn /clusters#cluster/databases#database/tables#CUSTOMER/columns#CUSTOMERID"
+                    "\nset $PREV estimatedtuplecount 0"
+                    "\nset $PREV materializer null"
+                    "\nset $PREV signature \"CUSTOMER|ivvi\""
+                    "\nset $PREV tuplelimit 1000"
+                    "\nset $PREV isDRed false"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER columns CUSTOMERID"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/columns#CUSTOMERID index 0"
+                    "\nset $PREV type 5"
+                    "\nset $PREV size 4"
+                    "\nset $PREV nullable false"
+                    "\nset $PREV name \"CUSTOMERID\""
+                    "\nset $PREV defaultvalue null"
+                    "\nset $PREV defaulttype 0"
+                    "\nset $PREV matview null"
+                    "\nset $PREV aggregatetype 0"
+                    "\nset $PREV matviewsource null"
+                    "\nset $PREV inbytes false"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER columns FIRSTNAME"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/columns#FIRSTNAME index 1"
+                    "\nset $PREV type 9"
+                    "\nset $PREV size 128"
+                    "\nset $PREV nullable true"
+                    "\nset $PREV name \"FIRSTNAME\""
+                    "\nset $PREV defaultvalue null"
+                    "\nset $PREV defaulttype 0"
+                    "\nset $PREV matview null"
+                    "\nset $PREV aggregatetype 0"
+                    "\nset $PREV matviewsource null"
+                    "\nset $PREV inbytes false"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER columns LASTNAME"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/columns#LASTNAME index 2"
+                    "\nset $PREV type 9"
+                    "\nset $PREV size 128"
+                    "\nset $PREV nullable true"
+                    "\nset $PREV name \"LASTNAME\""
+                    "\nset $PREV defaultvalue null"
+                    "\nset $PREV defaulttype 0"
+                    "\nset $PREV matview null"
+                    "\nset $PREV aggregatetype 0"
+                    "\nset $PREV matviewsource null"
+                    "\nset $PREV inbytes false"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER columns ZIPCODE"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/columns#ZIPCODE index 3"
+                    "\nset $PREV type 5"
+                    "\nset $PREV size 4"
+                    "\nset $PREV nullable false"
+                    "\nset $PREV name \"ZIPCODE\""
+                    "\nset $PREV defaultvalue null"
+                    "\nset $PREV defaulttype 0"
+                    "\nset $PREV matview null"
+                    "\nset $PREV aggregatetype 0"
+                    "\nset $PREV matviewsource null"
+                    "\nset $PREV inbytes false"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER indexes TABLEINDEX1"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX1 unique false"
+                    "\nset $PREV assumeUnique false"
+                    "\nset $PREV countable true"
+                    "\nset $PREV type 1"
+                    "\nset $PREV expressionsjson \"\""
+                    "\nset $PREV predicatejson \"\""
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX1 columns CUSTOMERID"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX1/columns#CUSTOMERID index 0"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#CUSTOMERID"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER indexes TABLEINDEX2"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2 unique true"
+                    "\nset $PREV assumeUnique false"
+                    "\nset $PREV countable true"
+                    "\nset $PREV type 1"
+                    "\nset $PREV expressionsjson \"\""
+                    "\nset $PREV predicatejson \"\""
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2 columns CUSTOMERID"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2/columns#CUSTOMERID index 0"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#CUSTOMERID"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2 columns FIRSTNAME"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2/columns#FIRSTNAME index 1"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#FIRSTNAME"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2 columns LASTNAME"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX2/columns#LASTNAME index 2"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#LASTNAME"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER indexes TABLEINDEX3"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX3 unique false"
+                    "\nset $PREV assumeUnique false"
+                    "\nset $PREV countable true"
+                    "\nset $PREV type 1"
+                    "\nset $PREV expressionsjson \"\""
+                    "\nset $PREV predicatejson \"\""
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX3 columns FIRSTNAME"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX3/columns#FIRSTNAME index 0"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#FIRSTNAME"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX3 columns LASTNAME"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#TABLEINDEX3/columns#LASTNAME index 1"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#LASTNAME"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER indexes VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID unique true"
+                    "\nset $PREV assumeUnique false"
+                    "\nset $PREV countable true"
+                    "\nset $PREV type 1"
+                    "\nset $PREV expressionsjson \"\""
+                    "\nset $PREV predicatejson \"\""
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER/indexes#VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID columns CUSTOMERID"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/indexes#VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID/columns#CUSTOMERID index 0"
+                    "\nset $PREV column /clusters#cluster/databases#database/tables#CUSTOMER/columns#CUSTOMERID"
+                    "\nadd /clusters#cluster/databases#database/tables#CUSTOMER constraints VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID"
+                    "\nset /clusters#cluster/databases#database/tables#CUSTOMER/constraints#VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID type 4"
+                    "\nset $PREV oncommit \"\""
+                    "\nset $PREV index /clusters#cluster/databases#database/tables#CUSTOMER/indexes#VOLTDB_AUTOGEN_IDX_PK_CUSTOMER_CUSTOMERID"
+                    "\nset $PREV foreignkeytable null";
 
             /*
              * Initialize the engine
              */
             engine = new VoltDBEngine();
             int partitionCount = 3;
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", 0, DEFAULT_TEMP_TABLE_MEMORY, false));
             engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
@@ -157,19 +234,14 @@ class ExecutionEngineTest : public Test {
             cluster = catalog->clusters().get("cluster");
             database = cluster->databases().get("database");
             database_id = database->relativeIndex();
-            catalog::Table *catalog_table_warehouse = database->tables().get("WAREHOUSE");
-            catalog::Table *catalog_table_stock = database->tables().get("STOCK");
-            warehouse_table_id = catalog_table_warehouse->relativeIndex();
-            stock_table_id = catalog_table_stock->relativeIndex();
-            warehouse_table = engine->getTable(warehouse_table_id);
-            stock_table = engine->getTable(stock_table_id);
+            catalog::Table *catalog_table_customer = database->tables().get("CUSTOMER");
+            customer_table_id = catalog_table_customer->relativeIndex();
+            customer_table = engine->getTable(customer_table_id);
             //
             // Fill in tuples
             //
-            ASSERT_TRUE(warehouse_table);
-            ASSERT_TRUE(stock_table);
-            ASSERT_TRUE(tableutil::addRandomTuples(warehouse_table, NUM_OF_TUPLES));
-            ASSERT_TRUE(tableutil::addRandomTuples(stock_table, NUM_OF_TUPLES));
+            ASSERT_TRUE(customer_table);
+            ASSERT_TRUE(tableutil::addRandomTuples(customer_table, NUM_OF_TUPLES));
         }
         ~ExecutionEngineTest() {
             //
@@ -190,14 +262,22 @@ class ExecutionEngineTest : public Test {
         catalog::Database *database;
         catalog::Constraint *constraint;
 
-        Table* warehouse_table;
-        Table* stock_table;
+        Table* customer_table;
 
-        int warehouse_table_id;
-        int stock_table_id;
+        int customer_table_id;
 
         void compareTables(Table *first, Table* second);
 };
+
+/* Check the order of index vector
+ * Index vector should follow the order of primary key first, all unique indices afterwards, and all the non-unique indices at the end.
+ */
+TEST_F(ExecutionEngineTest, IndexOrder) {
+    ASSERT_TRUE(customer_table->primaryKeyIndex() == customer_table->allIndexes()[0]);
+    ASSERT_TRUE(customer_table->allIndexes()[1]->isUniqueIndex());
+    ASSERT_FALSE(customer_table->allIndexes()[2]->isUniqueIndex());
+    ASSERT_FALSE(customer_table->allIndexes()[3]->isUniqueIndex());
+}
 
 /*
 // ------------------------------------------------------------------

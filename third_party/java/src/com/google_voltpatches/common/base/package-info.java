@@ -42,6 +42,7 @@
  * <li>{@link com.google_voltpatches.common.base.Predicate},
  *     {@link com.google_voltpatches.common.base.Predicates}
  * <li>{@link com.google_voltpatches.common.base.Equivalence}
+ * <li>{@link com.google_voltpatches.common.base.Converter}
  * <li>{@link com.google_voltpatches.common.base.Supplier},
  *     {@link com.google_voltpatches.common.base.Suppliers}
  * </ul>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,8 @@ package org.voltdb.utils;
 import org.voltdb.VoltType;
 import org.voltdb.client.NoConnectionsException;
 
+import java.util.concurrent.ExecutionException;
+
 /**
  * The interface CSVLoader uses to insert rows into the database.
  */
@@ -37,14 +39,14 @@ public interface CSVDataLoader {
      * @param values   The values to insert.
      * @throws InterruptedException
      */
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException;
+    public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException;
 
     /**
      * Close the loader.
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    public void close() throws InterruptedException, NoConnectionsException;
+    public void close() throws Exception;
 
     /**
      * @return The number of rows processed, including successfully inserted and failed ones.
@@ -55,4 +57,11 @@ public interface CSVDataLoader {
      * @return The number of rows failed to be inserted.
      */
     public long getFailedRows();
+
+    public void setFlushInterval(int delay, int seconds);
+
+    /**
+     * Flush use this only when you think you are done and want to push everything before close/quit.
+     */
+    public void flush() throws ExecutionException, InterruptedException;
 }

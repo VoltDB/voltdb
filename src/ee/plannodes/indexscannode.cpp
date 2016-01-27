@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -42,38 +42,28 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#include <stdexcept>
-#include <sstream>
 #include "indexscannode.h"
+
 #include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/types.h"
-#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
-#include "catalog/table.h"
-#include "catalog/index.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-IndexScanPlanNode::~IndexScanPlanNode() {
-    for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
-        delete m_searchkey_expressions[ii];
-    }
-    delete m_end_expression;
-    delete m_initial_expression;
-    delete m_skip_null_predicate;
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+IndexScanPlanNode::~IndexScanPlanNode() { }
 
-std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
+PlanNodeType IndexScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXSCAN; }
+
+std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
-    buffer << spacer << "IndexLookupType[" << m_lookup_type << "]\n";
-    buffer << spacer << "SortDirection[" << m_sort_direction << "]\n";
+    buffer << spacer << "IndexLookupType["
+           << indexLookupToString(m_lookup_type) << "]\n";
+    buffer << spacer << "SortDirection["
+           << sortDirectionToString(m_sort_direction) << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
     for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {
@@ -100,10 +90,11 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     } else {
         buffer << "<NULL>\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
-void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
@@ -114,28 +105,11 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    if (obj.hasNonNullKey("END_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("END_EXPRESSION");
-        m_end_expression = AbstractExpression::buildExpressionTree(exprValue);
-    }
+    m_end_expression.reset(loadExpressionFromJSONObject("END_EXPRESSION", obj));
+    m_initial_expression.reset(loadExpressionFromJSONObject("INITIAL_EXPRESSION", obj));
+    m_skip_null_predicate.reset(loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj));
 
-    if (obj.hasNonNullKey("INITIAL_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("INITIAL_EXPRESSION");
-        m_initial_expression = AbstractExpression::buildExpressionTree(exprValue);
-    }
-
-    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
-        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
-        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
-    }
-
-    if (obj.hasNonNullKey("SEARCHKEY_EXPRESSIONS")) {
-        PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
-        for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
-            AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-            m_searchkey_expressions.push_back(expr);
-        }
-    }
+    m_searchkey_expressions.loadExpressionArrayFromJSONObject("SEARCHKEY_EXPRESSIONS", obj);
 }
 
-}
+} // namespace voltdb

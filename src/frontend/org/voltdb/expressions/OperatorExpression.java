@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,20 @@ import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
+/**
+ * An instance of OperatorExpression is one of the following:
+ *   - + (add)
+ *   - - (subtract)
+ *   - * (multiply)
+ *   - / (divide)
+ *   - % (modulus)
+ *   - || (concat)
+ *   - is null
+ *   - not
+ *   - cast(... as type)
+ *   - case when
+ *   - alternative (unsupported?)
+ */
 public class OperatorExpression extends AbstractExpression {
     public OperatorExpression(ExpressionType type) {
         super(type);
@@ -45,6 +59,7 @@ public class OperatorExpression extends AbstractExpression {
         case OPERATOR_NOT:
         case OPERATOR_IS_NULL:
         case OPERATOR_CAST:
+        case OPERATOR_EXISTS:
             return false;
         default: return true;
         }
@@ -75,8 +90,7 @@ public class OperatorExpression extends AbstractExpression {
     @Override
     public void refineValueType(VoltType neededType, int neededSize)
     {
-        ExpressionType type = getExpressionType();
-        if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
+        if (! needsRightExpression()) {
             return;
         }
         // The intent here is to allow operands to have the maximum flexibility given the
@@ -87,7 +101,7 @@ public class OperatorExpression extends AbstractExpression {
         // the broadest integer type is preferable, even if the target is of a more limited
         // integer type -- math has a way of scaling values up AND down.
         VoltType operandType = neededType;
-        if (operandType.isInteger()) {
+        if (operandType.isBackendIntegerType()) {
             operandType = VoltType.BIGINT;
         }
         VoltType leftType = m_left.getValueType();
@@ -117,7 +131,8 @@ public class OperatorExpression extends AbstractExpression {
         finalizeChildValueTypes();
         ExpressionType type = getExpressionType();
         if (m_right == null) {
-            if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
+            if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT ||
+                    type == ExpressionType.OPERATOR_EXISTS) {
                 m_valueType = VoltType.BIGINT;
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
@@ -150,16 +165,34 @@ public class OperatorExpression extends AbstractExpression {
             return "(NOT " + m_left.explain(impliedTableName) + ")";
         }
         if (type == ExpressionType.OPERATOR_CAST) {
-            return "(CAST " + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + ")";
+            return "(CAST (" + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + "))";
+        }
+
+        if (type == ExpressionType.OPERATOR_EXISTS) {
+            return "(EXISTS " + m_left.explain(impliedTableName) + ")";
         }
         if (type == ExpressionType.OPERATOR_CASE_WHEN) {
-            return "CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
+            return "(CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
                     m_right.m_left.explain(impliedTableName) + " ELSE " +
-                    m_right.m_right.explain(impliedTableName) + " END";
+                    m_right.m_right.explain(impliedTableName) + " END)";
         }
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +
             m_right.explain(impliedTableName) + ")";
+    }
+
+    @Override
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        ExpressionType type = getExpressionType();
+        switch(type) {
+        case OPERATOR_NOT:
+        case OPERATOR_IS_NULL:
+        case OPERATOR_EXISTS:
+            msg.append("operator '" + getExpressionType().symbol() +"'");
+            return false;
+        default:
+            return true;
+        }
     }
 
 }

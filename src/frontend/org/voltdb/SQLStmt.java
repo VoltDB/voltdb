@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,11 +49,11 @@ public class SQLStmt {
         }
     }
 
-    // Used for uncompiled SQL.
+    // Used for non-compiled SQL.
     byte[] sqlText;
     String sqlTextStr;
     String joinOrder;
-    // hash of the sql string for determinism checks
+    // hash of the SQL string for determinism checks
     byte[] sqlCRC;
 
     byte statementParamJavaTypes[];

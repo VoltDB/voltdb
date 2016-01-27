@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,8 +53,6 @@ public class TestTwoSitePlans extends TestCase {
 
     static final String JAR = "distplanningregression.jar";
 
-    ExecutionSite site1;
-    ExecutionSite site2;
     ExecutionEngine ee1;
     ExecutionEngine ee2;
 
@@ -84,7 +82,8 @@ public class TestTwoSitePlans extends TestCase {
 
         // load a catalog
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
+        String serializedCatalog =
+            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
 
         // create the catalog (that will be passed to the ClientInterface
         catalog = new Catalog();
@@ -92,7 +91,7 @@ public class TestTwoSitePlans extends TestCase {
 
         // update the catalog with the data from the deployment file
         String pathToDeployment = pb.getPathToDeployment();
-        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment, true, false) >= 0);
+        assertTrue(CatalogUtil.compileDeployment(catalog, pathToDeployment, false) == null);
 
         cluster = catalog.getClusters().get("cluster");
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
@@ -114,8 +113,9 @@ public class TestTwoSitePlans extends TestCase {
                                 0,
                                 0,
                                 "",
+                                0,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
         site1Thread.start();
@@ -132,18 +132,17 @@ public class TestTwoSitePlans extends TestCase {
                                 1,
                                 0,
                                 "",
+                                0,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0)));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
         site2Thread.start();
         site2Thread.join();
 
         // create two EEs
-        site1 = new ExecutionSite(0); // site 0
         ee1 = site1Reference.get();
         ee1.loadCatalog( 0, catalog.serialize());
-        site2 = new ExecutionSite(1); // site 1
         ee2 = site2Reference.get();
         ee2.loadCatalog( 0, catalog.serialize());
 
@@ -177,13 +176,16 @@ public class TestTwoSitePlans extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectTopFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(insertFrag),
-                Encoder.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree()),
+                insertStmt.getSqltext());
 
         // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
@@ -193,6 +195,8 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { selectStmt.getSqltext() },
+                1,
                 1,
                 0,
                 42,
@@ -207,6 +211,8 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { insertStmt.getSqltext() },
+                2,
                 2,
                 1,
                 42,
@@ -224,11 +230,11 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE)[0];
+                new String[] { selectStmt.getSqltext() },
+                3, 3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         assertTrue(dependency1 != null);
@@ -238,11 +244,11 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE)[0];
+                new String[] { selectStmt.getSqltext() },
+                3, 3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         assertTrue(dependency2 != null);
@@ -255,12 +261,12 @@ public class TestTwoSitePlans extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
                 new long[] { outDepId },
                 new ParameterSet[] { params },
-                3, 2, 42, Long.MAX_VALUE)[0];
+                new String[] { selectStmt.getSqltext() },
+                3, 3, 2, 42, Long.MAX_VALUE)[0];
         try {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }

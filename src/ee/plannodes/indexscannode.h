@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,80 +46,63 @@
 #ifndef HSTOREINDEXSCANNODE_H
 #define HSTOREINDEXSCANNODE_H
 
-#include <string>
 #include "abstractscannode.h"
 
 namespace voltdb {
-
-class AbstractExpression;
 
 /**
  *
  */
 class IndexScanPlanNode : public AbstractScanPlanNode {
-    public:
-        IndexScanPlanNode(CatalogId id) : AbstractScanPlanNode(id)
-            , m_end_expression(NULL)
-            , m_initial_expression(NULL)
-            , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-            , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
-            , m_skip_null_predicate(NULL)
-        {}
+public:
+    IndexScanPlanNode()
+        : m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+        , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
+    { }
+    ~IndexScanPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        IndexScanPlanNode() : AbstractScanPlanNode()
-            , m_end_expression(NULL)
-            , m_initial_expression(NULL)
-            , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-            , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
-            , m_skip_null_predicate(NULL)
-        {}
+    IndexLookupType getLookupType() const { return m_lookup_type; }
 
-        ~IndexScanPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
+    SortDirectionType getSortDirection() const { return m_sort_direction; }
 
-        IndexLookupType getLookupType() const { return m_lookup_type; }
+    std::string getTargetIndexName() const { return m_target_index_name; }
 
-        SortDirectionType getSortDirection() const { return m_sort_direction; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
+    { return m_searchkey_expressions; }
 
-        std::string getTargetIndexName() const { return m_target_index_name; }
+    AbstractExpression* getEndExpression() const { return m_end_expression.get(); }
 
-        AbstractExpression* getEndExpression() const { return m_end_expression; }
+    AbstractExpression* getInitialExpression() const { return m_initial_expression.get(); }
 
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-        { return m_searchkey_expressions; }
+    AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate.get(); }
 
-        AbstractExpression* getInitialExpression() const { return m_initial_expression; }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate; }
+    // This is the id of the index to reference during execution
+    std::string m_target_index_name;
 
-        std::string debugInfo(const std::string &spacer) const;
+    // TODO: Document
+    OwningExpressionVector m_searchkey_expressions;
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        //
-        // This is the id of the index to reference during execution
-        //
-        std::string m_target_index_name;
+    // TODO: Document
+    boost::scoped_ptr<AbstractExpression> m_end_expression;
 
-        // TODO: Document
-        AbstractExpression* m_end_expression;
+    // TODO: Document
+    boost::scoped_ptr<AbstractExpression> m_initial_expression;
 
-        // TODO: Document
-        std::vector<AbstractExpression*> m_searchkey_expressions;
+    // Index Lookup Type
+    IndexLookupType m_lookup_type;
 
-        // TODO: Document
-        AbstractExpression* m_initial_expression;
+    // Sorting Direction
+    SortDirectionType m_sort_direction;
 
-        // Index Lookup Type
-        IndexLookupType m_lookup_type;
-
-        // Sorting Direction
-        SortDirectionType m_sort_direction;
-
-        // null row predicate for underflow edge case
-        AbstractExpression* m_skip_null_predicate;
+    // null row predicate for underflow edge case
+    boost::scoped_ptr<AbstractExpression> m_skip_null_predicate;
 };
 
-}
+} // namespace voltdb
 
 #endif

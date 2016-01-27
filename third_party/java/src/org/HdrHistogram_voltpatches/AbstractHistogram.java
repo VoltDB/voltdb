@@ -620,6 +620,15 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
     }
 
     public byte[] toCompressedBytes(CompressionStrategy strategy) {
+        byte[] array = toUncompressedBytes();
+        try {
+            return strategy.compress(array);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public byte[] toUncompressedBytes() {
         ByteBuffer buf = ByteBuffer.allocate(8 * countsArrayLength + (3 * 8) + 4);
         buf.order(ByteOrder.LITTLE_ENDIAN);
         buf.putLong(lowestTrackableValue);
@@ -629,8 +638,12 @@ public abstract class AbstractHistogram extends AbstractHistogramBase implements
         for (int ii = 0; ii < countsArrayLength; ii++) {
             buf.putLong(getCountAtIndex(ii));
         }
+        return buf.array();
+    }
+
+    public static byte[] toCompressedBytes(byte bytes[], CompressionStrategy strategy) {
         try {
-            return strategy.compress(buf.array());
+            return strategy.compress(bytes);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

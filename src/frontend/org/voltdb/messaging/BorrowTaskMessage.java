@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,8 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -65,7 +67,11 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
 
     public void addInputDepMap(Map<Integer, List<VoltTable>> inputDeps)
     {
-        m_inputDeps = inputDeps;
+        final ImmutableMap.Builder<Integer, List<VoltTable>> builder = ImmutableMap.builder();
+        for (Map.Entry<Integer, List<VoltTable>> e : inputDeps.entrySet()) {
+            builder.put(e.getKey(), ImmutableList.copyOf(e.getValue()));
+        }
+        m_inputDeps = builder.build();
     }
 
     public Map<Integer, List<VoltTable>> getInputDepMap()

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,4 +46,79 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("update ENG913 set name = 'tim' where user = ?;", "'user'", "not supported");
     }
 
+    public void testBitwise() {
+        String errorMsg = "incompatible data type in conversion";
+        failToCompile("select bitand(tinyint_type, 3) from bit;", errorMsg);
+        failToCompile("select bitand(INTEGER_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitand(FLOAT_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitand(VARCHAR_TYPE, 3) from bit;", errorMsg);
+
+
+        failToCompile("select bitor(tinyint_type, 3) from bit;", errorMsg);
+        failToCompile("select bitor(INTEGER_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitor(FLOAT_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitor(VARCHAR_TYPE, 3) from bit;", errorMsg);
+
+
+        failToCompile("select bitxor(tinyint_type, 3) from bit;", errorMsg);
+        failToCompile("select bitxor(INTEGER_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitxor(FLOAT_TYPE, 3) from bit;", errorMsg);
+        failToCompile("select bitxor(VARCHAR_TYPE, 3) from bit;", errorMsg);
+
+
+        failToCompile("select bitnot(tinyint_type) from bit;", errorMsg);
+        failToCompile("select bitnot(INTEGER_TYPE) from bit;", errorMsg);
+        failToCompile("select bitnot(FLOAT_TYPE) from bit;", errorMsg);
+        failToCompile("select bitnot(VARCHAR_TYPE) from bit;", errorMsg);
+
+        // bit shift
+        failToCompile("select BIT_SHIFT_LEFT(FLOAT_TYPE, 3), BIT_SHIFT_RIGHT(FLOAT_TYPE, 3) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(VARCHAR_TYPE, 3), BIT_SHIFT_RIGHT(VARCHAR_TYPE, 3) from bit", errorMsg);
+
+        failToCompile("select BIT_SHIFT_LEFT(tinyint_type, 3)  from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(tinyint_type, 3) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(3.356, tinyint_type)from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(3.356, tinyint_type)from bit", errorMsg);
+
+        failToCompile("select BIT_SHIFT_LEFT(INTEGER_TYPE, 3)  from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(INTEGER_TYPE, 3) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(3.356, INTEGER_TYPE) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(3.356, INTEGER_TYPE) from bit", errorMsg);
+
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, 0.5) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE, 0.5) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, FLOAT_TYPE) from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE, FLOAT_TYPE) from bit", errorMsg);
+
+        failToCompile("select hex(FLOAT_TYPE) from bit;", errorMsg);
+        failToCompile("select hex(INTEGER_TYPE) from bit;", errorMsg);
+
+        failToCompile("select bin(FLOAT_TYPE) from bit;", errorMsg);
+        failToCompile("select bin(INTEGER_TYPE) from bit;", errorMsg);
+
+        // compile on constants
+        compile("select BIT_SHIFT_LEFT(3, tinyint_type), BIT_SHIFT_RIGHT(3, tinyint_type) from bit");
+        compile("select BIT_SHIFT_LEFT(3, INTEGER_TYPE), BIT_SHIFT_RIGHT(3, INTEGER_TYPE) from bit");
+
+        // out of range exception
+        errorMsg = "numeric value out of range";
+        failToCompile("select bitand(bigint_type, 9223372036854775809) from bit;", errorMsg);
+        failToCompile("select bitand(bigint_type, -9223372036854775809) from bit;", errorMsg);
+
+        failToCompile("select BIT_SHIFT_LEFT(9223372036854775809, tinyint_type)from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_LEFT(-9223372036854775809, tinyint_type)from bit", errorMsg);
+
+        failToCompile("select BIT_SHIFT_RIGHT(9223372036854775809, tinyint_type)from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(-9223372036854775809, tinyint_type)from bit", errorMsg);
+
+        failToCompile("select hex(9223372036854775809) from bit;", errorMsg);
+
+        failToCompile("select bin(9223372036854775809) from bit;", errorMsg);
+
+        // invalid syntax
+        errorMsg = "user lacks privilege or object not found";
+        failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE)from bit", errorMsg);
+        failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE)from bit", errorMsg);
+
+    }
 }

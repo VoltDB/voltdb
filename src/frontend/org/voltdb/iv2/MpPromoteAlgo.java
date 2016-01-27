@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,17 +26,19 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId.MutableBinaryLogInfo;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class MpPromoteAlgo implements RepairAlgo
 {
@@ -47,11 +49,13 @@ public class MpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
+    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
+    private MutableBinaryLogInfo m_maxBinaryLogInfo = new MutableBinaryLogInfo();
     private final List<Iv2InitiateTaskMessage> m_interruptedTxns = new ArrayList<Iv2InitiateTaskMessage>();
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Long> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -117,7 +121,7 @@ public class MpPromoteAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Long> start()
+    public Future<RepairResult> start()
     {
         try {
             prepareForFaultRecovery();
@@ -166,6 +170,15 @@ public class MpPromoteAlgo implements RepairAlgo
             // Step 1: if the msg has a known (not MAX VALUE) handle, update m_maxSeen.
             if (response.getTxnId() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getTxnId());
+            }
+
+            if (response.getSequence() == 0) {
+                // The first Repair Log message contains the maximum values needed by DR for promotion
+                assert response.getLocalDrUniqueId() == Long.MIN_VALUE ||
+                        UniqueIdGenerator.getPartitionIdFromUniqueId(response.getLocalDrUniqueId()) ==  MpInitiator.MP_INIT_PID;
+                m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, response.getLocalDrUniqueId());
+                m_maxBinaryLogInfo.drId = Math.max(m_maxBinaryLogInfo.drId, response.getBinaryLogInfo().drId);
+                m_maxBinaryLogInfo.mpUniqueId = Math.max(m_maxBinaryLogInfo.mpUniqueId, response.getBinaryLogInfo().mpUniqueId);
             }
 
             // Step 2: track hashinator versions
@@ -251,7 +264,9 @@ public class MpPromoteAlgo implements RepairAlgo
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 
-        m_promotionResult.set(m_maxSeenTxnId);
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId,
+                                               m_maxSeenLocalMpUniqueId,
+                                               m_maxBinaryLogInfo.toImmutable()));
     }
 
     //

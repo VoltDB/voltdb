@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,29 +28,41 @@ package org.voltdb.client;
  */
 public enum ProcedureInvocationType {
     ORIGINAL((byte) 0),
-    REPLICATED ((byte) (1 << 7));
+    VERSION1((byte) 1),              // version with individual timeout support
+    REPLICATED ((byte) (1 << 7));    // -128
 
-    private final byte value;
+    private final byte m_value;
 
     private ProcedureInvocationType(byte val) {
-        value = val;
+        m_value = val;
     }
 
     public byte getValue() {
-        return value;
+        return m_value;
     }
 
     public static ProcedureInvocationType typeFromByte(byte b) {
-        byte bit = (byte) (b >> 7);
-        if (bit == 0) {
+        switch(b) {
+        case 0:
             return ORIGINAL;
-        } else {
+        case 1:
+            return VERSION1;
+        case -128:
             return REPLICATED;
+        default:
+            throw new RuntimeException("Unknown ProcedureInvocationType " + b);
         }
     }
 
     @Override
     public String toString() {
         return "ProcedureInvocationType." + name();
+    }
+
+    public static boolean isDeprecatedInternalDRType(ProcedureInvocationType type) {
+        if (type == REPLICATED) {
+            return true;
+        }
+        return false;
     }
 }

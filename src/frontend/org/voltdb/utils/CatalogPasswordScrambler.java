@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -80,7 +80,7 @@ public class CatalogPasswordScrambler {
                     user.getPassword() != null &&
                     !user.getPassword().trim().isEmpty()
             ) {
-                user.setPassword(Digester.sha1AsHex(user.getPassword()));
+                user.setPassword(Digester.shaAsHex(user.getPassword()));
                 user.setPlaintext(false);
             }
         }
@@ -109,7 +109,7 @@ public class CatalogPasswordScrambler {
     public static void main(String [] args) {
         if (args.length == 1) args = new String[] {args[0], args[0]};
         if (args.length != 2) {
-            System.out.println("Usage: CatalogPasswordScrambler [deployment-file-spec] [masked-deployment-file-spec");
+            System.out.println("Usage: CatalogPasswordScrambler [deployment-file-spec] [masked-deployment-file-spec]");
         }
 
         File deployFH = new File(args[0]);

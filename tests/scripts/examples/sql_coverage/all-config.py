@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -267,18 +267,20 @@
                             "ddl": "DDL.sql",
                             "template": "advanced-subq-joins.sql",
                             "normalizer": "normalizer.py"},
-    "advanced-repl-subq-joins": {"schema": "repl-schema.py",
-                                 "ddl": "repl-DDL.sql",
-                                 "template": "advanced-subq-joins.sql",
+    "advanced-subq-part-joins": {"schema": "schema.py",
+                                 "ddl": "subq-part-DDL.sql",
+                                 "template": "advanced-subq-part-joins.sql",
                                  "normalizer": "normalizer.py"},
     "advanced-compoundex-joins": {"schema": "schema.py",
                                   "ddl": "compoundex-DDL.sql",
                                   "template": "advanced-joins.sql",
                                   "normalizer": "normalizer.py"},
-    "advanced-matview-repl-subq-nonjoin": {"schema": "matview-repl-schema.py",
-                                 "ddl": "matview-repl-DDL.sql",
-                                 "template": "advanced-matview-repl-subq-nonjoin.sql",
-                                 "normalizer": "normalizer.py"},
+    "advanced-matview-subq-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
+                                  "ddl": "matview-DDL.sql",
+                                  "template": "advanced-matview-subq-nonjoin.sql",
+                                  "normalizer": "normalizer.py"},
+    "insert-into-select": {"schema": "insert-into-select-schema.py",
+                           "ddl": "insert-into-select-DDL.sql",
+                           "template": "insert-into-select.sql",
+                           "normalizer": "normalizer.py"},
 }
-
-

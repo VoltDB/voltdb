@@ -14,6 +14,10 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
+elif [ -d "$VOLTDB_BIN/../voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 else
     VOLTDB_LIB="`pwd`/../../../lib"
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
@@ -37,7 +41,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/oneshotkv/*.java \
         src/oneshotkv/procedures/*.java
     # stop if compilation fails
@@ -60,62 +64,6 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
-# run the client that drives the example
-function client() {
-    async-benchmark
-}
-
-# Asynchronous benchmark sample
-# Use this target for argument help
-function async-benchmark-help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj oneshotkv.AsyncBenchmark --help
-}
-
-function async-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        oneshotkv.AsyncBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.90 \
-        --keysize=32 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
-        --entropy=127 \
-        --usecompression=false \
-        --ratelimit=100000 \
-        --autotune=true \
-        --latencytarget=6
-}
-
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function sync-benchmark-help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj oneshotkv.SyncBenchmark --help
-}
-
-function sync-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        oneshotkv.SyncBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.90 \
-        --keysize=32 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
-        --usecompression=false \
-        --threads=40
-}
-
 function oneshot-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
@@ -134,33 +82,9 @@ function oneshot-benchmark() {
         --mpthreads=2
 }
 
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj oneshotkv.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        oneshotkv.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost:21212 \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.90 \
-        --keysize=32 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
-        --usecompression=false \
-        --threads=40
-}
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|catalog|server|oneshot-benchmark|...}"
 }
 
 # Run the target passed as the first arg on the command line

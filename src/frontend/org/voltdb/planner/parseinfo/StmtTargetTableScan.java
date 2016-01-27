@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ package org.voltdb.planner.parseinfo;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -37,12 +36,16 @@ public class StmtTargetTableScan extends StmtTableScan {
     private List<Index> m_indexes;
     private List<Column> m_columns;
 
-    public StmtTargetTableScan(Table table, String tableAlias) {
-        super(tableAlias);
+    public StmtTargetTableScan(Table table, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         assert (table != null);
         m_table = table;
 
         findPartitioningColumns();
+    }
+
+    public StmtTargetTableScan(Table table, String tableAlias) {
+        this(table, tableAlias, 0);
     }
 
     @Override
@@ -84,9 +87,7 @@ public class StmtTargetTableScan extends StmtTableScan {
 
         TupleValueExpression tve = new TupleValueExpression(
                 tbName, m_tableAlias, colName, colName, partitionCol.getIndex());
-        tve.setValueSize(partitionCol.getSize());
-        tve.setValueType(VoltType.get((byte)partitionCol.getType()));
-        tve.setInBytes(partitionCol.getInbytes());
+        tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
 
         SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
         m_partitioningColumns = new ArrayList<SchemaColumn>();
@@ -117,4 +118,6 @@ public class StmtTargetTableScan extends StmtTableScan {
     public void processTVE(TupleValueExpression expr, String columnName) {
         expr.resolveForTable(m_table);
     }
+
+
 }

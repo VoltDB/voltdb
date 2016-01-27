@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -138,10 +138,13 @@ static const int FUNC_SUBSTR           = 139;
 static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 
-// Specializations of EXTRACT.
-// They are based on various sets of constants and need to be adjusted by a constant offset
-// to prevent conflict with the other FUNC_ definitions
+// Function ID offsets for specializations of EXTRACT and TRIM.
+// Individual ID values are based on various Tokens.java constants
+// and need to be adjusted by these constant offsets to avoid overlap
+// with other sources of Function ID constants.
+// These are from FunctionSQL.java
 static const int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
+static const int SQL_TRIM_VOLT_FUNC_OFFSET = 2000;
 
 // These are from DTIType.java
 static const int SQL_TYPE_NUMBER_LIMIT = 256;
@@ -163,6 +166,7 @@ static const int SQL_DAY_OF_MONTH     = 610;
 static const int SQL_DAY_OF_YEAR      = 611;
 static const int SQL_WEEK_OF_YEAR     = 592;
 static const int SQL_QUARTER          = 609;
+static const int SQL_WEEKDAY          = 741;
 
 // These are from Types.java.
 static const int SQL_INTERVAL_YEAR             = 101;
@@ -196,14 +200,10 @@ static const int FUNC_EXTRACT_INTERVAL_DAY              = SQL_EXTRACT_VOLT_FUNC_
 static const int FUNC_EXTRACT_INTERVAL_HOUR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_HOUR;
 static const int FUNC_EXTRACT_INTERVAL_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_MINUTE;
 static const int FUNC_EXTRACT_INTERVAL_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_SECOND;
+static const int FUNC_EXTRACT_WEEKDAY                   = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_WEEKDAY;
 
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
-
-// These are from Tokens.java.
-static const int SQL_TRIM_LEADING                      = 149;
-static const int SQL_TRIM_TRAILING                     = 284;
-static const int SQL_TRIM_BOTH                         = 22;
 
 // VoltDB-specific functions
 static const int FUNC_VOLT_SQL_ERROR                   = 20000;
@@ -233,10 +233,62 @@ static const int FUNC_TRUNCATE_MILLISECOND             = 20021;
 static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
 
 static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
+
+static const int FUNC_VOLT_SET_FIELD                   = 20024;
+
+static const int FUNC_VOLT_FORMAT_CURRENCY             = 20025;
+
+static const int FUNC_VOLT_BITNOT                      = 20026;
+static const int FUNC_VOLT_BIT_SHIFT_LEFT              = 20027;
+static const int FUNC_VOLT_BIT_SHIFT_RIGHT             = 20028;
+static const int FUNC_VOLT_HEX                         = 20029;
+static const int FUNC_VOLT_BIN                         = 20030;
+
+static const int FUNC_VOLT_DATEADD                     = 20031;
+static const int FUNC_VOLT_DATEADD_YEAR                = 20032;
+static const int FUNC_VOLT_DATEADD_QUARTER             = 20033;
+static const int FUNC_VOLT_DATEADD_MONTH               = 20034;
+static const int FUNC_VOLT_DATEADD_DAY                 = 20035;
+static const int FUNC_VOLT_DATEADD_HOUR                = 20036;
+static const int FUNC_VOLT_DATEADD_MINUTE              = 20037;
+static const int FUNC_VOLT_DATEADD_SECOND              = 20038;
+static const int FUNC_VOLT_DATEADD_MILLISECOND         = 20039;
+static const int FUNC_VOLT_DATEADD_MICROSECOND         = 20040;
+static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
+
+// Geospatial functions
+static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
+static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;
+static const int FUNC_VOLT_CONTAINS                    = 21002;
+static const int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS  = 21003;
+static const int FUNC_VOLT_POLYGON_NUM_POINTS          = 21004;
+static const int FUNC_VOLT_POINT_LATITUDE              = 21005;
+static const int FUNC_VOLT_POINT_LONGITUDE             = 21006;
+static const int FUNC_VOLT_POLYGON_CENTROID            = 21007;
+static const int FUNC_VOLT_POLYGON_AREA                = 21008;
+static const int FUNC_VOLT_DISTANCE                    = 21009;     // wrapper id for distance between all geo types
+static const int FUNC_VOLT_DISTANCE_POINT_POINT        = 21010;     // distance between point and point
+static const int FUNC_VOLT_DISTANCE_POLYGON_POINT      = 21011;     // distance between polygon and point
+static const int FUNC_VOLT_ASTEXT                      = 21012;     // wrapper function id for converting geography types into wkt
+static const int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT      = 21013;     // asText(<point value>)
+static const int FUNC_VOLT_ASTEXT_GEOGRAPHY            = 21014;     // asText(<geography value>)
+static const int FUNC_VOLT_VALIDATE_POLYGON            = 21015;     // Validate a polygon.
+static const int FUNC_VOLT_POLYGON_INVALID_REASON      = 21016;     // Reason a polygon is invalid.
+
+// From Tokens.java.
+static const int SQL_TRIM_LEADING                     = 149;
+static const int SQL_TRIM_TRAILING                    = 284;
+static const int SQL_TRIM_BOTH                        = 22;
+
+static const int FUNC_TRIM_LEADING_CHAR               = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_LEADING;
+static const int FUNC_TRIM_TRAILING_CHAR              = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_TRAILING;
+static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_BOTH;
+
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
 // (FUNC_... constants and ...FunctionExpressionTemplates).
+#include "bitwisefunctions.h"
 #include "datefunctions.h"
 #include "numericfunctions.h"
 #include "stringfunctions.h"

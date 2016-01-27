@@ -26,7 +26,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Private replacement for {@link com.google.gwt.user.client.rpc.GwtTransient}
+ * Private replacement for {@link com.google_voltpatches.gwt.user.client.rpc.GwtTransient}
  * to work around build-system quirks. This annotation should be used
  * <b>only</b> in {@code com.google_voltpatches.common.collect}.
  */
@@ -34,5 +34,4 @@ import java.lang.annotation.Target;
 @GwtCompatible
 @Retention(RUNTIME)
 @Target(FIELD)
-@interface GwtTransient {
-}
+@interface GwtTransient {}

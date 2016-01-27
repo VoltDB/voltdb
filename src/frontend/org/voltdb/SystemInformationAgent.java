@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,28 +51,20 @@ public class SystemInformationAgent extends OpsAgent
         }
         String subselector = obj.getString("subselector");
 
-        // Some selectors can provide a single answer based on global data.
-        // Intercept them and respond before doing the distributed stuff.
-        if (subselector.equalsIgnoreCase("DEPLOYMENT")) {
-            PendingOpsRequest psr = new PendingOpsRequest(
+        PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
                 subselector,
                 c,
                 clientHandle,
                 System.currentTimeMillis(),
                 obj);
+
+        // Some selectors can provide a single answer based on global data.
+        // Intercept them and respond before doing the distributed stuff.
+        if (subselector.equalsIgnoreCase("DEPLOYMENT")) {
             collectSystemInformationDeployment(psr);
             return;
         }
-
-        PendingOpsRequest psr =
-            new PendingOpsRequest(
-                    selector,
-                    subselector,
-                    c,
-                    clientHandle,
-                    System.currentTimeMillis(),
-                    obj);
         distributeOpsWork(psr, obj);
     }
 

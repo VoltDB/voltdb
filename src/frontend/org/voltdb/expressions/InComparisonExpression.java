@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,10 +32,10 @@ public class InComparisonExpression extends ComparisonExpression {
     public void validate() throws Exception {
         super.validate();
         //
-        // We need at least one value defined
+        // Args list is not used by IN.
         //
-        if (m_args.isEmpty()) {
-            throw new Exception("ERROR: There were no values defined for '" + this + "'");
+        if (m_args != null) {
+            throw new Exception("ERROR: Args list was not null for '" + this + "'");
         }
         //
         // We always need both a left node and a right node

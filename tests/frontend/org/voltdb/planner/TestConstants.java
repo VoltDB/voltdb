@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,14 @@ public class TestConstants extends PlannerTestCase {
      */
     public void testSelectConstJoin() {
         compile("select a.CHAR1, 5, 'test' from T2 a, V_T1 b where a.T2_PK = b.V1 group by a.CHAR1 order by a.CHAR1");
+    }
+
+    public void testAggrInWhere() {
+        failToCompile("select 1 from T1 where max(INT1) > 0", "invalid WHERE expression");
+    }
+
+    public void testAggrInSubqueryWhere() {
+        failToCompile("select INT1 from T1 where exists (select 1 from T1 where max(INT1) > 0)", "invalid WHERE expression");
     }
 
 }

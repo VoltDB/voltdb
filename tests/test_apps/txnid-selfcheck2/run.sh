@@ -14,6 +14,10 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
+elif [ -d "$VOLTDB_BIN/../voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 else
     VOLTDB_LIB="`pwd`/../../../lib"
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
@@ -28,14 +32,13 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
-    rm -rf obj debugoutput $APPNAME-alt.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME-alt.jar $APPNAME-noexport.jar voltdbroot
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/txnIdSelfCheck/*.java \
         src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails
@@ -79,12 +82,12 @@ function client() {
 
 # Asynchronous benchmark sample
 # Use this target for argument help
-function benchmark-help() {
+function aysnc-benchmark-help() {
     srccompile
     java -classpath obj:$CLASSPATH:obj txnIdSelfCheck.Benchmark --help
 }
 
-function benchmark() {
+function async-benchmark() {
     srccompile
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark \
@@ -101,7 +104,9 @@ function benchmark() {
         --partfillerrowmb=128 \
         --progresstimeout=120 \
         --usecompression=false \
-        --allowinprocadhoc=false
+        --allowinprocadhoc=false \
+        --disabledthreads=none
+#ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
 }
 
 function help() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,11 +25,11 @@ import java.net.ServerSocket;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Deque;
 import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
@@ -63,6 +63,17 @@ public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private static final String licenseFileName = "license.xml";
+    private static final boolean assertsEnabled;
+
+    static {
+        boolean assertCaught = false;
+        assert(assertCaught = true);
+        assertsEnabled = assertCaught;
+    }
+
+    public static boolean areAssertsEnabled() {
+        return assertsEnabled;
+    }
 
     /**
      * Simple code to copy a file from one place to another...
@@ -155,6 +166,10 @@ public class MiscUtils {
 
                 @Override
                 public boolean isDrReplicationAllowed() {
+                    return false;
+                }
+
+                public boolean isDrActiveActiveAllowed() {
                     return false;
                 }
 
@@ -323,6 +338,23 @@ public class MiscUtils {
                                    expiresStr);
         consoleLog.info(msg);
 
+        // If this is a commercial license, and there is less than or equal to 30 days until expiration,
+        // issue a "days remaining" warning message.
+        long diff = licenseApi.expires().getTimeInMillis() - now.getTimeInMillis();
+        // The original license is only a whole data (no minutes/millis).
+        // There should thus be no issue with daylight savings time,
+        // but just in case, if the diff is a negative number, round up to zero.
+        if (diff < 0)
+        {
+            diff = 0;
+        }
+        long diffDays = diff / (24 * 60 * 60 * 1000);
+        if ((diff > 0) && (diff <= 30))
+        {
+            msg = "Warning, VoltDB commercial license expires in " + diffDays + " day(s).";
+            consoleLog.info(msg);
+        }
+
         return true;
     }
 
@@ -348,8 +380,9 @@ public class MiscUtils {
         // Test for git build string - example: 2.0 voltdb-2.0-70-gb39f43e-dirty
         Pattern p = Pattern.compile("-(\\d*-\\w{8}(?:-.*)?)");
         Matcher m = p.matcher(fullBuildString);
-        if (! m.find())
+        if (! m.find()) {
             return null;
+        }
         build = m.group(1).trim();
         if (build.length() == 0) {
             return null;
@@ -616,119 +649,6 @@ public class MiscUtils {
     }
 
     /**
-     * Split SQL statements on semi-colons with quoted string and comment support.
-     *
-     * Degenerate formats such as escape as the last character or unclosed strings are ignored and
-     * left to the SQL parser to complain about. This is a simple string splitter that errs on the
-     * side of not splitting.
-     *
-     * Regexes are avoided.
-     *
-     * Handle single and double quoted strings and backslash escapes. Backslashes escape a single
-     * character.
-     *
-     * Handle double-dash (single line) and C-style (muli-line) comments. Nested C-style comments
-     * are not supported.
-     *
-     * @param sql raw SQL text to split
-     * @return list of individual SQL statements
-     */
-    public static List<String> splitSQLStatements(final String sql) {
-        List<String> statements = new ArrayList<String>();
-        // Use a character array for efficient character-at-a-time scanning.
-        char[] buf = sql.toCharArray();
-        // Set to null outside of quoted segments or the quote character inside them.
-        Character cQuote = null;
-        // Set to null outside of comments or to the string that ends the comment.
-        String sCommentEnd = null;
-        // Index to start of current statement.
-        int iStart = 0;
-        // Index to current character.
-        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
-        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
-        int iCur = 0;
-        while (iCur < buf.length) {
-            if (sCommentEnd != null) {
-                // Processing the interior of a comment. Check if at the comment or buffer end.
-                if (iCur >= buf.length - sCommentEnd.length()) {
-                    // Exit
-                    iCur = buf.length;
-                } else if (String.copyValueOf(buf, iCur, sCommentEnd.length()).equals(sCommentEnd)) {
-                    // Move past the comment end.
-                    iCur += sCommentEnd.length();
-                    sCommentEnd = null;
-                } else {
-                    // Keep going inside the comment.
-                    iCur++;
-                }
-            } else if (cQuote != null) {
-                // Processing the interior of a quoted string.
-                if (buf[iCur] == '\\') {
-                    // Skip the '\' escape and the trailing single escaped character.
-                    // Doesn't matter if iCur is beyond the end, it won't be used in that case.
-                    iCur += 2;
-                } else if (buf[iCur] == cQuote) {
-                    // Look at the next character to distinguish a double escaped quote
-                    // from the end of the quoted string.
-                    iCur++;
-                    if (iCur < buf.length) {
-                        if (buf[iCur] != cQuote) {
-                            // Not a double escaped quote - end of quoted string.
-                            cQuote = null;
-                        } else {
-                            // Move past the double escaped quote.
-                            iCur++;
-                        }
-                    }
-                } else {
-                    // Move past an ordinary character.
-                    iCur++;
-                }
-            } else {
-                // Outside of a quoted string - watch for the next separator, quote or comment.
-                if (buf[iCur] == ';') {
-                    // Add terminated statement (if not empty after trimming).
-                    String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-                    if (!statement.isEmpty()) {
-                        statements.add(statement);
-                    }
-                    iStart = iCur + 1;
-                    iCur = iStart;
-                } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
-                    // Start of quoted string.
-                    cQuote = buf[iCur];
-                    iCur++;
-                } else if (iCur <= buf.length - 2) {
-                    // Comment (double-dash or C-style)?
-                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
-                        // One line double-dash comment start.
-                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
-                        iCur += 2;
-                    } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
-                        // Multi-line C-style comment start.
-                        sCommentEnd = "*/";
-                        iCur += 2;
-                    } else {
-                        // Not a comment start, move past this character.
-                        iCur++;
-                    }
-                } else {
-                    // Move past a non-quote/non-separator character.
-                    iCur++;
-                }
-            }
-        }
-        // Get the last statement, if any.
-        if (iStart < buf.length) {
-            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
-            if (!statement.isEmpty()) {
-                statements.add(statement);
-            }
-        }
-        return statements;
-    }
-
-    /**
      * Concatenate an list of arrays of typed-objects
      * @param empty An empty array of the right type used for cloning
      * @param arrayList A list of arrays to concatenate.
@@ -736,7 +656,9 @@ public class MiscUtils {
      */
     public static <T> T[] concatAll(final T[] empty, Iterable<T[]> arrayList) {
         assert(empty.length == 0);
-        if (arrayList.iterator().hasNext() == false) return empty;
+        if (arrayList.iterator().hasNext() == false) {
+            return empty;
+        }
 
         int len = 0;
         for (T[] subArray : arrayList) {
@@ -752,7 +674,9 @@ public class MiscUtils {
     }
 
     public static void deleteRecursively( File file) {
-        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) return;
+        if (file == null || !file.exists() || !file.canRead() || !file.canWrite()) {
+            return;
+        }
         if (file.isDirectory() && file.canExecute()) {
             for (File f: file.listFiles()) {
                 deleteRecursively(f);
@@ -811,6 +735,35 @@ public class MiscUtils {
         K firstKey = keys.get(0);
         while (valueIter.hasNext()) {
             result.put(firstKey, valueIter.next());
+        }
+
+        return result;
+    }
+
+    /**
+     * Aggregates the elements from each of the given deque. It takes one
+     * element from the head of each deque in each loop and put them into a
+     * single list. This method modifies the deques in-place.
+     * @param stuff
+     * @return
+     */
+    public static <K> List<K> zip(Collection<Deque<K>> stuff)
+    {
+        final List<K> result = Lists.newArrayList();
+
+        // merge the results
+        Iterator<Deque<K>> iter = stuff.iterator();
+        while (iter.hasNext()) {
+            final K next = iter.next().poll();
+            if (next != null) {
+                result.add(next);
+            } else {
+                iter.remove();
+            }
+
+            if (!iter.hasNext()) {
+                iter = stuff.iterator();
+            }
         }
 
         return result;
@@ -955,5 +908,56 @@ public class MiscUtils {
         remainingMs -= TimeUnit.SECONDS.toMillis(seconds);
         return String.format("%d days %02d:%02d:%02d.%03d",
                 days, hours, minutes, seconds, remainingMs);
+    }
+
+    /**
+     * Delays retrieval until first use, but holds onto a boolean value to
+     * minimize overhead. The delayed retrieval allows tests to set properties
+     * dynamically and have them obeyed.
+     */
+    public static class BooleanSystemProperty
+    {
+        private final String key;
+        private Boolean value = null;
+        private final boolean defaultValue;
+
+        /**
+         * Construct system property retriever with default value of false
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key)
+        {
+            this(key, false);
+        }
+
+        /**
+         * Construct system property retriever with default value provided by caller
+         * @param key  key name
+         */
+        public BooleanSystemProperty(String key, boolean defaultValue)
+        {
+            this.key = key;
+            this.defaultValue = defaultValue;
+        }
+
+        /**
+         * Retrieves once and caches boolean value. Uses default if not available.
+         * @return true if value or default is true ("true" or "yes" string)
+         */
+        public boolean isTrue()
+        {
+            if (this.value == null) {
+                // First time - retrieve and convert the value or use the default value.
+                String stringValue = System.getProperty(this.key);
+                if (stringValue != null) {
+                    this.value = (stringValue.equalsIgnoreCase("true") || stringValue.equalsIgnoreCase("yes"));
+                }
+                else {
+                    this.value = this.defaultValue;
+                }
+            }
+            assert this.value != null;
+            return this.value;
+        }
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -174,11 +174,10 @@ public abstract class NIOWriteStreamBase {
                 System.exit(-1);
             }
             RateLimitedLogger.tryLogForMessage(
-                    "Sloppy serialization size for message class " + ds,
                     System.currentTimeMillis(),
                     1, TimeUnit.HOURS,
                     networkLog,
-                    Level.WARN);
+                    Level.WARN, "Sloppy serialization size for message class %s", ds);
         }
     }
 

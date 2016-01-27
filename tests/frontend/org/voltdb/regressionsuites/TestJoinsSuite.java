@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -797,30 +797,71 @@ public class TestJoinsSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testMultiTableOuterJoin() throws NoConnectionsException, IOException, ProcCallException
+    public void testOuterJoin() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = this.getClient();
-        client.callProcedure("InsertR1", 11, 11, 11);
-        client.callProcedure("InsertR1", 12, 12, 12);
-        client.callProcedure("InsertR1", 13, 13, 13);
-        client.callProcedure("InsertR2", 21, 21);
-        client.callProcedure("InsertR2", 22, 22);
-        client.callProcedure("InsertR2", 12, 12);
-        client.callProcedure("InsertR3", 31, 31);
-        client.callProcedure("InsertR3", 32, 32);
-        client.callProcedure("InsertR3", 33, 21);
-        VoltTable result = client.callProcedure(
-                "@AdHoc", "select *  FROM R1 RIGHT JOIN R2 on R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C")
-                .getResults()[0];
-        System.out.println(result.toString());
-        assertEquals(3, result.getRowCount());
-
-        result = client.callProcedure(
-                "@AdHoc", "select *  FROM R1 RIGHT JOIN R2 on R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C WHERE R1.C > 0")
-                .getResults()[0];
-        System.out.println(result.toString());
-        assertEquals(1, result.getRowCount());
+        subtestOuterJoinMultiTable(client);
+        subtestOuterJoinENG8692(client);
     }
+
+    private void subtestOuterJoinMultiTable(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+         client.callProcedure("InsertR1", 11, 11, 11);
+         client.callProcedure("InsertR1", 12, 12, 12);
+         client.callProcedure("InsertR1", 13, 13, 13);
+         client.callProcedure("InsertR2", 21, 21);
+         client.callProcedure("InsertR2", 22, 22);
+         client.callProcedure("InsertR2", 12, 12);
+         client.callProcedure("InsertR3", 31, 31);
+         client.callProcedure("InsertR3", 32, 32);
+         client.callProcedure("InsertR3", 33, 21);
+         VoltTable result = client.callProcedure(
+                 "@AdHoc", "select *  FROM R1 RIGHT JOIN R2 on R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C")
+                 .getResults()[0];
+         System.out.println(result.toString());
+         assertEquals(3, result.getRowCount());
+
+         result = client.callProcedure(
+                 "@AdHoc", "select *  FROM R1 RIGHT JOIN R2 on R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C WHERE R1.C > 0")
+                 .getResults()[0];
+         assertEquals(1, result.getRowCount());
+
+         // truncate tables
+         client.callProcedure("@AdHoc", "truncate table R1;");
+         client.callProcedure("@AdHoc", "truncate table R2;");
+         client.callProcedure("@AdHoc", "truncate table R3;");
+    }
+
+    private void subtestOuterJoinENG8692(Client client)
+            throws NoConnectionsException, IOException, ProcCallException
+    {
+        client.callProcedure("@AdHoc", "INSERT INTO t1 VALUES(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO t2 VALUES(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO t3 VALUES(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO t4 VALUES(1);");
+        client.callProcedure("@AdHoc", "INSERT INTO t4 VALUES(null);");
+
+        String sql;
+        long MINVAL = Long.MIN_VALUE;
+
+        // case 1: missing join expression
+        sql = "SELECT * FROM t1 INNER JOIN t2 ON t1.i1 = t2.i2 RIGHT OUTER JOIN t3 ON t1.i1 = 1000;";
+        validateTableOfLongs(client, sql, new long[][]{{MINVAL, MINVAL, 1}});
+
+        // case 2: more than 5 table joins
+        sql = "SELECT * FROM t1 INNER JOIN t2 AS t2_copy1 ON t1.i1 = t2_copy1.i2 "
+                + "INNER JOIN t2 AS t2_copy2 ON t1.i1 = t2_copy2.i2 "
+                + "INNER JOIN t2 AS t2_copy3 ON t1.i1 = t2_copy3.i2 "
+                + "INNER JOIN t2 AS t2_copy4 ON t1.i1 = t2_copy4.i2 "
+                + "RIGHT OUTER JOIN t3 ON t1.i1 = t3.i3 AND t3.i3 < -1000;";
+        validateTableOfLongs(client, sql, new long[][]{{MINVAL, MINVAL, MINVAL, MINVAL, MINVAL, 1}});
+
+        // case 3: reverse scan with null data
+        sql = "SELECT * FROM t1 INNER JOIN t2 ON t1.i1= t2.i2 INNER JOIN t4 ON t4.i4 < 45;";
+        validateTableOfLongs(client, sql, new long[][]{{1, 1, 1}});
+    }
+
 
     static public junit.framework.Test suite()
     {

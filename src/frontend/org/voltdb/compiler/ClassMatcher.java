@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -67,8 +67,15 @@ public class ClassMatcher {
             classNamePattern = classNamePattern.substring(0, indexOfDollarSign);
         }
 
-        String regExPreppedName = preppedName.replace("**", "[\\w.\\$]+");
-        regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]+");
+        // Substitution order is critical.
+        // Keep track of whether or not this is a wildcard expression.
+        // '.' is specifically not a wildcard.
+        String regExPreppedName = preppedName.replace(".", "[.]");
+        boolean isWildcard = regExPreppedName.contains("*");
+        if (isWildcard) {
+            regExPreppedName = regExPreppedName.replace("**", "[\\w.\\$]+");
+            regExPreppedName = regExPreppedName.replace("*",  "[\\w\\$]*");
+        }
 
         String regex = "^" + // (line start)
                        regExPreppedName +
@@ -90,11 +97,11 @@ public class ClassMatcher {
             return ClassNameMatchStatus.MATCH_FOUND;
         }
         else {
-            if (preppedName.compareTo(regExPreppedName) == 0) {
-                return ClassNameMatchStatus.NO_EXACT_MATCH;
+            if (isWildcard) {
+                return ClassNameMatchStatus.NO_WILDCARD_MATCH;
             }
             else {
-                return ClassNameMatchStatus.NO_WILDCARD_MATCH;
+                return ClassNameMatchStatus.NO_EXACT_MATCH;
             }
         }
 

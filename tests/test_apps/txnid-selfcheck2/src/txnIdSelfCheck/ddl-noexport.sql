@@ -24,14 +24,14 @@ CREATE INDEX P_CIDINDEX ON partitioned (cid);
 CREATE TABLE dimension
 (
   cid        tinyint            NOT NULL
-, desc       tinyint            NOT NULL
+, desc	     tinyint     		NOT NULL
 , CONSTRAINT PK_id_d PRIMARY KEY
   (
     cid
   )
 , UNIQUE ( cid )
 );
-CREATE INDEX D_CIDINDEX ON dimension (cid);
+CREATE UNIQUE INDEX D_DESCINDEX ON dimension (desc);
 
 -- replicated table
 CREATE TABLE replicated
@@ -105,10 +105,61 @@ CREATE TABLE forDroppedProcedure
 );
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
+-- For loadsinglepartition
+CREATE TABLE loadp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+PARTITION TABLE loadp ON COLUMN cid;
+CREATE TABLE cploadp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+PARTITION TABLE cploadp ON COLUMN cid;
+
+
+-- For loadmultiplepartition
+CREATE TABLE loadmp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+CREATE TABLE cploadmp
+(
+  cid    BIGINT NOT NULL
+, txnid  BIGINT NOT NULL
+, rowid  BIGINT NOT NULL
+);
+
+CREATE TABLE trur
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_tr PRIMARY KEY (p,id)
+);
+
+CREATE TABLE trup
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_tp PRIMARY KEY (p,id)
+);
+PARTITION TABLE trup ON COLUMN p;
+
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonBaseProc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedBase;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedBase;
 
 -- real procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
@@ -125,9 +176,31 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadSPInProcAdHoc;
 PARTITION PROCEDURE ReadSPInProcAdHoc ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReadMPInProcAdHoc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize_Replica;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
 PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PopulateDimension;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedSP;
+PARTITION PROCEDURE CopyLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedSP;
+PARTITION PROCEDURE DeleteLoadPartitionedSP ON TABLE cploadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
+PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
+PARTITION PROCEDURE TRUPTableInsert ON TABLE bigp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
+PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
+PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURScanAggTable;

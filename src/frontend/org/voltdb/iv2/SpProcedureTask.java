@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -50,7 +51,7 @@ public class SpProcedureTask extends ProcedureTask
         HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
     }
 
-    SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
+    public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg,
                   PartitionDRGateway drGateway)
     {
@@ -74,9 +75,25 @@ public class SpProcedureTask extends ProcedureTask
 
         // cast up here .. ugly.
         SpTransactionState txnState = (SpTransactionState)m_txnState;
-        final InitiateResponseMessage response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
+
+        InitiateResponseMessage response;
+        int originalTimeout = siteConnection.getBatchTimeout();
+        int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
+        try {
+            // run the procedure with a specific individual timeout
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
+                siteConnection.setBatchTimeout(individualTimeout);
+            }
+            response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
+        } finally {
+            // reset the deployment timeout value back to its original value
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout) ) {
+                siteConnection.setBatchTimeout(originalTimeout);
+            }
+        }
+
         if (!response.shouldCommit()) {
-            m_txnState.setNeedsRollback();
+            m_txnState.setNeedsRollback(true);
         }
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
@@ -135,7 +152,7 @@ public class SpProcedureTask extends ProcedureTask
         SpTransactionState txnState = (SpTransactionState)m_txnState;
         final InitiateResponseMessage response = processInitiateTask(txnState.m_initiationMsg, siteConnection);
         if (!response.shouldCommit()) {
-            m_txnState.setNeedsRollback();
+            m_txnState.setNeedsRollback(true);
         }
         if (!m_txnState.isReadOnly()) {
             assert(siteConnection.getLatestUndoToken() != Site.kInvalidUndoToken) :

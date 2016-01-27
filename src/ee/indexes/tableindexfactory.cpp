@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -64,21 +64,21 @@ class TableIndexPicker
     template <class TKeyType>
     TableIndex *getInstanceForKeyType() const
     {
-           if (m_scheme.unique) {
+        if (m_scheme.unique) {
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashUniqueIndex<TKeyType >(m_keySchema, m_scheme);
             } else if (m_scheme.countable) {
-                return new CompactingTreeUniqueIndex<TKeyType, true>(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
             } else {
-                return new CompactingTreeUniqueIndex<TKeyType, false>(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
             }
         } else {
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
             } else if (m_scheme.countable) {
-                return new CompactingTreeMultiMapIndex<TKeyType, true>(m_keySchema, m_scheme);
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
             } else {
-                return new CompactingTreeMultiMapIndex<TKeyType, false>(m_keySchema, m_scheme);
+                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
             }
         }
     }
@@ -183,15 +183,15 @@ public:
 
         if (m_scheme.unique) {
             if (m_scheme.countable) {
-                return new CompactingTreeUniqueIndex<TupleKey, true >(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
             } else {
-                return new CompactingTreeUniqueIndex<TupleKey, false >(m_keySchema, m_scheme);
+                return new CompactingTreeUniqueIndex<NormalKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
             }
         }
         if (m_scheme.countable) {
-            return new CompactingTreeMultiMapIndex<TupleKey, true >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, true >(m_keySchema, m_scheme);
         } else {
-            return new CompactingTreeMultiMapIndex<TupleKey, false >(m_keySchema, m_scheme);
+            return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TupleKey>, false>(m_keySchema, m_scheme);
         }
     }
 

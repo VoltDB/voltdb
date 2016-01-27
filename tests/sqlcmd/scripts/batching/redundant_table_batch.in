@@ -1,0 +1,1 @@
+file -batch ./scripts/batching/redundant_table_batch.sqlfile

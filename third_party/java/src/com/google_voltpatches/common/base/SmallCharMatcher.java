@@ -18,7 +18,7 @@ package com.google_voltpatches.common.base;
 
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
-import com.google_voltpatches.common.base.CharMatcher.FastMatcher;
+import com.google_voltpatches.common.base.CharMatcher.NamedFastMatcher;
 
 import java.util.BitSet;
 
@@ -29,14 +29,13 @@ import java.util.BitSet;
  * @author Christopher Swenson
  */
 @GwtIncompatible("no precomputation is done in GWT")
-final class SmallCharMatcher extends FastMatcher {
+final class SmallCharMatcher extends NamedFastMatcher {
   static final int MAX_SIZE = 1023;
   private final char[] table;
   private final boolean containsZero;
   private final long filter;
 
-  private SmallCharMatcher(char[] table, long filter, boolean containsZero,
-      String description) {
+  private SmallCharMatcher(char[] table, long filter, boolean containsZero, String description) {
     super(description);
     this.table = table;
     this.filter = filter;
@@ -68,13 +67,14 @@ final class SmallCharMatcher extends FastMatcher {
   // Represents how tightly we can pack things, as a maximum.
   private static final double DESIRED_LOAD_FACTOR = 0.5;
 
- /**
-  * Returns an array size suitable for the backing array of a hash table that
-  * uses open addressing with linear probing in its implementation.  The
-  * returned size is the smallest power of two that can hold setSize elements
-  * with the desired load factor.
-  */
-  @VisibleForTesting static int chooseTableSize(int setSize) {
+  /**
+   * Returns an array size suitable for the backing array of a hash table that
+   * uses open addressing with linear probing in its implementation.  The
+   * returned size is the smallest power of two that can hold setSize elements
+   * with the desired load factor.
+   */
+  @VisibleForTesting
+  static int chooseTableSize(int setSize) {
     if (setSize == 1) {
       return 2;
     }
@@ -87,7 +87,6 @@ final class SmallCharMatcher extends FastMatcher {
     return tableSize;
   }
 
-  @GwtIncompatible("java.util.BitSet")
   static CharMatcher from(BitSet chars, String description) {
     // Compute the filter.
     long filter = 0;
@@ -140,7 +139,6 @@ final class SmallCharMatcher extends FastMatcher {
     return false;
   }
 
-  @GwtIncompatible("java.util.BitSet")
   @Override
   void setBits(BitSet table) {
     if (containsZero) {

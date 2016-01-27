@@ -18,24 +18,35 @@ package com.google_voltpatches.common.base;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
+import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 
+import java.io.Serializable;
+
+import javax.annotation_voltpatches.CheckReturnValue;
+import javax.annotation_voltpatches.Nullable;
+
 /**
- * Utility class for converting between various ASCII case formats.
+ * Utility class for converting between various ASCII case formats. Behavior is undefined for
+ * non-ASCII input.
  *
  * @author Mike Bostock
  * @since 1.0
  */
+@CheckReturnValue
 @GwtCompatible
 public enum CaseFormat {
   /**
    * Hyphenated variable naming convention, e.g., "lower-hyphen".
    */
   LOWER_HYPHEN(CharMatcher.is('-'), "-") {
-    @Override String normalizeWord(String word) {
+    @Override
+    String normalizeWord(String word) {
       return Ascii.toLowerCase(word);
     }
-    @Override String convert(CaseFormat format, String s) {
+
+    @Override
+    String convert(CaseFormat format, String s) {
       if (format == LOWER_UNDERSCORE) {
         return s.replace('-', '_');
       }
@@ -50,10 +61,13 @@ public enum CaseFormat {
    * C++ variable naming convention, e.g., "lower_underscore".
    */
   LOWER_UNDERSCORE(CharMatcher.is('_'), "_") {
-    @Override String normalizeWord(String word) {
+    @Override
+    String normalizeWord(String word) {
       return Ascii.toLowerCase(word);
     }
-    @Override String convert(CaseFormat format, String s) {
+
+    @Override
+    String convert(CaseFormat format, String s) {
       if (format == LOWER_HYPHEN) {
         return s.replace('_', '-');
       }
@@ -68,7 +82,8 @@ public enum CaseFormat {
    * Java variable naming convention, e.g., "lowerCamel".
    */
   LOWER_CAMEL(CharMatcher.inRange('A', 'Z'), "") {
-    @Override String normalizeWord(String word) {
+    @Override
+    String normalizeWord(String word) {
       return firstCharOnlyToUpper(word);
     }
   },
@@ -77,7 +92,8 @@ public enum CaseFormat {
    * Java and C++ class naming convention, e.g., "UpperCamel".
    */
   UPPER_CAMEL(CharMatcher.inRange('A', 'Z'), "") {
-    @Override String normalizeWord(String word) {
+    @Override
+    String normalizeWord(String word) {
       return firstCharOnlyToUpper(word);
     }
   },
@@ -86,10 +102,13 @@ public enum CaseFormat {
    * Java and C++ constant naming convention, e.g., "UPPER_UNDERSCORE".
    */
   UPPER_UNDERSCORE(CharMatcher.is('_'), "_") {
-    @Override String normalizeWord(String word) {
+    @Override
+    String normalizeWord(String word) {
       return Ascii.toUpperCase(word);
     }
-    @Override String convert(CaseFormat format, String s) {
+
+    @Override
+    String convert(CaseFormat format, String s) {
       if (format == LOWER_HYPHEN) {
         return Ascii.toLowerCase(s.replace('_', '-'));
       }
@@ -139,8 +158,61 @@ public enum CaseFormat {
       i = j + wordSeparator.length();
     }
     return (i == 0)
-      ? format.normalizeFirstWord(s)
-      : out.append(format.normalizeWord(s.substring(i))).toString();
+        ? format.normalizeFirstWord(s)
+        : out.append(format.normalizeWord(s.substring(i))).toString();
+  }
+
+  /**
+   * Returns a {@code Converter} that converts strings from this format to {@code targetFormat}.
+   *
+   * @since 16.0
+   */
+  @Beta
+  public Converter<String, String> converterTo(CaseFormat targetFormat) {
+    return new StringConverter(this, targetFormat);
+  }
+
+  private static final class StringConverter extends Converter<String, String>
+      implements Serializable {
+
+    private final CaseFormat sourceFormat;
+    private final CaseFormat targetFormat;
+
+    StringConverter(CaseFormat sourceFormat, CaseFormat targetFormat) {
+      this.sourceFormat = checkNotNull(sourceFormat);
+      this.targetFormat = checkNotNull(targetFormat);
+    }
+
+    @Override
+    protected String doForward(String s) {
+      return sourceFormat.to(targetFormat, s);
+    }
+
+    @Override
+    protected String doBackward(String s) {
+      return targetFormat.to(sourceFormat, s);
+    }
+
+    @Override
+    public boolean equals(@Nullable Object object) {
+      if (object instanceof StringConverter) {
+        StringConverter that = (StringConverter) object;
+        return sourceFormat.equals(that.sourceFormat) && targetFormat.equals(that.targetFormat);
+      }
+      return false;
+    }
+
+    @Override
+    public int hashCode() {
+      return sourceFormat.hashCode() ^ targetFormat.hashCode();
+    }
+
+    @Override
+    public String toString() {
+      return sourceFormat + ".converterTo(" + targetFormat + ")";
+    }
+
+    private static final long serialVersionUID = 0L;
   }
 
   abstract String normalizeWord(String word);

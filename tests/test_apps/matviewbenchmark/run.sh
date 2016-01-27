@@ -45,7 +45,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
+    javac -classpath $APPCLASSPATH -d obj \
         src/matviewbenchmark/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
@@ -99,7 +99,7 @@ function matviewbenchmark() {
         --servers=localhost \
         --txn=10000000 \
         --warmup=100000 \
-        --group=0
+        --group=5000
 }
 
 function help() {

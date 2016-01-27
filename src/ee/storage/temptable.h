@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -125,7 +125,7 @@ class TempTable : public Table {
      * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
      * before they are dirtied
      */
-    void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
+    void insertTupleNonVirtualWithDeepCopy(const TableTuple &source, Pool *pool);
 
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
@@ -176,7 +176,7 @@ class TempTable : public Table {
     std::vector<TBPtr> m_data;
 };
 
-inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
+inline void TempTable::insertTupleNonVirtualWithDeepCopy(const TableTuple &source, Pool *pool) {
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
@@ -232,8 +232,11 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
 
     m_tupleCount = 0;
     while (m_data.size() > 1) {
+        // This block of temp table may have been clean up already
+        // because of delete as we go feature.
+        TBPtr blockPtr = m_data.back();
         m_data.pop_back();
-        if (m_limits) {
+        if (m_limits && blockPtr) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
     }
@@ -245,7 +248,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
 }
 
 inline TBPtr TempTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, TBBucketPtr()));
+    TBPtr block(new TupleBlock(this, TBBucketPtr()));
     m_data.push_back(block);
 
     if (m_limits) {

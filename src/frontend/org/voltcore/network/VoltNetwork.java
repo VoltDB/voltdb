@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -105,8 +105,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
     private final String m_coreBindId;
     final String networkThreadName;
 
-    private final int m_networkId;
-
     private final NinjaKeySet m_ninjaSelectedKeys;
 
     /**
@@ -124,7 +122,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
     VoltNetwork(int networkId, String coreBindId, String networkName) {
         m_thread = new Thread(this, "Volt " + networkName + " Network - " + networkId);
         networkThreadName = new String("Volt " + networkName + " Network - " + networkId);
-        m_networkId = networkId;
         m_thread.setDaemon(true);
         m_coreBindId = coreBindId;
         try {
@@ -134,14 +131,10 @@ class VoltNetwork implements Runnable, IOStatsIntf
             throw new RuntimeException(ex);
         }
         m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
-        if (m_ninjaSelectedKeys == null) {
-            throw new AssertionError("Failed to instrument selector");
-        }
     }
 
     VoltNetwork( Selector s) {
         m_thread = null;
-        m_networkId = 0;
         m_selector = s;
         m_coreBindId = null;
         networkThreadName = new String("Test Selector Thread");
@@ -315,7 +308,11 @@ class VoltNetwork implements Runnable, IOStatsIntf
                         }
 
                         if (readyKeys > 0) {
-                            optimizedInvokeCallbacks(r);
+                            if (NinjaKeySet.supported) {
+                                optimizedInvokeCallbacks(r);
+                            } else {
+                                invokeCallbacks(r);
+                            }
                         }
 
                         /*
@@ -407,7 +404,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
             port.run();
         } catch (CancelledKeyException e) {
             port.m_running = false;
-            e.printStackTrace();
             // no need to do anything here until
             // shutdown makes more sense
         } catch (Exception e) {

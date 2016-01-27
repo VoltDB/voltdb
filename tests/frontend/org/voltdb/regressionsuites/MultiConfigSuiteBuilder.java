@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -118,19 +118,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             }
         }
 
-        final String buildType = System.getenv().get("BUILD");
-        if (buildType != null) {
-            if (buildType.startsWith("memcheck")) {
-                if (config instanceof LocalCluster) {
-                    LocalCluster lc = (LocalCluster) config;
-                    // don't run valgrind on multi-node clusters without embedded processes
-                    if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
-                        return true;
-                    }
-                }
-                if (config.isHSQL()) {
+        if (LocalCluster.isMemcheckDefined()) {
+            if (config instanceof LocalCluster) {
+                LocalCluster lc = (LocalCluster) config;
+                // don't run valgrind on multi-node clusters without embedded processes
+                if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
                     return true;
                 }
+            }
+            if (config.isHSQL()) {
+                return true;
             }
         }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,9 +46,40 @@
 #include <iostream>
 #include "indexes/tableindex.h"
 #include "expressions/abstractexpression.h"
+#include "expressions/expressionutil.h"
 #include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
+
+TableIndexScheme::TableIndexScheme(
+    std::string a_name,
+    TableIndexType a_type,
+    const std::vector<int32_t>& a_columnIndices,
+    const std::vector<AbstractExpression*>& a_indexedExpressions,
+    AbstractExpression* a_predicate,
+    bool a_unique,
+    bool a_countable,
+    const std::string& a_expressionsAsText,
+    const std::string& a_predicateAsText,
+    const TupleSchema *a_tupleSchema) :
+      name(a_name),
+      type(a_type),
+      columnIndices(a_columnIndices),
+      indexedExpressions(a_indexedExpressions),
+      predicate(a_predicate),
+      allColumnIndices(a_columnIndices),
+      unique(a_unique),
+      countable(a_countable),
+      expressionsAsText(a_expressionsAsText),
+      predicateAsText(a_predicateAsText),
+      tupleSchema(a_tupleSchema)
+    {
+        if (predicate != NULL)
+        {
+            // Collect predicate column indicies
+            ExpressionUtil::extractTupleValuesColumnIdx(a_predicate, allColumnIndices);
+        }
+    }
 
 TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
     m_scheme(scheme),
@@ -56,7 +87,6 @@ TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &sch
     m_id(TableCatalogDelegate::getIndexIdString(scheme)),
 
     // initialize all the counters to zero
-    m_lookups(0),
     m_inserts(0),
     m_deletes(0),
     m_updates(0),
@@ -71,6 +101,7 @@ TableIndex::~TableIndex()
     for (int ii = 0; ii < indexed_expressions.size(); ++ii) {
         delete indexed_expressions[ii];
     }
+    delete getPredicate();
 }
 
 std::string TableIndex::debug() const
@@ -104,6 +135,11 @@ std::string TableIndex::debug() const
         add = ", ";
     }
     buffer << "] --- size: " << getSize();
+    // Predicate
+    if (isPartialIndex())
+    {
+        buffer << " -> Predicate[" << getPredicate()->debug() << "]";
+    }
 
     std::string ret(buffer.str());
     return (ret);
@@ -117,7 +153,6 @@ void TableIndex::printReport()
 {
     std::cout << m_scheme.name << ",";
     std::cout << getTypeName() << ",";
-    std::cout << m_lookups << ",";
     std::cout << m_inserts << ",";
     std::cout << m_deletes << ",";
     std::cout << m_updates << std::endl;
@@ -127,4 +162,79 @@ bool TableIndex::equals(const TableIndex *other) const
 {
     //TODO Do something useful here!
     return true;
+}
+
+void TableIndex::addEntry(const TableTuple *tuple, TableTuple *conflictTuple)
+{
+    if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
+        // Tuple fails the predicate. Do not add it.
+        return;
+    }
+    addEntryDo(tuple, conflictTuple);
+}
+
+bool TableIndex::deleteEntry(const TableTuple *tuple)
+{
+    if (isPartialIndex() && !getPredicate()->eval(tuple, NULL).isTrue()) {
+        // Tuple fails the predicate. Nothing to delete
+        return true;
+    }
+    return deleteEntryDo(tuple);
+}
+
+bool TableIndex::replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+{
+    assert(originalTuple.address() != destinationTuple.address());
+
+    if (isPartialIndex()) {
+        const AbstractExpression* predicate = getPredicate();
+        if (!predicate->eval(&destinationTuple, NULL).isTrue() && !predicate->eval(&originalTuple, NULL).isTrue()) {
+            // both tuples fail the predicate. Nothing to do. Return TRUE
+            return true;
+        } else if (predicate->eval(&destinationTuple, NULL).isTrue() && !predicate->eval(&originalTuple, NULL).isTrue()) {
+            // The original tuple fails the predicate meaning the tuple is not indexed.
+            // Simply add the new tuple
+            TableTuple conflict(destinationTuple.getSchema());
+            addEntryDo(&destinationTuple, &conflict);
+            return conflict.isNullTuple();
+        } else if (!predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue()) {
+            // The destination tuple fails the predicate. Simply delete the original tuple
+            return deleteEntryDo(&originalTuple);
+        } else {
+            // both tuples pass the predicate.
+            assert(predicate->eval(&destinationTuple, NULL).isTrue() && predicate->eval(&originalTuple, NULL).isTrue());
+            return replaceEntryNoKeyChangeDo(destinationTuple, originalTuple);
+        }
+    } else {
+        return replaceEntryNoKeyChangeDo(destinationTuple, originalTuple);
+    }
+}
+
+bool TableIndex::exists(const TableTuple *persistentTuple) const
+{
+    if (isPartialIndex() && !getPredicate()->eval(persistentTuple, NULL).isTrue())
+    {
+        // Tuple fails the predicate.
+        return false;
+    }
+    return existsDo(persistentTuple);
+}
+
+bool TableIndex::checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const {
+    if (isPartialIndex()) {
+        const AbstractExpression* predicate = getPredicate();
+        if (!predicate->eval(lhs, NULL).isTrue() && !predicate->eval(rhs, NULL).isTrue()) {
+            // both tuples fail the predicate. Index is unaffected. Return FALSE
+            return false;
+        } else if ((predicate->eval(lhs, NULL).isTrue() && !predicate->eval(rhs, NULL).isTrue()) ||
+            (!predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue())) {
+            // only one tuple passes the predicate. Index is affected -
+            // either existing tuple needs to be deleted or the new one added from/to the index
+            return true;
+        } else {
+            assert(predicate->eval(lhs, NULL).isTrue() && predicate->eval(rhs, NULL).isTrue());
+            return checkForIndexChangeDo(lhs, rhs);
+        }
+    }
+    return checkForIndexChangeDo(lhs, rhs);
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,10 +25,12 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
@@ -94,10 +96,25 @@ public class FragmentTask extends TransactionTask
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
-        final FragmentResponseMessage response = processFragmentTask(siteConnection);
-        // completion?
-        response.m_sourceHSId = m_initiator.getHSId();
-        m_initiator.deliver(response);
+
+        int originalTimeout = siteConnection.getBatchTimeout();
+        int individualTimeout = m_fragmentMsg.getBatchTimeout();
+        try {
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                siteConnection.setBatchTimeout(individualTimeout);
+            }
+
+            // execute the procedure
+            final FragmentResponseMessage response = processFragmentTask(siteConnection);
+            // completion?
+            response.m_sourceHSId = m_initiator.getHSId();
+            m_initiator.deliver(response);
+        } finally {
+            if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                siteConnection.setBatchTimeout(originalTimeout);
+            }
+        }
+
         completeFragment();
 
         if (hostLog.isDebugEnabled()) {
@@ -155,6 +172,7 @@ public class FragmentTask extends TransactionTask
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
+
         // ignore response.
         processFragmentTask(siteConnection);
         completeFragment();
@@ -175,6 +193,15 @@ public class FragmentTask extends TransactionTask
     // modifed to work in the new world
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
+        // Ensure default procs loaded here
+        // Also used for LoadMultipartitionTable
+        String procNameToLoad = m_fragmentMsg.getProcNameToLoad();
+        if (procNameToLoad != null) {
+            // this will ensure proc is loaded
+            ProcedureRunner runner = siteConnection.getProcedureRunner(procNameToLoad);
+            assert(runner != null);
+        }
+
         // IZZY: actually need the "executor" HSId these days?
         final FragmentResponseMessage currentFragResponse =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
@@ -216,14 +243,20 @@ public class FragmentTask extends TransactionTask
             try {
                 VoltTable dependency;
                 fragmentPlan = m_fragmentMsg.getFragmentPlan(frag);
+                String stmtText = null;
 
                 // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan);
+                    // statement text for unplanned fragments are pulled from the message,
+                    // to ensure that we get the correct constants from the most recent
+                    // invocation.
+                    stmtText = m_fragmentMsg.getStmtText(frag);
+                    fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan, null);
                 }
                 // otherwise ask the plan source for a local fragment id
                 else {
                     fragmentId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
                 }
 
                 // set up the batch context for the fragment set
@@ -234,6 +267,8 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
+                        stmtText == null ? null : new String[] { stmtText },
+                        m_txnState.txnId,
                         m_txnState.m_spHandle,
                         m_txnState.uniqueId,
                         m_txnState.isReadOnly())[0];

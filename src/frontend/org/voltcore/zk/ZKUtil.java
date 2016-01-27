@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -123,14 +123,21 @@ public class ZKUtil {
 
     public static boolean uploadFileAsChunks(ZooKeeper zk, String zkPath, File file, boolean ephemeral)
             throws Exception {
-        if (file.exists() && file.canRead()) {
-            FileInputStream fis = new FileInputStream(file);
-            ByteBuffer fileBuffer = ByteBuffer.allocate((int)file.length());
-            while (fileBuffer.hasRemaining()) {
-                fis.getChannel().read(fileBuffer);
+        FileInputStream fis = null;
+        try {
+            if (file.exists() && file.canRead()) {
+                fis = new FileInputStream(file);
+                ByteBuffer fileBuffer = ByteBuffer.allocate((int)file.length());
+                while (fileBuffer.hasRemaining()) {
+                    fis.getChannel().read(fileBuffer);
+                }
+                fileBuffer.flip();
+                uploadBytesAsChunks(zk, zkPath, fileBuffer.array(), ephemeral);
             }
-            fileBuffer.flip();
-            uploadBytesAsChunks(zk, zkPath, fileBuffer.array(), ephemeral);
+        } finally {
+            if (fis != null) {
+                fis.close();
+            }
         }
         return true;
     }
@@ -231,6 +238,16 @@ public class ZKUtil {
             return null;
         }
         return zk;
+    }
+
+    public static boolean addIfMissing(ZooKeeper zk, String absolutePath, CreateMode createMode, byte[] data)
+            throws KeeperException, InterruptedException {
+        try {
+            zk.create(absolutePath, data, Ids.OPEN_ACL_UNSAFE, createMode);
+        } catch (KeeperException.NodeExistsException e) {
+            return false;
+        }
+        return true;
     }
 
     public static final void mkdirs(ZooKeeper zk, String dirDN) {

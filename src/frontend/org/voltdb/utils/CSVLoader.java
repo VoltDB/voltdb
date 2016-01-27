@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,8 +24,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.TimeZone;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -54,7 +54,7 @@ import org.voltdb.client.ClientResponse;
  * maxerror and additional errors may occur. Only first maxerror indicated errors will be reported.
  *
  */
-public class CSVLoader implements CSVLoaderErrorHandler {
+public class CSVLoader implements BulkLoaderErrorHandler {
 
     /**
      * Path of invalid row file that will be created.
@@ -104,38 +104,114 @@ public class CSVLoader implements CSVLoaderErrorHandler {
      * Size limit for each column.
      */
     public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
-
+    /**
+     * Using upsert instead of insert
+     */
+    public static final boolean DEFAULT_UPSERT_MODE = false;
     /**
      * Used for testing only.
      */
+
     public static boolean testMode = false;
 
+    private class ErrorInfoItem {
+        public long lineNumber;
+        public String[] errorInfo;
+        ErrorInfoItem(long line, String[] info) {
+            lineNumber = line;
+            errorInfo = info;
+        }
+    }
+
+    private static final int ERROR_INFO_QUEUE_SIZE = Integer.getInteger("ERROR_INFO_QUEUE_SIZE", 500);
     //Errors we keep track only upto maxerrors
-    final Map<Long, String[]> m_errorInfo = new TreeMap<Long, String[]>();
+    private final LinkedBlockingQueue<ErrorInfoItem> m_errorInfo = new LinkedBlockingQueue<ErrorInfoItem>(ERROR_INFO_QUEUE_SIZE);
+    private volatile long m_errorCount = 0;
+
+    private class ErrorInfoFlushProcessor extends Thread {
+        @Override
+        public void run() {
+            while (true) {
+                try {
+                    ErrorInfoItem currItem;
+                    currItem = m_errorInfo.take();
+
+                    if (currItem.lineNumber == -1)
+                        return;
+
+                    if (currItem.errorInfo.length != 2) {
+                        System.out.println("internal error, information is not enough");
+                    }
+                    out_invaliderowfile.write(currItem.errorInfo[0] + "\n");
+                    String message = "Invalid input on line " + currItem.lineNumber + ". " + currItem.errorInfo[1];
+                    m_log.error(message);
+                    out_logfile.write(message + "\n  Content: " + currItem.errorInfo[0] + "\n");
+
+                    m_errorCount++;
+
+                } catch (FileNotFoundException e) {
+                    m_log.error("CSV report directory '" + config.reportdir
+                            + "' does not exist.");
+                } catch (Exception x) {
+                    m_log.error(x.getMessage());
+                }
+
+            }
+        }
+    }
+
+    private ErrorInfoFlushProcessor m_errorinfoProcessor = null;
+
+    public void launchErrorFlushProcessor() {
+        m_errorinfoProcessor = new ErrorInfoFlushProcessor();
+        m_errorinfoProcessor.start();
+    }
+
+    public void waitForErrorFlushComplete() throws InterruptedException {
+
+        //Put an empty ErrorInfoItem
+        ErrorInfoItem emptyErrorInfo = new ErrorInfoItem(-1, null);
+
+        if (!m_errorInfo.offer(emptyErrorInfo)) {
+            m_errorInfo.put(emptyErrorInfo);
+        }
+
+        if (m_errorinfoProcessor != null)
+            m_errorinfoProcessor.join();
+    }
+
     @Override
-    public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
+    public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
         synchronized (m_errorInfo) {
             //Dont collect more than we want to report.
-            if (m_errorInfo.size() >= config.maxerrors) {
+            if (m_errorCount + m_errorInfo.size() >= config.maxerrors) {
                 return true;
             }
-            if (!m_errorInfo.containsKey(metaData.lineNumber)) {
-                String rawLine;
-                if (metaData.rawLine == null) {
-                    rawLine = "Unknown line content";
-                } else {
-                    rawLine = metaData.rawLine.toString();
+
+            String rawLine;
+            if (metaData.rawLine == null) {
+                rawLine = "Unknown line content";
+            } else {
+                rawLine = metaData.rawLine.toString();
+            }
+            String infoStr = (response != null) ? response.getStatusString() : error;
+            String[] info = {rawLine, infoStr};
+
+            ErrorInfoItem newErrorInfo = new ErrorInfoItem(metaData.lineNumber, info);
+
+            try {
+                if (!m_errorInfo.offer(newErrorInfo)) {
+                    m_errorInfo.put(newErrorInfo);
                 }
-                String infoStr = (response != null) ? response.getStatusString() : error;
-                String[] info = {rawLine, infoStr};
-                m_errorInfo.put(metaData.lineNumber, info);
-                if (response != null) {
-                    byte status = response.getStatus();
-                    if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
-                        System.out.println("Fatal Response from server for: " + response.getStatusString()
-                                + " for: " + rawLine);
-                        System.exit(1);
-                    }
+            } catch (InterruptedException e) {
+            }
+
+            if (response != null) {
+                byte status = response.getStatus();
+                if (status != ClientResponse.USER_ABORT && status != ClientResponse.GRACEFUL_FAILURE) {
+                    System.out.println("Fatal Response from server for: " + response.getStatusString()
+                            + " for: " + rawLine);
+                    System.exit(1);
                 }
             }
 
@@ -146,7 +222,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     @Override
     public boolean hasReachedErrorLimit()
     {
-        return m_errorInfo.size() >= config.maxerrors;
+        return m_errorCount + m_errorInfo.size() >= config.maxerrors;
     }
 
     /**
@@ -205,6 +281,16 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
+        @Option(shortOpt = "z", desc = "timezone for interpreting date and time strings")
+        String timezone = "";
+
+        @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
+        String customNullString = "";
+
+        @Option(desc = "Disables the quote character. All characters between delimiters, including quote characters, are included in the input.",
+                hasArg = false)
+        boolean noquotechar = false;
+
         /**
          * Batch size for processing batched operations.
          */
@@ -219,6 +305,8 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         // This is set to true when -p option us used.
         boolean useSuppliedProcedure = false;
 
+        @Option(desc = "Use upsert instead of insert", hasArg = false)
+        boolean update = DEFAULT_UPSERT_MODE;
         /**
          * Validate command line options.
          */
@@ -242,6 +330,9 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
+            if(!customNullString.isEmpty() && !blank.equals("error")){
+                blank = "empty";
+            }
             if (!blank.equalsIgnoreCase("error") &&
                 !blank.equalsIgnoreCase("null") &&
                 !blank.equalsIgnoreCase("empty")) {
@@ -249,6 +340,23 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
+            }
+            if ((useSuppliedProcedure) && (update)){
+                update = false;
+                exitWithMessageAndUsage("update is not applicable when stored procedure specified");
+            }
+            if(!timezone.equals("")){
+                boolean isValidTimezone = false;
+                for (String tzId : TimeZone.getAvailableIDs()) {
+                    if(tzId.equals(timezone)) {
+                        TimeZone.setDefault(TimeZone.getTimeZone(timezone));
+                        isValidTimezone = true;
+                        break;
+                    }
+                }
+                if(!isValidTimezone){
+                    exitWithMessageAndUsage("specified timezone \"" + timezone + "\" is invalid");
+                }
             }
         }
 
@@ -281,8 +389,12 @@ public class CSVLoader implements CSVLoaderErrorHandler {
 
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
-
         config = cfg;
+        if (config.noquotechar) {
+            config.quotechar = '\u0000';
+        }
+
+
         configuration();
         final Tokenizer tokenizer;
         ICsvListReader listReader = null;
@@ -326,10 +438,13 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             final CSVLoader errHandler = new CSVLoader();
             final CSVDataLoader dataLoader;
 
+            errHandler.launchErrorFlushProcessor();
+
+
             if (config.useSuppliedProcedure) {
                 dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
             }
 
             CSVFileReader.initializeReader(cfg, csvClient, listReader);
@@ -346,6 +461,9 @@ public class CSVLoader implements CSVLoaderErrorHandler {
             insertTimeEnd = System.currentTimeMillis();
 
             csvClient.close();
+
+            errHandler.waitForErrorFlushComplete();
+
             readerTime = (csvReader.m_parsingTime) / 1000000;
             insertCount = dataLoader.getProcessedRows();
             ackCount = insertCount - dataLoader.getFailedRows();
@@ -448,25 +566,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
         m_log.info("Elapsed time: " + latency / 1000F
                 + " seconds");
 
-        int bulkflush = 300; // by default right now
         try {
-            long linect = 0;
-            for (Map.Entry<Long, String[]> irow : m_errorInfo.entrySet()) {
-                String info[] = irow.getValue();
-                if (info.length != 2) {
-                    System.out.println("internal error, information is not enough");
-                }
-                linect++;
-                out_invaliderowfile.write(info[0] + "\n");
-                String message = "Invalid input on line " + irow.getKey() + ". " + info[1];
-                m_log.error(message);
-                out_logfile.write(message + "\n  Content: " + info[0] + "\n");
-                if (linect % bulkflush == 0) {
-                    out_invaliderowfile.flush();
-                    out_logfile.flush();
-                }
-            }
-
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
             out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
@@ -502,7 +602,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
                     + ackCount + "\n");
             // if prompted msg changed, change it also for test case
             out_reportfile.write("Number of rows that could not be inserted: "
-                    + m_errorInfo.size() + "\n");
+                    + m_errorCount + "\n");
             out_reportfile.write("CSVLoader rate: " + insertCount
                     / elapsedTimeSec + " row/s\n");
 

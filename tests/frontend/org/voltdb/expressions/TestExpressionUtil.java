@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -426,8 +426,8 @@ public class TestExpressionUtil extends TestCase {
             new OperatorExpression(ExpressionType.OPERATOR_MINUS, lit, bint);
 
         lit_bint.normalizeOperandTypes_recurse();
-        assertEquals(lit.m_valueType, VoltType.FLOAT);
-        assertEquals(lit.m_valueSize, VoltType.FLOAT.getLengthInBytesForFixedTypes());
+        assertEquals(lit.m_valueType, VoltType.DECIMAL);
+        assertEquals(lit.m_valueSize, VoltType.DECIMAL.getLengthInBytesForFixedTypes());
         assertEquals(bint.m_valueType, VoltType.BIGINT);
         assertEquals(bint.m_valueSize, VoltType.BIGINT.getLengthInBytesForFixedTypes());
 
@@ -993,4 +993,164 @@ public class TestExpressionUtil extends TestCase {
 
     }
 
+    // Test compiler time expression evaluation.
+    public void testEvaluateExpression() throws Exception {
+        TupleValueExpression tve = new TupleValueExpression();
+        AbstractExpression comp = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve, tve);
+        AbstractExpression notcomp = new OperatorExpression(ExpressionType.OPERATOR_NOT, comp, null);
+        ConstantValueExpression trueCVE = ConstantValueExpression.getTrue();
+        ConstantValueExpression falseCVE = ConstantValueExpression.getFalse();
+
+        AbstractExpression expr;
+        {
+            // TRUE and expr => expr
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, trueCVE, comp);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(comp, expr);
+
+            // expr and TRUE => expr
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, comp, trueCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(comp, expr);
+
+            // FALSE and expr => FASLE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, falseCVE, comp);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+
+            // expr and FALSE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, comp, falseCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+
+            // TRUE and TRUE => TRUE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, trueCVE, trueCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // TRUE and FALSE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, trueCVE, falseCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+
+            // FALSE and TRUE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, falseCVE, trueCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+
+            // FALSE and FALSE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, falseCVE, falseCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+        }
+        {
+             // TRUE or expr => TRUE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, trueCVE, comp);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // expr or TRUE => TRUE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, comp, trueCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // FALSE or expr => expr
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, falseCVE, comp);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(comp, expr);
+
+            // expr or FALSE => expr
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, comp, falseCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(comp, expr);
+
+            // expr or expr => no change
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, comp, comp);
+            AbstractExpression origExpr = (AbstractExpression) expr.clone();
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(origExpr, expr);
+
+            // TRUE or TRUE => TRUE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, trueCVE, trueCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // TRUE or FALSE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, trueCVE, falseCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // FALSE or TRUE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, falseCVE, trueCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // FALSE or FALSE => FALSE
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, falseCVE, falseCVE);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+        }
+        {
+            AbstractExpression expr1, expr2;
+            // expr AND expr AND TRUE => expr AND expr
+            expr1 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, trueCVE, comp);
+            expr2 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr1, comp);
+            expr = ExpressionUtil.evaluateExpression(expr2);
+            AbstractExpression finalExpr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, comp, comp);
+            assertEquals(finalExpr, expr);
+
+            // expr AND expr AND FALSE => FALSE
+            expr1 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, falseCVE, comp);
+            expr2 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr1, comp);
+            expr = ExpressionUtil.evaluateExpression(expr2);
+            assertEquals(falseCVE, expr);
+
+            // NOT(TRUE) => FASLE
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, trueCVE, null);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(falseCVE, expr);
+
+            // NOT(FALSE) => TRUE
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, falseCVE, null);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // NOT (FALSE OR NOT expr) => expr
+            expr1 = new OperatorExpression(ExpressionType.OPERATOR_NOT, comp, null);
+            expr2 = new OperatorExpression(ExpressionType.CONJUNCTION_OR, falseCVE, expr1);
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr2, null);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(comp, expr);
+
+            // NOT( .. OR .. OR ..) => (.. AND .. AND..)
+            expr1 = new OperatorExpression(ExpressionType.CONJUNCTION_OR, comp, comp);
+            expr2 = new OperatorExpression(ExpressionType.CONJUNCTION_OR, expr1, comp);
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr2, null);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            AbstractExpression expectedExpr1 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, notcomp, notcomp);
+            AbstractExpression expectedExpr2 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expectedExpr1, notcomp);
+            assertEquals(expectedExpr2, expr);
+
+
+            // NOT (FALSE AND expr) => TRUE OR NOT expr => TRUE
+            expr1 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, falseCVE, comp);
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr1, null);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+
+            // NOT (FALSE AND expr) => TRUE OR NOT expr => TRUE
+            expr1 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, falseCVE, comp);
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr1, null);
+            expr = ExpressionUtil.evaluateExpression(expr);
+            assertEquals(trueCVE, expr);
+
+            // NOT( .. AND .. AND ..) not equal to (NOT.. OR NOT.. OR..)
+            // special case not handled on purpose for short circuit reason.
+            expr1 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, comp, comp);
+            expr2 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr1, comp);
+            expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr2, null);
+            assertEquals(expr, ExpressionUtil.evaluateExpression(expr));
+        }
+    }
 }

@@ -1,0 +1,3 @@
+VOLTDB ERROR: Transaction Interrupted
+  A SQL query was terminated after 1.00# seconds because it exceeded the query-specific timeout period. The query-specific timeout is currently 1.0 seconds. The default query timeout is currently 10.0 seconds and can be changed in the systemsettings section of the deployment file.
+    at org.voltdb.sysprocs.AdHoc_RO_SP.run(AdHoc_RO_SP.java:52)

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,72 +33,48 @@ public class TestVoltTypeUtil extends TestCase
     public void testDetermineImplicitCastingExceptions()
     {
         // either INVALID results in VoltTypeException
-        boolean caught = false;
-        try
-        {
-            VoltTypeUtil.determineImplicitCasting(VoltType.INVALID,
-                                                  VoltType.INTEGER);
-        }
-        catch (VoltTypeException e)
-        {
-            caught = true;
-        }
-        assertTrue("VoltType.INVALID failed to throw exception", caught);
-
-        caught = false;
-        try
-        {
-            VoltTypeUtil.determineImplicitCasting(VoltType.INTEGER,
-                                                  VoltType.INVALID);
-        }
-        catch (VoltTypeException e)
-        {
-            caught = true;
-        }
-        assertTrue("VoltType.INVALID failed to throw exception", caught);
+        validateVoltTypeCastingException(VoltType.INVALID, VoltType.INTEGER);
+        validateVoltTypeCastingException(VoltType.INTEGER, VoltType.INVALID);
 
         // String and non-string throw VoltTypeException
-        caught = false;
-        try
-        {
-            VoltTypeUtil.determineImplicitCasting(VoltType.STRING,
-                                                  VoltType.INTEGER);
-        }
-        catch (VoltTypeException e)
-        {
-            caught = true;
-        }
-        assertTrue("VoltType.STRING and non-string failed to throw exception",
-                   caught);
+        validateVoltTypeCastingException(VoltType.STRING, VoltType.INTEGER);
+        validateVoltTypeCastingException(VoltType.INTEGER, VoltType.STRING);
     }
 
     public void testDecimalMixedTypes()
     {
-        // only exact types can cast to decimal.
-        boolean caught = false;
+        validateVoltTypeCastingException(VoltType.DECIMAL, VoltType.STRING);
+        validateVoltTypeCastingException(VoltType.STRING, VoltType.DECIMAL);
+        validateVoltTypeCastingException(VoltType.DECIMAL, VoltType.TIMESTAMP);
+
+        // Check that DECIMAL + FLOAT -> FLOAT
+        assertEquals(VoltType.FLOAT,
+                VoltTypeUtil.determineImplicitCasting(VoltType.DECIMAL,VoltType.FLOAT));
+
+        // Check that FLOAT + DECIMAL -> FLOAT
+        assertEquals(VoltType.FLOAT,
+                VoltTypeUtil.determineImplicitCasting(VoltType.FLOAT,VoltType.DECIMAL));
+
+        // Check that DECIMAL + DECIMAL -> DECIMAL
+        assertEquals(VoltType.DECIMAL,
+                VoltTypeUtil.determineImplicitCasting(VoltType.DECIMAL,VoltType.DECIMAL));
+
+        // D + SMALLINT = D
+        assertEquals(VoltType.DECIMAL,
+                VoltTypeUtil.determineImplicitCasting(VoltType.DECIMAL,VoltType.SMALLINT));
+    }
+
+    private void validateVoltTypeCastingException(VoltType t1, VoltType t2) {
         try
         {
-            VoltTypeUtil.determineImplicitCasting(VoltType.DECIMAL,
-                                                  VoltType.FLOAT);
+            VoltTypeUtil.determineImplicitCasting(t1,t2);
+            fail();
         }
         catch (VoltTypeException e)
         {
-            caught = true;
+            assertTrue(e.getMessage().contains(String.format(VoltTypeUtil.VoltTypeCastErrorMessage, t1, t2)));
         }
-
-        assertTrue("VoltType.DECIMAL and VoltType.FLOAT threw" +
-                   "exception", caught);
-
-        // Check that DECIMAL + DECIMAL -> DECIMAL
-        assertEquals(VoltTypeUtil.determineImplicitCasting(VoltType.DECIMAL,
-                                                           VoltType.DECIMAL),
-                                                           VoltType.DECIMAL);
-
-        // D + SMALLINT = D
-        assertEquals(VoltTypeUtil.determineImplicitCasting(VoltType.DECIMAL,
-                                                           VoltType.SMALLINT),
-                                                           VoltType.DECIMAL);
-}
+    }
 
     public void testDetermineImplicitCastingNullWins()
     {
@@ -113,25 +89,21 @@ public class TestVoltTypeUtil extends TestCase
 
         for (VoltType right : types)
         {
-            assertEquals(VoltTypeUtil.determineImplicitCasting(VoltType.NULL,
-                                                               right),
-                         VoltType.NULL);
+            assertEquals(VoltType.NULL,
+                    VoltTypeUtil.determineImplicitCasting(VoltType.NULL,right));
         }
     }
 
     public void testDetermineImplicitCastingOrder()
     {
         // Check that STRING + STRING -> STRING
-        assertEquals(VoltTypeUtil.determineImplicitCasting(VoltType.STRING,
-                                                           VoltType.STRING),
-                     VoltType.STRING);
+        assertEquals(VoltType.STRING,
+                VoltTypeUtil.determineImplicitCasting(VoltType.STRING,VoltType.STRING));
 
         // Check the easy non-coerced order
         VoltType[] winning_types = { VoltType.FLOAT,
-                                     VoltType.TIMESTAMP,
                                      VoltType.BIGINT };
         VoltType[] losing_types = { VoltType.FLOAT,
-                                    VoltType.TIMESTAMP,
                                     VoltType.BIGINT,
                                     VoltType.INTEGER,
                                     VoltType.SMALLINT,
@@ -141,8 +113,7 @@ public class TestVoltTypeUtil extends TestCase
             for (int j = i; j < losing_types.length; ++j)
             {
                 assertEquals(winning_types[i],
-                             VoltTypeUtil.determineImplicitCasting(winning_types[i],
-                                                                   losing_types[j]));
+                             VoltTypeUtil.determineImplicitCasting(winning_types[i],losing_types[j]));
             }
         }
 
@@ -156,9 +127,16 @@ public class TestVoltTypeUtil extends TestCase
             for (int j = i; j < promoted_types.length; ++j)
             {
                 assertEquals(VoltType.BIGINT,
-                             VoltTypeUtil.determineImplicitCasting(promoted_types[i],
-                                                                   promoted_types[j]));
+                             VoltTypeUtil.determineImplicitCasting(promoted_types[i],promoted_types[j]));
             }
+        }
+
+        assertEquals(VoltType.TIMESTAMP, VoltTypeUtil.determineImplicitCasting(VoltType.TIMESTAMP,VoltType.TIMESTAMP));
+
+        // check the invalid timestamp type operation
+        for (int i = 0; i < losing_types.length; ++i) {
+            validateVoltTypeCastingException(VoltType.TIMESTAMP, losing_types[i]);
+            validateVoltTypeCastingException(losing_types[i], VoltType.TIMESTAMP);
         }
     }
 }

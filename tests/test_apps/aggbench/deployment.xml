@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="8" kfactor="0" schema="catalog" />
+    <commandlog enabled="false"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <systemsettings>
+        <query timeout="90000"/>
+    </systemsettings>
+</deployment>

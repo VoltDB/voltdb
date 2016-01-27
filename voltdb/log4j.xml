@@ -36,6 +36,10 @@
         </layout>
     </appender>
 
+    <logger name="kafka.consumer.SimpleConsumer" additivity="false">
+        <level value="ERROR"/>
+    </logger>
+
     <!-- logger name="AUTH">
         <level value="INFO"/>
     </logger -->
@@ -56,11 +60,15 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 
     <!-- logger name="EXPORT">
+        <level value="INFO"/>
+    </logger -->
+
+    <!-- logger name="IMPORT">
         <level value="INFO"/>
     </logger -->
 
@@ -88,20 +96,26 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRAGENT">
+    <!-- logger name="DRAGENT">
         <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
+    </logger -->
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRSTATS">
+    <!-- logger name="DR">
         <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
+    </logger -->
+
+    <!-- logger name="DBBPOOL">
+        <level value="TRACE"/>
+    </logger -->
 
     <!-- Always let CSVLoader and its ilk to write to the console. -->
     <logger name="CSVLOADER">
+        <level value="INFO"/>
+        <appender-ref ref="console"/>
+    </logger>
+
+    <!-- Always let the bulk loader and its ilk to write to the console. -->
+    <logger name="LOADER">
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>

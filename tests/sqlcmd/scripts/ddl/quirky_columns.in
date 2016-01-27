@@ -1,0 +1,43 @@
+-- try column names at the start of lines that start with sqlcmd command keywords.
+drop table prefixes if exists;
+create table prefixes (
+ help_name integer,
+ goFish integer,
+ exitStrategy integer,
+ listList integer,
+ recallRecall integer,
+ file_name integer,
+ create_from_sql integer,
+ alter_from_sql integer,
+ drop_from_sql integer,
+ insert_from_sql integer,
+ select_from_sql integer,
+ update_from_sql integer,
+ delete_from_sql integer,
+ truncate_from_sql integer,
+ exec_like_a_proc integer,
+ );
+select * from prefixes;
+drop table prefixes;
+
+-- more challenging column names at the start of lines that are just sqlcmd command keywords.
+drop table raw if exists;
+create table raw (
+ help integer,
+ go integer,
+ exit integer,
+ list integer,
+ recall integer,
+ file integer, -- SOME DAY SOON?
+-- create integer, -- MAYBE? some day?
+ alter integer,
+-- drop integer, -- MAYBE? some day?
+ insert integer,
+-- select integer, -- MAYBE? some day?
+ update integer,
+ delete integer,
+ truncate integer,
+ exec integer,
+ );
+select * from raw;
+drop table raw;

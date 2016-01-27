@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -76,9 +76,9 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
     assert(m_node);
-    assert(m_node->getInputTables().size() == 1);
+    assert(m_node->getInputTableCount() == 1);
     // input table should be temptable
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]);
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable());
     assert(m_inputTable);
 
     // target table should be persistenttable
@@ -125,12 +125,6 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // for target table related info.
     m_partitionColumn = targetTable->partitionColumn();
-    m_partitionColumnIsString = false;
-    if (m_partitionColumn != -1) {
-        if (targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-            m_partitionColumnIsString = true;
-        }
-    }
 
     return true;
 }
@@ -149,11 +143,13 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
     // columns mutated by this executor
+    //
+    // Shouldn't this be done in p_init?  See ticket ENG-8668.
     std::vector<TableIndex*> indexesToUpdate;
     const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
     BOOST_FOREACH(TableIndex *index, allIndexes) {
         bool indexKeyUpdated = false;
-        BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
+        BOOST_FOREACH(int colIndex, index->getAllColumnIndices()) {
             std::pair<int, int> updateColInfo; // needs to be here because of macro failure
             BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
                 if (updateColInfo.second == colIndex) {
@@ -236,7 +232,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // delete/insert
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->tempTableTupleCount();
+    m_engine->addToTuplesModified(m_inputTable->tempTableTupleCount());
 
     return true;
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,7 @@ import org.voltdb.VoltTable;
 public class UpdateReplicatedMP extends ReplicatedUpdateBaseProc {
 
     public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        VoltTable[] results = doWork(r_getCIDData, r_cleanUp, r_insert, p_getAdhocData,
+        VoltTable[] results = doWork(r_getCIDData, r_cleanUp, r_insert, r_export, r_getAdhocData,
                 cid, rid, value, rollback);
 
         return doSummaryAndCombineResults(results);

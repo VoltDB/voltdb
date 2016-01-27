@@ -1,0 +1,23 @@
+This directory contains the source files for the performance test of live DDL CREATE and DROP.
+
+A run.sh script is provided to run the test app. The commands to process these files are the following:
+
+./run.sh help: show the command line parameters.
+./run.sh catalog: build the catalog for the VoltDB server. It will also call Initializer to automatically generate a ddl.sql file.
+./run.sh server: start a VoltDB server with the existing catalog.
+./run.sh client: start a client that runs a bunch of CREATEs or DROPs to test performance.
+
+You can set the testing parameters in run.sh script. The meanings are the following:
+
+In function catalog
+numOfTables: the number of tables that will be generated in the original ddl.sql.
+numOfCols: the number of columns in each table.
+numOfSPs: the number of SPs per table.
+idxPercent: the percentage of UNIQUE INDEX out of the columns that will be built in each table.
+
+In function client
+servers: the comma separate list of server names.
+numOfTests: the number of AdHoc DDLs that will be run in the benchmark
+numOfCols: the number of columns in each AdHoc DDL.
+numOfSPs: the number of SPs per table.
+idxPercent: the percentage of UNIQUE INDEX out of the columns that will be built in each AdHoc DDL.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,6 +46,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
+    /** The statement id this TVE refers to */
+    private int m_origStmtId = -1;
 
     /**
      * Create a new TupleValueExpression
@@ -105,6 +107,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
+        clone.m_origStmtId = m_origStmtId;
         return clone;
     }
 
@@ -196,12 +199,45 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
+    /**
+     *  Set the parent TVE indicator
+     * @param parentTve
+     */
+    public void setOrigStmtId(int origStmtId) {
+        m_origStmtId = origStmtId;
+    }
+
+    /**
+     * @return parent TVE indicator
+     */
+    public int getOrigStmtId() {
+        return m_origStmtId;
+    }
+
+    public void setTypeSizeBytes(VoltType SchemaColumnType, int size, boolean bytes) {
+        setValueType(SchemaColumnType);
+        setValueSize(size);
+        m_inBytes = bytes;
+    }
+
+    public void setTypeSizeBytes(int columnType, int size, boolean bytes) {
+        setTypeSizeBytes(VoltType.get((byte)columnType), size, bytes);
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
+        if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
+            // Implying both sides have statement id set
+            // If one of the ids is not set it is considered to be a wild card
+            // matching any other id.
+            if (m_origStmtId != expr.m_origStmtId) {
+                return false;
+            }
+        }
 
         if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
@@ -278,9 +314,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
-        setValueType(VoltType.get((byte)column.getType()));
-        setValueSize(column.getSize());
-        setInBytes(column.getInbytes());
+
+        setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
     }
 
     /**
@@ -293,9 +328,8 @@ public class TupleValueExpression extends AbstractValueExpression {
             // In case of sub-queries the TVE may not have its value type and size
             // resolved yet. Try to resolve it now
             SchemaColumn inputColumn = inputSchema.getColumns().get(index);
-            setValueType(inputColumn.getType());
-            setValueSize(inputColumn.getSize());
-            setInBytes(inputColumn.getExpression().getInBytes());
+            setTypeSizeBytes(inputColumn.getType(), inputColumn.getSize(),
+                    inputColumn.getExpression().getInBytes());
         }
         return index;
     }
@@ -331,7 +365,7 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String tableName = m_tableName;
+        String tableName = (m_tableAlias != null) ? m_tableAlias : m_tableName;
         String columnName = m_columnName;
         if (columnName == null || columnName.equals("")) {
             columnName = "column#" + m_columnIndex;
@@ -369,4 +403,25 @@ public class TupleValueExpression extends AbstractValueExpression {
         return columnName;
     }
 
+    private String chooseTwoNames(String name, String alias) {
+        if (name != null) {
+            if (alias != null && !name.equals(alias)) {
+                return String.format("%s(%s)", name, alias);
+            } else {
+                return name;
+            }
+        } else if (alias != null) {
+            return String.format ("(%s)", alias);
+        } else {
+            return "<none>";
+        }
+    }
+
+    @Override
+    protected String getExpressionNodeNameForToString() {
+        return String.format("%s: %s.%s",
+                             super.getExpressionNodeNameForToString(),
+                             chooseTwoNames(m_tableName, m_tableAlias),
+                             chooseTwoNames(m_columnName, m_columnAlias));
+    }
 }

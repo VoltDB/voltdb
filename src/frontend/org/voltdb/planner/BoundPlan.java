@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,22 +31,26 @@ import java.util.Arrays;
 public class BoundPlan {
 
     /** The plan itself. */
-    public final CorePlan core;
+    public final CorePlan m_core;
     /** The parameter bindings required to apply the plan to the matching query. */
-    public final String[] constants;
+    public final String[] m_constants;
 
     public BoundPlan(CorePlan corePlan, String[] constantBindings)
     {
-        core = corePlan;
-        constants = constantBindings;
+        m_core = corePlan;
+        m_constants = constantBindings;
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("BOUND PLAN {");
-        sb.append("\n   CORE: ").append(core.toString());
-        sb.append("\n   BINDINGS: ").append(constants.toString());
+        if (m_core != null) {
+            sb.append("\n   CORE: ").append(m_core.toString());
+        }
+        if (m_constants != null) {
+            sb.append("\n   BINDINGS: ").append(m_constants.toString());
+        }
         sb.append("\n}");
         return sb.toString();
     }
@@ -63,15 +67,15 @@ public class BoundPlan {
         }
         BoundPlan other = (BoundPlan) obj;
 
-        if ( ! core.equals(other.core)) {
+        if ( ! m_core.equals(other.m_core)) {
             return false;
         }
-        if (constants == null) {
-            if (other.constants != null) {
+        if (m_constants == null) {
+            if (other.m_constants != null) {
                 return false;
             }
         }
-        else if ( ! Arrays.equals(constants, other.constants)) {
+        else if ( ! Arrays.equals(m_constants, other.m_constants)) {
             return false;
         }
         return true;
@@ -88,20 +92,20 @@ public class BoundPlan {
 
     public boolean allowsParams(Object[] paramArray) {
         // A cached plan with no parameter binding requirements is an automatic match.
-        if (constants == null) {
+        if (m_constants == null) {
             return true;
         }
-        if (constants.length > paramArray.length) {
+        if (m_constants.length > paramArray.length) {
             return false;
         }
-        for (int ii = 0; ii < constants.length; ++ii) {
+        for (int ii = 0; ii < m_constants.length; ++ii) {
             // Only need to check "bound" parameters.
-            if (constants[ii] != null) {
+            if (m_constants[ii] != null) {
                 Object param = paramArray[ii];
                 if (param == null) {
                     return false;
                 }
-                if ( ! constants[ii].equals(param.toString())) {
+                if ( ! m_constants[ii].equals(param.toString())) {
                     return false;
                 }
             }

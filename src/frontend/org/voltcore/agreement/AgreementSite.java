@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -611,14 +611,25 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     true,
                     null);
         }
-        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage);
-        if (initiatorSafeInitPoint.isEmpty()) return;
-
-        Set<Long> failedSites = initiatorSafeInitPoint.keySet();
-        handleSiteFaults(failedSites,initiatorSafeInitPoint);
+        Set<Long> unknownFaultedHosts = new TreeSet<>();
+        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage, unknownFaultedHosts);
+        Set<Long> failedSites;
+        if (!initiatorSafeInitPoint.isEmpty()) {
+            failedSites = initiatorSafeInitPoint.keySet();
+            handleSiteFaults(failedSites, initiatorSafeInitPoint);
+        } else if (unknownFaultedHosts.isEmpty()) {
+            return;
+        } else {
+            failedSites = ImmutableSet.of();
+        }
 
         ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
         for (long hsId: failedSites) {
+            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
+        }
+        // Remove any hosts associated with failed sites that we don't know
+        // about, as could be the case with a failure early in a rejoin
+        for (long hsId : unknownFaultedHosts) {
             failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
         m_failedHostsCallback.disconnect(failedHosts.build());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -323,63 +323,59 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     @Override
     int drainTo (final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
-        long rc = 0;
-        do {
-            /*
-             * Nothing to write
-             */
-            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
-                if (m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
-                    backpressureEnded();
+        try {
+            long rc = 0;
+            do {
+                /*
+                 * Nothing to write
+                 */
+                if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                    return bytesWritten;
                 }
+
+                ByteBuffer buffer = null;
+                if (m_currentWriteBuffer == null) {
+                    m_currentWriteBuffer = m_queuedBuffers.poll();
+                    buffer = m_currentWriteBuffer.b();
+                    buffer.flip();
+                } else {
+                    buffer = m_currentWriteBuffer.b();
+                }
+
+                rc = channel.write(buffer);
+
+                //Discard the buffer back to a pool if no data remains
+                if (buffer.hasRemaining()) {
+                    if (!m_hadBackPressure) {
+                        backpressureStarted();
+                    }
+                } else {
+                    m_currentWriteBuffer.discard();
+                    m_currentWriteBuffer = null;
+                    m_messagesWritten++;
+                }
+                bytesWritten += rc;
+
+            } while (rc > 0);
+        } finally {
+            //We might fail after writing few bytes. make sure the ones that are written accounted for.
+            //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
+            if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+                backpressureEnded();
+            }
+            //Same here I dont know if we do need to do this housekeeping??
+            if (!isEmpty()) {
+                if (bytesWritten > 0) {
+                    m_lastPendingWriteTime = EstTime.currentTimeMillis();
+                }
+            } else {
                 m_lastPendingWriteTime = -1;
+            }
+            if (bytesWritten > 0) {
                 updateQueued(-bytesWritten, false);
                 m_bytesWritten += bytesWritten;
-                return bytesWritten;
             }
-
-            ByteBuffer buffer = null;
-            if (m_currentWriteBuffer == null) {
-                m_currentWriteBuffer = m_queuedBuffers.poll();
-                buffer = m_currentWriteBuffer.b();
-                buffer.flip();
-            } else {
-                buffer = m_currentWriteBuffer.b();
-            }
-
-            rc = channel.write(buffer);
-
-            //Discard the buffer back to a pool if no data remains
-            if (buffer.hasRemaining()) {
-                if (!m_hadBackPressure) {
-                    backpressureStarted();
-                }
-            } else {
-                m_currentWriteBuffer.discard();
-                m_currentWriteBuffer = null;
-                m_messagesWritten++;
-            }
-            bytesWritten += rc;
-
-        } while (rc > 0);
-
-        //This extra check is necessary because sometimes a buffer with nothing remaining
-        //has to be queued in the above loop resulting in rc == 0. Since rc == 0
-        //it won't loop around a last time and see that there are no more queued buffers
-        //and thus no backpressure
-        if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
-            backpressureEnded();
         }
-
-        if (!isEmpty()) {
-            if (bytesWritten > 0) {
-                m_lastPendingWriteTime = EstTime.currentTimeMillis();
-            }
-        } else {
-            m_lastPendingWriteTime = -1;
-        }
-        updateQueued(-bytesWritten, false);
-        m_bytesWritten += bytesWritten;
         return bytesWritten;
     }
 }

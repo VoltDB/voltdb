@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Voltdb Deployment Manager</title>
+<link rel="shortcut icon" href="{{ url_for('static',filename='images/favicon.ico') }}" type="image/x-icon" />
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='bootstrap/css/bootstrap.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/style.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/aero.css') }}">
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/multi-select.css') }}">
+</head>
+<body>
+<div id="wrap">
+  <div class="changeSaveStatus" title="Every change you make is automatically saved" style="" id="changeSaveStatus">Changes have been saved.</div>
+  <div id="main">
+    <nav class="navbar navbar-inverse navbar-fixed-top shadow">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <!--<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span> </button>-->
+         <img src="{{ url_for('static',filename='images/logo.jpg') }}" alt="Voltdb Deployment Manager"> </div>
+        <!--<div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav navbar-left">
+            <li class="active"><a href="#" id="dbManager">Cluster Settings</a></li>
+            <li><a href="#" id="serverSetting">Server Settings</a></li>
+          </ul>
+        </div>-->
+      </div>
+    </nav>
+    <div class="container-fluid database" id="divDbManager">
+      <div class="row">
+        <div class="col-md-12 clusterWrapTop">
+              <div class="clusterHeading">
+                <h4 class="clusterIcon" style="float:left"> <div class="clusterName"> Database </div> </h4>
+               <a class="createDB" data-toggle="modal" data-target="#createDatabase" id="btnDatabaseLink">
+                   <span class="clusterDBName" id="clusterName">  </span>
+                    <span class="glyphicon glyphicon-triangle-bottom"></span>
+                  </a>
+                <div class="clear"></div>
+              </div>
+        </div>
+      </div>
+
+      <div id="dbWarningText" class="overlayText" style="display:none"><span class="glyphicon glyphicon-warning-sign iconModify"></span>
+          <p>No database has been added. Please click the down icon besides the Database to add a new database.</p>
+      <div class="clear"></div>
+      </div>
+      <div id="divOverlayWrapper" class="overlayWrapper" style="display:none" title="No database has been added. Please click the down icon besides the Database to add a new database.">
+      </div>
+      <div class="clusterContent">
+      <div class="clusterStartStop">
+    <div class="clusterBtnWrap">
+     <a href="javascript:void(0);" class="clustBtn" data-toggle="modal" data-target="#stopClusterConfirmation"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
+    <div class="clear"></div>
+    </div>
+      
+      </div>
+        <div class="resetpb">
+                    <div class="clusterWrapper">
+                      <div class="ContentServerHead">
+                          <div class="ContentServerLeft">
+                          <span class="serverIcon">Servers</span>
+                          </div>
+                          <div class="addServer ContentServerRight">
+                          <!--<a class="addServer" id="btnAddServer" href="javascript:void(0);"data-toggle="modal" data-target="#addServer"> <span class="plus"></span>Add Server</a> </div>-->
+                          <div class="dropdown">
+                              <button id="btnAddServerOption" class="btnAddServer dropdown-toggle" type="button"  data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                              <span class="plus"></span> Add Server <span class="caret"></span>
+                              </button>
+                              <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                              <li><a id="btnAddServer"  data-toggle="modal" data-target="#addServer">Add New Server</a></li>
+                              <li><a id="btnAddExistingServer" data-toggle="modal" data-target="#addExistingServer">Add Existing Server</a></li>
+                              </ul>
+                          </div>
+                          <div class="clear"></div>
+                      </div>
+                        <div class="clear"></div>
+                        </div>
+                      <div class="ContentServerBody">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblCluster" id="serverList">
+                        </table>
+                      </div>
+                    </div>
+
+        </div>
+        <div class="clear"></div>
+      </div>
+
+
+      <div class="row">
+        <div class="col-md-12">
+          <div class="clusterConfigWrapper" style="">
+
+            <div class="leftSide"> <span class="clusterConfigIcon" ></span>
+            <span class="clustHeadText">Cluster Configuration</span></div>
+            <div class="rightSide">
+              <div class="leftSide upDownBtn"> <span class="uploadIcon"></span><span class="file-input  btn-file"> Upload Configuration
+                <input type="file" multiple>
+                </span> </div>
+              <div class="leftSide upDownBtn"><span class="downloadIcon" ></span> Download Configuration</div>
+            </div>
+            <div class="clear"></div>
+          </div>
+        </div>
+      </div>
+        <div class="row">
+        <div class="container-fluid clusterConfig">
+          <div class="col-md-6 clusterConfigLeft" >
+            <div class="main">
+              <div class="mainContent">
+                <h1>Overview</h1>
+              </div>
+              <div class="mainTbl">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" id="adminTbl" class="adminTbl">
+                  <tr>
+                    <td width="44%" class="configLabel">Site per host</td>
+                    <td id="sitePerHost" width="40%" align="right" >
+                      <form id="frmSitePerHost" action="" method="get" class="form-horizontal">
+                        <input id="txtSitePerHost" name="txtSitePerHost" type="text" class="overviewInputText">
+                      <label id="errorSitesPerHost" for="txtSitePerHost" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td width="8%">&nbsp;</td>
+                    <td width="8%">&nbsp;</td>
+                  </tr>
+                  <tr>
+                    <td class="configLabel">K-safety </td>
+                    <td id="kSafety" align="right" >
+                      <form id="frmKSafety" action="" method="get" class="form-horizontal">
+                      <input id="txtKSafety" name="txtKSafety" type="text" value="" class="overviewInputText">
+                      <label id="errorKSafety" for="txtKSafety" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="security">
+                    <td class="configLabel">Partition detection </td>
+
+                      <td align="right">
+                        <input id="chkPartitionDetection" tabindex="8" type="checkbox" >
+                      </td>
+                      <td class="onOff" id="txtPartitionDetection"></td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-6">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Security</span></a></td>
+                    <td align="right"><input id="chkSecurity" tabindex="1" type="checkbox" ></td>
+                    <td class="onOff" id="txtSecurity">On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-6 subLabelRow thead secTbl1">
+                             <td class="configLabel">Username</td>
+                             <td>Role</td>
+                             <td>&nbsp;</td>
+                            <td><a id="btnAddSecurity" class="plusIcon" href="javascript:void(0);" data-toggle="modal" data-target="#plusSecurity"></td>
+
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-1">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">HTTP Access</span></a></td>
+                    <td align="right"><input tabindex="9" type="checkbox" id="chkHttpAccess" ></td>
+                    <td class="onOff" id="txtHttpAccess">On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-1 subLabelRow">
+                    <td class="configLabel"> JSON API</td>
+                    <td align="right"><input tabindex="10" type="checkbox" id="chkJsonApi"></td>
+                    <td class="onOff" id="txtJsonApi">On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-2">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Auto Snapshots</span></a></td>
+                    <td align="right"><input tabindex="3" type="checkbox" id="chkAutoSnapshot" ></td>
+                    <td class="onOff" id="txtAutoSnapshot">On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-2 subLabelRow">
+                    <td class="configLabel">File Prefix</td>
+                    <td align="right">
+                        <form id="frmFilePrefix" action="" method="get" class="form-horizontal">
+                          <input id="txtFilePrefix" name="txtFilePrefix" type="text" value="" class="overviewInputText1">
+                        <label id="errorFilePrefix" for="txtFilePrefix" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-2 subLabelRow">
+                    <td class="configLabel">Frequency </td>
+                    <td align="right"><div id="frequencySpan">
+                      <form id="frmFrequency" action="" method="get" class="form-horizontal">
+                      <input id="txtFrequency" name="txtFrequency" type="text" value="" class="overviewInputText">
+                        <select id="selFreqUnit"><option value="1">Hrs</option><option value="2">Min</option><option value="3">Sec</option></select>
+                      <label id="errorFrequency" for="txtFrequency" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </div>
+                     </td>
+                    <td id="txtFrequencyUnit">&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-2 subLabelRow">
+                    <td class="configLabel">Retained </td>
+                    <td align="right">
+                      <form id="frmRetained" action="" method="get" class="form-horizontal">
+                      <input id="txtRetained" name="txtRetained" type="text" value="" class="overviewInputText">
+                    <label id="errorRetained" for="txtRetained" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>Copies </td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-3">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Command Logging</span></a></td>
+                    <td align="right"><input id="chkCommandLog" tabindex="4" type="checkbox" id="input-4"></td>
+                    <td class="onOff" id="txtCommandLog">Off</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-3 subLabelRow">
+                    <td class="configLabel">Log Frequency Time </td>
+                    <td id="commandlogfreqtime" align="right">
+                      <form id="frmLogFrequencyTime" action="" method="get" class="form-horizontal">
+                      <input id="txtLogFrequencyTime" name="txtLogFrequencyTime" type="text" value="" class="overviewInputText">
+                    <label id="errorLogFrequencyTime" for="txtLogFrequencyTime" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>ms</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-3 subLabelRow">
+                    <td class="configLabel">Log Frequency Transactions </td>
+                    <td id="commandlogfreqtxns" align="right">
+                      <form id="frmLogFreqTransaction" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtLogFreqTransaction" name="txtLogFreqTransaction" value="" class="overviewInputText1">
+                    <label id="errorLogFreqTransaction" for="txtLogFreqTransaction" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-3 subLabelRow">
+                    <td class="configLabel">Log Segment Size</td>
+                    <td align="right">
+                      <form id="frmLogSegmentSize" action="" method="get" class="form-horizontal">
+                      <input id="txtLogSegmentSize" name="txtLogSegmentSize" type="text" value="" class="overviewInputText">
+                    <label id="errorLogSegmentSize" for="txtLogSegmentSize" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>MB</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-4">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Export</span></a></td>
+                    <td align="right">&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td><a id="btnAddExportProperty" href="javascript:void(0);"data-toggle="modal" data-target="#plusExport">
+                      <span class="plusIcon"></span></a></td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-7">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Import</span></a></td>
+                    <td align="right">&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>
+                      <a id="btnAddImportProperty" href="javascript:void(0);"data-toggle="modal" data-target="#plusImport">
+                        <span class="plusIcon"></span>
+                      </a>
+                    </td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-5">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Advanced</span></a></td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Heartbeat time out </td>
+                    <td align="right" class="heartBeatTd">
+                      <form id="frmHeartBeatTimeout" action="" method="get" class="form-horizontal">
+                      <input id="txtHeartbeatTimeout" name="txtHeartbeatTimeout" type="text" value="" class="overviewInputText">
+                    <label id="errorHeartbeatTimeout" for="txtHeartbeatTimeout" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>ms</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Query time out</td>
+                    <td align="right" class="queryTimeOut">
+                      <form id="frmQueryTimeout" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtQueryTimeout" name="txtQueryTimeout" value="" class="overviewInputText">
+                    <label id="errorQueryTimeout" for="txtQueryTimeout" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>ms</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Max temp table memory</td>
+                    <td  id="temptablesmaxsize" align="right">
+                      <form id="frmMaxTempTableMemory" action="" method="get" class="form-horizontal">
+                      <input id="txtMaxTempTableMemory" name="txtMaxTempTableMemory" type="text" value="" class="overviewInputText">
+                    <label id="errortemptableMemory" for="txtMaxTempTableMemory" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>MB</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Snapshot priority</td>
+                    <td id="SnapshotPriority" align="right">
+                      <form id="frmSnapshotPriority" action="" method="get" class="form-horizontal">
+                      <input id="txtSnapshotPriority" name="txtSnapshotPriority" type="text" value="" class="overviewInputText">
+                    <label id="errorSnapshotPriority" for="txtSnapshotPriority" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Memory Limit</td>
+                    <td id="MemoryLimit" align="right">
+                      <form id="frmMemoryLimit" action="" method="get" class="form-horizontal">
+                      <input id="txtMemoryLimit" name="txtMemoryLimit" type="text" value="" class="overviewInputText">
+                    <label id="errorMemoryLimit" for="txtMemoryLimit" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                      </form>
+                    </td>
+                    <td><select id="selMemoryLimitUnit">
+                    <option val="GB">GB</option>
+                    <option val="%">%</option>
+                    </select></td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-5 subLabelRow diskLimitParentProp" id="row-51">
+                   <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Disk Limit</span></a></td>
+
+                    <td id="DiskLimit" align="right"> </td>
+                    <td>&nbsp;</td>
+                    <td><a data-target="#diskLimit" data-toggle="modal" href="javascript:void(0);" id="btnEditDiskLimit" class="">
+                      <span class="editIcon"></span></a></td>
+
+                  </tr>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="col-md-6 clusterConfigRight" >
+
+            <div class="main">
+              <div class="mainContent">
+                <h1>Directories</h1>
+              </div>
+              <div class="adminDirect">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl directories">
+                  <tr>
+                    <td>Root (destination)</td>
+                    <td>
+                      <form id="frmVoltdbRootDir" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtVoltdbRootDir" name="txtVoltdbRootDir" value="" class="inputText">
+                    </form>
+                    </td>
+
+                  </tr>
+                  <tr>
+                    <td>Snapshot</td>
+                    <td>
+                      <form id="frmSnapshotDir" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtSnapshotDir" name="txtSnapshotDir" value="" class="inputText">
+                    </form>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Export Overflow</td>
+                    <td>
+                      <form id="frmExportOverflowDir" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtExportOverflowDir" name="txtExportOverflowDir" value="" class="inputText">
+                    </form>
+                    </td>
+
+                  </tr>
+                  <tr>
+                    <td>Command Log</td>
+                    <td>
+                      <form id="frmCommandLogDir" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtCommandLogDir" name="txtCommandLogDir" value="" class="inputText">
+                    </form>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Command Log Snapshots</td>
+                    <td>
+                      <form id="frmCommandLogSnapDir" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtCommandLogSnapDir" name="txtCommandLogSnapDir" value="" class="inputText">
+                    </form>
+                    </td>
+                  </tr>
+                   <tr>
+                    <td>DR Overflow</td>
+                    <td>
+                      <form id="frmDrOverflow" action="" method="get" class="form-horizontal">
+                      <input type="text" id="txtDrOverflow" name="txtDrOverflow" value="" class="inputText">
+                    </form>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+
+             <div class="drWrapperAdmin" id="divDrWrapperAdmin" >
+              <div class="headerAdminContent">
+                <h1>
+                  <div class="drAdminHeaderLeft">Database Replication (DR)</div>
+                  <div class="drAdminHeaderRight">
+                    <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
+                      <span class="editIcon"></span></a>
+                  </div>
+                  <div class="clear"></div>
+                </h1>
+              </div>
+              <div class="drContent">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl connectionSourceTbl">
+                  <tr id="row-DrConfig" class="rowDr">
+                    <td class="configLabel" width="62%">DR Enabled</td>
+                    <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
+                    <td align="right" width="13%"><div id="onOffIcon"></div></td>
+                    <td class="onOff" id="chkDrOnOffVal"width="10%"> On</td>
+                  </tr>
+                  <tr id="row-DrId" class="rowDr clsDrType">
+                    <td class="configLabel" width="62%">Id</td>
+                    <td>&nbsp;</td>
+                    <td align="right" id="lblDrId"></td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr id="rowDrPort" class="rowDr clsDrType">
+                    <td class="configLabel" width="62%">Port</td>
+                    <td>&nbsp;</td>
+                    <td align="right" id="lblDrPort"></td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="rowDr clsDrEnabled clsDrType" >
+                    <td class="configLabel" width="62%">Connection Source</td>
+                    <td align="right" class="tdDrConfig" width="15%">&nbsp;</td>
+                    <td align="right" width="13%"><div id="onOffConnectionIcon"></div></td>
+                    <td class="onOff" id="chkDrOnOffConnectionVal" width="10%"> On</td>
+                  </tr>
+                  <tr class="rowDr subLabelRow clsDrEnabled" style="display:none" id="row-master-cluster">
+                    <td class="configLabel label-master-cluster">Source</td>
+                    <td colspan="2" align="right"><span id="master-cluster-name"></span></td>
+                     <td>&nbsp;</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<div class="footer" id="mainFooter">
+  <p>Copyright © 2015 VoltDB. All rights reserved. </p>
+</div>
+<script src="{{ url_for('static', filename='js/jquery-1.11.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jquery.cookie.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jquery.validate.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jquery.multi-select.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vdm.config.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vdm.core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vdm.ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vdm.render.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vdm.serversetting.ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vdm.service.js') }}"></script>
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/icheck.js') }}"></script>
+<script>
+          $(document).ready(function(){
+			 
+			  
+            var callbacks_list = $('.mainContent');
+            $('.hasSubLabel td input, .security td input, .rowDr td input, .subLabelRow td ').on('ifCreated ifClicked ifChanged ifChecked ifUnchecked ifDisabled ifEnabled ifDestroyed', function(event){
+              callbacks_list.prepend();
+            }).iCheck({
+              checkboxClass: 'icheckbox_square-blue',
+              radioClass: 'iradio_square-blue',
+              increaseArea: '20%'
+            });
+			 // $("#input-4").fileinput({showCaption: false});
+			  
+			 $("#navbar li").click(function () {
+       $("#navbar li").removeClass('active');
+       $(this).addClass('active');
+       var activeLinkId = "";
+       var activeLink = $("#navbar li.active a");
+       if (activeLink.length > 0) {
+           activeLinkId = activeLink.attr("id");
+           if (activeLinkId == "serverSetting") {
+               $("#divDbManager").addClass("hidden");
+               $("#divServerSetting").removeClass("hidden");
+           }
+           else {
+               $("#divServerSetting").addClass("hidden");
+               $("#divDbManager").removeClass("hidden");
+           }
+           $("#navbar").removeClass("in");
+       }
+
+       //if (activeLinkId == "navSqlQuery")
+       //        return NavigationTabs.SQLQuery;
+       //
+       //    else if (activeLinkId == "navSchema")
+       //        return NavigationTabs.Schema;
+   });
+          });
+		  
+		  
+ 
+
+$("[rel=top]").tooltip({ placement: 'top'}); 
+$("[rel=left]").tooltip({ placement: 'left'}); 
+$("[rel=right]").tooltip({ placement: 'right'}); 
+$("[rel=bottom]").tooltip({ placement: 'bottom'}); 
+
+		
+
+		  </script>
+
+<!---overlay--->
+
+
+
+
+<!-- Create Database -->
+<div id="createDatabase" class="modal custom fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center modifiedModalCreateDB"> 
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Database
+        <a id="btnAddDatabase" data-toggle="modal" data-target="#addDatabase" class="addDatabase"> <span class="plus"></span>Add Database</a>
+        </h4>
+        
+      </div>
+      <div class="modal-body">
+        <div class="col-md-12 databaseContainer">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblDatabase" id="tblDatabaseList">
+          </table>
+      </div>
+
+       
+      </div>
+      <div class="modal-footer">
+      
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Create Database End -->          
+
+<!-- Add Server -->
+<div id="addServer" class="modal custom fade" role="dialog" data-serverid="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="addServerTitle">Add Server</h4>
+      </div>
+      <div class="modal-body" style="overflow:auto; height:300px;">
+        <form id="frmCreateServer" action="" method="get" class="form-horizontal">
+          <div class="form-group formServer">
+            <label for="serverName" class="col-sm-4 control-label" >Server Name:</label>
+            <div class="col-sm-8" >
+              <input type="text" id="serverName" name="serverName" >
+              <label id="errorServerName" for="serverName" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtHostName" class="col-sm-4 control-label" >Host Name:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtHostName" name="txtHostName" >
+              <label id="errorHostName" for="txtHostName" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtDescription" class="col-sm-4 control-label">Description:</label>
+            <div class="col-sm-8" >
+              <textarea type="text"  id="txtDescription" name="txtDescription" ></textarea>
+              <label id="errorDescription" for="txtDescription" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          
+          <div class="form-group formServer">
+            <label for="txtClientPort" class="col-sm-4 control-label" >Client Listener:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtClientPort" name="txtClientPort" >
+              <label id="errorClientPort" for="txtClientPort" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtAdminPort" class="col-sm-4 control-label" >Admin Listener:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtAdminPort" name="txtAdminPort" >
+              <label id="errorAdminPort" for="txtAdminPort" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtInternalPort" class="col-sm-4 control-label" >Internal Listener:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtInternalPort" name="txtInternalPort" >
+              <label id="errorInternalPort" for="txtInternalPort" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtHttpPort" class="col-sm-4 control-label" >HTTP Listener:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtHttpPort" name="txtHttpPort" >
+              <label id="errorHttpPort" for="txtHttpPort" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtZookeeper" class="col-sm-4 control-label" >Zookeeper Listener:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtZookeeper" name="txtZookeeper" >
+              <label id="errorZookeeper" for="txtZookeeper" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtReplicationPort" class="col-sm-4 control-label" >Replication Listener:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtReplicationPort" name="txtReplicationPort" >
+              <label id="errorReplicationPort" for="txtReplicationPort" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+
+          <div class="form-group formServer">
+            <label for="txtInternalInterface" class="col-sm-4 control-label" >Internal Interface:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtInternalInterface" name="txtInternalInterface" >
+              <label id="errorInternalInterface" for="txtInternalInterface" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtExternalInterface" class="col-sm-4 control-label" >External Interface:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtExternalInterface" name="txtExternalInterface" >
+              <label id="errorExternalInterface" for="txtExternalInterface" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtPublicInterface" class="col-sm-4 control-label" >Public Interface:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtPublicInterface" name="txtPublicInterface" >
+              <label id="errorPublicInterface" for="txtPublicInterface" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formServer">
+            <label for="txtPlacementGroup" class="col-sm-4 control-label" >Placement Group:</label>
+            <div class="col-sm-8">
+              <input type="text"  id="txtPlacementGroup" name="txtPlacementGroup" >
+              <label id="errorPlacementGroup" for="txtPlacementGroup" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+        </form>
+       
+      </div>
+      <div class="modal-footer">
+        <button id="btnCreateServerOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add Server End -->
+<!-- Save Confirmation -->
+<div id="saveConfirmation" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Save</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to save the changes?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" id="btnSaveOk" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" id="btnSaveCancel" data-dismiss="modal">Cancel</button>
+
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Save Confirmation End -->
+
+<!-- Stop Confirmation -->
+<div id="stopClusterConfirmation" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center"> 
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Start Cluster</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to start this cluster?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Stop Confirmation End --> 
+<!-- Delete Confirmation -->
+<div id="deleteConfirmation" class="modal fade" role="dialog" data-serverid="">
+  <div class="modal-dialog modal-dialog-center"> 
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Delete Server</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to delete this server?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="deleteServerOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Delete Confirmation -->
+<div  style="display: none">
+  <div class="overlay-title icon-alert"></div>
+  <div class="clear"></div>
+  <div class="overlay-content confirmationHeight"> </div>
+  <div class="overlay-btns"><a  class="btn closeBtn">Ok</a> <a id="close" class="btn btn-gray closeBtn">Cancel</a></div>
+</div>
+<!-- Delete Confirmation End --> 
+
+<!-- Save server Setting -->
+<div id="serverSaveCon" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center"> 
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Save</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to save the changes?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Save Server Setting End -->
+
+<!-- Export table -->
+<div id="expTable" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center"> 
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Export Tables</h4>
+      </div>
+      <div class="modal-body">
+        
+        <p>No Export tables available.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-dismiss="modal">Ok</button>
+     
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Export table End -->
+
+<!--Error -->
+<div id="errorDialog" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <h4 class="modal-title">Error</h4>
+        </div>
+        <div class="modal-body">
+            <p id="errorMsg"></p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" data-dismiss="modal">Ok</button>
+        </div>
+    </div>
+  </div>
+</div>
+<!--Error -->
+
+<!--Success -->
+<div id="successDialog" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <h4 class="modal-title">Success</h4>
+        </div>
+        <div class="modal-body">
+            <p id="successMsg"></p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" data-dismiss="modal">Ok</button>
+        </div>
+    </div>
+  </div>
+</div>
+<!--Success -->
+
+<!-- Add Database -->
+<div id="addDatabase" class="modal custom fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="dbTitle">Add Database</h4>
+      </div>
+      <div class="modal-body">
+        <form id="frmCreateDB" action="" method="get" class="form-horizontal" >
+          <div class="form-group formDB">
+            <label for="txtDbName" class="col-sm-3 control-label">Name:</label>
+            <div class="col-sm-9">
+              <input type="text" id="txtDbName" name="txtDbName">
+              <label id="errorDbName" for="txtDbName" class="error" style="display:none">This field is required</label>
+            </div>
+          </div>
+          <div class="form-group formDB">
+            <label for="txtDeployment" class="col-sm-3 control-label">Deployment:</label>
+            <div class="col-sm-9">
+              <input type="text" id="txtDeployment" name="txtDeployment">
+            </div>
+          </div>
+        </form>
+        <div class="noteDb" ><p>Note: <span class="txt-bold">Server can only be added after creating Database</span></p></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnAddDatabaseOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add Database End -->
+
+<!-- Edit Database -->
+<div id="editDatabase" class="modal fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Update Database</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to Edit this Database?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- End edit Database -->
+<!-- Delete Database -->
+<div id="deleteDatabase" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Delete Database</h4>
+      </div>
+      <div class="modal-body">
+        <p>Do you want to delete this Database?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btnDeleteDatabaseOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Delete Database -->
+
+<!--addExistingServer -->
+<div id="addExistingServer" class="modal custom fade" role="dialog">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Add Existing Server</h4>
+      </div>
+      <div class="modal-body">
+        <form action="">
+          <select multiple="multiple" id="selectServers" name="selectServers[]">
+            <!--<option value='elem_1'>elem 1</option>-->
+            <!--<option value='elem_2'>elem 2</option>-->
+            <!--<option value='elem_3'>elem 3</option>-->
+            <!--<option value='elem_4'>elem 4</option>-->
+            <!--<option value='elem_5'>elem 5</option>-->
+            <!--<option value='elem_6'>elem 6</option>-->
+            <!--<option value='elem_7'>elem 7</option>-->
+            <!--<option value='elem_8'>elem 8</option>-->
+            <!--<option value='elem_9'>elem 9</option>-->
+            <!--<option value='elem_10'>elem 10</option>-->
+            <!--<option value='elem_11'>elem 11</option>-->
+          </select>
+        </form>
+       </div>
+      <div class="modal-footer">
+        <button id="btnSelectDbOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- addExistingServer End -->
+
+
+<!-- Plus Export table -->
+<div id="plusExport" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center"> 
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="btnAddExportConfigTitle">Add Configuration</h4>
+        <div id="deleteExportConfig" class="delete-export"><span class="icon-delete"></span>Delete this configuration</div>
+      </div>
+      <div class="modal-body">
+        <form id="formAddExportConfiguration" method="get" action="" novalidate style="overflow:auto;">
+          <div id="addExportConfigWrapper" class="configWrapper-modal">
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveExportOk" type="button" class="btn" data-dismiss="modal">Save</button>
+        <button  id="btnSaveExportCancel" type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!--  Plus Export End -->  
+
+<!-- Plus Import table -->
+<div id="plusImport" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 id="addImportConfigTitle" class="modal-title">Import Tables</h4>
+        <div id="deleteImportConfig" class="delete-export"><span class="icon-delete"></span>Delete this configuration</div>
+      </div>
+      <div class="modal-body">
+        <form id="formAddImportConfiguration" method="get" action="" novalidate style="overflow:auto;">
+          <div id="addImportConfigWrapper" class="configWrapper-modal">
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveImportOk" type="button" class="btn" data-dismiss="modal">Save</button>
+        <button id="btnSaveImportCancel" type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Plus Import table End --> 
+<!-- Plus Security table -->
+<div id="plusSecurity" class="modal fade" role="dialog">
+  <div id="addUserInnerPopup" data-isupdate="" data-username="" data-role="">
+    <div class="modal-dialog modal-dialog-center modal-add-user">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title" id="btnAddSecurityTitle">Add User</h4>
+        <div id="deleteUser" class="delete-export"><span class="icon-delete"></span>Delete this configuration</div>
+      </div>
+        <div class="modal-body">
+          <form id="frmAddUser" method="get" action="" style="overflow:auto;">
+            <div id="addSecurityConfigWrapper" class="configWrapper-modal">
+
+            </div>
+          </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveUserOk" type="button" class="btn" data-dismiss="modal">Save</button>
+        <button id="btnCancelUser" type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+     
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+<!-- Plus Security table End -->
+
+<!-- Connection Source table -->
+<div id="connectionSource" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center connectionSourceModel">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Database Replication (DR) Configuration</h4>
+        <div class="delete-connection" id="btnDeleteConnection"><span class="icon-delete"></span>Delete this configuration</div>
+      </div>
+      <div class="modal-body">
+        <form id="frmDatabaseReplication" method="get" action="" novalidate style="overflow:auto;">
+          <div id="" class="configWrapper-modal">
+              <table width="100%" cellpadding="0" cellspacing="0" class="connectionSourceTblPopup">
+                <tr>
+                  <td width="5%">DR Enabled</td>
+                   <td width="10%">
+                     <span><input id="chkDrOnOffStatus" tabindex="6" type="checkbox" checked></span>
+                     <span id="chkDrOnOffValue" class="onOffDr" id="chkDrOnOffValue1">On</span>
+                   </td>
+
+                </tr>
+                <tr class="showHideDrConfig">
+                  <td>Id</td>
+                  <td id="trDrId" width="10%" align="">
+                    <input id="txtDrId" name="txtDrId" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                    <label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>
+                  </td>
+                </tr>
+                <tr class="showHideDrConfig" id="trDrPort">
+                    <td>Port</td>
+                    <td id="tdDrPort" width="10%" align="">
+                      <input id="txtDrPort" name="txtDrPort" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                      <label id="errorDrPort" for="txtDrPort" class="error ccErrorMsg" style="display: none;"></label>
+                    </td>
+                </tr>
+                <tr class="showHideDrConfig">
+                  <td><h4>Connection Source</h4></td>
+                  <td width="10%">
+                     <span><input id="chkConnectionSourceOnOff" tabindex="6" type="checkbox" checked></span>
+                     <span id="chkConnectionSourceOnOffValue" class="onOffDr">On</span>
+                   </td>
+                </tr>
+                <tr class="trConnectionSource showHideDrConfig">
+                  <td>Source</td>
+                  <td>
+                    <input id="txtDatabase" name="txtDatabase" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
+                    <label id="errorDatabase" for="txtDatabase" class="error ccErrorMsg" style="display: none;"></label>
+                  </td>
+                </tr>
+                <!--<tr id="trServerList" class="trConnectionSource showHideDrConfig">-->
+                  <!--<td>Servers</td>-->
+                  <!--<td id="trDrId1" width="10%" align="">-->
+                    <!--<input id="txtServers" name="txtServers" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">-->
+                    <!--<label id="errorServers" for="txtServers" class="error ccErrorMsg" style="display: none;"></label>-->
+                  <!--</td>-->
+                <!--</tr>-->
+
+                <tr class="showHideDrConfig" style="border-bottom:none;" >
+                  <td></td>
+                  <td colspan="3">
+                    <label id="drServers-error" class="error" for="drServers" style="display:none">No servers selected.</label>
+                  </td>
+                </tr>
+              </table>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveReplication" type="button" class="btn" data-dismiss="modal">Save</button>
+        <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Connection Source End -->
+<!-- Disk Limit -->
+<div id="diskLimit" class="modal fade" role="dialog" data-id="">
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Edit Disk Limit</h4>
+      </div>
+      <div class="modal-body">
+         <form id="formAddDiskLimit" method="get" action="" novalidate style="overflow:auto;">
+          <div id="addDiskLimitWrapper" class="configWrapper-modal">
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveDiskLimitOk" type="button" class="btn" data-dismiss="modal">Ok</button>
+        <button id="btnSaveDiskLimitCancel" type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Disk Limit End-->
+
+<div class="loader" ></div>
+</div>
+</body>
+</html>

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,9 +49,6 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     {
         super(connection);
         VoltSQL query = VoltSQL.parseSQL(sql);
-        // You must have one or more parameters (otherwise just use a regular statement)
-        if (/*!query.hasParameters() || */!query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
-            throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         this.Query = query;
         this.parameters = this.Query.getParameterArray();
         this.parameterMetaData = new JDBC4ParameterMetaData(this, this.Query.getParameterCount()); // to be replaced with actual param count (!)
@@ -64,14 +61,13 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
         if (isCallableStatement)
         {
             query = VoltSQL.parseCall(sql);
-            if (!query.isOfType(VoltSQL.TYPE_EXEC))
+            if (!query.isOfType(VoltSQL.TYPE_EXEC)) {
                 throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
+            }
         }
         else
         {
             query = VoltSQL.parseSQL(sql);
-            if (/*!query.hasParameters() || */!query.isOfType(VoltSQL.TYPE_SELECT,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
-                throw SQLError.get(SQLError.ILLEGAL_STATEMENT, sql);
         }
         this.Query = query;
         this.parameters = this.Query.getParameterArray();
@@ -81,8 +77,9 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     protected synchronized void checkParameterBounds(int parameterIndex) throws SQLException
     {
         checkClosed();
-        if ((parameterIndex < 1) || (parameterIndex > this.Query.getParameterCount()))
+        if ((parameterIndex < 1) || (parameterIndex > this.Query.getParameterCount())) {
             throw SQLError.get(SQLError.PARAMETER_NOT_FOUND, parameterIndex, this.Query.getParameterCount());
+        }
     }
 
     // Adds a set of parameters to this PreparedStatement object's batch of commands.
@@ -90,8 +87,9 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public void addBatch() throws SQLException
     {
         checkClosed();
-        if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_SELECT)) {
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
+        }
         this.addBatch(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
     }
@@ -119,8 +117,9 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public ResultSet executeQuery() throws SQLException
     {
         checkClosed();
-        if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_SELECT))
+        if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_SELECT)) {
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
+        }
         ResultSet result = this.executeQuery(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
         return result;
@@ -131,8 +130,9 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public int executeUpdate() throws SQLException
     {
         checkClosed();
-        if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_INSERT,VoltSQL.TYPE_UPDATE,VoltSQL.TYPE_DELETE))
+        if (!this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_UPDATE)) {
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
+        }
         int result = this.executeUpdate(this.Query.getExecutableQuery(this.parameters));
         this.parameters = this.Query.getParameterArray();
         return result;
@@ -441,6 +441,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
             case Types.VARBINARY:
             case Types.VARCHAR:
             case Types.NVARCHAR:
+            case Types.NULL:
                 this.parameters[parameterIndex-1] = VoltType.NULL_STRING_OR_VARBINARY;
                 break;
             default:

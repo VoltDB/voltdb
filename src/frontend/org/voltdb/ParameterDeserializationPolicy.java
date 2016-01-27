@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,13 +21,12 @@ import java.io.StringWriter;
 import java.io.Writer;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 
 /**
  * Check if the parameters of the sysproc can be deserialized successfully.
  */
-public class ParameterDeserializationPolicy extends InvocationAcceptancePolicy {
+public class ParameterDeserializationPolicy extends InvocationValidationPolicy {
     public ParameterDeserializationPolicy(boolean isOn) {
         super(isOn);
     }

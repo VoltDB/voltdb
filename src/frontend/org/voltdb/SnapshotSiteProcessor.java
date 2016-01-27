@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,23 +45,26 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
+import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ListMultimap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -116,6 +119,8 @@ public class SnapshotSiteProcessor {
     private static final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers =
         new HashMap<String, Map<Integer, Pair<Long, Long>>>();
 
+    private static final Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfo = new HashMap<>();
+
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
      * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
@@ -124,6 +129,18 @@ public class SnapshotSiteProcessor {
      * Decoupling them seems like a good idea in case snapshot code is every re-organized.
      */
     private Map<String, Map<Integer, Pair<Long,Long>>> m_exportSequenceNumbersToLogOnCompletion;
+
+    /**
+     * Same as m_exportSequenceNumbersToLogOnCompletion, but for m_drTupleStreamInfo
+     */
+    private Map<Integer, TupleStreamStateInfo> m_drTupleStreamInfoToLogOnCompletion;
+
+    /**
+     * Used to pass the last seen unique ids from remote datacenters into the snapshot
+     * termination path so it can publish it to ZK where it is extracted by rejoining
+     * nodes
+     */
+    private Map<Integer, Map<Integer, DRLogSegmentId>> m_remoteDCLastSeenIds;
 
     /*
      * Do some random tasks that are deferred to the snapshot termination thread.
@@ -170,7 +187,7 @@ public class SnapshotSiteProcessor {
     private long m_lastSnapshotTxnId;
     private final int m_snapshotPriority;
 
-    private boolean m_lastSnapshotSucceded = true;
+    private boolean m_perSiteLastSnapshotSucceded = true;
 
     /**
      * List of threads to join to block on snapshot completion
@@ -205,7 +222,7 @@ public class SnapshotSiteProcessor {
      * site that gets the setup permit will  use getExportSequenceNumbers to retrieve the full
      * set and reset the contents.
      */
-    public static void populateExportSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
+    public static void populateSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
         Database database = context.getDatabase();
         for (Table t : database.getTables()) {
             if (!CatalogUtil.isTableExportOnly(database, t))
@@ -225,6 +242,11 @@ public class SnapshotSiteProcessor {
                                 ackOffSetAndSequenceNumber[0],
                                 ackOffSetAndSequenceNumber[1]));
         }
+        TupleStreamStateInfo drStateInfo = context.getSiteProcedureConnection().getDRTupleStreamStateInfo();
+        m_drTupleStreamInfo.put(context.getPartitionId(), drStateInfo);
+        if (drStateInfo.containsReplicatedStreamInfo) {
+            m_drTupleStreamInfo.put(MpInitiator.MP_INIT_PID, drStateInfo);
+        }
     }
 
     public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {
@@ -232,6 +254,12 @@ public class SnapshotSiteProcessor {
             new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
         m_exportSequenceNumbers.clear();
         return sequenceNumbers;
+    }
+
+    public static Map<Integer, TupleStreamStateInfo> getDRTupleStreamStateInfo() {
+        Map<Integer, TupleStreamStateInfo> stateInfo = ImmutableMap.copyOf(m_drTupleStreamInfo);
+        m_drTupleStreamInfo.clear();
+        return stateInfo;
     }
 
     private long m_quietUntil = 0;
@@ -368,17 +396,21 @@ public class SnapshotSiteProcessor {
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds)
     {
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
         m_quietUntil = now + 200;
-        m_lastSnapshotSucceded = true;
+        m_perSiteLastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
+        m_drTupleStreamInfoToLogOnCompletion = drTupleStreamInfo;
+        m_remoteDCLastSeenIds = remoteDCLastIds;
 
         // Table doesn't implement hashCode(), so use the table ID as key
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
@@ -415,6 +447,12 @@ public class SnapshotSiteProcessor {
      */
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        //Basically asserts that there are no tasks with null targets at this point
+        //getTarget checks and crashes
+        for (SnapshotTableTask t : m_snapshotTableTasks.values()) {
+            t.getTarget();
+        }
+
         ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
         for (final SnapshotDataTarget target : targets) {
             if (target.needsFinalClose()) {
@@ -511,10 +549,10 @@ public class SnapshotSiteProcessor {
                             try {
                                 tableTask.m_target.close();
                             } catch (IOException e) {
-                                m_lastSnapshotSucceded = false;
+                                m_perSiteLastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             } catch (InterruptedException e) {
-                                m_lastSnapshotSucceded = false;
+                                m_perSiteLastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
 
@@ -568,6 +606,7 @@ public class SnapshotSiteProcessor {
                 break;
             }
 
+
             // Stream more and add a listener to handle any failures
             Pair<ListenableFuture, Boolean> streamResult =
                     m_streamers.get(tableId).streamMore(context, outputBuffers, null);
@@ -580,13 +619,18 @@ public class SnapshotSiteProcessor {
                         try {
                             writeFutures.get();
                         } catch (Throwable t) {
-                            if (m_lastSnapshotSucceded) {
-                                SNAP_LOG.error("Error while attempting to write snapshot data", t);
-                                m_lastSnapshotSucceded = false;
+                            if (m_perSiteLastSnapshotSucceded) {
+                                if (t instanceof StreamSnapshotTimeoutException ||
+                                        t.getCause() instanceof StreamSnapshotTimeoutException) {
+                                    //This error is already logged by the watchdog when it generates the exception
+                                } else {
+                                    SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                }
+                                m_perSiteLastSnapshotSucceded = false;
                             }
                         }
                     }
-                }, MoreExecutors.sameThreadExecutor());
+                }, CoreUtils.SAMETHREADEXECUTOR);
             }
 
             /**
@@ -638,11 +682,17 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
                         m_exportSequenceNumbersToLogOnCompletion;
+                final Map<Integer, TupleStreamStateInfo> drTupleStreamInfo =
+                        m_drTupleStreamInfoToLogOnCompletion;
+                final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds =
+                        m_remoteDCLastSeenIds;
                 m_exportSequenceNumbersToLogOnCompletion = null;
+                m_remoteDCLastSeenIds = null;
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
                     public void run() {
+                        boolean snapshotSucceeded = true;
                         try {
                             /*
                              * Be absolutely sure the snapshot is finished
@@ -662,10 +712,10 @@ public class SnapshotSiteProcessor {
                                 try {
                                     t.close();
                                 } catch (IOException e) {
-                                    m_lastSnapshotSucceded = false;
+                                    snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 } catch (InterruptedException e) {
-                                    m_lastSnapshotSucceded = false;
+                                    snapshotSucceeded = false;
                                     throw new RuntimeException(e);
                                 }
                             }
@@ -683,7 +733,6 @@ public class SnapshotSiteProcessor {
                             // ExecutionSitesCurrentlySnapshotting set, so
                             // logSnapshotCompletionToZK() will not see incorrect values
                             // from the next snapshot
-                            final boolean snapshotSucceeded = m_lastSnapshotSucceded;
 
                             try {
                                 VoltDB.instance().getHostMessenger().getZK().delete(
@@ -708,7 +757,11 @@ public class SnapshotSiteProcessor {
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
 
-                            logSnapshotCompleteToZK(txnId, snapshotSucceeded, exportSequenceNumbers);
+                            logSnapshotCompleteToZK(txnId,
+                                                    snapshotSucceeded,
+                                                    exportSequenceNumbers,
+                                                    drTupleStreamInfo,
+                                                    remoteDCLastIds);
                         }
                     }
                 };
@@ -732,7 +785,9 @@ public class SnapshotSiteProcessor {
     private static void logSnapshotCompleteToZK(
             long txnId,
             boolean snapshotSuccess,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         // Timeout after 10 minutes
@@ -768,10 +823,11 @@ public class SnapshotSiteProcessor {
                 jsonObj.put("hostCount", remainingHosts);
                 jsonObj.put("didSucceed", snapshotSuccess);
                 if (!snapshotSuccess) {
-                    SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
+                mergeDRTupleStreamInfo(jsonObj, drTupleStreamInfo);
+                mergeDRLastIds(jsonObj, remoteDCLastIds);
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
@@ -856,6 +912,84 @@ public class SnapshotSiteProcessor {
                     newObj.put("sequenceNumber", partitionSequenceNumber);
                     newObj.put("ackOffset", ackOffset);
                     sequenceNumbers.put(partitionIdString, newObj);
+                }
+            }
+        }
+    }
+
+    private static void mergeDRTupleStreamInfo(JSONObject jsonObj,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo) throws JSONException {
+        JSONObject stateInfoMap;
+        if (jsonObj.has("drTupleStreamStateInfo")) {
+            stateInfoMap = jsonObj.getJSONObject("drTupleStreamStateInfo");
+        } else {
+            stateInfoMap = new JSONObject();
+            jsonObj.put("drTupleStreamStateInfo", stateInfoMap);
+        }
+
+        for (Map.Entry<Integer, TupleStreamStateInfo> e : drTupleStreamInfo.entrySet()) {
+            final String partitionId = e.getKey().toString();
+            DRLogSegmentId partitionStateInfo;
+            if (e.getKey() != MpInitiator.MP_INIT_PID) {
+                partitionStateInfo = e.getValue().partitionInfo;
+            } else {
+                partitionStateInfo = e.getValue().replicatedInfo;
+            }
+            JSONObject existingStateInfo = stateInfoMap.optJSONObject(partitionId);
+            if (existingStateInfo == null || partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
+                JSONObject stateInfo = new JSONObject();
+                stateInfo.put("sequenceNumber", partitionStateInfo.drId);
+                stateInfo.put("spUniqueId", partitionStateInfo.spUniqueId);
+                stateInfo.put("mpUniqueId", partitionStateInfo.mpUniqueId);
+                stateInfo.put("drVersion", e.getValue().drVersion);
+                stateInfoMap.put(partitionId, stateInfo);
+            }
+        }
+    }
+
+    /*
+     * When recording snapshot completion we also record DR remote DC unique ids
+     * as JSON. Need to merge our unique ids with existing numbers
+     * since multiple replicas will submit the unique ids
+     */
+    private static void mergeDRLastIds(JSONObject jsonObj,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastId) throws JSONException {
+        //DR ids/unique ids for remote partitions indexed by remote datacenter id,
+        //each DC has a full partition set
+        JSONObject dcIdMap;
+        if (jsonObj.has("remoteDCLastIds")) {
+            dcIdMap = jsonObj.getJSONObject("remoteDCLastIds");
+        } else {
+            dcIdMap = new JSONObject();
+            jsonObj.put("remoteDCLastIds", dcIdMap);
+        }
+
+        for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> dcEntry : remoteDCLastId.entrySet()) {
+            //Last seen ids for a specific data center
+            JSONObject lastSeenIds;
+            final String dcKeyString = dcEntry.getKey().toString();
+            if (dcIdMap.has(dcKeyString)) {
+                lastSeenIds = dcIdMap.getJSONObject(dcKeyString);
+            } else {
+                lastSeenIds = new JSONObject();
+                dcIdMap.put(dcKeyString, lastSeenIds);
+            }
+
+            for (Map.Entry<Integer, DRLogSegmentId> partitionEntry : dcEntry.getValue().entrySet()) {
+                final String partitionIdString = partitionEntry.getKey().toString();
+                final Long lastSeenDRIdLong = partitionEntry.getValue().drId;
+                final Long lastSeenSpUniqueIdLong = partitionEntry.getValue().spUniqueId;
+                final Long lastSeenMpUniqueIdLong = partitionEntry.getValue().mpUniqueId;
+                long existingDRId = Long.MIN_VALUE;
+                if (lastSeenIds.has(partitionIdString)) {
+                    existingDRId = lastSeenIds.getJSONObject(partitionIdString).getLong("drId");
+                }
+                if (lastSeenDRIdLong > existingDRId) {
+                    JSONObject ids = new JSONObject();
+                    ids.put("drId", lastSeenDRIdLong);
+                    ids.put("spUniqueId", lastSeenSpUniqueIdLong);
+                    ids.put("mpUniqueId", lastSeenMpUniqueIdLong);
+                    lastSeenIds.put(partitionIdString, ids);
                 }
             }
         }

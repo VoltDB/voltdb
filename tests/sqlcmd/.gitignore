@@ -1,0 +1,6 @@
+/scripts/*/*.err
+/scripts/*/*.errclean
+/scripts/*/*.out
+/scripts/*/*.outclean
+/sqlcmdtest.report
+/sqlcmdtest-procs.jar

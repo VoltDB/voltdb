@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,6 +61,17 @@ public class PortGenerator {
         }
         throw new RuntimeException("Exhausted all possible admin ports");
     }
+
+    public synchronized int nextHttp() {
+        while(nextAport >= MIN_STATIC_PORT) {
+            int port = nextAport--;
+            if (MiscUtils.isBindable(port)) {
+                return port;
+            }
+        }
+        throw new RuntimeException("Exhausted all possible http ports");
+    }
+
     public synchronized void reset() {
         nextCport = VoltDB.DEFAULT_PORT+portOffset;
         nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;

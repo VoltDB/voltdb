@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -60,12 +60,14 @@ namespace voltdb {
 
 class Table;
 class PersistentTable;
-class SerializeInput;
+template <Endianess E> class SerializeInput;
 class TempTable;
 class TempTableLimits;
 class TableColumn;
 class TableIndex;
 class ExecutorContext;
+class DRTupleStream;
+class ExportTupleStream;
 
 class TableFactory {
 public:
@@ -80,12 +82,24 @@ public:
         const std::string &name,
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
+        char *signature,
+        bool tableIsMaterialized = false,
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
         bool exportOnly = false,
         int tableAllocationTargetSize = 0,
         int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95);
+        int32_t compactionThreshold = 95,
+        bool drEnabled = false);
+
+    static Table* getStreamedTableForTest(
+                voltdb::CatalogId databaseId,
+                const std::string &name,
+                TupleSchema* schema,
+                const std::vector<std::string> &columnNames,
+                ExportTupleStream* mockWrapper = NULL,
+                bool exportEnabled = false,
+                int32_t compactionThreshold = 95);
 
     /**
     * Creates an empty temp table with given name and columns.

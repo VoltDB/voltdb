@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -101,6 +101,8 @@ public class LeaderAppointer implements Promotable
     private boolean m_partitionDetected = false;
     private boolean m_usingCommandLog = false;
     private final AtomicBoolean m_replayComplete = new AtomicBoolean(false);
+    private final boolean m_expectingDrSnapshot;
+    private final AtomicBoolean m_snapshotSyncComplete = new AtomicBoolean(false);
     private final KSafetyStats m_stats;
 
     /*
@@ -230,6 +232,11 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashGlobalVoltDB("Detected node failure during command log replay. Cluster will shut down.",
                                              false, null);
                 }
+                // If we are a DR replica and starting from a snapshot, check if that has completed
+                if (m_expectingDrSnapshot && m_snapshotSyncComplete.get() == false) {
+                    VoltDB.crashGlobalVoltDB("Detected node failure during DR snapshot sync. Cluster will shut down.",
+                                             false, null);
+                }
                 // Check to see if there's been a possible network partition and we're not already handling it
                 if (m_partitionDetectionEnabled && !m_partitionDetected) {
                     doPartitionDetectionActivities(hostsOnRing);
@@ -307,7 +314,7 @@ public class LeaderAppointer implements Promotable
             SnapshotSchedule partitionSnapshotSchedule,
             boolean usingCommandLog,
             JSONObject topology, MpInitiator mpi,
-            KSafetyStats stats)
+            KSafetyStats stats, boolean expectingDrSnapshot)
     {
         m_hostMessenger = hm;
         m_zk = hm.getZK();
@@ -323,6 +330,7 @@ public class LeaderAppointer implements Promotable
         m_partSnapshotSchedule = partitionSnapshotSchedule;
         m_usingCommandLog = usingCommandLog;
         m_stats = stats;
+        m_expectingDrSnapshot = expectingDrSnapshot;
         if (m_partitionDetectionEnabled) {
             if (!testPartitionDetectionDirectory(m_partSnapshotSchedule))
             {
@@ -404,7 +412,7 @@ public class LeaderAppointer implements Promotable
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
                     LeaderElector.createRootIfNotExist(m_zk,
-                            LeaderElector.electionDirForPartition(i));
+                            LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, i));
                     watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
@@ -454,7 +462,7 @@ public class LeaderAppointer implements Promotable
                 }
 
                 int partId = master.getKey();
-                String dir = LeaderElector.electionDirForPartition(partId);
+                String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partId);
                 m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
                 Pair<BabySitter, List<String>> sitterstuff =
                         BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
@@ -492,7 +500,7 @@ public class LeaderAppointer implements Promotable
     void watchPartition(int pid, ExecutorService es, boolean shouldBlock)
         throws InterruptedException, ExecutionException
     {
-        String dir = LeaderElector.electionDirForPartition(pid);
+        String dir = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, pid);
         m_callbacks.put(pid, new PartitionCallback(pid));
         BabySitter babySitter;
 
@@ -851,6 +859,10 @@ public class LeaderAppointer implements Promotable
     public void onReplayCompletion()
     {
         m_replayComplete.set(true);
+    }
+
+    public void onSyncSnapshotCompletion() {
+        m_snapshotSyncComplete.set(true);
     }
 
     public void shutdown()

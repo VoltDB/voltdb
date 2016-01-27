@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,8 +64,8 @@ public:
     ~CompactingMapTest() {
     }
 
-    void print(voltdb::CompactingMap<int, int, IntComparator> &m) {
-        voltdb::CompactingMap<int, int, IntComparator>::iterator iter;
+    void print(voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> &m) {
+        voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator iter;
 
         printf(" compactmap [ ");
         for (iter = m.begin(); !iter.isEnd(); iter.moveNext()) {
@@ -105,7 +105,7 @@ public:
      */
     void verifyIterators(std::multimap<std::string, std::string> &stl,
                          std::multimap<std::string, std::string>::iterator &stli,
-                         voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator &volti,
+                         voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator &volti,
                          std::string val, int *chainCounter)
     {
         std::vector<std::string> stlv;
@@ -152,7 +152,7 @@ TEST_F(CompactingMapTest, Benchmark) {
     const int ITERATIONS = 1000;
 
     std::map<std::string,std::string> stl;
-    voltdb::CompactingMap<std::string, std::string, StringComparator> volt(true, StringComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator> volt(true, StringComparator());
 
     timeval tp;
     gettimeofday(&tp, NULL);
@@ -187,7 +187,7 @@ TEST_F(CompactingMapTest, Benchmark) {
     // printf("Time elapsed: %.2f\n", (t2 - t1) / static_cast<double>(1000));
     // fflush(stdout);
 
-    voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator iter;
 
     for (int i = 0; i < ITERATIONS; i++) {
         volt.insert(std::pair<std::string,std::string>(keyFromInt(i),keyFromInt(i)));
@@ -233,7 +233,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
     const int ITERATIONS = 1000;
 
     std::map<std::string,std::string> stl;
-    voltdb::CompactingMap<std::string, std::string, StringComparator> volt(false, StringComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator> volt(false, StringComparator());
 
     std::map<std::string,std::string>::const_iterator iter_stl;
 
@@ -259,7 +259,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
      stl.insert(std::pair<std::string,std::string>(val,val));
      }
 
-    voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator iter;
 
     // printf("Inserting into the VoltDB Map\n");
 
@@ -325,7 +325,7 @@ TEST_F(CompactingMapTest, BenchmarkDel) {
 }
 
 TEST_F(CompactingMapTest, Bounds) {
-    voltdb::CompactingMap<int, int, IntComparator> volt(true, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> volt(true, IntComparator());
 
     ASSERT_TRUE(volt.lowerBound(1).isEnd());
     ASSERT_TRUE(volt.upperBound(1).isEnd());
@@ -358,7 +358,7 @@ TEST_F(CompactingMapTest, Bounds) {
     }
 
     // test range
-    voltdb::CompactingMap<int, int, IntComparator> volt2(false, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> volt2(false, IntComparator());
 
     volt2.insert(std::pair<int,int>(0,0));
     volt2.insert(std::pair<int,int>(1,666));
@@ -370,7 +370,7 @@ TEST_F(CompactingMapTest, Bounds) {
     volt2.insert(std::pair<int,int>(3,3));
     volt2.insert(std::pair<int,int>(3,999));
 
-    std::pair<voltdb::CompactingMap<int, int, IntComparator>::iterator, voltdb::CompactingMap<int, int, IntComparator>::iterator> p;
+    std::pair<voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator, voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator> p;
 
     p = volt2.equalRange(1);
     ASSERT_TRUE(p.first.value() == 666);
@@ -391,7 +391,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
     const int BATCH_COUNT = 10;
 
     std::map<std::string, int> stl;
-    voltdb::CompactingMap<std::string, int, StringComparator> volt(false, StringComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, int>, StringComparator> volt(false, StringComparator());
 
     std::map<std::string,std::string>::const_iterator iter_stl;
 
@@ -404,7 +404,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
         }
     }
 
-    voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator iter;
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator iter;
 
     // printf("Inserting into the VoltDB Map\n");
 
@@ -453,7 +453,7 @@ TEST_F(CompactingMapTest, BenchmarkMulti) {
 }
 
 TEST_F(CompactingMapTest, Trivial) {
-    voltdb::CompactingMap<int, int, IntComparator> m(true, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> m(true, IntComparator());
     bool success = m.insert(std::pair<int,int>(2,2));
     ASSERT_TRUE(success);
     success = m.insert(std::pair<int,int>(1,1));
@@ -463,7 +463,7 @@ TEST_F(CompactingMapTest, Trivial) {
 
     ASSERT_TRUE(m.verify());
 
-    voltdb::CompactingMap<int, int, IntComparator> m2(false, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> m2(false, IntComparator());
     success = m2.insert(std::pair<int,int>(1,1));
     ASSERT_TRUE(success);
     success = m2.insert(std::pair<int,int>(1,1));
@@ -490,11 +490,11 @@ TEST_F(CompactingMapTest, RandomUnique) {
     const int DELETE = 1;
 
     std::map<int,int> stl;
-    voltdb::CompactingMap<int, int, IntComparator> volt(true, IntComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> volt(true, IntComparator());
     ASSERT_TRUE(volt.verify());
 
     std::map<int,int>::const_iterator stli;
-    voltdb::CompactingMap<int, int, IntComparator>::iterator volti;
+    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator volti;
 
     srand(0);
 
@@ -560,10 +560,10 @@ TEST_F(CompactingMapTest, RandomMulti) {
     const int TOTAL_OPS = 8;
 
     std::multimap<std::string, std::string> stl;
-    voltdb::CompactingMap<std::string, std::string, StringComparator> volt(false, StringComparator());
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator> volt(false, StringComparator());
 
     std::multimap<std::string, std::string>::iterator stli;
-    voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator volti;
+    voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator volti;
 
     srand(0);
 
@@ -714,7 +714,7 @@ TEST_F(CompactingMapTest, RandomMulti) {
         //
         else if (op == EQ_RANGE) {
             std::pair<std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> stli_pair;
-            std::pair<voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator, voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator> volti_pair;
+            std::pair<voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator, voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator> volti_pair;
             stli_pair = stl.equal_range(val);
             volti_pair = volt.equalRange(val);
 
@@ -766,7 +766,7 @@ TEST_F(CompactingMapTest, RandomMulti) {
 // --izzy 3/22/2011
 //
 // TEST_F(CompactingMapTest, bytesAllocated) {
-//     voltdb::CompactingMap<int, int, IntComparator> volt(true, IntComparator());
+//     voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> volt(true, IntComparator());
 //
 //     int64_t entry_size = 40; // magic
 //     int64_t bigsize = 2L * (1024L * 1024L * 1024L) + (1024L * 1024L * 10L);

@@ -20,15 +20,17 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
-import com.google_voltpatches.common.annotations.GwtIncompatible;
+import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.common.annotations.VisibleForTesting;
 
-import java.util.ArrayDeque;
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Queue;
 
 /**
  * A non-blocking queue which automatically evicts elements from the head of the queue when
- * attempting to add new elements onto the queue and it is full.
+ * attempting to add new elements onto the queue and it is full. This data structure is logically
+ * equivalent to a circular buffer (i.e., cyclic buffer or ring buffer).
  *
  * <p>An evicting queue must be configured with a maximum size. Each time an element is added
  * to a full queue, the queue automatically removes its head element. This is different from
@@ -40,15 +42,16 @@ import java.util.Queue;
  * @since 15.0
  */
 @Beta
-@GwtIncompatible("java.util.ArrayDeque")
-public final class EvictingQueue<E> extends ForwardingQueue<E> {
+@GwtCompatible
+public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serializable {
 
   private final Queue<E> delegate;
-  private final int maxSize;
+
+  @VisibleForTesting final int maxSize;
 
   private EvictingQueue(int maxSize) {
     checkArgument(maxSize >= 0, "maxSize (%s) must >= 0", maxSize);
-    this.delegate = new ArrayDeque<E>(maxSize);
+    this.delegate = Platform.newFastestQueue(maxSize);
     this.maxSize = maxSize;
   }
 
@@ -62,7 +65,18 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
     return new EvictingQueue<E>(maxSize);
   }
 
-  @Override protected Queue<E> delegate() {
+  /**
+   * Returns the number of additional elements that this queue can accept without evicting;
+   * zero if the queue is currently full.
+   *
+   * @since 16.0
+   */
+  public int remainingCapacity() {
+    return maxSize - size();
+  }
+
+  @Override
+  protected Queue<E> delegate() {
     return delegate;
   }
 
@@ -72,7 +86,8 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
    *
    * @return {@code true} always
    */
-  @Override public boolean offer(E e) {
+  @Override
+  public boolean offer(E e) {
     return add(e);
   }
 
@@ -82,8 +97,9 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
    *
    * @return {@code true} always
    */
-  @Override public boolean add(E e) {
-    checkNotNull(e);  // check before removing
+  @Override
+  public boolean add(E e) {
+    checkNotNull(e); // check before removing
     if (maxSize == 0) {
       return true;
     }
@@ -94,7 +110,8 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
     return true;
   }
 
-  @Override public boolean addAll(Collection<? extends E> collection) {
+  @Override
+  public boolean addAll(Collection<? extends E> collection) {
     return standardAddAll(collection);
   }
 
@@ -108,7 +125,7 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> {
     return delegate().remove(checkNotNull(object));
   }
 
-  // TODO(user): Do we want to checkNotNull each element in containsAll, removeAll, and retainAll?
+  // TODO(kak): Do we want to checkNotNull each element in containsAll, removeAll, and retainAll?
 
-  // TODO(user): Do we want to add EvictingQueue#isFull()?
+  private static final long serialVersionUID = 0L;
 }

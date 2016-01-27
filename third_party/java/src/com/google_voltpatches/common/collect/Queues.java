@@ -257,8 +257,13 @@ public final class Queues {
    * @throws InterruptedException if interrupted while waiting
    */
   @Beta
-  public static <E> int drain(BlockingQueue<E> q, Collection<? super E> buffer, int numElements,
-      long timeout, TimeUnit unit) throws InterruptedException {
+  public static <E> int drain(
+      BlockingQueue<E> q,
+      Collection<? super E> buffer,
+      int numElements,
+      long timeout,
+      TimeUnit unit)
+      throws InterruptedException {
     Preconditions.checkNotNull(buffer);
     /*
      * This code performs one System.nanoTime() more than necessary, and in return, the time to
@@ -297,8 +302,12 @@ public final class Queues {
    * @return the number of elements transferred
    */
   @Beta
-  public static <E> int drainUninterruptibly(BlockingQueue<E> q, Collection<? super E> buffer, 
-      int numElements, long timeout, TimeUnit unit) {
+  public static <E> int drainUninterruptibly(
+      BlockingQueue<E> q,
+      Collection<? super E> buffer,
+      int numElements,
+      long timeout,
+      TimeUnit unit) {
     Preconditions.checkNotNull(buffer);
     long deadline = System.nanoTime() + unit.toNanos(timeout);
     int added = 0;
@@ -360,7 +369,6 @@ public final class Queues {
    * @return a synchronized view of the specified queue
    * @since 14.0
    */
-  @Beta
   public static <E> Queue<E> synchronizedQueue(Queue<E> queue) {
     return Synchronized.queue(queue, null);
   }
@@ -392,7 +400,6 @@ public final class Queues {
    * @return a synchronized view of the specified deque
    * @since 15.0
    */
-  @Beta
   public static <E> Deque<E> synchronizedDeque(Deque<E> deque) {
     return Synchronized.deque(deque, null);
   }

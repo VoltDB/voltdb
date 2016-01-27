@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,19 +24,21 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -64,16 +66,18 @@ public class MpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void configure(BackendTarget backend, String serializedCatalog,
+    public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway drGateway,
-                          String coreBindIds)
+                          ProducerDRGateway drGateway,
+                          ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -81,8 +85,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
             backend = BackendTarget.NATIVE_EE_JNI;
         }
 
-        super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
+        super.configureCommon(backend, catalogContext, serializedCatalog,
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds,
+                null, null, consumerDRGateway);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
@@ -96,7 +101,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
     }
 
@@ -115,9 +120,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
                 // term syslogs the start of leader promotion.
-                Long txnid = Long.MIN_VALUE;
+                long txnid = Long.MIN_VALUE;
+                DRLogSegmentId drLogInfo = null;
+                long localMpUniqueId = Long.MIN_VALUE;
                 try {
-                    txnid = repair.start().get();
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
+                    drLogInfo = res.m_binaryLogInfo;
+                    localMpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -153,6 +163,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    if (m_consumerDRGateway != null) {
+                        m_consumerDRGateway.beginPromotePartition(m_partitionId, drLogInfo, localMpUniqueId);
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during

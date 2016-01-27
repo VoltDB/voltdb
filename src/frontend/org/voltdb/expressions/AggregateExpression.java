@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,7 +58,7 @@ public class AggregateExpression extends AbstractExpression {
         return result;
     }
 
-
+    private final String FLOAT_AGG_ERR_MSG = "Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.";
     @Override
     public void finalizeValueTypes()
     {
@@ -67,11 +67,17 @@ public class AggregateExpression extends AbstractExpression {
         switch (type) {
         case AGGREGATE_COUNT:
         case AGGREGATE_COUNT_STAR:
+        case AGGREGATE_APPROX_COUNT_DISTINCT:
+        case AGGREGATE_HYPERLOGLOGS_TO_CARD:
             //
             // Always an integer
             //
             m_valueType = VoltType.BIGINT;
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            break;
+        case AGGREGATE_VALS_TO_HYPERLOGLOG:
+            m_valueType = VoltType.VARBINARY;
+            m_valueSize = 65537;
             break;
         case AGGREGATE_AVG:
         case AGGREGATE_MAX:
@@ -81,6 +87,11 @@ public class AggregateExpression extends AbstractExpression {
             //
             m_valueType = m_left.getValueType();
             m_valueSize = m_left.getValueSize();
+            // Of these aggregate functions, only AVG is
+            // non-deterministic on floating point types.
+            if (m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
+                updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
+            }
             break;
         case AGGREGATE_SUM:
             if (m_left.getValueType() == VoltType.TINYINT ||
@@ -91,6 +102,9 @@ public class AggregateExpression extends AbstractExpression {
             } else {
                 m_valueType = m_left.getValueType();
                 m_valueSize = m_left.getValueSize();
+            }
+            if (m_valueType == VoltType.FLOAT) {
+                updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
             }
             break;
         default:

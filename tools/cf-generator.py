@@ -30,7 +30,7 @@ TEMPLATE = r"""
             "Description": "VoltDB example to start. (voter, json-sessions, voltcache, voltkv, windowing)",
             "Type": "String",
             "Default": "voter",
-            "AllowedValues": ["voter", "json-sessions", "voltcache", "voltkv", "windowing"],
+            "AllowedValues": ["voter", "json-sessions", "voltkv", "windowing"],
             "ConstraintDescription": "must be a valid VoltDB example name."
         }
     },
@@ -51,7 +51,7 @@ TEMPLATE = r"""
         },
 
         "AWSRegionArch2AMI": {
-            "us-east-1"     : { "64": "ami-ba28c7d2", "64HVM": "NOT YET SUPPORTED" }
+            "us-east-1"     : { "64": "$amiid", "64HVM": "NOT YET SUPPORTED" }
         }
     },
 
@@ -125,18 +125,26 @@ TEMPLATE = r"""
                                                                      "cfn-init -s ", { "Ref": "AWS::StackId" }, " -r DBServer1 ",
                                                                      "    --region ", { "Ref": "AWS::Region" }, " || error_exit 'Failed to run cfn-init'\n",
 
+                                                                     "# Sync clocks so that they are close enough to start a cluster\n",
+                                                                     "service ntp stop\n",
+                                                                     "a=\"1.0\"\n",
+                                                                     "while [ $$(echo \"$${a#-}>0.05\" | bc) -eq 1 ];\n",
+                                                                     "do a=`ntpdate -b -p 8 time1.google.com | awk '{ print $$10 }'`; done\n",
+                                                                     "\n",
+
                                                                      "# Start VoltDB as user voltdb\n",
                                                                      "sudo su - voltdb -c bash << EOF\n",
-                                                                     "cd ", { "Ref": "Example" }, "; ./run.sh catalog\n",
-                                                                     "echo \"Starting VoltDB server\"\n",
-                                                                     "../../bin/voltdb create -B -H `hostname -I | awk '{ print $$1 }'` -l ../../voltdb/license.xml -d /tmp/deployment.xml ", { "Ref": "Example" }, ".jar\n",
+                                                                     "exec > /tmp/script.out 2>&1\n",
+                                                                     "set -x\n",
+                                                                     "cd ", { "Ref": "Example" },
+                                                                     ";echo \"Starting VoltDB server\"\n",
+                                                                     "../../bin/voltdb create -B -H `hostname -I` -l ../../voltdb/license.xml -d /tmp/deployment.xml\n",
                                                                      "\n",
-                                                                     "status=255\n",
-                                                                     "while [ \\$$status != 0 ]; do\n",
+                                                                     "while true; do\n",
                                                                      "    sleep 1\n",
-                                                                     "    ../../bin/sqlcmd --query=\"exec @Statistics memory 0;\" > /dev/null 2>&1\n",
-                                                                     "    status=\\$$?\n",
+                                                                     "    ../../bin/sqlcmd --query=exec\\ @Statistics\\ MEMORY\\ 0 </dev/null && break\n",
                                                                      "done\n",
+                                                                     "./run.sh init\n",
                                                                      "EOF\n",
                                                                      "\n",
                                                                      "# All is well so signal success\n",
@@ -277,8 +285,8 @@ SERVER_TEMPLATE = r"""
                                                                      "# Sync clocks so that they are close enough to start a cluster\n",
                                                                      "service ntp stop\n",
                                                                      "a=\"1.0\"\n",
-                                                                     "while [ $$(echo \"$${a#-}>0.08\" | bc) -eq 1 ];\n",
-                                                                     "do a=`ntpdate -p 8 ", { "Fn::GetAtt": [ "DBServer1", "PrivateIp" ]}, " | awk '{ print $$10 }'`; done\n",
+                                                                     "while [ $$(echo \"$${a#-}>0.05\" | bc) -eq 1 ];\n",
+                                                                     "do a=`ntpdate -b -p 8 time1.google.com | awk '{ print $$10 }'`; done\n",
                                                                      "\n",
 
                                                                      "# Initialize\n",
@@ -287,9 +295,9 @@ SERVER_TEMPLATE = r"""
 
                                                                      "# Start VoltDB as user voltdb\n",
                                                                      "sudo su - voltdb -c bash << EOF\n",
-                                                                     "cd ", { "Ref": "Example" }, "; ./run.sh catalog\n",
-                                                                     "echo \"Starting VoltDB server\"\n",
-                                                                     "../../bin/voltdb create -B -H ", { "Fn::GetAtt": [ "DBServer1", "PrivateIp" ]}, " -l ../../voltdb/license.xml -d /tmp/deployment.xml ", { "Ref": "Example" }, ".jar\n",
+                                                                     "cd ", { "Ref": "Example" },
+                                                                     ";echo \"Starting VoltDB server\"\n",
+                                                                     "../../bin/voltdb create -B -H ", { "Fn::GetAtt": [ "DBServer1", "PrivateIp" ]}, " -l ../../voltdb/license.xml -d /tmp/deployment.xml\n",
                                                                      "EOF\n"
                                                                  ]]}}
             }
@@ -297,12 +305,13 @@ SERVER_TEMPLATE = r"""
 """
 
 def main():
-    if (len(sys.argv) != 3):
-        print "Usage: %s HOSTCOUNT KSAFETY" % (sys.argv[0])
+    if (len(sys.argv) != 4):
+        print "Usage: %s HOSTCOUNT KSAFETY AMI-ID" % (sys.argv[0])
         return -1
 
     params = dict(hosts=int(sys.argv[1]),
                   ksafety=int(sys.argv[2]),
+                  amiid=sys.argv[3],
                   zone="",
                   zone_ref="")
 

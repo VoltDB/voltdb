@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
     public final SQLStmt r_getCIDData = new SQLStmt(
-            "SELECT * FROM replicated WHERE cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM replicated r INNER JOIN dimension d ON r.cid=d.cid WHERE r.cid = ? ORDER BY cid, rid desc;");
 
     public final SQLStmt r_cleanUp = new SQLStmt(
             "DELETE FROM replicated WHERE cid = ? and cnt < ?;");
@@ -39,6 +39,9 @@ public class ReplicatedUpdateBaseProc extends UpdateBaseProc {
 
     public final SQLStmt r_insert = new SQLStmt(
             "INSERT INTO replicated VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+
+    public final SQLStmt r_export = new SQLStmt(
+            "INSERT INTO replicated_export VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     // This is for DR. Make sure that the MP transaction gets inserted into the same place in the txn stream
     // at the master and replica.  If they differ, we should get a hash mismatch at the Doctor Agent since we've

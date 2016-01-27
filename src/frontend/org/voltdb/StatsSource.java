@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,7 +77,7 @@ public abstract class StatsSource {
 
         // Fill in an empty table for m_table so we're not returning null before
         // tick() populates stats (in the EE cases, at least)
-        m_table = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
+        resetStatsTable();
 
         m_isEEStats = isEE;
     }
@@ -159,6 +159,15 @@ public abstract class StatsSource {
      */
     public void setStatsTable(VoltTable statsTable) {
         m_table = statsTable;
+    }
+
+    /**
+     * Reset the VoltTable which contains the statistics.  Only sources which use
+     * VoltTable to keep track of statistics need to use this.  Allows
+     * clients to reset the tracking table without having to build an empty stats table and call setStatsTable()
+     */
+    public void resetStatsTable() {
+        m_table = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
     }
 
     private Long now = System.currentTimeMillis();

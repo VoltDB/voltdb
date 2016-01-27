@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,21 +30,22 @@ import java.util.Map;
 import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.json_voltpatches.JSONObject;
+import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 {
     String testout_jar;
 
-    private VoltCompiler compileForDDLTest(String project) {
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(project);
-        projectFile.deleteOnExit();
-        final String projectPath = projectFile.getPath();
+    private VoltCompiler compileForDDLTest2(String ddl) throws Exception {
+        String ddlPath = getPathForSchema(ddl);
         final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        boolean success = compiler.compileFromDDL(testout_jar, ddlPath);
         assertTrue("Catalog compile failed!", success);
         return compiler;
     }
@@ -68,77 +69,44 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         tjar.delete();
     }
 
-    boolean moveToMatchingRow(VoltTable table, String columnName,
-                              String columnValue)
-    {
-        boolean found = false;
-        table.resetRowPosition();
-        while (table.advanceRow())
-        {
-            if (((String)table.get(columnName, VoltType.STRING)).
-                    equalsIgnoreCase(columnValue.toUpperCase()))
-            {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    }
-
-    boolean moveToMatchingTupleRow(VoltTable table, String column1Name,
-                              String column1Value, String column2Name,
-                              String column2Value)
-    {
-        boolean found = false;
-        table.resetRowPosition();
-        while (table.advanceRow())
-        {
-            if (((String)table.get(column1Name, VoltType.STRING)).
-                    equalsIgnoreCase(column1Value.toUpperCase()) &&
-                    ((String)table.get(column2Name, VoltType.STRING)).
-                    equalsIgnoreCase(column2Value.toUpperCase()))
-            {
-                found = true;
-                break;
-            }
-        }
-        return found;
-    }
-
-    public void testGetTables()
+    public void testGetTables() throws Exception
     {
         String schema =
-            "create table Table1 (Column1 varchar(10), Column2 integer);" +
+            "create table Table1 (Column1 varchar(10) not null, Column2 integer);" +
+            "partition table Table1 on column Column1;" +
             "create table Table2 (Column1 integer);" +
             "create view View1 (Column1, num) as select Column1, count(*) from Table1 group by Column1;" +
-            "create table Export1 (Column1 integer);";
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "  <database name='database'>" +
-            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
-            "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
-            "    <export><tables><table name = \"Export1\"/></tables></export>" +
-            "  </database>" +
-            "</project>";
-
-        VoltCompiler c = compileForDDLTest(project);
+            "create view View2 (Column2, num) as select Column2, count(*) from Table1 group by Column2;" +
+            "create table Export1 (Column1 integer);" +
+            "export table Export1;" +
+            "create table Export2 (Column1 integer);" +
+            "export table Export2 to stream foo;" +
+            "create procedure sample as select * from Table1;";
+        VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable tables = dut.getMetaData("tables");
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
-        assertEquals(4, tables.getRowCount());
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
+        assertEquals(6, tables.getRowCount());
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "Table2"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\"}"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table2"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "View1"));
+        assertEquals(null, tables.get("REMARKS", VoltType.STRING));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
-        assertTrue(moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals(new JSONObject("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}").toString()));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View2"));
+        assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals(new JSONObject("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}").toString()));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
-        assertFalse(moveToMatchingRow(tables, "TABLE_NAME", "NotATable"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export2"));
+        assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
+        assertFalse(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "NotATable"));
     }
 
     private void assertWithNullCheck(Object expected, Object value, VoltTable table)
@@ -168,7 +136,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                                   VoltTable columns,
                                   Object[] expected)
     {
-        assertTrue(moveToMatchingRow(columns, "COLUMN_NAME", columnName));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(columns, "COLUMN_NAME", columnName));
         assertEquals(expected[0], columns.get("DATA_TYPE", VoltType.INTEGER));
         assertTrue("SQL Typename mismatch",
                    columns.get("TYPE_NAME", VoltType.STRING).equals(expected[1]));
@@ -195,7 +163,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      columns.get("ORDINAL_POSITION", VoltType.INTEGER));
     }
 
-    public void testGetColumns()
+    public void testGetColumns() throws Exception
     {
         HashMap<String, Object[]> refcolumns = new HashMap<String, Object[]>();
         refcolumns.put("Column1", new Object[] {java.sql.Types.VARCHAR,
@@ -345,24 +313,17 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         String schema =
             "create table Table1 (Column1 varchar(200) not null, Column2 tinyint);" +
             "create table Table2 (Column3 smallint not null, Column4 integer, Column5 bigint not null);" +
+            "partition table Table2 on column Column3;" +
             "create table Table3 (Column6 float, Column7 timestamp not null, Column8 decimal);" +
             "create table Table4 (Column9 varbinary(250) not null);" +
             "create view View1 (Column10, Column11) as select Column1, count(*) from Table1 group by Column1;" +
-            "create table Table5 (Default1 tinyint default 10, Default2 varchar(50) default 'DUDE');";
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "  <database name='database'>" +
-            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
-            "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
-            "    <partitions><partition table='Table2' column='Column3'/></partitions>" +
-            "  </database>" +
-            "</project>";
+            "create table Table5 (Default1 tinyint default 10, Default2 varchar(50) default 'DUDE');" +
+            "create procedure sample as select * from Table1;";
 
-        VoltCompiler c = compileForDDLTest(project);
+        VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable columns = dut.getMetaData("ColUmns");
         System.out.println(columns);
         assertEquals(23, columns.getColumnCount());
@@ -373,60 +334,53 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         }
     }
 
-    public void testGetIndexInfo()
+    public void testGetIndexInfo() throws Exception
     {
         String schema =
             "create table Table1 (Column1 smallint ASSUMEUNIQUE, Column2 integer, Column3 bigint not null, Column4 integer, Column5 integer, " +
             "  constraint pk_tree primary key (Column1, Column3));" +
+            "partition table Table1 on column Column3;" +
             "create index Index1_tree on Table1 (Column2, Column3);" +
-            "create index Index2_hash on Table1 (Column4, Column5);";
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "  <database name='database'>" +
-            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
-            "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
-            "    <partitions><partition table='Table1' column='Column3'/></partitions>" +
-            "  </database>" +
-            "</project>";
+            "create index Index2_hash on Table1 (Column4, Column5);" +
+            "create procedure sample as select * from Table1;";
 
-        VoltCompiler c = compileForDDLTest(project);
+        VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable indexes = dut.getMetaData("IndexInfo");
         System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
         assertEquals(7, indexes.getRowCount());
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column2"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column3"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX1_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexOther,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column4"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column4"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column5"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME", "INDEX2_HASH", "COLUMN_NAME", "Column5"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)1, indexes.get("NON_UNIQUE", VoltType.TINYINT));
         assertEquals(java.sql.DatabaseMetaData.tableIndexHashed,
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals(null, indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
                 HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
@@ -434,7 +388,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
                 HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_TREE", "COLUMN_NAME", "Column3"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
@@ -442,7 +396,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)2, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertTrue(moveToMatchingTupleRow(indexes, "INDEX_NAME",
+        assertTrue(VoltTableTestHelpers.moveToMatchingTupleRow(indexes, "INDEX_NAME",
                 HSQLInterface.AUTO_GEN_CONSTRAINT_PREFIX+"TABLE1_COLUMN1", "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", indexes.get("TABLE_NAME", VoltType.STRING));
         assertEquals((byte)0, indexes.get("NON_UNIQUE", VoltType.TINYINT));
@@ -450,83 +404,69 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
                      indexes.get("TYPE", VoltType.SMALLINT));
         assertEquals((short)1, indexes.get("ORDINAL_POSITION", VoltType.SMALLINT));
         assertEquals("A", indexes.get("ASC_OR_DESC", VoltType.STRING));
-        assertFalse(moveToMatchingRow(indexes, "COLUMN_NAME", "NotAColumn"));
+        assertFalse(VoltTableTestHelpers.moveToMatchingRow(indexes, "COLUMN_NAME", "NotAColumn"));
     }
 
-    public void testGetPrimaryKeys()
+    public void testGetPrimaryKeys() throws Exception
     {
         String schema =
             "create table Table1 (Column1 smallint not null, constraint primary1 primary key (Column1));" +
+            "partition table Table1 on column Column1;" +
             "create table Table2 (Column2 smallint not null, Column3 smallint not null, Column4 smallint not null, " +
-            "  constraint primary2 primary key (Column2, Column3, Column4));";
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "  <database name='database'>" +
-            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
-            "    <procedures><procedure class='sample'><sql>select * from Table1</sql></procedure></procedures>" +
-            "    <partitions><partition table='Table1' column='Column1'/></partitions>" +
-            "  </database>" +
-            "</project>";
+            "  constraint primary2 primary key (Column2, Column3, Column4));" +
+            "create procedure sample as select * from Table1;";
 
-        VoltCompiler c = compileForDDLTest(project);
+        VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable pkeys = dut.getMetaData("PrimaryKeys");
         System.out.println(pkeys);
         assertEquals(6, pkeys.getColumnCount());
         assertEquals(4, pkeys.getRowCount());
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column1"));
         assertEquals("TABLE1", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)1, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY1", pkeys.get("PK_NAME", VoltType.STRING));
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column2"));
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)1, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column3"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column3"));
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)2, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
-        assertTrue(moveToMatchingRow(pkeys, "COLUMN_NAME", "Column4"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(pkeys, "COLUMN_NAME", "Column4"));
         assertEquals("TABLE2", pkeys.get("TABLE_NAME", VoltType.STRING));
         assertEquals((short)3, pkeys.get("KEY_SEQ", VoltType.SMALLINT));
         assertEquals("PRIMARY2", pkeys.get("PK_NAME", VoltType.STRING));
     }
 
-    public void testGetProcedureColumns()
+    public void testGetProcedureColumns() throws Exception
     {
         String schema =
-            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "  <database name='database'>" +
-            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
-            "    <procedures>" +
-            "      <procedure class='proc1' partitioninfo=\"Table1.Column1:0\"><sql>select * from Table1 where Column1=?</sql></procedure>" +
-            "      <procedure class='proc2'><sql>select * from Table1 where Column2=?</sql></procedure>" +
-            "    </procedures>" +
-            "    <partitions><partition table='Table1' column='Column1'/></partitions>" +
-            "  </database>" +
-            "</project>";
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
+            "partition table Table1 on column Column1;" +
+            "create procedure proc1 as select * from Table1 where Column1=?;" +
+            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc2 as select * from Table1 where Column2=?;";
 
-        VoltCompiler c = compileForDDLTest(project);
+        VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
+        DefaultProcedureManager defaultProcs = new DefaultProcedureManager(c.getCatalogDatabase());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), defaultProcs, new InMemoryJarfile(testout_jar));
         VoltTable params = dut.getMetaData("ProcedureColumns");
         System.out.println(params);
         assertEquals(20, params.getColumnCount());
         assertEquals(4, params.getRowCount()); // 2 real and 2 crud inserts
-        assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc1"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("PRECISION", VoltType.INTEGER));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("LENGTH", VoltType.INTEGER));
         assertEquals(VoltType.MAX_VALUE_LENGTH, params.get("CHAR_OCTET_LENGTH", VoltType.INTEGER));
         assertEquals("PARTITION_PARAMETER", params.get("REMARKS", VoltType.STRING));
-        assertTrue(moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(params, "PROCEDURE_NAME", "proc2"));
         assertEquals("param0", params.get("COLUMN_NAME", VoltType.STRING));
         assertEquals(VoltType.INTEGER.getLengthInBytesForFixedTypes() * 8 - 1,
                      params.get("PRECISION", VoltType.INTEGER));
@@ -536,26 +476,18 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertWithNullCheck(null, params.get("REMARKS", VoltType.STRING), params);
     }
 
-    public void testGetTypeInfo()
+    public void testGetTypeInfo() throws Exception
     {
         String schema =
-            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "  <database name='database'>" +
-            "    <schemas><schema path='" + getPathForSchema(schema) + "' /></schemas>" +
-            "    <procedures>" +
-            "      <procedure class='proc1' partitioninfo=\"Table1.Column1:0\"><sql>select * from Table1 where Column1=?</sql></procedure>" +
-            "      <procedure class='proc2'><sql>select * from Table1 where Column2=?</sql></procedure>" +
-            "    </procedures>" +
-            "    <partitions><partition table='Table1' column='Column1'/></partitions>" +
-            "  </database>" +
-            "</project>";
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
+            "partition table Table1 on column Column1;" +
+            "create procedure proc1 as select * from Table1 where Column1=?;" +
+            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc2 as select * from Table1 where Column2=?;";
 
-        VoltCompiler c = compileForDDLTest(project);
+        VoltCompiler c = compileForDDLTest2(schema);
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog());
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable typeInfo = dut.getMetaData("typEINfo");
         System.out.println(typeInfo);
         // just do some minor sanity checks on size of table and that it contains the types
@@ -575,5 +507,56 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             assertTrue(expectedType != null);
         }
         assertTrue(expectedTypes.isEmpty());
+    }
+
+    public void testGetClasses() throws Exception
+    {
+        String schema =
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);" +
+            "partition table Table1 on column Column1;" +
+            "create procedure proc1 as select * from Table1 where Column1=?;" +
+            "partition procedure proc1 on table Table1 column Column1;" +
+            "create procedure proc2 as select * from Table1 where Column2=?;" +
+            "import class org.voltdb_testprocs.fullddlfeatures.*;" +
+            "create procedure from class org.voltdb_testprocs.fullddlfeatures.testImportProc;";
+
+        VoltCompiler c = compileForDDLTest2(schema);
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
+        VoltTable classes = dut.getMetaData("classes");
+        System.out.println(classes);
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));
+        assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
+        assertEquals(1, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc"));
+        assertEquals(1, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
+        assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.NoMeaningClass"));
+        assertEquals(0, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
+        assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
+    }
+
+    public void testGetConfig() throws Exception
+    {
+        String schema =
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
+        VoltCompiler c = compileForDDLTest2(schema);
+        JdbcDatabaseMetaDataGenerator dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
+        VoltTable config = dut.getMetaData("config");
+        System.out.println(config);
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(config, "CONFIG_NAME", DatabaseConfiguration.DR_MODE_NAME));
+        assertEquals(DatabaseConfiguration.ACTIVE_PASSIVE, config.get("CONFIG_VALUE", VoltType.STRING));
+
+       schema =
+            "set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";" +
+            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
+        c = compileForDDLTest2(schema);
+        dut =
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
+        config = dut.getMetaData("config");
+        System.out.println(config);
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(config, "CONFIG_NAME", DatabaseConfiguration.DR_MODE_NAME));
+        assertEquals(DatabaseConfiguration.ACTIVE_ACTIVE, config.get("CONFIG_VALUE", VoltType.STRING));
     }
 }

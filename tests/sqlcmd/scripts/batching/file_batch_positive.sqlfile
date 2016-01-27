@@ -1,0 +1,13 @@
+create table t (
+  i integer not null primary key,
+  vc varchar(32)
+);
+create index my_idx_t on t (vc);
+partition table t on column i;
+
+create table s (
+  i integer not null primary key,
+  vcc varchar(255)
+);
+create index my_idx_s on s (vcc);
+partition table s on column i;

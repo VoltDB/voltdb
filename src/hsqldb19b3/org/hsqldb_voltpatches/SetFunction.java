@@ -121,7 +121,11 @@ public class SetFunction implements Serializable {
 
             case OpTypes.COUNT :
                 return;
-
+            // A VoltDB extension APPROC_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT:
+                // Return "unexpected token" error
+                throw Error.error(ErrorCode.X_42581, Tokens.T_APPROX_COUNT_DISTINCT);
+            // End of VoltDB extension
             case OpTypes.AVG :
             case OpTypes.SUM : {
                 switch (dataType) {
@@ -242,6 +246,11 @@ public class SetFunction implements Serializable {
             return ValuePool.getInt(count);
         }
 
+        // A VoltDB extension APPROX_COUNT_DISTINCT
+        if (setType == OpTypes.APPROX_COUNT_DISTINCT) {
+            throw Error.error(ErrorCode.X_42581, Tokens.T_APPROX_COUNT_DISTINCT);
+        }
+        // End of VoltDB extension
         if (count == 0) {
             return null;
         }
@@ -374,6 +383,16 @@ public class SetFunction implements Serializable {
             return Type.SQL_INTEGER;
         }
 
+        // A VoltDB extension to handle aggfnc(*) syntax errors.
+        // If the argument node does not have
+        // a data type, it may be '*'.  If the
+        // operation is COUNT (optype == 71) this is
+        // just fine.  But if it's anything else this
+        // is a syntax error.
+        if (type == null) {
+            throw Error.error(ErrorCode.U_S0500);
+        }
+        // End of VoltDB extension
         int dataType = type.isIntervalType() ? Types.SQL_INTERVAL
                                              : type.typeCode;
 
@@ -448,6 +467,30 @@ public class SetFunction implements Serializable {
                 }
                 break;
 
+            // A VoltDB extension for APPROX_COUNT_DISTINCT
+            case OpTypes.APPROX_COUNT_DISTINCT :
+                switch (dataType) {
+                case Types.TINYINT :
+                case Types.SQL_SMALLINT :
+                case Types.SQL_INTEGER :
+                case Types.SQL_BIGINT :
+                case Types.SQL_DECIMAL :
+                case Types.SQL_TIMESTAMP :
+                    return Type.SQL_BIGINT;
+                default:
+                    // We only support fixed-width types for this
+                    // aggregate function.
+                    //
+                    // FLOAT is not supported since this function
+                    // relies on different values having different bit
+                    // patterns, and the same values being the
+                    // same.  Floating point numbers don't hold to
+                    // this---e.g., positive and negative zero.
+                    //
+                    // Incompatible data types in operation
+                    throw Error.error(ErrorCode.X_42565);
+                }
+            // End of VoltDB extension for APPROX_COUNT_DISTINCT
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "SetFunction");
         }

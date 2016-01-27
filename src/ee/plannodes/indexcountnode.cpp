@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,33 +16,20 @@
  */
 
 
-#include <stdexcept>
-#include <sstream>
 #include "indexcountnode.h"
-#include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/types.h"
-#include "common/FatalException.hpp"
+
 #include "expressions/abstractexpression.h"
-#include "catalog/table.h"
-#include "catalog/index.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-IndexCountPlanNode::~IndexCountPlanNode() {
-    for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
-        delete m_searchkey_expressions[ii];
-    }
-    for (int ii = 0; ii < m_endkey_expressions.size(); ii++) {
-        delete m_endkey_expressions[ii];
-    }
-    delete m_skip_null_predicate;
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+PlanNodeType IndexCountPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXCOUNT; }
 
-std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
+IndexCountPlanNode::~IndexCountPlanNode() { }
+
+std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
@@ -64,10 +51,11 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     } else {
         buffer << "<NULL>\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
-void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string endTypeString = obj.valueForKey("END_TYPE").asStr();
@@ -78,26 +66,10 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    if (obj.hasNonNullKey("ENDKEY_EXPRESSIONS")) {
-        PlannerDomValue endKeyExprArray = obj.valueForKey("ENDKEY_EXPRESSIONS");
-        for (int i = 0; i < endKeyExprArray.arrayLen(); i++) {
-            AbstractExpression *expr =
-                AbstractExpression::buildExpressionTree(endKeyExprArray.valueAtIndex(i));
-            m_endkey_expressions.push_back(expr);
-        }
-    }
+    m_searchkey_expressions.loadExpressionArrayFromJSONObject("SEARCHKEY_EXPRESSIONS", obj);
+    m_endkey_expressions.loadExpressionArrayFromJSONObject("ENDKEY_EXPRESSIONS", obj);
 
-    PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
-    for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
-        AbstractExpression *expr =
-            AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-        m_searchkey_expressions.push_back(expr);
-    }
-
-    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
-        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
-        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
-    }
+    m_skip_null_predicate.reset(loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj));
 }
 
-}
+} // namespace voltdb

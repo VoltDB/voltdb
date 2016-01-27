@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ public enum StatsSelector {
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
+    LATENCY_HISTOGRAM,
     PARTITIONCOUNT,
     IOSTATS,
     MEMORY,           // info about node's memory usage
@@ -35,14 +36,23 @@ public enum StatsSelector {
     PROCEDUREOUTPUT,
 
     /*
-     * DRPARTITION and DRNODE are internal names
-     * Externally the selector is just "DR"
+     * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names
+     * Externally the selector is "DRPRODUCER", or just "DR"
      */
     DR,
-    DRPARTITION,
-    DRNODE,
+    DRPRODUCER,
+    DRPRODUCERPARTITION,
+    DRPRODUCERNODE,
+
+    DRCONSUMER,
+    DRCONSUMERNODE,
+    DRCONSUMERPARTITION,
 
     TOPO,           // return leader and site info for iv2
     REBALANCE,      // return elastic rebalance progress
-    KSAFETY         // return ksafety coverage information
+    KSAFETY,        // return ksafety coverage information
+    CPU,            // Return CPU Stats
+
+    COMMANDLOG,     // return number of outstanding bytes and txns on this node
+    IMPORTER
 }

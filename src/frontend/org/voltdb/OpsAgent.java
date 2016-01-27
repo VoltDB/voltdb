@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -194,6 +194,9 @@ public abstract class OpsAgent
             }
         } catch (Exception e) {
             hostLog.error("Exception processing message in OpsAgent for " + m_name + ": " + message, e);
+        } catch (Throwable t) {
+            //Handle throwable because otherwise the future swallows up other exceptions
+            VoltDB.crashLocalVoltDB("Exception processing message in OpsAgent for " + m_name + ": " + message, true, t);
         }
 
     }

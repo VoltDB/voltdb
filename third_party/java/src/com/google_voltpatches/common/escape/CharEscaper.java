@@ -34,9 +34,9 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
  * <p>A {@code CharEscaper} instance is required to be stateless, and safe when used concurrently by
  * multiple threads.
  *
- * <p>Several popular escapers are defined as constants in classes like {@link
- * com.google_voltpatches.common.html.HtmlEscapers}, {@link com.google_voltpatches.common.xml.XmlEscapers}, and {@link
- * SourceCodeEscapers}. To create your own escapers extend this class and implement the {@link
+ * <p>Popular escapers are defined as constants in classes like {@link
+ * com.google_voltpatches.common.html.HtmlEscapers} and {@link com.google_voltpatches.common.xml.XmlEscapers}.
+ * To create your own escapers extend this class and implement the {@link
  * #escape(char)} method.
  *
  * @author Sven Mawson
@@ -101,10 +101,11 @@ public abstract class CharEscaper extends Escaper {
       int charsSkipped = index - lastEscape;
 
       // This is the size needed to add the replacement, not the full size
-      // needed by the string. We only regrow when we absolutely must.
+      // needed by the string. We only regrow when we absolutely must, and
+      // when we do grow, grow enough to avoid excessive growing. Grow.
       int sizeNeeded = destIndex + charsSkipped + rlen;
       if (destSize < sizeNeeded) {
-        destSize = sizeNeeded + (slen - index) + DEST_PAD;
+        destSize = sizeNeeded + DEST_PAD_MULTIPLIER * (slen - index);
         dest = growBuffer(dest, destIndex, destSize);
       }
 
@@ -167,7 +168,7 @@ public abstract class CharEscaper extends Escaper {
   }
 
   /**
-   * The amount of padding to use when growing the escape buffer.
+   * The multiplier for padding to use when growing the escape buffer.
    */
-  private static final int DEST_PAD = 32;
+  private static final int DEST_PAD_MULTIPLIER = 2;
 }

@@ -18,7 +18,7 @@ package com.google_voltpatches.common.util.concurrent;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.j2objc.annotations.WeakOuter;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -38,14 +38,20 @@ import java.util.concurrent.TimeoutException;
 public abstract class AbstractIdleService implements Service {
 
   /* Thread names will look like {@code "MyService STARTING"}. */
-  private final Supplier<String> threadNameSupplier = new Supplier<String>() {
+  private final Supplier<String> threadNameSupplier = new ThreadNameSupplier();
+
+  @WeakOuter
+  private final class ThreadNameSupplier implements Supplier<String> {
     @Override public String get() {
       return serviceName() + " " + state();
     }
-  };
+  }
 
   /* use AbstractService for state management */
-  private final Service delegate = new AbstractService() {
+  private final Service delegate = new DelegateService();
+
+  @WeakOuter
+  private final class DelegateService extends AbstractService {
     @Override protected final void doStart() {
       MoreExecutors.renamingDecorator(executor(), threadNameSupplier)
           .execute(new Runnable() {
@@ -55,7 +61,6 @@ public abstract class AbstractIdleService implements Service {
                 notifyStarted();
               } catch (Throwable t) {
                 notifyFailed(t);
-                throw Throwables.propagate(t);
               }
             }
           });
@@ -70,12 +75,15 @@ public abstract class AbstractIdleService implements Service {
                 notifyStopped();
               } catch (Throwable t) {
                 notifyFailed(t);
-                throw Throwables.propagate(t);
               }
             }
           });
     }
-  };
+
+    @Override public String toString() {
+      return AbstractIdleService.this.toString();
+    }
+  }
 
   /** Constructor for use by subclasses. */
   protected AbstractIdleService() {}
@@ -106,20 +114,6 @@ public abstract class AbstractIdleService implements Service {
     return serviceName() + " [" + state() + "]";
   }
 
-  // We override instead of using ForwardingService so that these can be final.
-
-  @Deprecated
-  @Override 
-   public final ListenableFuture<State> start() {
-    return delegate.start();
-  }
-
-  @Deprecated
-  @Override 
-   public final State startAndWait() {
-    return delegate.startAndWait();
-  }
-
   @Override public final boolean isRunning() {
     return delegate.isRunning();
   }
@@ -128,18 +122,6 @@ public abstract class AbstractIdleService implements Service {
     return delegate.state();
   }
 
-  @Deprecated
-  @Override 
-  public final ListenableFuture<State> stop() {
-    return delegate.stop();
-  }
-
-  @Deprecated
-  @Override 
-  public final State stopAndWait() {
-    return delegate.stopAndWait();
-  }
-  
   /**
    * @since 13.0
    */

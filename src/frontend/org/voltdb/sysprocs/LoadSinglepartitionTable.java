@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,9 +28,11 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.types.ConstraintType;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -67,14 +69,15 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @param table
      *            A VoltTable with schema matching tableName containing data to
      *            load.
+     * @param upsertMode
+     *            True if using upsert instead of insert
      * @return The number of rows modified.
      * @throws VoltAbortException
      */
     public long run(SystemProcedureExecutionContext ctx,
                     byte[] partitionParam,
-            String tableName, VoltTable table)
+            String tableName, byte upsertMode, VoltTable table)
             throws VoltAbortException {
-
         // if tableName is replicated, fail.
         // otherwise, create a VoltTable for each partition and
         // split up the incoming table .. then send those partial
@@ -89,19 +92,41 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
                     String.format("LoadSinglepartitionTable incompatible with replicated table %s.",
                             tableName));
         }
+
+        boolean isUpsert = (upsertMode != 0);
+
+        if (isUpsert) {
+            boolean hasPkey = false;
+            for (Constraint c : catTable.getConstraints()) {
+                if (c.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                    hasPkey = true;
+                    break;
+                }
+            }
+            if (!hasPkey) {
+                throw new VoltAbortException(
+                        String.format("The --update argument cannot be used for LoadingSinglePartionTable because the table %s does not have a primary key. "
+                                + "Either remove the --update argument or add a primary key to the table.",
+                                tableName));
+            }
+        }
+
+        // action should be either "insert" or "upsert"
+        final String action = (isUpsert ? "upsert" :"insert");
+
         // fix any case problems
         tableName = catTable.getTypeName();
 
         // check that the schema of the input matches
         int columnCount = table.getColumnCount();
 
-        // find the insert statement for this table
-        String insertProcName = String.format("%s.insert", tableName);
-        Procedure p = ctx.getDatabase().getProcedures().get(insertProcName);
+        // find the insert/upsert statement for this table
+        String crudProcName = String.format("%s.%s", tableName,action);
+        Procedure p = ctx.ensureDefaultProcLoaded(crudProcName);
         if (p == null) {
             throw new VoltAbortException(
-                    String.format("Unable to locate auto-generated CRUD insert statement for table %s",
-                            tableName));
+                    String.format("Unable to locate auto-generated CRUD %s statement for table %s",
+                            action,tableName));
         }
 
         // statements of all single-statement procs are named "sql"

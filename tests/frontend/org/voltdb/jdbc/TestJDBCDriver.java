@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,10 +41,13 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
@@ -90,9 +93,9 @@ public class TestJDBCDriver {
             "CREATE TABLE WAREHOUSE(A1 INTEGER NOT NULL, A2 INTEGER, A3 INTEGER, A4_ID INTEGER, " +
                              "A5 INTEGER, A6 INTEGER, A7 INTEGER, A8 INTEGER, W_ID INTEGER, " +
                              "PRIMARY KEY(A1));" +
-            "CREATE TABLE ALL_TYPES(A1 TINYINT NOT NULL, A2 SMALLINT, A3 INTEGER, A4 BIGINT, " +
-                             "A5 FLOAT, A6 VARCHAR(10), A7 VARBINARY(10), A8 TIMESTAMP, " +
-                             "A9 DECIMAL, PRIMARY KEY(A1));" +
+            "CREATE TABLE ALL_TYPES(A1 TINYINT NOT NULL, A2 TINYINT, A3 SMALLINT, A4 INTEGER, A5 BIGINT, " +
+                             "A6 FLOAT, A7 VARCHAR(10), A8 VARBINARY(10), A9 TIMESTAMP, " +
+                             "A10 DECIMAL, PRIMARY KEY(A1));" +
             "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
             "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
 
@@ -108,6 +111,8 @@ public class TestJDBCDriver {
         pb.addPartitionInfo("ROBBIE_MUSTOE", "A1");
         pb.addPartitionInfo("CUSTOMER", "A1");
         pb.addPartitionInfo("NUMBER_NINE", "A1");
+        pb.addPartitionInfo("ALL_TYPES", "A1");
+        pb.addStmtProcedure("InsertAllTypes", "INSERT INTO ALL_TYPES VALUES(?,?,?,?,?,?,?,?,?,?);", "TT.A1: 0");
         pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
         pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
         pb.addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;");
@@ -291,7 +296,7 @@ public class TestJDBCDriver {
         tableColumnTest("CUSTOMER", "____", 1);
         tableColumnTest("%", "%ID", 13);
         tableColumnTest(null, "%ID", 13);
-        tableColumnTest(null, "", 73);
+        tableColumnTest(null, "", 74);
     }
 
     /**
@@ -348,7 +353,7 @@ public class TestJDBCDriver {
         ResultSet procedures =
                 conn.getMetaData().getProcedures("blah", "blah", "%");
         int count = 0;
-        List<String> names = Arrays.asList(new String[] {"InsertA",
+        List<String> names = Arrays.asList(new String[] {"InsertA", "InsertAllTypes",
             "SelectB", "SelectC", "ArbitraryDurationProc"});
         while (procedures.next()) {
             String procedure = procedures.getString("PROCEDURE_NAME");
@@ -361,9 +366,9 @@ public class TestJDBCDriver {
         }
         System.out.println("Procedure count is: " + count);
         // After adding .upsert stored procedure
-        // 9 tables * 5 CRUD/table + 3 procedures +
+        // 9 tables * 5 CRUD/table + 4 procedures +
         // 4 tables * 4 for replicated crud
-        assertEquals(9 * 5 + 3 + 4 * 4, count);
+        assertEquals(10 * 5 + 4 + 3 * 4, count);
     }
 
     @Test
@@ -426,7 +431,7 @@ public class TestJDBCDriver {
                 count++;
             }
         }
-        assertEquals(3, count);
+        assertEquals(13, count);
     }
 
     @Test
@@ -434,7 +439,7 @@ public class TestJDBCDriver {
         CallableStatement cs = conn.prepareCall("{call SelectC}");
         ResultSet results = cs.executeQuery();
         ResultSetMetaData meta = results.getMetaData();
-        assertEquals(9, meta.getColumnCount());
+        assertEquals(10, meta.getColumnCount());
         // JDBC index starts at 1!!!!!!!!!!!!!!!!!!!!!!!
         assertEquals(Byte.class.getName(), meta.getColumnClassName(1));
         assertEquals(java.sql.Types.TINYINT, meta.getColumnType(1));
@@ -444,70 +449,70 @@ public class TestJDBCDriver {
         assertFalse(meta.isCaseSensitive(1));
         assertTrue(meta.isSigned(1));
 
-        assertEquals(Short.class.getName(), meta.getColumnClassName(2));
-        assertEquals(java.sql.Types.SMALLINT, meta.getColumnType(2));
-        assertEquals("SMALLINT", meta.getColumnTypeName(2));
-        assertEquals(15, meta.getPrecision(2));
-        assertEquals(0, meta.getScale(2));
-        assertFalse(meta.isCaseSensitive(2));
-        assertTrue(meta.isSigned(2));
-
-        assertEquals(Integer.class.getName(), meta.getColumnClassName(3));
-        assertEquals(java.sql.Types.INTEGER, meta.getColumnType(3));
-        assertEquals("INTEGER", meta.getColumnTypeName(3));
-        assertEquals(31, meta.getPrecision(3));
+        assertEquals(Short.class.getName(), meta.getColumnClassName(3));
+        assertEquals(java.sql.Types.SMALLINT, meta.getColumnType(3));
+        assertEquals("SMALLINT", meta.getColumnTypeName(3));
+        assertEquals(15, meta.getPrecision(3));
         assertEquals(0, meta.getScale(3));
         assertFalse(meta.isCaseSensitive(3));
         assertTrue(meta.isSigned(3));
 
-        assertEquals(Long.class.getName(), meta.getColumnClassName(4));
-        assertEquals(java.sql.Types.BIGINT, meta.getColumnType(4));
-        assertEquals("BIGINT", meta.getColumnTypeName(4));
-        assertEquals(63, meta.getPrecision(4));
+        assertEquals(Integer.class.getName(), meta.getColumnClassName(4));
+        assertEquals(java.sql.Types.INTEGER, meta.getColumnType(4));
+        assertEquals("INTEGER", meta.getColumnTypeName(4));
+        assertEquals(31, meta.getPrecision(4));
         assertEquals(0, meta.getScale(4));
         assertFalse(meta.isCaseSensitive(4));
         assertTrue(meta.isSigned(4));
 
-        assertEquals(Double.class.getName(), meta.getColumnClassName(5));
-        assertEquals(java.sql.Types.FLOAT, meta.getColumnType(5));
-        assertEquals("FLOAT", meta.getColumnTypeName(5));
-        assertEquals(53, meta.getPrecision(5));
+        assertEquals(Long.class.getName(), meta.getColumnClassName(5));
+        assertEquals(java.sql.Types.BIGINT, meta.getColumnType(5));
+        assertEquals("BIGINT", meta.getColumnTypeName(5));
+        assertEquals(63, meta.getPrecision(5));
         assertEquals(0, meta.getScale(5));
         assertFalse(meta.isCaseSensitive(5));
         assertTrue(meta.isSigned(5));
 
-        assertEquals(String.class.getName(), meta.getColumnClassName(6));
-        assertEquals(java.sql.Types.VARCHAR, meta.getColumnType(6));
-        assertEquals("VARCHAR", meta.getColumnTypeName(6));
-        assertEquals(VoltType.MAX_VALUE_LENGTH, meta.getPrecision(6));
+        assertEquals(Double.class.getName(), meta.getColumnClassName(6));
+        assertEquals(java.sql.Types.FLOAT, meta.getColumnType(6));
+        assertEquals("FLOAT", meta.getColumnTypeName(6));
+        assertEquals(53, meta.getPrecision(6));
         assertEquals(0, meta.getScale(6));
-        assertTrue(meta.isCaseSensitive(6));
-        assertFalse(meta.isSigned(6));
+        assertFalse(meta.isCaseSensitive(6));
+        assertTrue(meta.isSigned(6));
 
-        assertEquals(Byte[].class.getCanonicalName(), meta.getColumnClassName(7));
-        assertEquals(java.sql.Types.VARBINARY, meta.getColumnType(7));
-        assertEquals(128, meta.getColumnDisplaySize(7));
-        assertEquals("VARBINARY", meta.getColumnTypeName(7));
+        assertEquals(String.class.getName(), meta.getColumnClassName(7));
+        assertEquals(java.sql.Types.VARCHAR, meta.getColumnType(7));
+        assertEquals("VARCHAR", meta.getColumnTypeName(7));
         assertEquals(VoltType.MAX_VALUE_LENGTH, meta.getPrecision(7));
         assertEquals(0, meta.getScale(7));
-        assertFalse(meta.isCaseSensitive(7));
+        assertTrue(meta.isCaseSensitive(7));
         assertFalse(meta.isSigned(7));
 
-        assertEquals(Timestamp.class.getName(), meta.getColumnClassName(8));
-        assertEquals(java.sql.Types.TIMESTAMP, meta.getColumnType(8));
-        assertEquals("TIMESTAMP", meta.getColumnTypeName(8));
-        assertEquals(63, meta.getPrecision(8));
+        assertEquals(Byte[].class.getCanonicalName(), meta.getColumnClassName(8));
+        assertEquals(java.sql.Types.VARBINARY, meta.getColumnType(8));
+        assertEquals(128, meta.getColumnDisplaySize(8));
+        assertEquals("VARBINARY", meta.getColumnTypeName(8));
+        assertEquals(VoltType.MAX_VALUE_LENGTH, meta.getPrecision(8));
         assertEquals(0, meta.getScale(8));
         assertFalse(meta.isCaseSensitive(8));
         assertFalse(meta.isSigned(8));
 
-        assertEquals(BigDecimal.class.getName(), meta.getColumnClassName(9));
-        assertEquals(java.sql.Types.DECIMAL, meta.getColumnType(9));
-        assertEquals("DECIMAL", meta.getColumnTypeName(9));
-        assertEquals(VoltDecimalHelper.kDefaultPrecision, meta.getPrecision(9));
-        assertEquals(12, meta.getScale(9));
+        assertEquals(Timestamp.class.getName(), meta.getColumnClassName(9));
+        assertEquals(java.sql.Types.TIMESTAMP, meta.getColumnType(9));
+        assertEquals("TIMESTAMP", meta.getColumnTypeName(9));
+        assertEquals(63, meta.getPrecision(9));
+        assertEquals(0, meta.getScale(9));
         assertFalse(meta.isCaseSensitive(9));
-        assertTrue(meta.isSigned(9));
+        assertFalse(meta.isSigned(9));
+
+        assertEquals(BigDecimal.class.getName(), meta.getColumnClassName(10));
+        assertEquals(java.sql.Types.DECIMAL, meta.getColumnType(10));
+        assertEquals("DECIMAL", meta.getColumnTypeName(10));
+        assertEquals(VoltDecimalHelper.kDefaultPrecision, meta.getPrecision(10));
+        assertEquals(12, meta.getScale(10));
+        assertFalse(meta.isCaseSensitive(10));
+        assertTrue(meta.isSigned(10));
     }
 
     @Test
@@ -539,6 +544,65 @@ public class TestJDBCDriver {
             assertEquals(e.getSQLState(), SQLError.GENERAL_ERROR);
             assertTrue(e.getMessage().contains("violation of constraint"));
         }
+    }
+
+    // Check that the null type is handled the same way as specifying the correct type
+    // this is for spring framework compatibility
+    @Test
+    public void testInsertNulls() throws SQLException {
+        // First inserted row contains all null values (this will cause VoltType.NULL_STRING_OR_VARBINARY to be inserted in every field)
+        CallableStatement cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
+        cs.setInt(1, 0);
+        cs.setNull(2, Types.NULL);
+        cs.setNull(3, Types.NULL);
+        cs.setNull(4, Types.NULL);
+        cs.setNull(5, Types.NULL);
+        cs.setNull(6, Types.NULL);
+        cs.setNull(7, Types.NULL);
+        cs.setNull(8, Types.NULL);
+        cs.setNull(9, Types.NULL);
+        cs.setNull(10, Types.NULL);
+        cs.execute();
+        // Second inserted row contains the specific type of the field causing the typed nulls to be inserted
+        cs = conn.prepareCall("{call InsertAllTypes(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}");
+        cs.setInt(1, 1);
+        cs.setNull(2, Types.TINYINT);
+        cs.setNull(3, Types.SMALLINT);
+        cs.setNull(4, Types.INTEGER);
+        cs.setNull(5, Types.BIGINT);
+        cs.setNull(6, Types.DOUBLE);
+        cs.setNull(7, Types.VARCHAR);
+        cs.setNull(8, Types.VARBINARY);
+        cs.setNull(9, Types.TIMESTAMP);
+        cs.setNull(10, Types.DECIMAL);
+        cs.execute();
+        // Call SelectC (select * from ALL_TYPES)
+        cs = conn.prepareCall("{call SelectC}");
+        ResultSet results = cs.executeQuery();
+
+        // Retrieve the values for the first row
+        results.next();
+        byte a2 = results.getByte(2);
+        short a3 = results.getShort(3);
+        int a4 = results.getInt(4);
+        long a5 = results.getLong(5);
+        double a6 = results.getDouble(6);
+        String a7 = results.getString(7);
+        byte[] a8 = results.getBytes(8);
+        Timestamp a9 = results.getTimestamp(9);
+        BigDecimal a10 = results.getBigDecimal(10);
+
+        // Compare the second row values with the first row
+        results.next();
+        assertEquals(results.getByte(2), a2);
+        assertEquals(results.getShort(3), a3);
+        assertEquals(results.getInt(4), a4);
+        assertEquals(results.getLong(5), a5);
+        assertEquals(results.getDouble(6), a6, 0);
+        assertEquals(results.getString(7), a7);
+        assertEquals(results.getBytes(8), a8);
+        assertEquals(results.getTimestamp(9), a9);
+        assertEquals(results.getBigDecimal(10), a10);
     }
 
     public void testVersionMetadata() throws SQLException {
@@ -613,12 +677,12 @@ public class TestJDBCDriver {
         assertEquals(10, count);
     }
 
-    //Test to check Query Timeout
+    // Test to check Query without Timeout
     @Test
-    public void testQueryTimeout() throws SQLException {
-        //Use no timeout so default timeout of 2 min and thus no exception should be thrown.
+    public  void testQueryNotTimeout() throws SQLException {
+        //this should not timeout at all proc will wait for 3 min before returning.
         PreparedStatement stmt = conn.prepareCall("{call ArbitraryDurationProc(?)}");
-        stmt.setLong(1, 6000);
+        stmt.setLong(1, 180*1000);
         boolean exceptionCalled = false;
         try {
             stmt.execute();
@@ -628,20 +692,7 @@ public class TestJDBCDriver {
         }
         assertFalse(exceptionCalled);
 
-        //Now make it timeout
-        stmt.setQueryTimeout(1);
-        stmt.setLong(1, 6000);
-        try {
-            stmt.execute();
-        } catch (SQLException ex) {
-            System.out.println("Query timed out: " + ex.getSQLState());
-            exceptionCalled = true;
-        }
-        assertTrue(exceptionCalled);
-
-        //redo statement with long timeout should not timeout
-        stmt.setQueryTimeout(30);
-        stmt.setLong(1, 6000);
+        stmt.setLong(1, 60000);
         exceptionCalled = false;
         try {
             stmt.execute();
@@ -650,16 +701,67 @@ public class TestJDBCDriver {
             exceptionCalled = true;
         }
         assertFalse(exceptionCalled);
+    }
 
-        //Check -ve value
+    // execute a Query with a Timeout set
+    // return true if timeout (excecptionCalled)
+    public Boolean runQueryWithTimeout(int timeQuery, int timeout)
+            throws SQLException {
+        Boolean[] result = new Boolean[3];
+        boolean exceptionCalled = false;
+        PreparedStatement stmt = myconn
+                .prepareCall("{call ArbitraryDurationProc(?)}");
+
+        // Now make it timeout
+        stmt.setLong(1, timeQuery);
         try {
-            stmt.setQueryTimeout(-1);
+            stmt.setQueryTimeout(timeout);
+            stmt.execute();
         } catch (SQLException ex) {
-            //Bad value
+            System.out.println("Query timed out: " + ex.getSQLState());
             exceptionCalled = true;
         }
-        assertTrue(exceptionCalled);
+        return exceptionCalled;
+    }
 
+    // Test to check Query Timeout with Time Unit being setup
+    @Test
+    public void testQueryTimeout() throws Exception {
+        Properties props = new Properties();
+        // Check default setting, timeout unit should be TimeUnit.SECONDS
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertFalse(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
+
+        // Check set time unit to MILLISECONDS
+        // through url
+        myconn = getJdbcConnection(
+                "jdbc:voltdb://localhost:21212?jdbc.querytimeout.unit=milliseconds",
+                props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertTrue(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
+
+        // Check set time unit to MILLISECONDS
+        // through Java Propeties
+        props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "milliseconds");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertTrue(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
+
+        // Check set time unit to other unsupported unit, should by default
+        // still use TimeUnit.SECONDS
+        props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "nanoseconds");
+        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        assertTrue(runQueryWithTimeout(7000, 1));
+        assertFalse(runQueryWithTimeout(7000, 30));
+        assertTrue(runQueryWithTimeout(7000, -1));
+        myconn.close();
     }
 
     private void checkSafeMode(Connection myconn)

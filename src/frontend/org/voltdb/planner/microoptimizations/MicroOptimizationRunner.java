@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,7 +19,6 @@ package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
 
-import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
@@ -28,17 +27,23 @@ public class MicroOptimizationRunner {
     // list all of the micro optimizations here
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
+        // The orders here is important
         optimizations.add(new PushdownLimits());
         optimizations.add(new ReplaceWithIndexCounter());
-        optimizations.add(new SeqScansToUniqueTreeScans());
         optimizations.add(new ReplaceWithIndexLimit());
+
+        // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
+        optimizations.add(new InlineAggregation());
+
+        // MP ORDER BY Optimization
+        optimizations.add(new InlineOrderByIntoMergeReceive());
     }
 
-    public static void applyAll(CompiledPlan plan,
-            DeterminismMode detMode, AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
     {
-        for (MicroOptimization opt : optimizations) {
-            opt.apply(plan, detMode, parsedStmt);
+        for (int i = 0; i < optimizations.size(); i++) {
+            MicroOptimization opt = optimizations.get(i);
+            opt.apply(plan, parsedStmt);
         }
     }
 }

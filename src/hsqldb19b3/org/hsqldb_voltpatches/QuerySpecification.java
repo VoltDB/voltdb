@@ -31,6 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -44,6 +47,9 @@ import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
+// BEGIN Cherry-picked code change from hsqldb-2.3.2
+import org.hsqldb_voltpatches.lib.Iterator;
+// END Cherry-picked code change from hsqldb-2.3.2
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
@@ -246,8 +252,103 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
+    /************************* Volt DB Extensions *************************/
+        resolveColumnReferencesInGroupBy();
+    /**********************************************************************/
+
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
+
+    /************************* Volt DB Extensions *************************/
+    void resolveColumnReferencesInGroupBy() {
+        if (! isAggregated) {
+            return;
+        }
+
+        if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
+            return;
+        }
+
+        /**
+         * Hsql HashSet does not work properly to remove duplicates, I doubt the hash
+         * function or equal function on expression work properly or something else
+         * is wrong. So use list
+         *
+         */
+        // resolve GROUP BY columns/expressions
+        HsqlList newUnresolvedExpressions = new ArrayListIdentity();
+
+        int size = unresolvedExpressions.size();
+        for (int i = 0; i < size; i++) {
+            Object obj = unresolvedExpressions.get(i);
+            newUnresolvedExpressions.add(obj);
+            if (i + 1 < size && obj == unresolvedExpressions.get(i+1)) {
+                // unresolvedExpressions is a public member that can be accessed from anywhere and
+                // I (xin) am 90% percent sure about the hsql adds the unresolved expression twice
+                // together for our targeted GROUP BY alias case.
+                // so we want to skip the repeated expression also.
+                // For other unresolved expression, it may differs.
+                i += 1;
+            }
+            if (obj instanceof ExpressionColumn == false) {
+                continue;
+            }
+            ExpressionColumn element = (ExpressionColumn) obj;
+            if (element.tableName != null) {
+                // this alias does not belong to any table
+                continue;
+            }
+
+            // group by alias which is thought as an column
+            if (element.getType() != OpTypes.COLUMN) {
+                continue;
+            }
+
+            // find the unsolved expression in the groupBy list
+            int k = indexLimitVisible;
+            int endGroupbyIndex = indexLimitVisible + groupByColumnCount;
+            for (; k < endGroupbyIndex; k++) {
+                if (element == exprColumns[k]) {
+                    break;
+                }
+            }
+            if (k == endGroupbyIndex) {
+                // not found in selected list
+                continue;
+            }
+            assert(exprColumns[k].getType() == OpTypes.COLUMN);
+
+            ExpressionColumn exprCol = (ExpressionColumn) exprColumns[k];
+            String alias = exprCol.getColumnName();
+            if (alias == null) {
+                // we should not handle this case (group by constants)
+                continue;
+            }
+
+            // find it in the SELECT list
+            for (int j = 0; j < indexLimitVisible; j++) {
+                Expression selectCol = exprColumns[j];
+                if (selectCol.isAggregate) {
+                    // Group by can not support aggregate expression
+                    continue;
+                }
+                if (selectCol.alias == null) {
+                    // columns referenced by their alias must have an alias
+                    continue;
+                }
+                if (alias.equals(selectCol.alias.name)) {
+                    exprColumns[k] = selectCol;
+                    exprColumnList.set(k, selectCol);
+                    // found it and get the next one
+
+                    newUnresolvedExpressions.remove(element);
+                    break;
+                }
+            }
+        }
+        unresolvedExpressions = newUnresolvedExpressions;
+    }
+    /**********************************************************************/
 
     void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
 
@@ -597,6 +698,60 @@ public class QuerySpecification extends QueryExpression {
             if (queryCondition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
             }
+            // A VoltDB extension to guard against abuse of aggregates in subqueries.
+            // Make sure no aggregates in WHERE clause
+            tempSet.clear();
+            Expression.collectAllExpressions(
+                    tempSet, queryCondition, Expression.aggregateFunctionSet,
+                    Expression.subqueryExpressionSet);
+            if (!tempSet.isEmpty()) {
+
+                // A top level WHERE clause can't have aggregate expressions.
+                // In theory, a subquery WHERE clause may have aggregate
+                // expressions in some edge cases where they reference only
+                // columns from parent query(s).
+                // Even these should be restricted to cases where the subquery
+                // is evaluated after the parent agg, such as from the HAVING
+                // or SELECT clause of the parent query defining the columns.
+                // TO be safe, VoltDB doesn't support ANY cases of aggs of
+                // parent columns. All this code block does is choose between
+                // two error messages for two different unsupported cases.
+                if ( ! isTopLevel) {
+                    HsqlList columnSet = new OrderedHashSet();
+                    Iterator aggIt = tempSet.iterator();
+                    while (aggIt.hasNext()) {
+                        Expression nextAggr = (Expression) aggIt.next();
+                        Expression.collectAllExpressions(columnSet, nextAggr,
+                                Expression.columnExpressionSet, Expression.emptyExpressionSet);
+                    }
+                    Iterator columnIt = columnSet.iterator();
+                    while (columnIt.hasNext()) {
+                        Expression nextColumn = (Expression) columnIt.next();
+                        assert(nextColumn instanceof ExpressionColumn);
+                        ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
+                        String tableName = nextColumnEx.rangeVariable.rangeTable.tableName.name;
+                        String tableAlias = (nextColumnEx.rangeVariable.tableAlias != null) ?
+                                nextColumnEx.rangeVariable.tableAlias.name : null;
+                        boolean resolved = false;
+                        for (RangeVariable rv : rangeVariables) {
+                            if (rv.rangeTable.tableName.name.equals(tableName)) {
+                                if (rv.tableAlias == null && tableAlias == null) {
+                                    resolved = true;
+                                } else if (rv.tableAlias != null && tableAlias != null) {
+                                    resolved = tableAlias.equals(rv.tableAlias.name);
+                                }
+                            }
+                        }
+                        if (!resolved) {
+                            throw Error.error(ErrorCode.X_47001);
+                        }
+                    }
+                }
+                // If we get here it means that WHERE expression has an aggregate expression
+                // with local columns
+                throw Error.error(ErrorCode.X_47000);
+            }
+            // End of VoltDB extension
         }
 
         if (havingCondition != null) {
@@ -973,12 +1128,18 @@ public class QuerySpecification extends QueryExpression {
 
         int limitCount = Integer.MAX_VALUE;
 
+        // A VoltDB extension to support OFFSET without LIMIT
+        if (sortAndSlice.limitCondition != null
+                && sortAndSlice.limitCondition.getRightNode() != null) {
+        // End of VoltDB extension
+        /* disable 1 line ...
         if (sortAndSlice.limitCondition != null) {
+        ... disabled 1 line */
             Integer limit =
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
 
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             if (limit == null || limit.intValue() < 0) {
             /* disable 1 line ...
             if (limit == null || limit.intValue() <= 0) {
@@ -1011,7 +1172,7 @@ public class QuerySpecification extends QueryExpression {
                 rowCount = limitCount;
             }
 
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             if (rowCount > Integer.MAX_VALUE - limitStart) {
             /* disable 1 line ...
             if (rowCount == 0 || rowCount > Integer.MAX_VALUE - limitStart) {
@@ -1023,7 +1184,7 @@ public class QuerySpecification extends QueryExpression {
             }
         } else {
             rowCount = Integer.MAX_VALUE;
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
             // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
             // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY
@@ -1086,7 +1247,7 @@ public class QuerySpecification extends QueryExpression {
 
         result.setDataResultConcurrency(isUpdatable);
 
-        // A VoltDB extension to support LIMIT 0 
+        // A VoltDB extension to support LIMIT 0
         // Test for early return case added by VoltDB to support LIMIT 0 in "HSQL backend".
         if (limitcount == 0) {
             return result;
@@ -1848,5 +2009,42 @@ public class QuerySpecification extends QueryExpression {
 
     /************************* Volt DB Extensions *************************/
     Expression getHavingCondition() { return havingCondition; }
+
+    // Display columns expressions
+    List<Expression> displayCols = new ArrayList<Expression>();
+
+    /**
+     * Dumps the exprColumns list for this query specification.
+     * Writes to stdout.
+     *
+     * This method is useful to understand how the HSQL parser
+     * transforms its data structures during parsing.  For example,
+     * place call to this method at the beginning and end of
+     * resolveGroups() to see what it does.
+     *
+     * @param header    A string to be prepended to output
+     */
+    private void dumpExprColumns(String header){
+        System.out.println("\n\n*********************************************");
+        System.out.println(header);
+        try {
+            System.out.println(getSQL());
+        } catch (Exception e) {
+        }
+        for (int i = 0; i < exprColumns.length; ++i) {
+            if (i == 0)
+                System.out.println("Visible columns:");
+            if (i == indexStartOrderBy)
+                System.out.println("start order by:");
+            if (i == indexStartAggregates)
+                System.out.println("start aggregates:");
+            if (i == indexLimitVisible)
+                System.out.println("After limit of visible columns:");
+
+            System.out.println(i + ": " + exprColumns[i]);
+        }
+
+        System.out.println("\n\n");
+    }
     /**********************************************************************/
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,6 +44,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
@@ -54,10 +55,12 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -322,6 +325,58 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
     }
 
+    public void testPauseMode() throws Exception {
+        Client adminClient = getAdminClient();
+        ClientResponse resp = adminClient.callProcedure("@Pause");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        Client client = getClient();
+        String newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.jar");
+        String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            fail("Update catalog with procs from class should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.xml");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            fail("Update catalog with adhoc procs should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocschema.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocschema.xml");
+        try {
+            client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            fail("Update catalog with adhoc schema change should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler();
+        comp.addClassToJar(jarfile, TestProc.class);
+
+        try {
+            resp = client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            fail("Update classes should fail in PAUSE mode");
+        } catch(ProcCallException e) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+
+        // admin should pass
+        resp = adminClient.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        resp = adminClient.callProcedure("@Resume");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+    }
+
     public void testUpdate() throws Exception {
         Client client = getClient();
         String newCatalogURL;
@@ -512,17 +567,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertFalse(callbackSuccess);
         callbackSuccess = true;
 
-        boolean found = false;
-        int timeout = -1;
-        VoltTable result = client3.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("PROPERTY").equalsIgnoreCase("heartbeattimeout")) {
-                found = true;
-                timeout = Integer.valueOf(result.getString("VALUE"));
-            }
-        }
-        assertTrue(found);
-        assertEquals(6000, timeout);
+        checkDeploymentPropertyValue(client3, "heartbeattimeout", "6000");
     }
 
     private void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
@@ -904,6 +949,52 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         System.out.println("-----\n\n");
     }
 
+    public void testSystemSettingsUpdateTimeout() throws IOException, ProcCallException, InterruptedException  {
+        Client client = getClient();
+        String newCatalogURL, deploymentURL;
+        VoltTable[] results;
+
+        // check the catalog update with query timeout
+        String key = "querytimeout";
+        checkDeploymentPropertyValue(client, key, "10000"); // check default value
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "1000");
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "5000");
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "600");
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "10000"); // check default value
+
+        // check the catalog update with elastic duration and throughput
+        String duration = "elasticduration", throughput = "elasticthroughput";
+        checkDeploymentPropertyValue(client, duration, "50"); // check default value
+        checkDeploymentPropertyValue(client, throughput, "2"); // check default value
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, duration, "100");
+        checkDeploymentPropertyValue(client, throughput, "5");
+    }
+
     private void deleteDirectory(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -987,7 +1078,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
         // We piggy-back the heartbeat change here.
-        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, true, false)};
+        RoleInfo groups[] = new RoleInfo[] {new RoleInfo("group1", false, false, true, false, false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
         ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 
@@ -996,9 +1087,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addUsers(users);
-        project.addGroups(groups);
+        project.addRoles(groups);
         project.addProcedures(procInfo);
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, true);
         project.setDeadHostTimeout(6000);
         boolean compile = config.compile(project);
         assertTrue(compile);
@@ -1011,8 +1102,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS_OPROCS);
-        project.setElasticTargetPauseTime(100);
-        project.setElasticTargetThroughput(50);
+        project.setElasticDuration(100);
+        project.setElasticThroughput(50);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
@@ -1074,6 +1165,24 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-adhocproc.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addStmtProcedure("adhocproc1", "SELECT * from WAREHOUSE");
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocproc.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-adhocschema.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addLiteralSchema("CREATE TABLE CATALOG_MODE_DDL_TEST (fld1 INTEGER NOT NULL);");
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-adhocschema.xml"));
 
         //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
@@ -1149,6 +1258,54 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         hugeCatalogJarPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
         MiscUtils.copyFile(project.getPathToDeployment(), hugeCatalogXMLPath);
 
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+
+        // Catalogs with different system settings on query time out
+        config = new LocalCluster("catalogupdate-cluster-timeout-1000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.setQueryTimeout(1000);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-timeout-5000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.setQueryTimeout(5000);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-timeout-600.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.setQueryTimeout(600);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml"));
+
+        // elastic duration and throughput catalog update tests
+        config = new LocalCluster("catalogupdate-cluster-elastic-100-5.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        // build the jarfile
+        project.setElasticDuration(100);
+        project.setElasticThroughput(5);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.xml"));
+
+
         return builder;
     }
 
@@ -1162,5 +1319,14 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
     public void setUp() throws Exception {
         super.setUp();
         callbackSuccess = true;
+    }
+
+    public class TestProc extends VoltProcedure {
+
+        public long run()
+        {
+            // do nothing
+            return 0;
+        }
     }
 }

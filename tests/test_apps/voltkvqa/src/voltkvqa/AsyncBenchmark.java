@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -286,14 +286,7 @@ public class AsyncBenchmark {
                 }
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
                 totalConnections.decrementAndGet();
-                if (config.recover) {
-                    try {
-                        connectThis(hostname, "Retry");
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-                } else {
+                if (!config.recover) {
                     if (totalConnections.get() == 0) {
                         //totalConnections.set(-1);
                         System.exit(1);
@@ -313,6 +306,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.autotune) {
             clientConfig.enableAutoTune();
@@ -474,7 +468,7 @@ public class AsyncBenchmark {
             String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
             prt(msg);
         }
-        if ((System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
+        if (lastSuccessfulResponse > 0  && (System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
             prt("Not making any progress, last at " +
                     (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastSuccessfulResponse)) + ", exiting");
             printJStack();
@@ -715,17 +709,6 @@ public class AsyncBenchmark {
         }
     }
 
-    private void connectThis(final String server, final String info) throws InterruptedException, NoConnectionsException, IOException {
-        System.out.println("Trying to reconnect this server: '" + server + "'");
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                connectToOneServerWithRetry(server, info);
-            }
-        });
-        t.setDaemon(true);
-        t.start();
-    }
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -788,10 +771,6 @@ public class AsyncBenchmark {
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
-
-        if(totalConnections.get() == 1)
-            // If Volt is running on one node only, no need to run this test on multi-partition
-            config.multisingleratio = 0;
 
         // Run the benchmark loop for the requested duration or txn count
         // The throughput may be throttled depending on client configuration

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,12 +28,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DevNullSnapshotTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -49,10 +51,12 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override
     public Callable<Boolean> createSetup(String file_path, String file_nonce, long txnId,
                                          Map<Integer, Long> partitionTransactionIds,
+                                         Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                          JSONObject jsData,
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,
                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                         Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                          SiteTracker tracker,
                                          HashinatorSnapshotData hashinatorData,
                                          long timestamp)

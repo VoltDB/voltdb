@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,13 +18,11 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
-import java.util.List;
 
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
@@ -66,6 +64,13 @@ public class PushdownLimits extends MicroOptimization {
 
         // push into Scans
         if (child instanceof AbstractScanPlanNode) {
+
+            // scan node can not have inline aggregation because ee apply scan limit first
+            // in future, this limit can be aggregate inline node.
+            if (AggregatePlanNode.getInlineAggregationNode(child) != null) {
+                return plan;
+            }
+
             plan.clearChildren();
             child.clearParents();
             child.addInlinePlanNode(plan);

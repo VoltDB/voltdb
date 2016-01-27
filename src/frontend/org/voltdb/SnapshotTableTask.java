@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,10 +47,22 @@ public class SnapshotTableTask
 
     public void setTarget(SnapshotDataTarget target)
     {
+        if (target == null) {
+            VoltDB.crashLocalVoltDB("Attempted to set null target on snapshot table task", true, null);
+        }
         m_target = target;
     }
+
     public SnapshotDataTarget getTarget()
     {
+        return getTarget(false);
+    }
+
+    public SnapshotDataTarget getTarget(boolean canBeNull)
+    {
+        if (m_target == null && !canBeNull) {
+            VoltDB.crashLocalVoltDB("Attempted to operate on snapshot table task with a null target", true, null);
+        }
         return m_target;
     }
 

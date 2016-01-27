@@ -16,8 +16,9 @@
 
 package com.google_voltpatches.common.io;
 
+import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+
 import com.google_voltpatches.common.annotations.Beta;
-import com.google_voltpatches.common.base.Preconditions;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -52,8 +53,7 @@ public final class LineReader {
    * {@code Readable} object.
    */
   public LineReader(Readable readable) {
-    Preconditions.checkNotNull(readable);
-    this.readable = readable;
+    this.readable = checkNotNull(readable);
     this.reader = (readable instanceof Reader) ? (Reader) readable : null;
   }
 

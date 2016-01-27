@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -110,7 +110,7 @@ public class StreamSnapshotSink {
             // Currently, only export cares about this TXN ID.  Since we don't have one handy,
             // just use Long.MIN_VALUE to match how m_openSpHandle is initialized in ee/storage/TupleStreamWrapper
 
-            connection.loadTable(Long.MIN_VALUE, tableId, table, false, false);
+            connection.loadTable(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE, tableId, table, false, false, false);
         }
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,9 +26,10 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.DRLogSegmentId;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -53,6 +54,19 @@ public class RepairLog
     // transactions it should never have seen
     long m_lastSpHandle = Long.MAX_VALUE;
     long m_lastMpHandle = Long.MAX_VALUE;
+
+    /*
+     * Track the last master-cluster unique ID associated with an
+     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
+     *  ReplicaDRGateway on repair
+     */
+    private long m_maxSeenSpBinaryLogSpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenSpBinaryLogMpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenMpBinaryLogMpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenSpBinaryLogDRId = Long.MIN_VALUE;
+    private long m_maxSeenMpBinaryLogDRId = Long.MIN_VALUE;
+    private long m_maxSeenLocalSpUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenLocalMpUniqueId = Long.MIN_VALUE;
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -152,9 +166,18 @@ public class RepairLog
                 m_lastSpHandle = m.getSpHandle();
                 truncate(m.getTruncationHandle(), IS_SP);
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+                if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
+                    StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
+                    // params[2] is the end sequence number from the original cluster
+                    Object[] params = spi.getParams().toArray();
+                    m_maxSeenSpBinaryLogDRId = Math.max(m_maxSeenSpBinaryLogDRId, ((Number)params[2]).longValue());
+                    m_maxSeenSpBinaryLogSpUniqueId = Math.max(m_maxSeenSpBinaryLogSpUniqueId, ((Number)params[3]).longValue());
+                    m_maxSeenSpBinaryLogMpUniqueId = Math.max(m_maxSeenSpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
+                    m_maxSeenLocalSpUniqueId = Math.max(m_maxSeenLocalSpUniqueId, m.getUniqueId());
+                }
             }
         } else if (msg instanceof FragmentTaskMessage) {
-            final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
+            final FragmentTaskMessage m = (FragmentTaskMessage) msg;
             if (!m.isReadOnly()) {
                 truncate(m.getTruncationHandle(), IS_MP);
                 // only log the first fragment of a procedure (and handle 1st case)
@@ -162,6 +185,16 @@ public class RepairLog
                     m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
                     m_lastMpHandle = m.getTxnId();
                     m_lastSpHandle = m.getSpHandle();
+                }
+
+                final Iv2InitiateTaskMessage initiateTask = m.getInitiateTask();
+                if (initiateTask != null && "@ApplyBinaryLogMP".equals(initiateTask.getStoredProcedureName())) {
+                    StoredProcedureInvocation spi = initiateTask.getStoredProcedureInvocation();
+                    // params[3] is the end sequence number id from the original cluster
+                    Object[] params = spi.getParams().toArray();
+                    m_maxSeenMpBinaryLogDRId = Math.max(m_maxSeenMpBinaryLogDRId, ((Number)params[2]).longValue());
+                    m_maxSeenMpBinaryLogMpUniqueId = Math.max(m_maxSeenMpBinaryLogMpUniqueId, ((Number)params[4]).longValue());
+                    m_maxSeenLocalMpUniqueId = Math.max(m_maxSeenLocalMpUniqueId, m.getUniqueId());
                 }
             }
         }
@@ -242,8 +275,16 @@ public class RepairLog
         List<Item> items = new LinkedList<Item>();
         // All cases include the log of MP transactions
         items.addAll(m_logMP);
+        DRLogSegmentId logInfo;
+        long maxSeenLocalDrUniqueId;
         // SP repair requests also want the SP transactions
-        if (!forMPI) {
+        if (forMPI) {
+            logInfo = new DRLogSegmentId(m_maxSeenMpBinaryLogDRId, Long.MIN_VALUE, m_maxSeenMpBinaryLogMpUniqueId);
+            maxSeenLocalDrUniqueId = m_maxSeenLocalMpUniqueId;
+        }
+        else {
+            logInfo = new DRLogSegmentId(m_maxSeenSpBinaryLogDRId, m_maxSeenSpBinaryLogSpUniqueId, m_maxSeenSpBinaryLogMpUniqueId);
+            maxSeenLocalDrUniqueId = m_maxSeenLocalSpUniqueId;
             items.addAll(m_logSP);
         }
 
@@ -263,7 +304,9 @@ public class RepairLog
                         ofTotal,
                         m_lastSpHandle,
                         m_lastMpHandle,
-                        TheHashinator.getCurrentVersionedConfigCooked());
+                        TheHashinator.getCurrentVersionedConfigCooked(),
+                        maxSeenLocalDrUniqueId,
+                        logInfo);
         responses.add(hheader);
 
         int seq = responses.size();

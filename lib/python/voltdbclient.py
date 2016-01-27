@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -113,6 +113,8 @@ class FastSerializer:
     VOLTTYPE_MONEY = 20     # 8 byte long
     VOLTTYPE_VOLTTABLE = 21
     VOLTTYPE_VARBINARY = 25
+    VOLTTYPE_GEOGRAPHY_POINT = 26
+    VOLTTYPE_GEOGRAPHY = 27
 
     # SQL NULL indicator for object type serializations (string, decimal)
     NULL_STRING_INDICATOR = -1
@@ -301,13 +303,13 @@ class FastSerializer:
             print "ERROR: Connection failed. Please check that the host and port are correct."
             raise e
         except socket.timeout:
-            raise SystemExit("Authentication timed out after %d seconds."
+            raise RuntimeError("Authentication timed out after %d seconds."
                                 % self.socket.gettimeout())
         version = self.readByte()
         status = self.readByte()
 
         if status != 0:
-            raise SystemExit("Authentication failed.")
+            raise RuntimeError("Authentication failed.")
 
         self.readInt32()
         self.readInt64()

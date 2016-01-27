@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,16 @@
 
 package org.voltdb.client;
 
+import java.math.RoundingMode;
+import java.security.Principal;
+import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
+
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
-import java.util.concurrent.TimeUnit;
+
+import org.voltdb.types.VoltDecimalHelper;
 
 /**
  * Container for configuration settings for a Client
@@ -29,7 +35,10 @@ public class ClientConfig {
 
     static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
+    static final long DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS = 1000; // default initial connection retry interval is 1 second
+    static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
 
+    final ClientAuthScheme m_hashScheme;
     final String m_username;
     final String m_password;
     final boolean m_cleartext;
@@ -39,10 +48,31 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(DEFAULT_PROCEDURE_TIMOUT_NANOS);
+    long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMOUT_NANOS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
     boolean m_useClientAffinity = true;
     Subject m_subject = null;
+    boolean m_reconnectOnConnectionLoss;
+    long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
+    long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
+
+
+    final static String getUserNameFromSubject(Subject subject) {
+        if (subject == null || subject.getPrincipals() == null || subject.getPrincipals().isEmpty()) {
+            throw new IllegalArgumentException("Subject is null or does not contain principals");
+        }
+        Iterator<Principal> piter = subject.getPrincipals().iterator();
+        Principal principal = piter.next();
+        String username = principal.getName();
+        while (piter.hasNext()) {
+            principal = piter.next();
+            if (principal instanceof DelegatePrincipal) {
+                username = principal.getName();
+                break;
+            }
+        }
+        return username;
+    }
 
     /**
      * <p>Configuration for a client with no authentication credentials that will
@@ -53,7 +83,9 @@ public class ClientConfig {
         m_password = "";
         m_listener = null;
         m_cleartext = true;
+        m_hashScheme = ClientAuthScheme.HASH_SHA256;
     }
+
 
     /**
      * <p>Configuration for a client that specifies authentication credentials. The username and
@@ -63,7 +95,7 @@ public class ClientConfig {
      * @param password Cleartext password.
      */
     public ClientConfig(String username, String password) {
-        this(username, password, true, (ClientStatusListenerExt) null);
+        this(username, password, true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256);
     }
 
     /**
@@ -74,11 +106,12 @@ public class ClientConfig {
      * in
      * @param username Cleartext username.
      * @param password Cleartext password.
+     * @param scheme Client password hash scheme
      * @param listener {@link ClientStatusListener} implementation to receive callbacks.
      */
     @Deprecated
-    public ClientConfig(String username, String password, ClientStatusListener listener) {
-        this(username, password, true, new ClientStatusListenerWrapper(listener));
+    public ClientConfig(String username, String password, ClientStatusListener listener, ClientAuthScheme scheme) {
+        this(username, password, true, new ClientStatusListenerWrapper(listener), scheme);
     }
 
     /**
@@ -90,7 +123,20 @@ public class ClientConfig {
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
-        this(username,password,true,listener);
+        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256);
+    }
+
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password Cleartext password.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param scheme Client password hash scheme
+     */
+    public ClientConfig(String username, String password, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
+        this(username,password,true,listener, scheme);
     }
 
     /**
@@ -103,6 +149,31 @@ public class ClientConfig {
      * @param cleartext Whether the password is hashed.
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
+        this(username, password, cleartext, listener, ClientAuthScheme.HASH_SHA256);
+    }
+
+    /**
+     * <p>Configuration for a client that specifies an already authenticated {@link Subject}.
+     * Also specifies a status listener.</p>
+     *
+     * @param subject an authenticated {@link Subject}
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     */
+    public ClientConfig(Subject subject, ClientStatusListenerExt listener) {
+        this(getUserNameFromSubject(subject), "", true, listener, ClientAuthScheme.HASH_SHA256);
+        m_subject = subject;
+    }
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password A cleartext or hashed passowrd.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param cleartext Whether the password is hashed.
+     * @param scheme Client password hash scheme
+     */
+    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
         if (username == null) {
             m_username = "";
         } else {
@@ -115,6 +186,7 @@ public class ClientConfig {
         }
         m_listener = listener;
         m_cleartext = cleartext;
+        m_hashScheme = scheme;
     }
 
     /**
@@ -125,9 +197,9 @@ public class ClientConfig {
      * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
      * will be called.</p>
      *
-     * Default value is 2 minutes if not set. Value of 0 means forever.</p>
+     * <p>Default value is 2 minutes if not set. Value of 0 means forever.</p>
      *
-     * Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
+     * <p>Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
      *
      * @param ms Timeout value in milliseconds.
      */
@@ -251,6 +323,33 @@ public class ClientConfig {
     }
 
     /**
+     * <p>Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
+     *
+     * @param on Enable or disable the reconnection feature. Default is off.
+     */
+    public void setReconnectOnConnectionLoss(boolean on) {
+        this.m_reconnectOnConnectionLoss = on;
+    }
+
+    /**
+     * <p>Set the initial connection retry interval. Only takes effect if {@link #m_reconnectOnConnectionLoss} is turned on.</p>
+     *
+     * @param ms initial connection retry interval in milliseconds.
+     */
+    public void setInitialConnectionRetryInterval(long ms) {
+        this.m_initialConnectionRetryIntervalMS = ms;
+    }
+
+    /**
+     * <p>Set the max connection retry interval. Only takes effect if {@link #m_reconnectOnConnectionLoss} is turned on.</p>
+     *
+     * @param ms max connection retry interval in milliseconds.
+     */
+    public void setMaxConnectionRetryInterval(long ms) {
+        this.m_maxConnectionRetryIntervalMS = ms;
+    }
+
+    /**
      * <p>Set the target latency for the Auto Tune feature. Note this represents internal
      * latency as reported by the server(s), not round-trip latency measured by the
      * client. Default value is 5 if this is not called.</p>
@@ -266,8 +365,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Enable Kerberos authentication with the provided subject credentials<p>
-     * @param subject
+     * <p>Enable Kerberos authentication with the provided subject credentials</p>
+     * @param subject Identity of the authenticated user.
      */
     public void enableKerberosAuthentication(final Subject subject) {
         m_subject = subject;
@@ -289,5 +388,16 @@ public class ClientConfig {
        } catch (LoginException ex) {
            throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
        }
+    }
+
+    /**
+     * Enable or disable the rounding mode in the client.  This must match the
+     * rounding mode set in the server, which is set using system properties.
+     *
+     * @param isEnabled True iff rounding is enabled.
+     * @param mode The rounding mode, with values taken from java.math.RoundingMode.
+     */
+    public static void setRoundingConfig(boolean isEnabled, RoundingMode mode) {
+        VoltDecimalHelper.setRoundingConfig(isEnabled, mode);
     }
 }

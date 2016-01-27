@@ -1,0 +1,6 @@
+#valid_path
+/var/opt/test/manual_snapshots
+#invalid_path
+/var/invalid/path
+
+#empty_path

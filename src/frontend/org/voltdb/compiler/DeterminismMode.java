@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,9 +19,36 @@ package org.voltdb.compiler;
 
 public enum DeterminismMode {
     FASTER, // Pick the fastest plan without regard for determinism
-    SAFER   // Pick a fast plan that is more likely to be deterministic
+    SAFER;   // Pick a fast plan that is more likely to be deterministic
             //  In practice, this means avoiding table scans, but could
             //  still fail on non-unique indexes
     //SAFE  // Not yet added, but could add an order-by all over the place
             //  if that made sense.
+
+    char toChar() {
+        if (this == FASTER) {
+            return 'F';
+        }
+        if (this == SAFER) {
+            return 'S';
+        }
+        throw new RuntimeException("This shouldn't happend in DeterminismMode.java");
+    }
+
+    static DeterminismMode fromChar(char c) {
+        if (c == 'F') {
+            return FASTER;
+        }
+        if (c == 'S') {
+            return SAFER;
+        }
+        return null;
+    }
+
+    static DeterminismMode fromStr(String str) {
+        if ((str == null) || (str.isEmpty())) {
+            return null;
+        }
+        return fromChar(str.toUpperCase().charAt(0));
+    }
 }

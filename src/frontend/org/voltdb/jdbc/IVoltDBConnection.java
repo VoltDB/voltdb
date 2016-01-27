@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,9 +26,6 @@ public interface IVoltDBConnection
 {
     void writeSummaryCSV(ClientStats stats, String path) throws IOException;
     ClientStatsContext createStatsContext();
-    JDBC4PerfCounterMap getStatistics();
-    JDBC4PerfCounter getStatistics(String procedure);
-    JDBC4PerfCounter getStatistics(String... procedures);
-    void saveStatistics(String file) throws IOException;
+    void saveStatistics(ClientStats stats, String file) throws IOException;
 }
 

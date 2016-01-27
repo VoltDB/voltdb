@@ -1,0 +1,39 @@
+-- In case these tables get left behind by previous tests:
+drop table r if exists;
+drop table s if exists;
+drop table t if exists;
+
+show classes;
+load classes sqlcmdtest-procs.jar;
+show classes;
+
+drop table EMPLOYEE if exists;
+create table EMPLOYEE (
+  ID integer not null,
+  FIRST_NAME varchar,
+  LAST_NAME varchar not null,
+  DEPARTMENT varchar,
+primary key (ID));
+
+show procedures;
+create procedure from class sqlcmdtest.InsertEmployee;
+show procedures;
+show classes;
+
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec InsertEmployee John Smith Engineering;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec InsertEmployee Jane Jones Sales;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+
+drop procedure InsertEmployee;
+show procedures;
+show classes;
+
+remove classes sqlcmdtest.InsertEmployee;
+show classes;
+
+drop table EMPLOYEE;

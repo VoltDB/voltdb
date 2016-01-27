@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,12 +30,12 @@ namespace voltdb {
 // forward decl.
 class Topend;
 class ExecutorContext;
-class TupleStreamWrapper;
+class ExportTupleStream;
 
 /**
  * A streamed table does not store data. It may not be read. It may
  * not be updated. Only new appended writes are permitted. All writes
- * are passed through a TupleStreamWrapper to Export. The table exists
+ * are passed through a ExportTupleStream to Export. The table exists
  * only to support Export.
  */
 
@@ -45,7 +45,11 @@ class StreamedTable : public Table {
 
   public:
     StreamedTable(bool exportEnabled);
+    StreamedTable(bool exportEnabled, ExportTupleStream* wrapper);
     static StreamedTable* createForTest(size_t, ExecutorContext*);
+
+    //This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+    bool enableStream();
 
     virtual ~StreamedTable();
 
@@ -77,7 +81,7 @@ class StreamedTable : public Table {
                                                 bool=true);
 
 
-    virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
+    virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
 
@@ -127,7 +131,7 @@ private:
 
     voltdb::StreamedTableStats stats_;
     ExecutorContext *m_executorContext;
-    TupleStreamWrapper *m_wrapper;
+    ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
 };
 

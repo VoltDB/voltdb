@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,7 @@ public enum LogKeys {
     host_Backend_ErrorOnShutdown,
     host_ClientInterface_checkForAdhocSQL_SerializationException,
     host_VoltDB_ErrorStartAcceptingConnections,
+    host_VoltDB_ErrorStartHTTPListener,
     host_VoltDB_ServerCompletedInitialization,
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
@@ -60,11 +61,10 @@ public enum LogKeys {
     //AUTH
     auth_ClientInterface_ProcedureNotFound,
     auth_ClientInterface_LackingPermissionForProcedure,
-    auth_ClientInterface_LackingPermissionForAdhoc,
+    auth_ClientInterface_LackingPermissionForSql,
     auth_ClientInterface_LackingPermissionForSysproc,
     auth_ClientInterface_LackingPermissionForDefaultproc,
     auth_AuthSystem_NoSuchAlgorithm,
-    auth_AuthSystem_AuthenticatedUser,
     auth_AuthSystem_NoSuchUser,
     auth_AuthSystem_AuthFailedPasswordMistmatch,
 
@@ -86,6 +86,10 @@ public enum LogKeys {
     //EXPORT
     export_ExportManager_NoLoaderExtensions,
     export_ExportManager_DataDroppedLoaderDead,
+
+    //IMPORT
+    import_ImportManager_NoLoaderExtensions,
+    import_ImportManager_DataDroppedLoaderDead,
 
     //COMPILER
     compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost,

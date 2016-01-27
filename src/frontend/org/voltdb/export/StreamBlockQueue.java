@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,20 +16,21 @@
  */
 package org.voltdb.export;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
-import org.voltdb.utils.PersistentBinaryDeque;
-import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.VoltFile;
-
 import org.voltcore.utils.DBBPool.BBContainer;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import org.voltdb.utils.BinaryDeque;
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
+import org.voltdb.utils.BinaryDeque.TruncatorResponse;
+import org.voltdb.utils.PersistentBinaryDeque;
+import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
+import org.voltdb.utils.VoltFile;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -58,7 +59,7 @@ public class StreamBlockQueue {
     private final String m_nonce;
 
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
-        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
+        m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path), exportLog);
         m_nonce = nonce;
     }
 
@@ -241,7 +242,7 @@ public class StreamBlockQueue {
         }
     }
 
-    public long sizeInBytes() {
+    public long sizeInBytes() throws IOException {
         long memoryBlockUsage = 0;
         for (StreamBlock b : m_memoryDeque) {
             memoryBlockUsage += b.unreleasedSize(); //Use only unreleased size, but throw in the USO
@@ -272,7 +273,8 @@ public class StreamBlockQueue {
         m_persistentDeque.parseAndTruncate(new BinaryDequeTruncator() {
 
         @Override
-        public ByteBuffer parse(ByteBuffer b) {
+        public TruncatorResponse parse(BBContainer bbc) {
+            ByteBuffer b = bbc.b();
             b.order(ByteOrder.LITTLE_ENDIAN);
             try {
                 b.position(b.position() + 8);//Don't need the USO
@@ -292,13 +294,13 @@ public class StreamBlockQueue {
                         //If the truncation point was the first row in the block, the entire block is to be discard
                         //We know it is the first row if the position before the row is after the uso (8 bytes)
                         if (b.position() == 8) {
-                            return ByteBuffer.allocate(0);
+                            return PersistentBinaryDeque.fullTruncateResponse();
                         } else {
                             //Return everything in the block before the truncation point.
                             //Indicate this is the end of the interesting data.
                             b.limit(b.position());
                             b.position(0);
-                            return b;
+                            return new ByteBufferTruncatorResponse(b);
                         }
                     } else {
                         //Not the row we are looking to truncate at. Skip past it keeping in mind

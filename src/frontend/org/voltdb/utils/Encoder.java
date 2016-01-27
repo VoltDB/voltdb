@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -75,16 +75,23 @@ public class Encoder {
      * @return The binary byte array value for the string (half length).
      */
     public static byte[] hexDecode(String hexString) {
-        if ((hexString.length() % 2) != 0)
-            throw new RuntimeException("String is not properly hex-encoded.");
+        byte[] retval = null;
+        final String errorText = "String is not properly hex-encoded.";
 
-        hexString = hexString.toUpperCase();
-        byte[] retval = new byte[hexString.length() / 2];
-        for (int i = 0; i < retval.length; i++) {
-            int value = Integer.parseInt(hexString.substring(2 * i, 2 * i + 2), 16);
-            if ((value < 0) || (value > 255))
-                throw new RuntimeException("String is not properly hex-encoded.");
-            retval[i] = (byte) value;
+        if ((hexString.length() % 2) != 0)
+            throw new RuntimeException(errorText);
+
+        try {
+            retval = new byte[hexString.length() / 2];
+            for (int i = 0; i < retval.length; i++) {
+                int value = Integer.parseInt(hexString.substring(2 * i, 2 * i + 2), 16);
+                retval[i] = (byte) value;
+            }
+        }
+        catch (IllegalArgumentException exc) {
+            // parseInt can throw a NumberFormatException, which is a subclass of
+            // IllegalArgumentException, so both kinds of failure come here.
+            throw new RuntimeException(errorText);
         }
         return retval;
     }

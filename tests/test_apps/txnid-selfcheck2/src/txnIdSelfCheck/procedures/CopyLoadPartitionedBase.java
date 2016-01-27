@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,22 +30,33 @@ import org.voltdb.VoltTable;
 public class CopyLoadPartitionedBase extends VoltProcedure {
 
     public VoltTable[] doWork(SQLStmt select, SQLStmt insert, long cid) {
-        // Get row for cid and copy to new table.
-        voltQueueSQL(select, cid);
-        VoltTable[] results = voltExecuteSQL();
-        VoltTable data = results[0];
-        if (data.getRowCount() != 1) {
-            throw new VoltAbortException("Failed to find cid that should exist: cid=" + cid);
+        if (select != null) { // use select
+            // Get row for cid and copy to new table.
+            voltQueueSQL(select, cid);
+            VoltTable[] results = voltExecuteSQL();
+            VoltTable data = results[0];
+            if (data.getRowCount() != 1) {
+                throw new VoltAbortException("Failed to find cid that should exist: cid=" + cid);
+            }
+            data.advanceRow();
+            long rcid = data.getLong(0);
+            if (rcid != cid) {
+                throw new VoltAbortException("Failed to find cid does not match. (" + rcid + ":" + cid + ")");
+            }
+            long txnid = data.getLong(1);
+            long rowid = data.getLong(2);
+            voltQueueSQL(insert, rcid, txnid, rowid);
+            return voltExecuteSQL();
+        } else { // use insert into
+            voltQueueSQL(insert,cid);
+            VoltTable[] results = voltExecuteSQL();
+            VoltTable data = results[0];
+            int cnt = (int) data.fetchRow(0).getLong(0);
+            if (cnt != 1) {
+                throw new VoltAbortException("incorrect number of inserted rows=" + cnt + " for cid=" + cid);
+            }
+            return results;
         }
-        data.advanceRow();
-        long rcid = data.getLong(0);
-        if (rcid != cid) {
-            throw new VoltAbortException("Failed to find cid does not match. (" + rcid + ":" + cid + ")");
-        }
-        long txnid = data.getLong(1);
-        long rowid = data.getLong(2);
-        voltQueueSQL(insert, rcid, txnid, rowid);
-        return voltExecuteSQL();
     }
 
     public long run() {

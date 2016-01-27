@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,7 +53,7 @@ void CatalogType::set(const string &field, const string &value) {
     int32_t indicator = tolower(value[0]);
     // paths
     if (indicator == '/') {
-        //printf("Adding a path ref for %s[%s]:\n    %s\n", path().c_str(), field.c_str(), value.c_str());
+        //printf("Adding a path ref for %s[%s:\n    %s\n", path().c_str(), field.c_str(), value.c_str());
         //fflush(stdout);
         CatalogType *type = m_catalog->itemForRef(value);
         if (!type) {

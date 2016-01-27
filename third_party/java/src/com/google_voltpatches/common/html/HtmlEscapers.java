@@ -26,6 +26,9 @@ import com.google_voltpatches.common.escape.Escapers;
  * attribute values and <em>most</em> elements' text contents. When possible,
  * avoid manual escaping by using templating systems and high-level APIs that
  * provide autoescaping.
+ * One Google-authored templating system available for external use is <a
+ * href="https://developers.google.com/closure/templates/">Closure
+ * Templates</a>.
  *
  * <p>HTML escaping is particularly tricky: For example, <a
  * href="http://goo.gl/5TgZb">some elements' text contents must not be HTML
@@ -40,11 +43,6 @@ import com.google_voltpatches.common.escape.Escapers;
 @Beta
 @GwtCompatible
 public final class HtmlEscapers {
-  private HtmlEscapers() {}
-
-  // For each xxxEscaper() method, please add links to external reference pages
-  // that are considered authoritative for the behavior of that escaper.
-
   /**
    * Returns an {@link Escaper} instance that escapes HTML metacharacters as
    * specified by <a href="http://www.w3.org/TR/html4/">HTML 4.01</a>. The
@@ -54,7 +52,7 @@ public final class HtmlEscapers {
    * other Unicode encodings can).
    *
    *
-   * <p><b>Note</b>: This escaper only performs minimal escaping to make content
+   * <p><b>Note:</b> This escaper only performs minimal escaping to make content
    * structurally compatible with HTML. Specifically, it does not perform entity
    * replacement (symbolic or numeric), so it does not replace non-ASCII code
    * points with character references. This escaper escapes only the following
@@ -63,6 +61,9 @@ public final class HtmlEscapers {
   public static Escaper htmlEscaper() {
     return HTML_ESCAPER;
   }
+
+  // For each xxxEscaper() method, please add links to external reference pages
+  // that are considered authoritative for the behavior of that escaper.
 
   private static final Escaper HTML_ESCAPER =
       Escapers.builder()
@@ -73,4 +74,6 @@ public final class HtmlEscapers {
           .addEscape('<', "&lt;")
           .addEscape('>', "&gt;")
           .build();
+
+  private HtmlEscapers() {}
 }

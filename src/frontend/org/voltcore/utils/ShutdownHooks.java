@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,12 +35,10 @@ public class ShutdownHooks
     /**
      * Provide some initial constants for shutdown order
      */
-    public static int FIRST = 1;
-    public static int MIDDLE = 50;
-    // Async volt logger needs to purge before log4j shuts down
-    public static int VOLT_LOGGER = 99;
-    // Kill log4j
-    public static int VOLT_LOG4J = 100;
+    public static final int FIRST = 1;
+    public static final int MIDDLE = 50;
+    // There is only 1 final action allowed after VoltLogger shuts down.
+    private Runnable m_finalAction;
 
     class ShutdownTask {
         final int m_priority;
@@ -55,13 +53,7 @@ public class ShutdownHooks
         }
     }
 
-    private static VoltLogger consoleLog = new VoltLogger("CONSOLE");
-
-    private static ShutdownHooks m_instance = null;
-
-    static {
-        m_instance = new ShutdownHooks();
-    }
+    private static final ShutdownHooks m_instance = new ShutdownHooks();
 
     /**
      * Register an action to be run when the JVM exits.
@@ -73,6 +65,16 @@ public class ShutdownHooks
     public static void registerShutdownHook(int priority, boolean runOnCrash, Runnable action)
     {
         m_instance.addHook(priority, runOnCrash, action);
+    }
+
+    /**
+     * Register a final action to be run when the JVM exits.
+     * @param action   A Runnable containing the action to be run on shutdown.
+     */
+    public static void registerFinalShutdownAction(Runnable action)
+    {
+        // There should be only one -- otherwise, the last one to register wins.
+        m_instance.m_finalAction = action;
     }
 
     /**
@@ -124,7 +126,7 @@ public class ShutdownHooks
     private synchronized void runHooks()
     {
         if (m_iAmAServer && !m_crashing) {
-            consoleLog.warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
+            new VoltLogger("CONSOLE").warn("The VoltDB server will shut down due to a control-C or other JVM exit.");
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {
@@ -132,10 +134,18 @@ public class ShutdownHooks
                     try {
                         task.m_action.run();
                     } catch (Exception e) {
-                        consoleLog.warn("Exception while running shutdown hooks.", e);
+                        new VoltLogger("CONSOLE").warn("Exception while running shutdown hooks.", e);
                     }
                 }
             }
+        }
+        // Async volt logger needs to purge after other shutdown tasks but
+        // before log4j shuts down in the (typical) final action.
+        VoltLogger.shutdownAsynchronousLogging();
+        if (m_finalAction != null) {
+            try {
+                m_finalAction.run();
+            } catch (Exception e) {} // Don't even try to log that the logger failed to shutdown.
         }
     }
 

@@ -21,7 +21,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.Equivalence;
 import com.google_voltpatches.common.base.Function;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.collect.MapMaker.RemovalListener;
 import com.google_voltpatches.common.collect.MapMaker.RemovalNotification;
 
@@ -41,13 +41,13 @@ import java.util.concurrent.TimeUnit;
  *     com.google_voltpatches.common.cache.CacheBuilder}, which is a properly generified class and thus needs no
  *     "Generic" equivalent; simple use {@code CacheBuilder} naturally. For general migration
  *     instructions, see the <a
- *     href="http://code.google.com/p/guava-libraries/wiki/MapMakerMigration">MapMaker Migration
- *     Guide</a>. This class is scheduled for removal in Guava 16.0.
+ *     href="https://github.com/google/guava/wiki/MapMakerMigration">MapMaker Migration
+ *     Guide</a>.
  */
 @Beta
 @Deprecated
 @GwtCompatible(emulated = true)
-public abstract class GenericMapMaker<K0, V0> {
+abstract class GenericMapMaker<K0, V0> {
   @GwtIncompatible("To be supported")
   enum NullListener implements RemovalListener<Object, Object> {
     INSTANCE;
@@ -102,12 +102,11 @@ public abstract class GenericMapMaker<K0, V0> {
    * @deprecated Caching functionality in {@code MapMaker} has been moved to {@link
    *     com.google_voltpatches.common.cache.CacheBuilder}, with {@link #softValues} being replaced by {@link
    *     com.google_voltpatches.common.cache.CacheBuilder#softValues}. Note that {@code CacheBuilder} is simply
-   *     an enhanced API for an implementation which was branched from {@code MapMaker}. <b>This
-   *     method is scheduled for deletion in August 2014.</b>
+   *     an enhanced API for an implementation which was branched from {@code MapMaker}.
    */
   @Deprecated
   @GwtIncompatible("java.lang.ref.SoftReference")
-  public abstract GenericMapMaker<K0, V0> softValues();
+  abstract GenericMapMaker<K0, V0> softValues();
 
   /**
    * See {@link MapMaker#expireAfterWrite}.
@@ -128,7 +127,7 @@ public abstract class GenericMapMaker<K0, V0> {
   @SuppressWarnings("unchecked") // safe covariant cast
   @GwtIncompatible("To be supported")
   <K extends K0, V extends V0> RemovalListener<K, V> getRemovalListener() {
-    return (RemovalListener<K, V>) Objects.firstNonNull(removalListener, NullListener.INSTANCE);
+    return (RemovalListener<K, V>) MoreObjects.firstNonNull(removalListener, NullListener.INSTANCE);
   }
 
   /**

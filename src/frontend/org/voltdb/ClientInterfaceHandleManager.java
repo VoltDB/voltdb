@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,6 +57,7 @@ public class ClientInterfaceHandleManager
     private long m_outstandingTxns;
     public final boolean isAdmin;
     public final Connection connection;
+    public final ClientInterfaceRepairCallback repairCallback;
     private final long m_expectedThreadId = Thread.currentThread().getId();
     final AdmissionControlGroup m_acg;
 
@@ -133,10 +134,11 @@ public class ClientInterfaceHandleManager
     private ImmutableMap<Integer, PartitionData> m_partitionStuff =
             new Builder<Integer, PartitionData>().build();
 
-    ClientInterfaceHandleManager(boolean isAdmin, Connection connection, AdmissionControlGroup acg)
+    ClientInterfaceHandleManager(boolean isAdmin, Connection connection, ClientInterfaceRepairCallback repairCallback, AdmissionControlGroup acg)
     {
         this.isAdmin = isAdmin;
         this.connection = connection;
+        this.repairCallback = repairCallback;
         m_acg = acg;
     }
 
@@ -146,9 +148,9 @@ public class ClientInterfaceHandleManager
      * the natural thread-safety protocol/design of VoltNetwork.
      */
     public static ClientInterfaceHandleManager makeThreadSafeCIHM(
-            boolean isAdmin, Connection connection, AdmissionControlGroup acg)
+            boolean isAdmin, Connection connection, ClientInterfaceRepairCallback callback, AdmissionControlGroup acg)
     {
-        return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
+        return new ClientInterfaceHandleManager(isAdmin, connection, callback, acg) {
             @Override
             synchronized long getHandle(boolean isSinglePartition, int partitionId,
                     long clientHandle, int messageSize, long creationTimeNanos, String procName, long initiatorHSId,

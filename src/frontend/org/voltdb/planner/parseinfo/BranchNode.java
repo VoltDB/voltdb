@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,13 +21,18 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.types.JoinType;
 
+/**
+ * A BranchNode is an interior node of a join tree.
+ */
 public class BranchNode extends JoinNode {
     // Join type
     private JoinType m_joinType;
@@ -49,6 +54,8 @@ public class BranchNode extends JoinNode {
         m_joinType = joinType;
         m_leftNode = leftNode;
         m_rightNode = rightNode;
+        updateContentDeterminismMessage(leftNode.getContentDeterminismMessage());
+        updateContentDeterminismMessage(rightNode.getContentDeterminismMessage());
     }
 
     /**
@@ -131,13 +138,14 @@ public class BranchNode extends JoinNode {
         // without even considering the inner table). Testing the outer-only conditions
         // COULD be considered as an optimal first step to processing each outer tuple
         // 2. The INNER-only join conditions apply to the inner tuples (even prior to considering any outer tuple).
-        // if true for a given inner tuple, the condition has no effect, if false,
-        // it prevents the inner tuple from matching ANY outer tuple,
+        // if true for a given inner tuple, the condition has no effect,
+        // if false, it prevents the inner tuple from matching ANY outer tuple,
         // In case of multi-tables join, they could be pushed down to a child node if this node is a join itself
         // 3. The two-sided expressions that get evaluated on each combination of outer and inner tuple
         // and either accept or reject that particular combination.
         // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
-        // for the currently supported two table joins but could change if number of tables > 2
+        // for the currently supported two table joins but could change if number of tables > 2.
+        // Constant Value Expression may fall into this category.
         classifyJoinExpressions(joinList, outerTables, innerTables,  m_joinOuterList,
                 m_joinInnerList, m_joinInnerOuterList, noneList);
 
@@ -164,6 +172,17 @@ public class BranchNode extends JoinNode {
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
         pushDownExpressions(noneList);
+
+        Iterator<AbstractExpression> iter = noneList.iterator();
+        while (iter.hasNext()) {
+            AbstractExpression noneExpr = iter.next();
+            // Allow CVE(TRUE/FALSE)
+            if (VoltType.BOOLEAN == noneExpr.getValueType()) {
+                m_whereInnerOuterList.add(noneExpr);
+                iter.remove();
+            }
+        }
+
     }
 
     /**

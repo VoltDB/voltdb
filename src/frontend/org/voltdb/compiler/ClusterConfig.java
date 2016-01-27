@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,15 +16,23 @@
  */
 package org.voltdb.compiler;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -33,12 +41,18 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.Multimap;
+import org.voltdb.utils.MiscUtils;
 
 public class ClusterConfig
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static List<Integer> partitionsForHost(JSONObject topo, int hostId) throws JSONException
+    {
+        return partitionsForHost(topo, hostId, false);
+    }
+
+    public static List<Integer> partitionsForHost(JSONObject topo, int hostId, boolean onlyMasters) throws JSONException
     {
         List<Integer> partitions = new ArrayList<Integer>();
 
@@ -48,13 +62,17 @@ public class ClusterConfig
             // have an object in the partitions array
             JSONObject aPartition = parts.getJSONObject(p);
             int pid = aPartition.getInt("partition_id");
-            JSONArray replicas = aPartition.getJSONArray("replicas");
-            for (int h = 0; h < replicas.length(); h++)
-            {
-                int replica = replicas.getInt(h);
-                if (replica == hostId)
-                {
+            if (onlyMasters) {
+                if (aPartition.getInt("master") == hostId) {
                     partitions.add(pid);
+                }
+            } else {
+                JSONArray replicas = aPartition.getJSONArray("replicas");
+                for (int h = 0; h < replicas.length(); h++) {
+                    int replica = replicas.getInt(h);
+                    if (replica == hostId) {
+                        partitions.add(pid);
+                    }
                 }
             }
         }
@@ -164,7 +182,7 @@ public class ClusterConfig
         }
         if (m_hostCount <= m_replicationFactor)
         {
-            m_errorMsg = String.format("%d servers required for K-safety=%d",
+            m_errorMsg = String.format("%d servers required for K-safety = %d",
                                        m_replicationFactor + 1, m_replicationFactor);
             return false;
         }
@@ -172,6 +190,13 @@ public class ClusterConfig
         {
             m_errorMsg = String.format("Insufficient execution site count to achieve K-safety of %d",
                                        m_replicationFactor);
+            return false;
+        }
+        if ((m_hostCount * m_sitesPerHost) % (m_replicationFactor + 1) > 0)
+        {
+            m_errorMsg = "The cluster has more hosts and sites per hosts than required for the " +
+                "requested k-safety value. The number of total sites (sitesPerHost * hostCount) must be a " +
+                "whole multiple of the number of copies of the database (k-safety + 1)";
             return false;
         }
         m_errorMsg = "Cluster config contains no detected errors";
@@ -185,7 +210,7 @@ public class ClusterConfig
         {
             if ((m_hostCount - origStartCount) > m_replicationFactor + 1)
             {
-                m_errorMsg = String.format("You can only add %d servers at a time for k=&d",
+                m_errorMsg = String.format("You can only add %d servers at a time for k=%d",
                         m_replicationFactor + 1, m_replicationFactor);
                 return false;
             }
@@ -211,10 +236,6 @@ public class ClusterConfig
             m_neededReplicas = neededReplicas;
         }
 
-        boolean needsReplicas() {
-            return m_neededReplicas > 0;
-        }
-
         @Override
         public int hashCode() {
             return m_partitionId.hashCode();
@@ -225,10 +246,6 @@ public class ClusterConfig
                 throw new RuntimeException("ClusterConfig error: Attempted to replicate a partition too many times");
             }
             m_neededReplicas--;
-        }
-
-        public boolean canUseAsReplica(Node n) {
-            return needsReplicas() && m_master != n && !m_replicas.contains(n);
         }
 
         @Override
@@ -252,18 +269,35 @@ public class ClusterConfig
         }
     }
 
-    private static class Node {
+    private static class Node implements Comparable {
         Set<Partition> m_masterPartitions = new HashSet<Partition>();
         Set<Partition> m_replicaPartitions = new HashSet<Partition>();
-        Map<Node, Set<Partition>> m_replicationConnections = new HashMap<Node, Set<Partition>>();
+        Map<Node, Integer> m_replicationConnections = new HashMap<Node, Integer>();
         Integer m_hostId;
+        final String[] m_group;
 
-        public Node(Integer hostId) {
+        public Node(Integer hostId, String[] group) {
             m_hostId = hostId;
+            m_group = group;
         }
 
         int partitionCount() {
             return m_masterPartitions.size() + m_replicaPartitions.size();
+        }
+
+        /**
+         * Sum the replica count of each partition this node contains up. The
+         * count does not include this node itself.
+         */
+        int replicationFactor() {
+            int a = 0;
+            for (Partition p : m_masterPartitions) {
+                a += p.m_replicas.size();
+            }
+            for (Partition p : m_replicaPartitions) {
+                a += p.m_replicas.size();
+            }
+            return a;
         }
 
         @Override
@@ -292,71 +326,160 @@ public class ClusterConfig
                 sb.append(p.m_partitionId).append(", ");
             }
             sb.append(" connected to ");
-            for (Map.Entry<Node, Set<Partition>> entry : m_replicationConnections.entrySet()) {
-                sb.append(" host " + entry.getKey().m_hostId + " for partitions ");
-                for (Partition p : entry.getValue()) {
-                    sb.append(p.m_partitionId).append(", ");
-                }
-                sb.append(";");
+            for (Map.Entry<Node, Integer> entry : m_replicationConnections.entrySet()) {
+                sb.append(" host " + entry.getKey().m_hostId + " for " + entry.getValue() + " partitions");
             }
             return sb.toString();
         }
+
+        @Override
+        public int compareTo(Object o)
+        {
+            if (!(o instanceof Node)) {
+                return -1;
+            }
+            return Integer.compare(m_hostId, ((Node) o).m_hostId);
+        }
     }
 
-    /*
-     * Are there any partitions that are not fully replicated
+    /**
+     * Represents a group (rack, floor, data center, etc.). A group can have
+     * subgroups, e.g. racks on a floor. If the group does not have subgroups,
+     * it can contain nodes, e.g. nodes on a rack.
      */
-    private static boolean needReplication(List<Partition> partitions) {
-        for (Partition p : partitions) {
-            if (p.needsReplicas()) {
-                return true;
+    private static class Group {
+        final Map<String, Group> m_children = Maps.newTreeMap();
+        final Set<Node> m_hosts = Sets.newTreeSet();
+
+        public void addHost(String[] group, int host) {
+            addHost(group, 0, host);
+        }
+
+        private void addHost(String[] group, int i, int host) {
+            Group nextGroup = m_children.get(group[i]);
+            if (nextGroup == null) {
+                nextGroup = new Group();
+                m_children.put(group[i], nextGroup);
+            }
+
+            if (group.length == i + 1) {
+                nextGroup.m_hosts.add(new Node(host, group));
+            } else {
+                nextGroup.addHost(group, i + 1, host);
             }
         }
-        return false;
+
+        /**
+         * Get the nodes in the groups that are sibling to the given group,
+         * e.g. if the given group is a rack, the returned value is the servers
+         * in the neighboring racks.
+         *
+         * @return A list of nodes in their groups. The list is ordered by the
+         * reverse distance to the given group. So the first group in the list
+         * is farthest away from the given group, and the last group in the list
+         * is closest to the given group.
+         */
+        public List<Deque<Node>> getGroupSiblingsOf(String[] group)
+        {
+            List<Deque<Node>> results = Lists.newArrayList();
+            getGroupSiblingsOf(group, 0, results);
+            return results;
+        }
+
+        private void getGroupSiblingsOf(String[] group, int i, List<Deque<Node>> results) {
+            if (m_children.isEmpty()) {
+                // base condition. It works without this check, adding it here for readability.
+                return;
+            }
+
+            for (Map.Entry<String, Group> e : m_children.entrySet()) {
+                if (!e.getKey().equals(group[i])) {
+                    getHosts(e.getValue(), results);
+                }
+            }
+
+            for (Map.Entry<String, Group> e : m_children.entrySet()) {
+                if (e.getKey().equals(group[i])) {
+                    e.getValue().getGroupSiblingsOf(group, i + 1, results);
+                }
+            }
+        }
+
+        public void removeHost(Node node) {
+            if (m_children.isEmpty()) {
+                m_hosts.remove(node);
+                return;
+            }
+            for (Group l : m_children.values()) {
+                l.removeHost(node);
+            }
+        }
+
+        private static void getHosts(Group group, List<Deque<Node>> hosts) {
+            if (group.m_children.isEmpty() && !group.m_hosts.isEmpty()) {
+                final Deque<Node> hostsInGroup = new ArrayDeque<>();
+                hosts.add(hostsInGroup);
+                hostsInGroup.addAll(group.m_hosts);
+                return;
+            }
+            for (Group l : group.m_children.values()) {
+                getHosts(l, hosts);
+            }
+        }
+
+        @Override
+        public String toString()
+        {
+            return "Level{" +
+            "m_children=" + m_children +
+            ", m_hosts=" + m_hosts +
+            '}';
+        }
     }
 
-    /*
-     * Find the node that can take more replicas,
-     * has the least number of replication connections,
-     * and where the number of replication connections are equal,
-     * where the number of replicated partitions is smallest
+    /**
+     * Represents the physical topology of the cluster. Nodes are always
+     * organized in groups, a group can have subgroups, nodes only exist in the
+     * leaf groups.
      */
-    Node nextNotFullNode(List<Node> nodes, int sitesPerNode) {
-        ArrayList<Node> notFullList = new ArrayList<Node>();
-        for (Node n : nodes) {
-            if (n.partitionCount() < sitesPerNode) {
-                notFullList.add(n);
+    private static class PhysicalTopology {
+        final Group m_root = new Group();
+
+        public PhysicalTopology(Map<Integer, String> hostGroups) {
+            for (Map.Entry<Integer, String> e : hostGroups.entrySet()) {
+                m_root.addHost(parseGroup(e.getValue()), e.getKey());
             }
         }
 
-        Node leastConnectedNode = null;
-        for (Node n : notFullList) {
-            if (leastConnectedNode == null) {
-                leastConnectedNode = n;
-                continue;
+        /**
+         * Parse the group into components. A group is represented by dot
+         * seperated subgroups. A subgroup is just a string. For example,
+         * "rack1.server1" is a valid group with two subgroups, "192.168.0.1" is
+         * also a valid group with four subgroups.
+         */
+        private static String[] parseGroup(String group) {
+            final String[] components = group.trim().split("\\.");
+
+            for (int i = 0; i < components.length; i++) {
+                if (components[i].trim().isEmpty()) {
+                    throw new IllegalArgumentException("Group component cannot be empty: " + group);
+                }
+                components[i] = components[i].trim();
             }
 
-            /*
-             * Pick the one with the fewest connections, and for those that have the same number
-             * of connections, pick the one that is replicating the fewest partitions
-             */
-            if (n.m_replicationConnections.size() <= leastConnectedNode.m_replicationConnections.size()) {
-                int sumA = 0;
-                for (Set<Partition> replicas : n.m_replicationConnections.values()) {
-                    sumA += replicas.size();
-                }
-                int sumB = 0;
-                for (Set<Partition> replicas : leastConnectedNode.m_replicationConnections.values()) {
-                    sumB += replicas.size();
-                }
-                if (sumA < sumB) {
-                    leastConnectedNode = n;
-                }
-            }
+            return components;
         }
-        return leastConnectedNode;
+
+        /**
+         * Get all nodes reachable from the root group. Nodes that have enough
+         * partitions may be removed from the physical topology so that they no
+         * longer appear in the list of subsequent calculations. This does not
+         * mean that they are no longer part of the cluster.
+         */
+        public List<Deque<Node>> getAllHosts() {
+            return m_root.getGroupSiblingsOf(new String[]{null});
+        }
     }
-
 
     /*
      * Original placement strategy that doesn't get very good performance
@@ -418,74 +541,93 @@ public class ClusterConfig
         return topo;
     }
 
-    /*
-     * Placement strategy that attempts to involve multiple nodes in replication
-     * so that the socket between nodes is not a bottleneck.
+    /**
+     * Placement strategy that attempts to distribute replicas across different
+     * groups and also involve multiple nodes in replication so that the socket
+     * between nodes is not a bottleneck.
+     *
+     * This algorithm has three steps.
+     * 1. Partition master assignment,
+     * 2. Group partition replica assignment.
+     * 3. Remaining partition replica assignment.
      */
-    JSONObject newPlacementStrategy(
-            List<Integer> hostIds,
-            int hostCount,
+    JSONObject groupAwarePlacementStrategy(
+            Map<Integer, String> hostGroups,
             int partitionCount,
             int sitesPerHost) throws JSONException {
-        Collections.sort(hostIds);
+        final PhysicalTopology phys = new PhysicalTopology(hostGroups);
+        final List<Node> allNodes = MiscUtils.zip(phys.getAllHosts());
+
         List<Partition> partitions = new ArrayList<Partition>();
         for (int ii = 0; ii < partitionCount; ii++) {
             partitions.add(new Partition(ii, getReplicationFactor() + 1));
         }
 
-        List<Node> nodes = new ArrayList<Node>();
-        for (Integer hostId : hostIds) {
-            nodes.add(new Node(hostId));
-        }
-
-        /*
-         * Distribute master ship
-         */
-        for(int ii = 0; ii < partitions.size(); ii++) {
-            Partition p = partitions.get(ii);
-            Node n = nodes.get(ii % hostCount);
-            p.m_master = n;
+        // Step 1. Distribute mastership by round-robining across all the
+        // nodes. This balances the masters among the nodes.
+        Iterator<Node> iter = allNodes.iterator();
+        for (Partition p : partitions) {
+            if (!iter.hasNext()) {
+                iter = allNodes.iterator();
+                assert iter.hasNext();
+            }
+            p.m_master = iter.next();
             p.decrementNeededReplicas();
-            n.m_masterPartitions.add(p);
+            p.m_master.m_masterPartitions.add(p);
         }
 
-        while (needReplication(partitions)) {
-            Node n = nextNotFullNode(nodes, sitesPerHost);
-
-            //Find a partition that will increase number of hosts inter-replicating
-            boolean foundUsefulPartition = false;
-            Partition partitionToUse = null;
+        if (getReplicationFactor() > 0) {
+            // Step 2. For each partition, assign a replica to each group other
+            // than the group of the partition master. This guarantees that the
+            // replicas are spread out as much as possible. There may be more
+            // replicas than groups available, which will be handled in step 3.
             for (Partition p : partitions) {
-                if (p.canUseAsReplica(n)) {
-                    if (!p.m_master.m_replicationConnections.containsKey(n)) {
-                        foundUsefulPartition = true;
-                        partitionToUse = p;
+                final List<Deque<Node>> nodesInOtherGroups =
+                    sortByConnectionsToNode(p.m_master, phys.m_root.getGroupSiblingsOf(p.m_master.m_group));
+
+                List<Node> firstReplicaNodes = new ArrayList<>();
+                final Iterator<Deque<Node>> groupIter = nodesInOtherGroups.iterator();
+                int needed = p.m_neededReplicas;
+
+                // Pick one node from each other group to be the replica
+                while (needed-- > 0 && groupIter.hasNext()) {
+                    final Deque<Node> nextGroup = groupIter.next();
+                    for (Node nextNode : nextGroup) {
+                        if (nextNode.partitionCount() < sitesPerHost) {
+                            assert p.m_master != nextNode;
+                            assert !nextNode.m_replicaPartitions.contains(p);
+                            firstReplicaNodes.add(nextNode);
+                            break;
+                        }
                     }
                 }
+
+                assignReplicas(sitesPerHost, phys, p, firstReplicaNodes);
             }
 
-            if (!foundUsefulPartition) {
-                //Fall back to finding any old thing to replicate
-                for (Partition p : partitions) {
-                    if (p.canUseAsReplica(n)) {
-                        partitionToUse = p;
-                        break;
-                    }
+            // Step 3. Assign the remaining replicas. Make sure each partition
+            // is fully replicated.
+            for (Partition p : partitions) {
+                if (p.m_neededReplicas > 0) {
+                    final List<Node> nodesLeft = MiscUtils.zip(phys.getAllHosts());
+                    nodesLeft.remove(p.m_master);
+                    final List<Node> sortedNodesLeft =
+                        MiscUtils.zip(sortByConnectionsToNode(p.m_master, Collections.singletonList(nodesLeft)));
+                    assignReplicas(sitesPerHost, phys, p, sortedNodesLeft);
                 }
-                Set<Partition> replicatedPartitions = partitionToUse.m_master.m_replicationConnections.get(n);
-                replicatedPartitions.add(partitionToUse);
-                partitionToUse.m_replicas.add(n);
-                n.m_replicaPartitions.add(partitionToUse);
-                partitionToUse.decrementNeededReplicas();
-            } else {
-                //Connect the partition, node, and master together
-                Set<Partition> replicatedPartitions = new HashSet<Partition>();
-                replicatedPartitions.add(partitionToUse);
-                partitionToUse.m_master.m_replicationConnections.put(n, replicatedPartitions);
-                n.m_replicationConnections.put(partitionToUse.m_master, replicatedPartitions);
-                n.m_replicaPartitions.add(partitionToUse);
-                partitionToUse.decrementNeededReplicas();
-                partitionToUse.m_replicas.add(n);
+            }
+        }
+
+        // Sanity check to make sure each node has enough partitions and each
+        // partition has enough replicas.
+        for (Node n : allNodes) {
+            if (n.partitionCount() != sitesPerHost) {
+                throw new RuntimeException("Unable to assign partitions using the new placement algorithm");
+            }
+        }
+        for (Partition p : partitions) {
+            if (p.m_neededReplicas != 0) {
+                throw new RuntimeException("Unable to assign partitions using the new placement algorithm");
             }
         }
 
@@ -511,45 +653,111 @@ public class ClusterConfig
         stringer.endArray();
         stringer.endObject();
 
-        JSONObject topo = new JSONObject(stringer.toString());
-        return topo;
+        return new JSONObject(stringer.toString());
+    }
+
+    /**
+     * Given a collection of candidate nodes, try to assign the remaining
+     * replicas of the given partition to these nodes in the given order.
+     *
+     * If the given candidate nodes are more than needed, it will only use the
+     * first few. If there are less, the given partition will not be fully
+     * replicated.
+     */
+    private static void assignReplicas(int sitesPerHost, PhysicalTopology phys, Partition p, Collection<Node> nodes) {
+        final Iterator<Node> nodeIter = nodes.iterator();
+        while (p.m_neededReplicas > 0 && nodeIter.hasNext()) {
+            final Node replica = nodeIter.next();
+
+            if (replica.partitionCount() == sitesPerHost) {
+                phys.m_root.removeHost(replica);
+                continue;
+            }
+            if (p.m_master == replica || p.m_replicas.contains(replica)) {
+                continue;
+            }
+
+            p.m_replicas.add(replica);
+            p.decrementNeededReplicas();
+            replica.m_replicaPartitions.add(p);
+
+            if (p.m_master.m_replicationConnections.containsKey(replica)) {
+                final int connections = p.m_master.m_replicationConnections.get(replica);
+                p.m_master.m_replicationConnections.put(replica, connections + 1);
+                replica.m_replicationConnections.put(p.m_master, connections + 1);
+            } else {
+                p.m_master.m_replicationConnections.put(replica, 1);
+                replica.m_replicationConnections.put(p.m_master, 1);
+            }
+        }
+    }
+
+    /**
+     * Sort the given groups of nodes based on their connections to the master
+     * node, their replication factors, and their master partition counts, in
+     * that order. The sorting does not change the grouping of the nodes. It
+     * favors nodes with less connections to the master node. If the connection
+     * count is the same, it favors nodes with fewer replications. If the
+     * replication count is the same, it favors nodes with more master
+     * partitions.
+     */
+    private static List<Deque<Node>> sortByConnectionsToNode(final Node master, List<? extends Collection<Node>> nodes) {
+        List<Deque<Node>> result = Lists.newArrayList();
+
+        for (Collection<Node> deque : nodes) {
+            final LinkedList<Node> toBeSorted = Lists.newLinkedList(deque);
+
+            Collections.sort(toBeSorted, new Comparator<Node>() {
+                @Override
+                public int compare(Node o1, Node o2)
+                {
+                    final Integer o1Connections = master.m_replicationConnections.get(o1);
+                    final Integer o2Connections = master.m_replicationConnections.get(o2);
+                    final int connComp = Integer.compare(o1Connections == null ? 0 : o1Connections,
+                                                         o2Connections == null ? 0 : o2Connections);
+                    if (connComp == 0) {
+                        final int repFactorComp = Integer.compare(o1.replicationFactor(), o2.replicationFactor());
+                        if (repFactorComp == 0) {
+                            return -Integer.compare(o1.m_masterPartitions.size(), o2.m_masterPartitions.size());
+                        } else {
+                            return repFactorComp;
+                        }
+                    } else {
+                        return connComp;
+                    }
+                }
+            });
+
+            result.add(toBeSorted);
+        }
+
+        return result;
     }
 
     // Statically build a topology. This only runs at startup;
     // rejoin clones this from an existing server.
-    public JSONObject getTopology(List<Integer> hostIds) throws JSONException
+    public JSONObject getTopology(Map<Integer, String> hostGroups) throws JSONException
     {
         int hostCount = getHostCount();
         int partitionCount = getPartitionCount();
         int sitesPerHost = getSitesPerHost();
 
-        if (hostCount != hostIds.size()) {
-            throw new RuntimeException("Provided " + hostIds.size() + " host ids when host count is " + hostCount);
+        if (hostCount != hostGroups.size()) {
+            throw new RuntimeException("Provided " + hostGroups.size() + " host ids when host count is " + hostCount);
         }
 
-        boolean useFallbackStrategy = Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"));
-        if ((sitesPerHost * hostCount) % (getReplicationFactor() + 1) > 0) {
-            VoltDB.crashGlobalVoltDB("The cluster has more hosts and sites per hosts than required for the " +
-                    "requested k-safety value.  The number of total sites (sitesPerHost * hostCount) must be a " +
-                    "whole multiple of the number of copies of the database (k-safety + 1)", false, null);
-        }
-        if (sitesPerHost * hostCount % partitionCount > 0 || partitionCount < hostCount) {
-            hostLog.warn("Unable to use optimal replica placement strategy with this configuration. " +
-                    " Falling back to a less optimal strategy that may result in worse performance. " +
-                    " Try using an even number of sites per host.");
-            useFallbackStrategy = true;
-        }
-
-        JSONObject topo = null;
-        if (useFallbackStrategy) {
-            topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
+        JSONObject topo;
+        if (Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"))) {
+            topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
+                                             hostCount, partitionCount, sitesPerHost);
         } else {
             try {
-                topo = newPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
+                topo = groupAwarePlacementStrategy(hostGroups, partitionCount, sitesPerHost);
             } catch (Exception e) {
                 hostLog.error("Unable to use optimal replica placement strategy. " +
                               "Falling back to a less optimal strategy that may result in worse performance");
-                topo = fallbackPlacementStrategy(hostIds, hostCount, partitionCount, sitesPerHost);
+                topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
+                                                 hostCount, partitionCount, sitesPerHost);
             }
         }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,7 @@ public class PortGeneratorForTest extends PortGenerator {
 
     public PortProvider pprovider = null;
 
-    class PortProvider {
+    public class PortProvider {
 
         public int nClient = -1;
         public int nAdmin = -1;
@@ -36,6 +36,7 @@ public class PortGeneratorForTest extends PortGenerator {
         public int nReplicationPort = -1;
         public int nJMXPort = -1;
         public int nInternalPort = -1;
+        public int nHttp = -1;
 
         public int nextInternalPort() {
             return nInternalPort;
@@ -84,6 +85,14 @@ public class PortGeneratorForTest extends PortGenerator {
         public void setAdmin(int nc) {
             nAdmin = nc;
         }
+
+        public int nextHttp() {
+            return nHttp;
+        }
+
+        public void setHttp(int nc) {
+            nHttp = nc;
+        }
     }
 
     public void enablePortProvider() {
@@ -110,6 +119,17 @@ public class PortGeneratorForTest extends PortGenerator {
             }
         }
         return super.nextAdmin();
+    }
+
+    @Override
+    public int nextHttp() {
+        if (pprovider != null) {
+            int rport = pprovider.nextHttp();
+            if (rport != -1) {
+                return rport;
+            }
+        }
+        return super.nextHttp();
     }
 
     public int nextZkPort() {

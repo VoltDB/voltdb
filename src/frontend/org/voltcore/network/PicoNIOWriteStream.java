@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayDeque;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 
 /**
@@ -32,7 +31,6 @@ import org.voltcore.utils.DeferredSerialization;
 *
 */
 public class PicoNIOWriteStream extends NIOWriteStreamBase {
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     /**
      * Contains messages waiting to be serialized and written to the socket

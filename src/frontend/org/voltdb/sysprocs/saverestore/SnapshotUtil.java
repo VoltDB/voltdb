@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,8 +37,10 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -60,6 +62,7 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
@@ -69,6 +72,7 @@ import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -79,6 +83,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -89,11 +94,13 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class SnapshotUtil {
 
     public final static String HASH_EXTENSION = ".hash";
+    public final static String COMPLETION_EXTENSION = ".finished";
 
     public static final String JSON_PATH = "path";
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
     public static final String JSON_HASHINATOR = "hashinator";
+    public static final String JSON_IS_RECOVER = "isRecover";
 
     public static final ColumnInfo nodeResultsColumns[] =
     new ColumnInfo[] {
@@ -141,10 +148,14 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+        Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
         Map<Integer, Long> partitionTransactionIds,
+        Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
         InstanceId instanceId,
         long timestamp,
-        int newPartitionCount)
+        long clusterCreateTime,
+        int newPartitionCount,
+        int clusterId)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -161,10 +172,15 @@ public class SnapshotUtil {
             try {
                 stringer.object();
                 stringer.key("version").value(1);
+                stringer.key("clusterid").value(clusterId);
                 stringer.key("txnId").value(txnId);
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
                 stringer.key("newPartitionCount").value(newPartitionCount);
+                Iterator<Entry<Integer, TupleStreamStateInfo>> iter = drTupleStreamInfo.entrySet().iterator();
+                if (iter.hasNext()) {
+                    stringer.key("drVersion").value(iter.next().getValue().drVersion);
+                }
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -198,6 +214,41 @@ public class SnapshotUtil {
 
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("clusterCreateTime").value(clusterCreateTime);
+
+                stringer.key("remoteDCLastIds");
+                stringer.object();
+                for (Map.Entry<Integer, Map<Integer, DRLogSegmentId>> e : remoteDCLastIds.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    for (Map.Entry<Integer, DRLogSegmentId> e2 : e.getValue().entrySet()) {
+                        stringer.key(e2.getKey().toString());
+                        stringer.object();
+                        stringer.key("drId").value(e2.getValue().drId);
+                        stringer.key("spUniqueId").value(e2.getValue().spUniqueId);
+                        stringer.key("mpUniqueId").value(e2.getValue().mpUniqueId);
+                        stringer.endObject();
+                    }
+                    stringer.endObject();
+                }
+                stringer.endObject();
+                stringer.key("drTupleStreamStateInfo");
+                stringer.object();
+                for (Map.Entry<Integer, TupleStreamStateInfo> e : drTupleStreamInfo.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    if (e.getKey() != MpInitiator.MP_INIT_PID) {
+                        stringer.key("sequenceNumber").value(e.getValue().partitionInfo.drId);
+                        stringer.key("spUniqueId").value(e.getValue().partitionInfo.spUniqueId);
+                        stringer.key("mpUniqueId").value(e.getValue().partitionInfo.mpUniqueId);
+                    } else {
+                        stringer.key("sequenceNumber").value(e.getValue().replicatedInfo.drId);
+                        stringer.key("spUniqueId").value(e.getValue().replicatedInfo.spUniqueId);
+                        stringer.key("mpUniqueId").value(e.getValue().replicatedInfo.mpUniqueId);
+                    }
+                    stringer.endObject();
+                }
+                stringer.endObject();
                 stringer.endObject();
             } catch (JSONException e) {
                 throw new IOException(e);
@@ -432,6 +483,29 @@ public class SnapshotUtil {
             throw new IOException("Unable to write snapshot catalog to file: " +
                                   path + File.separator + filename, ioe);
         }
+    }
+
+    /**
+     * Write the .complete file for finished snapshot
+     */
+    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger) throws IOException {
+
+        final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
+        if (f.exists()) {
+            if (!f.delete()) {
+                throw new IOException("Failed to replace existing " + f.getName());
+            }
+        }
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    f.createNewFile();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
+                }
+            }
+        };
     }
 
     /**
@@ -1168,6 +1242,10 @@ public class SnapshotUtil {
      */
     public static final String constructHashinatorConfigFilenameForNonce(String nonce, int hostId) {
         return (nonce + "-host_" + hostId + HASH_EXTENSION);
+    }
+
+    public static final String constructCompletionFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + COMPLETION_EXTENSION);
     }
 
     /**

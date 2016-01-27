@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -103,6 +104,10 @@ public class OrderByPlanNode extends AbstractPlanNode {
         return m_sortExpressions;
     }
 
+    public List<SortDirectionType> getSortDirections() {
+        return m_sortDirections;
+    }
+
     @Override
     public void resolveColumnIndexes()
     {
@@ -120,6 +125,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
+
+        resolveSortIndexesUsingSchema(input_schema);
+    }
+
+    public void resolveSortIndexesUsingSchema(NodeSchema input_schema) {
 
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
@@ -193,5 +203,21 @@ public class OrderByPlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "ORDER BY (SORT)";
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+        for (AbstractExpression ae : m_sortExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
+    }
+
+    @Override
+    public boolean isOutputOrdered (List<AbstractExpression> sortExpressions, List<SortDirectionType> sortDirections) {
+        assert(sortExpressions.equals(m_sortExpressions));
+        assert(sortDirections.equals(m_sortDirections));
+        return true;
     }
 }

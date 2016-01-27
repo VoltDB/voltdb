@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,8 +20,8 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,6 +30,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
@@ -39,10 +40,12 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.export.ExportManager;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
@@ -63,26 +66,31 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             String file_nonce,
                                             long txnId,
                                             Map<Integer, Long> partitionTransactionIds,
+                                            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                             JSONObject jsData,
                                             SystemProcedureExecutionContext context,
                                             final VoltTable result,
                                             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                             SiteTracker tracker,
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
     {
-        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, jsData, context,
-                result, exportSequenceNumbers, tracker, hashinatorData, timestamp, context.getNumberOfPartitions());
+        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, remoteDCLastIds,
+                jsData, context, result, exportSequenceNumbers, drTupleStreamInfo,
+                tracker, hashinatorData, timestamp, context.getNumberOfPartitions());
     }
 
     Callable<Boolean> createSetupInternal(String file_path,
                                                     String file_nonce,
                                                     long txnId,
                                                     Map<Integer, Long> partitionTransactionIds,
+                                                    Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                     JSONObject jsData,
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
                                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                    Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
                                                     long timestamp,
@@ -94,7 +102,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+        final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
+        final Table[] tableArray;
+        if (config.tables.length == 0 && (jsData == null || !jsData.has("tables"))) {
+            tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
+        } else {
+            tableArray = config.tables;
+        }
+
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -102,13 +117,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.NATIVE,
-                    tables.toArray(new Table[0]));
+                    tableArray);
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
         final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
-        for (final Table table : tables) {
+        for (final Table table : tableArray) {
             final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table,
@@ -131,7 +146,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     "");
         }
 
-        if (!tables.isEmpty() && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
+        if (tableArray.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
             SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
@@ -140,27 +155,36 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         placePartitionedTasks(partitionedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
+        boolean isTruncationSnapshot = true;
+        if (jsData != null) {
+            isTruncationSnapshot = jsData.has("truncReqId");
+        }
+
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
-        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, context,
-                exportSequenceNumbers, tracker, hashinatorData, timestamp,
-                newPartitionCount, tables, m_snapshotRecord, partitionedSnapshotTasks,
-                replicatedSnapshotTasks);
+        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds,
+                remoteDCLastIds, context,
+                exportSequenceNumbers, drTupleStreamInfo, tracker, hashinatorData, timestamp,
+                newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
+                replicatedSnapshotTasks, isTruncationSnapshot);
     }
 
     private Callable<Boolean> createDeferredSetup(final String file_path,
                                                   final String file_nonce,
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
+                                                  final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                  final Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
                                                   final int newPartitionCount,
-                                                  final List<Table> tables,
+                                                  final Table[] tables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
                                                   final ArrayList<SnapshotTableTask> partitionedSnapshotTasks,
-                                                  final ArrayList<SnapshotTableTask> replicatedSnapshotTasks)
+                                                  final ArrayList<SnapshotTableTask> replicatedSnapshotTasks,
+                                                  final boolean isTruncationSnapshot)
     {
         return new Callable<Boolean>() {
             private final HashMap<Integer, SnapshotDataTarget> m_createdTargets = Maps.newHashMap();
@@ -168,13 +192,15 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             @Override
             public Boolean call() throws Exception
             {
-                final AtomicInteger numTables = new AtomicInteger(tables.size());
+                final AtomicInteger numTables = new AtomicInteger(tables.length);
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, context, exportSequenceNumbers,
+                        txnId, partitionTransactionIds, remoteDCLastIds, context, exportSequenceNumbers,
+                        drTupleStreamInfo,
                         hashinatorData,
                         timestamp,
-                        newPartitionCount);
+                        newPartitionCount,
+                        tables);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
@@ -185,6 +211,25 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
                     task.setTarget(target);
                 }
+
+                if (isTruncationSnapshot) {
+                    // Only sync the DR Log on Native Snapshots
+                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            context.forceAllDRNodeBuffersToDisk(false);
+                        }
+                    });
+                }
+                // Sync export buffer for all types of snapshot
+                SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        ExportManager.sync(false);
+                    }
+                });
 
                 return true;
             }
@@ -197,6 +242,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
                             context.getHostId(), context.getCluster().getTypeName(),
                             context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                            context.getDatabase().getIsactiveactivedred(),
                             tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
                 }
@@ -213,6 +259,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                         String clusterName,
                                                         String databaseName,
                                                         int partitionCount,
+                                                        boolean isActiveActiveDRed,
                                                         SiteTracker tracker,
                                                         long timestamp,
                                                         AtomicInteger numTables,
@@ -228,17 +275,32 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotFormat.NATIVE,
                 hostId);
 
-        sdt = new DefaultSnapshotDataTarget(saveFilePath,
-                hostId,
-                clusterName,
-                databaseName,
-                table.getTypeName(),
-                partitionCount,
-                table.getIsreplicated(),
-                tracker.getPartitionsForHost(hostId),
-                CatalogUtil.getVoltTable(table),
-                txnId,
-                timestamp);
+        if (isActiveActiveDRed && table.getIsdred()) {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO),
+                    txnId,
+                    timestamp);
+        }
+        else {
+            sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                    hostId,
+                    clusterName,
+                    databaseName,
+                    table.getTypeName(),
+                    partitionCount,
+                    table.getIsreplicated(),
+                    tracker.getPartitionsForHost(hostId),
+                    CatalogUtil.getVoltTable(table),
+                    txnId,
+                    timestamp);
+        }
 
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
@@ -250,25 +312,32 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
     static void createFileBasedCompletionTasks(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
+            Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             HashinatorSnapshotData hashinatorData,
-            long timestamp, int newPartitionCount) throws IOException
+            long timestamp, int newPartitionCount,
+            Table[] tables) throws IOException
     {
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
+        long clusterCreateTime = VoltDB.instance().getClusterCreateTime();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                 txnId,
                 context.getCatalogCRC(),
                 file_path,
                 file_nonce,
-                tables,
+                Arrays.asList(tables),
                 context.getHostId(),
                 exportSequenceNumbers,
+                drTupleStreamInfo,
                 partitionTransactionIds,
+                remoteDCLastIds,
                 instId,
                 timestamp,
-                newPartitionCount);
+                clusterCreateTime,
+                newPartitionCount,
+                context.getClusterId());
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }
@@ -280,6 +349,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             }
         }
         completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+        if (completionTask != null) {
+            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+        }
+        completionTask = SnapshotUtil.writeSnapshotCompletion(file_path, file_nonce, context.getHostId(), SNAP_LOG);
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }

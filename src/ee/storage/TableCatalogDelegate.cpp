@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,29 +27,29 @@
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
 #include "common/types.h"
+#include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
+#include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/persistenttable.h"
-#include "storage/StreamBlock.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+#include "sha1/sha1.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
+#include <string>
 #include <vector>
 #include <map>
 
 using namespace std;
-namespace voltdb {
 
-TableCatalogDelegate::TableCatalogDelegate(int32_t catalogId, string path, string signature, int32_t compactionThreshold) :
-    CatalogDelegate(catalogId, path), m_table(NULL), m_exportEnabled(false),
-    m_signature(signature), m_compactionThreshold(compactionThreshold)
-{
-}
+namespace voltdb {
 
 TableCatalogDelegate::~TableCatalogDelegate()
 {
@@ -58,36 +58,42 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
-TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catalogTable) {
+TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &catalogDatabase,
+                                                     catalog::Table const &catalogTable) {
     // Columns:
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     const int numColumns = static_cast<int>(catalogTable.columns().size());
-    vector<ValueType> columnTypes(numColumns);
-    vector<int32_t> columnLengths(numColumns);
-    vector<bool> columnAllowNull(numColumns);
-    vector<bool> columnInBytes(numColumns);
+    bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
+    TupleSchemaBuilder schemaBuilder(numColumns,
+                                     needsDRTimestamp ? 1 : 0); // number of hidden columns
+
     map<string, catalog::Column*>::const_iterator col_iterator;
-    vector<string> columnNames(numColumns);
     for (col_iterator = catalogTable.columns().begin();
          col_iterator != catalogTable.columns().end(); col_iterator++) {
+
         const catalog::Column *catalog_column = col_iterator->second;
-        const int columnIndex = catalog_column->index();
-        const ValueType type = static_cast<ValueType>(catalog_column->type());
-        columnTypes[columnIndex] = type;
-        const int32_t size = static_cast<int32_t>(catalog_column->size());
-        //Strings length is provided, other lengths are derived from type
-        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
-        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
-        columnLengths[columnIndex] = length;
-        columnAllowNull[columnIndex] = catalog_column->nullable();
-        columnInBytes[columnIndex] = catalog_column->inbytes();
+        schemaBuilder.setColumnAtIndex(catalog_column->index(),
+                                       static_cast<ValueType>(catalog_column->type()),
+                                       static_cast<int32_t>(catalog_column->size()),
+                                       catalog_column->nullable(),
+                                       catalog_column->inbytes());
     }
 
-    return TupleSchema::createTupleSchema(columnTypes,
-                                          columnLengths,
-                                          columnAllowNull,
-                                          columnInBytes);
+    if (needsDRTimestamp) {
+        // Create a hidden timestamp column for a DRed table in an
+        // active-active context.
+        //
+        // Column will be marked as not nullable in TupleSchema,
+        // because we never expect a null value here, but this is not
+        // actually enforced at runtime.
+        schemaBuilder.setHiddenColumnAtIndex(0,
+                                             VALUE_TYPE_BIGINT,
+                                             8,      // field size in bytes
+                                             false); // nulls not allowed
+    }
+
+    return schemaBuilder.build();
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
@@ -132,14 +138,21 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
         }
         index_columns[catalog_colref->index()] = catalog_colref->column()->index();
     }
-
+    // partial index predicate
+    const std::string predicateAsText = catalogIndex.predicatejson();
+    AbstractExpression* predicate = NULL;
+    if (!predicateAsText.empty()) {
+        predicate = ExpressionUtil::loadExpressionFromJson(predicateAsText);
+    }
     *scheme = TableIndexScheme(catalogIndex.name(),
                                (TableIndexType)catalogIndex.type(),
                                index_columns,
                                indexedExpressions,
+                               predicate,
                                catalogIndex.unique(),
                                true, // support counting indexes (wherever supported)
                                expressionsAsText,
+                               predicateAsText,
                                schema);
     return true;
 }
@@ -149,7 +162,8 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
  */
 static std::string
 getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
-                  const std::string& expressionsAsText, vector<int32_t> columnIndexes) {
+                  const std::string& expressionsAsText, vector<int32_t> columnIndexes,
+                  const std::string& predicateAsText) {
     // add the uniqueness of the index
     std::string retval = isUnique ? "U" : "M";
 
@@ -188,6 +202,10 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
     if (expressionsAsText.length() != 0) {
         retval += expressionsAsText;
     }
+    // Add partial index predicate if any
+    if (!predicateAsText.empty()) {
+        retval += predicateAsText;
+    }
     return retval;
 }
 
@@ -210,11 +228,14 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
 
     const std::string expressionsAsText = catalogIndex.expressionsjson();
 
+    const std::string predicateAsText = catalogIndex.predicatejson();
+
     return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
                              true, //catalogIndex.countable(), // always counting for now
                              catalogIndex.unique(),
                              expressionsAsText,
-                             columnIndexes);
+                             columnIndexes,
+                             predicateAsText);
 }
 
 std::string
@@ -232,13 +253,13 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
                              true, // indexScheme.countable, // // always counting for now
                              indexScheme.unique,
                              indexScheme.expressionsAsText,
-                             columnIndexes);
+                             columnIndexes,
+                             indexScheme.predicateAsText);
 }
 
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                                       catalog::Table const &catalogTable,
-                                                       const int32_t compactionThreshold)
+                                                       catalog::Table const &catalogTable)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -256,7 +277,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     }
 
     // get the schema for the table
-    TupleSchema *schema = createTupleSchema(catalogTable);
+    TupleSchema *schema = createTupleSchema(catalogDatabase, catalogTable);
 
     // Indexes
     map<string, TableIndexScheme> index_map;
@@ -336,7 +357,9 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     }
 
     // Build the index array
-    vector<TableIndexScheme> indexes;
+    // Please note the index array should follow the order of primary key first,
+    // all unique indices afterwards, and all the non-unique indices at the end.
+    deque<TableIndexScheme> indexes;
     TableIndexScheme pkey_index_scheme;
     map<string, TableIndexScheme>::const_iterator index_iterator;
     for (index_iterator = index_map.begin(); index_iterator != index_map.end();
@@ -346,7 +369,11 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
             pkey_index_scheme = index_iterator->second;
         // Just add it to the list
         } else {
-            indexes.push_back(index_iterator->second);
+            if (index_iterator->second.unique) {
+                indexes.push_front(index_iterator->second);
+            } else {
+                indexes.push_back(index_iterator->second);
+            }
         }
     }
 
@@ -359,15 +386,34 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool drEnabled = catalogTable.isDRed();
+    m_materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
+    SHA1_CTX shaCTX;
+    SHA1Init(&shaCTX);
+    SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
+    SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
+    // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
+    int tableAllocationTargetSize = 0;
+    if (m_materialized) {
+      catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
+      if (mvInfo->groupbycols().size() == 0) {
+        // ENG-8490: If the materialized view came with no group by, set table block size to 64KB
+        // to achieve better space efficiency.
+        // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
+        tableAllocationTargetSize = 1024 * 64;
+      }
+    }
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames,
+                                                    schema, columnNames, m_signatureHash,
+                                                    m_materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
-                                                    0,
+                                                    tableAllocationTargetSize,
                                                     catalogTable.tuplelimit(),
-                                                    compactionThreshold);
+                                                    m_compactionThreshold,
+                                                    drEnabled);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
@@ -392,13 +438,12 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
-                                        catalogTable,
-                                        m_compactionThreshold);
+                                        catalogTable);
     if (!m_table) {
         return false; // mixing ints and booleans here :(
     }
 
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    m_exportEnabled = evaluateExport(catalogDatabase, catalogTable);
 
     // configure for stats tables
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -408,11 +453,19 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     return 0;
 }
 
+//After catalog is updated call this to ensure your export tables are connected correctly.
+bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
+                           catalog::Table const &catalogTable)
+{
+    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    return m_exportEnabled;
+}
+
 
 
 void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
                   PersistentTable *existingTable, PersistentTable *newTable,
-                  std::map<std::string, CatalogDelegate*> const &delegatesByName)
+                  std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
@@ -461,14 +514,16 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
 void
 TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
                                            catalog::Table const &catalogTable,
-                                           std::map<std::string, CatalogDelegate*> const &delegatesByName)
+                                           std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
 {
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
+
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////
 
     PersistentTable *newTable =
-        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable, m_compactionThreshold));
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
     assert(newTable);
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 
@@ -551,7 +606,9 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
         }
         else {
             std::string defaultValue = column->defaultvalue();
-            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue);
+            // this could probably use the temporary string pool instead?
+            // (Instead of passing NULL to use persistant storage)
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, NULL);
         }
 
         // find a source column in the existing table, if one exists
@@ -586,7 +643,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocateObjectFromInlinedValue();
+                        value.allocateObjectFromInlinedValue(NULL);
                     }
                     tupleToInsert.setNValue(i, value);
                 }
@@ -637,5 +694,65 @@ void TableCatalogDelegate::deleteCommand()
     }
 }
 
+static bool isDefaultNow(const std::string& defaultValue) {
+    std::vector<std::string> tokens;
+    boost::split(tokens, defaultValue, boost::is_any_of(":"));
+    if (tokens.size() != 2) {
+        return false;
+    }
+
+    int funcId = boost::lexical_cast<int>(tokens[1]);
+    if (funcId == FUNC_CURRENT_TIMESTAMP) {
+        return true;
+    }
+
+    return false;
+}
+
+// This method produces a row containing all the default values for
+// the table, skipping over fields explictly set, and adding "default
+// now" fields to nowFields.
+void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
+                                                      catalog::Table const *catalogTable,
+                                                      const std::set<int>& fieldsExplicitlySet,
+                                                      TableTuple& tbTuple,
+                                                      std::vector<int>& nowFields) {
+    catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
+    for (colIter = catalogTable->columns().begin();
+         colIter != catalogTable->columns().end();
+         colIter++) {
+
+        catalog::Column *col = colIter->second;
+        if (fieldsExplicitlySet.find(col->index()) != fieldsExplicitlySet.end()) {
+            // this field will be set explicitly so no need to
+            // serialize the default value
+            continue;
+        }
+
+        ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
+
+        switch (defaultColType) {
+        case VALUE_TYPE_INVALID:
+            tbTuple.setNValue(col->index(), ValueFactory::getNullValue());
+            break;
+
+        case VALUE_TYPE_TIMESTAMP:
+            if (isDefaultNow(col->defaultvalue())) {
+                // Caller will need to set this to the current
+                // timestamp at the appropriate time
+                nowFields.push_back(col->index());
+                break;
+            }
+            // else, fall through to default case
+        default:
+
+            NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
+                                                                         col->defaultvalue(),
+                                                                         pool);
+            tbTuple.setNValue(col->index(), defaultValue);
+            break;
+        }
+    }
+}
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -128,6 +127,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     };
 
+    public interface DurableUniqueIdListener {
+        /**
+         * Notify listener of last durable Single-Part and Multi-Part uniqueIds
+         */
+        public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId);
+    }
+
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
@@ -145,10 +151,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
+    // The DurabilityListener is not thread-safe. Access it only on the Site thread.
     private final DurabilityListener m_durabilityListener;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
-
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -158,31 +164,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         super(partitionId, taskQueue);
         m_pendingTasks = new TransactionTaskQueue(m_tasks,getCurrentTxnId());
         m_snapMonitor = snapMonitor;
-        m_durabilityListener = new DurabilityListener() {
-            @Override
-            public void onDurability(final ArrayList<Object> durableThings) {
-                final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
-                    @Override
-                    void run() {
-                        synchronized (m_lock) {
-                            for (Object o : durableThings) {
-                                m_pendingTasks.offer((TransactionTask)o);
-
-                                // Make sure all queued tasks for this MP txn are released
-                                if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
-                                    offerPendingMPTasks(((TransactionTask) o).getTxnId());
-                                }
-                            }
-                        }
-                    }
-                };
-                if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
-                    m_tasks.offer(r);
-                } else {
-                    r.run();
-                }
-            }
-        };
+        m_durabilityListener = new SpDurabilityListener(this, m_pendingTasks);
         m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
@@ -200,19 +182,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         writeIv2ViableReplayEntry();
     }
 
+    @Override
+    public void setDurableUniqueIdListener(final DurableUniqueIdListener listener) {
+        m_tasks.offer(new SiteTaskerRunnable() {
+            @Override
+            void run()
+            {
+                m_durabilityListener.setUniqueIdListener(listener);
+            }
+        });
+    }
+
     public void setDRGateway(PartitionDRGateway gateway)
     {
         m_drGateway = gateway;
-        if (m_drGateway != null) {
-            // Schedules to be fired every 5ms
-            VoltDB.instance().schedulePriorityWork(new Runnable() {
-                @Override
-                public void run() {
-                    // Send a DR task to the site
-                    m_tasks.offer(new DRTask(m_drGateway));
-                }
-            }, 0, 5, TimeUnit.MILLISECONDS);
-        }
+        setDurableUniqueIdListener(gateway);
     }
 
     @Override
@@ -311,7 +295,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
         boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
+                ((TransactionInfoBaseMessage)message).isForDRv1()));
 
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
@@ -445,7 +429,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     hostLog.fatal("Invocation: " + message);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-            } else if (message.isForDR()) {
+            } else if (message.isForDRv1()) {
+                assert false;
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid
                 if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
@@ -535,7 +520,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else {
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
-            uniqueId = msg.getUniqueId();
+
+            // Don't update the uniqueID if this is a run-everywhere txn, because it has an MPI unique ID.
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(msg.getUniqueId()) == m_partitionId) {
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(msg.getUniqueId());
+            }
         }
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
         doLocalInitiateOffer(msg);
@@ -560,7 +549,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
-            if (durabilityBackpressureFuture != null) {
+            if (m_cl.canOfferTask()) {
+                assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             }
         } else {
@@ -761,6 +751,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             } else {
                 newSpHandle = getMaxTaskedSpHandle();
             }
+
             msg.setSpHandle(newSpHandle);
             if (msg.getInitiateTask() != null) {
                 msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
@@ -857,7 +848,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Durability future is always null for sync command logging
             //the transaction will be delivered again by the CL for execution once durable
             //Async command logging has to offer the task immediately with a Future for backpressure
-            if (durabilityBackpressureFuture != null) {
+            if (m_cl.canOfferTask()) {
+                assert durabilityBackpressureFuture != null;
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and
@@ -882,7 +874,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      *
      * @param txnId    The MP transaction ID.
      */
-    private void offerPendingMPTasks(long txnId)
+    public void offerPendingMPTasks(long txnId)
     {
         Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(txnId);
         if (pendingTasks != null) {
@@ -946,7 +938,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             msg = new CompleteTransactionMessage(message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
-            advanceTxnEgo();
+            if (!msg.isForReplay()) advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, msg);
@@ -977,6 +969,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the provided SP handle
         writeIv2ViableReplayEntryInternal(message.getSpHandle());
         setMaxSeenTxnId(message.getSpHandle());
+
+        // Also initialize the unique ID generator and the last durable unique ID using
+        // the value sent by the master
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
+        m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
     }
 
     public void handleDumpMessage()
@@ -1006,6 +1003,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setCommandLog(CommandLog cl) {
         m_cl = cl;
+        m_durabilityListener.createFirstCompletionCheck(cl.isSynchronous(), cl.isEnabled());
+        m_cl.registerDurabilityListener(m_durabilityListener);
     }
 
     @Override
@@ -1027,7 +1026,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 long faultSpHandle = advanceTxnEgo().getTxnId();
                 writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
-                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
+                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
                 m_mailbox.send(m_sendToHSIds,
                         faultMsg);
             }
@@ -1054,6 +1053,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         return new CountDownLatch(0);
+    }
+
+    public void processDurabilityChecks(final CommandLog.CompletionChecks currentChecks) {
+        final SiteTaskerRunnable r = new SiteTasker.SiteTaskerRunnable() {
+            @Override
+            void run() {
+                assert(currentChecks != null);
+                synchronized (m_lock) {
+                    currentChecks.processChecks();
+                }
+            }
+        };
+        if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
+            m_tasks.offer(r);
+        } else {
+            r.run();
+        }
     }
 
     @Override

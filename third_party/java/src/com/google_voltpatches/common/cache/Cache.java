@@ -16,7 +16,6 @@
 
 package com.google_voltpatches.common.cache;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ExecutionError;
@@ -37,15 +36,9 @@ import javax.annotation_voltpatches.Nullable;
  * <p>Implementations of this interface are expected to be thread-safe, and can be safely accessed
  * by multiple concurrent threads.
  *
- * <p>Note that while this class is still annotated as {@link Beta}, the API is frozen from a
- * consumer's standpoint. In other words existing methods are all considered {@code non-Beta} and
- * won't be changed without going through an 18 month deprecation cycle; however new methods may be
- * added at any time.
- *
  * @author Charles Fry
  * @since 10.0
  */
-@Beta
 @GwtCompatible
 public interface Cache<K, V> {
 
@@ -130,12 +123,17 @@ public interface Cache<K, V> {
   /**
    * Returns a current snapshot of this cache's cumulative statistics. All stats are initialized
    * to zero, and are monotonically increasing over the lifetime of the cache.
+   *
    */
   CacheStats stats();
 
   /**
    * Returns a view of the entries stored in this cache as a thread-safe map. Modifications made to
    * the map directly affect the cache.
+   *
+   * <p>Iterators from the returned map are at least <i>weakly consistent</i>: they are safe for
+   * concurrent use, but if the cache is modified (including by eviction) after the iterator is
+   * created, it is undefined which of the changes (if any) will be reflected in that iterator.
    */
   ConcurrentMap<K, V> asMap();
 

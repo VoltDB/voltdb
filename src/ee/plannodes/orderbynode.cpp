@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -42,73 +42,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "orderbynode.h"
 
-#include "common/types.h"
-#include "storage/table.h"
-
 #include <sstream>
-#include <stdexcept>
-#include <string>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
-OrderByPlanNode::OrderByPlanNode(CatalogId id) : AbstractPlanNode(id)
+OrderByPlanNode::~OrderByPlanNode() { }
+
+PlanNodeType OrderByPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_ORDERBY; }
+
+std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
 {
-    //DO NOTHING
-}
-
-OrderByPlanNode::OrderByPlanNode() : AbstractPlanNode()
-{
-    //DO NOTHING
-}
-
-OrderByPlanNode::~OrderByPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-    for (int i = 0; i < m_sortExpressions.size(); i++)
-    {
-        delete m_sortExpressions[i];
-    }
-}
-
-PlanNodeType
-OrderByPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_ORDERBY;
-}
-
-vector<AbstractExpression*>&
-OrderByPlanNode::getSortExpressions()
-{
-    return m_sortExpressions;
-}
-
-void
-OrderByPlanNode::setSortDirections(vector<SortDirectionType>& dirs)
-{
-    m_sortDirections = dirs;
-}
-
-vector<SortDirectionType>&
-OrderByPlanNode::getSortDirections()
-{
-    return m_sortDirections;
-}
-
-const vector<SortDirectionType>&
-OrderByPlanNode::getDirections() const
-{
-    return m_sortDirections;
-}
-
-string
-OrderByPlanNode::debugInfo(const string& spacer) const
-{
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "SortColumns[" << m_sortExpressions.size() << "]\n";
     for (int ctr = 0, cnt = (int)m_sortExpressions.size(); ctr < cnt; ctr++)
     {
@@ -117,11 +63,9 @@ OrderByPlanNode::debugInfo(const string& spacer) const
                << "::" << m_sortDirections[ctr] << "\n";
     }
     return buffer.str();
-
 }
 
-void
-OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
 
@@ -147,3 +91,5 @@ OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
     }
 }
+
+} // namespace voltdb

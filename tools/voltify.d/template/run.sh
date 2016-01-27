@@ -34,7 +34,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
-    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -50,7 +49,7 @@ function clean() {
 function srccompile() {
     if [ -d src ]; then
         mkdir -p obj
-        javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj src/com/$APPNAME/*.java
+        javac -classpath $APPCLASSPATH -d obj src/com/$APPNAME/*.java
         # stop if compilation fails
         if [ $? != 0 ]; then exit; fi
     fi

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,17 +17,20 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -35,7 +38,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -52,11 +54,6 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.compiler.ClusterConfig;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import java.util.ArrayDeque;
-import java.util.Queue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -297,7 +294,7 @@ public class Cartographer extends StatsSource
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {
-        String zkpath = LeaderElector.electionDirForPartition(partition);
+        String zkpath = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partition);
         List<Long> retval = new ArrayList<Long>();
         try {
             List<String> children = m_zk.getChildren(zkpath, null);
@@ -326,7 +323,7 @@ public class Cartographer extends StatsSource
         List<Pair<Integer,ZKUtil.ChildrenCallback>> callbacks = new ArrayList<Pair<Integer, ZKUtil.ChildrenCallback>>();
 
         for (Integer partition : partitions) {
-            String zkpath = LeaderElector.electionDirForPartition(partition);
+            String zkpath = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partition);
             ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
             callbacks.add(Pair.of(partition, cb));
             m_zk.getChildren(zkpath, false, cb, null);
@@ -367,16 +364,7 @@ public class Cartographer extends StatsSource
      */
     static public List<Integer> sortKeysByValue(Map<Integer, Integer> map)
     {
-        List<Entry<Integer, Integer>> entries = new ArrayList<Entry<Integer, Integer>>(map.entrySet());
-        Collections.sort(entries, new Comparator<Entry<Integer, Integer>>() {
-            @Override
-            public int compare(Entry<Integer, Integer> o1, Entry<Integer, Integer> o2) {
-                if (!o1.getValue().equals(o2.getValue())) {
-                    return (o1.getValue()).compareTo(o2.getValue());
-                }
-                return o1.getKey().compareTo(o2.getKey());
-            }
-        } );
+        List<Entry<Integer, Integer>> entries = CoreUtils.sortKeyValuePairByValue(map);
         List<Integer> keys = new ArrayList<Integer>();
         for (Entry<Integer, Integer> entry : entries) {
             keys.add(entry.getKey());
@@ -482,14 +470,14 @@ public class Cartographer extends StatsSource
     }
 
     //Check partition replicas.
-    public synchronized boolean isClusterSafeIfNodeDies(final List<Integer> liveHids, final int hid) {
+    public synchronized boolean isClusterSafeIfNodeDies(final Set<Integer> liveHids, final int hid) {
         try {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
                     if (m_configuredReplicationFactor == 0
-                            || (m_configuredReplicationFactor == 1 && liveHids.size() == 2)) {
-                        //Dont die in k=0 cluster or 2node k1
+                            || (m_configuredReplicationFactor == 1 && liveHids.size() == 2 && m_partitionDetectionEnabled)) {
+                        //Dont die in k=0 cluster or 2node k1 (with partition detection on)
                         return false;
                     }
                     //Otherwise we do check replicas for host

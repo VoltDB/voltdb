@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,14 +47,18 @@
 #define VOLTDBNODEABSTRACTEXECUTOR_H
 
 #include "common/InterruptException.h"
+#include "common/tabletuple.h"
+#include "common/types.h"
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
 
 #include <cassert>
+#include <vector>
 
 namespace voltdb {
 
+class AbstractExpression;
 class TempTableLimits;
 class VoltDBEngine;
 
@@ -83,6 +87,40 @@ class AbstractExecutor {
             m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
         }
     }
+
+    inline void cleanupInputTempTable(Table * input_table) {
+        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        if (tmp_input_table) {
+            // No need of its input temp table
+            tmp_input_table->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
+    virtual void cleanupMemoryPool() {
+        // LEAVE as blank on purpose
+    }
+
+    inline bool outputTempTableIsEmpty() const {
+        if (m_tmpOutputTable != NULL) {
+            return m_tmpOutputTable->activeTupleCount() == 0;
+        }
+
+        return true;
+    }
+
+    // Compares two tuples based on the provided sets of expressions and sort directions
+    struct TupleComparer
+    {
+        TupleComparer(const std::vector<AbstractExpression*>& keys,
+                  const std::vector<SortDirectionType>& dirs);
+
+        bool operator()(TableTuple ta, TableTuple tb) const;
+
+    private:
+        const std::vector<AbstractExpression*>& m_keys;
+        const std::vector<SortDirectionType>& m_dirs;
+        size_t m_keyCount;
+    };
 
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
@@ -116,6 +154,7 @@ class AbstractExecutor {
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
+
 };
 
 
@@ -123,11 +162,6 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
-    }
 
     // run the executor
     return p_execute(params);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,8 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.Future;
 
 import org.voltcore.messaging.VoltMessage;
-
-import org.voltcore.utils.Pair;
+import org.voltdb.DRLogSegmentId;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -48,12 +47,27 @@ import org.voltcore.utils.Pair;
  */
 public interface RepairAlgo
 {
+    public static class RepairResult
+    {
+        public final long m_txnId;
+        public final long m_localDrUniqueId;
+        public final DRLogSegmentId m_binaryLogInfo;
+
+        RepairResult(long txnId, long localDrUniqueId, DRLogSegmentId binaryLogInfo) {
+            m_txnId = txnId;
+            m_localDrUniqueId = localDrUniqueId;
+            m_binaryLogInfo = binaryLogInfo;
+        }
+    }
+
     /**
      * Start a new RepairAlgo. Returns a future that is done when the
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
+     *
+     * The return value is the largest seen txnid and largest seen unique id
      */
-    public Future<Long> start();
+    public Future<RepairResult> start();
 
     public boolean cancel();
 

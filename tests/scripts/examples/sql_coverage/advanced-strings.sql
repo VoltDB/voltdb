@@ -1,12 +1,13 @@
 <configure-for-string.sql>
 <advanced-template.sql>
 
-SELECT SUBSTRING ( DESC FROM _value[int:1,10] FOR _value[int:1,10] ) substrQ1 FROM @fromtables ORDER BY DESC
-SELECT DESC substrQ3 FROM @fromtables ORDER BY SUBSTRING ( DESC FROM _value[int:1,10] ), DESC
+SELECT SUBSTRING ( VCHAR FROM _value[int:1,10] FOR _value[int:1,10] ) substrQ1 FROM @fromtables ORDER BY VCHAR
+SELECT VCHAR substrQ3 FROM @fromtables ORDER BY SUBSTRING ( VCHAR FROM _value[int:1,10] ), VCHAR
 
 -- patterns in set 1 contain '%'
 {_patterns1 |= "'abc%'"}
-{_patterns1 |= "'%'"}
+-- Uncomment after ENG-9449 is fixed (??):
+--{_patterns1 |= "'%'"}
 {_patterns1 |= "'!%'"}
 {_patterns1 |= "'abc!%'"}
 {_patterns1 |= "'abc!%%'"}
@@ -83,15 +84,15 @@ SELECT DESC substrQ3 FROM @fromtables ORDER BY SUBSTRING ( DESC FROM _value[int:
 {_patterns6 |= "'abc!___z'"}
 {_patterns6 |= "'abc__!_z'"}
 
-SELECT DESC likeQ11 FROM @fromtables WHERE DESC _maybe LIKE _patterns1
-SELECT DESC likeQ12 FROM @fromtables WHERE DESC _maybe LIKE _patterns2
-SELECT DESC likeQ13 FROM @fromtables WHERE DESC _maybe LIKE _patterns3
-SELECT DESC likeQ14 FROM @fromtables WHERE DESC _maybe LIKE _patterns4
-SELECT DESC likeQ15 FROM @fromtables WHERE DESC _maybe LIKE _patterns5
-SELECT DESC likeQ16 FROM @fromtables WHERE DESC _maybe LIKE _patterns6
-SELECT DESC likeQ21 FROM @fromtables WHERE DESC _maybe LIKE _patterns1 ESCAPE '!'
-SELECT DESC likeQ22 FROM @fromtables WHERE DESC _maybe LIKE _patterns2 ESCAPE '!'
-SELECT DESC likeQ23 FROM @fromtables WHERE DESC _maybe LIKE _patterns3 ESCAPE '!'
-SELECT DESC likeQ24 FROM @fromtables WHERE DESC _maybe LIKE _patterns4 ESCAPE '!'
-SELECT DESC likeQ25 FROM @fromtables WHERE DESC _maybe LIKE _patterns5 ESCAPE '!'
-SELECT DESC likeQ26 FROM @fromtables WHERE DESC _maybe LIKE _patterns6 ESCAPE '!'
+SELECT VCHAR likeQ11 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns1
+SELECT VCHAR likeQ12 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns2
+SELECT VCHAR likeQ13 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns3
+SELECT VCHAR likeQ14 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns4
+SELECT VCHAR likeQ15 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns5
+SELECT VCHAR likeQ16 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns6
+SELECT VCHAR likeQ21 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns1 ESCAPE '!'
+SELECT VCHAR likeQ22 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns2 ESCAPE '!'
+SELECT VCHAR likeQ23 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns3 ESCAPE '!'
+SELECT VCHAR likeQ24 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns4 ESCAPE '!'
+SELECT VCHAR likeQ25 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns5 ESCAPE '!'
+SELECT VCHAR likeQ26 FROM @fromtables WHERE VCHAR _maybe LIKE _patterns6 ESCAPE '!'

@@ -1,5 +1,5 @@
 DDL:
-../../../tests/frontend/org/voltdb_testprocs/regressionsuites/aggregates/aggregate-sql-ddl.sql
+../../testprocs/org/voltdb_testprocs/regressionsuites/aggregates/aggregate-sql-ddl.sql
 
 SQL:
 select distinct T.NUM from R1 T;

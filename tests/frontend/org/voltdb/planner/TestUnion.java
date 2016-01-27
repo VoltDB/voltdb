@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,11 +23,19 @@
 
 package org.voltdb.planner;
 
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.types.PlanNodeType;
 
 public class TestUnion extends PlannerTestCase {
 
@@ -187,6 +195,9 @@ public class TestUnion extends PlannerTestCase {
         // At this point, coordinator designation is only supported for single-fragment plans.
         failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
 
+        // Multiple Set operations in a single statement with multiple partitioned tables
+        failToCompile("select F from T1 UNION select G from T6 INTERSECT select F from T1");
+
         // Column types must match.
         failToCompile("select A, DESC from T1 UNION select B from T2");
         failToCompile("select B from T2 EXCEPT select A, DESC from T1");
@@ -206,7 +217,7 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
 
         // The same table/alias is repeated twice in the union but in the different selects
-        pn = compile("select B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
+        pn = compile("select A1.B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn.getChildCount() == 2);
@@ -231,8 +242,306 @@ public class TestUnion extends PlannerTestCase {
         failToCompile("select DESC from T1 UNION select DESC from T1");
     }
 
+    public void testSubqueryUnionWithParamENG7783() {
+        AbstractPlanNode pn = compile(
+                "SELECT B, ABS( B - ? ) AS distance FROM ( " +
+                "( SELECT B FROM T2 WHERE B >=? ORDER BY B LIMIT ? " +
+                ") UNION ALL ( " +
+                "SELECT B FROM T2 WHERE B < ? ORDER BY B DESC LIMIT ? ) " +
+                ") AS n ORDER BY distance LIMIT ?;"
+                );
+        assertTrue(pn.getChild(0) instanceof ProjectionPlanNode);
+        assertTrue(pn.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(pn.getChild(0).getChild(0).getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(pn.getChild(0).getChild(0).getChild(0).getChild(0) instanceof UnionPlanNode);
+
+    }
+
+    public void testUnionLimitOffset() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 UNION select B from T2 limit 3 offset 2");
+            checkLimitNode(pn.getChild(0), 3, 2);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 UNION (select B from T2 limit 3 offset 2) ");
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 INTERSECT select B from T2 limit 3");
+            checkLimitNode(pn.getChild(0), 3, 0);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 EXCEPT select B from T2 offset 2");
+            checkLimitNode(pn.getChild(0), -1, 2);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "(select C from T3 EXCEPT select B from T2 offset 2) UNION select F from T6 limit 4 offset 5");
+            checkLimitNode(pn.getChild(0), 4, 5);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+            UnionPlanNode upn = (UnionPlanNode) pn.getChild(0).getChild(0);
+            checkLimitNode(upn.getChild(0), -1, 2);
+            assertTrue(upn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+        {
+            // T1 is partitioned
+            AbstractPlanNode pn = compile(
+                    "select A from T1 EXCEPT select B from T2 offset 2");
+            checkLimitNode(pn.getChild(0), -1, 2);
+            assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+        }
+    }
+
+    public void testUnionOrderby() {
+        {
+            AbstractPlanNode pn = compile("select B from T2 UNION select B from T2 order by B");
+            pn = pn.getChild(0);
+            String[] columnNames = {"B"};
+            int[] idxs = {0};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+        {
+            AbstractPlanNode pn = compile("(select B as B1, B as B2 from T2 UNION select B as B1, B as B2 from T2) order by B1 asc, B2 desc");
+            pn = pn.getChild(0);
+            String[] columnNames = {"B1", "B2"};
+            int[] idxs = {1, 1};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+        {
+            // T1 is partitioned
+            AbstractPlanNode pn = compile("(select A from T1 UNION select B from T2) order by A");
+            pn = pn.getChild(0);
+            String[] columnNames = {"A"};
+            int[] idxs = {0};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+    }
+
+    public void testUnionDeterminism() {
+        {
+            CompiledPlan plan = compileAdHocPlan("select B, DESC from T2 UNION select A, DESC from T1");
+            boolean isDeterministic = plan.isOrderDeterministic();
+            assertEquals(false, isDeterministic);
+        }
+        {
+            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc");
+            boolean isDeterministic = plan.isOrderDeterministic();
+            assertEquals(false, isDeterministic);
+        }
+        {
+            CompiledPlan plan = compileAdHocPlan("(select B, DESC from T2 UNION select A, DESC from T1) order by B asc, DESC desc");
+            boolean isDeterministic = plan.isOrderDeterministic();
+            assertEquals(true, isDeterministic);
+        }
+    }
+
+    public void testInvalidOrderBy() {
+        String errorMsg = "invalid ORDER BY expression";
+        // hsqldb 1.9 parser does not like ORDER BY expression operating on output columns
+        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by C+1", errorMsg);
+        // Column B is not avaiable
+        failToCompile("(select C from T3 UNION select B from T2) order by B", errorMsg);
+        // ORDER BY is not at the end of the UNION SQL clause
+        failToCompile("select C from T3 UNION select A from T1 order by A UNION select B from T2", errorMsg);
+
+        // ORDER BY in the union has to be at the last part of the query
+        failToCompile("select C from T3 UNION select A from T1 order by C UNION select B from T2", "unexpected token: UNION");
+
+        // C is not available in ORDER BY clause "abs(C)"
+        failToCompile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by abs(C)", errorMsg);
+
+        // hsqldb 1.9 parser does not like ORDER BY expression operating on output columns
+        failToCompile("select C from T3 UNION select B from T2 order by C+1", errorMsg);
+
+        // ORDER BY expression
+        // voltdb has exception for type match on the output columns. expression that may change its type
+        failToCompile("select C+1, C as C2 from T3 UNION select B,B from T2 order by 1", "Incompatible data types in UNION");
+    }
+
+    public void testMultiUnionOrderby() {
+      {
+          AbstractPlanNode pn = compile("select A from T1 union ((select B from T2 UNION select B from T2) order by B)");
+          pn = pn.getChild(0);
+          assertTrue(pn instanceof UnionPlanNode);
+          assertEquals(2, pn.getChildCount());
+          // Left branch - SELECT FRM T1
+          assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
+          // Right branch - union with order by
+          assertTrue(pn.getChild(1) instanceof OrderByPlanNode);
+          pn = pn.getChild(1);
+          assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+      }
+      {
+          AbstractPlanNode pn = compile("select A from T1 union (select B from T2 UNION select B from T2 limit 3)");
+          pn = pn.getChild(0);
+          assertTrue(pn instanceof UnionPlanNode);
+          assertEquals(2, pn.getChildCount());
+          // Left branch - SELECT FRM T1
+          assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
+          // Right branch - union with limit
+          assertTrue(pn.getChild(1) instanceof LimitPlanNode);
+          pn = pn.getChild(1);
+          assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+      }
+      {
+          AbstractPlanNode pn = compile("select A from T1 union (select B from T2 UNION select B from T2 offset 3)");
+          pn = pn.getChild(0);
+          assertTrue(pn instanceof UnionPlanNode);
+          assertEquals(2, pn.getChildCount());
+          // Left branch - SELECT FRM T1
+          assertTrue(pn.getChild(0).getChild(0) instanceof ReceivePlanNode);
+          // Right branch - union with limit
+          assertTrue(pn.getChild(1) instanceof LimitPlanNode);
+          pn = pn.getChild(1);
+          assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+      }
+      {
+          AbstractPlanNode pn = compile("(select A from T1 union select B from T2 order by A) UNION select B from T2");
+          pn = pn.getChild(0);
+          assertTrue(pn instanceof UnionPlanNode);
+          assertEquals(2, pn.getChildCount());
+          // Left branch - union with order by
+          assertTrue(pn.getChild(0) instanceof OrderByPlanNode);
+          assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+          // Right branch - select from T2
+          assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
+      }
+      {
+          AbstractPlanNode pn = compile("(select A from T1 union select B from T2 offset 1) UNION select B from T2");
+          pn = pn.getChild(0);
+          assertTrue(pn instanceof UnionPlanNode);
+          assertEquals(2, pn.getChildCount());
+          // Left branch - union with offset
+          assertTrue(pn.getChild(0) instanceof LimitPlanNode);
+          assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+          // Right branch - select from T2
+          assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
+      }
+      {
+          AbstractPlanNode pn = compile("(select A from T1 union select B from T2 limit 1) UNION select B from T2");
+          pn = pn.getChild(0);
+          assertTrue(pn instanceof UnionPlanNode);
+          assertEquals(2, pn.getChildCount());
+          // Left branch - union with offset
+          assertTrue(pn.getChild(0) instanceof LimitPlanNode);
+          assertTrue(pn.getChild(0).getChild(0) instanceof UnionPlanNode);
+          // Right branch - select from T2
+          assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
+      }
+  }
+
+    public void testUnionOrderByExpr() {
+        {
+            AbstractPlanNode pn = compile(
+                    "select C, abs(C) as A from T3 UNION select B, B from T2 order by C, A");
+            pn = pn.getChild(0);
+            String[] columnNames = {"C", "A"};
+            int[] idxs = {0, 1};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+        {
+            AbstractPlanNode pn = compile(
+                    "select C, abs(C) as A from T3 UNION select B, B from T2 order by 1,2");
+            pn = pn.getChild(0);
+            String[] columnNames = {"C", "A"};
+            int[] colIdx = { 0, 1};
+            checkOrderByNode(pn, columnNames, colIdx);
+        }
+        {
+            AbstractPlanNode pn = compile("select abs(C) as tag, C as C2 from T3 UNION select B,B from T2 order by tag, C2");
+            pn = pn.getChild(0);
+            String[] columnNames = {"TAG", "C2"};
+            int[] colIdx = {0, 1};
+            checkOrderByNode(pn, columnNames, colIdx);
+        }
+        {
+            AbstractPlanNode pn = compile("select cast((C+1) as integer) TAG, C as C2 from T3 UNION select B,B from T2 order by TAG");
+            pn = pn.getChild(0);
+            String[] columnNames = {"TAG", "C2"};
+            int[] colIdx = {0, 1};
+            checkOrderByNode(pn, columnNames, colIdx);
+        }
+    }
+
+    public void testUnionOrderByLimit() {
+        // order by column name
+        {
+            AbstractPlanNode pn = compile(
+                    "select C from T3 UNION select B from T2 order by C limit 3 offset 2");
+            String[] columnNames = {"C"};
+            pn = pn.getChild(0);
+            checkOrderByNode(pn, columnNames, new int[]{0});
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+            checkLimitNode(pn, 3, 2);
+        }
+        // order by alias
+        {
+            AbstractPlanNode pn = compile(
+                    "select C as TAG from T3 UNION select B from T2 order by TAG limit 3 offset 2");
+            String[] columnNames = {"TAG"};
+            pn = pn.getChild(0);
+            checkOrderByNode(pn, columnNames, new int[]{0});
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+            checkLimitNode(pn, 3, 2);
+        }
+        // order by number
+        {
+            AbstractPlanNode pn = compile(
+                    "select C as TAG from T3 UNION select B from T2 order by 1 limit 3 offset 2");
+            String[] columnNames = {"TAG"};
+            pn = pn.getChild(0);
+            checkOrderByNode(pn, columnNames, new int[]{0});
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+            checkLimitNode(pn, 3, 2);
+        }
+    }
+
+    public void testUnionOrderByLimitParams() {
+        AbstractPlanNode pn = compile(
+                "select C from T3 where C = ? UNION select B from T2 order by C limit ? offset ?");
+        String[] columnNames = {"C"};
+        pn = pn.getChild(0);
+        int[] idxs = {0};
+        checkOrderByNode(pn, columnNames, idxs);
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        pn = pn.getInlinePlanNode(PlanNodeType.LIMIT);
+        assert (pn instanceof LimitPlanNode);
+        assertTrue(pn.toExplainPlanString().contains("LIMIT with parameter"));
+    }
+
+    private void checkOrderByNode(AbstractPlanNode pn, String columns[], int[] idxs) {
+        assertTrue(pn != null);
+        assertTrue(pn instanceof OrderByPlanNode);
+        OrderByPlanNode opn = (OrderByPlanNode) pn;
+        assertEquals(columns.length, opn.getOutputSchema().size());
+        for(int i = 0; i < columns.length; ++i) {
+            SchemaColumn col = opn.getOutputSchema().getColumns().get(i);
+            assertEquals(columns[i], col.getColumnAlias());
+            AbstractExpression colExpr = col.getExpression();
+            assertEquals(ExpressionType.VALUE_TUPLE, colExpr.getExpressionType());
+            assertEquals(idxs[i], ((TupleValueExpression) colExpr).getColumnIndex());
+        }
+    }
+
+    private void checkLimitNode(AbstractPlanNode pn, int limit, int offset) {
+        assertTrue(pn instanceof LimitPlanNode);
+        LimitPlanNode lpn = (LimitPlanNode) pn;
+        assertEquals(limit, lpn.getLimit());
+        assertEquals(offset, lpn.getOffset());
+    }
+
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestUnion.class.getResource("testunion-ddl.sql"), "testunion", false);
+        setupSchema(TestUnion.class.getResource("testplans-union-ddl.sql"), "testunion", false);
     }
 }

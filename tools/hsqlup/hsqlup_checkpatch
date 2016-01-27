@@ -1,0 +1,46 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    echo Baseline directory does not exist: $1
+    exit 1
+fi
+if [ ! -d "$2" ]; then
+    echo Patched directory does not exist: $2
+    exit 2
+fi
+
+BASELINE=$1
+
+function do_diff_work {
+    if [ ! -d $BASELINE ]; then
+        echo Baseline directory should be an absolute path.
+        exit 3 
+    fi
+    voltsrc=$BASELINE/$1
+    if [ -f $voltsrc ]; then
+        ### echo diffing $1 $voltsrc
+        cat $voltsrc | sed -e '/\sCHERRY\sPICK\scode/,/\(\*\sdisable\s[0-9]*\sline\)\|\(\sEnd\sof\sCHERRY\sPICK\)/ d' \
+                     | sed -e '/\sA\sVoltDB\sextension/,/\(\*\sdisable\s[0-9]*\sline\)\|\(\sEnd\sof\sVoltDB\sextension\)/ d' \
+                     | sed -e '/...\sdisabled\s[0-9]*\sline/,/\(\sEnd\sof\sVoltDB\sextension\)\|\(\sEnd\sof\sCHERRY\sPICK\)/ d' \
+                     | sed -e '/^$/ N'                                                                \
+                           -e '/\sVolt\sDB\sExtensions/,/\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*/ d' \
+                     | diff $1 - || echo diffed $1 $voltsrc
+    else
+        echo not diffing $1 $voltsrc
+    fi
+}
+pushd $2 >> /dev/null
+rm -f ../do_diffs ../diffs_do ../done_diffs.out
+# Generate a script that applies do_diff_work to each java file in the patched source tree.
+find . -type f -name "*.java" | sed -e 's/^/do_diff_work /' >> ../do_diffs
+sort ../do_diffs > ../diffs_do
+
+# run the generated script
+source ../diffs_do > ../done_diffs.out
+
+# Complain if it caught any non-compliant changes
+if [ -s ../done_diffs.out ];then
+    echo "An incorrectly applied patch OR incorrectly annotated VoltDB extension was detected in one or more java files. See ../done_diffs.out."
+fi
+popd >> /dev/null
+

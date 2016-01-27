@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -213,7 +215,42 @@ public enum VoltType {
             null, // unsigned?
             null, // minimum scale
             null, // maximum scale
-            "java.lang.Byte[]"); // getObject return type
+            "java.lang.Byte[]"), // getObject return type
+
+    /**
+     * Boolean type. Not a valid value for actual user data.
+     */
+    BOOLEAN  ((byte)23, 1, "boolean", new Class[] {boolean.class, Boolean.class}, boolean[].class, 'o', //'b' is taken by BIGINT
+            java.sql.Types.BOOLEAN,  // java.sql.Types DATA_TYPE
+            null, // prefix to specify a literal
+            null, // suffix to specify a literal
+            null, // necessary params to create
+            false, // case-sensitive
+            java.sql.DatabaseMetaData.typePredBasic, // where-clauses supported
+            false, // unsigned?
+            0, // minimum scale
+            0, // maximum scale
+            "java.lang.Boolean"), // getObject return type
+
+    /**
+     * Point type, for a geographical point (lat, long)
+     */
+    GEOGRAPHY_POINT ((byte)26,
+            GeographyPointValue.getLengthInBytes(),
+            "GEOGRAPHY_POINT",
+            new Class[] {GeographyPointValue.class},
+            GeographyPointValue[].class,
+            'P'), // 'p' was taken by timestamp
+
+    /**
+     * Geography type, for geographical objects (polygons, etc)
+     */
+    GEOGRAPHY ((byte)27,
+            -1, // length in bytes (variable length)
+            "GEOGRAPHY",
+            new Class[] {GeographyValue.class},
+            GeographyValue[].class,
+            'g');
 
     /**
      * Size in bytes of the maximum length for a VoltDB field value, presumably a
@@ -223,6 +260,8 @@ public enum VoltType {
     public static final int MAX_VALUE_LENGTH_IN_CHARACTERS = MAX_VALUE_LENGTH / 4;
     /**
      * String representation of <code>MAX_VALUE_LENGTH</code>.
+     * @param size The size you want to represent in human readable string.
+     * @return String representation of Size passed in.
      */
     public static String humanReadableSize(int size)
     {
@@ -345,7 +384,7 @@ public enum VoltType {
 
     private final static ImmutableMap<Class<?>, VoltType> s_classes;
     //Update this if you add a type.
-    private final static VoltType s_types[] = new VoltType[26];
+    private final static VoltType s_types[] = new VoltType[28];
     static {
         ImmutableMap.Builder<Class<?>, VoltType> b = ImmutableMap.builder();
         HashMap<Class<?>, VoltType> validation = new HashMap<Class<?>, VoltType>();
@@ -485,6 +524,15 @@ public enum VoltType {
         return type;
     }
 
+    public static VoltType typeFromSignature(char signature) {
+        for (VoltType type : values()) {
+            if (type.m_signatureChar == signature) {
+                return type;
+            }
+        }
+        throw new VoltTypeException("Unknown type signature: " + signature);
+    }
+
     /**
      * Return the string representation of this type. Note that
      * <tt>VoltType.typeFromString(voltTypeInstance.toString) == true</tt>.
@@ -492,6 +540,10 @@ public enum VoltType {
      */
     @Override public String toString() {
         return "VoltType." + name();
+    }
+
+    public String getName() {
+        return name();
     }
 
     /**
@@ -521,6 +573,22 @@ public enum VoltType {
             return MAX_VALUE_LENGTH;
         }
         return m_lengthInBytes;
+    }
+
+    /**
+     * Get the minimum number of bytes required to store the type
+     * @return An integer value representing a number of bytes.
+     */
+    public int getMinLengthInBytes() {
+        if (m_lengthInBytes != -1) {
+            return getLengthInBytesForFixedTypes();
+        }
+
+        if (this == GEOGRAPHY) {
+            return GeographyValue.MIN_SERIALIZED_LENGTH;
+        }
+
+        return 1;
     }
 
     /** JDBC getTypeInfo() accessors */
@@ -682,6 +750,10 @@ public enum VoltType {
             return NULL_DECIMAL;
         case VARBINARY:
             return NULL_STRING_OR_VARBINARY;
+        case GEOGRAPHY_POINT:
+            return NULL_POINT;
+        case GEOGRAPHY:
+            return NULL_GEOGRAPHY;
         default:
             throw new VoltTypeException("No NULL value for " + toString());
         }
@@ -689,54 +761,51 @@ public enum VoltType {
 
     public static boolean isNullVoltType(Object obj)
     {
-        boolean retval = false;
-        if (obj == null)
+        if ((obj == null) ||
+            (obj == VoltType.NULL_TIMESTAMP) ||
+            (obj == VoltType.NULL_STRING_OR_VARBINARY) ||
+            (obj == VoltType.NULL_DECIMAL) ||
+            (obj == VoltType.NULL_POINT) ||
+            (obj == VoltType.NULL_GEOGRAPHY))
         {
-            retval = true;
+            return true;
         }
-        else if (obj == VoltType.NULL_TIMESTAMP ||
-                obj == VoltType.NULL_STRING_OR_VARBINARY ||
-                obj == VoltType.NULL_DECIMAL)
+
+        switch(typeFromObject(obj))
         {
-            retval = true;
+        case TINYINT:
+            return (((Number) obj).byteValue() == NULL_TINYINT);
+        case SMALLINT:
+            return (((Number) obj).shortValue() == NULL_SMALLINT);
+        case INTEGER:
+            return (((Number) obj).intValue() == NULL_INTEGER);
+        case BIGINT:
+            return (((Number) obj).longValue() == NULL_BIGINT);
+        case FLOAT:
+            return (((Number) obj).doubleValue() == NULL_FLOAT);
+        case TIMESTAMP:
+        case STRING:
+        case VARBINARY:
+        case DECIMAL:
+        case GEOGRAPHY_POINT:
+        case GEOGRAPHY:
+            // already checked these above
+            return false;
+        default:
+            throw new VoltTypeException("Unsupported type: " +
+                                        typeFromObject(obj));
         }
-        else
-        {
-            switch(typeFromObject(obj))
-            {
-            case TINYINT:
-                retval = (((Number) obj).byteValue() == NULL_TINYINT);
-                break;
-            case SMALLINT:
-                retval = (((Number) obj).shortValue() == NULL_SMALLINT);
-                break;
-            case INTEGER:
-                retval = (((Number) obj).intValue() == NULL_INTEGER);
-                break;
-            case BIGINT:
-                retval = (((Number) obj).longValue() == NULL_BIGINT);
-                break;
-            case FLOAT:
-                retval = (((Number) obj).doubleValue() == NULL_FLOAT);
-                break;
-            case TIMESTAMP:
-                retval = (obj == VoltType.NULL_TIMESTAMP);
-                break;
-            case STRING:
-                retval = (obj == VoltType.NULL_STRING_OR_VARBINARY);
-                break;
-            case VARBINARY:
-                retval = (obj == VoltType.NULL_STRING_OR_VARBINARY);
-                break;
-            case DECIMAL:
-                retval = (obj == VoltType.NULL_DECIMAL);
-                break;
-            default:
-                throw new VoltTypeException("Unsupported type: " +
-                                            typeFromObject(obj));
-            }
+    }
+
+    public boolean isIndexable() {
+        switch(this) {
+        case GEOGRAPHY_POINT:
+        case GEOGRAPHY:
+        case BOOLEAN:
+            return false;
+        default:
+            return true;
         }
-        return retval;
     }
 
     /**
@@ -762,7 +831,7 @@ public enum VoltType {
      * <code>INTEGER</code>, <code>BIGINT</code> and <code>TIMESTAMP</code>.
      * @return True if integer type. False if not.
      */
-    public boolean isInteger() {
+    public boolean isBackendIntegerType() {
         switch(this)  {
         case TINYINT:
         case SMALLINT:
@@ -774,6 +843,35 @@ public enum VoltType {
             return false;
         }
     }
+
+    public boolean isVariableLength() {
+        switch (this) {
+        case GEOGRAPHY:
+        case VARBINARY:
+        case STRING:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /**
+     * Is this type an integer type? True for <code>TINYINT</code>, <code>SMALLINT</code>,
+     * <code>INTEGER</code>, <code>BIGINT</code>.
+     * @return True if integer type. False if not.
+     */
+    public boolean isAnyIntegerType() {
+        switch(this)  {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
 
     public boolean isMaxValuePaddable() {
         switch (this) {
@@ -811,6 +909,7 @@ public enum VoltType {
             case INTEGER:
             case BIGINT:
             case FLOAT:
+            case DECIMAL:
                 return true;
             default:
                 return false;
@@ -840,8 +939,8 @@ public enum VoltType {
         if (this == otherType)
             return true;
 
-        if (otherType.isInteger()) {
-            if (this.isInteger()) {
+        if (otherType.isBackendIntegerType()) {
+            if (this.isBackendIntegerType()) {
                 // Don't allow integers getting smaller.
                 return this.getMaxLengthInBytes() >= otherType.getMaxLengthInBytes();
             }
@@ -960,4 +1059,32 @@ public enum VoltType {
     /** Null value for <code>DECIMAL</code>.  */
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();
 
+    private static final class NullPointSigil{}
+    /** Null value for <code>POINT</code>. */
+    public static final NullPointSigil NULL_POINT = new NullPointSigil();
+
+    private static final class NullGeographySigil{}
+    /** Null value for <code>POINT</code>. */
+    public static final NullGeographySigil NULL_GEOGRAPHY = new NullGeographySigil();
+
+    /**
+     * The size specifier for columns with a variable-length type is optional in a
+     * CREATE TABLE or ALTER TABLE statement.  If no size is specified, VoltDB chooses
+     * a default size.
+     *
+     * @return the default size for the given type
+     */
+    public int defaultLengthForVariableLengthType() {
+        assert(isVariableLength());
+        if (this == GEOGRAPHY) {
+            return GeographyValue.DEFAULT_LENGTH;
+        }
+
+        // These constants should be kept up-to-date with those in DDLCompiler.
+        // We can't reference DDLCompiler here since this class is used in the client.
+        final int MAX_COLUMNS = 1024;
+        final int MAX_ROW_SIZE = 1024 * 1024 * 2;
+
+        return MAX_ROW_SIZE / MAX_COLUMNS;
+    }
 }

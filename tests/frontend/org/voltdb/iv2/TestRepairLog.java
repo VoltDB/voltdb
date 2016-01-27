@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,6 +40,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
+import org.voltdb.ParameterSet;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -227,7 +230,7 @@ public class TestRepairLog
     // There should be only one FragmentTaskMessage per MP TxnID
     // There should be at most one FragmentTaskMessage uncovered by a CompleteTransactionMessage
     // There should be no CompleteTransactionMessages indicating restart
-    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff)
+    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff, long binaryLogSpUniqueId, long binaryLogMpUniqueId)
     {
         long prevHandle = Long.MIN_VALUE;
         Long mpTxnId = null;
@@ -249,74 +252,66 @@ public class TestRepairLog
                 }
             } else {
                 assertTrue(imsg.hasHashinatorConfig());
+                assertEquals(binaryLogSpUniqueId, imsg.getBinaryLogInfo().spUniqueId);
+                assertEquals(binaryLogMpUniqueId, imsg.getBinaryLogInfo().mpUniqueId);
             }
         }
+    }
+
+    public static Pair<Long, Long> setBinaryLogUniqueId(TransactionInfoBaseMessage msg, UniqueIdGenerator spbuig, UniqueIdGenerator mpbuig) {
+        Iv2InitiateTaskMessage taskMsg = null;
+        if (msg instanceof Iv2InitiateTaskMessage) {
+            taskMsg = (Iv2InitiateTaskMessage) msg;
+        } else if (msg instanceof FragmentTaskMessage) {
+            taskMsg = ((FragmentTaskMessage) msg).getInitiateTask();
+        }
+
+        if (taskMsg != null && taskMsg.getStoredProcedureName().startsWith("@ApplyBinaryLog")) {
+            ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
+            long spuid = spbuig == null?0:spbuig.getNextUniqueId();
+            long mpuid = mpbuig.getNextUniqueId();
+            when(params.toArray()).thenReturn(new Object[] {null, 0l, 0l, spuid, mpuid, null});
+            return Pair.of(spuid, mpuid);
+        }
+
+        return Pair.of(Long.MIN_VALUE, Long.MIN_VALUE);
     }
 
     @Test
     public void testFuzz()
     {
         TxnEgo sphandle = TxnEgo.makeZero(0);
+        UniqueIdGenerator spbuig = new UniqueIdGenerator(0, 0);
+        UniqueIdGenerator mpbuig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         RepairLog dut = new RepairLog();
+        long spBinaryLogSpUniqueId = Long.MIN_VALUE;
+        long spBinaryLogMpUniqueId = Long.MIN_VALUE;
+        long mpBinaryLogMpUniqueId = Long.MIN_VALUE;
         for (int i = 0; i < 4000; i++) {
             // get next message, update the sphandle according to SpScheduler rules,
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandle(sphandle.getTxnId());
+            if (msg instanceof Iv2InitiateTaskMessage) {
+                Pair<Long, Long> uids = setBinaryLogUniqueId(msg, spbuig, mpbuig);
+                spBinaryLogSpUniqueId = Math.max(spBinaryLogSpUniqueId, uids.getFirst());
+                spBinaryLogMpUniqueId = Math.max(spBinaryLogMpUniqueId, uids.getSecond());
+            } else if (msg instanceof FragmentTaskMessage) {
+                mpBinaryLogMpUniqueId = Math.max(mpBinaryLogMpUniqueId, setBinaryLogUniqueId(msg, null, mpbuig).getSecond());
+            }
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 dut.deliver(msg);
             }
         }
         List<Iv2RepairLogResponseMessage> stuff = dut.contents(1l, false);
-        validateRepairLog(stuff);
+        validateRepairLog(stuff, spBinaryLogSpUniqueId, spBinaryLogMpUniqueId);
         // Also check the MP version
         stuff = dut.contents(1l, true);
-        validateRepairLog(stuff);
-    }
-
-    @Test
-    public void testPerformance()
-    {
-        RepairLog dut = new RepairLog();
-        // First, add and truncate SP transactions with no MPs
-        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
-        long start = System.currentTimeMillis();
-        for (int i = 0; i < 100000; i++)
-        {
-            VoltMessage msg = truncInitMsg(i, i + 1);
-            dut.deliver(msg);
-        }
-        long end = System.currentTimeMillis();
-        long duration1 = end - start;
-        System.out.println("Time to deliver 100,000 SPs: " + duration1);
-
-        // Now, add 40000 MP messages and then see how long it takes to do the SPs
-        dut = new RepairLog();
-        dut.deliver(truncInitMsg(Long.MIN_VALUE, 0));
-        for (int i = 0; i < 40000; i++) {
-            dut.deliver(truncCompleteMsg(Long.MIN_VALUE, i));
-        }
-        start = System.currentTimeMillis();
-        for (int i = 0; i < 100000; i++)
-        {
-            VoltMessage msg = truncInitMsg(i, i + 1);
-            dut.deliver(msg);
-        }
-        end = System.currentTimeMillis();
-        long duration2 = end - start;
-        System.out.println("Time to deliver 100,000 SPs: " + duration2);
-        // rough check, verify that the two don't differ by more than 20%
-        if (duration2 > duration1) {
-            long delta = Math.abs(duration2 - duration1);
-            float deltaPercent = delta / (float)duration1;
-            assertTrue("SP deliver performance with stored MP logs exceeds allowed hit of 20%, was: " +
-                    (deltaPercent * 100) + "%.",
-                    deltaPercent < .20);
-        }
+        validateRepairLog(stuff, Long.MIN_VALUE, mpBinaryLogMpUniqueId);
     }
 
     @Test
@@ -330,5 +325,27 @@ public class TestRepairLog
             items.add(item);
         }
         Collections.sort(items, dut.m_handleComparator);
+    }
+
+    @Test
+    public void testTrackBinaryLogUniqueId() {
+        // The end unique id for an @ApplyBinaryLogSP invocation is recorded
+        // as its fifth parameter. Create a realistic invocation, deliver it
+        // to the repair log, and see what we get
+        final long endSpUniqueId = 42;
+        final long endMpUniqueId = 25;
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@ApplyBinaryLogSP");
+        spi.setParams(0, endSpUniqueId - 10, endSpUniqueId, endSpUniqueId, endMpUniqueId, new byte[]{0});
+        spi.setOriginalUniqueId(endSpUniqueId - 10);
+        spi.setOriginalTxnId(endSpUniqueId -15);
+
+        Iv2InitiateTaskMessage msg =
+                new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,
+                        spi, 0l, 0l, false);
+        msg.setSpHandle(900l);
+        RepairLog log = new RepairLog();
+        log.deliver(msg);
+        validateRepairLog(log.contents(1l, false), endSpUniqueId, endMpUniqueId);
     }
 }

@@ -26,6 +26,7 @@ import static java.lang.Float.POSITIVE_INFINITY;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
+import com.google_voltpatches.common.base.Converter;
 
 import java.io.Serializable;
 import java.util.AbstractList;
@@ -36,6 +37,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.RandomAccess;
 
+import javax.annotation_voltpatches.CheckForNull;
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -43,12 +46,13 @@ import javax.annotation_voltpatches.Nullable;
  * already found in either {@link Float} or {@link Arrays}.
  *
  * <p>See the Guava User Guide article on <a href=
- * "http://code.google.com/p/guava-libraries/wiki/PrimitivesExplained">
+ * "https://github.com/google/guava/wiki/PrimitivesExplained">
  * primitive utilities</a>.
  *
  * @author Kevin Bourrillion
  * @since 1.0
  */
+@CheckReturnValue
 @GwtCompatible(emulated = true)
 public final class Floats {
   private Floats() {}
@@ -78,6 +82,10 @@ public final class Floats {
    * Float#compare(float, float)}. You may prefer to invoke that method
    * directly; this method exists only for consistency with the other utilities
    * in this package.
+   *
+   * <p><b>Note:</b> this method simply delegates to the JDK method {@link
+   * Float#compare}. It is provided for consistency with the other primitive
+   * types, whose compare methods were not added to the JDK until JDK 7.
    *
    * @param a the first {@code float} to compare
    * @param b the second {@code float} to compare
@@ -132,8 +140,7 @@ public final class Floats {
   }
 
   // TODO(kevinb): consider making this public
-  private static int indexOf(
-      float[] array, float target, int start, int end) {
+  private static int indexOf(float[] array, float target, int start, int end) {
     for (int i = start; i < end; i++) {
       if (array[i] == target) {
         return i;
@@ -190,8 +197,7 @@ public final class Floats {
   }
 
   // TODO(kevinb): consider making this public
-  private static int lastIndexOf(
-      float[] array, float target, int start, int end) {
+  private static int lastIndexOf(float[] array, float target, int start, int end) {
     for (int i = end - 1; i >= start; i--) {
       if (array[i] == target) {
         return i;
@@ -220,7 +226,7 @@ public final class Floats {
 
   /**
    * Returns the greatest value present in {@code array}, using the same rules
-   * of comparison as {@link Math#min(float, float)}.
+   * of comparison as {@link Math#max(float, float)}.
    *
    * @param array a <i>nonempty</i> array of {@code float} values
    * @return the value present in {@code array} that is greater than or equal to
@@ -259,6 +265,43 @@ public final class Floats {
     return result;
   }
 
+  private static final class FloatConverter extends Converter<String, Float>
+      implements Serializable {
+    static final FloatConverter INSTANCE = new FloatConverter();
+
+    @Override
+    protected Float doForward(String value) {
+      return Float.valueOf(value);
+    }
+
+    @Override
+    protected String doBackward(Float value) {
+      return value.toString();
+    }
+
+    @Override
+    public String toString() {
+      return "Floats.stringConverter()";
+    }
+
+    private Object readResolve() {
+      return INSTANCE;
+    }
+
+    private static final long serialVersionUID = 1;
+  }
+
+  /**
+   * Returns a serializable converter object that converts between strings and
+   * floats using {@link Float#valueOf} and {@link Float#toString()}.
+   *
+   * @since 16.0
+   */
+  @Beta
+  public static Converter<String, Float> stringConverter() {
+    return FloatConverter.INSTANCE;
+  }
+
   /**
    * Returns an array containing the same values as {@code array}, but
    * guaranteed to be of a specified minimum length. If {@code array} already
@@ -275,8 +318,7 @@ public final class Floats {
    * @return an array containing the values of {@code array}, with guaranteed
    *     minimum length {@code minLength}
    */
-  public static float[] ensureCapacity(
-      float[] array, int minLength, int padding) {
+  public static float[] ensureCapacity(float[] array, int minLength, int padding) {
     checkArgument(minLength >= 0, "Invalid minLength: %s", minLength);
     checkArgument(padding >= 0, "Invalid padding: %s", padding);
     return (array.length < minLength)
@@ -347,7 +389,7 @@ public final class Floats {
     public int compare(float[] left, float[] right) {
       int minLength = Math.min(left.length, right.length);
       for (int i = 0; i < minLength; i++) {
-        int result = Floats.compare(left[i], right[i]);
+        int result = Float.compare(left[i], right[i]);
         if (result != 0) {
           return result;
         }
@@ -427,26 +469,30 @@ public final class Floats {
       this.end = end;
     }
 
-    @Override public int size() {
+    @Override
+    public int size() {
       return end - start;
     }
 
-    @Override public boolean isEmpty() {
+    @Override
+    public boolean isEmpty() {
       return false;
     }
 
-    @Override public Float get(int index) {
+    @Override
+    public Float get(int index) {
       checkElementIndex(index, size());
       return array[start + index];
     }
 
-    @Override public boolean contains(Object target) {
+    @Override
+    public boolean contains(Object target) {
       // Overridden to prevent a ton of boxing
-      return (target instanceof Float)
-          && Floats.indexOf(array, (Float) target, start, end) != -1;
+      return (target instanceof Float) && Floats.indexOf(array, (Float) target, start, end) != -1;
     }
 
-    @Override public int indexOf(Object target) {
+    @Override
+    public int indexOf(Object target) {
       // Overridden to prevent a ton of boxing
       if (target instanceof Float) {
         int i = Floats.indexOf(array, (Float) target, start, end);
@@ -457,7 +503,8 @@ public final class Floats {
       return -1;
     }
 
-    @Override public int lastIndexOf(Object target) {
+    @Override
+    public int lastIndexOf(Object target) {
       // Overridden to prevent a ton of boxing
       if (target instanceof Float) {
         int i = Floats.lastIndexOf(array, (Float) target, start, end);
@@ -468,7 +515,8 @@ public final class Floats {
       return -1;
     }
 
-    @Override public Float set(int index, Float element) {
+    @Override
+    public Float set(int index, Float element) {
       checkElementIndex(index, size());
       float oldValue = array[start + index];
       // checkNotNull for GWT (do not optimize)
@@ -476,7 +524,8 @@ public final class Floats {
       return oldValue;
     }
 
-    @Override public List<Float> subList(int fromIndex, int toIndex) {
+    @Override
+    public List<Float> subList(int fromIndex, int toIndex) {
       int size = size();
       checkPositionIndexes(fromIndex, toIndex, size);
       if (fromIndex == toIndex) {
@@ -485,7 +534,8 @@ public final class Floats {
       return new FloatArrayAsList(array, start + fromIndex, start + toIndex);
     }
 
-    @Override public boolean equals(Object object) {
+    @Override
+    public boolean equals(@Nullable Object object) {
       if (object == this) {
         return true;
       }
@@ -505,7 +555,8 @@ public final class Floats {
       return super.equals(object);
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
       int result = 1;
       for (int i = start; i < end; i++) {
         result = 31 * result + Floats.hashCode(array[i]);
@@ -513,7 +564,8 @@ public final class Floats {
       return result;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       StringBuilder builder = new StringBuilder(size() * 12);
       builder.append('[').append(array[start]);
       for (int i = start + 1; i < end; i++) {
@@ -552,12 +604,13 @@ public final class Floats {
    *     parsed as a {@code float} value
    * @since 14.0
    */
-  @GwtIncompatible("regular expressions")
-  @Nullable
   @Beta
+  @Nullable
+  @CheckForNull
+  @GwtIncompatible("regular expressions")
   public static Float tryParse(String string) {
     if (Doubles.FLOATING_POINT_PATTERN.matcher(string).matches()) {
-      // TODO(user): could be potentially optimized, but only with
+      // TODO(lowasser): could be potentially optimized, but only with
       // extensive testing
       try {
         return Float.parseFloat(string);

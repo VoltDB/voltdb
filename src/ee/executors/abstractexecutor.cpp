@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,6 +46,7 @@
 #include "abstractexecutor.h"
 
 #include "execution/VoltDBEngine.h"
+#include "expressions/abstractexpression.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
 #include "storage/tablefactory.h"
@@ -130,8 +131,10 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     if (!p_init(m_abstractNode, limits)) {
         return false;
     }
-    Table* tmp_output_table_base = m_abstractNode->getOutputTable();
-    m_tmpOutputTable = dynamic_cast<TempTable*>(tmp_output_table_base);
+
+    if (m_tmpOutputTable == NULL) {
+        m_tmpOutputTable = dynamic_cast<TempTable*>(m_abstractNode->getOutputTable());
+    }
 
     return true;
 }
@@ -142,19 +145,22 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
  */
 void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
     assert(limits);
-    TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
-    int column_count = (int)m_abstractNode->getOutputSchema().size();
+    TupleSchema* schema = m_abstractNode->generateTupleSchema();
+    int column_count = schema->columnCount();
     std::vector<std::string> column_names(column_count);
     assert(column_count >= 1);
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();
+    const std::vector<SchemaColumn*>& outputSchema = m_abstractNode->getOutputSchema();
+
+    for (int ctr = 0; ctr < column_count; ctr++) {
+        column_names[ctr] = outputSchema[ctr]->getColumnName();
     }
-    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
+
+    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
                                                               tempTableName,
                                                               schema,
                                                               column_names,
-                                                              limits));
+                                                              limits);
+    m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
 /**
@@ -164,12 +170,34 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
 void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
     TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
     const std::vector<std::string> columnNames(1, "modified_tuples");
-    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
+    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
                                                               "temp",
                                                               schema,
                                                               columnNames,
-                                                              limits));
+                                                              limits);
+    m_abstractNode->setOutputTable(m_tmpOutputTable);
 }
 
 
 AbstractExecutor::~AbstractExecutor() {}
+
+AbstractExecutor::TupleComparer::TupleComparer(const std::vector<AbstractExpression*>& keys,
+    const std::vector<SortDirectionType>& dirs) : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
+{
+    assert(keys.size() == dirs.size());
+    assert(std::find(m_dirs.begin(), m_dirs.end(), SORT_DIRECTION_TYPE_INVALID) == m_dirs.end());
+}
+
+bool AbstractExecutor::TupleComparer::operator()(TableTuple ta, TableTuple tb) const
+{
+    for (size_t i = 0; i < m_keyCount; ++i)
+    {
+        AbstractExpression* k = m_keys[i];
+        SortDirectionType dir = m_dirs[i];
+        int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
+
+        if (cmp < 0) return (dir == SORT_DIRECTION_TYPE_ASC);
+        if (cmp > 0) return (dir == SORT_DIRECTION_TYPE_DESC);
+    }
+    return false; // ta == tb on these keys
+}

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,8 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -25,6 +27,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -62,9 +65,9 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     public void setRowData(AbstractExpression tableData) {
         assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
-        m_outputExpression.setValueType(m_tableData.getValueType());
-        m_outputExpression.setValueSize(m_tableData.getValueSize());
-        m_outputExpression.setInBytes(m_tableData.getInBytes());
+
+        m_outputExpression.setTypeSizeBytes(m_tableData.getValueType(), m_tableData.getValueSize(),
+                m_tableData.getInBytes());
     }
 
     public void setSortDirection(SortDirectionType direction) {
@@ -152,6 +155,14 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         if (!obj.isNull(Members.SORT_DIRECTION.name())) {
             m_sortDirection = SortDirectionType.get(obj.getString( Members.SORT_DIRECTION.name()));
         }
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_tableData, aeClass));
+        return collected;
     }
 
 }

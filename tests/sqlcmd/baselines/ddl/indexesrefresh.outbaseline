@@ -1,0 +1,48 @@
+
+drop table t if exists;
+Command succeeded.
+
+create table t (
+ stable integer,
+ constraint pk primary key (stable),
+ altkey integer,
+ constraint altuniq unique (altkey),
+);
+Command succeeded.
+
+insert into t values (1, 1);
+(Returned 1 rows in #.##s)
+
+FILE scripts/ddl/indexesrefresh.sqlfile
+
+drop table t if exists;
+Command succeeded.
+
+create table t (
+ stable integer,
+ constraint pk primary key (stable),
+ altkey integer,
+ constraint altuniq unique (altkey),
+);
+Command succeeded.
+
+alter table t drop constraint altuniq;
+Command succeeded.
+
+alter table t drop primary key;
+Command succeeded.
+
+alter table t add primary key ( altkey );
+Command succeeded.
+
+alter table t add unique ( stable );
+Command succeeded.
+
+select * from t;
+STABLE  ALTKEY 
+------- -------
+
+(Returned 0 rows in #.##s)
+
+drop table t;
+Command succeeded.

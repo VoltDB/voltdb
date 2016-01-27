@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -287,6 +287,10 @@ public class SocketJoiner {
             throw new IOException(
                     "Length prefix on wire for expected JSON string is greater than 16K max.");
         }
+        if (length < 2) {
+            throw new IOException(
+                    "Length prefix on wire for expected JSON string is less than minimum document size of 2.");
+        }
 
         // content
         ByteBuffer messageBytes = ByteBuffer.allocate(length);
@@ -416,7 +420,8 @@ public class SocketJoiner {
             for (ServerSocketChannel ssc : m_listenerSockets) {
                 try {
                     ssc.close();
-                } catch (Exception e) {}
+                } catch (IOException e) {
+                }
             }
             m_listenerSockets.clear();
             try {
@@ -445,16 +450,19 @@ public class SocketJoiner {
 
         if (remoteVersionString.equals(localVersionString)) {
             if (localBuildString.equals(remoteBuildString) == false) {
-                VoltDB.crashLocalVoltDB("For VoltDB version " + localVersionString +
-                        " git tag/hash is not identical across the cluster. Node join failed.\n" +
-                        "  joining build string:  " + localBuildString + "\n" +
-                        "  existing build string: " + remoteBuildString, false, null);
+                // ignore test/eclipse build string so tests still work
+                if (!localBuildString.equals("VoltDB") && !remoteBuildString.equals("VoltDB")) {
+                    VoltDB.crashLocalVoltDB("For VoltDB version " + localVersionString +
+                            " git tag/hash is not identical across the cluster. Node join failed.\n" +
+                            "  joining build string:  " + localBuildString + "\n" +
+                            "  existing build string: " + remoteBuildString, false, null);
+                }
             }
         }
         else if (!remoteAcceptsLocalVersion) {
             if (!VoltDB.instance().isCompatibleVersionString(remoteVersionString)) {
                 VoltDB.crashLocalVoltDB("Cluster contains nodes running VoltDB version " + remoteVersionString +
-                        " which is incompatbile with local version " + localVersionString + ".\n", false, null);
+                        " which is incompatibile with local version " + localVersionString + ".\n", false, null);
             }
         }
         activeVersions.add(remoteVersionString);
@@ -691,20 +699,23 @@ public class SocketJoiner {
         if (m_selector != null) {
             try {
                 m_selector.close();
-            } catch (Exception e) {}
+            } catch (IOException e) {
+            }
         }
         m_es.shutdownNow();
         m_es.awaitTermination(356, TimeUnit.DAYS);
         for (ServerSocketChannel ssc : m_listenerSockets) {
             try {
                 ssc.close();
-            } catch (Exception e) {}
+            } catch (IOException e) {
+            }
         }
         m_listenerSockets.clear();
         if (m_selector != null) {
             try {
                 m_selector.close();
-            } catch (Exception e) {}
+            } catch (IOException e) {
+            }
             m_selector = null;
         }
     }

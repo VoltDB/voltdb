@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -38,10 +37,11 @@ public interface SiteProcedureConnection {
     public long getLatestUndoToken();
 
     /**
-     * Get the HSQL backend, if any.  Returns null if we're not configured
-     * to use it
+     * Get the non-VoltDB backend, if any, such as an HSQL or PostgreSQL
+     * backend used for comparison testing. Returns null if we're not
+     * configured to use it.
      */
-    public HsqlBackend getHsqlBackendIfExists();
+    public NonVoltDBBackend getNonVoltDBBackendIfExists();
 
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
@@ -59,6 +59,11 @@ public interface SiteProcedureConnection {
     public int getCorrespondingHostId();
 
     /**
+     * Get the catalog cluster id for the corresponding SiteProcedureConnection
+     */
+    public int getCorrespondingClusterId();
+
+    /**
      * Log settings changed. Signal EE to update log level.
      */
     public void updateBackendLogLevels();
@@ -68,11 +73,14 @@ public interface SiteProcedureConnection {
      */
     public byte[] loadTable(
             long txnId,
+            long spHandle,
+            long uniqueId,
             String clusterName,
             String databaseName,
             String tableName,
             VoltTable data,
             boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo)
     throws VoltAbortException;
 
@@ -81,9 +89,12 @@ public interface SiteProcedureConnection {
      */
     public byte[] loadTable(
             long txnId,
+            long spHandle,
+            long uniqueId,
             int tableId,
             VoltTable data,
             boolean returnUniqueViolations,
+            boolean shouldDRStream,
             boolean undo);
 
     /**
@@ -96,6 +107,8 @@ public interface SiteProcedureConnection {
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            String[] sqlTexts,
+            long txnId,
             long spHandle,
             long uniqueId,
             boolean readOnly) throws EEException;
@@ -112,6 +125,9 @@ public interface SiteProcedureConnection {
      */
     public void setProcedureName(String procedureName);
 
+    public void setBatchTimeout(int batchTimeout);
+    public int getBatchTimeout();
+
     /**
      * Legacy recursable execution interface for MP transaction states.
      */
@@ -124,7 +140,7 @@ public interface SiteProcedureConnection {
     public void setSpHandleForSnapshotDigest(long spHandle);
 
     /**
-     * IV2 commit / rollback interface to the EE
+     * IV2 commit / rollback interface to the EE and java level roll back if needed
      */
     public void truncateUndoLog(boolean rollback, long token, long spHandle, List<UndoAction> undoActions);
 
@@ -154,9 +170,14 @@ public interface SiteProcedureConnection {
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
+
+    public TupleStreamStateInfo getDRTupleStreamStateInfo();
+
+    public void setDRSequenceNumbers(Long partitionSequenceNumber, Long mpSequenceNumber);
 
     public void toggleProfiler(int toggle);
 
@@ -181,4 +202,6 @@ public interface SiteProcedureConnection {
     public void updateHashinator(TheHashinator hashinator);
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
+    public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
+    public void setDRProtocolVersion(int drVersion);
 }

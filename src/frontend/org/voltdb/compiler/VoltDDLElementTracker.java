@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,13 @@ import static org.voltdb.compiler.ProcedureCompiler.deriveShortProcedureName;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -40,9 +44,12 @@ public class VoltDDLElementTracker {
     final Map<String, String> m_partitionMap = new HashMap<String, String>();
     final Map<String, ProcedureDescriptor> m_procedureMap =
             new HashMap<String, ProcedureDescriptor>();
-    final Set<String> m_exports = new HashSet<String>();
+    // map from export group name to a sorted set of table names in that group
+    final NavigableMap<String, NavigableSet<String>> m_exportsByTargetName = new TreeMap<>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
+    final Map<String, String> m_drTables = new LinkedHashMap<String, String>();
+    final Set<String> m_importLines = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -58,21 +65,21 @@ public class VoltDDLElementTracker {
      *
      * @param tableName table name
      * @param colName column name
-     * @throws VoltCompilerException
      */
-    void put(String tableName, String colName) throws VoltCompilerException
+    void addPartition(String tableName, String colName)
     {
-        // where is table and column validity checked?
-        if (tableName.length() == 0) {
-            throw m_compiler.new VoltCompilerException("PARTITION or REPLICATE has no TABLE specified");
-        }
-
         if (m_partitionMap.containsKey(tableName.toLowerCase())) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Partitioning already specified for table \"%s\"", tableName));
+            m_compiler.addInfo(String.format("Replacing partition column %s on table %s with column %s\n",
+                        m_partitionMap.get(tableName.toLowerCase()), tableName,
+                        colName));
         }
 
-        m_partitionMap.put(tableName.toLowerCase(), colName);
+        m_partitionMap.put(tableName.toLowerCase(), colName.toLowerCase());
+    }
+
+    void removePartition(String tableName)
+    {
+        m_partitionMap.remove(tableName);
     }
 
     /**
@@ -82,12 +89,17 @@ public class VoltDDLElementTracker {
         m_extraClassses.addAll(classNames);
     }
 
+    void addImportLine(String importLine) {
+        m_importLines.add(importLine);
+    }
+
     /**
      * Tracks the given procedure descriptor if it is not already tracked
      * @param descriptor a {@link VoltCompiler.ProcedureDescriptor}
+     * @return name added to procedure map
      * @throws VoltCompilerException if it is already tracked
      */
-    void add(ProcedureDescriptor descriptor) throws VoltCompilerException
+    String add(ProcedureDescriptor descriptor) throws VoltCompilerException
     {
         assert descriptor != null;
 
@@ -102,6 +114,28 @@ public class VoltDDLElementTracker {
         }
 
         m_procedureMap.put(shortName, descriptor);
+
+        return shortName;
+    }
+
+    /**
+     * Searches for and removes the Procedure provided in prior DDL statements
+     * @param Name of procedure being removed
+     * @throws VoltCompilerException if the procedure does not exist
+     */
+    void removeProcedure(String procName, boolean ifExists) throws VoltCompilerException
+    {
+        assert procName != null && ! procName.trim().isEmpty();
+
+        String shortName = deriveShortProcedureName(procName);
+
+        if( m_procedureMap.containsKey(shortName)) {
+            m_procedureMap.remove(shortName);
+        }
+        else if (!ifExists) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Dropped Procedure \"%s\" is not defined", procName));
+        }
     }
 
     /**
@@ -120,7 +154,7 @@ public class VoltDDLElementTracker {
         ProcedureDescriptor descriptor = m_procedureMap.get(procedureName);
         if( descriptor == null) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Partition in referencing an undefined procedure \"%s\"",
+                    "Partition references an undefined procedure \"%s\"",
                     procedureName));
         }
 
@@ -160,28 +194,52 @@ public class VoltDDLElementTracker {
     /**
      * Track an exported table
      * @param tableName a table name
+     * @param targetName
      * @throws VoltCompilerException when the given table is already exported
      */
-    void addExportedTable( String tableName)
-        throws VoltCompilerException
+    void addExportedTable(String tableName, String targetName)
     {
         assert tableName != null && ! tableName.trim().isEmpty();
+        assert targetName != null && ! targetName.trim().isEmpty();
 
-        if( m_exports.contains(tableName)) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Table \"%s\" is already exported", tableName
-                    ));
+        // store uppercase in the catalog as typename
+        targetName = targetName.toUpperCase();
+
+        // insert the table's name into the export group
+        NavigableSet<String> tableGroup = m_exportsByTargetName.get(targetName);
+        if (tableGroup == null) {
+            tableGroup = new TreeSet<String>();
+            m_exportsByTargetName.put(targetName, tableGroup);
         }
+        tableGroup.add(tableName);
+    }
 
-        m_exports.add(tableName);
+    void removeExportedTable(String tableName)
+    {
+        for (Entry<String, NavigableSet<String>> groupTables : m_exportsByTargetName.entrySet()) {
+            if(groupTables.getValue().remove(tableName)) {
+                break;
+            }
+        }
     }
 
     /**
      * Get a collection with tracked table exports
      * @return a collection with tracked table exports
      */
-    Collection<String> getExportedTables() {
-        return m_exports;
+    NavigableMap<String, NavigableSet<String>> getExportedTables() {
+        return m_exportsByTargetName;
+    }
+
+    void addDRedTable(String tableName, String action)
+    {
+        assert tableName != null && ! tableName.trim().isEmpty();
+
+        m_drTables.put(tableName, action);
+    }
+
+    Map<String, String> getDRedTables() {
+        return m_drTables;
     }
 
 }

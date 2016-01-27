@@ -18,8 +18,8 @@ package com.google_voltpatches.common.cache;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Objects;
 
 import java.util.concurrent.Callable;
@@ -46,7 +46,6 @@ import javax.annotation_voltpatches.Nullable;
  * </ul>
  * <li>When an entry is evicted from the cache, {@code evictionCount} is incremented.
  * <li>No stats are modified when a cache entry is invalidated or manually removed.
- * <li>No stats are modified on a query to {@link Cache#getIfPresent}.
  * <li>No stats are modified by operations invoked on the {@linkplain Cache#asMap asMap} view of
  *     the cache.
  * </ul>
@@ -58,7 +57,6 @@ import javax.annotation_voltpatches.Nullable;
  * @author Charles Fry
  * @since 10.0
  */
-@Beta
 @GwtCompatible
 public final class CacheStats {
   private final long hitCount;
@@ -264,7 +262,7 @@ public final class CacheStats {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("hitCount", hitCount)
         .add("missCount", missCount)
         .add("loadSuccessCount", loadSuccessCount)

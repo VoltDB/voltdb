@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,6 +54,7 @@
 #include <list>
 #include <cassert>
 
+#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -61,29 +62,10 @@
 #include "common/tabletuple.h"
 #include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
-#include "stx/btree_set.h"
+#include "storage/ExportTupleStream.h"
 #include "common/ThreadLocalPool.h"
 
 namespace voltdb {
-
-class TableIndex;
-class TableColumn;
-class TableTuple;
-class TableFactory;
-class TableIterator;
-class CopyOnWriteIterator;
-class CopyOnWriteContext;
-class UndoLog;
-class ReadWriteSet;
-class SerializeInput;
-class SerializeOutput;
-class TableStats;
-class StatsSource;
-class StreamBlock;
-class Topend;
-class TupleBlock;
-class PersistentTableUndoDeleteAction;
-class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -263,7 +245,10 @@ class Table {
     // SERIALIZATION
     // ------------------------------------------------------------------
     int getApproximateSizeToSerialize() const;
+    size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
+    size_t getAccurateSizeToSerialize(bool includeTotalSize);
     bool serializeTo(SerializeOutput &serialize_out);
+    bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
     bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
 
     /*
@@ -275,17 +260,19 @@ class Table {
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInput &serialize_in,
+    void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
                                 Pool *stringPool = NULL,
-                                ReferenceSerializeOutput *uniqueViolationOutput = NULL);
+                                ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                                bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInput &serialize_in,
+    void loadTuplesFrom(SerializeInputBE &serialize_in,
                         Pool *stringPool = NULL,
-                        ReferenceSerializeOutput *uniqueViolationOutput = NULL);
+                        ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                        bool shouldDRStreamRows = false);
 
 
     // ------------------------------------------------------------------
@@ -369,7 +356,8 @@ protected:
     virtual void processLoadedTuple(TableTuple &tuple,
                                     ReferenceSerializeOutput *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition) {
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRow) {
     };
 
     virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
@@ -402,7 +390,7 @@ protected:
         return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // per table-type initialization
     virtual void onSetColumns() {

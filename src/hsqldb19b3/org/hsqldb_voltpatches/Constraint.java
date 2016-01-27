@@ -116,7 +116,9 @@ public final class Constraint implements SchemaObject {
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
                             TEMP           = 5,
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
                             LIMIT          = 6;
+    // End of VoltDB extension
     ConstraintCore          core;
     private HsqlName        name;
     int                     constType;
@@ -175,6 +177,16 @@ public final class Constraint implements SchemaObject {
         copy.notNullColumnIndex = notNullColumnIndex;
         copy.rangeVariable      = rangeVariable;
         copy.schemaObjectNames  = schemaObjectNames;
+        // A VoltDB extension to support the assume unique attribute
+        copy.assumeUnique       = assumeUnique;
+        // End of VoltDB extension
+        // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+        copy.rowsLimit          = rowsLimit;
+        copy.rowsLimitDeleteStmt = rowsLimitDeleteStmt;
+        // End of VoltDB extension
+        // A VoltDB extension to support indexed expressions
+        copy.indexExprs         = indexExprs;
+        // End of VoltDB extension
 
         return copy;
     }
@@ -589,7 +601,10 @@ public final class Constraint implements SchemaObject {
             case FOREIGN_KEY :
                 return core.refCols.length == 1 && core.refCols[0] == colIndex
                        && core.mainTable == core.refTable;
-
+            // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+            case LIMIT :
+                return false; // LIMIT PARTITION ROWS depends on no columns
+            // End of VoltDB extension
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
         }
@@ -618,6 +633,11 @@ public final class Constraint implements SchemaObject {
                        && (core.mainCols.length != 1
                            || core.mainTable == core.refTable);
 
+            // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+            case LIMIT :
+                return false; // LIMIT PARTITION ROWS depends on no columns
+            // End of VoltDB extension
+
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
         }
@@ -637,6 +657,11 @@ public final class Constraint implements SchemaObject {
 
             case FOREIGN_KEY :
                 return ArrayUtil.find(core.refCols, colIndex) != -1;
+
+            // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+            case LIMIT :
+                return false; // LIMIT PARTITION ROWS depends on no columns
+            // End of VoltDB extension
 
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Constraint");
@@ -1018,15 +1043,29 @@ public final class Constraint implements SchemaObject {
 
     /************************* Volt DB Extensions *************************/
 
-    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
-    boolean assumeUnique = false; // For VoltDB
-    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+    // !!!!!!!!
+    // NOTE!  IF YOU ARE GOING TO ADD NEW MEMBER FIELDS HERE YOU
+    // NEED TO MAKE SURE THEY GET ADDED TO Constraint.duplicate()
+    // AT THE TOP OF THE FILE OR ALTER WILL HATE YOU --izzy
 
     // A VoltDB extension to support indexed expressions
+    Expression[] indexExprs;
+    // End of VoltDB extension
+    // A VoltDB extension to support the assume unique attribute
+    boolean assumeUnique = false;
+    // End of VoltDB extension
+    // A VoltDB extension to support LIMIT PARTITION ROWS syntax
+    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+    String rowsLimitDeleteStmt;
+    // End of VoltDB extension
+
+    // A VoltDB extension to support indexed expressions
+    // and new kinds of constraints
     public Constraint withExpressions(Expression[] exprs) {
         indexExprs = exprs;
         return this;
     }
+    // End of VoltDB extension
 
     /**
      * @return The name of this constraint instance's type.
@@ -1064,6 +1103,9 @@ public final class Constraint implements SchemaObject {
         constraint.attributes.put("constrainttype", getTypeName());
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
         constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
+        if (rowsLimitDeleteStmt != null) {
+            constraint.attributes.put("rowslimitdeletestmt", rowsLimitDeleteStmt);
+        }
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
         // or by issuing a "not supported" warning (such as for foreign keys).
@@ -1104,6 +1146,19 @@ public final class Constraint implements SchemaObject {
     public Constraint setAssumeUnique(boolean assumeUnique) {
         this.assumeUnique = assumeUnique;
         return this;
+    }
+
+    @Override
+    public String toString() {
+        String str = "CONSTRAINT " + getName().name + " " + getTypeName();
+        if (constType == LIMIT) {
+            str += " " + rowsLimit;
+            if (rowsLimitDeleteStmt != null) {
+                str += " EXECUTE (" + rowsLimitDeleteStmt + ")";
+            }
+        }
+
+        return str;
     }
     /**********************************************************************/
 }

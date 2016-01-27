@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,14 +31,16 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_SMALLINT):
       case (VALUE_TYPE_INTEGER):
       case (VALUE_TYPE_BIGINT):
+      case (VALUE_TYPE_DECIMAL):
       case (VALUE_TYPE_DOUBLE):
         return true;
       break;
       case (VALUE_TYPE_VARCHAR):
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
+      case (VALUE_TYPE_POINT):
+      case (VALUE_TYPE_GEOGRAPHY):
       case (VALUE_TYPE_NULL):
-      case (VALUE_TYPE_DECIMAL):   // test assumes castAsBigInt() makes sense if isNumeric()
       case (VALUE_TYPE_INVALID):
       case (VALUE_TYPE_ARRAY):
         return false;
@@ -61,6 +63,8 @@ bool isIntegralType(ValueType type) {
       case (VALUE_TYPE_VARCHAR):
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
+      case (VALUE_TYPE_POINT):
+      case (VALUE_TYPE_GEOGRAPHY):
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_DECIMAL):
       case (VALUE_TYPE_ARRAY):
@@ -71,7 +75,19 @@ bool isIntegralType(ValueType type) {
     throw exception();
 }
 
-NValue getRandomValue(ValueType type) {
+bool isVariableLengthType(ValueType type) {
+    switch (type) {
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
+        return true;
+    default:
+        return false;
+    }
+}
+
+
+NValue getRandomValue(ValueType type, uint32_t maxLength) {
     switch (type) {
         case VALUE_TYPE_TIMESTAMP:
             return ValueFactory::getTimestampValue(static_cast<int64_t>(time(NULL)));
@@ -83,11 +99,24 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getIntegerValue(rand() % (1 << 31));
         case VALUE_TYPE_BIGINT:
             return ValueFactory::getBigIntValue(rand());
+        case VALUE_TYPE_DECIMAL: {
+            char characters[29];
+            int i;
+            for (i = 0; i < 15; ++i) {
+                characters[i] = (char)(48 + (rand() % 10));
+            }
+            characters[i] = '.';
+            for (i = 16; i < 28; ++i) {
+                characters[i] = (char)(48 + (rand() % 10));
+            }
+            characters[i] = '\0';
+            return ValueFactory::getDecimalValueFromString(string(characters));
+        }
         case VALUE_TYPE_DOUBLE:
             return ValueFactory::getDoubleValue((rand() % 10000) / (double)(rand() % 10000));
         case VALUE_TYPE_VARCHAR: {
-            int length = (rand() % 10);
-            char characters[11];
+            int length = (rand() % maxLength);
+            char characters[maxLength];
             for (int ii = 0; ii < length; ii++) {
                 characters[ii] = (char)(32 + (rand() % 94)); //printable characters
             }
@@ -96,10 +125,10 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getStringValue(string(characters));
         }
         case VALUE_TYPE_VARBINARY: {
-            int length = (rand() % 16);
-            unsigned char bytes[17];
+            int length = (rand() % maxLength);
+            unsigned char bytes[maxLength];
             for (int ii = 0; ii < length; ii++) {
-                bytes[ii] = (unsigned char)rand() % 256; //printable characters
+                bytes[ii] = static_cast<unsigned char> (rand() % 256); //printable characters
             }
             bytes[length] = '\0';
             //printf("Characters are \"%s\"\n", characters);
@@ -146,6 +175,12 @@ string getTypeName(ValueType type) {
             break;
         case (VALUE_TYPE_BOOLEAN):
             ret = "boolean";
+            break;
+        case (VALUE_TYPE_POINT):
+            ret = "point";
+            break;
+        case (VALUE_TYPE_GEOGRAPHY):
+            ret = "geography";
             break;
         case (VALUE_TYPE_ADDRESS):
             ret = "address";
@@ -234,6 +269,12 @@ string valueToString(ValueType type)
       case VALUE_TYPE_DECIMAL: {
           return "DECIMAL";
       }
+      case VALUE_TYPE_POINT: {
+          return "POINT";
+      }
+      case VALUE_TYPE_GEOGRAPHY: {
+          return "GEOGRAPHY";
+      }
       case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
           return "NUMERIC";
       }
@@ -269,6 +310,10 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_TIMESTAMP;
     } else if (str == "DECIMAL") {
         return VALUE_TYPE_DECIMAL;
+    } else if (str == "POINT") {
+        return VALUE_TYPE_POINT;
+    } else if (str == "GEOGRAPHY") {
+        return VALUE_TYPE_GEOGRAPHY;
     } else if (str == "ARRAY") {
         return VALUE_TYPE_ARRAY;
     }
@@ -372,7 +417,7 @@ string planNodeToString(PlanNodeType type)
         return "UPDATE";
     }
     case PLAN_NODE_TYPE_INSERT: {
-        return "DELETE";
+        return "INSERT";
     }
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
@@ -383,17 +428,23 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_RECEIVE: {
         return "RECEIVE";
     }
+    case PLAN_NODE_TYPE_MERGERECEIVE: {
+        return "MERGERECEIVE";
+    }
     case PLAN_NODE_TYPE_AGGREGATE: {
         return "AGGREGATE";
     }
     case PLAN_NODE_TYPE_HASHAGGREGATE: {
         return "HASHAGGREGATE";
     }
+    case PLAN_NODE_TYPE_PARTIALAGGREGATE: {
+        return "PARTIALAGGREGATE";
+    }
     case PLAN_NODE_TYPE_UNION: {
         return "UNION";
     }
     case PLAN_NODE_TYPE_ORDERBY: {
-        return "RECEIVE";
+        return "ORDERBY";
     }
     case PLAN_NODE_TYPE_PROJECTION: {
         return "PROJECTION";
@@ -404,16 +455,13 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_LIMIT: {
         return "LIMIT";
     }
-    case PLAN_NODE_TYPE_DISTINCT: {
-        return "DISTINCT";
-    }
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
-    case PLAN_NODE_TYPE_UPSERT: {
-        return "UPSERT";
+    case PLAN_NODE_TYPE_TUPLESCAN: {
+        return "TUPLESCAN";
     }
-    }
+    } // END OF SWITCH
     return "UNDEFINED";
 }
 
@@ -443,10 +491,14 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_SEND;
     } else if (str == "RECEIVE") {
         return PLAN_NODE_TYPE_RECEIVE;
+    } else if (str == "MERGERECEIVE") {
+        return PLAN_NODE_TYPE_MERGERECEIVE;
     } else if (str == "AGGREGATE") {
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {
         return PLAN_NODE_TYPE_HASHAGGREGATE;
+    } else if (str == "PARTIALAGGREGATE") {
+        return PLAN_NODE_TYPE_PARTIALAGGREGATE;
     } else if (str == "UNION") {
         return PLAN_NODE_TYPE_UNION;
     } else if (str == "ORDERBY") {
@@ -457,12 +509,10 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZE;
     } else if (str == "LIMIT") {
         return PLAN_NODE_TYPE_LIMIT;
-    } else if (str == "DISTINCT") {
-        return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
-    } else if (str == "UPSERT") {
-        return PLAN_NODE_TYPE_UPSERT;
+    } else if (str == "TUPLESCAN") {
+        return PLAN_NODE_TYPE_TUPLESCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -500,6 +550,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
         return "OPERATOR_IS_NULL";
     }
+    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
+        return "OPERATOR_EXISTS";
+    }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
     }
@@ -524,6 +577,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_COMPARE_IN: {
         return "COMPARE_IN";
     }
+    case EXPRESSION_TYPE_COMPARE_NOTDISTINCT: {
+        return "COMPARE_NOTDISTINCT";
+    }
     case EXPRESSION_TYPE_CONJUNCTION_AND: {
         return "CONJUNCTION_AND";
     }
@@ -542,6 +598,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS: {
         return "VALUE_TUPLE_ADDRESS";
     }
+    case EXPRESSION_TYPE_VALUE_SCALAR: {
+        return "VALUE_SCALAR";
+    }
     case EXPRESSION_TYPE_VALUE_NULL: {
         return "VALUE_NULL";
     }
@@ -550,6 +609,15 @@ string expressionToString(ExpressionType type)
     }
     case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR: {
         return "AGGREGATE_COUNT_STAR";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT: {
+        return "AGGREGATE_APPROX_COUNT_DISTINCT";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG: {
+        return "AGGREGATE_VALS_TO_HYPERLOGLOG";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD: {
+        return "AGGREGATE_HYPERLOGLOGS_TO_CARD";
     }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";
@@ -578,6 +646,12 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
         return "OPERATOR_ALTERNATIVE";
     }
+    case EXPRESSION_TYPE_ROW_SUBQUERY: {
+        return "ROW_SUBQUERY";
+    }
+    case EXPRESSION_TYPE_SELECT_SUBQUERY: {
+        return "SELECT_SUBQUERY";
+    }
     }
     return "INVALID";
 }
@@ -604,6 +678,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_NOT;
     } else if (str == "OPERATOR_IS_NULL") {
         return EXPRESSION_TYPE_OPERATOR_IS_NULL;
+    } else if (str == "OPERATOR_EXISTS") {
+        return EXPRESSION_TYPE_OPERATOR_EXISTS;
     } else if (str == "COMPARE_EQUAL") {
         return EXPRESSION_TYPE_COMPARE_EQUAL;
     } else if (str == "COMPARE_NOTEQUAL") {
@@ -620,6 +696,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_COMPARE_LIKE;
     } else if (str == "COMPARE_IN") {
         return EXPRESSION_TYPE_COMPARE_IN;
+    } else if (str == "COMPARE_NOTDISTINCT") {
+        return EXPRESSION_TYPE_COMPARE_NOTDISTINCT;
     } else if (str == "CONJUNCTION_AND") {
         return EXPRESSION_TYPE_CONJUNCTION_AND;
     } else if (str == "CONJUNCTION_OR") {
@@ -632,12 +710,20 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_VALUE_TUPLE;
     } else if (str == "VALUE_TUPLE_ADDRESS") {
         return EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS;
+    } else if (str == "VALUE_SCALAR") {
+        return EXPRESSION_TYPE_VALUE_SCALAR;
     } else if (str == "VALUE_NULL") {
         return EXPRESSION_TYPE_VALUE_NULL;
     } else if (str == "AGGREGATE_COUNT") {
         return EXPRESSION_TYPE_AGGREGATE_COUNT;
     } else if (str == "AGGREGATE_COUNT_STAR") {
         return EXPRESSION_TYPE_AGGREGATE_COUNT_STAR;
+    } else if (str == "AGGREGATE_APPROX_COUNT_DISTINCT") {
+        return EXPRESSION_TYPE_AGGREGATE_APPROX_COUNT_DISTINCT;
+    } else if (str == "AGGREGATE_VALS_TO_HYPERLOGLOG") {
+        return EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG;
+    } else if (str == "AGGREGATE_HYPERLOGLOGS_TO_CARD") {
+        return EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD;
     } else if (str == "AGGREGATE_SUM") {
         return EXPRESSION_TYPE_AGGREGATE_SUM;
     } else if (str == "AGGREGATE_MIN") {
@@ -656,9 +742,40 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
+    } else if (str == "ROW_SUBQUERY") {
+        return EXPRESSION_TYPE_ROW_SUBQUERY;
+    } else if (str == "SELECT_SUBQUERY") {
+        return EXPRESSION_TYPE_SELECT_SUBQUERY;
     }
 
+
     return EXPRESSION_TYPE_INVALID;
+}
+
+string quantifierToString(QuantifierType type)
+{
+    switch (type) {
+    case QUANTIFIER_TYPE_NONE: {
+        return "NONE";
+    }
+    case QUANTIFIER_TYPE_ANY: {
+        return "ANY";
+    }
+    case QUANTIFIER_TYPE_ALL: {
+        return "ALL";
+    }
+    }
+    return "INVALID";
+}
+
+QuantifierType stringToQuantifier(string str )
+{
+    if (str == "ANY") {
+        return QUANTIFIER_TYPE_ANY;
+    } else if (str == "ALL") {
+        return QUANTIFIER_TYPE_ALL;
+    }
+    return QUANTIFIER_TYPE_NONE;
 }
 
 string indexLookupToString(IndexLookupType type)

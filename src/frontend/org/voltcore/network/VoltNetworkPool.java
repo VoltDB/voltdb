@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,7 +42,6 @@ public class VoltNetworkPool {
     }
 
     private static final VoltLogger m_logger = new VoltLogger(VoltNetworkPool.class.getName());
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final VoltNetwork m_networks[];
     private final AtomicLong m_nextNetwork = new AtomicLong();

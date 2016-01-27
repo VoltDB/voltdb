@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -62,11 +62,15 @@
     "basic": {"schema": "schema.py",
               "ddl": "DDL.sql",
               "template": "basic.sql",
-              "normalizer": "normalizer.py"},
+              "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-joins": {"schema": "schema.py",
                     "ddl": "DDL.sql",
                     "template": "basic-joins.sql",
+                    "normalizer": "normalizer.py"},
+    "basic-int-joins": {"schema": "int-schema.py",
+                    "ddl": "int-DDL.sql",
+                    "template": "basic-int-joins.sql",
                     "normalizer": "normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-unions": {"schema": "union-schema.py",
@@ -81,12 +85,12 @@
     "basic-index": {"schema": "schema.py",
                     "ddl": "index-DDL.sql",
                     "template": "basic.sql",
-                    "normalizer": "normalizer.py"},
+                    "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-strings": {"schema": "strings-schema.py",
                       "ddl": "strings-DDL.sql",
                       "template": "basic-strings.sql",
-                      "normalizer": "normalizer.py"},
+                      "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "partial-covering": {"schema": "partial-covering-schema.py",
                          "ddl": "partial-covering-DDL.sql",
@@ -135,21 +139,21 @@
     "advanced": {"schema": "schema.py",
                  "ddl": "DDL.sql",
                  "template": "advanced.sql",
-                 "normalizer": "normalizer.py"},
+                 "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced-index": {"schema": "schema.py",
                        "ddl": "index-DDL.sql",
                        "template": "advanced.sql",
-                       "normalizer": "normalizer.py"},
+                       "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-compoundex": {"schema": "schema.py",
                        "ddl": "compoundex-DDL.sql",
                        "template": "advanced.sql",
-                       "normalizer": "normalizer.py"},
+                       "normalizer": "nulls-lowest-normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced-strings": {"schema": "strings-schema.py",
                          "ddl": "strings-DDL.sql",
                          "template": "advanced-strings.sql",
-                         "normalizer": "normalizer.py"},
+                         "normalizer": "nulls-lowest-normalizer.py"},
     "advanced-ints": {"schema": "int-schema.py",
                       "ddl": "int-DDL.sql",
                       "template": "advanced-ints.sql",
@@ -159,17 +163,34 @@
                                          "ddl": "int-DDL.sql",
                                          "template": "regression-advanced-ints-cntonly.sql",
                                          "normalizer": "not-a-normalizer.py"},
+# To test advanced IN/EXISTS
+    "advanced-inexists": {"schema": "schema.py",
+                          "ddl": "DDL.sql",
+                          "template": "advanced-inexists.sql",
+                          "normalizer": "normalizer.py"},
+
+# To test advanced scalar subqueries
+    "advanced-scalar-subquery": {"schema": "schema.py",
+                                 "ddl": "DDL.sql",
+                                 "template": "advanced-scalar-subquery.sql",
+                                 "normalizer": "normalizer.py"},
+
+# To test advanced scalar subqueries containing set operators
+    "advanced-scalar-set-subquery": {"schema": "schema.py",
+                                     "ddl": "DDL.sql",
+                                     "template": "advanced-scalar-set-subquery.sql",
+                                     "normalizer": "normalizer.py"},
 
 # ADVANCED MATERIALIZED VIEW TESTING, INCLUDING COMPLEX GROUP BY AND AGGREGATIONS.
     "advanced-matview-nonjoin": {"schema": "matview-advanced-nonjoin-schema.py",
                                  "ddl": "matview-DDL.sql",
                                  "template": "advanced-matview-nonjoin.sql",
-                                 "normalizer": "normalizer.py"},
+                                 "normalizer": "nulls-lowest-normalizer.py"},
 
     "advanced-matview-join": {"schema": "matview-advanced-join-schema.py",
                               "ddl": "matview-DDL.sql",
                               "template": "advanced-matview-join.sql",
-                              "normalizer": "normalizer.py"},
+                              "normalizer": "nulls-lowest-normalizer.py"},
 
 # To test index count
     "index-count1": {"schema": "index-count1-schema.py",
@@ -179,9 +200,15 @@
 
 # To test index scan: forward scan, reverse scan
     "index-scan": {"schema": "index-scan-schema.py",
-        "ddl": "index-DDL.sql",
-        "template": "index-scan.sql",
-        "normalizer": "normalizer.py"},
+                   "ddl": "index-DDL.sql",
+                   "template": "index-scan.sql",
+                   "normalizer": "nulls-lowest-normalizer.py"},
+
+# To test index with varbinary
+    "index-varbinary": {"schema": "index-varbinary-schema.py",
+                        "ddl": "index-DDL.sql",
+                        "template": "index-varbinary.sql",
+                        "normalizer": "normalizer.py"},
 
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.

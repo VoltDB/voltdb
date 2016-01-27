@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -110,6 +110,21 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
     public void testMax0003() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C1 = ?");
         checkIndexLimit(pn, false, null);
+    }
+
+    public void testMax0004() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C1=1 and C2 < ?");
+        checkIndexLimit(pn, true, new String[]{"R_IDX2_TREE"});
+    }
+
+    public void testMax0005() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C2 <= ? and C1 = 1");
+        checkIndexLimit(pn, true, new String[]{"R_IDX2_TREE"});
+    }
+
+    public void testMax0006() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C2 = ? and C1 = 1");
+        checkIndexLimit(pn, true, new String[]{"R_IDX2_TREE"});
     }
 
     // combination of [min(), max(), sum()] tests: should not replace

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -187,6 +187,18 @@ public class TestSqlUpdateSuite extends RegressionSuite {
                                           table, table, table, table);
             executeAndTestUpdate(table, update, 2);
         }
+    }
+
+    // This is a regression test for ENG-6799
+    public void testUpdateFromInlineVarchar() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("STRINGPART.insert",
+                "aa", 1, 1, 0, "a potentially (but not really) very long string)");
+
+        // NAME is inlined varchar, DESC is not.
+        String update = "update STRINGPART set desc = name, num = -1 where val1 = 1";
+        executeAndTestUpdate("STRINGPART", update, 1);
     }
 
     //

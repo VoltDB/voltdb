@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -169,5 +169,20 @@ public void testAllZeros() throws Exception {
         StatsProcOutputTable dut = new StatsProcOutputTable();
         loadEmUpNoDeDup(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
+    }
+
+    @Test
+    public void testRounding() throws Exception {
+        ProcOutputRow data[] = {     //proc/part/time/invok/min/max/avg
+            new ProcOutputRow("A", 0L, 12345L, 10000000*mB, 3L, 5L, 4L),
+            new ProcOutputRow("B", 0L, 12345L, 1*mB, 1L, 4L, 2L)
+        };
+        ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
+            new ResultRow(12345L, "A", 100L, 10000000*mB, 3L, 5L, 4L, 40000000L),
+            new ResultRow(12345L, "B", 0L, 1*mB, 1L, 4L, 2L, 2L)
+        };
+        StatsProcOutputTable dut = new StatsProcOutputTable();
+        loadEmUp(dut, data);
+        validateEmGood("testRounding", dut, result);
     }
 }

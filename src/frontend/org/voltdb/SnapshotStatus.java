@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -29,6 +30,31 @@ import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
 import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
+
+    enum SNAPSHOT_TYPE {
+        AUTO,
+        MANUAL,
+        COMMANDLOG
+    };
+
+    private File m_truncationSnapshotPath = null;
+    private File m_autoSnapshotPath = null;
+
+    public void setSnapshotPath(String truncationSnapshotPathStr, String autoSnapshotPathStr) {
+        m_truncationSnapshotPath = new File(truncationSnapshotPathStr);
+        m_autoSnapshotPath = new File(autoSnapshotPathStr);
+    }
+
+    private String getSnapshotType(String path) {
+        File thisSnapshotPath = new File(path);
+        if (m_truncationSnapshotPath.equals(thisSnapshotPath)) {
+            return SNAPSHOT_TYPE.COMMANDLOG.name();
+        }
+        else if (m_autoSnapshotPath.equals(thisSnapshotPath)) {
+            return SNAPSHOT_TYPE.AUTO.name();
+        }
+        return SNAPSHOT_TYPE.MANUAL.name();
+    }
 
     /**
      * Since there are multiple tables inside a Snapshot object, and we cannot
@@ -89,6 +115,7 @@ public class SnapshotStatus extends StatsSource {
         columns.add(new ColumnInfo("DURATION", VoltType.BIGINT));
         columns.add(new ColumnInfo("THROUGHPUT", VoltType.FLOAT));
         columns.add(new ColumnInfo("RESULT", VoltType.STRING));
+        columns.add(new ColumnInfo("TYPE", VoltType.STRING));
     }
 
     @SuppressWarnings("unchecked")
@@ -117,6 +144,7 @@ public class SnapshotStatus extends StatsSource {
         rowValues[columnNameToIndex.get("DURATION")] = duration;
         rowValues[columnNameToIndex.get("THROUGHPUT")] = throughput;
         rowValues[columnNameToIndex.get("RESULT")] = t.error == null ? "SUCCESS" : "FAILURE";
+        rowValues[columnNameToIndex.get("TYPE")] = getSnapshotType(s.path);
         super.updateStatsRow(rowKey, rowValues);
     }
 

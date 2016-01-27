@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,18 +35,19 @@ public interface CommandLogReinitiator {
 
     public void setCallback(Callback callback);
 
-    public void setCatalogContext(CatalogContext context);
-
     public void setInitiator(TransactionCreator initiator);
 
     public void initPartitionTracking();
 
     /**
      * Generate the local replay plan. Call this before starting replay.
+     * @param snapshotTimeStamp
+     * @param snapshotTxnId
      * @param newPartitionCount
      * @param true if this node contains the MPI
      */
-    public void generateReplayPlan(int newPartitionCount, boolean isMPINode);
+    public void generateReplayPlan(long snapshotTimeStamp, long snapshotTxnId,
+            int newPartitionCount, boolean isMPINode);
 
     /**
      * Start replaying the log. Two threads will be started, one for reading the

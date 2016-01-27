@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,8 +16,6 @@
  */
 
 package org.voltdb.compiler;
-
-import groovy.lang.Closure;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -61,31 +59,43 @@ import org.voltdb.utils.InMemoryJarfile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
+import groovy.lang.Closure;
+
 /**
  * Compiles stored procedures into a given catalog,
  * invoking the StatementCompiler as needed.
  */
 public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
-    static void compile(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor,
-            InMemoryJarfile jarOutput)
-    throws VoltCompiler.VoltCompilerException {
+    static void compile(VoltCompiler compiler,
+                        HSQLInterface hsql,
+                        DatabaseEstimates estimates,
+                        Catalog catalog,
+                        Database db,
+                        ProcedureDescriptor procedureDescriptor,
+                        InMemoryJarfile jarOutput)
+                                throws VoltCompiler.VoltCompilerException
+    {
 
         assert(compiler != null);
         assert(hsql != null);
         assert(estimates != null);
 
-        if (procedureDescriptor.m_singleStmt == null)
+        if (procedureDescriptor.m_singleStmt == null) {
             compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, jarOutput);
-        else
+        }
+        else {
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
+        }
     }
 
-    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler, String procName, Class<?> procClass, Object procInstance, boolean withPrivate)
-            throws VoltCompilerException {
-
+    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler,
+                                                        String procName,
+                                                        Class<?> procClass,
+                                                        Object procInstance,
+                                                        boolean withPrivate)
+                                                                throws VoltCompilerException
+    {
         Map<String, SQLStmt> retval = new HashMap<String, SQLStmt>();
 
         Field[] fields = procClass.getDeclaredFields();
@@ -265,11 +275,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
     }
 
 
-    static void compileJavaProcedure(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor,
-            InMemoryJarfile jarOutput)
-    throws VoltCompiler.VoltCompilerException {
+    static void compileJavaProcedure(VoltCompiler compiler,
+                                     HSQLInterface hsql,
+                                     DatabaseEstimates estimates,
+                                     Catalog catalog,
+                                     Database db,
+                                     ProcedureDescriptor procedureDescriptor,
+                                     InMemoryJarfile jarOutput)
+                                             throws VoltCompiler.VoltCompilerException
+    {
 
         final String className = procedureDescriptor.m_className;
         final Language lang = procedureDescriptor.m_language;
@@ -285,7 +299,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
             }
             final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
             groupRef.setGroup(group);
@@ -396,11 +410,12 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            StatementCompiler.compile(compiler, hsql, catalog, db,
+            boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
-            if (partitioning.wasSpecifiedAsSingle()) {
+            // if this was a cache hit or specified single, don't worry about figuring out more partitioning
+            if (partitioning.wasSpecifiedAsSingle() || cacheHit) {
                 procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
                 // The planner does not currently attempt to second-guess a plan declared as single-partition, maybe some day.
                 // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
@@ -413,7 +428,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 // Only consider statements that are capable of running SP with a partitioning parameter that does not seem to
                 // conflict with the partitioning of prior statements.
                 if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                    AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
+                    AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
                     if (statementPartitionExpression != null) {
                         if (commonPartitionExpression == null) {
                             commonPartitionExpression = statementPartitionExpression;
@@ -474,7 +489,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 String valueDescription = null;
                 if (exampleSPvalue == null) {
                     // Statements partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                    valueDescription = "of " + commonPartitionExpression.toString();
+                    valueDescription = "of " + commonPartitionExpression.explain("");
                 } else {
                     valueDescription = exampleSPvalue.toString(); // A simple constant value COULD have been a parameter.
                 }
@@ -489,31 +504,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
         procedure.setHasseqscans(procHasSeqScans);
 
-        for (Statement catalogStmt : procedure.getStatements()) {
-            if (catalogStmt.getIscontentdeterministic() == false) {
-                String potentialErrMsg =
-                    "Procedure " + shortName + " has a statement with a non-deterministic result - statement: \"" +
-                    catalogStmt.getSqltext() + "\" , reason: " + catalogStmt.getNondeterminismdetail();
-                // throw compiler.new VoltCompilerException(potentialErrMsg);
-                compiler.addWarn(potentialErrMsg);
-            }
-            else if (catalogStmt.getIsorderdeterministic() == false) {
-                String warnMsg;
-                if (procHasWriteStmts) {
-                    String rwPotentialErrMsg = "Procedure " + shortName +
-                            " is RW and has a statement whose result has a non-deterministic ordering - statement: \"" +
-                            catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
-                    // throw compiler.new VoltCompilerException(rwPotentialErrMsg);
-                    warnMsg = rwPotentialErrMsg;
-                }
-                else {
-                    warnMsg = "Procedure " + shortName +
-                        " has a statement with a non-deterministic result - statement: \"" +
-                        catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
-                }
-                compiler.addWarn(warnMsg);
-            }
-        }
+        checkForDeterminismWarnings(compiler, shortName, procedure, procHasWriteStmts);
 
         // set procedure parameter types
         CatalogMap<ProcParameter> params = procedure.getParameters();
@@ -611,14 +602,52 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
 
         // put the compiled code for this procedure into the jarfile
-        compiler.addClassToJar(jarOutput, procClass);
+        // need to find the outermost ancestor class for the procedure in the event
+        // that it's actually an inner (or inner inner...) class.
+        // addClassToJar recursively adds all the children, which should include this
+        // class
+        Class<?> ancestor = procClass;
+        while (ancestor.getEnclosingClass() != null) {
+            ancestor = ancestor.getEnclosingClass();
+        }
+        compiler.addClassToJar(jarOutput, ancestor);
     }
 
-    static void compileSingleStmtProcedure(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor)
-    throws VoltCompiler.VoltCompilerException {
+    private static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
+                                         boolean procHasWriteStmts) {
+        for (Statement catalogStmt : procedure.getStatements()) {
+            if (catalogStmt.getIscontentdeterministic() == false) {
+                String potentialErrMsg =
+                    "Procedure " + shortName + " has a statement with a non-deterministic result - statement: \"" +
+                    catalogStmt.getSqltext() + "\" , reason: " + catalogStmt.getNondeterminismdetail();
+                compiler.addWarn(potentialErrMsg);
+            }
+            else if (catalogStmt.getIsorderdeterministic() == false) {
+                String warnMsg;
+                if (procHasWriteStmts) {
+                    String rwPotentialErrMsg = "Procedure " + shortName +
+                            " is RW and has a statement whose result has a non-deterministic ordering - statement: \"" +
+                            catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                    warnMsg = rwPotentialErrMsg;
+                }
+                else {
+                    warnMsg = "Procedure " + shortName +
+                        " has a statement with a non-deterministic result - statement: \"" +
+                        catalogStmt.getSqltext() + "\", reason: " + catalogStmt.getNondeterminismdetail();
+                }
+                compiler.addWarn(warnMsg);
+            }
+        }
+    }
 
+    static void compileSingleStmtProcedure(VoltCompiler compiler,
+                                           HSQLInterface hsql,
+                                           DatabaseEstimates estimates,
+                                           Catalog catalog,
+                                           Database db,
+                                           ProcedureDescriptor procedureDescriptor)
+                                                   throws VoltCompiler.VoltCompilerException
+    {
         final String className = procedureDescriptor.m_className;
         if (className.indexOf('@') != -1) {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
@@ -637,7 +666,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
             }
             final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
             groupRef.setGroup(group);
@@ -672,7 +701,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             info.singlePartition ? StatementPartitioning.forceSP() :
                                    StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compile(compiler, hsql, catalog, db,
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
@@ -715,26 +744,35 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             // message that the passed parameter is assumed to be equal to that constant (expression).
         } else {
             if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
+                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
                 if (statementPartitionExpression != null) {
                     // The planner has uncovered an overlooked opportunity to run the statement SP.
-                    String msg = null;
+                    String msg = "This procedure " + shortName + " would benefit from being partitioned, by ";
+                    String tableName = "tableName", partitionColumnName = "partitionColumnName";
+                    try {
+                        assert(partitioning.getFullColumnName() != null);
+                        String array[] = partitioning.getFullColumnName().split("\\.");
+                        tableName = array[0];
+                        partitionColumnName = array[1];
+                    } catch(Exception ex) {
+                    }
+
                     if (statementPartitionExpression instanceof ParameterValueExpression) {
-                        msg = "This procedure would benefit from setting the attribute 'partitioninfo=" + partitioning.getFullColumnName() +
-                                ":" + ((ParameterValueExpression) statementPartitionExpression).getParameterIndex() + "'";
+                        paramCount = ((ParameterValueExpression) statementPartitionExpression).getParameterIndex();
                     } else {
                         String valueDescription = null;
                         Object partitionValue = partitioning.getInferredPartitioningValue();
                         if (partitionValue == null) {
                             // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                            valueDescription = "of " + statementPartitionExpression.toString();
+                            valueDescription = "of " + statementPartitionExpression.explain("");
                         } else {
                             valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
                         }
-                        msg = "This procedure would benefit from adding a parameter to be passed the value " + valueDescription +
-                                " and setting the attribute 'partitioninfo=" + partitioning.getFullColumnName() +
-                                ":" + paramCount  + "'";
+                        msg += "adding a parameter to be passed the value " + valueDescription + " and ";
                     }
+                    msg += "adding a 'PARTITION ON TABLE " + tableName + " COLUMN ON " +
+                            partitionColumnName + " PARAMETER " + paramCount + "' clause to the " +
+                            "CREATE PROCEDURE statement. or using a separate PARTITION PROCEDURE statement";
                     compiler.addWarn(msg);
                 }
             }

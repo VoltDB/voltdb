@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,7 @@
 
 #include "streamedtable.h"
 #include "StreamedTableUndoAction.hpp"
-#include "TupleStreamWrapper.h"
+#include "ExportTupleStream.h"
 #include "common/executorcontext.hpp"
 #include "tableiterator.h"
 
@@ -29,8 +29,17 @@ StreamedTable::StreamedTable(bool exportEnabled)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
-        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+        enableStream();
+    }
+}
+
+StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
+    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(wrapper),
+    m_sequenceNo(0)
+{
+    // In StreamedTable, a non-null m_wrapper implies export enabled.
+    if (exportEnabled) {
+        enableStream();
     }
 }
 
@@ -41,6 +50,15 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     return st;
 }
 
+//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
+bool StreamedTable::enableStream() {
+    if (!m_wrapper) {
+        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
+                                           m_executorContext->m_siteId);
+        return true;
+    }
+    return false;
+}
 
 StreamedTable::~StreamedTable()
 {
@@ -85,7 +103,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
-                                      TupleStreamWrapper::INSERT);
+                                      ExportTupleStream::INSERT);
         m_tupleCount++;
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
@@ -113,7 +131,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       tuple,
-                                      TupleStreamWrapper::DELETE);
+                                      ExportTupleStream::DELETE);
         m_tupleCount++;
         // Infallible delete (schema change with tuple migration & views) is not supported for export tables
         assert(fallible);
@@ -127,7 +145,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInput&, Pool*)
+void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");
@@ -137,8 +155,7 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedSpHandle,
-                                 m_executorContext->currentSpHandle());
+                                 m_executorContext->m_lastCommittedSpHandle);
     }
 }
 
@@ -154,7 +171,7 @@ void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t gen
 void StreamedTable::undo(size_t mark)
 {
     if (m_wrapper) {
-        m_wrapper->rollbackTo(mark);
+        m_wrapper->rollbackTo(mark, SIZE_MAX);
         //Decrementing the sequence number should make the stream of tuples
         //contiguous outside of actual system failures. Should be more useful
         //then having gaps.

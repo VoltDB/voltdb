@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -103,7 +103,7 @@ public class TestClientFeatures extends TestCase {
     public void testPerCallTimeout() throws Exception {
         CSL csl = new CSL();
 
-        ClientConfig config = new ClientConfig(null, null, csl);
+        ClientConfig config = new ClientConfig(null, null, csl, ClientAuthScheme.HASH_SHA1);
         config.setProcedureCallTimeout(500);
         Client client = ClientFactory.createClient(config);
         client.createConnection("localhost");
@@ -138,22 +138,25 @@ public class TestClientFeatures extends TestCase {
             // (shouldn't have to do this, but for now, the table loader requires
             //  a VoltTable, and can't read schema. Could fix by using this VoltTable
             //  to generate schema or by teaching to loader how to discover tables)
+            TableHelper.Configuration helperConfig = new TableHelper.Configuration();
+            helperConfig.rand = new Random();
+            TableHelper helper = new TableHelper(helperConfig);
             VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
-                                                          "c01:varchar63, " +
-                                                          "c02:varchar63, " +
-                                                          "c03:varchar63, " +
-                                                          "c04:varchar63, " +
-                                                          "c05:varchar63, " +
-                                                          "c06:varchar63, " +
-                                                          "c07:varchar63, " +
-                                                          "c08:varchar63, " +
-                                                          "c09:varchar63, " +
-                                                          "c10:varchar63) " +
-                                                          "PKEY(pkey)");
+                                                 "c01:varchar63, " +
+                                                 "c02:varchar63, " +
+                                                 "c03:varchar63, " +
+                                                 "c04:varchar63, " +
+                                                 "c05:varchar63, " +
+                                                 "c06:varchar63, " +
+                                                 "c07:varchar63, " +
+                                                 "c08:varchar63, " +
+                                                 "c09:varchar63, " +
+                                                 "c10:varchar63) " +
+                                                 "PKEY(pkey)");
             // get a client with a normal timout
             Client client2 = ClientFactory.createClient();
             client2.createConnection("localhost");
-            TableHelper.fillTableWithBigintPkey(t, 400, 0, client2, new Random(), 0, 1);
+            helper.fillTableWithBigintPkey(t, 400, 0, client2, 0, 1);
 
             long start;
             double duration;
@@ -202,7 +205,8 @@ public class TestClientFeatures extends TestCase {
         boolean exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             assertEquals(ClientResponse.CONNECTION_TIMEOUT, ex.m_response.getStatus());
             exceptionCalled = true;
@@ -213,7 +217,8 @@ public class TestClientFeatures extends TestCase {
         exceptionCalled = false;
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -222,7 +227,8 @@ public class TestClientFeatures extends TestCase {
         //no timeout of 0
         try {
             // Query timeout is in seconds second arg.
-            ((ClientImpl) client).callProcedureWithTimeout("ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
+            ((ClientImpl) client).callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT,
+                    "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 2000);
         } catch (ProcCallException ex) {
             exceptionCalled = true;
         }
@@ -236,11 +242,11 @@ public class TestClientFeatures extends TestCase {
                 System.out.println("Async Query timeout called..");
                 latch.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
         //Async versions
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback(), "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 3, TimeUnit.SECONDS, 6000);
         try {
             latch.await();
         } catch (InterruptedException ex) {
@@ -257,10 +263,10 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
                 latch2.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback2(), "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback2(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 30, TimeUnit.SECONDS, 6000);
         try {
             latch2.await();
         } catch (InterruptedException ex) {
@@ -277,10 +283,10 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.SUCCESS);
                 latch3.countDown();
             }
-
         }
         // Query timeout is in seconds third arg.
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback3(), "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback3(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 0, TimeUnit.SECONDS, 6000);
         try {
             latch3.await();
         } catch (InterruptedException ex) {
@@ -296,13 +302,13 @@ public class TestClientFeatures extends TestCase {
                 assert (clientResponse.getStatus() == ClientResponse.CONNECTION_TIMEOUT);
                 latch4.countDown();
             }
-
         }
 
         /*
          * Check that a super tiny timeout triggers fast
          */
-        ((ClientImpl) client).callProcedureWithTimeout(new MyCallback4(), "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
+        ((ClientImpl) client).callProcedureWithClientTimeout(new MyCallback4(), BatchTimeoutOverrideType.NO_TIMEOUT,
+                "ArbitraryDurationProc", 50, TimeUnit.NANOSECONDS, 6000);
         final long start = System.nanoTime();
         try {
             latch4.await();
@@ -334,6 +340,37 @@ public class TestClientFeatures extends TestCase {
         client.createConnection("localhost");
 
         assertFalse(client.getConnectedHostList().isEmpty());
+    }
+
+    /**
+     * Verify a client can reconnect automatically if reconnect on connection loss feature is turned on
+     */
+    public void testAutoReconnect() throws Exception {
+        ClientConfig config = new ClientConfig();
+        config.setReconnectOnConnectionLoss(true);
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
+
+        tearDown();
+
+        for (int i = 0; (i < 40) && (client.getConnectedHostList().size() > 0); i++) {
+            Thread.sleep(500);
+        }
+        assertTrue(client.getConnectedHostList().isEmpty());
+
+        // sleep before server restart to force some reconnect failures
+        Thread.sleep(2000);
+
+        setUp();
+
+        for (int i = 0; i < 40; i++) {
+            if (client.getConnectedHostList().size() > 0) {
+                return;
+            }
+            Thread.sleep(500);
+        }
+
+        fail("Client should have been reconnected");
     }
 
     public void testGetAddressList() throws UnknownHostException, IOException, InterruptedException {
@@ -381,5 +418,24 @@ public class TestClientFeatures extends TestCase {
         assertFalse(client.backpressureBarrier(System.nanoTime(), TimeUnit.MINUTES.toNanos(1)));
         assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
         assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(20));
+    }
+
+    public void testDefaultConfigValues() {
+        final ClientConfig dut = new ClientConfig();
+        assertEquals(ClientAuthScheme.HASH_SHA256, dut.m_hashScheme);
+        assertTrue(dut.m_username.isEmpty());
+        assertTrue(dut.m_password.isEmpty());
+        assertTrue(dut.m_cleartext);
+        assertFalse(dut.m_heavyweight);
+        assertEquals(3000, dut.m_maxOutstandingTxns);
+        assertEquals(Integer.MAX_VALUE, dut.m_maxTransactionsPerSecond);
+        assertFalse(dut.m_autoTune);
+        assertEquals(5, dut.m_autoTuneTargetInternalLatency);
+        assertEquals(TimeUnit.MINUTES.toNanos(2), dut.m_procedureCallTimeoutNanos);
+        assertEquals(TimeUnit.MINUTES.toMillis(2), dut.m_connectionResponseTimeoutMS);
+        assertTrue(dut.m_useClientAffinity);
+        assertFalse(dut.m_reconnectOnConnectionLoss);
+        assertEquals(TimeUnit.SECONDS.toMillis(1), dut.m_initialConnectionRetryIntervalMS);
+        assertEquals(TimeUnit.SECONDS.toMillis(8), dut.m_maxConnectionRetryIntervalMS);
     }
 }

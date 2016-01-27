@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final long m_targetId;
 
     // shortened when in test mode
-    public final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
+    public final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : Long.getLong("REJOIN_WRITE_TIMEOUT_MS", 60000);
     final static long WATCHDOG_PERIOS_S = 5;
 
     // schemas for all the tables on this partition
@@ -79,10 +79,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // the same exception multiple times.
     private boolean m_failureReported = false;
 
+    private volatile IOException m_reportedSerializationFailure = null;
+
     // number of sent, but un-acked buffers
     final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
     // map of sent, but un-acked buffers, packaged up a bit
-    private final Map<Integer, SendWork> m_outstandingWork = (new TreeMap<Integer, SendWork>());
+    private final TreeMap<Integer, SendWork> m_outstandingWork = new TreeMap<Integer, SendWork>();
 
     int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
@@ -217,6 +219,18 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
     }
 
+    public static class StreamSnapshotTimeoutException extends IOException {
+        public StreamSnapshotTimeoutException(String message) {
+            super(message);
+        }
+    }
+
+    public static class SnapshotSerializationException extends IOException {
+        public SnapshotSerializationException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Task run every so often to look for writes that haven't been acked
      * in writeTimeout time.
@@ -232,34 +246,48 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
 
         @Override
-        public synchronized void run() {
+        public void run() {
             if (m_closed.get()) {
                 return;
             }
 
-            long bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-            rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                    CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+            long bytesWritten = 0;
+            try {
+                bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
+                rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
+                        CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
 
-            long now = System.currentTimeMillis();
-            for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
-                SendWork work = e.getValue();
-                if ((now - work.m_ts) > m_writeTimeout) {
-                    IOException exception =
-                        new IOException(String.format(
-                            "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
-                            (now - work.m_ts) / 1000));
-                    rejoinLog.error(exception.getMessage());
-                    m_writeFailed.compareAndSet(null, exception);
-                    break;
+                checkTimeout(m_writeTimeout);
+                if (m_writeFailed.get() != null) {
+                    clearOutstanding(); // idempotent
                 }
+            } catch (Throwable t) {
+                rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
+            } finally {
+                // schedule to run again
+                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
             }
-            if (m_writeFailed.get() != null) {
-                clearOutstanding(); // idempotent
-            }
+        }
+    }
 
-            // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+    /**
+     * Called by the watchdog from the periodic work thread to check if the
+     * oldest unacked block is older than the timeout interval.
+     */
+    private synchronized void checkTimeout(final long timeoutMs) {
+        final Entry<Integer, SendWork> oldest = m_outstandingWork.firstEntry();
+        if (oldest != null) {
+            final long now = System.currentTimeMillis();
+            SendWork work = oldest.getValue();
+            if ((now - work.m_ts) > timeoutMs) {
+                StreamSnapshotTimeoutException exception =
+                        new StreamSnapshotTimeoutException(String.format(
+                                "A snapshot write task failed after a timeout (currently %d seconds outstanding). " +
+                                        "Node rejoin may need to be retried",
+                                (now - work.m_ts) / 1000));
+                rejoinLog.error(exception.getMessage());
+                m_writeFailed.compareAndSet(null, exception);
+            }
         }
     }
 
@@ -476,6 +504,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
+    public void reportSerializationFailure(IOException ex) {
+        m_reportedSerializationFailure = ex;
+    }
+
+    @Override
     public boolean needsFinalClose()
     {
         // Streamed snapshot targets always need to be closed by the last site
@@ -484,8 +517,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     @Override
     public void close() throws IOException, InterruptedException {
-        boolean hadFailureBeforeClose = m_writeFailed.get() != null;
-
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -518,9 +549,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             closeHandle.run();
         }
 
+        if (m_reportedSerializationFailure != null) {
+            // There was an error reported by the EE during serialization
+            throw m_reportedSerializationFailure;
+        }
         // If there was an error during close(), throw it so that the snapshot
         // can be marked as failed.
-        if (!hadFailureBeforeClose && m_writeFailed.get() != null) {
+        if (m_writeFailed.get() != null) {
             throw m_writeFailed.get();
         }
     }

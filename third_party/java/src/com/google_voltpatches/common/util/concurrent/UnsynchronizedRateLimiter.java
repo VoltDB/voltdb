@@ -16,14 +16,14 @@
 
 package com.google_voltpatches.common.util.concurrent;
 
-import java.util.concurrent.TimeUnit;
-
-import javax.annotation_voltpatches.concurrent.ThreadSafe;
-
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Ticker;
+
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation_voltpatches.concurrent.ThreadSafe;
 
 /**
  * A rate limiter. Conceptually, a rate limiter distributes permits at a
@@ -36,20 +36,20 @@ import com.google_voltpatches.common.base.Ticker;
  * accesses instead of the rate (note though that concurrency and rate are closely related,
  * e.g. see <a href="http://en.wikipedia.org/wiki/Little's_law">Little's Law</a>).
  *
- * <p>A {@code RateLimiter} is defined primarily by the rate at which permits
+ * <p>A {@code UnsynchronizedRateLimiter} is defined primarily by the rate at which permits
  * are issued. Absent additional configuration, permits will be distributed at a
  * fixed rate, defined in terms of permits per second. Permits will be distributed
  * smoothly, with the delay between individual permits being adjusted to ensure
  * that the configured rate is maintained.
  *
- * <p>It is possible to configure a {@code RateLimiter} to have a warmup
+ * <p>It is possible to configure a {@code UnsynchronizedRateLimiter} to have a warmup
  * period during which time the permits issued each second steadily increases until
  * it hits the stable rate.
  *
  * <p>As an example, imagine that we have a list of tasks to execute, but we don't want to
  * submit more than 2 per second:
  *<pre>  {@code
- *  final RateLimiter rateLimiter = RateLimiter.create(2.0); // rate is "2 permits per second"
+ *  final UnsynchronizedRateLimiter rateLimiter = UnsynchronizedRateLimiter.create(2.0); // rate is "2 permits per second"
  *  void submitTasks(List<Runnable> tasks, Executor executor) {
  *    for (Runnable task : tasks) {
  *      rateLimiter.acquire(); // may wait
@@ -62,7 +62,7 @@ import com.google_voltpatches.common.base.Ticker;
  * at 5kb per second. This could be accomplished by requiring a permit per byte, and specifying
  * a rate of 5000 permits per second:
  *<pre>  {@code
- *  final RateLimiter rateLimiter = RateLimiter.create(5000.0); // rate = 5000 permits per second
+ *  final UnsynchronizedRateLimiter rateLimiter = UnsynchronizedRateLimiter.create(5000.0); // rate = 5000 permits per second
  *  void submitPacket(byte[] packet) {
  *    rateLimiter.acquire(packet.length);
  *    networkService.send(packet);
@@ -73,11 +73,11 @@ import com.google_voltpatches.common.base.Ticker;
  * affect the throttling of the request itself (an invocation to {@code acquire(1)}
  * and an invocation to {@code acquire(1000)} will result in exactly the same throttling, if any),
  * but it affects the throttling of the <i>next</i> request. I.e., if an expensive task
- * arrives at an idle RateLimiter, it will be granted immediately, but it is the <i>next</i>
+ * arrives at an idle UnsynchronizedRateLimiter, it will be granted immediately, but it is the <i>next</i>
  * request that will experience extra throttling, thus paying for the cost of the expensive
  * task.
  *
- * <p>Note: {@code RateLimiter} does not provide fairness guarantees.
+ * <p>Note: {@code UnsynchronizedRateLimiter} does not provide fairness guarantees.
  *
  * @author Dimitris Andreou
  * @since 13.0
@@ -88,9 +88,9 @@ import com.google_voltpatches.common.base.Ticker;
 @Beta
 public abstract class UnsynchronizedRateLimiter {
   /*
-   * How is the RateLimiter designed, and why?
+   * How is the UnsynchronizedRateLimiter designed, and why?
    *
-   * The primary feature of a RateLimiter is its "stable rate", the maximum rate that
+   * The primary feature of a UnsynchronizedRateLimiter is its "stable rate", the maximum rate that
    * is should allow at normal conditions. This is enforced by "throttling" incoming
    * requests as needed, i.e. compute, for an incoming request, the appropriate throttle time,
    * and make the calling thread wait as much.
@@ -98,19 +98,19 @@ public abstract class UnsynchronizedRateLimiter {
    * The simplest way to maintain a rate of QPS is to keep the timestamp of the last
    * granted request, and ensure that (1/QPS) seconds have elapsed since then. For example,
    * for a rate of QPS=5 (5 tokens per second), if we ensure that a request isn't granted
-   * earlier than 200ms after the the last one, then we achieve the intended rate.
+   * earlier than 200ms after the last one, then we achieve the intended rate.
    * If a request comes and the last request was granted only 100ms ago, then we wait for
    * another 100ms. At this rate, serving 15 fresh permits (i.e. for an acquire(15) request)
    * naturally takes 3 seconds.
    *
-   * It is important to realize that such a RateLimiter has a very superficial memory
-   * of the past: it only remembers the last request. What if the RateLimiter was unused for
+   * It is important to realize that such a UnsynchronizedRateLimiter has a very superficial memory
+   * of the past: it only remembers the last request. What if the UnsynchronizedRateLimiter was unused for
    * a long period of time, then a request arrived and was immediately granted?
-   * This RateLimiter would immediately forget about that past underutilization. This may
+   * This UnsynchronizedRateLimiter would immediately forget about that past underutilization. This may
    * result in either underutilization or overflow, depending on the real world consequences
    * of not using the expected rate.
    *
-   * Past underutilization could mean that excess resources are available. Then, the RateLimiter
+   * Past underutilization could mean that excess resources are available. Then, the UnsynchronizedRateLimiter
    * should speed up for a while, to take advantage of these resources. This is important
    * when the rate is applied to networking (limiting bandwidth), where past underutilization
    * typically translates to "almost empty buffers", which can be filled immediately.
@@ -131,9 +131,9 @@ public abstract class UnsynchronizedRateLimiter {
    *
    * How this works is best explained with an example:
    *
-   * For a RateLimiter that produces 1 token per second, every second
-   * that goes by with the RateLimiter being unused, we increase storedPermits by 1.
-   * Say we leave the RateLimiter unused for 10 seconds (i.e., we expected a request at time
+   * For a UnsynchronizedRateLimiter that produces 1 token per second, every second
+   * that goes by with the UnsynchronizedRateLimiter being unused, we increase storedPermits by 1.
+   * Say we leave the UnsynchronizedRateLimiter unused for 10 seconds (i.e., we expected a request at time
    * X, but we are at time X + 10 seconds before a request actually arrives; this is
    * also related to the point made in the last paragraph), thus storedPermits
    * becomes 10.0 (assuming maxStoredPermits >= 10.0). At that point, a request of acquire(3)
@@ -180,13 +180,13 @@ public abstract class UnsynchronizedRateLimiter {
    * exactly the same cost as fresh ones (1/QPS is the cost for each). We use this trick later.
    *
    * If we pick a function that goes /below/ that horizontal line, it means that we reduce
-   * the area of the function, thus time. Thus, the RateLimiter becomes /faster/ after a
+   * the area of the function, thus time. Thus, the UnsynchronizedRateLimiter becomes /faster/ after a
    * period of underutilization. If, on the other hand, we pick a function that
    * goes /above/ that horizontal line, then it means that the area (time) is increased,
-   * thus storedPermits are more costly than fresh permits, thus the RateLimiter becomes
+   * thus storedPermits are more costly than fresh permits, thus the UnsynchronizedRateLimiter becomes
    * /slower/ after a period of underutilization.
    *
-   * Last, but not least: consider a RateLimiter with rate of 1 permit per second, currently
+   * Last, but not least: consider a UnsynchronizedRateLimiter with rate of 1 permit per second, currently
    * completely unused, and an expensive acquire(100) request comes. It would be nonsensical
    * to just wait for 100 seconds, and /then/ start the actual task. Why wait without doing
    * anything? A much better approach is to /allow/ the request right away (as if it was an
@@ -194,13 +194,13 @@ public abstract class UnsynchronizedRateLimiter {
    * we allow starting the task immediately, and postpone by 100 seconds future requests,
    * thus we allow for work to get done in the meantime instead of waiting idly.
    *
-   * This has important consequences: it means that the RateLimiter doesn't remember the time
+   * This has important consequences: it means that the UnsynchronizedRateLimiter doesn't remember the time
    * of the _last_ request, but it remembers the (expected) time of the _next_ request. This
    * also enables us to tell immediately (see tryAcquire(timeout)) whether a particular
    * timeout is enough to get us to the point of the next scheduling time, since we always
-   * maintain that. And what we mean by "an unused RateLimiter" is also defined by that
+   * maintain that. And what we mean by "an unused UnsynchronizedRateLimiter" is also defined by that
    * notion: when we observe that the "expected arrival time of the next request" is actually
-   * in the past, then the difference (now - past) is the amount of time that the RateLimiter
+   * in the past, then the difference (now - past) is the amount of time that the UnsynchronizedRateLimiter
    * was formally unused, and it is that amount of time which we translate to storedPermits.
    * (We increase storedPermits with the amount of permits that would have been produced
    * in that idle time). So, if rate == 1 permit per second, and arrivals come exactly
@@ -209,10 +209,10 @@ public abstract class UnsynchronizedRateLimiter {
    */
 
   /**
-   * Creates a {@code RateLimiter} with the specified stable throughput, given as
+   * Creates a {@code UnsynchronizedRateLimiter} with the specified stable throughput, given as
    * "permits per second" (commonly referred to as <i>QPS</i>, queries per second).
    *
-   * <p>The returned {@code RateLimiter} ensures that on average no more than {@code
+   * <p>The returned {@code UnsynchronizedRateLimiter} ensures that on average no more than {@code
    * permitsPerSecond} are issued during any given second, with sustained requests
    * being smoothly spread over each second. When the incoming request rate exceeds
    * {@code permitsPerSecond} the rate limiter will release one permit every {@code
@@ -220,15 +220,15 @@ public abstract class UnsynchronizedRateLimiter {
    * bursts of up to {@code permitsPerSecond} permits will be allowed, with subsequent
    * requests being smoothly limited at the stable rate of {@code permitsPerSecond}.
    *
-   * @param permitsPerSecond the rate of the returned {@code RateLimiter}, measured in
-   *        how many permits become available per second.
+   * @param permitsPerSecond the rate of the returned {@code UnsynchronizedRateLimiter}, measured in
+   *        how many permits become available per second. Must be positive
    */
   // TODO(user): "This is equivalent to
   //                 {@code createWithCapacity(permitsPerSecond, 1, TimeUnit.SECONDS)}".
   public static UnsynchronizedRateLimiter create(double permitsPerSecond) {
     /*
-       * The default RateLimiter configuration can save the unused permits of up to one second.
-       * This is to avoid unnecessary stalls in situations like this: A RateLimiter of 1qps,
+       * The default UnsynchronizedRateLimiter configuration can save the unused permits of up to one second.
+       * This is to avoid unnecessary stalls in situations like this: A UnsynchronizedRateLimiter of 1qps,
        * and 4 threads, all calling acquire() at these moments:
        *
        * T0 at 0 seconds
@@ -244,30 +244,30 @@ public abstract class UnsynchronizedRateLimiter {
 
   @VisibleForTesting
   static UnsynchronizedRateLimiter create(SleepingTicker ticker, double permitsPerSecond) {
-      UnsynchronizedRateLimiter rateLimiter = new Bursty(ticker, 1.0 /* maxBurstSeconds */);
+    UnsynchronizedRateLimiter rateLimiter = new Bursty(ticker, 1.0 /* maxBurstSeconds */);
     rateLimiter.setRate(permitsPerSecond);
     return rateLimiter;
   }
 
   /**
-   * Creates a {@code RateLimiter} with the specified stable throughput, given as
+   * Creates a {@code UnsynchronizedRateLimiter} with the specified stable throughput, given as
    * "permits per second" (commonly referred to as <i>QPS</i>, queries per second), and a
-   * <i>warmup period</i>, during which the {@code RateLimiter} smoothly ramps up its rate,
+   * <i>warmup period</i>, during which the {@code UnsynchronizedRateLimiter} smoothly ramps up its rate,
    * until it reaches its maximum rate at the end of the period (as long as there are enough
-   * requests to saturate it). Similarly, if the {@code RateLimiter} is left <i>unused</i> for
+   * requests to saturate it). Similarly, if the {@code UnsynchronizedRateLimiter} is left <i>unused</i> for
    * a duration of {@code warmupPeriod}, it will gradually return to its "cold" state,
    * i.e. it will go through the same warming up process as when it was first created.
    *
-   * <p>The returned {@code RateLimiter} is intended for cases where the resource that actually
+   * <p>The returned {@code UnsynchronizedRateLimiter} is intended for cases where the resource that actually
    * fulfills the requests (e.g., a remote server) needs "warmup" time, rather than
    * being immediately accessed at the stable (maximum) rate.
    *
-   * <p>The returned {@code RateLimiter} starts in a "cold" state (i.e. the warmup period
+   * <p>The returned {@code UnsynchronizedRateLimiter} starts in a "cold" state (i.e. the warmup period
    * will follow), and if it is left unused for long enough, it will return to that state.
    *
-   * @param permitsPerSecond the rate of the returned {@code RateLimiter}, measured in
-   *        how many permits become available per second
-   * @param warmupPeriod the duration of the period where the {@code RateLimiter} ramps up its
+   * @param permitsPerSecond the rate of the returned {@code UnsynchronizedRateLimiter}, measured in
+   *        how many permits become available per second. Must be positive
+   * @param warmupPeriod the duration of the period where the {@code UnsynchronizedRateLimiter} ramps up its
    *        rate, before reaching its stable (maximum) rate
    * @param unit the time unit of the warmupPeriod argument
    */
@@ -278,7 +278,7 @@ public abstract class UnsynchronizedRateLimiter {
   @VisibleForTesting
   static UnsynchronizedRateLimiter create(
       SleepingTicker ticker, double permitsPerSecond, long warmupPeriod, TimeUnit unit) {
-      UnsynchronizedRateLimiter rateLimiter = new WarmingUp(ticker, warmupPeriod, unit);
+    UnsynchronizedRateLimiter rateLimiter = new WarmingUp(ticker, warmupPeriod, unit);
     rateLimiter.setRate(permitsPerSecond);
     return rateLimiter;
   }
@@ -299,7 +299,7 @@ public abstract class UnsynchronizedRateLimiter {
   private final SleepingTicker ticker;
 
   /**
-   * The timestamp when the RateLimiter was created; used to avoid possible overflow/time-wrapping
+   * The timestamp when the UnsynchronizedRateLimiter was created; used to avoid possible overflow/time-wrapping
    * errors.
    */
   private final long offsetNanos;
@@ -332,9 +332,9 @@ public abstract class UnsynchronizedRateLimiter {
   }
 
   /**
-   * Updates the stable rate of this {@code RateLimiter}, that is, the
+   * Updates the stable rate of this {@code UnsynchronizedRateLimiter}, that is, the
    * {@code permitsPerSecond} argument provided in the factory method that
-   * constructed the {@code RateLimiter}. Currently throttled threads will <b>not</b>
+   * constructed the {@code UnsynchronizedRateLimiter}. Currently throttled threads will <b>not</b>
    * be awakened as a result of this invocation, thus they do not observe the new rate;
    * only subsequent requests will.
    *
@@ -343,28 +343,28 @@ public abstract class UnsynchronizedRateLimiter {
    * after an invocation to {@code setRate} will not be affected by the new rate;
    * it will pay the cost of the previous request, which is in terms of the previous rate.
    *
-   * <p>The behavior of the {@code RateLimiter} is not modified in any other way,
-   * e.g. if the {@code RateLimiter} was configured with a warmup period of 20 seconds,
+   * <p>The behavior of the {@code UnsynchronizedRateLimiter} is not modified in any other way,
+   * e.g. if the {@code UnsynchronizedRateLimiter} was configured with a warmup period of 20 seconds,
    * it still has a warmup period of 20 seconds after this method invocation.
    *
-   * @param permitsPerSecond the new stable rate of this {@code RateLimiter}.
+   * @param permitsPerSecond the new stable rate of this {@code UnsynchronizedRateLimiter}. Must be positive
    */
   public final void setRate(double permitsPerSecond) {
     Preconditions.checkArgument(permitsPerSecond > 0.0
         && !Double.isNaN(permitsPerSecond), "rate must be positive");
-      resync(readSafeMicros());
-      double stableIntervalMicros = TimeUnit.SECONDS.toMicros(1L) / permitsPerSecond;
-      this.stableIntervalMicros = stableIntervalMicros;
-      doSetRate(permitsPerSecond, stableIntervalMicros);
+    resync(readSafeMicros());
+    double stableIntervalMicros = TimeUnit.SECONDS.toMicros(1L) / permitsPerSecond;
+    this.stableIntervalMicros = stableIntervalMicros;
+    doSetRate(permitsPerSecond, stableIntervalMicros);
   }
 
   abstract void doSetRate(double permitsPerSecond, double stableIntervalMicros);
 
   /**
    * Returns the stable rate (as {@code permits per seconds}) with which this
-   * {@code RateLimiter} is configured with. The initial value of this is the same as
+   * {@code UnsynchronizedRateLimiter} is configured with. The initial value of this is the same as
    * the {@code permitsPerSecond} argument passed in the factory method that produced
-   * this {@code RateLimiter}, and it is only updated after invocations
+   * this {@code UnsynchronizedRateLimiter}, and it is only updated after invocations
    * to {@linkplain #setRate}.
    */
   public final double getRate() {
@@ -372,28 +372,57 @@ public abstract class UnsynchronizedRateLimiter {
   }
 
   /**
-   * Acquires a permit from this {@code RateLimiter}, blocking until the request can be granted.
+   * Acquires a single permit from this {@code UnsynchronizedRateLimiter}, blocking until the
+   * request can be granted. Tells the amount of time slept, if any.
    *
    * <p>This method is equivalent to {@code acquire(1)}.
+   *
+   * @return time spent sleeping to enforce rate, in seconds; 0.0 if not rate-limited
+   * @since 16.0 (present in 13.0 with {@code void} return type})
    */
-  public void acquire() {
-    acquire(1);
+  public double acquire() {
+    return acquire(1);
   }
 
   /**
-   * Acquires the given number of permits from this {@code RateLimiter}, blocking until the
-   * request be granted.
+   * Acquires the given number of permits from this {@code UnsynchronizedRateLimiter}, blocking until the
+   * request can be granted. Tells the amount of time slept, if any.
    *
    * @param permits the number of permits to acquire
+   * @return time spent sleeping to enforce rate, in seconds; 0.0 if not rate-limited
+   * @since 16.0 (present in 13.0 with {@code void} return type})
    */
-  public void acquire(int permits) {
-    checkPermits(permits);
-    long microsToWait = reserveNextTicket(permits, readSafeMicros());
+  public double acquire(int permits) {
+    long microsToWait = reserve(permits);
     ticker.sleepMicrosUninterruptibly(microsToWait);
+    return 1.0 * microsToWait / TimeUnit.SECONDS.toMicros(1L);
   }
 
   /**
-   * Acquires a permit from this {@code RateLimiter} if it can be obtained
+   * Reserves a single permit from this {@code UnsynchronizedRateLimiter} for future use, returning the number of
+   * microseconds until the reservation.
+   *
+   * <p>This method is equivalent to {@code reserve(1)}.
+   *
+   * @return time in microseconds to wait until the resource can be acquired.
+   */
+  long reserve() {
+    return reserve(1);
+  }
+
+  /**
+   * Reserves the given number of permits from this {@code UnsynchronizedRateLimiter} for future use, returning
+   * the number of microseconds until the reservation can be consumed.
+   *
+   * @return time in microseconds to wait until the resource can be acquired.
+   */
+  long reserve(int permits) {
+    checkPermits(permits);
+    return reserveNextTicket(permits, readSafeMicros());
+  }
+
+  /**
+   * Acquires a permit from this {@code UnsynchronizedRateLimiter} if it can be obtained
    * without exceeding the specified {@code timeout}, or returns {@code false}
    * immediately (without waiting) if the permit would not have been granted
    * before the timeout expired.
@@ -409,7 +438,7 @@ public abstract class UnsynchronizedRateLimiter {
   }
 
   /**
-   * Acquires permits from this {@link RateLimiter} if it can be acquired immediately without delay.
+   * Acquires permits from this {@link UnsynchronizedRateLimiter} if it can be acquired immediately without delay.
    *
    * <p>
    * This method is equivalent to {@code tryAcquire(permits, 0, anyUnit)}.
@@ -423,7 +452,7 @@ public abstract class UnsynchronizedRateLimiter {
   }
 
   /**
-   * Acquires a permit from this {@link RateLimiter} if it can be acquired immediately without
+   * Acquires a permit from this {@link UnsynchronizedRateLimiter} if it can be acquired immediately without
    * delay.
    *
    * <p>
@@ -437,7 +466,7 @@ public abstract class UnsynchronizedRateLimiter {
   }
 
   /**
-   * Acquires the given number of permits from this {@code RateLimiter} if it can be obtained
+   * Acquires the given number of permits from this {@code UnsynchronizedRateLimiter} if it can be obtained
    * without exceeding the specified {@code timeout}, or returns {@code false}
    * immediately (without waiting) if the permits would not have been granted
    * before the timeout expired.
@@ -467,10 +496,12 @@ public abstract class UnsynchronizedRateLimiter {
 
   /**
    * Reserves next ticket and returns the wait time that the caller must wait for.
+   *
+   * <p>The return value is guaranteed to be non-negative.
    */
   private long reserveNextTicket(double requiredPermits, long nowMicros) {
     resync(nowMicros);
-    long microsToNextFreeTicket = nextFreeTicketMicros - nowMicros;
+    long microsToNextFreeTicket = Math.max(0, nextFreeTicketMicros - nowMicros);
     double storedPermitsToSpend = Math.min(requiredPermits, this.storedPermits);
     double freshPermits = requiredPermits - storedPermitsToSpend;
 
@@ -507,7 +538,7 @@ public abstract class UnsynchronizedRateLimiter {
 
   @Override
   public String toString() {
-    return String.format("RateLimiter[stableRate=%3.1fqps]", 1000000.0 / stableIntervalMicros);
+    return String.format("UnsynchronizedRateLimiter[stableRate=%3.1fqps]", 1000000.0 / stableIntervalMicros);
   }
 
   /**
@@ -531,9 +562,9 @@ public abstract class UnsynchronizedRateLimiter {
    *              (halfPermits) (maxPermits)
    *
    * Before going into the details of this particular function, let's keep in mind the basics:
-   * 1) The state of the RateLimiter (storedPermits) is a vertical line in this figure.
-   * 2) When the RateLimiter is not used, this goes right (up to maxPermits)
-   * 3) When the RateLimiter is used, this goes left (down to zero), since if we have storedPermits,
+   * 1) The state of the UnsynchronizedRateLimiter (storedPermits) is a vertical line in this figure.
+   * 2) When the UnsynchronizedRateLimiter is not used, this goes right (up to maxPermits)
+   * 3) When the UnsynchronizedRateLimiter is used, this goes left (down to zero), since if we have storedPermits,
    *    we serve from those first
    * 4) When _unused_, we go right at the same speed (rate)! I.e., if our rate is
    *    2 permits per second, and 3 unused seconds pass, we will always save 6 permits
@@ -571,10 +602,10 @@ public abstract class UnsynchronizedRateLimiter {
    * BUT, by point (3) above, it only takes "warmupPeriod / 2" amount of time to return back
    * to maxPermits, from halfPermits! (Because the trapezoid has double the area of the rectangle
    * of height stableInterval and equivalent width). We decided that the "cooldown period"
-   * time should be equivalent to "warmup period", thus a fully saturated RateLimiter
+   * time should be equivalent to "warmup period", thus a fully saturated UnsynchronizedRateLimiter
    * (with zero stored permits, serving only fresh ones) can go to a fully unsaturated
    * (with storedPermits == maxPermits) in the same amount of time it takes for a fully
-   * unsaturated RateLimiter to return to the stableInterval -- which happens in halfPermits,
+   * unsaturated UnsynchronizedRateLimiter to return to the stableInterval -- which happens in halfPermits,
    * since beyond that point, we use a horizontal line of "stableInterval" height, simulating
    * the regular rate.
    *
@@ -640,13 +671,13 @@ public abstract class UnsynchronizedRateLimiter {
   }
 
   /**
-   * This implements a "bursty" RateLimiter, where storedPermits are translated to
-   * zero throttling. The maximum number of permits that can be saved (when the RateLimiter is
-   * unused) is defined in terms of time, in this sense: if a RateLimiter is 2qps, and this
+   * This implements a "bursty" UnsynchronizedRateLimiter, where storedPermits are translated to
+   * zero throttling. The maximum number of permits that can be saved (when the UnsynchronizedRateLimiter is
+   * unused) is defined in terms of time, in this sense: if a UnsynchronizedRateLimiter is 2qps, and this
    * time is specified as 10 seconds, we can save up to 2 * 10 = 20 permits.
    */
   private static class Bursty extends UnsynchronizedRateLimiter {
-    /** The work (permits) of how many seconds can be saved up if this RateLimiter is unused? */
+    /** The work (permits) of how many seconds can be saved up if this UnsynchronizedRateLimiter is unused? */
     final double maxBurstSeconds;
 
     Bursty(SleepingTicker ticker, double maxBurstSeconds) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,17 @@ public class Digester {
         md.reset();
         return md.digest(buf);
     }
+    final public static byte [] sha256(final byte buf[]) {
+        Preconditions.checkArgument(buf !=null, "specified null buffer");
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            Throwables.propagate(e);
+        }
+        md.reset();
+        return md.digest(buf);
+    }
 
     final public static String sha1AsBase64(final byte buf []) {
         return Encoder.base64Encode(sha1(buf));
@@ -50,10 +61,12 @@ public class Digester {
     final public static String sha1AsHex(final byte buf []) {
         return Encoder.hexEncode(sha1(buf));
     }
-
-    final public static String sha1AsHex(final String str) {
-        Preconditions.checkArgument(str != null, "specified null string");
-        return sha1AsHex(str.getBytes(Charsets.UTF_8));
+    final public static String sha256AsHex(final byte buf []) {
+        return Encoder.hexEncode(sha256(buf));
     }
 
+    final public static String shaAsHex(final String str) {
+        Preconditions.checkArgument(str != null, "specified null string");
+        return (sha1AsHex(str.getBytes(Charsets.UTF_8)) + sha256AsHex(str.getBytes(Charsets.UTF_8)));
+    }
 }

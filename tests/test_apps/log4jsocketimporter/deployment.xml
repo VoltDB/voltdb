@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0"/>
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <import>
+        <configuration module="log4jsocketimporter.jar" type="custom" enabled="true">
+            <property name="port">6060</property>
+            <property name="log-event-table">log_events</property>
+            <property name="procedure">log_events.insert</property>
+        </configuration>
+    </import>
+</deployment>

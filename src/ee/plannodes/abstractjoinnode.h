@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,53 +48,51 @@
 
 #include "abstractplannode.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 class AbstractExpression;
 
 class AbstractJoinPlanNode : public AbstractPlanNode
 {
 public:
-    AbstractJoinPlanNode(CatalogId id);
     AbstractJoinPlanNode();
-    virtual ~AbstractJoinPlanNode();
+    ~AbstractJoinPlanNode();
+    std::string debugInfo(const std::string& spacer) const;
 
-    JoinType getJoinType() const;
-
-    AbstractExpression* getPreJoinPredicate() const;
-
-    AbstractExpression* getJoinPredicate() const;
-
-    AbstractExpression* getWherePredicate() const;
-
-    virtual std::string debugInfo(const std::string& spacer) const;
+    JoinType getJoinType() const { return m_joinType; }
+    AbstractExpression* getPreJoinPredicate() const { return m_preJoinPredicate.get(); }
+    AbstractExpression* getJoinPredicate() const { return m_joinPredicate.get(); }
+    AbstractExpression* getWherePredicate() const { return m_wherePredicate.get(); }
+    const TupleSchema* getTupleSchemaPreAgg() const { return m_tupleSchemaPreAgg; }
+    void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
 
 protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
-
-    void loadPredicateFromJSONObject(
-        const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate);
+    void loadFromJSONObject(PlannerDomValue obj);
 
     // This is the outer-table-only join expression. If the outer tuple fails it,
     // it may still be part of the result set (pending other filtering)
     // but can't be joined with any tuple from the inner table.
     // In a left outer join, the failed outer tuple STILL gets null-padded in the output table.
-    AbstractExpression* m_preJoinPredicate;
+    boost::scoped_ptr<AbstractExpression> m_preJoinPredicate;
 
     // This is the predicate to figure out whether a joined tuple should
     // be put into the output table
-    AbstractExpression* m_joinPredicate;
+    boost::scoped_ptr<AbstractExpression> m_joinPredicate;
 
     // The additional filtering criteria specified by the WHERE clause
     // in case of outer joins. The predicated is applied to the whole
     // joined tuple after it's assembled
-    AbstractExpression* m_wherePredicate;
+    boost::scoped_ptr<AbstractExpression> m_wherePredicate;
 
     // Currently either inner or left outer.
     JoinType m_joinType;
+
+    // output schema pre inline aggregation
+    std::vector<SchemaColumn*> m_outputSchemaPreAgg;
+
+    TupleSchema* m_tupleSchemaPreAgg;
 };
 
-}
+} // namespace voltdb
 
 #endif

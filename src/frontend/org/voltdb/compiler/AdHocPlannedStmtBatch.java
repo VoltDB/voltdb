@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,10 +22,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
@@ -109,7 +109,16 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
 
     public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
             Object[] extractedValues, VoltType[] paramTypes,
-            Object[] userParams, int partitionParamIndex) {
+            Object[] userParams, int partitionParamIndex, byte[] catalogHash)
+    {
+        return mockStatementBatch(replySiteId, sql, extractedValues, paramTypes, userParams, partitionParamIndex, catalogHash, true, false);
+    }
+
+    public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
+            Object[] extractedValues, VoltType[] paramTypes,
+            Object[] userParams, int partitionParamIndex, byte[] catalogHash,
+            boolean readOnly, boolean isAdmin)
+    {
         // Mock up a dummy completion handler to satisfy the dummy work request.
         AsyncCompilerWorkCompletionHandler dummyHandler = new AsyncCompilerWorkCompletionHandler() {
 
@@ -123,16 +132,17 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                                                                                 sql,
                                                                                 userParams,
                                                                                 false, // mock inferred partitioning
-                                                                                null, dummyHandler);
+                                                                                null, dummyHandler,
+                                                                                isAdmin);
         // Mock up dummy results from the work request.
         CorePlan core = new CorePlan(new byte[0],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 new byte[20],
                 partitionParamIndex == -1 ? new byte[20] : null,
                 false,
-                true,
+                readOnly,
                 paramTypes,
-                0);
+                catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                 core,
                 extractedValues == null ? ParameterSet.emptyParameterSet() :
@@ -237,7 +247,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     /**
      * For convenience, serialization is accomplished with this single method,
      * but deserialization is piecemeal via the static methods userParamsFromBuffer
-     * and planArrayFromBuffer wih no dummy "AdHocPlannedStmtBatch receiver" instance required.
+     * and planArrayFromBuffer with no dummy "AdHocPlannedStmtBatch receiver" instance required.
      */
     public ByteBuffer flattenPlanArrayToBuffer() throws IOException {
         int size = 0; // sizeof batch
@@ -312,8 +322,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         return statements;
     }
 
-    public boolean isExplainWork() {
-        return work.isExplainWork;
+    public ExplainMode getExplainMode() {
+        return work.explainMode;
     }
 
     /*
@@ -356,17 +366,15 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         PlanNodeTree pnt = new PlanNodeTree();
         try {
             JSONObject jobj = new JSONObject( aggplan );
-            JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadFromJSONPlan(jobj, db);
 
             if( plannedStatement.core.collectorFragment != null ) {
                 //multi-partition query plan
                 String collplan = new String(plannedStatement.core.collectorFragment, Constants.UTF8ENCODING);
                 PlanNodeTree collpnt = new PlanNodeTree();
                 //reattach plan fragments
-                jobj = new JSONObject( collplan );
-                jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                collpnt.loadFromJSONArray(jarray, db);
+                JSONObject jobMP = new JSONObject( collplan );
+                collpnt.loadFromJSONPlan(jobMP, db);
                 assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
                 pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,12 @@ import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-import org.voltdb.*;
+import org.voltdb.ParameterSet;
+import org.voltdb.StatsSelector;
+import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 
@@ -44,6 +49,7 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -119,7 +125,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
+    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
     }
 
     @Override
@@ -128,7 +134,8 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId, boolean returnUniqueViolations, long undoToken)
+        final long spHandle, final long lastCommittedTxnId, long uniqueId,
+        boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
     throws EEException
     {
         return null;
@@ -154,7 +161,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void toggleProfiler(final int toggle) {
-        return;
     }
 
     @Override
@@ -169,7 +175,6 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void quiesce(long lastCommittedTxnId) {
-
     }
 
     @Override
@@ -208,9 +213,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorConfig config)
-    {
+    public void updateHashinator(TheHashinator.HashinatorConfig config) {
+    }
 
+    @Override
+    public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
+                               int remoteClusterId, long undoToken) throws EEException
+    {
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -219,7 +229,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
         throw new UnsupportedOperationException();
     }
 }

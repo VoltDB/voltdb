@@ -40,7 +40,11 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
+    <!--logger name="HSQLDB_COMPILER">
+        <level  value="DEBUG"/>
+    </logger -->
+
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 

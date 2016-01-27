@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,7 +16,6 @@
  */
 package org.voltcore.zk;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
@@ -25,18 +24,19 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
-import java.util.concurrent.TimeUnit;
-import org.apache.zookeeper_voltpatches.Watcher;
-import org.voltdb.VoltZK;
+
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
@@ -237,7 +237,6 @@ public class LeaderElector {
         m_done.set(true);
         es.shutdown();
         es.awaitTermination(365, TimeUnit.DAYS);
-        zk.delete(node, -1);
     }
 
     /**
@@ -315,8 +314,8 @@ public class LeaderElector {
         }
     }
 
-    public static String electionDirForPartition(int partition) {
-        return ZKUtil.path(VoltZK.leaders_initiators, "partition_" + partition);
+    public static String electionDirForPartition(String path, int partition) {
+        return ZKUtil.path(path, "partition_" + partition);
     }
 
     public static int getPartitionFromElectionDir(String partitionDir) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,9 +46,10 @@
 #ifndef HSTOREINSERTEXECUTOR_H
 #define HSTOREINSERTEXECUTOR_H
 
+#include "common/Pool.hpp"
 #include "common/common.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
+#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
@@ -63,13 +64,19 @@ class InsertExecutor : public AbstractExecutor
 {
 public:
     InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
+        : AbstractExecutor(engine, abstract_node),
+        m_node(NULL),
+        m_inputTable(NULL),
+        m_partitionColumn(-1),
+        m_multiPartition(false),
+        m_isStreamed(false),
+        m_isUpsert(false),
+        m_sourceIsPartitioned(false),
+        m_hasPurgeFragment(false),
+        m_templateTuple(),
+        m_memoryPool(),
+        m_nowFields()
     {
-        m_inputTable = NULL;
-        m_node = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-        m_multiPartition = false;
     }
 
     protected:
@@ -81,12 +88,38 @@ public:
         TempTable* m_inputTable;
 
         int m_partitionColumn;
-        bool m_partitionColumnIsString;
         bool m_multiPartition;
         bool m_isStreamed;
+        bool m_isUpsert;
+        bool m_sourceIsPartitioned;
+        bool m_hasPurgeFragment;
 
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
+    private:
+
+        /** If the table is at or over its tuple limit, this method
+         * executes the purge fragment for the table.  Returns true if
+         * nothing went wrong (regardless of whether the purge
+         * fragment was executed) and false otherwise.
+         *
+         * The purge fragment might perform a truncate table,
+         * in which case the persistent table object we're inserting
+         * into might change.  Passing a pointer-to-pointer allows
+         * the callee to update the persistent table pointer.
+         */
+        bool executePurgeFragmentIfNeeded(PersistentTable** table);
+
+        /** A tuple with the target table's schema that is populated
+         * with default values for each field. */
+        StandAloneTupleStorage m_templateTuple;
+
+        /** A memory pool for allocating non-inlined varchar and
+         * varbinary default values */
+        Pool m_memoryPool;
+
+        /** A list of indexes of each column in the template tuple
+         * that has a DEFAULT of NOW, which must be set on each
+         * execution of this plan. */
+        std::vector<int> m_nowFields;
 };
 
 }

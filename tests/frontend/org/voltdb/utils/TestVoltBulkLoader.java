@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,7 +46,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -524,6 +524,31 @@ public class TestVoltBulkLoader extends TestCase {
         test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
     }
 
+    public void testUpsertWithNoPrimaryKey() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        int myBatchSize = 200;
+
+        Object [][]myData = {
+            {1,1,1},
+            {2,2,2},
+            {3,3,3},
+            {4,4,4},
+        };
+        Integer[] failures = {};
+        ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
+        boolean upsert = true;
+        try {
+            test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0, upsert);
+            fail();
+        }catch (IllegalArgumentException e){};
+    }
+
     public void testStrictQuote() throws Exception
     {
         String mySchema =
@@ -865,140 +890,6 @@ public class TestVoltBulkLoader extends TestCase {
                 "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
 
-    //Test single tables with multiple loaders.
-    public void testSingleTableOnMultipleLoaders() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
-        TimestampType currentTime = new TimestampType();
-        Object [][] myData1 = {
-            {1,1,1,11111111,"first",1.10,1.11,currentTime},
-            {2,1,1,11111111,"first",1.10,1.11,currentTime},
-            {3,1,1,11111111,"first",1.10,1.11,currentTime},
-            {4,1,1,11111111,"first",1.10,1.11,currentTime},
-            {5,1,1,11111111,"first",1.10,1.11,currentTime},
-            {6,1,1,11111111,"first",1.10,1.11,currentTime},
-            {7,1,1,11111111,"first",1.10,1.11,currentTime},
-            {8,1,1,11111111,"first",1.10,1.11,currentTime},
-            {9,1,1,11111111,"first",1.10,1.11,currentTime},
-            {10,1,1,11111111,"first",1.10,1.11,currentTime},
-            {11,1,1,11111111,"first",1.10,1.11,currentTime},
-            {12,1,1,11111111,"first",1.10,1.11,currentTime},
-            {13,1,1,11111111,"first",1.10,1.11,currentTime},
-            {14,1,1,11111111,"first",1.10,1.11,currentTime},
-            {15,1,1,11111111,"first",1.10,1.11,currentTime},
-            {16,1,1,11111111,"first",1.10,1.11,currentTime},
-            {17,1,1,11111111,"first",1.10,1.11,currentTime}
-        };
-        int myBatchSize1 = 200;
-        Integer[] failures1 = {};
-        ArrayList<Integer> expectedFailures1 = new ArrayList<Integer>(Arrays.asList(failures1));
-        Object [][] myData2 = {
-            {18,1,1,11111111,"first",1.10,1.11,currentTime},
-            {19,1,1,11111111,"first",1.10,1.11,currentTime},
-            {20,1,1,11111111,"first",1.10,1.11,currentTime},
-            {21,1,1,11111111,"first",1.10,1.11,currentTime},
-            {22,1,1,11111111,"first",1.10,1.11,currentTime},
-            {23,1,1,11111111,"first",1.10,1.11,currentTime},
-            {24,1,1,11111111,"first",1.10,1.11,currentTime},
-            {25,1,1,11111111,"first",1.10,1.11,currentTime},
-            {26,1,1,11111111,"first",1.10,1.11,currentTime},
-            {27,1,1,11111111,"first",1.10,1.11,currentTime},
-            {28,1,1,11111111,"first",1.10,1.11,currentTime},
-            {29,1,1,11111111,"first",1.10,1.11,currentTime},
-            {30,1,1,11111111,"first",1.10,1.11,currentTime},
-            {31,1,1,11111111,"first",1.10,1.11,currentTime},
-            {32,1,1,11111111,"first",1.10,1.11,currentTime},
-            {33,1,1,11111111,"first",1.10,1.11,currentTime},
-            {34,1,1,11111111,"first",1.10,1.11,currentTime},
-            {35,1,1,11111111,"first",1.10,1.11,currentTime},
-            {36,1,1,11111111,"first",1.10,1.11,currentTime}
-        };
-        int myBatchSize2 = 15;
-        Integer[] failures2 = {};
-        ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, false, true, false,
-                "BLAH", myData1, myBatchSize1, expectedFailures1, false,
-                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
-    }
-
-    //Test single tables with multiple loaders.
-    public void testSingleTableOnMultipleLoadersWithAbort() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
-        TimestampType currentTime = new TimestampType();
-        Object [][] myData1 = {
-            {1,1,1,11111111,"first",1.10,1.11,currentTime},
-            {2,1,1,11111111,"first",1.10,1.11,currentTime},
-            {3,1,1,11111111,"first",1.10,1.11,currentTime},
-            {4,1,1,11111111,"first",1.10,1.11,currentTime},
-            {5,1,1,11111111,"first",1.10,1.11,currentTime},
-            {6,1,1,11111111,"first",1.10,1.11,currentTime},
-            {7,1,1,11111111,"first",1.10,1.11,currentTime},
-            {8,1,1,11111111,"first",1.10,1.11,currentTime},
-            {9,1,1,11111111,"first",1.10,1.11,currentTime},
-            {10,1,1,11111111,"first",1.10,1.11,currentTime},
-            {11,1,1,11111111,"first",1.10,1.11,currentTime},
-            {12,1,1,11111111,"first",1.10,1.11,currentTime},
-            {13,1,1,11111111,"first",1.10,1.11,currentTime},
-            {14,1,1,11111111,"first",1.10,1.11,currentTime},
-            {15,1,1,11111111,"first",1.10,1.11,currentTime},
-            {16,1,1,11111111,"first",1.10,1.11,currentTime},
-            {17,1,1,11111111,"first",1.10,1.11,currentTime}
-        };
-        int myBatchSize1 = 200;
-        Integer[] failures1 = {};
-        ArrayList<Integer> expectedFailures1 = new ArrayList<Integer>(Arrays.asList(failures1));
-        Object [][] myData2 = {
-            {18,1,1,11111111,"first",1.10,1.11,currentTime},
-            {19,1,1,11111111,"first",1.10,1.11,currentTime},
-            {20,1,1,11111111,"first",1.10,1.11,currentTime},
-            {21,1,1,11111111,"first",1.10,1.11,currentTime},
-            {22,1,1,11111111,"first",1.10,1.11,currentTime},
-            {23,1,1,11111111,"first",1.10,1.11,currentTime},
-            {24,1,1,11111111,"first",1.10,1.11,currentTime},
-            {25,1,1,11111111,"first",1.10,1.11,currentTime},
-            {26,1,1,11111111,"first",1.10,1.11,currentTime},
-            {27,1,1,11111111,"first",1.10,1.11,currentTime},
-            {28,1,1,11111111,"first",1.10,1.11,currentTime},
-            {29,1,1,11111111,"first",1.10,1.11,currentTime},
-            {30,1,1,11111111,"first",1.10,1.11,currentTime},
-            {31,1,1,11111111,"first",1.10,1.11,currentTime},
-            {32,1,1,11111111,"first",1.10,1.11,currentTime},
-            {33,1,1,11111111,"first",1.10,1.11,currentTime},
-            {34,1,1,11111111,"first",1.10,1.11,currentTime},
-            {35,1,1,11111111,"first",1.10,1.11,currentTime},
-            {36,1,1,11111111,"first",1.10,1.11,currentTime}
-        };
-        int myBatchSize2 = 15;
-        Integer[] failures2 = {};
-        ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, false, true, false,
-                "BLAH", myData1, myBatchSize1, expectedFailures1, true,
-                "BLAH", myData2, myBatchSize2, expectedFailures2, false);
-    }
-
     //Test single table with single loader.
     public void testSingleTableOnSingleLoader() throws Exception {
         String mySchema =
@@ -1135,6 +1026,12 @@ public class TestVoltBulkLoader extends TestCase {
 
     public void test_Interface(String my_schema, Object[][] my_data,
             int my_batchSize, ArrayList<Integer> expectedFailList, int flushInterval) throws Exception {
+        test_Interface(my_schema, my_data,
+                my_batchSize, expectedFailList, flushInterval, false);
+    }
+
+    public void test_Interface(String my_schema, Object[][] my_data,
+            int my_batchSize, ArrayList<Integer> expectedFailList, int flushInterval, boolean upsert) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
@@ -1159,7 +1056,7 @@ public class TestVoltBulkLoader extends TestCase {
 
             prepare();
             TestFailureCallback testCallback = new TestFailureCallback();
-            VoltBulkLoader bulkLoader = client1.getNewBulkLoader("BLAH", my_batchSize, testCallback);
+            VoltBulkLoader bulkLoader = client1.getNewBulkLoader("BLAH", my_batchSize, upsert, testCallback);
             if (flushInterval > 0) {
                 bulkLoader.setFlushInterval(0, flushInterval);
             }
@@ -1198,21 +1095,21 @@ public class TestVoltBulkLoader extends TestCase {
             if (flushInterval <= 0 && rnd.nextBoolean()) {
                 // One in 10 tests generate a sync and VoltBulkLoader internal state verification
                 bulkLoader.drain();
-                assert(bulkLoader.getOutstandingRowCount() == 0);
-                assert(bulkLoader.getCompletedRowCount() == rowCnt);
+                assertEquals(0, bulkLoader.getOutstandingRowCount());
+                assertEquals(rowCnt, bulkLoader.getCompletedRowCount());
             }
             if (flushInterval > 0) {
                 //Lets get timerFlush in
                 Thread.sleep(flushInterval + 500);
                 bulkLoader.drain();
                 //We should have everything processed callbacked.
-                assert (bulkLoader.getOutstandingRowCount() == 0);
-                assert (bulkLoader.getCompletedRowCount() == rowCnt);
+                assertEquals(0, bulkLoader.getOutstandingRowCount());
+                assertEquals(rowCnt, bulkLoader.getCompletedRowCount());
             }
 
             bulkLoader.close();
-            assert(bulkLoader.getCompletedRowCount() == rowCnt);
-            assert(testCallback.failureRowListMatches(expectedFailList));
+            assertEquals(rowCnt, bulkLoader.getCompletedRowCount());
+            assertTrue(testCallback.failureRowListMatches(expectedFailList));
         }
         finally {
             if (client1 != null) client1.close();
@@ -1229,10 +1126,17 @@ public class TestVoltBulkLoader extends TestCase {
         }
     }
 
-
     public void test_multiplexing( String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
             String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1,
             String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2) throws Exception {
+            test_multiplexing(my_schema, multipleClients, multipleLoaders, multiPartTable,
+                    my_tableName1, my_data1, my_batchSize1, expectedFailList1, abort1, false,
+                    my_tableName2, my_data2, my_batchSize2, expectedFailList2, abort2, false);
+    }
+
+    public void test_multiplexing( String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
+            String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1, boolean upsert1,
+            String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2, boolean upsert2) throws Exception {
         try{
             pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
@@ -1279,10 +1183,10 @@ public class TestVoltBulkLoader extends TestCase {
             TestFailureCallback testCallback1 = new TestFailureCallback();
             TestFailureCallback testCallback2 = new TestFailureCallback();
 
-            VoltBulkLoader bulkLoader1 = client1.getNewBulkLoader(my_tableName1, my_batchSize1, testCallback1);
+            VoltBulkLoader bulkLoader1 = client1.getNewBulkLoader(my_tableName1, my_batchSize1, upsert1, testCallback1);
             VoltBulkLoader bulkLoader2;
             if (multipleLoaders) {
-                bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, testCallback2);
+                bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, upsert2, testCallback2);
                 if (!multipleClients && sameTable) {
                     assert(bulkLoader1.getMaxBatchSize() == Math.min(my_batchSize1, my_batchSize2));
                     assert(bulkLoader1.getMaxBatchSize() == bulkLoader2.getMaxBatchSize());
@@ -1348,13 +1252,6 @@ public class TestVoltBulkLoader extends TestCase {
             }
             System.out.println(String.format("Attempted inserting %d rows in Table %s and %d rows in Table %s",
                     --rowCnt1, my_tableName1, --rowCnt2, my_tableName2));
-
-            if (abort1) {
-                bulkLoader1.cancelQueued();
-            }
-            else
-            if (abort2)
-                bulkLoader2.cancelQueued();
 
             if (!abort1 && rnd.nextInt() % 4 == 0) {
                 // One in 4 tests generate a sync and VoltBulkLoader internal state verification

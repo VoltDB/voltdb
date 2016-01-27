@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,9 +42,23 @@ public class ParameterValueExpression extends AbstractValueExpression {
     // The constant value does not need to participate in parameter value identity (equality/hashing)
     // or serialization (export to EE).
     private ConstantValueExpression m_originalValue = null;
+    // In case of subqueries, TVE from a parent query that is part of a correlated expression
+    // is substituted with the PVE within the child. The m_correlatedExpr points back to the
+    // original TVE for 'explain' purposes
+    private AbstractExpression m_correlatedExpr;
 
     public ParameterValueExpression() {
         super(ExpressionType.VALUE_PARAMETER);
+        m_correlatedExpr = null;
+    }
+
+    public ParameterValueExpression(int nextParamIndex, AbstractExpression expr) {
+        super(ExpressionType.VALUE_PARAMETER);
+        m_paramIndex = nextParamIndex;
+        setValueType(expr.getValueType());
+        setValueSize(expr.getValueSize());
+        setInBytes(expr.getInBytes());
+        m_correlatedExpr = expr;
     }
 
     @Override
@@ -53,6 +67,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         clone.m_paramIndex = m_paramIndex;
         clone.m_paramIsVector = m_paramIsVector;
         clone.m_originalValue = m_originalValue;
+        clone.m_correlatedExpr = m_correlatedExpr;
         return clone;
     }
 
@@ -122,7 +137,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (columnType == null) {
             return;
         }
-        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
+        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isBackendIntegerType()) {
             m_valueType = columnType;
             m_valueSize = columnType.getLengthInBytesForFixedTypes();
         } else if (m_valueType == null) {
@@ -183,6 +198,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
+        // BigInt or Float, Decimal is not selected here because of its range is smaller
         VoltType fallbackType = VoltType.FLOAT;
         if (m_originalValue != null) {
             m_originalValue.refineOperandType(VoltType.BIGINT);
@@ -206,6 +222,14 @@ public class ParameterValueExpression extends AbstractValueExpression {
         return m_originalValue;
     }
 
+    public AbstractExpression getCorrelatedExpression() {
+        return m_correlatedExpr;
+    }
+
+    public void setCorrelatedExpression(AbstractExpression correlatedExpr) {
+        m_correlatedExpr = correlatedExpr;
+    }
+
     // Return this parameter in a list of bound parameters if the expr argument is in fact
     // its original value constant "binding". This ensures that the index plan that depends
     // on the parameter binding to a critical constant value does not get misapplied to a later
@@ -223,7 +247,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String unused) {
-        return "?" + m_paramIndex;
+        if (m_correlatedExpr == null) {
+            return "?" + m_paramIndex;
+        } else {
+            return m_correlatedExpr.explain(unused);
+        }
     }
 
     // Mark a parameter as vector-valued, so that it can properly drive argument type checking for

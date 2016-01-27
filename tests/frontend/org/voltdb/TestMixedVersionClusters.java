@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,10 +64,44 @@ public class TestMixedVersionClusters {
                     m_builder.getPathToVoltRoot().getAbsolutePath());
         }
 
+        MixedVersionCluster(String[] versions, String[] regexOverrides, String[] buildStrings) {
+            assert(versions != null);
+            assert(regexOverrides != null);
+            assert(buildStrings != null);
+            assert(versions.length == regexOverrides.length);
+
+            m_cluster = new LocalCluster(
+                    JAR_NAME,
+                    2,
+                    versions.length,
+                    K,
+                    BackendTarget.NATIVE_EE_JNI);
+            m_cluster.setOverridesForHotfix(versions, regexOverrides, buildStrings);
+            m_cluster.setHasLocalServer(false);
+            m_cluster.setDeploymentAndVoltDBRoot(
+                    m_builder.getPathToDeployment(),
+                    m_builder.getPathToVoltRoot().getAbsolutePath());
+        }
+
         boolean start() {
             m_cluster.startUp();
 
             return true;
+        }
+
+        boolean killAndRejoin(String version, String regexMatcher, String buildString) {
+            try {
+                m_cluster.killSingleHost(2);
+                // just set the override for the last host
+                m_cluster.setOverridesForHotfix(new String[] {"", "", version},
+                                                new String[] {"", "", regexMatcher},
+                                                new String[] {"", "", buildString});
+                return m_cluster.recoverOne(2, 0, "");
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
         }
 
         boolean killAndRejoin(String version, String regexMatcher) {
@@ -114,6 +148,15 @@ public class TestMixedVersionClusters {
         cluster = new MixedVersionCluster(
                 new String[] {"4.1.1", "4.1.2", "4.1.1"},
                 new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"});
+
+        assertTrue(cluster.start());
+        cluster.shutdown();
+
+        // should work
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1.1", "4.1.2", "4.1.1"},
+                new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"},
+                new String[] {"4.1.1_test1", "4.1.2_test2", "4.1.1_test1"});
 
         assertTrue(cluster.start());
         cluster.shutdown();
@@ -166,6 +209,19 @@ public class TestMixedVersionClusters {
 
         assertTrue(cluster.killAndRejoin("4.1.2", "^4\\.1(\\.\\d+)*\\z"));
         assertTrue(cluster.killAndRejoin("4.1hp", "^4\\.1(\\.\\d+)*(\\w+)*\\z"));
+
+        cluster.shutdown();
+
+        // test some rejoins
+        cluster = new MixedVersionCluster(
+                new String[] {"4.1.1", "4.1.1", "4.1.1"},
+                new String[] {"^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z", "^4\\.1(\\.\\d+)*\\z"},
+                new String[] {"4.1.1_test", "4.1.1_test", "4.1.1_test"});
+
+        assertTrue(cluster.start());
+
+        assertTrue(cluster.killAndRejoin("4.1.2", "^4\\.1(\\.\\d+)*\\z", "4.1.2_test2"));
+        assertTrue(cluster.killAndRejoin("4.1hp", "^4\\.1(\\.\\d+)*(\\w+)*\\z", "4.1hp_testhp"));
 
         cluster.shutdown();
 

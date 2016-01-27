@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -89,6 +89,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_vemTag = m_vemTag;
         cl.m_versionStringOverrideForTest = m_versionStringOverrideForTest;
         cl.m_versionCompatibilityRegexOverrideForTest = m_versionCompatibilityRegexOverrideForTest;
+        cl.m_buildStringOverrideForTest = m_buildStringOverrideForTest;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -156,6 +157,11 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine adminPort(int adminPort) {
         m_adminPort = adminPort;
+        return this;
+    }
+
+    public CommandLine httpPort(int httpPort) {
+        m_httpPort = httpPort;
         return this;
     }
 
@@ -318,7 +324,8 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine target(BackendTarget target) {
         m_backend = target;
-        m_noLoadLibVOLTDB = (target == BackendTarget.HSQLDB_BACKEND);
+        m_noLoadLibVOLTDB = (target == BackendTarget.HSQLDB_BACKEND ||
+                             target == BackendTarget.POSTGRESQL_BACKEND);
         return this;
     }
     public BackendTarget target() {
@@ -452,6 +459,11 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
         cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
         cmdline.add("-Djava.library.path=" + java_library_path);
+        /*
+         * Facilitate SPNEGO (Kerberos HTTP) authentication
+         */
+        cmdline.add("-Djavax.security.auth.useSubjectCredsOnly=false");
+
         if (rmi_host_name != null)
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
         cmdline.add("-Dlog4j.configuration=" + log4j);
@@ -548,7 +560,9 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add(m_startAction.verb());
 
         cmdline.add("host"); cmdline.add(m_leader);
-        cmdline.add("catalog"); cmdline.add(jarFileName());
+        if (jarFileName() != null) {
+            cmdline.add("catalog"); cmdline.add(jarFileName());
+        }
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
         // rejoin has no replication role
@@ -624,6 +638,10 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("versionoverride");
             cmdline.add(m_versionStringOverrideForTest);
             cmdline.add(m_versionCompatibilityRegexOverrideForTest);
+            if (m_buildStringOverrideForTest != null) {
+                cmdline.add("buildstringoverride");
+                cmdline.add(m_buildStringOverrideForTest);
+            }
         }
 
         if (m_tag != null) {

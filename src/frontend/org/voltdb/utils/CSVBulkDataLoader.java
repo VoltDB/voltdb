@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -29,21 +30,35 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class CSVBulkDataLoader implements CSVDataLoader {
     private final VoltBulkLoader m_loader;
-    private final CSVLoaderErrorHandler m_errHandler;
+    private final BulkLoaderErrorHandler m_errHandler;
     private final AtomicLong m_failedInsertCount = new AtomicLong(0);
 
-    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
-                             CSVLoaderErrorHandler errHandler) throws Exception
-    {
-        m_loader = client.getNewBulkLoader(tableName, batchSize, new CsvFailureCallback());
+    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
+            BulkLoaderErrorHandler errHandler) throws Exception    {
+        m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback());
         m_errHandler = errHandler;
+    }
+
+    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
+            BulkLoaderErrorHandler errHandler) throws Exception    {
+        this(client, tableName, batchSize, false, errHandler);
+    }
+
+    @Override
+    public void setFlushInterval(int delay, int seconds) {
+        m_loader.setFlushInterval(delay, seconds);
+    }
+
+    @Override
+    public void flush() throws ExecutionException, InterruptedException {
+        m_loader.flush();
     }
 
     public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             m_failedInsertCount.incrementAndGet();
-            m_errHandler.handleError((CSVLineWithMetaData) rowHandle, response, response.getStatusString());
+            m_errHandler.handleError((RowWithMetaData) rowHandle, response, response.getStatusString());
         }
     }
 
@@ -54,14 +69,12 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException
-    {
+    public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException {
         m_loader.insertRow(metaData, values);
     }
 
     @Override
-    public void close() throws InterruptedException
-    {
+    public void close() throws Exception {
         m_loader.close();
     }
 

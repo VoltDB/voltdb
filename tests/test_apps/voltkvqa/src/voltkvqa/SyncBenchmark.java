@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -99,16 +99,6 @@ public class SyncBenchmark {
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
 
-    // For retry connections
-    private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -160,6 +150,12 @@ public class SyncBenchmark {
         @Option(desc = "disable client affinity.")
         boolean noclientaffinity = false;
 
+        @Option(desc = "user id.")
+        String username = "";
+
+        @Option(desc = "password.")
+        String password = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -181,28 +177,6 @@ public class SyncBenchmark {
     }
 
     /**
-     * Provides a callback to be notified on node failure.
-     * This example only logs the event.
-     */
-    class StatusListener extends ClientStatusListenerExt {
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // if the benchmark is still active
-            if (benchmarkComplete.get() == false) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-                // setup for retry
-                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-                es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        connectToOneServerWithRetry(server);
-                    }
-                });
-            }
-        }
-    }
-
-    /**
      * Constructor for benchmark instance.
      * Configures VoltDB client and prints configuration.
      *
@@ -211,7 +185,8 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password);
+        clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);
 

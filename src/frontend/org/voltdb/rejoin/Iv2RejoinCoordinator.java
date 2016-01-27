@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,8 +25,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -34,6 +37,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Database;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
@@ -165,6 +169,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     }
 
     @Override
+    public void initialize(int kfactor) throws JSONException, KeeperException, InterruptedException, ExecutionException
+    {
+        VoltZK.createCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
+    }
+
+    @Override
     public boolean startJoin(Database catalog) {
         m_catalog = catalog;
         boolean schemaHasNoTables = catalog.getTables().isEmpty();
@@ -232,6 +242,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
+            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
+
             // All sites have finished snapshot streaming, clear buffer pool
             m_snapshotBufPool.clear();
 

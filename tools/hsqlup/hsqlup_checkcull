@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ ! -d "$1" ]; then
+    echo Baseline directory does not exist: $1
+    exit 1
+fi
+if [ ! -d "$2" ]; then
+    echo Cull directory does not exist: $2
+    exit 2
+fi
+
+pushd $1 > /dev/null
+find . -type f | sort > /tmp/hsql_baseline.found
+popd > /dev/null
+
+pushd $2 > /dev/null
+find . -type f > /tmp/hsql_culled.found
+popd > /dev/null
+
+cat >> /tmp/hsql_culled.found <<VOLTadditions
+./HSQLInterface.java
+./VoltXMLElement.java
+./HSQLFileParser.java
+./HSQLDDLInfo.java
+./FunctionForVoltDB.java
+VOLTadditions
+
+sort /tmp/hsql_culled.found > /tmp/hsql_sorted.found
+
+
+diff /tmp/hsql_baseline.found  /tmp/hsql_sorted.found
+

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,14 +37,19 @@ public abstract class ActivePlanRepository {
         /// A non-zero value is either the fragment's current key in the LRU map OR its intended/future
         /// key, if it has been lazily updated after the fragment was reused.
         long lastUse;
+        /// The statement text for this fragment.  For ad hoc queries this may be null, since
+        /// there is no single statement text---ad hoc queries that differ only by their constants
+        /// reuse the same plan.
+        String stmtText;
 
-        FragInfo(Sha1Wrapper key, byte[] plan, long nextId)
+        FragInfo(Sha1Wrapper key, byte[] plan, long nextId, String stmtText)
         {
             this.hash = key;
             this.plan = plan;
             this.fragId = nextId;
             this.refCount = 0;
             this.lastUse = 0;
+            this.stmtText = stmtText;
         }
     }
 
@@ -71,21 +76,48 @@ public abstract class ActivePlanRepository {
     }
 
     /**
+     * Get the statement text for the fragment identified by its hash
+     */
+    public static String getStmtTextForPlanHash(byte[] planHash) {
+        Sha1Wrapper key = new Sha1Wrapper(planHash);
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansByHash.get(key);
+        }
+        assert(frag != null);
+        // SQL statement text is not stored in the repository for ad hoc statements
+        // -- it may be inaccurate because we parameterize the statement on its constants.
+        // Callers know if they are asking about ad hoc or pre-planned fragments,
+        // and shouldn't call this method for the ad hoc case.
+        assert(frag.stmtText != null);
+        return frag.stmtText;
+    }
+
+    /**
      * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
      * If the plan isn't known to this SPC, load it up. Otherwise addref it.
      */
-    public static long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
+    public static long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan, String stmtText) {
         Sha1Wrapper key = new Sha1Wrapper(planHash);
         synchronized (FragInfo.class) {
             FragInfo frag = m_plansByHash.get(key);
             if (frag == null) {
-                frag = new FragInfo(key, plan, m_nextFragId++);
+                frag = new FragInfo(key, plan, m_nextFragId++, stmtText);
                 m_plansByHash.put(frag.hash, frag);
                 m_plansById.put(frag.fragId, frag);
                 if (m_plansById.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
                     evictLRUfragment();
                 }
             }
+
+            // Bit of a hack to work around an issue where a statement-less adhoc
+            // fragment could be identical to a statement-needing regular procedure.
+            // This doesn't really address the broader issue that fragment hashes
+            // are not 1-1 with SQL statements.
+            if (frag.stmtText == null) {
+                frag.stmtText = stmtText;
+            }
+
             // The fragment MAY be in the LRU map.
             // An incremented refCount is a lazy way to keep it safe from eviction
             // without having to update the map.
@@ -208,10 +240,10 @@ public abstract class ActivePlanRepository {
     }
 
     @Deprecated
-    public static void addFragmentForTest(long fragmentId, byte[] plan) {
+    public static void addFragmentForTest(long fragmentId, byte[] plan, String stmtText) {
         Sha1Wrapper key = new Sha1Wrapper(new byte[20]);
         synchronized (FragInfo.class) {
-            FragInfo frag = new FragInfo(key, plan, fragmentId);
+            FragInfo frag = new FragInfo(key, plan, fragmentId, stmtText);
             m_plansById.put(frag.fragId, frag);
             frag.refCount++;
         }

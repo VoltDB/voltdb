@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -111,8 +111,6 @@ public class PlannerTestAideDeCamp {
         Statement catalogStmt = proc.getStatements().add(stmtLabel);
         catalogStmt.setSqltext(sql);
         catalogStmt.setSinglepartition(forceSingle);
-        catalogStmt.setBatched(false);
-        catalogStmt.setParamnum(paramCount);
 
         // determine the type of the query
         QueryType qtype = QueryType.SELECT;

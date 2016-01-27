@@ -10,6 +10,7 @@ message UUID {
 message Ack {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
+    optional fixed64 averageRowLatencyNanos = 3;
 }
 
 message SnapshotReq {
@@ -23,6 +24,20 @@ message Reset {
 
 message Pause {
     optional int32 partitionId = 1;
+}
+
+message Connect {
+    optional int32 clusterId = 1;
+    optional fixed64 persistInstanceId = 2;
+    optional int32 protocolVersion = 3;
+}
+
+message Subscribe {
+    optional int32 partitionId = 1;
+    optional fixed64 timestamp = 2;
+    optional bool isCovering = 3;
+    optional fixed64 rewindToUniqueId = 4;
+    optional bool isSyncing = 5;
 }
 
 message Response {
@@ -46,6 +61,12 @@ message Response {
     repeated PartitionInfo partitionInfo = 8;
     // status. 0 means ok
     optional int32 status = 9 [default = 0];
+    optional CtrlEnvelope.Type type = 10;
+    optional fixed64 catalogCRC = 11;
+    optional string catalogSignature = 12;
+    optional string failureCause = 13;
+    optional bool isEndOfStream = 14;
+    optional int32 protocolVersion = 15;
 }
 
 message NodeInfo {
@@ -70,6 +91,10 @@ message PartitionInfo {
     optional int64 outstandingByteCount = 7;
     optional bool isPaused = 8;
     optional bool isSynced = 9;
+
+    // info for event synchronization
+    optional int64 nextUniqueId = 10;
+    optional bool isEnded = 11;
 }
 
 message CtrlEnvelope {
@@ -83,6 +108,7 @@ message CtrlEnvelope {
         SNAPSHOT_TERM = 7;
         STOP_SYNC = 8;
         CONNECT = 9;
+        SUBSCRIBE = 10;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -91,4 +117,7 @@ message CtrlEnvelope {
     optional Pause pause = 5;
     optional Response response = 6;
     optional SnapshotReq snapshotReq = 7;
+    optional Subscribe subscribe = 8;
+    // Intentionally skip field 9 -- deprecated message type
+    optional Connect connect = 10;
 }

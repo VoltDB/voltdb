@@ -1,0 +1,35 @@
+drop table addable if exists;
+create table addable (
+ stable integer,
+ altkey integer,
+ defaultable integer,
+ nevernullable integer,
+ alterable integer,
+ );
+
+select * from addable;
+
+drop table dropable if exists;
+create table dropable (
+ limit partition rows 1,
+ stable integer,
+ constraint pk primary key (stable),
+ altkey integer,
+ constraint altuniq unique (altkey),
+ expendable integer,
+ defaulted integer default -1,
+ nevernull integer not null,
+);
+
+select * from dropable;
+
+FILE scripts/ddl/alter.sqlfile
+
+select * from addable;
+
+select * from dropable;
+
+drop table addable;
+
+drop table dropable;
+

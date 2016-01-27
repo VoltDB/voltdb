@@ -18,16 +18,18 @@ package com.google_voltpatches.common.cache;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
-import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 
 import java.io.Serializable;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 
 /**
  * Computes or retrieves values, based on a key, for use in populating a {@link LoadingCache}.
@@ -130,7 +132,6 @@ public abstract class CacheLoader<K, V> {
    * @param function the function to be used for loading values; must never return {@code null}
    * @return a cache loader that loads values by passing each key to {@code function}
    */
-  @Beta
   public static <K, V> CacheLoader<K, V> from(Function<K, V> function) {
     return new FunctionToCacheLoader<K, V>(function);
   }
@@ -160,9 +161,47 @@ public abstract class CacheLoader<K, V> {
    * @return a cache loader that loads values by calling {@link Supplier#get}, irrespective of the
    *     key
    */
-  @Beta
   public static <V> CacheLoader<Object, V> from(Supplier<V> supplier) {
     return new SupplierToCacheLoader<V>(supplier);
+  }
+
+  /**
+   * Returns a {@code CacheLoader} which wraps {@code loader}, executing calls to
+   * {@link CacheLoader#reload} using {@code executor}.
+   *
+   * <p>This method is useful only when {@code loader.reload} has a synchronous implementation,
+   * such as {@linkplain #reload the default implementation}.
+   *
+   * @since 17.0
+   */
+  @GwtIncompatible("Executor + Futures")
+  public static <K, V> CacheLoader<K, V> asyncReloading(final CacheLoader<K, V> loader,
+      final Executor executor) {
+    checkNotNull(loader);
+    checkNotNull(executor);
+    return new CacheLoader<K, V>() {
+      @Override
+      public V load(K key) throws Exception {
+        return loader.load(key);
+      }
+
+      @Override
+      public ListenableFuture<V> reload(final K key, final V oldValue) throws Exception {
+        ListenableFutureTask<V> task = ListenableFutureTask.create(new Callable<V>() {
+          @Override
+          public V call() throws Exception {
+            return loader.reload(key, oldValue).get();
+          }
+        });
+        executor.execute(task);
+        return task;
+      }
+
+      @Override
+      public Map<K, V> loadAll(Iterable<? extends K> keys) throws Exception {
+        return loader.loadAll(keys);
+      }
+    };
   }
 
   private static final class SupplierToCacheLoader<V>
@@ -182,7 +221,17 @@ public abstract class CacheLoader<K, V> {
     private static final long serialVersionUID = 0;
   }
 
-  static final class UnsupportedLoadingOperationException extends UnsupportedOperationException {}
+  /**
+   * Exception thrown by {@code loadAll()} to indicate that it is not supported.
+   *
+   * @since 19.0
+   */
+  public static final class UnsupportedLoadingOperationException
+      extends UnsupportedOperationException {
+    // Package-private because this should only be thrown by loadAll() when it is not overridden.
+    // Cache implementors may want to catch it but should not need to be able to throw it.
+    UnsupportedLoadingOperationException() {}
+  }
 
   /**
    * Thrown to indicate that an invalid response was returned from a call to {@link CacheLoader}.

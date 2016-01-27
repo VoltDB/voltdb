@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -166,6 +166,9 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             m_hash = null;
         }
         int tableCount = buf.getShort();
+        if (tableCount < 0) {
+            throw new IOException("Table count is negative: " + tableCount);
+        }
         results = new VoltTable[tableCount];
         for (int i = 0; i < tableCount; i++) {
             int tableSize = buf.getInt();
@@ -238,7 +241,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (m_hash != null) {
             buf.putInt(m_hash.intValue());
         }
-        buf.putShort((short)results.length);
+        buf.putShort((short) results.length);
         for (VoltTable vt : results)
         {
             vt.flattenToBuffer(buf);

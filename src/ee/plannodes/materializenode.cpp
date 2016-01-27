@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -42,34 +42,28 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "materializenode.h"
 
 #include <sstream>
-#include <stdexcept>
-#include "materializenode.h"
-#include "common/common.h"
-#include "common/serializeio.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
 
 namespace voltdb {
 
-MaterializePlanNode::~MaterializePlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+MaterializePlanNode::~MaterializePlanNode() { }
 
-std::string MaterializePlanNode::debugInfo(const std::string &spacer) const {
+PlanNodeType MaterializePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MATERIALIZE; }
+
+std::string MaterializePlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
-    buffer << this->ProjectionPlanNode::debugInfo(spacer);
-    buffer << spacer << "batched: " << (this->batched ? "true" : "false") << "\n";
+    buffer << ProjectionPlanNode::debugInfo(spacer);
+    buffer << spacer << "batched: " << (m_batched ? "true" : "false") << "\n";
     return (buffer.str());
 }
 
-void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     ProjectionPlanNode::loadFromJSONObject(obj);
-
-    batched = obj.valueForKey("BATCHED").asBool();
+    m_batched = obj.valueForKey("BATCHED").asBool();
 }
 
-}
+} // namespace voltdb

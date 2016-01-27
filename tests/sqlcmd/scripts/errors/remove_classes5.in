@@ -1,0 +1,2 @@
+-- This should fail, but currently does not (ENG-8718)
+REMOVE CLASSES nonexistent.NonExistent;

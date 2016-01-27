@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,19 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.base.Charsets;
+
 /**
  * All the operational modes VoltDB can be in
  */
 public enum OperationMode {
     INITIALIZING, RUNNING, PAUSED, SHUTTINGDOWN;
+
+    private final byte [] bytes;
+
+    OperationMode() {
+        bytes = name().getBytes(Charsets.UTF_8);
+    }
 
     /**
      * Get the operation mode from its ordinal value.
@@ -35,5 +43,13 @@ public enum OperationMode {
             }
         }
         throw new AssertionError("Unknown mode: " + val);
+    }
+
+    public byte [] getBytes() {
+        return bytes;
+    }
+
+    public static OperationMode valueOf(byte [] bytes) {
+        return valueOf(new String(bytes, Charsets.UTF_8));
     }
 }

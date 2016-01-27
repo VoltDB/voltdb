@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,18 +33,34 @@
  */
 package voltkvqa;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 import org.voltdb.CLIConfig;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.jdbc.IVoltDBConnection;
+
+import javax.sql.DataSource;
+
+import org.apache.tomcat.jdbc.pool.PoolProperties;
+import com.jolbox.bonecp.BoneCPConfig;
+import com.jolbox.bonecp.BoneCPDataSource;
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 public class JDBCBenchmark
 {
@@ -54,8 +70,20 @@ public class JDBCBenchmark
     private static final AtomicLongArray PutStoreResults = new AtomicLongArray(2);
     private static final AtomicLongArray PutCompressionResults = new AtomicLongArray(2);
 
+    private static ClientStatsContext periodicStatsContext;
+    private static long benchmarkStartTS;
+
     // Reference to the database connection we will use in them main thread
     private static Connection Con;
+
+    private static final String DRIVER_NAME = "org.voltdb.jdbc.Driver";
+    // Reference to the dataSource
+    private static DataSource Ds;
+    private static boolean useConnectionPool = false;
+    private static final String C3P0_CONNECTIONPOOL = "c3p0";
+    private static final String TOMCAT_CONNECTIONPOOL = "tomcat";
+    private static final String BONECP_CONNECTIONPOOL = "bonecp";
+    private static final String HIKARI_CONNECTIONPOOL = "hikari";
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -102,6 +130,9 @@ public class JDBCBenchmark
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Use External Connection Pool, c3p0, tomcat, bonecp or hikari")
+        String externalConnectionPool = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -143,20 +174,23 @@ public class JDBCBenchmark
             Connection con = null;
             try
             {
-                con = DriverManager.getConnection(url, "", "");
-                final CallableStatement getCS = con.prepareCall("{call Get(?)}");
-                final CallableStatement putCS = con.prepareCall("{call Put(?,?)}");
                 long endTime = System.currentTimeMillis() + (1000l * this.duration);
                 Random rand = new Random();
                 while (endTime > System.currentTimeMillis())
                 {
+                    if (con != null) {
+                        try { con.close(); } catch (Exception x) {}
+                    }
+                    con = useConnectionPool ? Ds.getConnection() : DriverManager.getConnection(url, "", "");
                     // Decide whether to perform a GET or PUT operation
                     if (rand.nextDouble() < getPutRatio)
                     {
+                        CallableStatement getCS = con.prepareCall("{call STORE.select(?)}");
+                        ResultSet result = null;
                         try
                         {
                             getCS.setString(1, processor.generateRandomKeyForRetrieval());
-                            ResultSet result = getCS.executeQuery();
+                            result = getCS.executeQuery();
                             if (result.next())
                             {
                                 final PayloadProcessor.Pair pair = processor.retrieveFromStore(result.getString(1), result.getBytes(2));
@@ -171,13 +205,20 @@ public class JDBCBenchmark
                         {
                             GetStoreResults.incrementAndGet(1);
                         }
+                        finally {
+                            getCS.close();
+                            if (result != null) {
+                                result.close();
+                            }
+                        }
                     }
                     else
                     {
+                        CallableStatement putCS = con.prepareCall("{call STORE.upsert(?,?)}");
                         final PayloadProcessor.Pair pair = processor.generateForStore();
                         try
                         {
-                            // Put a key/value pair, asynchronously
+                            // Put a key/value pair using inbuilt upsert procedure, asynchronously
                             putCS.setString(1, pair.Key);
                             putCS.setBytes(2, pair.getStoreValue());
                             putCS.executeUpdate();
@@ -191,6 +232,7 @@ public class JDBCBenchmark
                         {
                             PutCompressionResults.addAndGet(0, pair.getStoreValueLength());
                             PutCompressionResults.addAndGet(1, pair.getRawValueLength());
+                            putCS.close();
                         }
                     }
                 }
@@ -207,6 +249,22 @@ public class JDBCBenchmark
         }
     }
 
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public static synchronized void printStatistics() {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
+    }
+
     // Application entry point
     public static void main(String[] args)
     {
@@ -220,10 +278,81 @@ public class JDBCBenchmark
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // We need only do this once, to "hot cache" the JDBC driver reference so the JVM may realize it's there.
-            Class.forName("org.voltdb.jdbc.Driver");
+            Class.forName(DRIVER_NAME);
 
             // Prepare the JDBC URL for the VoltDB driver
             String url = "jdbc:voltdb://" + config.servers;
+
+            // Prepare the Datasource if choose to use a connection pool
+            if (config.externalConnectionPool.equalsIgnoreCase(C3P0_CONNECTIONPOOL)) {
+                useConnectionPool = true;
+                ComboPooledDataSource cpds = new ComboPooledDataSource();
+                cpds.setDriverClass(DRIVER_NAME); //loads the jdbc driver
+                cpds.setJdbcUrl(url);
+                Ds = cpds;
+            }
+            else if (config.externalConnectionPool.equalsIgnoreCase(TOMCAT_CONNECTIONPOOL)) {
+                useConnectionPool = true;
+                // read the config file for connection pool
+                String configName = "tomcat.properties";
+                boolean useDefaultConnectionPoolConfig = true;
+                Properties cpProperties = new Properties();
+                try {
+                    FileInputStream fileInput = new FileInputStream(new File(configName));
+                    cpProperties.load(fileInput);
+                    fileInput.close();
+                    useDefaultConnectionPoolConfig = false;
+                } catch (FileNotFoundException e) {
+                    System.out.println("connection pool property file '" + configName + "' not found, use default settings");
+                }
+                PoolProperties p = new PoolProperties();
+                p.setUrl(url);
+                p.setDriverClassName(DRIVER_NAME);
+                if (useDefaultConnectionPoolConfig) {
+                    p.setInitialSize(config.threads + 1);
+                }
+                else {
+                    p.setInitialSize(Integer.parseInt(cpProperties.getProperty("tomcat.initialSize","40")));
+                }
+                org.apache.tomcat.jdbc.pool.DataSource tomcatDs = new org.apache.tomcat.jdbc.pool.DataSource();
+                tomcatDs.setPoolProperties(p);
+                Ds = tomcatDs;
+            } else if (config.externalConnectionPool.equalsIgnoreCase(BONECP_CONNECTIONPOOL)) {
+                useConnectionPool = true;
+                String configName = "bonecp.properties";
+                boolean useDefaultConnectionPoolConfig = true;
+                Properties cpProperties = new Properties();
+                try {
+                    FileInputStream fileInput = new FileInputStream(new File(configName));
+                    cpProperties.load(fileInput);
+                    fileInput.close();
+                    useDefaultConnectionPoolConfig = false;
+                } catch (FileNotFoundException e) {
+                    System.out.println("connection pool property file '" + configName + "' not found, use default settings");
+                }
+                BoneCPConfig p;
+                if (useDefaultConnectionPoolConfig) {
+                    p = new BoneCPConfig();
+                    p.setDefaultReadOnly(false);
+                    p.setPartitionCount(config.threads/2);
+                    p.setMaxConnectionsPerPartition(4);
+                } else {
+                    p = new BoneCPConfig(cpProperties);
+                }
+                p.setJdbcUrl(url + "?enableSetReadOnly=true");  // set the JDBC url
+                BoneCPDataSource boneDs  = new BoneCPDataSource(p);
+                Ds = boneDs;
+            } else if (config.externalConnectionPool.equalsIgnoreCase(HIKARI_CONNECTIONPOOL)) {
+                useConnectionPool = true;
+                HikariConfig p = new HikariConfig("hikari.properties");
+                p.setDriverClassName(DRIVER_NAME);
+                p.setJdbcUrl(url);
+                HikariDataSource hiDs = new HikariDataSource(p);
+                Ds = hiDs;
+            } else {
+                useConnectionPool = false;
+                Ds = null;
+            }
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
             System.out.printf("Connecting to: %s\n", url);
@@ -232,17 +361,26 @@ public class JDBCBenchmark
             {
                 try
                 {
+                    if (useConnectionPool) {
+                        Ds.getConnection();
+                        System.out.printf("Using Connection Pool: %s\n", config.externalConnectionPool);
+                    }
                     Con = DriverManager.getConnection(url, "", "");
                     break;
                 }
                 catch (Exception e)
                 {
-                    System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
+                    System.err.printf("Connection failed - retrying in %d second(s).\n " + e , sleep/1000);
                     try {Thread.sleep(sleep);} catch(Exception tie){}
                     if (sleep < 8000)
                         sleep += sleep;
                 }
             }
+
+            // Statistics manager objects from the connection, used to generate latency histogram
+            ClientStatsContext fullStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+            periodicStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+
             System.out.println("Connected.  Starting benchmark.");
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
@@ -251,33 +389,35 @@ public class JDBCBenchmark
                     config.entropy, config.poolsize, config.usecompression);
 
             // Initialize the store
-            if (config.preload)
-            {
+            if (config.preload) {
                 System.out.print("Initializing data store... ");
-                final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?,?,?)}");
-                for(int i=0;i<config.poolsize;i+=1000)
-                {
-                    initializeCS.setInt(1, i);
-                    initializeCS.setInt(2, Math.min(i+1000,config.poolsize));
-                    initializeCS.setString(3, processor.KeyFormat);
-                    initializeCS.setBytes(4, processor.generateForStore().getStoreValue());
-                    initializeCS.executeUpdate();
+
+                final PreparedStatement removeCS = Con.prepareStatement("DELETE FROM store;");
+                final CallableStatement putCS = Con.prepareCall("{call STORE.upsert(?,?)}");
+                for(int i=0;i<config.poolsize ;i++) {
+                    if (i == 0) {
+                        removeCS.execute();
+                    }
+                    putCS.setString(1, String.format(processor.KeyFormat, i));
+                    putCS.setBytes(2,processor.generateForStore().getStoreValue());
+                    putCS.execute();
                 }
                 System.out.println(" Done.");
             }
+            // start the stats
+            fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
+            benchmarkStartTS = System.currentTimeMillis();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create a Timer task to display performance data on the operating procedures
             Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
+            TimerTask statsPrinting = new TimerTask() {
                 @Override
-                public void run()
-                {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put")); } catch(Exception x) {}
-                }
-            }
+                public void run() { printStatistics(); }
+            };
+            timer.scheduleAtFixedRate(statsPrinting
             , config.displayinterval*1000l
             , config.displayinterval*1000l
             );
@@ -305,6 +445,9 @@ public class JDBCBenchmark
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Now print application results:
+
+            // stop and fetch the stats
+            ClientStats stats = fullStatsContext.fetch().getStats();
 
             // 1. Store statistics as tracked by the application (ops counts, payload traffic)
             System.out.printf(
@@ -339,22 +482,34 @@ public class JDBCBenchmark
             + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
             );
 
-            // 2. Overall performance statistics for GET/PUT operations
             System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put").toString(false));
-
-            // 3. Per-procedure detailed performance statistics
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " Detailed Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics().toString(false));
+                    "\n\n-------------------------------------------------------------------------------------\n"
+                  + " Client Latency Statistics\n"
+                  + "-------------------------------------------------------------------------------------\n\n");
+            System.out.printf("Average latency:               %,9.2f ms\n",
+                    stats.getAverageLatency());
+            System.out.printf("10th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.1));
+            System.out.printf("25th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.25));
+            System.out.printf("50th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.5));
+            System.out.printf("75th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.75));
+            System.out.printf("90th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.9));
+            System.out.printf("95th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.95));
+            System.out.printf("99th percentile latency:       %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.99));
+            System.out.printf("99.5th percentile latency:     %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.995));
+            System.out.printf("99.9th percentile latency:     %,9.2f ms\n",
+                    stats.kPercentileLatencyAsDouble(.999));
+            System.out.println("\n\n" + stats.latencyHistoReport());
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(stats, config.statsfile);
 
             Con.close();
 

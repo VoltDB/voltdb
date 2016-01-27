@@ -1,0 +1,1 @@
+[./scripts/batching/redundant_table_batch.sqlfile:4]: DDL Error: "object name already exists: MY_TABLE_1 in statement [create table my_table_1 (j integer)]"

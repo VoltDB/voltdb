@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -140,16 +140,23 @@ void Catalog::executeOne(const string &stmt) {
     CatalogType *item = NULL;
     if (ref.compare("$PREV") == 0) {
         if (!m_lastUsedPath) {
-            std::string errmsg = "$PREV reference was not preceded by a cached reference.";
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+            // Silently ignore failures -- these are indicative of commands for types
+            // that the EE doesn't need/support (hopefully).
+            // Trust java code to send us the right thing. Trade sanity check here
+            // for memory usage and simpler code on the java side.
+            return;
         }
         item = m_lastUsedPath;
     }
     else {
         item = itemForRef(ref);
         if (item == NULL) {
-            std::string errmsg = "Catalog reference for " + ref + " not found.";
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+            // Silently ignore failures -- these are indicative of commands for types
+            // that the EE doesn't need/support (hopefully).
+            // Trust java code to send us the right thing. Trade sanity check here
+            // for memory usage and simpler code on the java side.
+            m_lastUsedPath = NULL;
+            return;
         }
         m_lastUsedPath = item;
     }
@@ -158,8 +165,11 @@ void Catalog::executeOne(const string &stmt) {
     if (command.compare("add") == 0) {
         CatalogType *type = item->addChild(coll, child);
         if (type == NULL) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                           "Catalog failed to add child.");
+            // Silently ignore failures -- these are indicative of commands for types
+            // that the EE doesn't need/support (hopefully).
+            // Trust java code to send us the right thing. Trade sanity check here
+            // for memory usage and simpler code on the java side.
+            return;
         }
         type->added();
         resolveUnresolvedInfo(type->path());
@@ -172,11 +182,14 @@ void Catalog::executeOne(const string &stmt) {
         // remove from collection and hash path to the deletion tracker
         // throw if nothing was removed.
         if(item->removeChild(coll, child)) {
-            m_deletions.push_back(ref + "/" + coll + "[" + child + "]");
+            m_deletions.push_back(ref + "/" + coll + MAP_SEPARATOR + child);
         }
         else {
-            std::string errmsg = "Catalog reference for " + ref + " not found.";
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+            // Silently ignore failures -- these are indicative of commands for types
+            // that the EE doesn't need/support (hopefully).
+            // Trust java code to send us the right thing. Trade sanity check here
+            // for memory usage and simpler code on the java side.
+            return;
         }
     }
     else {
@@ -193,38 +206,44 @@ CatalogType *Catalog::itemForRef(const string &ref) {
     // if it's a path
     boost::unordered_map<std::string, CatalogType*>::const_iterator iter;
     iter = m_allCatalogObjects.find(ref);
-    if (iter != m_allCatalogObjects.end())
+    if (iter != m_allCatalogObjects.end()) {
         return iter->second;
-    else
+    }
+    else {
         return NULL;
+    }
 }
 
 CatalogType *Catalog::itemForPath(const CatalogType *parent, const string &path) {
     string realpath = path;
-    if (path.at(0) == '/')
+    if (path.at(0) == '/') {
         realpath = realpath.substr(1);
+    }
 
     // root case
-    if (realpath.length() == 0)
+    if (realpath.length() == 0) {
         return this;
+    }
 
     vector<string> parts = MiscUtil::splitToTwoString(realpath, '/');
 
     // child of root
-    if (parts.size() <= 1)
+    if (parts.size() <= 1) {
         return itemForPathPart(parent, parts[0]);
+    }
 
     CatalogType *nextParent = itemForPathPart(parent, parts[0]);
-    if (nextParent == NULL)
+    if (nextParent == NULL) {
         return NULL;
+    }
     return itemForPath(nextParent, parts[1]);
 }
 
 CatalogType *Catalog::itemForPathPart(const CatalogType *parent, const string &pathPart) const {
-    vector<string> parts = MiscUtil::splitToTwoString(pathPart, '[');
-    if (parts.size() <= 1)
+    vector<string> parts = MiscUtil::splitToTwoString(pathPart, MAP_SEPARATOR);
+    if (parts.size() <= 1) {
         return NULL;
-    parts[1] = MiscUtil::splitString(parts[1], ']')[0];
+    }
     return parent->getChild(parts[0], parts[1]);
 }
 
@@ -289,9 +308,10 @@ CatalogType *
 Catalog::addChild(const string &collectionName, const string &childName) {
     if (collectionName.compare("clusters") == 0) {
         CatalogType *exists = m_clusters.get(childName);
-        if (exists)
+        if (exists) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "trying to add a duplicate value.");
+        }
         return m_clusters.add(childName);
     }
 
@@ -300,8 +320,9 @@ Catalog::addChild(const string &collectionName, const string &childName) {
 
 CatalogType *
 Catalog::getChild(const string &collectionName, const string &childName) const {
-    if (collectionName.compare("clusters") == 0)
+    if (collectionName.compare("clusters") == 0) {
         return m_clusters.get(childName);
+    }
     return NULL;
 }
 
@@ -319,15 +340,17 @@ int32_t hexCharToInt(char c) {
     c = static_cast<char>(toupper(c));
     assert ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'));
     int32_t retval;
-    if (c >= 'A')
+    if (c >= 'A') {
         retval = c - 'A' + 10;
-    else
+    }
+    else {
         retval = c - '0';
+    }
     assert(retval >=0 && retval < 16);
     return retval;
 }
 
-/** pass in a buffer at least half as long as the string */
+/** pass in a buffer at least (len(hexString)/2+1) */
 void Catalog::hexDecodeString(const string &hexString, char *buffer) {
     assert (buffer);
     int32_t i;
@@ -342,11 +365,11 @@ void Catalog::hexDecodeString(const string &hexString, char *buffer) {
     buffer[i] = '\0';
 }
 
-/** pass in a buffer at least twice as long as the string */
-void Catalog::hexEncodeString(const char *string, char *buffer) {
+/** pass in a buffer at least (2*len+1) */
+void Catalog::hexEncodeString(const char *string, char *buffer, size_t len) {
     assert (buffer);
     int32_t i = 0;
-    for (; i < strlen(string); i++) {
+    for (; i < len; i++) {
         char ch[2];
         snprintf(ch, 2, "%x", (string[i] >> 4) & 0xF);
         buffer[i * 2] = ch[0];

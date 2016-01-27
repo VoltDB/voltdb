@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -47,11 +47,8 @@
 #define HSTOREMATERIALIZENODE_H
 
 #include "projectionnode.h"
-#include "expressions/abstractexpression.h"
 
 namespace voltdb {
-
-class Table;
 
 /**
  *
@@ -68,23 +65,18 @@ class MaterializePlanNode : public ProjectionPlanNode {
     // something special to populate these columns
     // Andy - 06/25/2008
     //
-    public:
-        MaterializePlanNode(CatalogId id): ProjectionPlanNode(id), batched(false) {
-        }
-        MaterializePlanNode(): ProjectionPlanNode(), batched(false) {
-        }
-        virtual ~MaterializePlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZE); }
+public:
+    MaterializePlanNode() { }
+    ~MaterializePlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        std::string debugInfo(const std::string &spacer) const;
-
-        bool isBatched() const { return batched; }
-        void setBatched(bool batched) { this->batched = batched; }
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        bool batched;
+    bool isBatched() const { return m_batched; }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
+    bool m_batched;
 };
 
-}
+} // namespace voltdb
 
 #endif

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@
 #include <list>
 #include <boost/shared_ptr.hpp>
 #include <boost/foreach.hpp>
+#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSerializer.h"
@@ -36,7 +37,6 @@ class CopyOnWriteTest;
 namespace voltdb
 {
 
-class ReferenceSerializeInput;
 class PersistentTable;
 class PersistentTableSurgeon;
 class TupleOutputStreamProcessor;

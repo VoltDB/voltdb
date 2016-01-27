@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -88,24 +88,6 @@ AbstractExpression::~AbstractExpression()
     delete m_right;
 }
 
-void
-AbstractExpression::substitute(const NValueArray &params)
-{
-    if (!m_hasParameter)
-        return;
-
-    // descend. nodes with parameters overload substitute()
-    VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-    if (m_left) {
-        VOLT_TRACE("Substitute processing left child...");
-        m_left->substitute(params);
-    }
-    if (m_right) {
-        VOLT_TRACE("Substitute processing right child...");
-        m_right->substitute(params);
-    }
-}
-
 bool
 AbstractExpression::hasParameter() const
 {
@@ -123,9 +105,6 @@ AbstractExpression::initParamShortCircuits()
 std::string
 AbstractExpression::debug() const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     std::ostringstream buffer;
     //buffer << "Expression[" << expressionutil::getTypeName(getExpressionType()) << "]";
     buffer << "Expression[" << expressionToString(getExpressionType()) << ", " << getExpressionType() << "]";
@@ -135,18 +114,12 @@ AbstractExpression::debug() const
 std::string
 AbstractExpression::debug(bool traverse) const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     return (traverse ? debug(std::string("")) : debug());
 }
 
 std::string
 AbstractExpression::debug(const std::string &spacer) const
 {
-    if (this == NULL) {
-        return "NULL";
-    }
     std::ostringstream buffer;
     buffer << spacer << "+ " << debug() << "\n";
 

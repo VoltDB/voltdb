@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,19 +54,6 @@ public:
             }
         }
         return false;
-    }
-
-    virtual void substitute(const NValueArray &params)
-    {
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        for (size_t i = 0; i < m_args.size(); i++) {
-            assert(m_args[i]);
-            VOLT_TRACE("Substituting parameters for arg at index %d...", static_cast<int>(i));
-            m_args[i]->substitute(params);
-        }
     }
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Database;
@@ -71,106 +70,106 @@ public class plannerTester {
     public static ArrayList<String> m_diffMessages = new ArrayList<String>();
     private static String m_reportPath = "/tmp/";
     private static BufferedWriter m_reportWriter;
-    private static ArrayList<String>  m_filters = new ArrayList<String> ();
+    private static ArrayList<String> m_filters = new ArrayList<String>();
 
     public static class diffPair {
         private Object m_first;
         private Object m_second;
 
-        public diffPair( Object first, Object second ) {
+        public diffPair(Object first, Object second) {
             m_first = first;
             m_second = second;
         }
 
         @Override
         public String toString() {
-            String first = ( ( m_first == null ) || ( m_first == "" ) ) ?
+            String first = ((m_first == null) || (m_first == "")) ?
                             "[]" : m_first.toString();
-            String second = ( m_second == null || ( m_second == "" )) ?
+            String second = ((m_second == null) || (m_second == "")) ?
                             "[]" : m_second.toString();
-            return "("+first+" => "+second+")";
+            return "(" + first + " => " + second + ")";
         }
 
         public boolean equals() {
             return m_first.equals(m_second);
         }
 
-        public void setFirst( Object first ) {
+        public void setFirst(Object first) {
             m_first = first;
         }
 
-        public void setSecond( Object second ) {
+        public void setSecond(Object second) {
             m_second = second;
         }
 
-        public void set( Object first, Object second ) {
+        public void set(Object first, Object second) {
             m_first = first;
             m_second = second;
         }
     }
 
-    public static void main( String[] args ) {
+    public static void main(String[] args) {
         int numError = 0;
         for(String str : args) {
-            if( str.startsWith("-C=")) {
+            if (str.startsWith("-C=")) {
                 String subStr = str.split("=")[1];
                 String [] configs = subStr.split(",");
-                for( String config : configs ) {
-                    m_config.add( config.trim() );
+                for (String config : configs) {
+                    m_config.add(config.trim());
                 }
             }
-            else if( str.startsWith("-sp=")) {
+            else if (str.startsWith("-sp=")) {
                 m_workPath = str.split("=")[1];
                 m_workPath = m_workPath.trim();
-                if( ! m_workPath.endsWith("/") ) {
+                if ( ! m_workPath.endsWith("/")) {
                     m_workPath += "/";
                 }
             }
-            else if( str.startsWith("-b=")) {
+            else if (str.startsWith("-b=")) {
                 m_fixedBaselinePath = str.split("=")[1];
                 m_fixedBaselinePath = m_fixedBaselinePath.trim();
-                if( !m_fixedBaselinePath.endsWith("/") ) {
+                if (!m_fixedBaselinePath.endsWith("/")) {
                     m_fixedBaselinePath += "/";
                 }
             }
-            else if( str.equals("-s") ) {
+            else if (str.equals("-s")) {
                 m_isCompile = true;
                 m_isSave = true;
             }
-            else if( str.equals("-sv") ) {
+            else if (str.equals("-sv")) {
                 m_isCompile = true;
                 m_isSave = true;
                 m_reportExplainedPlan = true;
                 m_reportSQLStatement = true;
             }
-            else if( str.equals("-d") ) {
+            else if (str.equals("-d")) {
                 m_isCompile = true;
                 m_isDiff = true;
             }
-            else if( str.equals("-dv") ) {
+            else if (str.equals("-dv")) {
                 m_isCompile = true;
                 m_isDiff = true;
                 m_reportDiffExplainedPlan = true;
                 m_reportSQLStatement = true;
             }
-            else if( str.startsWith("-r=") ){
+            else if (str.startsWith("-r=")) {
                 m_reportPath = str.split("=")[1];
                 m_reportPath = m_reportPath.trim();
-                if( !m_reportPath.endsWith("/") ) {
+                if (!m_reportPath.endsWith("/")) {
                     m_reportPath += "/";
                 }
             }
-            else if( str.equals("-re") ){
+            else if (str.equals("-re")) {
                 m_reportExplainedPlan = true;
                 m_reportDiffExplainedPlan = true;
             }
-            else if( str.equals("-rs") ){
+            else if (str.equals("-rs")) {
                 m_reportSQLStatement = true;
             }
-            else if( str.startsWith("-i=") ) {
-                m_filters.add(str.split("=")[1] );
+            else if (str.startsWith("-i=")) {
+                m_filters.add(str.split("=")[1]);
             }
-            else if( str.startsWith("-help") || str.startsWith("-h") ){
+            else if (str.startsWith("-help") || str.startsWith("-h")) {
                 printUsage();
                 System.exit(0);
             }
@@ -181,55 +180,59 @@ public class plannerTester {
             }
         }
 
-        if( !new File(m_workPath).exists() ) {
+        if ( ! new File(m_workPath).exists()) {
             new File(m_workPath).mkdirs();
         }
 
-        if( m_isCompile ) {
-            for( String config : m_config ) {
+        if (m_isCompile) {
+            for (String config : m_config) {
                 try {
                     configCompileSave(config, m_isSave);
-                } catch (Exception e) {
+                }
+                catch (Exception e) {
                     e.printStackTrace();
                     ++numError;
                 }
             }
         }
-        if( m_isDiff ) {
-            if( !new File(m_reportPath).exists() ) {
+        if (m_isDiff) {
+            if ( ! new File(m_reportPath).exists()) {
                 new File(m_reportPath).mkdirs();
             }
             try {
-                m_reportWriter = new BufferedWriter(new FileWriter( m_reportPath+"plannerTester.report" ));
-            } catch (IOException e1) {
+                m_reportWriter = new BufferedWriter(new FileWriter(m_reportPath + "plannerTester.report"));
+            }
+            catch (IOException e1) {
                 System.out.println(e1.getMessage());
                 System.exit(-1);
             }
-            for( String config : m_config ) {
+            for (String config : m_config) {
                 try {
                     configDiff(config);
-                } catch (Exception e) {
+                }
+                catch (Exception e) {
                     e.printStackTrace();
                     ++numError;
                 }
             }
             int numTest = m_numPass + m_numFail;
-            String summary = "\nTest: "+numTest+"\nPass: "+m_numPass+"\nFail: "+
-                    m_numFail+"\nError: "+numError+"\n";
+            String summary = "\nTest: " + numTest + "\nPass: " + m_numPass + "\nFail: " +
+                    m_numFail + "\nError: " + numError + "\n";
             System.out.print(summary);
             try {
                 m_reportWriter.write(summary);
                 m_reportWriter.flush();
                 m_reportWriter.close();
-            } catch (IOException e) {
+            }
+            catch (IOException e) {
                 e.printStackTrace();
             }
-            System.out.println("Report file created at "+m_reportPath+"plannerTester.report");
+            System.out.println("Report file created at " + m_reportPath + "plannerTester.report");
         }
-        if( numError != 0 ) {
+        if (numError != 0) {
             System.exit(2);
         }
-        if( m_numFail != 0 ) {
+        if (m_numFail != 0) {
             System.exit(1);
         }
         System.exit(0);
@@ -261,50 +264,50 @@ public class plannerTester {
 
     }
 
-    public static boolean setUp( String config ) throws Exception {
+    public static boolean setUp(String config) throws Exception {
         m_baselinePath = (m_fixedBaselinePath != null) ? m_fixedBaselinePath : (config + "/baseline/");
         String ddlFilePath = null;
         m_stmts.clear();
-        BufferedReader reader = new BufferedReader( new FileReader(config + "/config") );
+        BufferedReader reader = new BufferedReader(new FileReader(config + "/config"));
         String line = null;
-        while( ( line = reader.readLine() ) != null ) {
-            if( line.startsWith("#") ) {
+        while((line = reader.readLine()) != null) {
+            if (line.startsWith("#")) {
                 continue;
             }
-            else if( line.equalsIgnoreCase("DDL:")) {
-                if ( ( line = reader.readLine() ) == null ) {
+            else if (line.equalsIgnoreCase("DDL:")) {
+                if ((line = reader.readLine()) == null) {
                     break;
                 }
-                ddlFilePath = new File( line ).getCanonicalPath();
+                ddlFilePath = new File(line).getCanonicalPath();
             }
-            else if( line.equalsIgnoreCase("SQL:")) {
+            else if (line.equalsIgnoreCase("SQL:")) {
                 boolean atEof = false;
                 while (true) {
-                    if ( ( line = reader.readLine() ) == null ) {
+                    if ((line = reader.readLine()) == null) {
                         atEof = true;
                         break;
                     }
-                    if( line.startsWith("#") ) {
+                    if (line.startsWith("#")) {
                         continue;
                     }
-                    if (line.length() <= 6 ) {
+                    if (line.length() <= 6) {
                         break;
                     }
-                    if( line.startsWith("JOIN:") ) {
+                    if (line.startsWith("JOIN:")) {
                         // These lines have three parts JOIN:<joinOrder>:<query>
-                        if ( line.split(":").length != 3 ) {
+                        if (line.split(":").length != 3) {
                             System.err.println("Config file syntax error : ignoring line: " + line);
                         }
                     }
-                    m_stmts.add( line );
+                    m_stmts.add(line);
                 }
                 if (atEof) {
                     break;
                 }
             }
             // This section of the config file is optional, deprecated, and ignored.
-            else if( line.equalsIgnoreCase("Partition Columns:") ) {
-                if ( ( line = reader.readLine() ) == null ) {
+            else if (line.equalsIgnoreCase("Partition Columns:")) {
+                if ((line = reader.readLine()) == null) {
                     break;
                 }
             }
@@ -313,7 +316,7 @@ public class plannerTester {
             }
         }
         boolean success = true;
-        if (ddlFilePath == null ) {
+        if (ddlFilePath == null) {
             System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'DDL:' section");
             success = false;
         }
@@ -335,7 +338,8 @@ public class plannerTester {
             File ddlFile = new File(pathDDL);
             URL ddlURL = ddlFile.toURI().toURL();
             s_singleton.setupSchema(ddlURL, config, false);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -345,60 +349,89 @@ public class plannerTester {
         return s_singleton.compileToFragments(sql);
     }
 
-    public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
-        if( pn == null ) {
-            System.err.println("the plan node is null, nothing to write");
-            return;
-        }
-        PlanNodeTree pnt = new PlanNodeTree( pn );
+    public static void writePlanToFile(AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
+        assert(pn != null);
+        PlanNodeTree pnt = new PlanNodeTree(pn);
         String prettyJson = pnt.toJSONString();
-        if( !new File(pathToDir).exists() ) {
+        if (!new File(pathToDir).exists()) {
             new File(pathToDir).mkdirs();
         }
         try {
-            BufferedWriter writer = new BufferedWriter( new FileWriter( pathToDir+fileName ) );
-            writer.write( sql );
-            writer.write( "\n" );
-            writer.write( prettyJson );
+            BufferedWriter writer = new BufferedWriter(new FileWriter(pathToDir + fileName));
+            writer.write(sql);
+            writer.write("\n");
+            writer.write(prettyJson);
             writer.flush();
             writer.close();
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static PlanNodeTree loadPlanFromFile( String path, ArrayList<String> getsql ) throws FileNotFoundException {
-        PlanNodeTree pnt = new PlanNodeTree();
-        String prettyJson = "";
-        String line = null;
-        BufferedReader reader = new BufferedReader( new FileReader( path ));
+    public static AbstractPlanNode loadPlanFromFile(String path, ArrayList<String> getsql) {
+        BufferedReader reader;
         try {
-            getsql.add( reader.readLine() );
-            while( (line = reader.readLine() ) != null ){
-                line = line.trim();
-                prettyJson += line;
-            }
-        } catch (IOException e1) {
+            reader = new BufferedReader(new FileReader(path));
+        }
+        catch (FileNotFoundException e1) {
             e1.printStackTrace();
+            String message = "ERROR: Plan file " + path + " doesn't exist.\n" +
+                    "Use -s (the Compile/Save option) or 'ant plannertestrefresh'" +
+                    " ' to generate plans to the baseline directory.\n";
+            System.err.print(message);
+            try {
+                m_reportWriter.write(message);
+            }
+            catch (IOException e2) {
+                e2.printStackTrace();
+            }
+            return null;
         }
-        JSONObject jobj;
+
         try {
-            jobj = new JSONObject( prettyJson );
-            JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-            Database db = s_singleton.getDatabase();
-            pnt.loadFromJSONArray(jarray, db);
-        } catch (JSONException e) {
-            e.printStackTrace();
+            String json = "";
+            try {
+                String line = reader.readLine();
+                getsql.add(line);
+                while((line = reader.readLine()) != null) {
+                    json += line;
+                }
+            }
+            catch (IOException e2) {
+                e2.printStackTrace();
+                return null;
+            }
+            try {
+                PlanNodeTree pnt = new PlanNodeTree();
+                JSONObject jobj = new JSONObject(json);
+                Database db = s_singleton.getDatabase();
+                pnt.loadFromJSONPlan(jobj, db);
+                return pnt.getRootPlanNode();
+            }
+            catch (JSONException e3) {
+                e3.printStackTrace();
+                System.out.println("Failed on input from file: " + path +
+                        " with JSON text: \n'" + json + "'");
+                return null;
+            }
         }
-        return pnt;
+        finally {
+            try {
+                reader.close();
+            }
+            catch (IOException e2) {
+                e2.printStackTrace();
+            }
+        }
     }
 
-    public static ArrayList< AbstractPlanNode > getJoinNodes( ArrayList<AbstractPlanNode> pnlist ) {
+    public static ArrayList< AbstractPlanNode > getJoinNodes(ArrayList<AbstractPlanNode> pnlist) {
         ArrayList< AbstractPlanNode > joinNodeList = new ArrayList<AbstractPlanNode>();
 
-        for( AbstractPlanNode pn : pnlist ) {
-            if( pn.getPlanNodeType().equals(PlanNodeType.NESTLOOP) ||
-                    pn.getPlanNodeType().equals(PlanNodeType.NESTLOOPINDEX) ) {
+        for (AbstractPlanNode pn : pnlist) {
+            if (pn.getPlanNodeType().equals(PlanNodeType.NESTLOOP) ||
+                    pn.getPlanNodeType().equals(PlanNodeType.NESTLOOPINDEX)) {
                 joinNodeList.add(pn);
             }
         }
@@ -406,29 +439,35 @@ public class plannerTester {
     }
 
     private static void configCompileSave(String config, boolean isSave) throws Exception {
-        if ( ! setUp( config )) {
+        if ( ! setUp(config)) {
             return;
         }
         int size = m_stmts.size();
-        for( int i = 0; i < size; i++ ) {
+        for (int i = 0; i < size; i++) {
             String query = m_stmts.get(i);
             String joinOrder = null;
-            if( query.startsWith("JOIN:") ) {
+            if (query.startsWith("JOIN:")) {
                 String[] splitLine = query.split(":");
                 joinOrder = splitLine[1];
                 query = splitLine[2];
             }
-            List<AbstractPlanNode> pnList = s_singleton.compileWithJoinOrderToFragments(query, joinOrder);
-            AbstractPlanNode pn = pnList.get(0);
-            if( pnList.size() == 2 ){//multi partition query plan
-                assert( pnList.get(1) instanceof SendPlanNode );
-                if( ! pn.reattachFragment( ( SendPlanNode) pnList.get(1) ) ) {
-                    System.err.println( "Receive plan node not found in reattachFragment." );
+            // If one compilation fails, try subsequent ones.
+            // This avoids cascading "file-not-found" errors.
+            try {
+                List<AbstractPlanNode> pnList = s_singleton.compileWithJoinOrderToFragments(query, joinOrder);
+                AbstractPlanNode pn = pnList.get(0);
+                if (pnList.size() == 2) {// multi partition query plan
+                    assert(pnList.get(1) instanceof SendPlanNode);
+                    if ( ! pn.reattachFragment((SendPlanNode) pnList.get(1))) {
+                        System.err.println("Receive plan node not found in reattachFragment.");
+                    }
                 }
-            }
-            writePlanToFile(pn, m_workPath, config+".plan"+i, m_stmts.get(i) );
-            if (isSave) {
-                writePlanToFile(pn, m_baselinePath, config+".plan"+i, m_stmts.get(i) );
+                writePlanToFile(pn, m_workPath, config + ".plan" + i, m_stmts.get(i));
+                if (isSave) {
+                    writePlanToFile(pn, m_baselinePath, config + ".plan" + i, m_stmts.get(i));
+                }
+            } catch (PlanningErrorException ex) {
+                System.err.printf("Planning error, line %d: %s\n", i, ex.getMessage());
             }
         }
         if (isSave) {
@@ -436,101 +475,92 @@ public class plannerTester {
         }
     }
 
-    //parameters : path to baseline and the new plans
-    //size : number of total files in the baseline directory
+    // parameters : path to baseline and the new plans
+    // size : number of total files in the baseline directory
     public static void configDiff(String config) throws Exception {
-        if ( ! setUp( config )) {
+        if ( ! setUp(config)) {
             return;
         }
-        m_reportWriter.write( "===================================================================Begin "+config+"\n" );
-        PlanNodeTree pnt1 = null;
-        PlanNodeTree pnt2 = null;
+        m_reportWriter.write("===================================================================Begin " + config + "\n");
+        AbstractPlanNode pn1 = null;
+        AbstractPlanNode pn2 = null;
         int size = m_stmts.size();
         String baseStmt = null;
-        for( int i = 0; i < size; i++ ){
-            //* Enable for debug:*/ System.out.println("DEBUG: comparing " + m_savePlanPath+config+".plan"+i + " and " + m_baselinePath+config+".plan"+i);
+        for (int i = 0; i < size; i++) {
+            // * Enable for debug:*/ System.out.println("DEBUG: comparing " + m_savePlanPath + config + ".plan" + i + " and " + m_baselinePath + config + ".plan" + i);
             ArrayList<String> getsql = new ArrayList<String>();
-            try {
-                pnt1 = loadPlanFromFile( m_baselinePath+config+".plan"+i, getsql );
-                baseStmt = getsql.get(0);
-            } catch (FileNotFoundException e) {
-                String message = "ERROR: Plan file "+m_baselinePath+config+".plan"+i+" doesn't exist. Use -s (the Compile/Save option) or 'ant plannertestrefresh -Dconfig="+config + " ' to generate plans to the baseline directory.\n";
-                System.err.print(message);
-                m_reportWriter.write(message);
-                System.exit(1);
+            pn1 = loadPlanFromFile(m_baselinePath + config + ".plan" + i, getsql);
+            if (pn1 == null) {
+                continue;
             }
 
-            //if sql stmts not consistent
-            if( !baseStmt.equalsIgnoreCase( m_stmts.get(i)) ) {
-                diffPair strPair = new diffPair( baseStmt, m_stmts.get(i) );
-                m_reportWriter.write("Statement "+i+" of "+config+"/config:\n SQL statement is not consistent with the one in baseline :"+"\n"+
-                        strPair.toString()+"\n");
+            baseStmt = getsql.get(0);
+            // if sql stmts not consistent
+            if (!baseStmt.equalsIgnoreCase(m_stmts.get(i))) {
+                diffPair strPair = new diffPair(baseStmt, m_stmts.get(i));
+                m_reportWriter.write("Statement " + i + " of " + config + "/config:\n" +
+                        "SQL statement is not consistent with the one in baseline :\n" +
+                        strPair.toString() + "\n");
                 m_numFail++;
                 continue;
             }
 
-            try{
-                pnt2  = loadPlanFromFile( m_workPath+config+".plan"+i, getsql );
-            } catch (FileNotFoundException e) {
-                String message = "ERROR: Temporary plan file "+m_workPath+config+".plan"+i+" was not generated.\n";
-                System.err.print(message);
-                m_reportWriter.write(message);
-                System.exit(1);
+            pn2  = loadPlanFromFile(m_workPath + config + ".plan" + i, getsql);
+            if (pn2 == null) {
+                continue;
             }
-            AbstractPlanNode pn1 = pnt1.getRootPlanNode();
-            AbstractPlanNode pn2 = pnt2.getRootPlanNode();
 
-
-            if( diff( pn1, pn2, false ) ) {
+            if (diff(pn1, pn2, false)) {
                 m_numPass++;
-                if( m_reportExplainedPlan ) {
-                    m_reportWriter.write( "SQL statement:\n"+m_stmts.get(i)+"\n");
-                    m_reportWriter.write("\nExplained plan:\n"+pn2.toExplainPlanString()+"\n");
+                if (m_reportExplainedPlan) {
+                    m_reportWriter.write("SQL statement:\n" + m_stmts.get(i) + "\n");
+                    m_reportWriter.write("\nExplained plan:\n" + pn2.toExplainPlanString() + "\n");
                 }
-            } else {
+            }
+            else {
                 m_numFail++;
-                m_reportWriter.write( "Statement "+i+" of "+config+": \n" );
-                //TODO add more logic to determine which plan is better
-                if( !m_changedSQL ){
-                    if( m_treeSizeDiff < 0 ){
-                        m_reportWriter.write( "Old plan might be better\n" );
+                m_reportWriter.write("Statement " + i + " of " + config + ": \n");
+                // TODO add more logic to determine which plan is better
+                if (!m_changedSQL) {
+                    if (m_treeSizeDiff < 0) {
+                        m_reportWriter.write("Old plan might be better\n");
                     }
-                    else if( m_treeSizeDiff > 0 ) {
-                        m_reportWriter.write( "New plan might be better\n" );
+                    else if (m_treeSizeDiff > 0) {
+                        m_reportWriter.write("New plan might be better\n");
                     }
                 }
 
-                for( String msg : m_diffMessages ) {
+                for (String msg : m_diffMessages) {
                     boolean isIgnore = false;
-                    for( String filter : m_filters ) {
-                        if( msg.contains( filter ) ) {
+                    for (String filter : m_filters) {
+                        if (msg.contains(filter)) {
                             isIgnore = true;
                             break;
                         }
                     }
-                    if( !isIgnore )
-                        m_reportWriter.write( msg+"\n\n" );
+                    if (!isIgnore)
+                        m_reportWriter.write(msg + "\n\n");
                 }
-                if( m_reportSQLStatement ) {
-                    m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");
-                }
-
-                if( m_reportDiffExplainedPlan ) {
-                    m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
+                if (m_reportSQLStatement) {
+                    m_reportWriter.write("SQL statement:\n" + baseStmt + "\n==>\n" + m_stmts.get(i) + "\n");
                 }
 
-                m_reportWriter.write("Path to the config file :"+config+"\n" +
-                                     "Path to the baseline file :"+m_baselinePath+config+".plan"+i+"\n" +
-                                     "Path to the current plan file :"+m_workPath+config+".plan"+i +
+                if (m_reportDiffExplainedPlan) {
+                    m_reportWriter.write("\nExplained plan:\n" + pn1.toExplainPlanString() + "\n==>\n" + pn2.toExplainPlanString() + "\n");
+                }
+
+                m_reportWriter.write("Path to the config file :" + config + "\n" +
+                                     "Path to the baseline file :" + m_baselinePath + config + ".plan" + i + "\n" +
+                                     "Path to the current plan file :" + m_workPath + config + ".plan" + i +
                                      "\n\n----------------------------------------------------------------------\n");
             }
         }
         m_reportWriter.write("===================================================================" +
-                            "End "+config+"\n");
+                            "End " + config + "\n");
         m_reportWriter.flush();
     }
 
-    public static boolean diffInlineAndJoin( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
+    public static boolean diffInlineAndJoin(AbstractPlanNode oldpn1, AbstractPlanNode newpn2) {
         m_treeSizeDiff = 0;
         boolean noDiff = true;
         ArrayList<String> messages = new ArrayList<String>();
@@ -541,9 +571,9 @@ public class plannerTester {
         m_treeSizeDiff = size1 - size2;
         diffPair intdiffPair = new diffPair(0,0);
         diffPair stringdiffPair = new diffPair(null,null);
-        if( size1 != size2 ) {
+        if (size1 != size2) {
             intdiffPair.set(size1, size2);
-            messages.add( "Plan tree size diff: "+intdiffPair.toString() );
+            messages.add("Plan tree size diff: " + intdiffPair.toString());
         }
         Map<String,ArrayList<Integer>> planNodesPosMap1 = new LinkedHashMap<String,ArrayList<Integer>> ();
         Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap1 = new LinkedHashMap<String,ArrayList<AbstractPlanNode>> ();
@@ -554,50 +584,50 @@ public class plannerTester {
         fetchPositionInfoFromList(list1, planNodesPosMap1, inlineNodesPosMap1);
         fetchPositionInfoFromList(list2, planNodesPosMap2, inlineNodesPosMap2);
 
-        planNodePositionDiff( planNodesPosMap1, planNodesPosMap2, messages );
-        inlineNodePositionDiff( inlineNodesPosMap1, inlineNodesPosMap2, messages );
+        planNodePositionDiff(planNodesPosMap1, planNodesPosMap2, messages);
+        inlineNodePositionDiff(inlineNodesPosMap1, inlineNodesPosMap2, messages);
 
-        //join nodes diff
-        ArrayList<AbstractPlanNode> joinNodes1 = getJoinNodes( list1 );
-        ArrayList<AbstractPlanNode> joinNodes2 = getJoinNodes( list2 );
+        // join nodes diff
+        ArrayList<AbstractPlanNode> joinNodes1 = getJoinNodes(list1);
+        ArrayList<AbstractPlanNode> joinNodes2 = getJoinNodes(list2);
         size1 = joinNodes1.size();
         size2 = joinNodes2.size();
-        if( size1 != size2 ) {
-            intdiffPair.set( size1 , size2);
-            messages.add( "Join Nodes Number diff:\n"+intdiffPair.toString()+"\nSQL statement might be changed.");
+        if (size1 != size2) {
+            intdiffPair.set(size1 , size2);
+            messages.add("Join Nodes Number diff:\n" + intdiffPair.toString() + "\nSQL statement might be changed.");
             m_changedSQL = true;
             String str1 = "";
             String str2 = "";
-            for( AbstractPlanNode pn : joinNodes1 ) {
+            for (AbstractPlanNode pn : joinNodes1) {
                 str1 = str1 + pn.toString() + ", ";
             }
-            for( AbstractPlanNode pn : joinNodes2 ) {
+            for (AbstractPlanNode pn : joinNodes2) {
                 str2 = str2 + pn.toString() + ", ";
             }
-            if( str1.length() > 1  ){
-                str1 = ( str1.subSequence(0, str1.length()-2) ).toString();
+            if (str1.length() > 1) {
+                str1 = (str1.subSequence(0, str1.length()-2)).toString();
             }
-            if( str2.length() > 1  ){
-                str2 = ( str2.subSequence(0, str2.length()-2) ).toString();
+            if (str2.length() > 1) {
+                str2 = (str2.subSequence(0, str2.length()-2)).toString();
             }
-            stringdiffPair.set( str1, str2 );
-            messages.add( "Join Node List diff: "+"\n"+stringdiffPair.toString()+"\n");
+            stringdiffPair.set(str1, str2);
+            messages.add("Join Node List diff: " + "\n" + stringdiffPair.toString() + "\n");
         }
         else {
-            for( int i = 0 ; i < size1 ; i++  ) {
+            for (int i = 0 ; i < size1 ; i++) {
                 AbstractPlanNode pn1 = joinNodes1.get(i);
                 AbstractPlanNode pn2 = joinNodes2.get(i);
                 PlanNodeType pnt1 = pn1.getPlanNodeType();
                 PlanNodeType pnt2 = pn2.getPlanNodeType();
-                if( !pnt1.equals(pnt2) ) {
-                    stringdiffPair.set( pn1.toString(), pn2.toString() );
-                    messages.add( "Join Node Type diff:\n"+stringdiffPair.toString());
+                if (!pnt1.equals(pnt2)) {
+                    stringdiffPair.set(pn1.toString(), pn2.toString());
+                    messages.add("Join Node Type diff:\n" + stringdiffPair.toString());
                 }
             }
         }
 
-        for( String msg : messages ) {
-            if( msg.contains("diff") || msg.contains("Diff") ) {
+        for (String msg : messages) {
+            if (msg.contains("diff") || msg.contains("Diff")) {
                 noDiff = false;
                 break;
             }
@@ -606,81 +636,91 @@ public class plannerTester {
         return noDiff;
     }
 
-    private static void fetchPositionInfoFromList( Collection<AbstractPlanNode> list,
+    private static void fetchPositionInfoFromList(Collection<AbstractPlanNode> list,
             Map<String,ArrayList<Integer>> planNodesPosMap,
-            Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap ) {
-        for( AbstractPlanNode pn : list ) {
+            Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap) {
+        for (AbstractPlanNode pn : list) {
             String nodeTypeStr = pn.getPlanNodeType().name();
-            if( !planNodesPosMap.containsKey(nodeTypeStr) ) {
-                ArrayList<Integer> intList = new ArrayList<Integer>( );
-                intList.add( pn.getPlanNodeId() );
-                planNodesPosMap.put(nodeTypeStr, intList );
+            if (!planNodesPosMap.containsKey(nodeTypeStr)) {
+                ArrayList<Integer> intList = new ArrayList<Integer>();
+                intList.add(pn.getPlanNodeId());
+                planNodesPosMap.put(nodeTypeStr, intList);
             }
-            else{
-                planNodesPosMap.get( nodeTypeStr ).add( pn.getPlanNodeId() );
+            else {
+                planNodesPosMap.get(nodeTypeStr).add(pn.getPlanNodeId());
             }
-            //walk inline nodes
-            for( AbstractPlanNode inlinepn : pn.getInlinePlanNodes().values() ) {
+            // walk inline nodes
+            for (AbstractPlanNode inlinepn : pn.getInlinePlanNodes().values()) {
                 String inlineNodeTypeStr = inlinepn.getPlanNodeType().name();
-                if( !inlineNodesPosMap.containsKey( inlineNodeTypeStr ) ) {
-                    ArrayList<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>( );
+                if (!inlineNodesPosMap.containsKey(inlineNodeTypeStr)) {
+                    ArrayList<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
                     nodeList.add(pn);
-                    inlineNodesPosMap.put( inlineNodeTypeStr, nodeList );
+                    inlineNodesPosMap.put(inlineNodeTypeStr, nodeList);
                 }
-                else{
-                    inlineNodesPosMap.get( inlineNodeTypeStr ).add( pn );
+                else {
+                    inlineNodesPosMap.get(inlineNodeTypeStr).add(pn);
                 }
             }
         }
     }
 
-    private static void planNodePositionDiff( Map<String,ArrayList<Integer>> planNodesPosMap1, Map<String,ArrayList<Integer>> planNodesPosMap2, ArrayList<String> messages ) {
+    private static void planNodePositionDiff(Map<String,ArrayList<Integer>> planNodesPosMap1,
+            Map<String,ArrayList<Integer>> planNodesPosMap2, ArrayList<String> messages)
+    {
         Set<String> typeWholeSet = new HashSet<String>();
-        typeWholeSet.addAll( planNodesPosMap1.keySet() );
-        typeWholeSet.addAll( planNodesPosMap2.keySet() );
+        typeWholeSet.addAll(planNodesPosMap1.keySet());
+        typeWholeSet.addAll(planNodesPosMap2.keySet());
 
-        for( String planNodeTypeStr : typeWholeSet ) {
-            if( ! planNodesPosMap1.containsKey( planNodeTypeStr ) &&  planNodesPosMap2.containsKey( planNodeTypeStr ) ){
-                diffPair strPair = new diffPair( null, planNodesPosMap2.get(planNodeTypeStr).toString() );
-                messages.add( planNodeTypeStr+" diff: \n"+strPair.toString() );
+        for (String planNodeTypeStr : typeWholeSet) {
+            if ( ! planNodesPosMap1.containsKey(planNodeTypeStr) &&
+                    planNodesPosMap2.containsKey(planNodeTypeStr)) {
+                diffPair strPair = new diffPair(null, planNodesPosMap2.get(planNodeTypeStr).toString());
+                messages.add(planNodeTypeStr + " diff: \n" + strPair.toString());
             }
-            else if( planNodesPosMap1.containsKey( planNodeTypeStr ) &&  !planNodesPosMap2.containsKey( planNodeTypeStr ) ) {
-                diffPair strPair = new diffPair( planNodesPosMap1.get(planNodeTypeStr).toString(), null );
-                messages.add( planNodeTypeStr+" diff: \n"+strPair.toString() );
+            else if (planNodesPosMap1.containsKey(planNodeTypeStr) &&
+                    ! planNodesPosMap2.containsKey(planNodeTypeStr)) {
+                diffPair strPair = new diffPair(planNodesPosMap1.get(planNodeTypeStr).toString(), null);
+                messages.add(planNodeTypeStr + " diff: \n" + strPair.toString());
             }
-            else{
-                diffPair strPair = new diffPair( planNodesPosMap1.get(planNodeTypeStr).toString(), planNodesPosMap2.get(planNodeTypeStr).toString() );
-                if( !strPair.equals() ) {
-                    messages.add( planNodeTypeStr+" diff: \n"+strPair.toString() );
+            else {
+                diffPair strPair = new diffPair(planNodesPosMap1.get(planNodeTypeStr).toString(),
+                        planNodesPosMap2.get(planNodeTypeStr).toString());
+                if (!strPair.equals()) {
+                    messages.add(planNodeTypeStr + " diff: \n" + strPair.toString());
                 }
             }
         }
     }
 
-    private static void inlineNodePositionDiff( Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap1, Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap2, ArrayList<String> messages ) {
+    private static void inlineNodePositionDiff(Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap1, Map<String,ArrayList<AbstractPlanNode>> inlineNodesPosMap2, ArrayList<String> messages)
+    {
         Set<String> typeWholeSet = new HashSet<String>();
-        typeWholeSet.addAll( inlineNodesPosMap1.keySet() );
-        typeWholeSet.addAll( inlineNodesPosMap2.keySet() );
+        typeWholeSet.addAll(inlineNodesPosMap1.keySet());
+        typeWholeSet.addAll(inlineNodesPosMap2.keySet());
 
-        for( String planNodeTypeStr : typeWholeSet ) {
-            if( ! inlineNodesPosMap1.containsKey( planNodeTypeStr ) &&  inlineNodesPosMap2.containsKey( planNodeTypeStr ) ){
-                diffPair strPair = new diffPair( null, inlineNodesPosMap2.get(planNodeTypeStr).toString() );
-                messages.add( "Inline "+planNodeTypeStr+" diff: \n"+strPair.toString() );
+        for (String planNodeTypeStr : typeWholeSet) {
+            if ( ! inlineNodesPosMap1.containsKey(planNodeTypeStr) &&
+                    inlineNodesPosMap2.containsKey(planNodeTypeStr)) {
+                diffPair strPair = new diffPair(null, inlineNodesPosMap2.get(planNodeTypeStr).toString());
+                messages.add("Inline " + planNodeTypeStr + " diff: \n" + strPair.toString());
             }
-            else if( inlineNodesPosMap1.containsKey( planNodeTypeStr ) &&  !inlineNodesPosMap2.containsKey( planNodeTypeStr ) ) {
-                diffPair strPair = new diffPair( inlineNodesPosMap1.get(planNodeTypeStr).toString(), null );
-                messages.add( "Inline "+planNodeTypeStr+" diff: \n"+strPair.toString() );
+            else if (inlineNodesPosMap1.containsKey(planNodeTypeStr) &&
+                    ! inlineNodesPosMap2.containsKey(planNodeTypeStr)) {
+                diffPair strPair = new diffPair(inlineNodesPosMap1.get(planNodeTypeStr).toString(), null);
+                messages.add("Inline " + planNodeTypeStr + " diff: \n" + strPair.toString());
             }
-            else{
-                diffPair strPair = new diffPair( inlineNodesPosMap1.get(planNodeTypeStr).toString(), inlineNodesPosMap2.get(planNodeTypeStr).toString() );
-                if( !strPair.equals() ) {
-                    messages.add( "Inline "+planNodeTypeStr+" diff: \n"+strPair.toString() );
+            else {
+                diffPair strPair = new diffPair(inlineNodesPosMap1.get(planNodeTypeStr).toString(), inlineNodesPosMap2.get(planNodeTypeStr).toString());
+                if ( ! strPair.equals()) {
+                    messages.add("Inline " + planNodeTypeStr + " diff: \n" + strPair.toString());
                 }
             }
         }
     }
 
-    private static void scanNodeDiffModule( int leafID, AbstractScanPlanNode spn1, AbstractScanPlanNode spn2, ArrayList<String> messages ) {
+    private static void scanNodeDiffModule(int leafID, AbstractScanPlanNode spn1,
+            AbstractScanPlanNode spn2, ArrayList<String> messages)
+    {
         diffPair stringdiffPair = new diffPair("", "");
         String table1 = "";
         String table2 = "";
@@ -688,57 +728,59 @@ public class plannerTester {
         String nodeType2 = "";
         String index1 = "";
         String index2 = "";
-        if( spn1 == null && spn2 != null ) {
+        if (spn1 == null && spn2 != null) {
             table2 = spn2.getTargetTableName();
             nodeType2 = spn2.getPlanNodeType().toString();
-            if( nodeType2.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name() ) ) {
+            if (nodeType2.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name())) {
                 index2 = ((IndexScanPlanNode)spn2).getTargetIndexName();
             }
         }
-        else if( spn2 == null && spn1 != null ) {
+        else if (spn2 == null && spn1 != null) {
             table1 = spn1.getTargetTableName();
             nodeType1 = spn1.getPlanNodeType().toString();
-            if( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name() ) ) {
+            if (nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name())) {
                 index1 = ((IndexScanPlanNode)spn1).getTargetIndexName();
             }
         }
-        //both null is not possible
-        else{
+        // both null is not possible
+        else {
             table1 = spn1.getTargetTableName();
             table2 = spn2.getTargetTableName();
             nodeType1 = spn1.getPlanNodeType().toString();
             nodeType2 = spn2.getPlanNodeType().toString();
-            if( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name() ) ) {
+            if (nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name())) {
                 index1 = ((IndexScanPlanNode)spn1).getTargetIndexName();
             }
-            if( nodeType2.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name() ) ) {
+            if (nodeType2.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name())) {
                 index2 = ((IndexScanPlanNode)spn2).getTargetIndexName();
             }
         }
-        if( !table1.equals(table2) ) {
-            stringdiffPair.set( table1.equals("") ? null : nodeType1+" on "+table1,
-                                table2.equals("") ? null : nodeType2+" on "+table2 );
-            messages.add( "Table diff at leaf "+leafID+":"+"\n"+stringdiffPair.toString());
+        if (!table1.equals(table2)) {
+            stringdiffPair.set(table1.equals("") ? null : nodeType1 + " on " + table1,
+                                table2.equals("") ? null : nodeType2 + " on " + table2);
+            messages.add("Table diff at leaf " + leafID + ":" + "\n" + stringdiffPair.toString());
         }
-        else if( !nodeType1.equals(nodeType2) ) {
-            stringdiffPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2);
-            messages.add("Scan diff at leaf "+leafID+" :"+"\n"+stringdiffPair.toString());
+        else if (!nodeType1.equals(nodeType2)) {
+            stringdiffPair.set(nodeType1 + " on " + table1, nodeType2 + " on " + table2);
+            messages.add("Scan diff at leaf " + leafID + " :" + "\n" + stringdiffPair.toString());
         }
-        else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
-            if( !index1.equals(index2) ) {
-                stringdiffPair.set( index1, index2);
-                messages.add("Index diff at leaf "+leafID+" :"+"\n"+stringdiffPair.toString());
-            } else {
-                messages.add("Same at leaf "+leafID);
+        else if (nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name())) {
+            if (!index1.equals(index2)) {
+                stringdiffPair.set(index1, index2);
+                messages.add("Index diff at leaf " + leafID + " :" + "\n" + stringdiffPair.toString());
+            }
+            else {
+                messages.add("Same at leaf " + leafID);
             }
         }
-        //either index scan using same index or seqscan on same table
-        else{
-            messages.add("Same at leaf "+leafID);
+        // either index scan using same index or seqscan on same table
+        else {
+            messages.add("Same at leaf " + leafID);
         }
     }
 
-    public static boolean diffScans( AbstractPlanNode oldpn, AbstractPlanNode newpn ){
+    public static boolean diffScans(AbstractPlanNode oldpn, AbstractPlanNode newpn)
+    {
         m_changedSQL = false;
         boolean noDiff = true;
         ArrayList<AbstractScanPlanNode> list1 = oldpn.getScanNodeList();
@@ -749,31 +791,32 @@ public class plannerTester {
         int min = Math.min(size1, size2);
         diffPair intdiffPair = new diffPair(0,0);
         ArrayList<String> messages = new ArrayList<String>();
-        AbstractScanPlanNode spn1 = null;
-        AbstractScanPlanNode spn2 = null;
-        if( max == 0 ) {
+        if (max == 0) {
             messages.add("0 scan statement");
         }
         else {
-            if( size1 != size2 ){
+            AbstractScanPlanNode spn1 = null;
+            AbstractScanPlanNode spn2 = null;
+            if (size1 != size2) {
                 intdiffPair.set(size1, size2);
-                messages.add("Scan time diff : "+"\n"+intdiffPair.toString()+"\n"+"SQL statement might be changed");
+                messages.add("Scan time diff : " + "\n" + intdiffPair.toString() +
+                       "\nSQL statement might be changed");
                 m_changedSQL = true;
-                for( int i = 0; i < min; i++ ) {
+                for (int i = 0; i < min; i++) {
                     spn1 = list1.get(i);
                     spn2 = list2.get(i);
                     scanNodeDiffModule(i, spn1, spn2, messages);
                 }
-                //lists size are different
-                if( size2 < max ) {
-                    for( int i = min; i < max; i++ ) {
+                // lists size are different
+                if (size2 < max) {
+                    for (int i = min; i < max; i++) {
                         spn1 = list1.get(i);
                         spn2 = null;
                         scanNodeDiffModule(i, spn1, spn2, messages);
                     }
                 }
-                else if( size1 < max ) {
-                    for( int i = min; i < max; i++ ) {
+                else if (size1 < max) {
+                    for (int i = min; i < max; i++) {
                         spn1 = null;
                         spn2 = list2.get(i);
                         scanNodeDiffModule(i, spn1, spn2, messages);
@@ -781,8 +824,8 @@ public class plannerTester {
                 }
             }
             else {
-                messages.add( "same leaf size" );
-                if( max == 1 ) {
+                messages.add("same leaf size");
+                if (max == 1) {
                     messages.add("Single scan plan");
                     spn1 = list1.get(0);
                     spn2 = list2.get(0);
@@ -790,7 +833,7 @@ public class plannerTester {
                 }
                 else {
                     messages.add("Join query");
-                    for( int i = 0; i < max; i++ ) {
+                    for (int i = 0; i < max; i++) {
                         spn1 = list1.get(i);
                         spn2 = list2.get(i);
                         scanNodeDiffModule(i, spn1, spn2, messages);
@@ -798,8 +841,8 @@ public class plannerTester {
                 }
             }
         }
-        for( String msg : messages ) {
-            if( msg.contains("diff") || msg.contains("Diff") ) {
+        for (String msg : messages) {
+            if (msg.contains("diff") || msg.contains("Diff")) {
                 noDiff = false;
                 break;
             }
@@ -808,24 +851,21 @@ public class plannerTester {
         return noDiff;
     }
 
-    //return true is there are no diff
-    //false if there's any diff
-    public static boolean diff( AbstractPlanNode oldpn, AbstractPlanNode newpn, boolean print ) {
+    // return true is there are no diff
+    // false if there's any diff
+    public static boolean diff(AbstractPlanNode oldpn, AbstractPlanNode newpn, boolean print)
+    {
         m_diffMessages.clear();
         boolean noDiff1 = diffScans(oldpn, newpn);
         boolean noDiff2 = diffInlineAndJoin(oldpn, newpn);
-        noDiff1 = noDiff1 && noDiff2;
-
-        if( noDiff1  ) {
+        if (noDiff1 && noDiff2) {
             return true;
         }
-        else {
-            if( print  ) {
-                for( String msg : m_diffMessages ) {
-                    System.out.println(msg);
-                }
+        if (print) {
+            for (String msg : m_diffMessages) {
+                System.out.println(msg);
             }
-            return false;
         }
+        return false;
     }
 }

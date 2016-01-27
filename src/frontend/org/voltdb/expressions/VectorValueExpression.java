@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,7 @@ import org.voltdb.types.ExpressionType;
 
 /**
  * Represents a vector of expression trees.
- * Currently used for SQL IN lists (of values, not subqueries).
+ * Currently used for SQL IN lists (of values), and (column list) IN (SELECT ...)
  */
 public class VectorValueExpression extends AbstractExpression {
 

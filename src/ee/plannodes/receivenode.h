@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,26 +46,20 @@
 #ifndef HSTORERECEIVENODE_H
 #define HSTORERECEIVENODE_H
 
-#include "abstractplannode.h"
+#include "abstractreceivenode.h"
 
-namespace voltdb
+namespace voltdb {
+
+class ReceivePlanNode : public AbstractReceivePlanNode
 {
-
-class ReceivePlanNode : public AbstractPlanNode
-{
- public:
-    ReceivePlanNode(CatalogId id);
-    ReceivePlanNode();
-    ~ReceivePlanNode();
-
-    virtual PlanNodeType getPlanNodeType() const;
-
+public:
+    PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue obj);
 };
 
-}
+} // namespace voltdb
 
 #endif

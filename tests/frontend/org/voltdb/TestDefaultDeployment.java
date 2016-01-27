@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,6 +28,7 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -60,7 +61,7 @@ public class TestDefaultDeployment extends TestCase {
         // the default deployment file includes an http server on port 8080.
         // do some verification without starting VoltDB, since that port
         // number conflicts with jenkins on some test servers.
-        String absolutePath = RealVoltDB.setupDefaultDeployment();
+        String absolutePath = RealVoltDB.setupDefaultDeployment(new VoltLogger("HOST"));
 
         DeploymentType dflt = CatalogUtil.parseDeployment(absolutePath);
         assertTrue(dflt != null);

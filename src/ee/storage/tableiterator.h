@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -88,7 +88,7 @@ public:
         m_tempTableDeleteAsGo = flag;
     }
 
-private:
+protected:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
@@ -160,7 +160,6 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
     {
     }
 
-// FIXME: This constructor is called from Temptable constructor, but set m_tempTableIterator to be false
 inline TableIterator::TableIterator(Table *parent)
     : m_table(parent),
       m_dataPtr(NULL),
@@ -171,7 +170,7 @@ inline TableIterator::TableIterator(Table *parent)
       m_tupleLength(0),
       m_tuplesPerBlock(1),
       m_currentBlock(NULL),
-      m_tempTableIterator(false),
+      m_tempTableIterator(true),
       m_tempTableDeleteAsGo(false)
     {
     }
@@ -297,6 +296,43 @@ inline bool TableIterator::tempNext(TableTuple &out) {
 
 inline int TableIterator::getLocation() const {
     return m_location;
+}
+
+class JumpingTableIterator : public TableIterator {
+public:
+    // Get an iterator via table->iterator()
+    JumpingTableIterator(PersistentTable* table, TBMapI start, TBMapI end);
+    int getTuplesInNextBlock();
+    bool hasNextBlock();
+    void nextBlock();
+
+private:
+    TBMapI m_end;        // Use here for easy access to end()
+};
+
+inline JumpingTableIterator::JumpingTableIterator(PersistentTable* parent, TBMapI start, TBMapI end)
+    : TableIterator((Table*)parent, start), m_end(end)
+    {
+    }
+
+
+inline int JumpingTableIterator::getTuplesInNextBlock() {
+    assert(m_blockIterator != m_end);
+    return m_blockIterator.data()->activeTuples();
+}
+
+inline bool JumpingTableIterator::hasNextBlock() {
+    assert(m_blockOffset == 0);
+    return m_blockIterator != m_end;
+}
+
+inline void JumpingTableIterator::nextBlock() {
+    assert(m_blockOffset == 0);
+    assert(m_blockIterator != m_end);
+    TBPtr currentBlock = m_blockIterator.data();
+    m_blockIterator++;
+    m_foundTuples += currentBlock->activeTuples();
+    m_location += m_table->getTuplesPerBlock();
 }
 
 }

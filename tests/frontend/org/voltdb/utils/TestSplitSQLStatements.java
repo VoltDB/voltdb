@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,13 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.parser.SQLLexer;
 
 public class TestSplitSQLStatements {
 
@@ -40,7 +41,7 @@ public class TestSplitSQLStatements {
     }
 
     private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = MiscUtils.splitSQLStatements(strIn);
+        final List<String> strsOut = SQLLexer.splitStatements(strIn);
         assertEquals(strsCmp.length, strsOut.size());
         for (int i = 0; i < strsCmp.length; ++i) {
             assertEquals(strsCmp[i], strsOut.get(i));
@@ -64,6 +65,9 @@ public class TestSplitSQLStatements {
         checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
+        checkSplitter("--one\n--two\nreal", "--one", "--two", "real");
+        checkSplitter("  --one\n  --two\nreal", "--one", "--two", "real");
+        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "--def", "/*ghi\njkl;*/");
     }
 
 }

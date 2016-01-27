@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.MiscUtils;
@@ -333,7 +334,19 @@ public class SystemInformation extends VoltSystemProcedure
 
         // try to get the external interface first, if none was set, use local addresses
         InetAddress addr = null;
+        String clientInterface = null;
         int clientPort = VoltDB.DEFAULT_PORT;
+        String adminInterface = null;
+        int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
+        String httpInterface = null;
+        int httpPort = VoltDB.DEFAULT_HTTP_PORT;
+        String internalInterface = null;
+        int internalPort = VoltDB.DEFAULT_INTERNAL_PORT;
+        String zkInterface = null;
+        int zkPort = VoltDB.DEFAULT_ZK_PORT;
+        String drInterface = null;
+        int drPort = VoltDB.DEFAULT_DR_PORT;
+        String publicInterface = null;
         try {
             String localMetadata = VoltDB.instance().getLocalMetadata();
             JSONObject jsObj = new JSONObject(localMetadata);
@@ -341,6 +354,18 @@ public class SystemInformation extends VoltSystemProcedure
             String iface = interfaces.getString(0);
             addr = InetAddress.getByName(iface);
             clientPort = jsObj.getInt("clientPort");
+            clientInterface = jsObj.getString("clientInterface");
+            adminPort = jsObj.getInt("adminPort");
+            adminInterface = jsObj.getString("adminInterface");
+            httpPort = jsObj.getInt("httpPort");
+            httpInterface = jsObj.getString("httpInterface");
+            internalPort = jsObj.getInt("internalPort");
+            internalInterface = jsObj.getString("internalInterface");
+            zkPort = jsObj.getInt("zkPort");
+            zkInterface = jsObj.getString("zkInterface");
+            drPort = jsObj.getInt("drPort");
+            drInterface = jsObj.getString("drInterface");
+            publicInterface = jsObj.getString("publicInterface");
         } catch (JSONException e) {
             hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
@@ -353,7 +378,19 @@ public class SystemInformation extends VoltSystemProcedure
         }
         vt.addRow(hostId, "IPADDRESS", addr.getHostAddress());
         vt.addRow(hostId, "HOSTNAME", CoreUtils.getHostnameOrAddress());
+        vt.addRow(hostId, "CLIENTINTERFACE", clientInterface);
         vt.addRow(hostId, "CLIENTPORT", Integer.toString(clientPort));
+        vt.addRow(hostId, "ADMININTERFACE", adminInterface);
+        vt.addRow(hostId, "ADMINPORT", Integer.toString(adminPort));
+        vt.addRow(hostId, "HTTPINTERFACE", httpInterface);
+        vt.addRow(hostId, "HTTPPORT", Integer.toString(httpPort));
+        vt.addRow(hostId, "INTERNALINTERFACE", internalInterface);
+        vt.addRow(hostId, "INTERNALPORT", Integer.toString(internalPort));
+        vt.addRow(hostId, "ZKINTERFACE", zkInterface);
+        vt.addRow(hostId, "ZKPORT", Integer.toString(zkPort));
+        vt.addRow(hostId, "DRINTERFACE", drInterface);
+        vt.addRow(hostId, "DRPORT", Integer.toString(drPort));
+        vt.addRow(hostId, "PUBLICINTERFACE", publicInterface);
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());
@@ -400,6 +437,10 @@ public class SystemInformation extends VoltSystemProcedure
         if (hubAppender != null)
             port = hubAppender.getPort();
         vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
+        //Add license information
+        if (MiscUtils.isPro()) {
+            vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
+        }
 
         return vt;
     }
@@ -444,12 +485,14 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("snapshotenabled", snap_enabled);
 
-        Connector export_conn = database.getConnectors().get("0");
         String export_enabled = "false";
-        if (export_conn != null && export_conn.getEnabled())
-        {
-            export_enabled = "true";
-            results.addRow("exportoverflowpath", cluster.getExportoverflow());
+        for (Connector export_conn : database.getConnectors()) {
+            if (export_conn != null && export_conn.getEnabled())
+            {
+                export_enabled = "true";
+                results.addRow("exportoverflowpath", cluster.getExportoverflow());
+                break;
+            }
         }
         results.addRow("export", export_enabled);
 
@@ -520,6 +563,15 @@ public class SystemInformation extends VoltSystemProcedure
             users += ";";
         }
         results.addRow("users", users);
+
+        // Add system setting information also
+        // the attribute names follows the above naming rule
+        Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
+        results.addRow("elasticduration", Integer.toString(sysSettings.getElasticduration()));
+        results.addRow("elasticthroughput", Integer.toString(sysSettings.getElasticthroughput()));
+        results.addRow("snapshotpriority", Integer.toString(sysSettings.getSnapshotpriority()));
+        results.addRow("temptablesmaxsize", Integer.toString(sysSettings.getTemptablemaxsize()));
+        results.addRow("querytimeout", Integer.toString(sysSettings.getQuerytimeout()));
 
         return results;
     }

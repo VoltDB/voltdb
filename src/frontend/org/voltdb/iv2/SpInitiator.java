@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,22 +17,22 @@
 
 package org.voltdb.iv2;
 
-import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
+import org.voltdb.DRLogSegmentId;
 import org.voltdb.MemoryStats;
-import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.ProducerDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StartAction;
@@ -40,6 +40,8 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.RepairAlgo.RepairResult;
+import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -83,15 +85,18 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void configure(BackendTarget backend, String serializedCatalog,
+    public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
+                          String serializedCatalog,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          NodeDRGateway nodeDRGateway,
+                          ProducerDRGateway nodeDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
@@ -104,20 +109,25 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // configure DR
         PartitionDRGateway drGateway =
                 PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
-                        startAction.doesRejoin());
+                        startAction);
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
 
-        super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions,
-                startAction,
-                agent, memStats, cl, coreBindIds, drGateway);
+        PartitionDRGateway mpPDRG = null;
+        if (createMpDRGateway) {
+            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
+            setDurableUniqueIdListener(mpPDRG);
+        }
+
+        super.configureCommon(backend, catalogContext, serializedCatalog,
+                csp, numberOfPartitions, startAction, agent, memStats, cl,
+                coreBindIds, drGateway, mpPDRG, consumerDRGateway);
 
         m_tickProducer.start();
 
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
+                LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
     }
 
@@ -132,6 +142,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
+            long localSpUniqueId = Long.MIN_VALUE;
             while (!success) {
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
@@ -149,9 +160,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
 
                 // term syslogs the start of leader promotion.
-                Long txnid = Long.MIN_VALUE;
+                long txnid = Long.MIN_VALUE;
+                DRLogSegmentId drLogInfo = null;
                 try {
-                    txnid = repair.start().get();
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
+                    drLogInfo = res.m_binaryLogInfo;
+                    localSpUniqueId = res.m_localDrUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -167,6 +182,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    // If we are a DR replica, inform that subsystem of any remote data we've seen
+                    if (m_consumerDRGateway != null) {
+                        m_consumerDRGateway.beginPromotePartition(m_partitionId, drLogInfo, localSpUniqueId);
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -205,6 +225,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
     @Override
     public void enableWritingIv2FaultLog() {
         m_initiatorMailbox.enableWritingIv2FaultLog();
+    }
+
+    @Override
+    public void setDurableUniqueIdListener(DurableUniqueIdListener listener)
+    {
+        m_scheduler.setDurableUniqueIdListener(listener);
     }
 
     @Override

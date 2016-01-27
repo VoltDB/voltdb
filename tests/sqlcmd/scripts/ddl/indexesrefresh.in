@@ -1,0 +1,17 @@
+drop table t if exists;
+create table t (
+ stable integer,
+ constraint pk primary key (stable),
+ altkey integer,
+ constraint altuniq unique (altkey),
+);
+
+-- insert a spoiler value to cause potential trouble for new unique constraints.
+insert into t values (1, 1);
+
+FILE scripts/ddl/indexesrefresh.sqlfile
+
+select * from t;
+
+drop table t;
+

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,16 +50,18 @@
 
 package org.voltdb;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
 import java.math.BigDecimal;
 import java.util.Date;
 
-import junit.framework.TestCase;
-
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.catalog.Catalog;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.TimestampType;
+
+import junit.framework.TestCase;
 
 public class TestVoltProcedure extends TestCase {
     static class DateProcedure extends NullProcedureWrapper {
@@ -214,6 +216,32 @@ public class TestVoltProcedure extends TestCase {
         }
     }
 
+    static class LargeNumberOfTablesProc extends NullProcedureWrapper
+    {
+        public static VoltTable[] run(String arg)
+        {
+            ColumnInfo columnInfo = new ColumnInfo("intcol", VoltType.INTEGER);
+            VoltTable table = new VoltTable(columnInfo);
+            table.addRow(10);
+            int count = Short.MAX_VALUE + 1;
+            VoltTable[] results = new VoltTable[count];
+            for (int i=0; i<count; i++) {
+                results[i] = table;
+            }
+
+            return results;
+        }
+    }
+
+     class GetClusterIdProcedure extends NullProcedureWrapper {
+        public VoltTable[] run(Object arg) {
+            clusterId = getClusterId();
+            return new VoltTable[0];
+        }
+
+        public int clusterId;
+    }
+
     static class NullProcedureWrapper extends VoltProcedure {
         VoltTable runQueryStatement(SQLStmt stmt, Object... params) {
             assert false;
@@ -240,10 +268,11 @@ public class TestVoltProcedure extends TestCase {
     }
 
     MockVoltDB manager;
-    MockExecutionSite site;
+    SiteProcedureConnection site;
     MockStatsAgent agent;
     ParameterSet nullParam;
     private long executionSiteId;
+    private final int expectedClusterId = 5;
 
     @Override
     public void setUp()
@@ -272,17 +301,13 @@ public class TestVoltProcedure extends TestCase {
         manager.addProcedureForTest(BoxedDoubleProcedure.class.getName());
         manager.addProcedureForTest(LongArrayProcedure.class.getName());
         manager.addProcedureForTest(NPEProcedure.class.getName());
+        manager.addProcedureForTest(LargeNumberOfTablesProc.class.getName());
         manager.addProcedureForTest(UnexpectedFailureFourProcedure.class.getName());
-        site = new MockExecutionSite(
-                executionSiteId,
-                VoltDB.instance().getCatalogContext().catalog.serialize(),
-                null) {
-
-            @Override
-            public int getCorrespondingPartitionId() {
-                return 42;
-            }
-        };
+        manager.addProcedureForTest(GetClusterIdProcedure.class.getName());
+        site = mock(SiteProcedureConnection.class);
+        doReturn(42).when(site).getCorrespondingPartitionId();
+        doReturn(executionSiteId).when(site).getCorrespondingSiteId();
+        doReturn(expectedClusterId).when(site).getCorrespondingClusterId();
         nullParam = ParameterSet.fromArrayNoCopy(new Object[]{null});
     }
 
@@ -392,6 +417,13 @@ public class TestVoltProcedure extends TestCase {
         assertTrue(r.getStatusString().contains("java.lang.NullPointerException"));
     }
 
+    public void testLargeNumberOfTablesError() {
+        ClientResponse r = call(LargeNumberOfTablesProc.class);
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.getStatus());
+        System.out.println(r.getStatusString());
+        assertTrue(r.getStatusString().contains("Exceeded  maximum number of VoltTables"));
+    }
+
     public void testNegativeWiderType() {
         ClientResponse r = callWithArgs(LongProcedure.class, Integer.valueOf(-1000));
         assertEquals(-1000L, LongProcedure.arg);
@@ -409,7 +441,7 @@ public class TestVoltProcedure extends TestCase {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
                 wrapper, site, null,
-                site.m_context.database.getProcedures().get(LongProcedure.class.getName()), null);
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
 
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
         assertNotNull(agent.m_selector);
@@ -433,6 +465,17 @@ public class TestVoltProcedure extends TestCase {
         assertTrue(((Long)statsRow[0][9]) > 0L);
     }
 
+    public void testGetClusterId() {
+        GetClusterIdProcedure gcip = new GetClusterIdProcedure();
+        ProcedureRunner runner = new ProcedureRunner(
+                gcip, site, null,
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()), null);
+        runner.setupTransaction(null);
+        ClientResponse r = runner.call((Object) null);
+        assertEquals(expectedClusterId, gcip.clusterId);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
     private ClientResponse call(Class<? extends NullProcedureWrapper> procedure) {
         return callWithArgs(procedure, (Object) null);
     }
@@ -442,30 +485,16 @@ public class TestVoltProcedure extends TestCase {
         try {
             wrapper = procedure.newInstance();
         }  catch (InstantiationException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         } catch (IllegalAccessException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         ProcedureRunner runner = new ProcedureRunner(
                 wrapper, site, null,
-                site.m_context.database.getProcedures().get(procedure.getName()), null);
+                VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()), null);
 
         runner.setupTransaction(null);
         return runner.call(args);
-    }
-
-    private class MockExecutionSite extends ExecutionSite {
-        public MockExecutionSite(long siteId, String serializedCatalog, SiteTracker tracker) {
-            super(siteId);
-            // get some catalog shortcuts ready
-            Catalog catalog = new Catalog();
-            catalog.execute(serializedCatalog);
-            long now = System.currentTimeMillis();
-            m_context = new CatalogContext( now, now, catalog, null, null, 0, 0);
-            m_tracker = tracker;
-        }
     }
 
     private class MockStatsAgent extends StatsAgent {

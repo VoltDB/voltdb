@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,11 +30,24 @@ public class AdvertisedDataSource
     final public int partitionId;
     final public String signature;
     final public String tableName;
+    //Set to other than partition column in case of kafka.
+    private String m_partitionColumnName = "";
     final public long m_generation;
     final public long systemStartTimestamp;
     final public ArrayList<String> columnNames = new ArrayList<String>();
     final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
     final public List<Integer> columnLengths = new ArrayList<Integer>();
+    final public ExportFormat exportFormat;
+
+    /*
+     * Enumeration defining what format the blocks of export data are in.
+     * Updated for 4.4 to use smaller values for integers and a binary variable size
+     * representation for decimals so that the format would be more efficient and
+     * shareable with other features
+     */
+    public enum ExportFormat {
+        ORIGINAL, FOURDOTFOUR;
+    }
 
     @Override
     public int hashCode() {
@@ -55,15 +68,18 @@ public class AdvertisedDataSource
     }
 
     public AdvertisedDataSource(int p_id, String t_signature, String t_name,
+            String partitionColumnName,
             long systemStartTimestamp,
             long generation,
             ArrayList<String> names,
             ArrayList<VoltType> types,
-            List<Integer> lengths)
+            List<Integer> lengths,
+            ExportFormat exportFormat)
     {
         partitionId = p_id;
         signature = t_signature;
         tableName = t_name;
+        m_partitionColumnName = partitionColumnName;
         m_generation = generation;
         this.systemStartTimestamp = systemStartTimestamp;
 
@@ -75,6 +91,7 @@ public class AdvertisedDataSource
         if (lengths != null) {
             columnLengths.addAll(lengths);
         }
+        this.exportFormat = exportFormat;
     }
 
     public VoltType columnType(int index) {
@@ -89,8 +106,20 @@ public class AdvertisedDataSource
         return columnLengths.get(index);
     }
 
+    //This is for setting column other than partition column of table.
+    //Kafka uses any arbitrary column for using its value for kafka key
+    public void setPartitionColumnName(String partitionColumnName) {
+        m_partitionColumnName = partitionColumnName;
+    }
+
+    public String getPartitionColumnName() {
+        return m_partitionColumnName;
+    }
+
     @Override
     public String toString() {
-        return "Generation: " + m_generation + " Table: " + tableName + " partition " + partitionId + " signature " + signature;
+        return "Generation: " + m_generation + " Table: " + tableName
+                + " partition " + partitionId + " signature " + signature
+                + " partitionColumn " + m_partitionColumnName;
     }
 }

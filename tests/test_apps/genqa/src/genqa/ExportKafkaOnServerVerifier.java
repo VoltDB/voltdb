@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -63,12 +63,14 @@ public class ExportKafkaOnServerVerifier {
     private VoltKafkaConsumerConfig m_kafkaConfig;
     private long expectedRows = 0;
     private final AtomicLong consumedRows = new AtomicLong(0);
+    private final AtomicLong verifiedRows = new AtomicLong(0);
 
     private static class VoltKafkaConsumerConfig {
         final String m_zkhost;
         final ConsumerConfig consumerConfig;
         final ConsumerConfig doneConsumerConfig;
         final ConsumerConnector consumer;
+        final ConsumerConnector consumer2;
         final ConsumerConnector doneConsumer;
         private final String m_groupId;
 
@@ -85,10 +87,11 @@ public class ExportKafkaOnServerVerifier {
             props.put("auto.offset.reset", "smallest");
             props.put("queuedchunks.max", "1000");
             props.put("backoff.increment.ms", "1500");
-            props.put("consumer.timeout.ms", "120000");
+            props.put("consumer.timeout.ms", "600000");
 
             consumerConfig = new ConsumerConfig(props);
             consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+            consumer2 = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
 
             //Certain properties in done consumer are different.
             props.remove("consumer.timeout.ms");
@@ -102,6 +105,8 @@ public class ExportKafkaOnServerVerifier {
         public void stop() {
             doneConsumer.commitOffsets();
             doneConsumer.shutdown();
+            consumer2.commitOffsets();
+            consumer2.shutdown();
             consumer.commitOffsets();
             consumer.shutdown();
             tryCleanupZookeeper();
@@ -130,8 +135,8 @@ public class ExportKafkaOnServerVerifier {
         //Zookeeper
         m_zookeeper = args[0];
         System.out.println("Zookeeper is: " + m_zookeeper);
-        //Topic
-        m_topic = args[1]; //"voltdbexportEXPORT_PARTITIONED_TABLE";
+        //Topic Prefix
+        m_topicPrefix = args[1]; //"voltdbexport";
 
         boolean skinny = false;
         if (args.length > 3 && args[3] != null && !args[3].trim().isEmpty()) {
@@ -151,7 +156,7 @@ public class ExportKafkaOnServerVerifier {
      */
     void verifyFat() throws Exception
     {
-        createAndConsumeKafkaStreams(m_topic, m_doneTopic, false);
+        createAndConsumeKafkaStreams(m_topicPrefix, false);
     }
 
     /**
@@ -162,7 +167,7 @@ public class ExportKafkaOnServerVerifier {
      */
     void verifySkinny() throws Exception
     {
-        createAndConsumeKafkaStreams(m_topic, m_doneTopic, true);
+        createAndConsumeKafkaStreams(m_topicPrefix, true);
     }
 
     public class ExportConsumer implements Runnable {
@@ -181,9 +186,9 @@ public class ExportKafkaOnServerVerifier {
 
         @Override
         public void run() {
+            System.out.println("Consumer waiting count: " + m_cdl.getCount());
             try {
                 ConsumerIterator<byte[], byte[]> it = m_stream.iterator();
-                int ttlVerified = 0;
                 while (it.hasNext()) {
                     byte msg[] = it.next().message();
                     String smsg = new String(msg);
@@ -204,8 +209,8 @@ public class ExportKafkaOnServerVerifier {
                         if (err != null) {
                             System.out.println("ERROR in validation: " + err.toString());
                         }
-                        if (++ttlVerified % VALIDATION_REPORT_INTERVAL == 0) {
-                            System.out.println("Verified " + ttlVerified + " rows.");
+                        if (verifiedRows.incrementAndGet() % VALIDATION_REPORT_INTERVAL == 0) {
+                            System.out.println("Verified " + verifiedRows.get() + " rows. Consumed: " + consumedRows.get());
                         }
 
                         Integer partition = Integer.parseInt(row[3].trim());
@@ -228,13 +233,18 @@ public class ExportKafkaOnServerVerifier {
             } finally {
                 if (m_cdl != null) {
                     m_cdl.countDown();
+                    System.out.println("Consumer waiting count: " + m_cdl.getCount());
                 }
             }
         }
     }
 
     //Submit consumer tasks to executor and wait for EOS message then continue on.
-    void createAndConsumeKafkaStreams(String topic, String doneTopic, boolean skinny) throws Exception {
+    void createAndConsumeKafkaStreams(String topicPrefix, boolean skinny) throws Exception {
+        final String topic = topicPrefix + "EXPORT_PARTITIONED_TABLE";
+        final String topic2 = topicPrefix + "EXPORT_PARTITIONED_TABLE2";
+        final String doneTopic = topicPrefix + "EXPORT_DONE_TABLE";
+
         List<Future<Long>> doneFutures = new ArrayList<>();
 
         Map<String, Integer> topicCountMap = new HashMap<>();
@@ -252,19 +262,35 @@ public class ExportKafkaOnServerVerifier {
             executor.submit(consumer);
         }
 
+        Map<String, Integer> topicCountMap2 = new HashMap<>();
+        topicCountMap2.put(topic2, 1);
+        Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap2 = m_kafkaConfig.consumer2.createMessageStreams(topicCountMap2);
+        List<KafkaStream<byte[], byte[]>> streams2 = consumerMap2.get(topic2);
+
+        ExecutorService executor2 = Executors.newFixedThreadPool(streams2.size());
+
+        // now launch all the threads
+        CountDownLatch consumersLatch2 = new CountDownLatch(streams2.size());
+        for (final KafkaStream stream : streams2) {
+            System.out.println("Creating consumer for " + topic2);
+            ExportConsumer consumer = new ExportConsumer(stream, false, skinny, consumersLatch2);
+            executor2.submit(consumer);
+        }
+
         Map<String, Integer> topicDoneCountMap = new HashMap<String, Integer>();
         topicDoneCountMap.put(doneTopic, 1);
         Map<String, List<KafkaStream<byte[], byte[]>>> doneConsumerMap = m_kafkaConfig.doneConsumer.createMessageStreams(topicDoneCountMap);
 
         List<KafkaStream<byte[], byte[]>> doneStreams = doneConsumerMap.get(doneTopic);
-        ExecutorService executor2 = Executors.newFixedThreadPool(doneStreams.size());
+        ExecutorService executord2 = Executors.newFixedThreadPool(doneStreams.size());
         CompletionService<Long> ecs
-                 = new ExecutorCompletionService<>(executor2);
+                 = new ExecutorCompletionService<>(executord2);
+        CountDownLatch doneLatch = new CountDownLatch(doneStreams.size());
 
         // now launch all the threads
         for (final KafkaStream stream : doneStreams) {
             System.out.println("Creating consumer for " + doneTopic);
-            ExportConsumer consumer = new ExportConsumer(stream, true, true, null);
+            ExportConsumer consumer = new ExportConsumer(stream, true, true, doneLatch);
             Future<Long> f = ecs.submit(consumer, new Long(0));
             doneFutures.add(f);
         }
@@ -277,20 +303,33 @@ public class ExportKafkaOnServerVerifier {
             f.cancel(true);
         }
         //Wait for all consumers to consume and timeout.
-        consumersLatch.await();
+        System.out.println("Wait for drain of consumers.");
+        long cnt = consumedRows.get();
+        long wtime = System.currentTimeMillis();
+        while (true) {
+            Thread.sleep(5000);
+            if (cnt != consumedRows.get()) {
+                wtime = System.currentTimeMillis();
+                System.out.println("Train is still running.");
+                continue;
+            }
+            if ( (System.currentTimeMillis() - wtime) > 60000 ) {
+                System.out.println("Waited long enough looks like train has stopped.");
+                break;
+            }
+        }
         m_kafkaConfig.stop();
-        executor.shutdownNow();
-        executor.awaitTermination(1, TimeUnit.DAYS);
+        consumersLatch.await();
+        consumersLatch2.await();
         System.out.println("Seen Rows: " + consumedRows.get() + " Expected: " + expectedRows);
-        if (consumedRows.get() != expectedRows) {
+        if (consumedRows.get() < expectedRows) {
             System.out.println("ERROR: Exported row count does not match consumed rows.");
         }
         //For shutdown hook to not stop twice.
         m_kafkaConfig = null;
     }
 
-    String m_topic = null;
-    final String m_doneTopic = "voltdbexportEXPORT_DONE_TABLE";
+    String m_topicPrefix = null;
     String m_zookeeper = null;
 
     static {

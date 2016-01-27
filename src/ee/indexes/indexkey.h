@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -225,7 +225,9 @@ struct IntsKey
         return std::string(buffer.str());
     }
 
-    IntsKey() {}
+    IntsKey() {
+        ::memset(data, 0, keySize * sizeof(uint64_t));
+    }
 
     IntsKey(const TableTuple *tuple) {
         ::memset(data, 0, keySize * sizeof(uint64_t));
@@ -428,7 +430,9 @@ struct GenericKey
     static inline bool keyDependsOnTupleAddress() { return false; }
     static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
 
-    GenericKey() {}
+    GenericKey() {
+        ::memset(data, 0, keySize * sizeof(char));
+    }
 
     GenericKey(const TableTuple *tuple) {
         assert(tuple);
@@ -704,7 +708,7 @@ struct TupleKey
 
     // Return a table tuple that is valid for comparison
     TableTuple getTupleForComparison() const {
-        return TableTuple(m_keyTuple, m_keyTupleSchema);
+        return TableTuple(static_cast<char*>(const_cast<void*>(m_keyTuple)), m_keyTupleSchema);
     }
 
     // Return the indexColumn'th key-schema column.
@@ -721,14 +725,14 @@ struct TupleKey
         return (*m_indexedExprs)[indexColumn]->eval(&tuple, NULL);
     }
 
-private:
+protected:
     // TableIndex owns these vectors which are used to extract key values from a persistent tuple
     // - both are NULL for an ephemeral key
     const std::vector<int> *m_columnIndices;
     const std::vector<AbstractExpression*> *m_indexedExprs;
 
     // Pointer to a persistent tuple in the non-ephemeral case.
-    char *m_keyTuple;
+    const void *m_keyTuple;
     const TupleSchema *m_keyTupleSchema;
 };
 
@@ -758,6 +762,111 @@ struct TupleKeyComparator
     }
 private:
     const TupleSchema *m_keySchema;
+};
+
+static inline int comparePointer(const void *lhs, const void *rhs) {
+    const uintptr_t l = reinterpret_cast<const uintptr_t>(lhs);
+    const uintptr_t r = reinterpret_cast<const uintptr_t>(rhs);
+
+    if (l == r) return 0;
+    else if (l < r) return -1;
+    else return 1;
+}
+
+template <typename KeyType> struct ComparatorWithPointer;
+
+template <typename KeyType>
+struct KeyWithPointer : public KeyType {
+    typedef ComparatorWithPointer<KeyType> KeyComparator;
+    friend struct ComparatorWithPointer<KeyType>;
+
+    KeyWithPointer() : KeyType(), m_keyTuple(NULL) {}
+
+    KeyWithPointer(const TableTuple *tuple) : KeyType(tuple), m_keyTuple(NULL) {}
+
+    KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
+                   const std::vector<AbstractExpression*> &indexed_expressions,
+                   const TupleSchema *keySchema)
+        : KeyType(tuple, indices, indexed_expressions, keySchema) {
+        m_keyTuple = tuple->address();
+    }
+
+    static inline bool keyDependsOnTupleAddress() { return true; }
+
+    const void * const& getValue() const { return m_keyTuple;}
+    void setValue(const void * const &value) { m_keyTuple = value; }
+    const void *setPointerValue(const void *value) {
+        const void *rv = m_keyTuple;
+        m_keyTuple = value;
+        return rv;
+    }
+
+private:
+    const void* m_keyTuple;
+};
+
+template <>
+struct KeyWithPointer<TupleKey> : public TupleKey {
+    typedef ComparatorWithPointer<TupleKey> KeyComparator;
+    friend struct ComparatorWithPointer<TupleKey>;
+
+    KeyWithPointer() : TupleKey() {}
+
+    KeyWithPointer(const TableTuple *tuple) : TupleKey(tuple) {}
+
+    KeyWithPointer(const TableTuple *tuple, const std::vector<int> &indices,
+                   const std::vector<AbstractExpression*> &indexed_expressions,
+                   const TupleSchema *unused_keySchema)
+        : TupleKey(tuple, indices, indexed_expressions, unused_keySchema) {}
+
+    const void * const& getValue() const { return m_keyTuple; }
+    void setValue(const void * const &value) { m_keyTuple = value; }
+    const void *setPointerValue(const void * &value) {
+        const void *rv = m_keyTuple;
+        m_keyTuple = value;
+        return rv;
+    }
+};
+
+template <typename KeyType>
+struct ComparatorWithPointer : public KeyType::KeyComparator {
+    ComparatorWithPointer(const TupleSchema *keySchema)
+        : KeyType::KeyComparator(keySchema) {}
+
+    int operator()(const KeyWithPointer<KeyType> &lhs, const KeyWithPointer<KeyType> &rhs) const {
+        int rv = KeyType::KeyComparator::operator()(lhs, rhs);
+        return rv == 0 ? comparePointer(lhs.m_keyTuple, rhs.m_keyTuple) : rv;
+    }
+};
+
+// overload template
+template <typename KeyType>
+inline void setPointerValue(KeyWithPointer<KeyType>& k, const void * v) { k.setValue(v); }
+
+template < typename KeyType, typename DataType = const void*>
+class PointerKeyValuePair {
+public:
+    // in order to be consistent with std::pair
+    typedef KeyWithPointer<KeyType> first_type;
+    typedef DataType second_type;
+
+    // the caller has to make sure the key has already contained the value
+    // the signatures are to be consist with the general template
+    PointerKeyValuePair() {}
+    PointerKeyValuePair(const first_type &key, const second_type &value) : k(key) {}
+
+    const first_type& getKey() const { return k; }
+    const second_type& getValue() const { return k.getValue(); }
+    void setKey(const first_type &key) { k = key; }
+    void setValue(const second_type &value) { k.setValue(value); }
+
+    // set the tuple pointer to the new value, and return the old value
+    const void *setPointerValue(const void *value) {
+        return k.setPointerValue(value);
+    }
+
+private:
+    first_type k;
 };
 
 }

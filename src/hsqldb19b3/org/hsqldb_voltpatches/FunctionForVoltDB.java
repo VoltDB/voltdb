@@ -88,6 +88,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
+        static final int FUNC_CONCAT                     = 124;
+
         private static final int FUNC_VOLT_SQL_ERROR     = 20000;
         private static final int FUNC_VOLT_DECODE        = 20001;
         private static final int FUNC_VOLT_FIELD         = 20002;
@@ -117,12 +119,66 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
 
+        static final int FUNC_VOLT_SET_FIELD              = 20024;
+
+        static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
+
+        static final int FUNC_VOLT_BITNOT                 = 20026;
+        static final int FUNC_VOLT_BIT_SHIFT_LEFT         = 20027;
+        static final int FUNC_VOLT_BIT_SHIFT_RIGHT        = 20028;
+        static final int FUNC_VOLT_HEX                    = 20029;
+        static final int FUNC_VOLT_BIN                    = 20030;
+
+        static final int FUNC_VOLT_DATEADD                = 20031;
+        static final int FUNC_VOLT_DATEADD_YEAR           = 20032;
+        static final int FUNC_VOLT_DATEADD_QUARTER        = 20033;
+        static final int FUNC_VOLT_DATEADD_MONTH          = 20034;
+        static final int FUNC_VOLT_DATEADD_DAY            = 20035;
+        static final int FUNC_VOLT_DATEADD_HOUR           = 20036;
+        static final int FUNC_VOLT_DATEADD_MINUTE         = 20037;
+        static final int FUNC_VOLT_DATEADD_SECOND         = 20038;
+        static final int FUNC_VOLT_DATEADD_MILLISECOND    = 20039;
+        static final int FUNC_VOLT_DATEADD_MICROSECOND    = 20040;
+        static final int FUNC_VOLT_REGEXP_POSITION        = 20041;
+        // Geospatial functions
+        static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
+        static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
+        static final int FUNC_VOLT_CONTAINS                     = 21002;
+        static final int FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS   = 21003;
+        static final int FUNC_VOLT_POLYGON_NUM_POINTS           = 21004;
+        static final int FUNC_VOLT_POINT_LATITUDE               = 21005;
+        static final int FUNC_VOLT_POINT_LONGITUDE              = 21006;
+        static final int FUNC_VOLT_POLYGON_CENTROID             = 21007;
+        static final int FUNC_VOLT_POLYGON_AREA                 = 21008;
+        static final int FUNC_VOLT_DISTANCE                     = 21009;    // wrapper id for distance between all geo types
+        static final int FUNC_VOLT_DISTANCE_POINT_POINT         = 21010;    // distance between point and point
+        static final int FUNC_VOLT_DISTANCE_POLYGON_POINT       = 21011;    // distance between polygon and point
+        static final int FUNC_VOLT_ASTEXT                       = 21012;    // wrapper for asText function for all geo types
+        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY_POINT       = 21013;    // point to text
+        static final int FUNC_VOLT_ASTEXT_GEOGRAPHY             = 21014;    // polygon to text
+        static final int FUNC_VOLT_VALIDATE_POLYGON             = 21015;    // Polygon validation.
+        static final int FUNC_VOLT_POLYGON_INVALID_REASON       = 21016;    // Reason a polygon may be invalid.
+
+
+        /*
+         * Note: The name must be all lower case.
+         */
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
                     new Type[] { null, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bit_shift_left", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_LEFT, -1,
+                    new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bit_shift_right", Type.SQL_BIGINT, FUNC_VOLT_BIT_SHIFT_RIGHT, -1,
+                    new Type[] { Type.SQL_BIGINT, Type.SQL_BIGINT },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
             new FunctionId("decode", null, FUNC_VOLT_DECODE, 2,
                     new Type[] { null, null },
@@ -135,6 +191,13 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
+
+            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
 
             new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },
@@ -170,6 +233,99 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
                     new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bitnot", Type.SQL_BIGINT, FUNC_VOLT_BITNOT, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
+            new FunctionId("hex", Type.SQL_VARCHAR, FUNC_VOLT_HEX, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("bin", Type.SQL_VARCHAR, FUNC_VOLT_BIN, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("dateadd", Type.SQL_TIMESTAMP, FUNC_VOLT_DATEADD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT, Type.SQL_TIMESTAMP },
+                    new short[] { Tokens.OPENBRACKET, Tokens.X_KEYSET, 11, Tokens.YEAR,
+                                  Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
+                                  Tokens.MILLIS, Tokens.MILLISECOND, Tokens.MICROS, Tokens.MICROSECOND, Tokens.COMMA,
+                                  Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("regexp_position", Type.SQL_BIGINT, FUNC_VOLT_REGEXP_POSITION, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
+
+            new FunctionId("pointfromtext", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POINTFROMTEXT, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("polygonfromtext", Type.VOLT_GEOGRAPHY, FUNC_VOLT_POLYGONFROMTEXT, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+            new FunctionId("contains", Type.SQL_BOOLEAN, FUNC_VOLT_CONTAINS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY, Type.VOLT_GEOGRAPHY_POINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("numinteriorring", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+             // numinteriorrings() is synonm to numinteriorring()
+            new FunctionId("numinteriorrings", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_INTERIOR_RINGS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("numpoints", Type.SQL_INTEGER, FUNC_VOLT_POLYGON_NUM_POINTS, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("latitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LATITUDE, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY_POINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("longitude", Type.SQL_DOUBLE, FUNC_VOLT_POINT_LONGITUDE, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY_POINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("centroid", Type.VOLT_GEOGRAPHY_POINT, FUNC_VOLT_POLYGON_CENTROID, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("area", Type.SQL_DOUBLE, FUNC_VOLT_POLYGON_AREA, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("distance", Type.SQL_DOUBLE, FUNC_VOLT_DISTANCE, -1,
+                    new Type[] { Type.SQL_ALL_TYPES, Type.SQL_ALL_TYPES },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                                   Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("isvalid", Type.SQL_BOOLEAN, FUNC_VOLT_VALIDATE_POLYGON, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("isinvalidreason", Type.SQL_VARCHAR, FUNC_VOLT_POLYGON_INVALID_REASON, -1,
+                    new Type[] { Type.VOLT_GEOGRAPHY },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("astext", Type.SQL_VARCHAR, FUNC_VOLT_ASTEXT, -1,
+                    new Type[] { Type.SQL_ALL_TYPES },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
@@ -259,7 +415,14 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
         }
 
-        switch(funcType) {
+        switch(m_def.getId()) {
+        case FunctionId.FUNC_CONCAT:
+            for (int ii = 0; ii < nodes.length; ii++) {
+                if (nodes[ii].dataType == null && nodes[ii].isParam) {
+                    nodes[ii].dataType = Type.SQL_VARCHAR;
+                }
+            }
+            break;
         /*
          * The types to the FIELD functions parameters are VARCHAR
          */
@@ -348,6 +511,73 @@ public class FunctionForVoltDB extends FunctionSQL {
             }
             break;
 
+        case FunctionId.FUNC_VOLT_BITNOT:
+            voltResolveToBigintTypesForBitwise();
+            break;
+
+        case FunctionId.FUNC_VOLT_BIT_SHIFT_LEFT:
+        case FunctionId.FUNC_VOLT_BIT_SHIFT_RIGHT:
+            // the first parameter has to be BigInteger
+            voltResolveToBigintType(0);
+            voltResolveToBigintCompatibleType(1);
+
+            dataType = Type.SQL_BIGINT;
+            break;
+
+        case FunctionId.FUNC_VOLT_HEX:
+        case FunctionId.FUNC_VOLT_BIN:
+            voltResolveToBigintType(0);
+            dataType = Type.SQL_VARCHAR;
+            break;
+
+        case FunctionId.FUNC_VOLT_DISTANCE:
+            // validate the types of argument is valid
+            if ((nodes[0].dataType == null && nodes[0].isParam) ||
+                (nodes[1].dataType == null && nodes[1].isParam)) {
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to DISTANCE function is ambiguous");
+            }
+            else if (nodes[0].dataType == null || nodes[1].dataType == null) {
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to DISTANCE function is ambiguous");
+            }
+            else if ((!nodes[0].dataType.isGeographyType() && !nodes[0].dataType.isGeographyPointType()) ||
+                     (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isGeographyPointType())) {
+                // either of the nodes is not a valid type
+                throw Error.error(ErrorCode.X_42565,
+                        "The DISTANCE function computes distances between POINT-to-POINT, POINT-to-POLYGON " +
+                        "and POLYGON-to-POINT only.");
+            } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
+                // distance between two polygons is not supported, flag as an error
+                throw Error.error(ErrorCode.X_42565, "DISTANCE between two POLYGONS not supported");
+            } else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
+                // distance between polygon-to-point and point-to-polygon is symmetric.
+                // So, update the the expression for distance between point and polygon to
+                // distance between polygon and point. This simplifies the logic and have to
+                // handle only one case: polygon-to-point instead of two
+                Expression tempNode = nodes[0];
+                nodes[0] = nodes[1];
+                nodes[1] = tempNode;
+            }
+            break;
+
+
+        case FunctionId.FUNC_VOLT_ASTEXT:
+            if (nodes[0].dataType == null) {
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type to ASTEXT function is ambiguous");
+            }
+
+            if (! (nodes[0].dataType.isGeographyPointType() || nodes[0].dataType.isGeographyType())) {
+                // "incompatible data type in operation"
+                throw Error.error(ErrorCode.X_42565,
+                        "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types.");
+            }
+            break;
+
         default:
             break;
         }
@@ -405,90 +635,34 @@ public class FunctionForVoltDB extends FunctionSQL {
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
+        sb.append(m_def.getName()).append(Tokens.T_OPENBRACKET);
 
-        switch (funcType) {
-            case FunctionId.FUNC_VOLT_DECODE: {
-                sb.append(name).append(Tokens.T_OPENBRACKET);
-                sb.append(nodes[0].getSQL());
-                for (int ii = 1; ii < nodes.length; ii++) {
-                    sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
-                }
-                sb.append(Tokens.T_CLOSEBRACKET);
-
-                return sb.toString();
-            }
-            case FunctionId.FUNC_VOLT_FIELD:
-            case FunctionId.FUNC_VOLT_ARRAY_ELEMENT: {
-                sb.append(name).append(Tokens.T_OPENBRACKET);
-                sb.append(nodes[0].getSQL()).append(Tokens.T_COMMA).append(nodes[1].getSQL());
-                sb.append(Tokens.T_CLOSEBRACKET);
-
-                return sb.toString();
-            }
-            case FunctionId.FUNC_VOLT_ARRAY_LENGTH: {
-                sb.append(name).append(Tokens.T_OPENBRACKET);
-                sb.append(nodes[0].getSQL());
-                sb.append(Tokens.T_CLOSEBRACKET);
-
-                return sb.toString();
-            }
-            case FunctionId.FUNC_VOLT_SINCE_EPOCH: {
-                int timeUnit = ((Number) nodes[0].valueData).intValue();
-                sb.append(name).append(Tokens.T_OPENBRACKET);
-                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
-                sb.append(Tokens.T_CLOSEBRACKET);
-
-                return sb.toString();
-            }
-            case FunctionId.FUNC_VOLT_TO_TIMESTAMP: {
-                int timeUnit = ((Number) nodes[0].valueData).intValue();
-                sb.append(name).append(Tokens.T_OPENBRACKET);
-                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
-                sb.append(Tokens.T_CLOSEBRACKET);
-
-                return sb.toString();
-            }
-            case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
-                int timeUnit = ((Number) nodes[0].valueData).intValue();
-                sb.append(name).append(Tokens.T_OPENBRACKET);
-                sb.append(Tokens.getKeyword(timeUnit)).append(Tokens.T_COMMA).append(nodes[1].getSQL());
-                sb.append(Tokens.T_CLOSEBRACKET);
-
-                return sb.toString();
-            }
-            case FunctionId.FUNC_VOLT_FROM_UNIXTIME: {
-                sb.append(name).append(Tokens.T_OPENBRACKET).append(nodes[0].getSQL());
-                sb.append(Tokens.T_CLOSEBRACKET);
-            }
-            default :
-                return super.getSQL();
+        switch (m_def.getId()) {
+        case FunctionId.FUNC_VOLT_SINCE_EPOCH:
+        case FunctionId.FUNC_VOLT_TO_TIMESTAMP:
+        case FunctionId.FUNC_VOLT_TRUNCATE_TIMESTAMP: {
+            int timeUnit = ((Number) nodes[0].valueData).intValue();
+            sb.append(Tokens.getKeyword(timeUnit));
+            break;
         }
-    }
-
-    // This function will be removed with a new attribute is added XML indicating Function Unit
-    public static boolean isUnitFunction(int functionType) {
-
-        switch (functionType) {
-            case FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND:
-            case FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND:
-            case FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND:
-            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND:
-            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND:
-            case FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND:
-            case FunctionId.FUNC_VOLT_TRUNCATE_YEAR:
-            case FunctionId.FUNC_VOLT_TRUNCATE_QUARTER:
-            case FunctionId.FUNC_VOLT_TRUNCATE_MONTH:
-            case FunctionId.FUNC_VOLT_TRUNCATE_DAY:
-            case FunctionId.FUNC_VOLT_TRUNCATE_HOUR:
-            case FunctionId.FUNC_VOLT_TRUNCATE_MINUTE:
-            case FunctionId.FUNC_VOLT_TRUNCATE_SECOND:
-            case FunctionId.FUNC_VOLT_TRUNCATE_MILLISECOND:
-            case FunctionId.FUNC_VOLT_TRUNCATE_MICROSECOND:
-                return true;
-
-            default :
-                return false;
+        default:
+            sb.append(nodes[0].getSQL());
+            break;
         }
+        for (int ii = 1; ii < nodes.length; ii++) {
+            if (nodes[ii] != null) {
+                sb.append(Tokens.T_COMMA).append(nodes[ii].getSQL());
+            }
+            else {
+                // Some functions, like regexp_position, have optional parameters.
+                // The omitted optional parameters appear as a null in the function's
+                // node list.  This null-preserving behavior seems to be intentional in
+                // ParserSQL.readExpression, for reasons that are unclear to me.
+                //   --cwolff, December 2015.
+            }
+        }
+        sb.append(Tokens.T_CLOSEBRACKET);
+        return sb.toString();
     }
 
 }

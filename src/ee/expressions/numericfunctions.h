@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,6 +14,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "common/NValue.hpp"
+#include "boost/math/constants/constants.hpp"
 
 namespace voltdb {
 
@@ -177,6 +180,20 @@ template<> inline NValue NValue::callUnary<FUNC_EXP>() const {
 }
 
 
+/** implement the SQL LOG/LN function for all numeric values */
+template<> inline NValue NValue::callUnary<FUNC_LN>() const {
+    if (isNull()) {
+        return *this;
+    }
+    NValue retval(VALUE_TYPE_DOUBLE);
+    double inputValue = castAsDoubleAndGetValue();
+    double resultDouble = std::log(inputValue);
+    throwDataExceptionIfInfiniteOrNaN(resultDouble, "function LN");
+    retval.getDouble() = resultDouble;
+    return retval;
+}
+
+
 /** implement the SQL POWER function for all numeric values */
 template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -199,6 +216,61 @@ template<> inline NValue NValue::call<FUNC_POWER>(const std::vector<NValue>& arg
     return retval;
 }
 
+/**
+ * FYI, http://stackoverflow.com/questions/7594508/modulo-operator-with-negative-values
+ *
+ * It looks like having any negative operand results in undefined behavior,
+ * meaning different C++ compilers could get different answers here.
+ * In C++2003, the modulo operator (%) is implementation defined.
+ * In C++2011 the policy is slavish devotion to Fortran semantics. This makes sense because,
+ * apparently, all the current hardware uses Fortran semantics anyway. So, even if it's implementation
+ * defined it's likely to be implementation defined in the same way.
+ *
+ * FYI, Fortran semantics: https://gcc.gnu.org/onlinedocs/gfortran/MOD.html
+ * It has the same semantics with C99 as: (a / b) * b + MOD(a,b)  == a
+ */
+template<> inline NValue NValue::call<FUNC_MOD>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& base = arguments[0];
+    const NValue& divisor = arguments[1];
+
+    const ValueType baseType = base.getValueType();
+    const ValueType divisorType = divisor.getValueType();
+
+    // planner should guard against any invalid number type
+    if (!isNumeric(baseType) || !isNumeric(divisorType)) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-numeric type for SQL MOD function");
+    }
+
+    bool areAllIntegralType = isIntegralType(baseType) && isIntegralType(divisorType);
+
+    if (! areAllIntegralType) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-integral type for SQL MOD function");
+    }
+    if (base.isNull() || divisor.isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    } else if (divisor.castAsBigIntAndGetValue() == 0) {
+        throw SQLException(SQLException::data_exception_division_by_zero, "division by zero");
+    }
+
+    NValue retval(divisorType);
+    int64_t baseValue = base.castAsBigIntAndGetValue();
+    int64_t divisorValue = divisor.castAsBigIntAndGetValue();
+
+    int64_t result = std::abs(baseValue) % std::abs(divisorValue);
+    if (baseValue < 0) {
+        result *= -1;
+    }
+
+    return getBigIntValue(result);
+}
+
+/*
+ * implement the SQL PI function
+ */
+template<> inline NValue NValue::callConstant<FUNC_PI>() {
+    return getDoubleValue(boost::math::constants::pi<double>());
+}
 
 
 }

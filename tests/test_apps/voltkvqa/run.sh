@@ -14,6 +14,10 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
+elif [ -d "$VOLTDB_BIN/../voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 else
     VOLTDB_LIB="`pwd`/../../../lib"
     VOLTDB_VOLTDB="`pwd`/../../../voltdb"
@@ -24,6 +28,18 @@ CLASSPATH=$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
+# Jars needed to compile JDBC Benchmark. Apprunner uses a nfs shared path.
+CONNECTIONPOOLLIB=${CONNECTIONPOOLLIB:-"/home/opt/connection-pool"}
+CONNECIONPOOLCLASSPATH=$({\
+    \ls -1 "$CONNECTIONPOOLLIB"/tomcat-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/mchange-commons-java-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/c3p0-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/bonecp-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/HikariCP-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/guava-*.jar; \
+    \ls -1 "$CONNECTIONPOOLLIB"/slf4j-*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+CLASSPATH="$CONNECIONPOOLCLASSPATH:$CLASSPATH:`pwd`"
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -32,7 +48,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME*.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -51,6 +67,7 @@ function catalog() {
     srccompile
     $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml || exit 1
     $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar -p project_withexport.xml || exit 1
+    $VOLTDB compile --classpath obj -o ${APPNAME}-security.jar -p project-security.xml || exit 1
 }
 
 # run the voltdb server locally
@@ -127,7 +144,6 @@ function sync-benchmark() {
         --threads=40
 }
 
-# JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
@@ -140,7 +156,7 @@ function jdbc-benchmark() {
         voltkvqa.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
-        --servers=localhost:21212 \
+        --servers=localhost \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
@@ -151,9 +167,81 @@ function jdbc-benchmark() {
         --threads=40
 }
 
+function jdbc-benchmark-c3p0() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=c3p0 \
+        --threads=40
+}
+
+function jdbc-benchmark-tomcat() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=tomcat \
+        --threads=40
+}
+
+function jdbc-benchmark-bonecp() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=bonecp \
+        --threads=40
+}
+
+function jdbc-benchmark-hikari() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltkvqa.JDBCBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --poolsize=100000 \
+        --preload=true \
+        --getputratio=0.90 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --usecompression=false \
+	--externalConnectionPool=hikari \
+        --threads=40
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark-*|jdbc-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

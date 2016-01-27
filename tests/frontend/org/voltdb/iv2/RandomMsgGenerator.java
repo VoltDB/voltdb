@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,7 +28,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.Random;
 
-import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
@@ -36,10 +35,13 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+import com.google_voltpatches.common.collect.Sets;
+
 // Generate a random stream of messages seen by an SPI.
 public class RandomMsgGenerator
 {
     TxnEgo m_mpiTxnEgo;
+    UniqueIdGenerator m_mpiGenerator = new UniqueIdGenerator(MpInitiator.MP_INIT_PID, 0);
     Random m_rand;
     boolean m_mpInProgress = false;
     boolean m_currentMpReadOnly = false;
@@ -47,6 +49,7 @@ public class RandomMsgGenerator
     static final double MPDONECHANCE = .75;
     static final double READCHANCE = .50;
     static final double MPRESTARTCHANCE = 0.20;
+    static final double BINARYLOGCHANCE = 0.75;
 
     RandomMsgGenerator()
     {
@@ -56,21 +59,35 @@ public class RandomMsgGenerator
         m_mpiTxnEgo = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
     }
 
-    private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly)
+    private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly, boolean binaryLog, boolean isMp)
     {
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(ps);
+        when(spi.getOriginalTxnId()).thenReturn((long)-1);
+        if (binaryLog) {
+            when(ps.toArray()).thenReturn(new Object[] {null, 0l, 0l, Long.MIN_VALUE, Long.MIN_VALUE, null});
+            if (!isMp) {
+                when(spi.getProcName()).thenReturn("@ApplyBinaryLogSP");
+            } else {
+                when(spi.getProcName()).thenReturn("@ApplyBinaryLogMP");
+            }
+        } else {
+            when(ps.toArray()).thenReturn(new Object[] {null, 0l, 0l, Long.MIN_VALUE, null});
+            when(spi.getProcName()).thenReturn("dummy");
+        }
         Iv2InitiateTaskMessage msg =
-            new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, true, spi,
-                    0l, 0l, false);
+                new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, spi,
+                        0l, 0l, false);
         return msg;
     }
 
     private FragmentTaskMessage makeFragmentTaskMsg(boolean readOnly, boolean isFinal)
     {
         FragmentTaskMessage msg =
-            new FragmentTaskMessage(0l, 0l, m_mpiTxnEgo.getTxnId(), 0l, readOnly, isFinal, false);
+            new FragmentTaskMessage(0l, 0l, m_mpiTxnEgo.getTxnId(),
+                    UniqueIdGenerator.makeIdFromComponents(System.currentTimeMillis(), 0, MpInitiator.MP_INIT_PID),
+                    readOnly, isFinal, false);
         return msg;
     }
 
@@ -86,14 +103,18 @@ public class RandomMsgGenerator
     public TransactionInfoBaseMessage generateRandomMessageInStream()
     {
         if (m_rand.nextDouble() > MPCHANCE) {
-            boolean readOnly = (m_rand.nextDouble() < READCHANCE);
-            Iv2InitiateTaskMessage msg = makeIv2InitiateTaskMsg(readOnly);
+            double type = m_rand.nextDouble();
+            boolean readOnly = (type < READCHANCE);
+            boolean binaryLog = (!readOnly && type < BINARYLOGCHANCE);
+            Iv2InitiateTaskMessage msg = makeIv2InitiateTaskMsg(readOnly, binaryLog, false);
             return msg;
         }
         else if (!m_mpInProgress) {
-            m_currentMpReadOnly = (m_rand.nextDouble() < READCHANCE);
+            double type = m_rand.nextDouble();
+            m_currentMpReadOnly = (type < READCHANCE);
+            boolean binaryLog = (!m_currentMpReadOnly && type < BINARYLOGCHANCE);
             FragmentTaskMessage msg = makeFragmentTaskMsg(m_currentMpReadOnly, false);
-            msg.setStateForDurability(mock(Iv2InitiateTaskMessage.class), Sets.newHashSet(0, 1, 2));
+            msg.setStateForDurability(makeIv2InitiateTaskMsg(false, binaryLog, true), Sets.newHashSet(0, 1, 2));
             m_mpInProgress = true;
             return msg;
         }

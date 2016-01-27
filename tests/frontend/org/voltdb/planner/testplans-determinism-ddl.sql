@@ -1,3 +1,7 @@
+create table tonecolumn (
+  a bigint not null primary key
+);
+
 create table ttree (
   a bigint not null,
   b bigint not null,
@@ -7,6 +11,16 @@ create table ttree (
 
 create index cover2_TREE on ttree (a, b);
 create index cover3_TREE on ttree (a, c, b);
+
+create table ttree_with_key (
+  a bigint not null,
+  b bigint not null,
+  c bigint not null,
+  d bigint not null,
+  e bigint not null,
+  id bigint not null,
+  primary key (a, b, c)
+);
 
 create table thash (
   a bigint not null,
@@ -101,3 +115,9 @@ create table ppk (
 );
 
 partition table ppk on column a;
+
+create table floataggs (
+    alpha float,
+    beta  float,
+    gamma float
+);

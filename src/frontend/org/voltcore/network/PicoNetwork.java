@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -64,7 +64,6 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.CancelledKeyException;
@@ -146,7 +145,10 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         m_thread.setDaemon(true);
         try {
             sc.configureBlocking(false);
-            sc.setOption(StandardSocketOptions.TCP_NODELAY, true);
+            // Cannot use sc.setOption(StandardSocketOptions.TCP_NODELAY, true)
+            // because that is available only in java 7. This class is included in
+            // client build with -source 1.6.
+            sc.socket().setTcpNoDelay(true);
             m_selector = Selector.open();
             m_interestOps = SelectionKey.OP_READ;
             m_key = m_sc.register(m_selector, m_interestOps);
@@ -463,6 +465,11 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     }
 
     @Override
+    public String getHostnameOrIP(long clientHandle) {
+        return getHostnameOrIP();
+    }
+
+    @Override
     public int getRemotePort() {
         return m_remoteSocketAddress.getPort();
     }
@@ -475,6 +482,11 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     @Override
     public long connectionId() {
         return m_ih.connectionId();
+    }
+
+    @Override
+    public long connectionId(long clientHandle) {
+        return connectionId();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,7 +24,6 @@
 package schemachange;
 
 import java.util.Collections;
-import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,13 +41,13 @@ class TableLoader {
 
     static VoltLogger log = new VoltLogger("HOST");
 
-    final SchemaChangeClient scc;
     final VoltTable table;
     final Client client;
-    final Random rand;
+    final TableHelper helper;
     final int pkeyColIndex;
     final String deleteCRUD;
     final String insertCRUD;
+    final int timeout;
 
     final AtomicBoolean hadError = new AtomicBoolean(false);
     final SortedSet<Long> outstandingPkeys = Collections.synchronizedSortedSet(new TreeSet<Long>());
@@ -59,11 +58,12 @@ class TableLoader {
         return String.format(str, parameters);
     }
 
-    TableLoader(SchemaChangeClient scc, VoltTable t, Random rand) {
-        this.scc = scc;
+    TableLoader(Client client, VoltTable t, int timeout, TableHelper helper) {
         this.table = t;
-        this.client = scc.client;
-        this.rand = rand;
+        this.client = client;
+        assert(helper != null);
+        this.helper = helper;
+        this.timeout = timeout;
 
         // find the primary key
         pkeyColIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(table);
@@ -120,7 +120,7 @@ class TableLoader {
     }
 
     long countKeys(long max) {
-        return scc.callROProcedureWithRetry("@AdHoc",
+        return SchemaChangeUtility.callROProcedureWithRetry(this.client, "@AdHoc", this.timeout,
                 String.format("select count(*) from %s where pkey <= %d;",
                         TableHelper.getTableName(table), max)).getResults()[0].asScalarLong();
     }
@@ -161,6 +161,7 @@ class TableLoader {
 
         log.info(_F("loadChunk | startPkey:%d stopPkey:%d", startPkey, stopPkey));
 
+        TableHelper.RandomRowMaker filler = helper.createRandomRowMaker(table, Integer.MAX_VALUE, false, true);
         long maxSentPkey = -1;
         hadError.set(false);
         for (long key = startPkey; key <= stopPkey; key++) {
@@ -169,7 +170,7 @@ class TableLoader {
                 return false;
             }
 
-            Object[] row = TableHelper.randomRow(table, Integer.MAX_VALUE, rand);
+            Object[] row = filler.randomRow();
             row[pkeyColIndex] = key;
             try {
                 outstandingPkeys.add(key);

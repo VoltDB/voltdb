@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <queue>
 #include <vector>
+#include <deque>
 #include "harness.h"
 
 #include "common/executorcontext.hpp"
@@ -38,8 +39,8 @@
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
+#include "common/StreamBlock.h"
 #include "storage/streamedtable.h"
-#include "storage/StreamBlock.h"
 
 #include "boost/smart_ptr.hpp"
 
@@ -48,62 +49,17 @@ using namespace voltdb;
 
 const int COLUMN_COUNT = 5;
 
-class MockTopend : public Topend {
-  public:
-    MockTopend() {
-    }
-
-    void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) {
-        if (sync) {
-            return;
-        }
-        partitionIds.push(partitionId);
-        signatures.push(signature);
-        blocks.push_back(boost::shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(boost::shared_ptr<char>(block->rawPtr()));
-        receivedExportBuffer = true;
-    }
-
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
-        return 0;
-    }
-
-    virtual int loadNextDependency(
-        int32_t dependencyId, Pool *pool, Table* destination)
-    {
-        return 0;
-    }
-
-    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound) {
-        return 1000000000; // larger means less likely/frequent callbacks to ignore
-    }
-
-    virtual std::string planForFragmentId(int64_t fragmentId) {
-        return "";
-    }
-
-    virtual void crashVoltDB(FatalException e) {
-
-    }
-
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
-    queue<int32_t> partitionIds;
-    queue<std::string> signatures;
-    vector<boost::shared_ptr<StreamBlock> > blocks;
-    vector<boost::shared_ptr<char> > data;
-    bool receivedExportBuffer;
-};
-
 class StreamedTableTest : public Test {
 public:
     StreamedTableTest() {
         srand(0);
-        m_topend = new MockTopend();
+        m_topend = new DummyTopend();
         m_pool = new Pool();
         m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
-
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
+        NValueArray* noParams = NULL;
+        VoltDBEngine* noEngine = NULL;
+        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool,
+                                        noParams, noEngine, "", 0, NULL, NULL, 0);
 
         // set up the schema used to fill the new buffer
         std::vector<ValueType> columnTypes;
@@ -140,7 +96,7 @@ public:
         m_quantum->release();
         m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool);
         // quant, currTxnId, committedTxnId
-        m_context->setupForPlanFragments(m_quantum, i, i - 1, 0);
+        m_context->setupForPlanFragments(m_quantum, i, i, i - 1, 0);
     }
 
     virtual ~StreamedTableTest() {
@@ -155,7 +111,7 @@ public:
     }
 
 protected:
-    MockTopend *m_topend;
+    DummyTopend *m_topend;
     Pool *m_pool;
     UndoQuantum *m_quantum;
     ExecutorContext *m_context;
@@ -194,7 +150,7 @@ TEST_F(StreamedTableTest, BaseCase) {
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    vector<boost::shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
+    deque<boost::shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
     int64_t uso = (*begin)->uso();
     EXPECT_EQ(uso, 0);
     size_t offset = (*begin)->offset();

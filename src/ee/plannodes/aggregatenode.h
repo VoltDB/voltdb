@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -48,16 +48,15 @@
 
 #include "plannodes/abstractplannode.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 class AggregatePlanNode : public AbstractPlanNode
 {
 public:
-    AggregatePlanNode(PlanNodeType type) : m_type(type), m_prePredicate(NULL), m_postPredicate(NULL) { }
+    AggregatePlanNode(PlanNodeType type) : m_type(type) { }
     ~AggregatePlanNode();
-
-    virtual PlanNodeType getPlanNodeType() const { return m_type; }
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
     const std::vector<ExpressionType> getAggregates() const { return m_aggregates; }
 
@@ -72,6 +71,9 @@ public:
     const std::vector<int>& getAggregateOutputColumns() const
     { return m_aggregateOutputColumns; }
 
+    const std::vector<int>& getPartialGroupByColumns() const
+    { return m_partialGroupByColumns; }
+
     const std::vector<AbstractExpression*>& getAggregateInputExpressions() const
     { return m_aggregateInputExpressions; }
 
@@ -79,43 +81,36 @@ public:
     { return m_groupByExpressions; }
 
     AbstractExpression* getPrePredicate() const
-    { return m_prePredicate; }
+    { return m_prePredicate.get(); }
 
     AbstractExpression* getPostPredicate() const
-    { return m_postPredicate; }
+    { return m_postPredicate.get(); }
 
     void collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const;
 
-    std::string debugInfo(const std::string &spacer) const;
-
-    //
-    // Public methods used only for tests
-    //
-    void setAggregates(std::vector<ExpressionType> &aggregates);
-    void setAggregateOutputColumns(std::vector<int> outputColumns);
-
 protected:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
+    void loadFromJSONObject(PlannerDomValue obj);
 
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
-    std::vector<AbstractExpression*> m_aggregateInputExpressions;
-    std::vector<AbstractExpression*> m_outputColumnExpressions;
+    OwningExpressionVector m_aggregateInputExpressions;
 
     //
     // What columns to group by on
     //
-    std::vector<AbstractExpression*> m_groupByExpressions;
+    OwningExpressionVector m_groupByExpressions;
 
-    PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
+    std::vector<int> m_partialGroupByColumns;
+
+    PlanNodeType m_type; //AGGREGATE, PARTIALAGGREGATE, HASHAGGREGATE
 
     // ENG-1565: for accelerating min() / max() using index purpose only
-    AbstractExpression* m_prePredicate;
+    boost::scoped_ptr<AbstractExpression> m_prePredicate;
 
-    AbstractExpression* m_postPredicate;
+    boost::scoped_ptr<AbstractExpression> m_postPredicate;
 };
 
-}
+} // namespace voltdb
 
 #endif

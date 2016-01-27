@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -52,6 +52,7 @@
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/declarations.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -60,7 +61,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticIndex.h"
 #include "storage/table.h"
-#include "storage/TupleStreamWrapper.h"
+#include "storage/ExportTupleStream.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
@@ -80,20 +81,6 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 
-class TableColumn;
-class TableIndex;
-class TableIterator;
-class TableFactory;
-class TupleSerializer;
-class SerializeInput;
-class Topend;
-class MaterializedViewMetadata;
-class RecoveryProtoMsg;
-class TupleOutputStreamProcessor;
-class ReferenceSerializeInput;
-class PersistentTable;
-class TableCatalogDelegate;
-
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
  * normally-private stuff in PersistentTable.
@@ -105,7 +92,7 @@ class PersistentTableSurgeon {
 
 public:
 
-    TBMap &getData();
+    TBMap &getData() const;
     PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
@@ -116,6 +103,9 @@ public:
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
 
+    size_t getSnapshotPendingBlockCount() const;
+    size_t getSnapshotPendingLoadBlockCount() const;
+    bool blockCountConsistent() const;
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
     uint32_t getTupleCount() const;
 
@@ -146,6 +136,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
+    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -202,6 +193,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
     friend class PersistentTableSurgeon;
     friend class TableFactory;
+    friend class JumpingTableIterator;
     friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
@@ -214,6 +206,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // default iterator
     TableIterator m_iter;
+
+ protected:
+
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
   public:
     virtual ~PersistentTable();
@@ -234,6 +230,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return new TableIterator(this, m_data.begin());
     }
 
+    JumpingTableIterator* makeJumpingIterator() {
+        return new JumpingTableIterator(this, m_data.begin(), m_data.end());
+    }
+
     TableIterator& iteratorDeletingAsWeGo() {
         m_iter.reset(m_data.begin());
         m_iter.setTempTableDeleteAsGo(false);
@@ -246,7 +246,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
 
-    virtual void truncateTable(VoltDBEngine* engine);
+    virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -273,7 +273,20 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
                                                 std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true);
+                                                bool fallible=true,
+                                                bool updateDRTimestamp=true);
+
+    virtual void addIndex(TableIndex *index) {
+        Table::addIndex(index);
+        m_noAvailableUniqueIndex = false;
+        m_smallestUniqueIndex = NULL;
+        m_smallestUniqueIndexCrc = 0;
+    }
+    virtual void removeIndex(TableIndex *index) {
+        Table::removeIndex(index);
+        m_smallestUniqueIndex = NULL;
+        m_smallestUniqueIndexCrc = 0;
+    }
 
     // ------------------------------------------------------------------
     // PERSISTENT TABLE OPERATIONS
@@ -290,10 +303,23 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     /*
-     * Lookup the address of the tuple that is identical to the specified tuple.
+     * Lookup the address of the tuple whose values are identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
      */
-    voltdb::TableTuple lookupTuple(TableTuple tuple);
+    voltdb::TableTuple lookupTupleByValues(TableTuple tuple);
+
+    /*
+     * Lookup the address of the tuple that is identical to the specified tuple.
+     * It is assumed that the tuple argument was first retrieved from this table.
+     * Does a primary key lookup or table scan if necessary.
+     */
+    voltdb::TableTuple lookupTupleForUndo(TableTuple tuple);
+
+    /*
+     * Functions the same as lookupTupleByValues(), but takes the DR hidden timestamp
+     * column into account.
+     */
+    voltdb::TableTuple lookupTupleForDR(TableTuple tuple);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -328,7 +354,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         TableStreamType streamType,
                         int32_t partitionId,
                         CatalogId tableId,
-                        ReferenceSerializeInput &serializeIn);
+                        ReferenceSerializeInputBE &serializeIn);
 
     void dropMaterializedView(MaterializedViewMetadata *targetView);
     void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
@@ -385,11 +411,30 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    inline bool isReplicatedTable() const {
+        return (m_partitionColumn == -1);
+    }
+
+    /** Returns true if DR is enabled for this table */
+    bool isDREnabled() const { return m_drEnabled; }
+
+    /** Returns true if there is a hidden column in this table for the
+        DR timestamp (used to resolve active/active conflicts) */
+    bool hasDRTimestampColumn() const { return m_drTimestampColumnIndex != -1; }
+
+    /** Returns the index of the DR timestamp column (relative to the
+        hidden columns for the table).  If there's no DR timestamp
+        column, returns -1. */
+    int getDRTimestampColumnIndex() const { return m_drTimestampColumnIndex; }
+
+    // for test purpose
+    void setDR(bool flag) { m_drEnabled = flag; }
+
     void setTupleLimit(int32_t newLimit) {
         m_tupleLimit = newLimit;
     }
 
-    bool isPersistentTableEmpty()
+    bool isPersistentTableEmpty() const
     {
         // The narrow usage of this function (while updating the catalog)
         // suggests that it could also mean "table is new and never had tuples".
@@ -405,7 +450,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() {
+    PersistentTable * getPreTruncateTable() const {
         return m_preTruncateTable;
     }
 
@@ -436,10 +481,37 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         }
     }
 
+    /**
+     * Returns true if this table has a fragment that may be executed
+     * when the table's row limit will be exceeded.
+     */
+    bool hasPurgeFragment() const {
+        return m_purgeExecutorVector.get() != NULL;
+    }
+
+    /**
+     * Sets the purge executor vector for this table to method
+     * argument (Using swap instead of reset so that ExecutorVector
+     * may remain a forward-declared incomplete type here)
+     */
+    void swapPurgeExecutorVector(boost::shared_ptr<ExecutorVector> ev) {
+        m_purgeExecutorVector.swap(ev);
+    }
+
+    /**
+     * Returns the purge executor vector for this table
+     */
+    boost::shared_ptr<ExecutorVector> getPurgeExecutorVector() {
+        assert(hasPurgeFragment());
+        return m_purgeExecutorVector;
+    }
+
+    std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
+
   private:
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
+    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -453,6 +525,22 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<std::string> &predicateStrings,
                                     bool skipInternalActivation);
 
+    size_t getSnapshotPendingBlockCount() const {
+        return m_blocksPendingSnapshot.size();
+    }
+
+    size_t getSnapshotPendingLoadBlockCount() const {
+        size_t blockCnt = 0;
+        for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
+            blockCnt += m_blocksPendingSnapshotLoad[ii]->size();
+        }
+        return blockCnt;
+    }
+
+    bool blockCountConsistent() const {
+        return m_blocksNotPendingSnapshot.size() == m_data.size();
+    }
+
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
             assert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
@@ -462,19 +550,19 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         if (finishedBlock != NULL && !finishedBlock->isEmpty()) {
             m_blocksNotPendingSnapshot.insert(finishedBlock);
             int bucketIndex = finishedBlock->calculateBucketIndex();
-            if (bucketIndex != -1) {
+            if (bucketIndex != NO_NEW_BUCKET_INDEX) {
                 finishedBlock->swapToBucket(m_blocksNotPendingSnapshotLoad[bucketIndex]);
             }
         }
     }
 
     void nextFreeTuple(TableTuple *tuple);
-    bool doCompactionWithinSubset(TBBucketMap *bucketMap);
-    void doForcedCompaction();
+    bool doCompactionWithinSubset(TBBucketPtrVector *bucketVector);
+    bool doForcedCompaction();  // Returns true if a compaction was performed
 
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
-    bool tryInsertOnAllIndexes(TableTuple *tuple);
+    void tryInsertOnAllIndexes(TableTuple *tuple, TableTuple *conflict);
     bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                     const TableTuple &sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const &indexesToUpdate);
@@ -495,7 +583,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream = true);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -516,9 +604,29 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual void processLoadedTuple(TableTuple &tuple,
                                     ReferenceSerializeOutput *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition);
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRows);
+
+    enum LookupType {
+        LOOKUP_BY_VALUES,
+        LOOKUP_FOR_DR,
+        LOOKUP_FOR_UNDO
+    };
+    TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
     TBPtr allocateNextBlock();
+
+    inline AbstractDRTupleStream *getDRTupleStream(ExecutorContext *ec) {
+        if (isReplicatedTable()) {
+            return ec->drReplicatedStream();
+        } else {
+            return ec->drStream();
+        }
+    }
+
+    void setDRTimestampForTuple(ExecutorContext* ec, TableTuple &tuple, bool update);
+
+    void computeSmallestUniqueIndex();
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
@@ -529,6 +637,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // table row count limit
     int m_tupleLimit;
 
+    // Executor vector to be executed when imminent insert will exceed
+    // tuple limit
+    boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
+
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;
 
@@ -536,14 +648,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     voltdb::PersistentTableStats stats_;
     voltdb::TableStats* getTableStats();
 
-    // is Export enabled
-    bool m_exportEnabled;
-
     // STORAGE TRACKING
 
     // Map from load to the blocks with level of load
-    TBBucketMap m_blocksNotPendingSnapshotLoad;
-    TBBucketMap m_blocksPendingSnapshotLoad;
+    TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
+    TBBucketPtrVector m_blocksPendingSnapshotLoad;
 
     // Map containing blocks that aren't pending snapshot
     boost::unordered_set<TBPtr> m_blocksNotPendingSnapshot;
@@ -570,6 +679,20 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // The original table from the first truncated table
     PersistentTable * m_preTruncateTable;
+
+    //Cache config info, is this a materialized view
+    bool m_isMaterialized;
+
+    // is DR enabled
+    bool m_drEnabled;
+
+    //SHA-1 of signature string
+    char m_signature[20];
+
+    bool m_noAvailableUniqueIndex;
+    TableIndex* m_smallestUniqueIndex;
+    uint32_t m_smallestUniqueIndexCrc;
+    int m_drTimestampColumnIndex;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -580,7 +703,7 @@ inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
 inline PersistentTableSurgeon::~PersistentTableSurgeon()
 {}
 
-inline TBMap &PersistentTableSurgeon::getData() {
+inline TBMap &PersistentTableSurgeon::getData() const {
     return m_table.m_data;
 }
 
@@ -612,6 +735,18 @@ inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
 
 inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     m_table.deleteTupleStorage(tuple, block);
+}
+
+inline size_t PersistentTableSurgeon::getSnapshotPendingBlockCount() const {
+    return m_table.getSnapshotPendingBlockCount();
+}
+
+inline size_t PersistentTableSurgeon::getSnapshotPendingLoadBlockCount() const {
+    return m_table.getSnapshotPendingLoadBlockCount();
+}
+
+inline bool PersistentTableSurgeon::blockCountConsistent() const {
+    return m_table.blockCountConsistent();
 }
 
 inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
@@ -746,6 +881,19 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
+inline void
+PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
+    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
+        if (m_table.m_partitionColumn == -1) {
+            if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
+                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
+            }
+        } else {
+            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
+        }
+    }
+}
+
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     assert (m_tempTuple.m_data);
     m_tempTuple.copy(source);
@@ -786,7 +934,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 
     int retval = block->freeTuple(tuple.address());
-    if (retval != -1) {
+    if (retval != NO_NEW_BUCKET_INDEX) {
         //Check if if the block is currently pending snapshot
         if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
             //std::cout << "Swapping block " << static_cast<void*>(block.get()) << " to bucket " << retval << std::endl;
@@ -834,13 +982,25 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
     return TBPtr(NULL);
 }
 
-inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
-    m_data.insert( block->address(), block);
+inline TBPtr PersistentTable::allocateNextBlock()
+{
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    m_data.insert(block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;
 }
 
+inline TableTuple PersistentTable::lookupTupleByValues(TableTuple tuple) {
+    return lookupTuple(tuple, LOOKUP_BY_VALUES);
+}
+
+inline TableTuple PersistentTable::lookupTupleForUndo(TableTuple tuple) {
+    return lookupTuple(tuple, LOOKUP_FOR_UNDO);
+}
+
+inline TableTuple PersistentTable::lookupTupleForDR(TableTuple tuple) {
+    return lookupTuple(tuple, LOOKUP_FOR_DR);
+}
 
 }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import org.voltdb.benchmark.tpcc.procedures.FragmentUpdateTestProcedure;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouse;
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouseReplicated;
 import org.voltdb.benchmark.tpcc.procedures.ResetWarehouse;
@@ -45,8 +46,6 @@ import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * A subclass of VoltProjectBuilder that already knows about all of the
@@ -64,7 +63,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         ostatByCustomerName.class, paymentByCustomerIdC.class,
         paymentByCustomerNameC.class, paymentByCustomerIdW.class,
         paymentByCustomerNameW.class, slev.class, SelectAll.class,
-        ResetWarehouse.class, LoadWarehouse.class,
+        ResetWarehouse.class, LoadWarehouse.class, FragmentUpdateTestProcedure.class,
         LoadWarehouseReplicated.class,
         paymentByCustomerName.class, paymentByCustomerId.class
     };
@@ -83,7 +82,6 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     public static final URL ddlURL = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
     public static final String jarFilename = "tpcc.jar";
     private static final String m_jarFileName = "tpcc.jar";
-
 
     /**
      * Add the TPC-C procedures to the VoltProjectBuilder base class.
@@ -144,9 +142,9 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
                                        int kFactor,
                                        String voltRoot) {
         addAllDefaults();
-        boolean compile = compile(m_jarFileName, sitesPerHost,
+        Catalog catalog = compile(m_jarFileName, sitesPerHost,
                                   length, kFactor, voltRoot);
-        if (!compile) {
+        if (catalog == null) {
             throw new RuntimeException("Bingo project builder failed app compilation.");
         }
         return new String[] {m_jarFileName};
@@ -173,20 +171,9 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         addDefaultSchema();
         addDefaultPartitioning();
         addDefaultProcedures();
-        //this.addProcedures(org.voltdb.benchmark.tpcc.procedures.InsertHistory.class);
 
-        boolean status = compile(catalogJar);
-        assert(status);
-
-        // read in the catalog
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
-        assert(serializedCatalog != null);
-
-        // create the catalog (that will be passed to the ClientInterface
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
+        Catalog catalog = compile(catalogJar, 1, 1, 0, null);
+        assert(catalog != null);
         return catalog;
     }
 
