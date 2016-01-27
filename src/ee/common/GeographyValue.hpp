@@ -289,15 +289,11 @@ inline int GeographyValue::compareWith(const GeographyValue& rhs) const {
         S2Loop* rhsLoop = rhsPoly.loop(i);
 
         for (int j = 0; j < lhsLoop->num_vertices(); ++j) {
-            S2LatLng lhsLL(lhsLoop->vertex(j));
-            S2LatLng rhsLL(rhsLoop->vertex(j));
-
-            if (lhsLL < rhsLL) {
-                return VALUE_COMPARE_LESSTHAN;
-            }
-
-            if (lhsLL > rhsLL) {
-                return VALUE_COMPARE_GREATERTHAN;
+            const GeographyPointValue lhsVert(lhsLoop->vertex(j));
+            const GeographyPointValue rhsVert(rhsLoop->vertex(j));
+            int cmp = lhsVert.compareWith(rhsVert);
+            if (cmp != VALUE_COMPARE_EQUAL) {
+                return cmp;
             }
         }
     }

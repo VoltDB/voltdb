@@ -217,7 +217,7 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
 
         // The same table/alias is repeated twice in the union but in the different selects
-        pn = compile("select B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
+        pn = compile("select A1.B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn.getChildCount() == 2);

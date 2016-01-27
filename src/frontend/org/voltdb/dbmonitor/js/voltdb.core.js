@@ -1,5 +1,3 @@
-
-
 (function (window, unused) {
 
     var iVoltDbCore = (function () {
@@ -67,6 +65,10 @@
                         for (i = 0; i < localParameters.length; i++) {
                             if (i > 0) {
                                 params += ',';
+                            }
+                            if (localParameters[i] === null) {
+                                params += "null";
+                                continue;
                             }
                             switch (signature[i]) {
                                 case 'tinyint':

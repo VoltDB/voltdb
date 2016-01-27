@@ -1843,6 +1843,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         if (m_executorContext->drReplicatedStream() && mpSequenceNumber >= 0) {
             m_executorContext->drReplicatedStream()->setLastCommittedSequenceNumber(mpSequenceNumber);
         }
+        m_resultOutput.writeInt(0);
         break;
     }
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
@@ -1860,6 +1861,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
             }
         }
         m_drVersion = drVersion;
+        m_resultOutput.writeInt(0);
         break;
     }
     default:

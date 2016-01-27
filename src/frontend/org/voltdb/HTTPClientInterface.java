@@ -166,10 +166,6 @@ public class HTTPClientInterface {
             return;
         }
 
-        Continuation continuation = ContinuationSupport.getContinuation(request);
-        if (m_timeout > 0 && continuation.isInitial()) {
-            continuation.setTimeout(m_timeout);
-        }
         String result = (String )request.getAttribute("result");
         if (result != null) {
             try {
@@ -182,6 +178,10 @@ public class HTTPClientInterface {
                 m_log.warn("JSON failed to send response: ", e);
             }
             return;
+        }
+        Continuation continuation = ContinuationSupport.getContinuation(request);
+        if (m_timeout > 0 && continuation.isInitial()) {
+            continuation.setTimeout(m_timeout);
         }
         //Check if this is resumed request.
         if (Boolean.TRUE.equals(request.getAttribute("SQLSUBMITTED"))) {
@@ -196,7 +196,6 @@ public class HTTPClientInterface {
         }
         String jsonp = null;
         try {
-            jsonp = request.getParameter("jsonp");
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
                 if (queryParamSize > MAX_QUERY_PARAM_SIZE) {
@@ -208,6 +207,7 @@ public class HTTPClientInterface {
                 }
             }
 
+            jsonp = request.getParameter("jsonp");
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
             String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
@@ -289,6 +289,7 @@ public class HTTPClientInterface {
                 }
             }
             if (!success) {
+                continuation.complete();
                 throw new Exception("Server is not accepting work at this time.");
             }
             if (jsonp != null) {

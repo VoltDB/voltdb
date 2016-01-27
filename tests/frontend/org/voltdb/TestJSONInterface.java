@@ -54,6 +54,7 @@
 package org.voltdb;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -64,6 +65,7 @@ import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -149,29 +151,31 @@ public class TestJSONInterface extends TestCase {
         conn.setDoOutput(true);
         conn.connect();
 
-        OutputStreamWriter out = new OutputStreamWriter(conn.getOutputStream());
+        OutputStream connos = conn.getOutputStream();
+
+        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(connos));
         out.write(varString);
         out.flush();
         out.close();
+        connos.close();
         out = null;
-        conn.getOutputStream().close();
 
         BufferedReader in = null;
         try {
             if (conn.getInputStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                                conn.getInputStream(), "UTF-8"));
+                                conn.getInputStream(), StandardCharsets.UTF_8));
             }
         } catch (IOException e) {
             if (conn.getErrorStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                                conn.getErrorStream(), "UTF-8"));
+                                conn.getErrorStream(), StandardCharsets.UTF_8));
             }
         }
         if (in == null) {
-            throw new Exception("Unable to read response from server, response code: " + conn.getResponseCode());
+            throw new Exception("Unable to read response from server");
         }
 
         StringBuilder decodedString = new StringBuilder();
@@ -1358,14 +1362,15 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //create a large query string
-            final StringBuilder b = new StringBuilder();
-            b.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
+            final StringBuilder s = new StringBuilder();
+            s.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
             for (int i = 0; i < 450000; i++) {
-                b.append(i);
+                s.append(i);
             }
+            String query = s.toString();
             //call multiple times.
             for (int i = 0; i < 500; i++) {
-                String response = callProcOverJSONRaw(b.toString(), 200);
+                String response = callProcOverJSONRaw(query, 200);
                 System.out.println(response);
                 Response r = responseFromJSON(response);
                 assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
@@ -1374,7 +1379,6 @@ public class TestJSONInterface extends TestCase {
                 String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
                 System.out.println(responseJSON);
                 r = responseFromJSON(responseJSON);
-                System.out.println(r.statusString);
                 assertEquals(ClientResponse.SUCCESS, r.status);
             }
             //make sure good queries can still work after.
@@ -1567,7 +1571,7 @@ public class TestJSONInterface extends TestCase {
             String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
-            params.put("deployment", jdep);
+            params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
@@ -1588,7 +1592,7 @@ public class TestJSONInterface extends TestCase {
                 deptype.getHeartbeat().setTimeout(99);
             }
             String ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1614,7 +1618,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1628,7 +1632,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", ndeptype);
+            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -2182,7 +2186,7 @@ public class TestJSONInterface extends TestCase {
                             deptype.getHeartbeat().setTimeout(timeout);
                         }
                         Map<String,String> params = new HashMap<>();
-                        params.put("deployment", mapper.writeValueAsString(deptype));
+                        params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
                         params.put("admin", "true");
                         String responseJSON = postUrlOverJSON("http://localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {

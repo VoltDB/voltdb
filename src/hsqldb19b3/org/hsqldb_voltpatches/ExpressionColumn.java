@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.Comparator;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -47,7 +49,7 @@ import org.hsqldb_voltpatches.types.Type;
  * @since 1.9.0
  */
 public class ExpressionColumn extends Expression {
-
+    private static final ColumnComparator m_comparator = new ColumnComparator();
     public final static ExpressionColumn[] emptyArray =
         new ExpressionColumn[]{};
 
@@ -182,6 +184,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {
 
         this.column     = column;
@@ -189,6 +192,7 @@ public class ExpressionColumn extends Expression {
         this.isWritable = isWritable;
     }
 
+    @Override
     SimpleName getSimpleName() {
 
         if (alias != null) {
@@ -206,6 +210,7 @@ public class ExpressionColumn extends Expression {
         return null;
     }
 
+    @Override
     String getAlias() {
 
         if (alias != null) {
@@ -237,6 +242,7 @@ public class ExpressionColumn extends Expression {
         return column.getName();
     }
 
+    @Override
     void collectObjectNames(Set set) {
 
         // BEGIN Cherry-picked code change from hsqldb-2.3.2
@@ -287,6 +293,7 @@ public class ExpressionColumn extends Expression {
         // END Cherry-picked code change from hsqldb-2.3.2
     }
 
+    @Override
     String getColumnName() {
 
         if (opType == OpTypes.COLUMN && column != null) {
@@ -296,6 +303,7 @@ public class ExpressionColumn extends Expression {
         return getAlias();
     }
 
+    @Override
     ColumnSchema getColumn() {
         return column;
     }
@@ -304,10 +312,12 @@ public class ExpressionColumn extends Expression {
         return schema;
     }
 
+    @Override
     RangeVariable getRangeVariable() {
         return rangeVariable;
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -332,7 +342,21 @@ public class ExpressionColumn extends Expression {
                 if (rangeVariable != null) {
                     return unresolvedSet;
                 }
-
+                // Look in all the range variables.  We may
+                // find this column more than once, and that
+                // would be an error See ENG-9367.
+                //
+                // Note that we can't actually commit to a resolution
+                // until we have looked everywhere.  This means we need to
+                // store up potential resolutions until we have looked at all
+                // the range variables.  If we find just one, we finally
+                // resolve it. below.
+                java.util.Set<ColumnReferenceResolution> usingResolutions
+                    = new java.util.TreeSet<ColumnReferenceResolution>(m_comparator);
+                java.util.Set<ColumnReferenceResolution> rangeVariableResolutions
+                    = new java.util.TreeSet<ColumnReferenceResolution>(m_comparator);
+                ColumnReferenceResolution lastRes = null;
+                int foundSize = 0;
                 for (int i = 0; i < rangeCount; i++) {
                     RangeVariable rangeVar = rangeVarArray[i];
 
@@ -340,72 +364,329 @@ public class ExpressionColumn extends Expression {
                         continue;
                     }
 
-                    if (resolveColumnReference(rangeVar)) {
-                        return unresolvedSet;
+                    ColumnReferenceResolution resolution = resolveColumnReference(rangeVar);
+                    if (resolution != null) {
+                        if (resolution.isExpression()) {
+                            if (usingResolutions.add(resolution)) {
+                                foundSize += 1;
+                            }
+                            // Cache this in case this is the only resolution.
+                            lastRes = resolution;
+                        } else if (resolution.isRangeVariable()) {
+                            if (rangeVariableResolutions.add(resolution)) {
+                                foundSize += 1;
+                            }
+                            // Cache this in case this is the only resolution.
+                            lastRes = resolution;
+                        } else {
+                            assert(false);
+                        }
                     }
                 }
-
+                if (foundSize == 1) {
+                    lastRes.finallyResolve();
+                    return unresolvedSet;
+                } else if (foundSize > 1) {
+                    StringBuffer sb = new StringBuffer();
+                    sb.append(String.format("Column \"%s\" is ambiguous.  It's in tables: ", columnName));
+                    String sep = "";
+                    // Note: The resolution sets are TreeSets.  So we can iterate over them
+                    //       in name order.
+                    if (usingResolutions.size() > 0) {
+                        sb.append("USING(");
+                        for (ColumnReferenceResolution crr : usingResolutions) {
+                            sb.append(sep).append(crr.getName());
+                            sep = ", ";
+                        }
+                        sb.append(")");
+                        sep = ", ";
+                    }
+                    for (ColumnReferenceResolution crr : rangeVariableResolutions) {
+                        sb.append(sep).append(crr.getName());
+                        sep = ", ";
+                    }
+                    throw new HsqlException(sb.toString(), "", 0);
+                }
+                // If we get here we didn't find anything.  So, add this expression
+                // to the unresolved set.
                 if (unresolvedSet == null) {
                     unresolvedSet = new ArrayListIdentity();
                 }
 
                 unresolvedSet.add(this);
         }
-
+        // IF we got to here, return the set of unresolved columns.
         return unresolvedSet;
     }
 
-    public boolean resolveColumnReference(RangeVariable rangeVar) {
+    /**
+     * Return a sort of closure which is useful for resolving a column reference.
+     * The column reference is either an expression or a column in a table, which
+     * is named by a range variable.  We keep the expression or the
+     * range variable/column index pair here.  We may have several resolutions
+     * if the column reference is ambiguous.  We can't actually commit to one
+     * until we have examined all of them.  So, we defer changing this object
+     * until we are more sure of the reference.
+     *
+     * We store these in a java.util.HashSet.  So we need to have our own
+     * notion of equality.
+     */
+    private interface ColumnReferenceResolution {
+        /**
+         * This is the important operation for this interface.  This
+         * member function calculates the final resolution.  We call this after we have
+         * verified that there is only one possible resolution for this
+         * column name.
+         */
+        public void finallyResolve();
+        /**
+         * This method calculates the name of the column reference.  Two
+         * column references are equal if they have the same name.  This can
+         * be a column alias or a table name.
+         * @return
+         */
+        public String getName();
+        /**
+         * This is used for creating error messages.  We need to know when a
+         * potential resolution is in a USING or range variable.
+         */
+        boolean isExpression();
+        boolean isRangeVariable();
+    }
+
+    /**
+     * Return a {@link ColumnReferenceResolution} from an expression.
+     * @param expr
+     * @return
+     */
+    private ColumnReferenceResolution makeExpressionResolution(Expression expr) {
+        return this.new ExpressionColumnReferenceResolution(expr);
+    }
+
+    /**
+     * Return a {@link ColumnReferenceResolution} from a range variable and a
+     * column index.
+     * @param rangeVariable
+     * @param colIndex
+     * @return
+     */
+    private ColumnReferenceResolution makeRangeVariableResolution(RangeVariable rangeVariable, int colIndex) {
+        return this.new RangeVariableColumnReferenceResolution(rangeVariable, colIndex);
+    }
+
+    private static class ColumnComparator implements Comparator<ColumnReferenceResolution> {
+
+        @Override
+        public int compare(ColumnReferenceResolution o1, ColumnReferenceResolution o2) {
+            String n1 = o1.getName();
+            String n2 = o2.getName();
+            return n1.compareTo(n2);
+        }
+
+    }
+    /**
+     * This class implements the interface for expression columns.
+     * An expression column is created for a "USING(C)" join condition.
+     * In this case, the expression will be an ExpressionColumn referencing
+     * the column "C", which presumably is a column common to two joined
+     * tables.
+     */
+    private class ExpressionColumnReferenceResolution implements ColumnReferenceResolution {
+        Expression    m_expr;
+        private static final String m_unknownColumnName = "UnknownColumnName";
+        public ExpressionColumnReferenceResolution(Expression expr) {
+            assert(expr != null);
+            assert(expr instanceof ExpressionColumn);
+            m_expr = expr;
+        }
+
+        @Override
+        public void finallyResolve() {
+            opType   = m_expr.opType;
+            nodes    = m_expr.nodes;
+            dataType = m_expr.dataType;
+        }
+
+        @Override
+        public String toString() {
+            return getName();
+        }
+
+        @Override
+        /**
+         * We hash the names if there is a name.  Otherwise we
+         * has the entire expression or range variable object.
+         */
+        public int hashCode() {
+            return getName().hashCode();
+        }
+
+        @Override
+        public String getName() {
+            ExpressionColumn ec = (ExpressionColumn)m_expr;
+            if (ec.alias != null && ec.alias.name != null) {
+                return ec.alias.name;
+            }
+            if (ec.columnName != null) {
+                return ec.columnName;
+            }
+            /*
+             * This should never happen.  We should always have an
+             * alias, or at least a column name.  After all, this will
+             * have been built with "USING(C)" where "C" is a column
+             * name.
+             */
+            return m_unknownColumnName;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (!(obj instanceof ExpressionColumnReferenceResolution)) {
+                return false;
+            }
+            // Test the names.
+            ExpressionColumnReferenceResolution other = (ExpressionColumnReferenceResolution)obj;
+            String name = getName();
+            String otherName = other.getName();
+            return (name != m_unknownColumnName)
+                    && (otherName != m_unknownColumnName)
+                    && name.equals(otherName);
+        }
+
+        private ExpressionColumn getOuterType() {
+            return ExpressionColumn.this;
+        }
+
+        @Override
+        public boolean isExpression() {
+            return true;
+        }
+
+        @Override
+        public boolean isRangeVariable() {
+            return false;
+        }
+    }
+
+    private class RangeVariableColumnReferenceResolution implements ColumnReferenceResolution {
+        RangeVariable m_rangeVariable;
+        int           m_colIndex;
+        private final static String m_unknownTableName = "UnknownTable";
+        public RangeVariableColumnReferenceResolution(RangeVariable rangeVariable, int colIndex) {
+            assert(rangeVariable != null && 0 <= colIndex);
+            m_rangeVariable = rangeVariable;
+            m_colIndex = colIndex;
+        }
+
+        @Override
+        public void finallyResolve() {
+            setAttributesAsColumn(m_rangeVariable, m_colIndex);
+        }
+        @Override
+        public String toString() {
+            return getName();
+        }
+
+        /**
+         * We hash the names if there is a name.  Otherwise we
+         * has the entire expression or range variable object.
+         */
+        @Override
+        public int hashCode() {
+            return getName().hashCode();
+        }
+
+        @Override
+        public boolean isExpression() {
+            return false;
+        }
+
+        @Override
+        public boolean isRangeVariable() {
+            return true;
+        }
+
+        @Override
+        public String getName() {
+            // We prefer to aliases.  If we can't find an
+            // alias, we use the table name.
+            if (m_rangeVariable.tableAlias != null && m_rangeVariable.tableAlias.name != null) {
+                return m_rangeVariable.tableAlias.name;
+            } else if (m_rangeVariable.getTable() != null
+                       && m_rangeVariable.getTable().getName() != null
+                       && m_rangeVariable.getTable().getName().name != null) {
+                return m_rangeVariable.getTable().getName().name;
+            }
+            return m_unknownTableName;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (!(obj instanceof RangeVariableColumnReferenceResolution)) {
+                return false;
+            }
+            RangeVariableColumnReferenceResolution other = (RangeVariableColumnReferenceResolution) obj;
+            String otherName = other.getName();
+            String name = getName();
+            // Test the names.
+            return (name != m_unknownTableName)
+                    && (otherName != m_unknownTableName)
+                    && (name.equals(otherName));
+        }
+    }
+
+    public ColumnReferenceResolution resolveColumnReference(RangeVariable rangeVar) {
 
         if (tableName == null) {
             Expression e = rangeVar.getColumnExpression(columnName);
 
             if (e != null) {
-                opType   = e.opType;
-                nodes    = e.nodes;
-                dataType = e.dataType;
-
-                return true;
+                return makeExpressionResolution(e);
             }
 
             if (rangeVar.variables != null) {
-                int colIndex = rangeVar.findColumn(columnName);
+                int colIndex = rangeVar.findColumn(tableName, columnName);
 
                 if (colIndex == -1) {
-                    return false;
+                    return null;
                 }
 
                 ColumnSchema column = rangeVar.getColumn(colIndex);
 
                 if (column.getParameterMode()
                         == SchemaObject.ParameterModes.PARAM_OUT) {
-                    return false;
+                    return null;
                 } else {
                     opType = rangeVar.isVariable ? OpTypes.VARIABLE
                                                  : OpTypes.PARAMETER;
 
-                    setAttributesAsColumn(rangeVar, colIndex);
-
-                    return true;
+                    return makeRangeVariableResolution(rangeVar, colIndex);
                 }
             }
         }
 
         if (!rangeVar.resolvesTableName(this)) {
-            return false;
+            return null;
         }
 
-        int colIndex = rangeVar.findColumn(columnName);
+        int colIndex = rangeVar.findColumn(tableName, columnName);
 
         if (colIndex != -1) {
-            setAttributesAsColumn(rangeVar, colIndex);
-
-            return true;
+            return makeRangeVariableResolution(rangeVar, colIndex);
         }
 
-        return false;
+        return null;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         switch (opType) {
@@ -430,6 +711,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -445,9 +727,9 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangeVariable.rangePosition]
-                        .getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangeVariable.rangePosition]
+                    .getCurrent();
                 Object value   = data[columnIndex];
                 Type   colType = column.getDataType();
 
@@ -459,8 +741,8 @@ public class ExpressionColumn extends Expression {
             }
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    (Object[]) session.sessionContext
-                        .rangeIterators[rangePosition].getCurrent();
+                    session.sessionContext
+                    .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -490,6 +772,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -562,6 +845,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -672,6 +956,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     public OrderedHashSet getUnkeyedColumns(OrderedHashSet unresolvedSet) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -697,6 +982,7 @@ public class ExpressionColumn extends Expression {
     /**
      * collects all range variables in expression tree
      */
+    @Override
     void collectRangeVariables(RangeVariable[] rangeVariables, Set set) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -714,6 +1000,7 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    @Override
     Expression replaceAliasInOrderBy(Expression[] columns, int length) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -760,6 +1047,7 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
+    @Override
     Expression replaceColumnReferences(RangeVariable range,
                                        Expression[] list) {
 
@@ -778,6 +1066,7 @@ public class ExpressionColumn extends Expression {
         return this;
     }
 
+    @Override
     int findMatchingRangeVariableIndex(RangeVariable[] rangeVarArray) {
 
         for (int i = 0; i < rangeVarArray.length; i++) {
@@ -794,6 +1083,7 @@ public class ExpressionColumn extends Expression {
     /**
      * return true if given RangeVariable is used in expression tree
      */
+    @Override
     boolean hasReference(RangeVariable range) {
 
         if (range == rangeVariable) {
@@ -811,6 +1101,7 @@ public class ExpressionColumn extends Expression {
         return false;
     }
 
+    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {

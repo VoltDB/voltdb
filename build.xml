@@ -739,6 +739,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
             <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
         </fileset>
     </javadoc>
 

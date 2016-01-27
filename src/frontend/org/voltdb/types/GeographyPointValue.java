@@ -22,6 +22,10 @@ import java.text.DecimalFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * The Java class that corresponds to the SQL type GEOGRAPHY_POINT.
+ * Represents a point as defined by its longitude and latitude.
+ */
 public class GeographyPointValue {
     //
     // It's slightly hard to see this in the actual pattern
@@ -49,6 +53,7 @@ public class GeographyPointValue {
     private final double m_longitude;
 
     private static final int BYTES_IN_A_COORD = Double.SIZE / 8;
+    static final double EPSILON = 1.0e-12;
 
     // We use this value to represent a null point.
     // (Only for sending data over the wire.  The client
@@ -56,6 +61,11 @@ public class GeographyPointValue {
     // VoltTable.)
     static final double NULL_COORD = 360.0;
 
+    /**
+     * Construct a new GeographyPointValue from its coordinates.
+     * @param longitude  in degrees.
+     * @param latitude   in degrees.
+     */
     public GeographyPointValue(double longitude, double latitude) {
         // Add 0.0 to avoid -0.0.
         m_latitude = latitude + 0.0;
@@ -74,8 +84,9 @@ public class GeographyPointValue {
         return Double.parseDouble(aInt + "." + (aFrac == null ? "0" : aFrac));
     }
     /**
-     * Create a GeographyPointValue from a WellKnownText string.
-     * @param param
+     * Create a GeographyPointValue from a well-known text string.
+     * @param param  A well-known text string.
+     * @return  A new instance of GeographyPointValue.
      */
     public static GeographyPointValue fromWKT(String param) {
         if (param == null) {
@@ -98,45 +109,65 @@ public class GeographyPointValue {
         }
     }
 
+    /**
+     * Return the latitude of this point in degrees.
+     * @return The latitude of this point in degrees.
+     */
     public double getLatitude() {
         return m_latitude;
     }
 
+    /**
+     * Return the longitude of this point in degrees.
+     * @return The longitude of this point in degrees.
+     */
     public double getLongitude() {
         return m_longitude;
     }
 
 
     /**
-     * Format this point as WKT.  Use 12 digits of precision.
+     * Format the coordinates for this point.  Use 12 digits of precision after the
+     * decimal point.
+     * @return  A string containing the longitude and latitude for this point
+     * separated by one space.
      */
-    public String formatLngLat() {
+    String formatLngLat() {
         DecimalFormat df = new DecimalFormat("##0.0###########");
 
         // Explicitly test for differences less than 1.0e-12 and
         // force them to be zero.  Otherwise you may find a case
         // where two points differ in the less significant bits, but
         // they format as the same number.
-        double lng = (Math.abs(m_longitude) < 1.0e-12) ? 0 : m_longitude;
-        double lat = (Math.abs(m_latitude) < 1.0e-12) ? 0 : m_latitude;
+        double lng = (Math.abs(m_longitude) < EPSILON) ? 0 : m_longitude;
+        double lat = (Math.abs(m_latitude) < EPSILON) ? 0 : m_latitude;
         return df.format(lng) + " " + df.format(lat);
     }
 
     /**
-     * Print this point as a string.  We currently use WKT.
+     * Return this point as a well-known text string.
+     * @return  This point as a well-known text string.
      */
     @Override
     public String toString() {
         return toWKT();
     }
 
+    /**
+     * Return this point as a well-known text string.
+     * @return  This point as a well-known text string.
+     */
     public String toWKT() {
         // This is not GEOGRAPHY_POINT.  This is wkt syntax.
         return "POINT (" + formatLngLat() + ")";
     }
 
-    // Returns true for two points that have the same latitude and
-    // longitude.
+    /**
+     * Compare this point with another object. Returns true
+     * if this point is being compared to another point that
+     * represents the same location.
+     * @see java.lang.Object#equals(java.lang.Object)
+     */
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof GeographyPointValue)) {
@@ -144,24 +175,33 @@ public class GeographyPointValue {
         }
 
         GeographyPointValue that = (GeographyPointValue)o;
+        if (this == that) {
+            return true;
+        }
 
-        if (that.getLatitude() != getLatitude()) {
+        GeographyPointValue normThis = normalizeLngLat(getLongitude(), getLatitude());
+        GeographyPointValue normThat = normalizeLngLat(that.getLongitude(), that.getLatitude());
+
+        if (Math.abs(normThis.getLongitude() - normThat.getLongitude()) > EPSILON) {
             return false;
         }
 
-        return that.getLongitude() == getLongitude();
+        return Math.abs(normThis.getLatitude() - normThat.getLatitude()) < EPSILON;
     }
 
     /**
-     * The number of bytes an instance of this class requires in serialized form.
+     * Returns the number of bytes an instance of this class requires when serialized
+     * to a ByteBuffer.
+     * @return The number of bytes an instance of this class requires when serialized
+     * to a ByteBuffer.
      */
     static public int getLengthInBytes() {
         return BYTES_IN_A_COORD * 2;
     }
 
     /**
-     * Serialize this instance to a byte buffer.
-     * @param buffer
+     * Serialize this point to a ByteBuffer.
+     * @param buffer  The ByteBuffer to which this point will be serialized.
      */
     public void flattenToBuffer(ByteBuffer buffer) {
         buffer.putDouble(getLongitude());
@@ -169,10 +209,10 @@ public class GeographyPointValue {
     }
 
     /**
-     * Deserialize a point type from a byte buffer
-     * @param inBuffer
-     * @param offset    offset of point data in buffer
-     * @return a new instance of GeographyPointValue
+     * Deserializes a point from a ByteBuffer, at an absolute offset.
+     * @param inBuffer  The ByteBuffer from which to read the bytes for a point.
+     * @param offset    Absolute offset of point data in buffer.
+     * @return A new instance of GeographyPointValue.
      */
     public static GeographyPointValue unflattenFromBuffer(ByteBuffer inBuffer, int offset) {
         double lng = inBuffer.getDouble(offset);
@@ -186,10 +226,9 @@ public class GeographyPointValue {
     }
 
     /**
-     * Deserialize a point type from a byte buffer
-     * @param inBuffer
-     * @param offset    offset of point data in buffer
-     * @return a new instance of GeographyPointValue
+     * Deserialize a point from a ByteBuffer at the buffer's current position
+     * @param inBuffer  The ByteBuffer from which to read the bytes for a point.
+     * @return A new instance of GeographyPointValue.
      */
     public static GeographyPointValue unflattenFromBuffer(ByteBuffer inBuffer) {
         double lng = inBuffer.getDouble();
@@ -203,8 +242,9 @@ public class GeographyPointValue {
     }
 
     /**
-     * Serialize the null point to a byte buffer
-     * @param buffer
+     * Serialize the null point (that is, a SQL null value) to a ByteBuffer,
+     * at the buffer's current position.
+     * @param buffer  The ByteBuffer to which a null point will be serialized.
      */
     public static void serializeNull(ByteBuffer buffer) {
         buffer.putDouble(NULL_COORD);
@@ -212,13 +252,13 @@ public class GeographyPointValue {
     }
 
     /**
-     * Create a GeographyPointValue with normal coordinated.  The longitude and
+     * Create a GeographyPointValue with normalized coordinates.  The longitude and
      * latitude inputs may be any real numbers.  They are not restricted to be in
-     * the ranges [-180,180] or [-90,90] respectively.  We will calculate the equivalent
-     * longitude and latitude which is in these ranges and create a new GeographyPointValue.
+     * the ranges [-180,180] or [-90,90] respectively.  The created instance will
+     * will have coordinates between (-180,180) and [-90,90].
      *
-     * @param longitude
-     * @param latitude
+     * @param longitude  in degrees, not range-restricted.
+     * @param latitude   in degrees, not range-restricted.
      * @return A GeographyPointValue with the given coordinates normalized.
      */
     public static GeographyPointValue normalizeLngLat(double longitude, double latitude) {
@@ -269,8 +309,22 @@ public class GeographyPointValue {
                 lngFinal = lngNorm - 180;
             }
         }
-        assert(-180 <= lngFinal && lngFinal <= 180);
+
         assert(-90 <= latFinal && latFinal <= 90);
+        // For latitude of 90 or -90, canonicalize longitude to
+        // to 0.
+        if (90 - Math.abs(latFinal) < EPSILON) {
+            // We are at one of the poles
+            lngFinal = 0;
+        }
+
+        // For longitudes within epsilon of the international dateline
+        // (on the east side), canonicalize to 180.0.
+        if (lngFinal < 0 && 180 + lngFinal < EPSILON) {
+            lngFinal = 180.0;
+        }
+
+        assert(-180 < lngFinal && lngFinal <= 180);
         // Return the point.
         return new GeographyPointValue(lngFinal + 0.0, latFinal + 0.0);
     }
@@ -290,17 +344,17 @@ public class GeographyPointValue {
     }
 
     /**
-     * Return a point which is offset by the given offset point.  The
-     * offset point is scaled by alpha.  That is, the return value is
-     * <code> this + alpha*offset</code>, except that Java does not
-     * allow us to write it in this way.
+     * Return a point which is offset by the given offset point multiplied by alpha.
+     * That is, the return value is <code> this + alpha*offset</code>, except that
+     * Java does not allow one to write it in this way.
      *
      * In particular, <code>this - other</code> is equal to
-     * <code> add(other, -1)</code>, but fewer temporary objects are
+     * <code>add(other, -1)</code>, but fewer temporary objects are
      * created.
      *
      * Normalize the coordinates.
-     * @param offset
+     * @param offset  A point to add to this.
+     * @param alpha   Coordinates of offset will be scaled by this much.
      * @return A new point offset by the scaled offset.
      */
     public GeographyPointValue add(GeographyPointValue offset, double alpha) {
@@ -311,9 +365,9 @@ public class GeographyPointValue {
     }
 
     /**
-     * Add two points, and return a new point.
+     * Add a point to this, and return the result.
      *
-     * @param offset The offset to add in.
+     * @param offset The offset to add to this.
      * @return A new point which is this plus the offset.
      */
     public GeographyPointValue add(GeographyPointValue offset) {
@@ -321,7 +375,7 @@ public class GeographyPointValue {
     }
 
     /**
-     * Return <code>this - offset</code>.
+     * Subtract a given offset point from this, and return the result.
      *
      * @param offset The offset to subtract from this.
      * @return A new point translated by -offset.
@@ -330,6 +384,14 @@ public class GeographyPointValue {
         return add(offset, -1.0);
     }
 
+    /**
+     * Subtract a point from this, and return the result.  The point being
+     * subtracted is computed by scaling a given offset point.
+     *
+     * @param offset The offset to subtract from this.
+     * @param scale  The amount by which to scale the offset point.
+     * @return A new point translated by -offset.
+     */
     public GeographyPointValue sub(GeographyPointValue offset, double scale) {
         return add(offset, -1.0 * scale);
     }
@@ -337,7 +399,7 @@ public class GeographyPointValue {
     /**
      * Return a point scaled by the given alpha value.
      *
-     * @param alpha
+     * @param alpha  The amount by which to scale this.
      * @return The scaled point.
      */
     public GeographyPointValue mul(double alpha) {
@@ -348,7 +410,7 @@ public class GeographyPointValue {
     /**
      * Return a new point which is this point rotated by the angle phi around a given center point.
      *
-     * @param phi The angle to rotate.
+     * @param phi The angle to rotate in degrees.
      * @param center The center of rotation.
      * @return A new, rotated point.
      */
@@ -372,7 +434,7 @@ public class GeographyPointValue {
      *
      * @param center The origin of scaling.
      * @param alpha The scale factor.
-     * @return
+     * @return The scaled point.
      */
     public GeographyPointValue scale(GeographyPointValue center, double alpha) {
         return GeographyPointValue.normalizeLngLat(alpha*(getLongitude()-center.getLongitude()) + center.getLongitude(),

@@ -23,28 +23,23 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
 
-import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.ImporterConfig;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 /**
  * ImporterConfig for server socket importer.
  */
 public class ServerSocketImporterConfig implements ImporterConfig
 {
-    private static final String CSV_FORMATTER_NAME = "csv";
-    private static final String TSV_FORMATTER_NAME = "tsv";
-
     private static final String SOCKET_IMPORTER_URI_SCHEME = "socketimporter";
 
     private final URI m_resourceID;
+    private final AbstractFormatterFactory m_formatterFactory;
     private final String m_procedure;
     private final int m_port;
-    private final char m_separator;
     private final ServerSocket m_serverSocket;
 
-    public ServerSocketImporterConfig(Properties props)
+    public ServerSocketImporterConfig(Properties props, AbstractFormatterFactory formatterFactory)
     {
         Properties propsCopy = (Properties) props.clone();
 
@@ -75,17 +70,19 @@ public class ServerSocketImporterConfig implements ImporterConfig
             throw new RuntimeException(e);
         }
 
-        String formatter = props.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
-        if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
-            throw new RuntimeException("Invalid formatter: " + formatter);
-        }
-        m_separator = CSV_FORMATTER_NAME.equals(formatter) ? CSVParser.DEFAULT_SEPARATOR : '\t';
+        m_formatterFactory = formatterFactory;
     }
 
     @Override
     public URI getResourceID()
     {
         return m_resourceID;
+    }
+
+    @Override
+    public AbstractFormatterFactory getFormatterFactory()
+    {
+        return m_formatterFactory;
     }
 
     public String getProcedure()
@@ -96,11 +93,6 @@ public class ServerSocketImporterConfig implements ImporterConfig
     public int getPort()
     {
         return m_port;
-    }
-
-    public char getSeparator()
-    {
-        return m_separator;
     }
 
     public ServerSocket getServerSocket()

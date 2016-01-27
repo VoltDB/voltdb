@@ -31,8 +31,8 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -1194,6 +1194,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     /**
      * Tables containing a single row and a single integer column can be read using this convenience
      * method.
+     * Looking at the return value is not a reliable way to check if the value
+     * is <tt>null</tt>. Use {@link #wasNull()} instead.
      * @return The integer row value.
      */
     public final long asScalarLong() {
@@ -1210,13 +1212,21 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         final VoltType colType = getColumnType(0);
         switch (colType) {
         case TINYINT:
-            return m_buffer.get(m_rowStart + 8);
+            final byte tinyInt = m_buffer.get(m_rowStart + 8);
+            m_wasNull = (tinyInt == VoltType.NULL_TINYINT);
+            return tinyInt;
         case SMALLINT:
-            return m_buffer.getShort(m_rowStart + 8);
+            final short smallInt = m_buffer.getShort(m_rowStart + 8);
+            m_wasNull = (smallInt == VoltType.NULL_SMALLINT);
+            return smallInt;
         case INTEGER:
-            return m_buffer.getInt(m_rowStart + 8);
+            final int integer = m_buffer.getInt(m_rowStart + 8);
+            m_wasNull = (integer == VoltType.NULL_INTEGER);
+            return integer;
         case BIGINT:
-            return m_buffer.getLong(m_rowStart + 8);
+            final long bigInt = m_buffer.getLong(m_rowStart + 8);
+            m_wasNull = (bigInt == VoltType.NULL_BIGINT);
+            return bigInt;
         default:
             throw new IllegalStateException(
                     "table must contain exactly 1 integral value; column 1 is type = " + colType.name());
@@ -1361,6 +1371,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public String toFormattedString() {
 
         final int MAX_PRINTABLE_CHARS = 30;
+        // chose print width for geography column such that it can print polygon in
+        // aligned manner with geography column for a polygon up to:
+        // a polygon composed of 4 vertices + 1 repeat vertex,
+        // one ring, each coordinate of vertex having 5 digits space including the sign of lng/lat
+        final int MAX_PRINTABLE_CHARS_GEOGRAPHY = 74;
+
         final String ELLIPSIS = "...";
         final String DECIMAL_FORMAT = "%01.12f";
 
@@ -1369,6 +1385,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         int columnCount = getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
+        // start with minimum padding based on length of column names. this gets
+        // increased later as needed
         for (int i = 0; i < columnCount; i++) {
             padding[i] = getColumnName(i).length(); // min value to be increased later
         }
@@ -1397,8 +1415,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     else {
                         width = value.toString().length();
                     }
-                    if (width > MAX_PRINTABLE_CHARS) {
-                        width = MAX_PRINTABLE_CHARS;
+                    if ( ((colType == VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS_GEOGRAPHY)) ||
+                         ((colType != VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS)) ) {
+                        width = (colType == VoltType.GEOGRAPHY) ? MAX_PRINTABLE_CHARS_GEOGRAPHY : MAX_PRINTABLE_CHARS;
                     }
                 }
 

@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -67,10 +68,10 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      *
      * @param props Properties defined in a configuration section for this importer
      */
-    public final void configure(Properties props)
+    public final void configure(Properties props, AbstractFormatterFactory formatterFactory)
     {
         ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
-        builder.putAll(m_factory.createImporterConfigurations(props));
+        builder.putAll(m_factory.createImporterConfigurations(props, formatterFactory));
         m_configs = builder.build();
     }
 
@@ -88,6 +89,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      */
     public final void readyForData(ChannelDistributer distributer)
     {
+        distributer.registerCallback(m_factory.getTypeName(), this);
         if (m_stopping) return;
 
         if (m_executorService != null) { // Should be caused by coding error. Generic RuntimeException is OK
@@ -121,7 +123,6 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             startImporters(m_importers.get().values());
         } else {
             m_importers.set(ImmutableMap.<URI, AbstractImporter> of());
-            distributer.registerCallback(m_factory.getTypeName(), this);
             distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
         }
     }

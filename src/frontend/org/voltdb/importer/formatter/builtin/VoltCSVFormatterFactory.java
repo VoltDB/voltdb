@@ -17,14 +17,12 @@
 
 package org.voltdb.importer.formatter.builtin;
 
-import java.util.Properties;
-
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
-public class VoltFormatterFactory extends AbstractFormatterFactory {
+public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
     @Override
-    public VoltFormatter create(String name, Properties prop) {
-        VoltFormatter formatter = new VoltFormatter(name, prop);
+    public VoltCSVFormatter create() {
+        VoltCSVFormatter formatter = new VoltCSVFormatter(m_formatName, m_formatProps);
         return formatter;
     }
 }

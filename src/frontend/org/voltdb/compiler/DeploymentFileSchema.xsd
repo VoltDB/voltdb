@@ -166,7 +166,7 @@
       <xs:all>
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="size" type="xs:string" default="0"/>
+                <xs:attribute name="size" type="xs:string" default="80%"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="disklimit" type="diskLimitType"
@@ -345,11 +345,12 @@
   <xs:complexType name="ImportConfigurationType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="format-property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="module" type="xs:string" />
     <xs:attribute name="type" type="ServerImportEnum" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-    <xs:attribute name="format" type="xs:string"/>
+    <xs:attribute name="format" type="xs:string" default="csv"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">

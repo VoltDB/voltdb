@@ -251,7 +251,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
             // equals
             VoltTable vt = client.callProcedure("@AdHoc",
-                    "select pk, name, poly "
+                    "select t1.pk, t1.name, t1.poly "
                             + "from " + tbl + " as t1, t as t2 "
                             + "where t1.poly = t2.poly "
                             + "order by t1.pk").getResults()[0];
@@ -290,11 +290,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly < t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
-                    {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
-                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
+                    {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 0, "Bermuda Triangle"},
                     {2, "Billerica Triangle", 1, "Bermuda Triangle with a hole"},
-                    {2, "Billerica Triangle" , 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 3, "Lowell Square"},
                     {3, "Lowell Square", 1, "Bermuda Triangle with a hole"}},
                     vt);
 
@@ -305,14 +305,14 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly <= t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
-                    {0, "Bermuda Triangle" , 0, "Bermuda Triangle"},
-                    {0, "Bermuda Triangle" , 1, "Bermuda Triangle with a hole"},
-                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
+                    {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
+                    {0, "Bermuda Triangle", 1, "Bermuda Triangle with a hole"},
                     {0, "Bermuda Triangle", 3, "Lowell Square"},
-                    {1, "Bermuda Triangle with a hole" , 1, "Bermuda Triangle with a hole"},
+                    {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
+                    {2, "Billerica Triangle", 0, "Bermuda Triangle"},
                     {2, "Billerica Triangle", 1, "Bermuda Triangle with a hole"},
                     {2, "Billerica Triangle", 2, "Billerica Triangle"},
-                    {2, "Billerica Triangle" , 3, "Lowell Square"},
+                    {2, "Billerica Triangle", 3, "Lowell Square"},
                     {3, "Lowell Square", 1, "Bermuda Triangle with a hole"},
                     {3, "Lowell Square", 3, "Lowell Square"}},
                     vt);
@@ -324,10 +324,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "where t1.poly > t2.poly "
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
+                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
-                    {2, "Billerica Triangle",0 ,"Bermuda Triangle"},
                     {3, "Lowell Square", 0, "Bermuda Triangle"},
                     {3, "Lowell Square", 2, "Billerica Triangle"}},
                     vt);
@@ -340,11 +340,11 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             + "order by t1.pk, t2.pk").getResults()[0];
             assertContentOfTable(new Object[][] {
                     {0, "Bermuda Triangle", 0, "Bermuda Triangle"},
+                    {0, "Bermuda Triangle", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 0, "Bermuda Triangle"},
                     {1, "Bermuda Triangle with a hole", 1, "Bermuda Triangle with a hole"},
                     {1, "Bermuda Triangle with a hole", 2, "Billerica Triangle"},
                     {1, "Bermuda Triangle with a hole", 3, "Lowell Square"},
-                    {2, "Billerica Triangle", 0 ,"Bermuda Triangle"},
                     {2, "Billerica Triangle", 2, "Billerica Triangle"},
                     {3, "Lowell Square", 0, "Bermuda Triangle"},
                     {3, "Lowell Square", 2, "Billerica Triangle"},
@@ -414,7 +414,7 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // to reverse them.
         //
         List<GeographyValue> cheesyHoles = new ArrayList<GeographyValue>();
-        List<List<GeographyPointValue>> loops = cheesyPolygon.getLoops();
+        List<List<GeographyPointValue>> loops = cheesyPolygon.getRings();
         for (int idx = 1; idx < loops.size(); idx += 1) {
             List<GeographyPointValue> oneHole = loops.get(idx);
             List<GeographyPointValue> rev = new ArrayList<GeographyPointValue>();
@@ -589,8 +589,8 @@ public class TestGeographyValueQueries extends RegressionSuite {
                             .getResults()[0];
             assertContentOfTable(new Object[][] {
                     {null, 3},
-                    {BERMUDA_TRIANGLE_POLY, 3},
                     {BILLERICA_TRIANGLE_POLY, 3},
+                    {BERMUDA_TRIANGLE_POLY, 3},
                     {LOWELL_SQUARE_POLY, 3},
                     {BERMUDA_TRIANGLE_HOLE_POLY, 3}},
                     vt);
@@ -747,15 +747,55 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
     // This is really misplaced.  But we don't have a regression
     // suite test for testing points.  We ought to, but we don't.
-    private void assertGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
+    private void checkOnePoint(Client client, long pk, String txt) throws Exception {
+        try {
+            ClientResponse cr = client.callProcedure("@AdHoc",
+                                                     String.format("insert into location (pk, loc_point) values (%d, pointfromtext('%s'))",
+                                                                   pk, txt));
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        } catch (Exception ex) {
+            assertFalse("Unexpected compilation failure: " + ex.getMessage(), true);
+        }
+    }
+
+    public void testPointFromTextPositive() throws Exception {
+        Client client = getClient();
+        for (String tbl : TABLES) {
+            fillTable(client, tbl, 1000);
+        }
+        checkOnePoint(client, 100, "point(0 90)");
+        checkOnePoint(client, 101, "point(0 -90)");
+        checkOnePoint(client, 102, "point(180 0)");
+        checkOnePoint(client, 103, "point(-180 0)");
+    }
+
+    private void assertSelectGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt) throws Exception {
         String stmt = "select pointfromtext('" + wkt + "') from t";
         verifyStmtFails(client, stmt, expectedMsg);
     }
 
+    private void assertInsertGeographyPointValueWktParseError(Client client, String expectedMsg, String wkt, long pk) throws Exception {
+        String stmt = String.format("insert into location (pk, loc_point) values (%d, pointfromtext('%s'));", pk, wkt);
+        verifyStmtFails(client, stmt, expectedMsg);
+    }
+
     public void testPointFromTextNegative() throws Exception {
+
         Client client = getClient();
-        validateTableOfScalarLongs(client, "insert into t (pk) values (0)", new long[] {1});
-        assertGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
+        for (String tbl : TABLES) {
+            fillTable(client, tbl, 0);
+        }
+        assertSelectGeographyPointValueWktParseError(client, "expected input of the form 'POINT\\(<lng> <lat>\\)", "point(20.0)");
+        // Try a couple of bad latitudes.
+        assertSelectGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(10 100)");
+        assertInsertGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(10 100)", 100);
+        assertSelectGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(20 -100)");
+        assertInsertGeographyPointValueWktParseError(client, "Latitude must be in the range", "point(20 -100)", 101);
+        // Try a couple of bad longitudes.
+        assertSelectGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(200 20)");
+        assertInsertGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(200 20)", 200);
+        assertSelectGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(-200 20)");
+        assertInsertGeographyPointValueWktParseError(client, "Longitude must be in the range", "point(-200 20)", 201);
     }
 
     public void testPolygonFromTextNegative() throws Exception {
@@ -764,9 +804,9 @@ public class TestGeographyValueQueries extends RegressionSuite {
 
         assertGeographyValueWktParseError(client, "does not start with POLYGON keyword", "NOT_A_POLYGON(...)");
         assertGeographyValueWktParseError(client, "missing left parenthesis after POLYGON", "POLYGON []");
-        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON ()");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a ring", "POLYGON ()");
         assertGeographyValueWktParseError(client, "A polygon ring must contain at least 4 points", "POLYGON (())");
-        assertGeographyValueWktParseError(client, "expected left parenthesis to start a loop", "POLYGON(3 3, 4 4, 5 5, 3 3)");
+        assertGeographyValueWktParseError(client, "expected left parenthesis to start a ring", "POLYGON(3 3, 4 4, 5 5, 3 3)");
         assertGeographyValueWktParseError(client, "expected a number but found ','", "POLYGON ((80 80, 60, 70 70, 90 90))");
         assertGeographyValueWktParseError(client, "unexpected token: '60'", "POLYGON ((80 80 60 60, 70 70, 90 90))");
         assertGeographyValueWktParseError(client, "unexpected end of input", "POLYGON ((80 80, 60 60, 70 70,");
@@ -782,6 +822,10 @@ public class TestGeographyValueQueries extends RegressionSuite {
         // But boost's tokenizer (at least as its currently configured) will consider "32.305-64.571" as a single
         // token.  This seems like an acceptable discrepancy?
         assertGeographyValueWktParseError(client, "expected a number but found '32.305-64.751'", "POLYGON((32.305-64.751,25.244-80.437,18.476-66.371,32.305-64.751))");
+        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '200'.  Longitude must be in the range \\[-180,180\\]",  "POLYGON((0 0,  200 0,  200   45, 0   45, 0 0))");
+        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '100'.  Latitude must be in the range \\[-90,90\\]",     "POLYGON((0 0,   45 0,   45  100, 0  100, 0 0))");
+        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '-200'.  Longitude must be in the range \\[-180,180\\]", "POLYGON((0 0, -200 0, -200   45, 0   45, 0 0))");
+        assertGeographyValueWktParseError(client, "Invalid input to POLYGONFROMTEXT: '-100'.  Latitude must be in the range \\[-90,90\\]",    "POLYGON((0 0,   45 0,   45 -100, 0 -100, 0 0))");
     }
 
     public void testGeographySize() throws Exception {

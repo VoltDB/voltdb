@@ -50,8 +50,6 @@
 
 package com.procedures;
 
-import java.io.UnsupportedEncodingException;
-
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -116,19 +114,13 @@ public class paymentByCustomerNameW extends VoltProcedure {
         return new VoltTable[]{warehouse, district};
     }
 
-    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, byte[] c_last, TimestampType timestamp) throws VoltAbortException {
+    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, String c_last, TimestampType timestamp) throws VoltAbortException {
         // retrieve c_id from replicated CUSTOMER_NAME table
         voltQueueSQL(getCidByLastName, c_last, c_d_id, c_w_id);
         final VoltTable result = voltExecuteSQL()[0];
         final int namecnt = result.getRowCount();
         if (namecnt == 0) {
-            String c_lastString = null;
-            try {
-                c_lastString = new String(c_last, "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                throw new RuntimeException(e);
-            }
-            throw new VoltAbortException("paymentByCustomerNameW: no customers with last name: " + c_lastString
+            throw new VoltAbortException("paymentByCustomerNameW: no customers with last name: " + c_last
                     + " in warehouse: "
                     + c_w_id + " and in district " + c_d_id);
         }
