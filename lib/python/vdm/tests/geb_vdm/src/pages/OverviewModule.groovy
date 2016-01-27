@@ -163,22 +163,22 @@ class OverviewModule extends Module {
         // Advanced
         advancedText                    { $(class:"fontFamily", text: "Advanced") }
 
-        maxJavaHeapText                 { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(24) > td.configLabel") }
+        maxJavaHeapText                 { $("#adminTbl > tbody > tr:nth-child(21) > td.configLabel") }
         maxJavaHeapField                { $(id:"txtMaxJavaHeap") }
 
-        heartbeatTimeoutText            { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(25) > td.configLabel") }
+        heartbeatTimeoutText            { $("#adminTbl > tbody > tr:nth-child(22) > td.configLabel") }
         heartbeatTimeoutField           { $(id:"txtHeartbeatTimeout") }
 
-        queryTimeoutText                { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(26) > td.configLabel") }
+        queryTimeoutText                { $("#adminTbl > tbody > tr:nth-child(23) > td.configLabel") }
         queryTimeoutField               { $(id:"txtQueryTimeout") }
 
-        maxTempTableMemoryText          { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(27) > td.configLabel") }
+        maxTempTableMemoryText          { $("#adminTbl > tbody > tr:nth-child(24) > td.configLabel") }
         maxTempTableMemoryField         { $(id:"txtMaxTempTableMemory") }
 
-        snapshotPriorityText            { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(28) > td.configLabel") }
+        snapshotPriorityText            { $("#adminTbl > tbody > tr:nth-child(25) > td.configLabel") }
         snapshotPriorityField           { $(id:"txtSnapshotPriority") }
 
-        memoryLimitText                 { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigLeft > div > div.mainTbl > table > tbody > tr:nth-child(29) > td.configLabel") }
+        memoryLimitText                 { $("#adminTbl > tbody > tr:nth-child(26) > td.configLabel") }
         memoryLimitField                { $(id:"txtMemoryLimit") }
 
         // security

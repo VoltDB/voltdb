@@ -30,8 +30,13 @@ OTHER DEALINGS IN THE SOFTWARE.
 import unittest
 import requests
 import xmlrunner
+import socket
 
-__url__ = 'http://localhost:8000/api/1.0/deployment/users/1/test'
+
+__host_name__ = socket.gethostname()
+__host_or_ip__ = socket.gethostbyname(__host_name__)
+
+__url__ = 'http://'+__host_or_ip__+':8000/api/1.0/deployment/users/1/test'
 
 
 class DeploymentUser(unittest.TestCase):
