@@ -39,21 +39,19 @@ class DatabaseReplicationModule extends Module {
         enabledCheckbox     { $("#frmDatabaseReplication > div > table > tbody > tr:nth-child(1) > td:nth-child(2) > span:nth-child(1) > div > ins") }
 
         idField             { $("#txtDrId") }
-        typeSelect          { $("#selectDrType") }
-
-        masterSelect        { $("#selectDrType > option:nth-child(1)") }
-        replicaSelect       { $("#selectDrType > option:nth-child(2)") }
 
         // DR Box
         status              { $("#chkDrOnOffVal") }
 
-        type                (required: false) { $("#lblDrType") }
-        id                  (required: false) { $("#lblDrId") }
+        databasePort        { $("#txtDrPort") }
 
-        databaseSelect      { $("#tdDbSelect") }
-        secondDatabase      { $("#tdDbSelect > option:nth-child(2)") }
+        sourceCheckBox      { $("#frmDatabaseReplication > div > table > tbody > tr:nth-child(4) > td:nth-child(2) > span:nth-child(1) > div > ins") }
+        sourceText          { $("#chkConnectionSourceOnOffValue") }
+        sourceField         { $("#txtDatabase") }
 
-        firstServer         { $("#ulDrServerList > li > label > input") }
+        displayedId         { $("#lblDrId") }
+        displayedPort       { $("#lblDrPort") }
+        displayedSource     { $("#master-cluster-name") }
     }
 
 }
