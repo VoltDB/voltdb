@@ -54,6 +54,7 @@ import org.voltcore.logging.Level;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
+import org.voltdb.importclient.kafka.KafkaStreamImporterConfig.HostAndPort;
 import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.Invocation;
 import org.voltdb.importer.formatter.Formatter;
@@ -73,12 +74,12 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     //Start with invalid so consumer will fetch it.
     private final AtomicLong m_currentOffset = new AtomicLong(-1);
     private long m_lastCommittedOffset = -1;
-    private final AtomicReference<SimpleConsumer> m_offsetManager = new AtomicReference<SimpleConsumer>();
+    private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<BlockingChannel>();
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
     private final KafkaStreamImporterConfig m_config;
-    private KafkaStreamImporterConfig.HostAndPort m_coordinator;
+    private HostAndPort m_coordinator;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
@@ -97,7 +98,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private PartitionMetadata findLeader() {
         PartitionMetadata returnMetaData = null;
         loop:
-            for (KafkaStreamImporterConfig.HostAndPort broker : m_config.getBrokers()) {
+            for (HostAndPort broker : m_config.getBrokers()) {
                 SimpleConsumer consumer = null;
                 try {
                     consumer = new SimpleConsumer(broker.getHost(), broker.getPort(), m_config.getSocketTimeout(), m_config.getFetchSize(), "findLeader");
@@ -128,7 +129,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     //Find leader for this topic partition.
-    private KafkaStreamImporterConfig.HostAndPort findNewLeader() {
+    private HostAndPort findNewLeader() {
         for (int i = 0; i < 3; i++) {
             boolean shouldSleep = false;
             PartitionMetadata metadata = findLeader();
@@ -141,7 +142,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 // second time, assume the broker did recover before failover, or it was a non-Broker issue
                 shouldSleep = true;
             } else {
-                return new KafkaStreamImporterConfig.HostAndPort(metadata.leader().host(), metadata.leader().port());
+                return new HostAndPort(metadata.leader().host(), metadata.leader().port());
             }
             if (shouldSleep) {
                 backoffSleep(i+1);
@@ -157,26 +158,40 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         int correlationId = 0;
 
         OUTER: for (int attempts = 0; attempts < 3; ++attempts) {
-            for (KafkaStreamImporterConfig.HostAndPort hp: m_config.getBrokers()) {
+            for (HostAndPort hp: m_config.getBrokers()) {
                 BlockingChannel channel = null;
                 try {
-                    channel = new BlockingChannel(hp.getHost(), hp.getPort(),
-                            BlockingChannel.UseDefaultBufferSize(), BlockingChannel.UseDefaultBufferSize(), m_config.getSocketTimeout());
+                    channel = new BlockingChannel(
+                            hp.getHost(), hp.getPort(),
+                            BlockingChannel.UseDefaultBufferSize(),
+                            BlockingChannel.UseDefaultBufferSize(),
+                            m_config.getSocketTimeout()
+                            );
                     channel.connect();
-                    channel.send(new ConsumerMetadataRequest(m_config.getGroupId(), ConsumerMetadataRequest.CurrentVersion(), correlationId++, KafkaStreamImporterConfig.CLIENT_ID));
+                    channel.send(new ConsumerMetadataRequest(
+                            m_config.getGroupId(),
+                            ConsumerMetadataRequest.CurrentVersion(),
+                            correlationId++,
+                            KafkaStreamImporterConfig.CLIENT_ID
+                            ));
                     ConsumerMetadataResponse metadataResponse = ConsumerMetadataResponse.readFrom(channel.receive().buffer());
                     if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
                         Broker offsetManager = metadataResponse.coordinator();
-                        m_coordinator = new KafkaStreamImporterConfig.HostAndPort(offsetManager.host(), offsetManager.port());
-                        SimpleConsumer consumer = m_offsetManager.getAndSet(
-                                new SimpleConsumer(
-                                        m_coordinator.getHost(),
-                                        m_coordinator.getPort(),
-                                        m_config.getSocketTimeout(),
-                                        m_config.getFetchSize(), KafkaStreamImporterConfig.CLIENT_ID
-                                        ));
+                        m_coordinator = new HostAndPort(offsetManager.host(), offsetManager.port());
+                        BlockingChannel consumer = m_offsetManager.getAndSet(
+                                new BlockingChannel(
+                                        m_coordinator.getHost(), m_coordinator.getPort(),
+                                        BlockingChannel.UseDefaultBufferSize(),
+                                        BlockingChannel.UseDefaultBufferSize(),
+                                        m_config.getSocketTimeout()
+                                        )
+                                );
+                        m_offsetManager.get().connect();
                         info(null, "Offset Coordinator for " + m_topicAndPartition + " is " + offsetManager);
-                        KafkaStreamImporterConfig.closeConsumer(consumer);
+                        if (consumer != null) try {
+                            channel.disconnect();
+                        } catch (Exception ignoreIt) {
+                        }
                         probeException = null;
                         consumer = null;
                         break OUTER;
@@ -247,15 +262,22 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         Throwable fault = null;
 
         for (int attempts = 0; attempts < 3; ++attempts) try {
-            rsp = m_offsetManager.get().fetchOffsets(rq);
+            BlockingChannel channel = m_offsetManager.get();
+            channel.send(rq.underlying());
+            rsp = OffsetFetchResponse.readFrom(channel.receive().buffer());
             short code = rsp.offsets().get(m_topicAndPartition).error();
             if (code != ErrorMapping.NoError()) {
                 fault = ErrorMapping.exceptionFor(code);
+                warn(null, "STEBUG get client offset returned error code %d", code);
+                backoffSleep(attempts+1);
                 if (code == ErrorMapping.NotCoordinatorForConsumerCode()) {
                     getOffsetCoordinator();
+                } else if (code == ErrorMapping.ConsumerCoordinatorNotAvailableCode()) {
+                    getOffsetCoordinator();
                 } else if (code == ErrorMapping.UnknownTopicOrPartitionCode()) {
+                    getOffsetCoordinator();
                     fault = null;
-                    break;
+                    continue;
                 }
             } else {
                 fault = null;
@@ -269,7 +291,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         }
         if (fault != null) {
             rateLimitedLog(Level.ERROR, fault, "unable to fetch earliest offset for " + m_topicAndPartition);
-                    rsp = null;
+            rsp = null;
         }
         return rsp;
     }
@@ -314,7 +336,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private void resetLeader() {
         KafkaStreamImporterConfig.closeConsumer(m_consumer);
         m_consumer = null;
-        KafkaStreamImporterConfig.HostAndPort leaderBroker = findNewLeader();
+        HostAndPort leaderBroker = findNewLeader();
         if (leaderBroker == null) {
             //point to original leader which will fail and we fall back again here.
             rateLimitedLog(Level.ERROR, null, "Fetch Failed to find leader continue with old leader: " + m_config.getPartitionLeader());
@@ -455,7 +477,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             commitOffset();
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
-            KafkaStreamImporterConfig.closeConsumer(m_offsetManager.getAndSet(null));
+            BlockingChannel channel = m_offsetManager.getAndSet(null);
+            if (channel != null) try { channel.disconnect(); } catch (Exception ignoreIt) {}
         }
         m_dead.compareAndSet(false, true);
         info(null, "Partition fetcher stopped for " + m_topicAndPartition
@@ -467,34 +490,34 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     public boolean commitOffset() {
         final int correlationId = m_topicAndPartition.partition();
         final short version = 1;
-        final short notCoordinatorCode = ErrorMapping.NotCoordinatorForConsumerCode();
 
         final long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
-
+            long now = System.currentTimeMillis();
             OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
                     m_config.getGroupId(),
-                    singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", ErrorMapping.NoError())),
+                    singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
                     correlationId,
                     KafkaStreamImporterConfig.CLIENT_ID,
                     version
                     );
             OffsetCommitResponse offsetCommitResponse = null;
             try {
-                SimpleConsumer consumer = null;;
+                BlockingChannel channel = null;
                 int retries = 3;
-                short code = notCoordinatorCode;
-                while ((consumer == null || code == notCoordinatorCode) && --retries >= 0) {
-                    if ((consumer = m_offsetManager.get()) == null) {
+                while (channel == null && --retries >= 0) {
+                    if ((channel = m_offsetManager.get()) == null) {
                         getOffsetCoordinator();
                         rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
-                    offsetCommitResponse = consumer.commitOffsets(offsetCommitRequest);
-                    code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
-                    if (code == notCoordinatorCode) {
+                    channel.send(offsetCommitRequest.underlying());
+                    offsetCommitResponse = OffsetCommitResponse.readFrom(channel.receive().buffer());
+                    final short code = ((Short) offsetCommitResponse.errors().get(m_topicAndPartition));
+                    if (code == ErrorMapping.NotCoordinatorForConsumerCode() || code == ErrorMapping.ConsumerCoordinatorNotAvailableCode()) {
                         info(null, "Not coordinator for committing offset for " + m_topicAndPartition + " Updating coordinator.");
                         getOffsetCoordinator();
+                        channel = null;
                         continue;
                     }
                 }
