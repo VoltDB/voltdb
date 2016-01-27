@@ -28,19 +28,13 @@
 {@fromtables = "_table"}
 {@idcol = "ID"}
 
---TODO: this should be randomized:
---{@insertvals = "_id, pointFromText('POINT(0 0)'), pointFromText('POINT(-71.0 42.0)'), null, polygonFromText('POLYGON((-1 -1, 1 -1, 1 1, -1 1, -1 -1))')"}
-{@insertvals = "_id, pointFromText('POINT(0 0)'), pointFromText('POINT(-71.0 42.0)'), null, polygonFromText('POLYGON((-1 -1, 1 -1, 1 1, -1 1, -1 -1))')"}
---{@insertvals = "_id, pointFromText('POINT(_value[decimal:-1,1] _value[decimal:-1,1])'), pointFromText('POINT(_value[decimal:-1,1] _value[decimal:-1,1])'), null, polygonFromText('POLYGON((_value[decimal:-0.9,-0.3] _value[decimal:-0.9,-0.3], _value[decimal:0.3,0.9] _value[decimal:-0.9,-0.3], _value[decimal:0.3,0.9] _value[decimal:0.3,0.9], _value[decimal:-0.9,-0.3] _value[decimal:0.3,0.9], _value[decimal:-0.9,-0.3] _value[decimal:-0.9,-0.3]))')"}
+{@insertvals = "_id, _value[point:-109,-102,37,41], null, null, _value[polygon], _value[polygon null25], _value[polygon null50], null"}
 
-{@onefun = ""}  -- There are no handy unary point-to-point or polygon-to-polygon functions.
+{@onefun = ""}  -- There are no handy unary polygon-to-polygon functions.
 {@optionalfn = "_geofun"}
--- TODO: perhaps change this to use "AsText" (not LONGITUDE, LATITUDE, AREA), once fully supported (?);
--- and then, perhaps back to "*", once the Python client works (?? - only if results are comparable with PostGIS, so probably not)
-{@star = "ID, LONGITUDE(PT1), LATITUDE(PT1), LONGITUDE(PT2), LATITUDE(PT2), AREA(POLY1)"}
-{@lhsstar = "LHS.ID, LONGITUDE(LHS.PT1), LATITUDE(LHS.PT1), LONGITUDE(LHS.PT2), LATITUDE(LHS.PT2), AREA(LHS.POLY1)"}
+{@star = "ID, AsText(PT1), AsText(POLY1), AsText(POLY2), AsText(POLY3)"}
+{@lhsstar = "LHS.ID, AsText(LHS.PT1), AsText(LHS.POLY1), AsText(LHS.POLY2), AsText(LHS.POLY3)"}
 
-{@updatecolumn = "POLY1"}
+{@updatecolumn = "POLY3"}
 {@updatesource = "POLY1"}
---TODO: this should be randomized (e.g. "_value[polygon]"??):
-{@updatevalue = "polygonFromText('POLYGON((-2 -2, 2 -2, 2 2, -2 2, -2 -2))')"}
+{@updatevalue = "_value[polygon null25]"}
