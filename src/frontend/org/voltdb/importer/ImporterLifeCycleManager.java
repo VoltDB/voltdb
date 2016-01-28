@@ -164,9 +164,16 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
 
         List<AbstractImporter> newImporters = new ArrayList<>();
         for (final URI added: assignment.getAdded()) {
-            AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
-            newImporters.add(importer);
-            builder.put(added, importer);
+            try {
+                AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
+                newImporters.add(importer);
+                builder.put(added, importer);
+            } catch(Exception e) {
+                s_logger.warn("Error adding assignment " + added.toString() + " importer not found.");
+                if (s_logger.isDebugEnabled()) {
+                    e.printStackTrace();
+                }
+            }
         }
 
         ImmutableMap<URI, AbstractImporter> newReference = builder.build();
