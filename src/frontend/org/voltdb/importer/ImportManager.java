@@ -109,20 +109,24 @@ public class ImportManager implements ChannelChangeCallback {
             throw new IOException("Cannot access OSGI cache directory: " + f.getAbsolutePath());
         }
 
+        /*
+         * Note for developers: please keep list in alpha-numerical order
+         */
         List<String> packages = ImmutableList.<String>builder()
-                .add("org.voltcore.network")
-                .add("org.voltcore.logging")
-                .add("org.voltdb.importer")
-                .add("org.voltdb.importer.formatter")
-                .add("org.apache.log4j")
-                .add("org.voltdb.client")
-                .add("org.slf4j")
-                .add("org.voltcore.utils")
                 .add("com.google_voltpatches.common.base")
                 .add("com.google_voltpatches.common.collect")
-                .add("com.google_voltpatches.common.net")
                 .add("com.google_voltpatches.common.io")
+                .add("com.google_voltpatches.common.net")
                 .add("com.google_voltpatches.common.util.concurrent")
+                .add("jsr166y")
+                .add("org.apache.log4j")
+                .add("org.slf4j")
+                .add("org.voltcore.network")
+                .add("org.voltcore.logging")
+                .add("org.voltcore.utils")
+                .add("org.voltdb.client")
+                .add("org.voltdb.importer")
+                .add("org.voltdb.importer.formatter")
                 .build();
 
         String systemPackagesSpec = FluentIterable.from(packages).transform(appendVersion).join(COMMA_JOINER);
@@ -193,9 +197,9 @@ public class ImportManager implements ChannelChangeCallback {
                     if (formatterFactory == null) {
                         Bundle bundle = m_framework.getBundleContext().installBundle(module);
                         bundle.start();
-                        ServiceReference refs[] = bundle.getRegisteredServices();
+                        ServiceReference<?> refs[] = bundle.getRegisteredServices();
                         //Must have one service only.
-                        ServiceReference reference = refs[0];
+                        ServiceReference<?> reference = refs[0];
                         if (reference == null) {
                             VoltDB.crashLocalVoltDB("Failed to initialize formatter from: " + module);
                         }
