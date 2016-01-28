@@ -118,8 +118,8 @@ public class SQLLexer extends SQLPatternFactory
     private static final Pattern PAT_TABLE_DDL_PREAMBLE =
         SPF.statementLeader(
             SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
-            SPF.capture(SPF.tokenAlternatives("table", "stream")),       // target is table or stream
-            SPF.capture(SPF.databaseObjectName())                        // table name (captured)
+            SPF.tokenAlternatives("table", "stream"),               // target is table or stream
+            SPF.capture(SPF.databaseObjectName())                   // table name (captured)
         ).compile("PAT_TABLE_DDL_PREAMBLE");
 
     // Matches the start of a SELECT statement

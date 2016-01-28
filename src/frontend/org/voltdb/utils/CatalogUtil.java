@@ -794,7 +794,7 @@ public abstract class CatalogUtil {
                     exportConfig.setExportconnectorclass(export.getExportconnectorclass());
                 }
                 //Set target to default name.
-                exportConfig.setStream(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             }
 
             populateDefaultDeployment(deployment);
@@ -1377,7 +1377,7 @@ public abstract class CatalogUtil {
             boolean connectorEnabled = exportConfiguration.isEnabled();
             // Get the stream name from the xml attribute "stream"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String streamName = exportConfiguration.getStream();
+            String streamName = exportConfiguration.getTarget();
             if (streamName == null || streamName.trim().isEmpty()) {
                     throw new RuntimeException("stream must be specified along with type in export configuration.");
             }
@@ -2353,7 +2353,7 @@ public abstract class CatalogUtil {
         }
         boolean userDefineStream = false;
         for (ExportConfigurationType exportConfiguration : export.getConfiguration()) {
-            if (exportConfiguration.getStream().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
+            if (exportConfiguration.getTarget().equals(DR_CONFLICTS_TABLE_EXPORT_GROUP)) {
                 userDefineStream = true;
             }
         }
@@ -2361,7 +2361,7 @@ public abstract class CatalogUtil {
         if (!userDefineStream) {
             ExportConfigurationType defaultConfiguration = new ExportConfigurationType();
             defaultConfiguration.setEnabled(true);
-            defaultConfiguration.setStream(DR_CONFLICTS_TABLE_EXPORT_GROUP);
+            defaultConfiguration.setTarget(DR_CONFLICTS_TABLE_EXPORT_GROUP);
             defaultConfiguration.setType(ServerExportEnum.FILE);
 
             // type

@@ -215,6 +215,17 @@ public class SQLParser extends SQLPatternFactory
         parsedProcedureModifierClause().compile("PAT_ANY_CREATE_PROCEDURE_STATEMENT_CLAUSE");
 
     /**
+     * Pattern for parsing a single EXPORT or PARTITION clauses within a CREATE STREAM statement.
+     *
+     * Capture groups:
+     *  (1) ALLOW clause: target name
+     *  (2) PARTITION clause: column name
+     *
+     */
+    private static final Pattern PAT_ANY_CREATE_STREAM_STATEMENT_CLAUSE =
+        parsedStreamModifierClause().compile("PAT_ANY_CREATE_STREAM_STATEMENT_CLAUSE");
+
+    /**
      * DROP PROCEDURE  statement regex
      */
     private static final Pattern PAT_DROP_PROCEDURE = Pattern.compile(
@@ -296,7 +307,7 @@ public class SQLParser extends SQLPatternFactory
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (group 1) <table name>
-            "(?:\\s+TO\\s+TARGET\\s+" +         // begin optional TO STREAM <export target> clause
+            "(?:\\s+TO\\s+STREAM\\s+" +         // begin optional TO STREAM <export target> clause
             "([\\w.$]+)" +                      // (group 2) <export target>
             ")?" +                              // end optional TO STREAM <export target> clause
             "\\s*;\\z"                          // (end statement)
@@ -310,12 +321,11 @@ public class SQLParser extends SQLPatternFactory
      *  (2) optional target name
      */
     private static final Pattern PAT_CREATE_STREAM =
-        SPF.statementLeader(
-            SPF.token("create"), SPF.token("stream"), SPF.capture("object", SPF.databaseObjectName()),
-            SPF.optional(SPF.clause(
-                    SPF.token("export to target"),
-                    SPF.capture("target", SPF.databaseObjectName())))
-        ).compile("PAT_CREATE_STREAM");
+            SPF.statement(
+                    SPF.token("create"), SPF.token("stream"), SPF.capture("name", SPF.databaseObjectName()),
+                    unparsedStreamModifierClauses(),
+                    SPF.anyColumnFields()
+            ).compile("PAT_CREATE_STREAM");
 
     /**
      *  If the statement starts with a VoltDB-specific DDL command,
@@ -712,6 +722,16 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against pattern for export/partition clauses of create stream statement
+     * @param statement  statement to match against
+     * @return           pattern matcher object
+     */
+    public static Matcher matchAnyCreateStreamStatementClause(String statement)
+    {
+        return PAT_ANY_CREATE_STREAM_STATEMENT_CLAUSE.matcher(statement);
+    }
+
+    /**
      * Match statement against pattern for replicate table
      * @param statement  statement to match against
      * @return           pattern matcher object
@@ -790,6 +810,59 @@ public class SQLParser extends SQLPatternFactory
         return SPF.capture(SPF.repeat(makeInnerProcedureModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
     }
 
+    /**
+     * Build a pattern segment to accept a single optional EXPORT or PARTITION clause
+     * to modify CREATE STREAM statements.
+     *
+     * @param captureTokens  Capture individual tokens if true
+     * @return               Inner pattern to be wrapped by the caller as appropriate
+     *
+     * Capture groups (when captureTokens is true):
+     *  (1) EXPORT clause: target name
+     *  (2) PARTITION clause: column name
+     */
+    private static SQLPatternPart makeInnerStreamModifierClausePattern(boolean captureTokens)
+    {
+        return
+            SPF.oneOf(
+                SPF.clause(
+                    SPF.token("export"),SPF.token("to"),SPF.token("target"),
+                    SPF.group(captureTokens,  SPF.databaseObjectName())
+                ),
+                SPF.clause(
+                    SPF.token("partition"), SPF.token("on"), SPF.token("column"),
+                    SPF.group(captureTokens, SPF.databaseObjectName())
+                )
+            );
+    }
+
+    /**
+     * Build a pattern segment to accept and parse a single optional EXPORT or PARTITION
+     * clause used to modify a CREATE STREAM statement.
+     *
+     * @return EXPORT/PARTITION modifier clause parsing pattern.
+     *
+     * Capture groups:
+     *  (1) EXPORT clause: target name     *
+     *  (2) PARTITION clause: column name
+     */
+    static SQLPatternPart parsedStreamModifierClause() {
+        return SPF.clause(makeInnerStreamModifierClausePattern(true));
+    }
+
+    /**
+     * Build a pattern segment to recognize all the EXPORT or PARTITION modifier clauses
+     * of a CREATE STREAM statement.
+     *
+     * @return Pattern to be used by the caller inside a CREATE STREAM pattern.
+     *
+     * Capture groups:
+     *  (1) All EXPORT/PARTITION modifier clauses as one string
+     */
+    private static SQLPatternPart unparsedStreamModifierClauses() {
+        // Force the leading space to go inside the repeat block.
+        return SPF.capture(SPF.repeat(makeInnerStreamModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
+    }
     //========== Other utilities from or for SQLCommand ==========
 
     /**
