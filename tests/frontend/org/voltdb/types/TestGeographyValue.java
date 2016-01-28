@@ -23,10 +23,13 @@
 
 package org.voltdb.types;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import org.voltdb.types.GeographyValue.XYZPoint;
 
 import junit.framework.TestCase;
 
@@ -36,6 +39,106 @@ public class TestGeographyValue extends TestCase {
         assertTrue(message,
                    Math.abs(expected.getLongitude() - actual.getLongitude()) < epsilon
                    && Math.abs(expected.getLatitude() - actual.getLatitude()) < epsilon);
+    }
+
+    private static final String WKT = "polygon((0 0, 1 0, 1 1, 0 1, 0 0), (0.1 0.1, 0.1 0.9, 0.9 0.9, 0.9 0.1, 0.1 0.1))";
+    private void printOneXYZPointForDoc(GeographyPointValue pt) {
+        XYZPoint xyzpt = XYZPoint.fromGeographyPointValue(pt);
+        System.out.printf("  <tr><td>%f</td><td>%f</td><td>%f</td><td>%f</td><td>%f</td></tr>\n",
+                          pt.getLongitude(), pt.getLatitude(),
+                          xyzpt.x(), xyzpt.y(), xyzpt.z());
+    }
+    /*
+     * This just prints out the XYZPoint coordinates for a polygon.  We use
+     * this in generating the documentation.  Run this as a junit test and the
+     * XYZPoint coordinates will be printed on the console as the body of an
+     * HTML table.  Note that we don't reverse any order here, as we don't really
+     * need to for this application.
+     */
+    public void notestXYZPointForDoc() {
+        GeographyValue poly = GeographyValue.fromWKT(WKT);
+        List<List<GeographyPointValue>> rings = poly.getRings();
+        for (List<GeographyPointValue> oneRing : rings) {
+            for (int idx = 0; idx != oneRing.size()-1; idx += 1) {
+                printOneXYZPointForDoc(oneRing.get(idx));
+            }
+        }
+    }
+
+    private void printOneGVRowMessageForDoc(String message) {
+        System.out.printf("  <tr><td colspan=\"5\">%s</td></tr>\n", message);
+    }
+
+    private int printOneGVRowForDoc(int bytePos, int length, String value, String type, String meaning) {
+        System.out.printf("  <tr><td>%d</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
+                          bytePos,
+                          length,
+                          value,
+                          type,
+                          meaning);
+        try {
+            return meaning.getBytes("UTF-16BE").length;
+        } catch (UnsupportedEncodingException ex) {
+            return 0;
+        }
+    }
+
+    private int printOneGVRowForDoc(int bytePos, byte value, String meaning) {
+        printOneGVRowForDoc(bytePos, 1, "byte", String.format("%x", value), meaning);
+        return 1;
+    }
+
+    private int printOneGVRowForDoc(int bytePos, int value, String meaning) {
+        printOneGVRowForDoc(bytePos, 4, "32 bit int", String.format("%d", value), meaning);
+        return 4;
+    }
+
+    private int printOneGVRowForDoc(int bytePos, double value, String meaning) {
+        printOneGVRowForDoc(bytePos, 8, "double", String.format("%f", value), meaning);
+        return 8;
+    }
+
+    private int printOneGVRowOfZerosForDoc(int pos, int length, String meaning) {
+        printOneGVRowForDoc(pos, length, "0", "blob of zeros", meaning);
+        return length;
+    }
+
+    /*
+     * Print the wire protocol representation for a polygon.  This is used to generate
+     * the wire protocol documentation.
+     */
+    public void notestGeographyValueForDoc() {
+        GeographyValue poly = GeographyValue.fromWKT(WKT);
+        ByteBuffer buf = ByteBuffer.allocate(poly.getLengthInBytes());
+        poly.flattenToBuffer(buf);
+        buf.position(0);
+        int pos = 0;
+        pos += printOneGVRowForDoc(pos, buf.get(pos), "IsValid.  Initially zero (0)");
+        pos += printOneGVRowForDoc(pos, buf.get(pos), "Internal.  Initially one (1)");
+        pos += printOneGVRowForDoc(pos, buf.get(pos), "Polygon has holes.");
+        int nrings = buf.getInt(pos);
+        pos += printOneGVRowForDoc(pos, nrings, "Number of Rings");
+        printOneGVRowMessageForDoc("Vertices follow here.");
+        for (int ringNo = 0; ringNo < nrings; ringNo += 1) {
+            printOneGVRowMessageForDoc(String.format("Ring %d", ringNo + 1));
+            pos += printOneGVRowForDoc(pos, buf.get(pos), "Is initialized.  Initially zero (0)");
+            int numVerts = buf.getInt(pos);
+            pos += printOneGVRowForDoc(pos, numVerts,
+                                       String.format("Number Vertices in ring %d", ringNo + 1));
+            for (int vertNo = 0; vertNo < numVerts; vertNo += 1) {
+                pos += printOneGVRowForDoc(pos, buf.getDouble(pos),
+                                           String.format("X Coordinate for ring %d, vertex %d",
+                                                         ringNo + 1, vertNo + 1));
+                pos += printOneGVRowForDoc(pos, buf.getDouble(pos),
+                                           String.format("Y Coordinate for ring %d, vertex %d",
+                                                         ringNo + 1, vertNo + 1));
+                pos += printOneGVRowForDoc(pos, buf.getDouble(pos),
+                                           String.format("Z Coordinate for ring %d, vertex %d",
+                                                         ringNo + 1, vertNo + 1));
+            }
+            pos += printOneGVRowOfZerosForDoc(pos, 38, "Internal plus the bounding box of the ring.  Initially zero (0).");
+        }
+        pos += printOneGVRowOfZerosForDoc(pos, 33, "Internal fields plus the bounding box of the polygon.  Initially zero(0).");
     }
 
     public void testGeographyValuePositive() {
