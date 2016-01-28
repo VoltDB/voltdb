@@ -46,6 +46,10 @@ import ast
 import os.path
 import urllib
 import DeploymentConfig
+import glob
+sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
+from voltcli import utility
+
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
 CORS(APP)
@@ -532,12 +536,18 @@ def start_local_server(database_id, recover=False):
 def get_voltdb_dir():
     return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
 
+
+def get_volt_jar_dir():
+    return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'voltdb'))
+
+
 def is_security_enabled(database_id):
     security_config = Global.DEPLOYMENT[database_id-1]['security']
     if not security_config:
         return False
 
     return security_config['enabled']
+
 
 def get_admin_user(database_id):
     
@@ -554,6 +564,7 @@ def get_admin_user(database_id):
         return None
     else:
         return admins[0]
+
 
 def stop_server(database_id, server_id):
     members = []
@@ -573,6 +584,7 @@ def stop_server(database_id, server_id):
 
     args = [ '-H', server[0]['hostname'], server[0]['name'] ]
     return run_voltdb_cmd('voltadmin', 'stop', args, database_id)
+
 
 def run_voltdb_cmd(cmd, verb, args, database_id):
     user_options = []
@@ -2057,6 +2069,23 @@ def main(runner, amodule, config_dir, server):
     if os.path.exists(config_path):
         convert_xml_to_json(config_path)
     else:
+        ##############################################
+        file_path = ''
+        try:
+            volt_jar = glob.glob(os.path.join(get_volt_jar_dir(), 'voltdb-*.jar'))
+            if len(volt_jar) > 0:
+                file_path = volt_jar[0]
+            else:
+                print 'No voltdb jar file found.'
+        except Exception, err:
+            print err
+        if file_path != '':
+            is_pro = utility.is_pro_version(file_path)
+            if is_pro:
+                if 'commandlog' in deployment and 'enabled' in deployment['commandlog'] and not deployment['commandlog']['enabled']:
+                    deployment['commandlog']['enabled'] = True
+        ###############################################
+
         Global.DEPLOYMENT.append(deployment)
 
         Global.SERVERS.append({'id': 1, 'name': __host_name__, 'hostname': __host_or_ip__, 'description': "",
