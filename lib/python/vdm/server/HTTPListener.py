@@ -2052,10 +2052,12 @@ def main(runner, amodule, config_dir, server):
     config_path = os.path.join(config_dir, 'vdm.xml')
 
     arrServer = {}
+    bindIp = "0.0.0.0"
     if server is not None:
         arrServer = server.split(':', 2)
         __host_name__ = arrServer[0]
         __host_or_ip__ = arrServer[0]
+        bindIp = __host_or_ip__
         __PORT__ = int(8000)
         __IP__ = arrServer[0]
         if len(arrServer) >= 2:
@@ -2158,4 +2160,4 @@ def main(runner, amodule, config_dir, server):
                      methods=['GET'])
     APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
                      methods=['GET'])
-    APP.run(threaded=True, host=__IP__, port=__PORT__)
+    APP.run(threaded=True, host=bindIp, port=__PORT__)

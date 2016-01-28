@@ -1371,6 +1371,12 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     public String toFormattedString() {
 
         final int MAX_PRINTABLE_CHARS = 30;
+        // chose print width for geography column such that it can print polygon in
+        // aligned manner with geography column for a polygon up to:
+        // a polygon composed of 4 vertices + 1 repeat vertex,
+        // one ring, each coordinate of vertex having 5 digits space including the sign of lng/lat
+        final int MAX_PRINTABLE_CHARS_GEOGRAPHY = 74;
+
         final String ELLIPSIS = "...";
         final String DECIMAL_FORMAT = "%01.12f";
 
@@ -1379,6 +1385,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         int columnCount = getColumnCount();
         int[] padding = new int[columnCount];
         String[] fmt = new String[columnCount];
+        // start with minimum padding based on length of column names. this gets
+        // increased later as needed
         for (int i = 0; i < columnCount; i++) {
             padding[i] = getColumnName(i).length(); // min value to be increased later
         }
@@ -1407,8 +1415,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                     else {
                         width = value.toString().length();
                     }
-                    if (width > MAX_PRINTABLE_CHARS) {
-                        width = MAX_PRINTABLE_CHARS;
+                    if ( ((colType == VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS_GEOGRAPHY)) ||
+                         ((colType != VoltType.GEOGRAPHY) && (width > MAX_PRINTABLE_CHARS)) ) {
+                        width = (colType == VoltType.GEOGRAPHY) ? MAX_PRINTABLE_CHARS_GEOGRAPHY : MAX_PRINTABLE_CHARS;
                     }
                 }
 
