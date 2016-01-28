@@ -115,88 +115,6 @@ class XML(unittest.TestCase):
 
         return doc
 
-        # def test_default_xml_attributes(self):
-        #     """
-        #         test xml default attributes
-        #     """
-        #     data = requests.get(__url__)
-        #     tree = ElementTree.fromstring(data.content)
-        #     databaseFound = False
-        #     membersFound = False
-        #     for child in tree:
-        #         if child.tag == "databases":
-        #             for subnode in child:
-        #                 if subnode.tag == "database":
-        #                     databaseFound = True
-        #                     self.assertEqual(subnode.attrib['deployment'], "default")
-        #                     self.assertEqual(subnode.attrib['id'], "1")
-        #                     self.assertEqual(subnode.attrib['members'], "[1]")
-        #                     self.assertEqual(subnode.attrib['name'], "local")
-        #         if child.tag == "members":
-        #             for subnode in child:
-        #                 if subnode.tag == "member":
-        #                     membersFound = True
-        #                     self.assertEqual(subnode.attrib['admin-listener'], "")
-        #                     self.assertEqual(subnode.attrib['client-listener'], "")
-        #                     self.assertEqual(subnode.attrib['description'], "")
-        #                     self.assertEqual(subnode.attrib['enabled'], "true")
-        #                     self.assertEqual(subnode.attrib['external-interface'], "")
-        #                     # self.assertEqual(subnode.attrib['hostname'], "127.0.1.1")
-        #                     self.assertEqual(subnode.attrib['http-listener'], "")
-        #                     self.assertEqual(subnode.attrib['id'], "1")
-        #                     self.assertEqual(subnode.attrib['internal-interface'], "")
-        #                     self.assertEqual(subnode.attrib['internal-listener'], "")
-        #                     # self.assertEqual(subnode.attrib['name'], "")
-        #                     self.assertEqual(subnode.attrib['placement-group'], "")
-        #                     self.assertEqual(subnode.attrib['public-interface'], "")
-        #                     self.assertEqual(subnode.attrib['replication-listener'], "")
-        #                     self.assertEqual(subnode.attrib['zookeeper-listener'], "")
-        #         if child.tag == "deployments":
-        #             for subnode in child:
-        #                 if subnode.tag == "deployment":
-        #                     for supersubnode in subnode:
-        #                         if supersubnode.tag == "paths":
-        #                             for node in supersubnode:
-        #                                 if supersubnode.tag == "snapshots":
-        #                                     self.assertEqual(node.attrib['path'], "snapshots")
-        #                                 if supersubnode.tag == "commandlog":
-        #                                     self.assertEqual(node.attrib['path'], "command_log")
-        #                                 if supersubnode.tag == "voltdbroot":
-        #                                     self.assertEqual(node.attrib['path'], "voltdbroot")
-        #                                 if supersubnode.tag == "exportoverflow":
-        #                                     self.assertEqual(node.attrib['path'], "export_overflow")
-        #                                 if supersubnode.tag == "droverflow":
-        #                                     self.assertEqual(node.attrib['path'], "dr_overflow")
-        #                         if supersubnode.tag == "httpd":
-        #                             self.assertEqual(supersubnode.attrib['enabled'], "true")
-        #                             self.assertEqual(supersubnode.attrib['port'], "8080")
-        #                             for node in supersubnode:
-        #                                 if supersubnode.tag == "jsonapi":
-        #                                     self.assertEqual(node.attrib['enabled'], "true")
-        #                         if supersubnode.tag == "systemsettings":
-        #                             for node in supersubnode:
-        #                                 if node.tag == "query":
-        #                                     self.assertEqual(node.attrib['timeout'], "10000")
-        #                                 if node.tag == "temptables":
-        #                                     self.assertEqual(node.attrib['maxsize'], "100")
-        #                                 if node.tag == "snapshot":
-        #                                     self.assertEqual(node.attrib['priority'], "6")
-        #                                 if node.tag == "elastic":
-        #                                     self.assertEqual(node.attrib['duration'], "50")
-        #                                     self.assertEqual(node.attrib['throughput'], "2")
-        #                         if supersubnode.tag == "commandlog":
-        #                             self.assertEqual(supersubnode.attrib['enabled'], "false")
-        #                             self.assertEqual(supersubnode.attrib['logsize'], "1024")
-        #                             self.assertEqual(supersubnode.attrib['synchronous'], "false")
-        #                             for node in supersubnode:
-        #                                 if node.tag == "query":
-        #                                     self.assertEqual(node.attrib['timeout'], "10000")
-        #
-        #     if databaseFound == False:
-        #         self.fail("Xml must contain databases tag")
-        #     if membersFound == False:
-        #         self.fail("Xml must contain members tag")
-
 
 class UpdateDatabase(Database):
     """
@@ -208,13 +126,13 @@ class UpdateDatabase(Database):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for database in root.iter('database'):
+        for database in root.findall('database'):
             if database.attrib['id'] == last_db_id:
                 self.assertEqual(database.attrib['deployment'], "")
                 self.assertEqual(database.attrib['name'], "testDB")
                 self.assertEqual(database.attrib['members'], "[]")
                 self.assertEqual(database.attrib['id'], str(last_db_id))
-        for deployment in root.iter('deployment'):
+        for deployment in root.findall('deployment'):
             if deployment.attrib['databaseid'] == str(last_db_id):
                 for child in deployment:
                     if child.tag == "paths":
@@ -349,7 +267,7 @@ class UpdateMember(Server):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for member in root.iter('member'):
+        for member in root.findall('member'):
             if member.attrib['id'] == last_server_id:
                 self.assertEqual(member.attrib['hostname'], "test")
                 self.assertEqual(member.attrib['name'], "test")
@@ -434,13 +352,13 @@ class UpdateDatabaseDeployment(Deployment):
         data = requests.get(__url__)
         root = ElementTree.fromstring(data.content)
 
-        for database in root.iter('database'):
+        for database in root.findall('database'):
             if database.attrib['id'] == last_db_id:
                 self.assertEqual(database.attrib['deployment'], "")
                 self.assertEqual(database.attrib['name'], "testDB")
                 self.assertEqual(database.attrib['members'], "[]")
                 self.assertEqual(database.attrib['id'], str(last_db_id))
-        for deployment in root.iter('deployment'):
+        for deployment in root.findall('deployment'):
             if deployment.attrib['databaseid'] == str(last_db_id):
                 for child in deployment:
                     if child.tag == "paths":
