@@ -201,18 +201,12 @@ public class StandaloneExportGeneration implements Generation {
             //                    + partitionId);
             return 0;
         }
-
-        ExportDataSource source = sources.get(signature);
-        if (source == null) {
-            /*
-             * This is fine. If the table is dropped it won't have an entry in the generation created
-             * after the table was dropped.
-             */
-            //exportLog.error("Could not find export data source for generation " + m_timestamp + " partition " + partitionId +
-            //        " signature " + signature);
-            return 0;
+        long qb = 0;
+        for (ExportDataSource source : sources.values()) {
+            if (source == null) continue;
+            qb += source.sizeInBytes();
         }
-        return source.sizeInBytes();
+        return qb;
     }
 
     /*

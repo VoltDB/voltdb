@@ -61,12 +61,25 @@ public class PushSpecificGeneration {
                     }
                     break;
             }
-            StandaloneExportManager.initialize(0, args[1], exportClientClassName, /* TODO */ null);
+            StandaloneExportManager.initialize(0, args[1], exportClientClassName, dep.getExport().getConfiguration().get(0).getProperty());
+            int maxPart = dep.getCluster().getSitesperhost();
+            System.out.println("Please wait...|");
             while (true) {
-                Thread.sleep(10000);
+                System.out.print(".");
+                Thread.yield();
+                Thread.sleep(1000);
+                long sz = 0;
+                for (int i = 0; i < maxPart; i++) {
+                    sz += StandaloneExportManager.getQueuedExportBytes(i, "");
+                }
+                if (sz <= 0) {
+                    break;
+                }
             }
         } catch (Exception ex) {
             ex.printStackTrace();
+        } finally {
+            StandaloneExportManager.instance().shutdown();
         }
     }
 
