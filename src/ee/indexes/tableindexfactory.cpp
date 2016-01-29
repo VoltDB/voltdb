@@ -48,6 +48,7 @@
 #include "indexes/tableindexfactory.h"
 #include "common/SerializableEEException.h"
 #include "common/types.h"
+#include "common/TupleSchemaBuilder.h"
 #include "catalog/index.h"
 #include "expressions/tuplevalueexpression.h"
 #include "indexes/tableindex.h"
@@ -56,6 +57,7 @@
 #include "indexes/CompactingTreeMultiMapIndex.h"
 #include "indexes/CompactingHashUniqueIndex.h"
 #include "indexes/CompactingHashMultiMapIndex.h"
+#include "indexes/CoveringCellIndex.h"
 
 namespace voltdb {
 
@@ -76,7 +78,7 @@ class TableIndexPicker
             if (m_type != BALANCED_TREE_INDEX) {
                 return new CompactingHashMultiMapIndex<TKeyType >(m_keySchema, m_scheme);
             } else if (m_scheme.countable) {
-                return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
+                    return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, true>(m_keySchema, m_scheme);
             } else {
                 return new CompactingTreeMultiMapIndex<PointerKeyValuePair<TKeyType>, false>(m_keySchema, m_scheme);
             }
@@ -214,7 +216,18 @@ private:
     TableIndexType m_type;
 };
 
+static CoveringCellIndex* getCoveringCellIndexInstance(const TableIndexScheme &scheme) {
+    TupleSchemaBuilder builder(1);
+    builder.setColumnAtIndex(0, VALUE_TYPE_POINT);
+    return new CoveringCellIndex(builder.build(), scheme);
+}
+
 TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
+
+    if (scheme.type == COVERING_CELL_INDEX) {
+        return getCoveringCellIndexInstance(scheme);
+    }
+
     const TupleSchema *tupleSchema = scheme.tupleSchema;
     assert(tupleSchema);
     bool isIntsOnly = true;
