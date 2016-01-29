@@ -70,7 +70,7 @@ public class ImportProcessor implements ImportDataProcessor {
             m_bundle = bundle;
             m_importerFactory = (AbstractImporterFactory) o;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
-            m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory);
+            m_importerTypeMgr = new ImporterLifeCycleManager(m_importerFactory, m_distributer);
         }
 
         public String getImporterType() {
@@ -85,7 +85,7 @@ public class ImportProcessor implements ImportDataProcessor {
             try {
                 //Handler can be null for initial period if shutdown come quickly.
                 if (m_importerFactory != null) {
-                    m_importerTypeMgr.stop(m_distributer);
+                    m_importerTypeMgr.stop();
                 }
                 if (m_bundle != null) {
                     m_bundle.stop();
@@ -111,9 +111,9 @@ public class ImportProcessor implements ImportDataProcessor {
 
                     Bundle bundle = m_framework.getBundleContext().installBundle(bundleJar);
                     bundle.start();
-                    ServiceReference refs[] = bundle.getRegisteredServices();
+                    ServiceReference<?> refs[] = bundle.getRegisteredServices();
                     //Must have one service only.
-                    ServiceReference reference = refs[0];
+                    ServiceReference<?> reference = refs[0];
                     if (reference == null) {
                         m_logger.error("Failed to initialize importer from: " + bundleJar);
                         bundle.stop();
@@ -123,7 +123,7 @@ public class ImportProcessor implements ImportDataProcessor {
                     wrapper = new BundleWrapper(o, bundle);
                 } else {
                     //Class based importer.
-                    Class reference = this.getClass().getClassLoader().loadClass(bundleJar);
+                    Class<?> reference = this.getClass().getClassLoader().loadClass(bundleJar);
                     if (reference == null) {
                         m_logger.error("Failed to initialize importer from: " + bundleJar);
                         return;
@@ -156,7 +156,7 @@ public class ImportProcessor implements ImportDataProcessor {
             public void run() {
                 for (BundleWrapper bw : m_bundles.values()) {
                     try {
-                        bw.m_importerTypeMgr.readyForData(m_distributer);
+                        bw.m_importerTypeMgr.readyForData();
                     } catch (Exception ex) {
                         //Should never fail. crash.
                         VoltDB.crashLocalVoltDB("Import failed to set Handler", true, ex);
