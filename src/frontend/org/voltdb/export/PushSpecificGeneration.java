@@ -19,10 +19,14 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.FileInputStream;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import static org.voltdb.compiler.deploymentfile.ServerExportEnum.CUSTOM;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.ELASTICSEARCH;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.FILE;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.HTTP;
 import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
 import static org.voltdb.compiler.deploymentfile.ServerExportEnum.KAFKA;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.RABBITMQ;
 import org.voltdb.utils.CatalogUtil;
 
 public class PushSpecificGeneration {
@@ -38,26 +42,41 @@ public class PushSpecificGeneration {
                 System.exit(1);
             }
             DeploymentType dep = CatalogUtil.getDeployment(new FileInputStream(new File(args[0])));
-            ExportType exportType = dep.getExport();
-            String exportClientClassName = "org.voltdb.exportclient.ExportToFileClient";
-            switch (exportType.getTarget()) {
+            ExportConfigurationType exportConfiguration = dep.getExport().getConfiguration().get(0);
+            String exportClientClassName = null;
+
+            switch (exportConfiguration.getType()) {
+                case FILE:
+                    exportClientClassName = "org.voltdb.exportclient.ExportToFileClient";
+                    break;
                 case JDBC:
                     exportClientClassName = "org.voltdb.exportclient.JDBCExportClient";
                     break;
                 case KAFKA:
-                    exportClientClassName = "org.voltdb.exportclient.KafkaExportClient";
+                    exportClientClassName = "org.voltdb.exportclient.kafka.KafkaExportClient";
+                    break;
+                case RABBITMQ:
+                    exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient";
+                    break;
+                case HTTP:
+                    exportClientClassName = "org.voltdb.exportclient.HttpExportClient";
+                    break;
+                case ELASTICSEARCH:
+                    exportClientClassName = "org.voltdb.exportclient.ElasticSearchHttpExportClient";
                     break;
                 //Validate that we can load the class.
                 case CUSTOM:
-                    try {
-                        CatalogUtil.class.getClassLoader().loadClass(exportType.getExportconnectorclass());
-                        exportClientClassName = exportType.getExportconnectorclass();
-                    } catch (ClassNotFoundException ex) {
-                        System.out.println(
-                                "Custom Export failed to configure, failed to load "
-                                + " export plugin class: " + exportType.getExportconnectorclass()
-                                + " Disabling export.");
-                        return;
+                    exportClientClassName = exportConfiguration.getExportconnectorclass();
+                    if (exportConfiguration.isEnabled()) {
+                        try {
+                            CatalogUtil.class.getClassLoader().loadClass(exportClientClassName);
+                        } catch (ClassNotFoundException ex) {
+                            String msg
+                                    = "Custom Export failed to configure, failed to load"
+                                    + " export plugin class: " + exportConfiguration.getExportconnectorclass()
+                                    + " Disabling export.";
+                            throw new CatalogUtil.DeploymentCheckException(msg);
+                        }
                     }
                     break;
             }
