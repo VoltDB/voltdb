@@ -394,17 +394,11 @@ public class ExpressionColumn extends Expression {
                     //       in name order.
                     if (usingResolutions.size() > 0) {
                         sb.append("USING(");
-                        for (ColumnReferenceResolution crr : usingResolutions) {
-                            sb.append(sep).append(crr.getName());
-                            sep = ", ";
-                        }
+                        appendNameList(sb, usingResolutions, "");
                         sb.append(")");
                         sep = ", ";
                     }
-                    for (ColumnReferenceResolution crr : rangeVariableResolutions) {
-                        sb.append(sep).append(crr.getName());
-                        sep = ", ";
-                    }
+                    appendNameList(sb, rangeVariableResolutions, sep);
                     throw new HsqlException(sb.toString(), "", 0);
                 }
                 // If we get here we didn't find anything.  So, add this expression
@@ -419,6 +413,19 @@ public class ExpressionColumn extends Expression {
         return unresolvedSet;
     }
 
+    /*
+     * Append the names of all the elements in the set of resolutions to the
+     * string buffer.  This is only used for error messages.
+     */
+    private <T> void appendNameList(StringBuffer sb,
+                                    java.util.Set<T> resolutions,
+                                    String sep) {
+        for (T oneRes : resolutions) {
+            sb.append(sep).append(oneRes.toString());
+            sep = ", ";
+        }
+    }
+
     /**
      * Return a sort of closure which is useful for resolving a column reference.
      * The column reference is either an expression or a column in a table, which
@@ -428,7 +435,7 @@ public class ExpressionColumn extends Expression {
      * until we have examined all of them.  So, we defer changing this object
      * until we are more sure of the reference.
      *
-     * We store these in a java.util.HashSet.  So we need to have our own
+     * We store these in a java.util.TreeSet.  So we need to have our own
      * notion of equality.
      */
     private interface ColumnReferenceResolution {
@@ -1000,6 +1007,106 @@ public class ExpressionColumn extends Expression {
         }
     }
 
+    /*
+     * This class holds the name of an expression to which a column
+     * reference in an order by resolves.  This might be useful in other
+     * circumstances.
+     */
+    private static class SelectListAliasResolution implements Comparable<SelectListAliasResolution> {
+        // the table name from the select list.
+        String m_tableName;
+        // the alias or column name from the select list
+        String m_name;
+        // The index.  Mostly used to disambiguate if the name is
+        // not equal.
+        int m_index;
+        public SelectListAliasResolution(String name, int index) {
+            m_tableName = null;
+            m_name = name;
+            m_index = index;
+        }
+        public SelectListAliasResolution(String tableName, String columnName, int index) {
+            m_tableName = tableName;
+            m_name = columnName;
+            m_index = index;
+        }
+        public String getName() {
+            if (m_tableName == null) {
+                return m_name;
+            } else {
+                return m_tableName + "." + m_name;
+            }
+        }
+
+        public String getTableName() {
+            return m_tableName;
+        }
+
+        @Override
+        public String toString() {
+            if (m_tableName == null) {
+                return m_name + "(" + m_index + ")";
+            } else {
+                return getName();
+            }
+        }
+        protected final int getIndex() {
+            return m_index;
+        }
+        @Override
+        public boolean equals(Object other) {
+            if (other == null) {
+                return false;
+            }
+            if (!(other instanceof SelectListAliasResolution)) {
+                return false;
+            }
+            // The real equals test is here.  We defer to compareTo.
+            SelectListAliasResolution aliasOther = (SelectListAliasResolution)other;
+            int nc = compareTo(aliasOther);
+            return nc == 0;
+        }
+
+        /*
+         * (non-Javadoc)
+         * 1. If there is no table name, this is an alias.  So we just compare the names,
+         *    and then indices if the names are equal.
+         * 2. If the table name of this is null and the table name of the other is not, then
+         *    this is less than the other.
+         * 3. If the table name of this is non-null and the table name of the other is
+         *    null, then this is greater than the othe.
+         * 4. If both table names are non-null, this is not an alias.  So we compare the
+         *    table names and then the columns and ignore the indices.
+         * @see java.lang.Comparable#compareTo(java.lang.Object)
+         */
+        @Override
+        public int compareTo(SelectListAliasResolution o) {
+            if (getTableName() == null) {
+                if (o.getTableName() == null) {
+                    // This is case (1) above.
+                    int nc = getName().compareTo(o.getName());
+                    if (nc == 0) {
+                        return m_index - o.getIndex();
+                    } else {
+                        return nc;
+                    }
+                } else {
+                    // This is case 2 above.
+                    return -1;
+                }
+            } else if (o.getTableName() == null) {
+                // This is case 3 above.
+                return 1;
+            } else {
+                // This is case 4 above.
+                int nc = getTableName().compareTo(o.getTableName());
+                if (nc == 0) {
+                    nc =- getName().compareTo(o.getName());
+                }
+                return nc;
+            }
+        }
+    }
     @Override
     Expression replaceAliasInOrderBy(Expression[] columns, int length) {
 
@@ -1015,6 +1122,15 @@ public class ExpressionColumn extends Expression {
 
             case OpTypes.COALESCE :
             case OpTypes.COLUMN : {
+                // Look through all the columns in columns.  These are
+                // the select list, and they may have aliases equal to
+                // the column which we are trying to resolve.  In that
+                // case we really want to use the expression in the
+                // select list.  Note that we only look for aliases here.
+                // Column references which name columns in tables in the
+                // from clause are handled later an.
+                java.util.Set<SelectListAliasResolution> foundNames = new java.util.TreeSet<SelectListAliasResolution>();
+                Expression lastExpr = null;
                 for (int i = 0; i < length; i++) {
                     SimpleName aliasName = columns[i].alias;
                     String     alias     = aliasName == null ? null
@@ -1022,23 +1138,22 @@ public class ExpressionColumn extends Expression {
 
                     if (schema == null && tableName == null
                             && columnName.equals(alias)) {
-                        return columns[i];
+                        foundNames.add(new SelectListAliasResolution(alias, i));
+                        lastExpr = columns[i];
                     }
                 }
-
-                for (int i = 0; i < length; i++) {
-                    if (columns[i] instanceof ExpressionColumn) {
-                        if (this.equals(columns[i])) {
-                            return columns[i];
-                        }
-
-                        if (tableName == null && schema == null
-                                && columnName
-                                    .equals(((ExpressionColumn) columns[i])
-                                        .columnName)) {
-                            return columns[i];
-                        }
-                    }
+                // If we only got one answer, then we just return it.
+                // If we got more than one, then we print an ambiguous
+                // error message.  If we got no message, we let HSQL
+                // handle it in the usual way.
+                if (foundNames.size() == 1) {
+                    return lastExpr;
+                } else if (foundNames.size() > 1) {
+                    StringBuffer sb = new StringBuffer();
+                    sb.append(String.format("The name \"%s\" in an order by expression is ambiguous.  It's in columns: ", columnName));
+                    appendNameList(sb, foundNames, "");
+                    sb.append(".");
+                    throw new HsqlException(sb.toString(), "", 0);
                 }
             }
             default :

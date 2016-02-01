@@ -489,7 +489,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                     "where T1.id = T2.id " +
                     "and exists " +
                     "    (select 1 from R1 where R1.dept * 2 = T2.dept) " +
-                    "order by id;";
+                    "order by t1.id;";
             validateTableOfLongs(client, sql, new long[][] {{4}, {5}});
 
             sql =   "select t1.id, t2.id from r1 t1, " + tb + " t2 " +

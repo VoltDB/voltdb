@@ -1215,6 +1215,8 @@ public class TestPlansJoin extends PlannerTestCase {
        // Ambiguous reference in a where clause.
        failToCompile("select NOTC from R1, R3_NOC where A > 100;", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
        failToCompile("select NOTC from R1, R3_NOC where A > sqrt(NOTC);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       failToCompile("select NOTC from R1, R3_NOC where sqrt(A) > sqrt(NOTC);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       failToCompile("select NOTC from R1 join R3_NOC on sqrt(A) > sqrt(NOTC);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
        // Ambiguous reference to an unconstrained column in a join.  That is,
        // C is in both R1 and R3, R1 and R3 are joined together, but not on C.
        // Note that we test above for a similar case, with three joined tables.
@@ -1223,6 +1225,7 @@ public class TestPlansJoin extends PlannerTestCase {
        // Ambiguous references in group by expressions.
        failToCompile("select NOTC from R1, R3_NOC group by A;", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
        failToCompile("select NOTC from R1, R3_NOC group by sqrt(A);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       failToCompile("select sqrt(R1.A) from R1, R3_NOC group by R1.A having count(A) + 2 * sum(A) > 2;", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
        // Ambiguous references in subqueries.
        failToCompile("select ALPHA from (select SQRT(A) as ALPHA from R1) as S1, (select SQRT(C) as ALPHA from R1) as S2;",
                      "Column \"ALPHA\" is ambiguous.  It's in tables: S1, S2");
@@ -1232,6 +1235,16 @@ public class TestPlansJoin extends PlannerTestCase {
                      "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
        failToCompile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 ON C=R3.A;",
                      "Column \"C\" is ambiguous.  It's in tables: USING(C), R3");
+       // Ambiguous columns in an order by expression.
+       failToCompile("select LR.A, RR.A from R1 LR, R1 RR order by A;", "Column \"A\" is ambiguous.  It's in tables: LR, RR");
+       // Note that LT.A and RT.A are not considered here.
+       failToCompile("select LT.A as LA, RT.A as RA from R1 as LT, R1 as RT order by A;", "Column \"A\" is ambiguous.  It's in tables: LT, RT");
+       failToCompile("select LT.A, RT.A from R1 as LT, R1 as RT order by A", "Column \"A\" is ambiguous.  It's in tables: LT, RT");
+       // Two columns in the select list with the same name.  This complicates
+       // checking for order by aliases.
+       failToCompile("select LT.A as LA, RT.A as LA from R1 as LT, R1 as RT order by LA;", "The name \"LA\" in an order by expression is ambiguous.  It's in columns: LA(0), LA(1)");
+       failToCompile("select NOTC from R1, R3_NOC order by A;", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
+       failToCompile("select NOTC from R1, R3_NOC order by sqrt(A);", "Column \"A\" is ambiguous.  It's in tables: R1, R3_NOC");
        // This is not actually an ambiguous query.  This is actually ok.
        compile("select * from R2 where A in (select A from R1);");
        compile("SELECT R3.C, C FROM R1 INNER JOIN R2 USING(C) INNER JOIN R3 USING(C);");
@@ -1242,6 +1255,7 @@ public class TestPlansJoin extends PlannerTestCase {
        compile("SELECT R2.C FROM R1 INNER JOIN R2 USING (C), R3");
        compile("SELECT R1.C FROM R1 INNER JOIN R2 USING (C), R3 WHERE R1.A = R3.A");
        compile("SELECT R3.C, R1.C FROM R1 INNER JOIN R2 USING(C), R3;");
+       compile("SELECT C, C FROM R1 GROUP BY C ORDER BY C;");
    }
 
     @Override
