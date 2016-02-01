@@ -267,25 +267,26 @@ public class GeographyValue {
             return true;
         }
 
-        List<List<XYZPoint>> expectedLoops = that.m_loops;
+        List<List<GeographyPointValue>> expectedRings = that.getRings();
+        List<List<GeographyPointValue>> actualRings = getRings();
 
         // check number of rings/loops
-        if (expectedLoops.size() != m_loops.size()) {
+        if (expectedRings.size() != actualRings.size()) {
             return false;
         }
 
-        Iterator<List<XYZPoint>> expectedLoopIt = expectedLoops.iterator();
-        for (List<XYZPoint> actualLoop : m_loops) {
-            List<XYZPoint> expectedLoop = expectedLoopIt.next();
+        Iterator<List<GeographyPointValue>> expectedRingIt = expectedRings.iterator();
+        for (List<GeographyPointValue> actualRing : actualRings) {
+            List<GeographyPointValue> expectedRing = expectedRingIt.next();
 
             // check if number of the vertices in loops are equal
-            if (expectedLoop.size() != actualLoop.size()) {
+            if (expectedRing.size() != actualRing.size()) {
                 return false;
             };
 
-            Iterator<XYZPoint> expectedVertexIt = expectedLoop.iterator();
-            for (XYZPoint actualPt : actualLoop) {
-                XYZPoint expectedPt = expectedVertexIt.next();
+            Iterator<GeographyPointValue> expectedVertexIt = expectedRing.iterator();
+            for (GeographyPointValue actualPt : actualRing) {
+                GeographyPointValue expectedPt = expectedVertexIt.next();
                 if (!expectedPt.equals(actualPt)) {
                     return false;
                 }
