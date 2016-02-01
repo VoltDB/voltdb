@@ -71,7 +71,7 @@ https://voltdb.com/product
 
 ### Go Full Cloud
 
-Learn How to Run VoltDB Virtualized, Containerized or in the Cloud.
+For information on using VoltDB virtualized, containerized or in the Cloud, see the the VoltDB website.
 
 https://voltdb.com/run-voltdb-virtualized-containerized-or-cloud
 
@@ -99,13 +99,13 @@ If you have installed VoltDB from the distribution kit, you now have a directory
 Commercial VoltDB Differences
 ====================
 
-VoltDB offers a pre-built binary distribution of VoltDB under a commercial license. It can be downloaded from the VoltDB website and this download includes a 30 day trial license.
+VoltDB offers a pre-built binary distribution of VoltDB under a commercial license. It can be downloaded from the VoltDB website. This download includes a 30 day trial license.
 
 https://voltdb.com/download
 
 When to use this open-source version:
 
-- When developing applications (so long as they don't need VoltDB Export).
+- When developing applications (as long as they don't need VoltDB Export).
 - When performance testing in non-redundant configurations.
 - When reading or modifying source code.
 
@@ -113,7 +113,7 @@ When to use the commercial version:
 
 - When disk persistence is required.
 - When the VoltDB Export feature is required.
-- When high availability features like like redundant clustering, live node rejoin, and multi-datacenter replication are required.
+- When high availability features like redundant clustering, live node rejoin, and multi-datacenter replication are required.
 
 
 Getting Help & Providing Feedback
