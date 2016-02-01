@@ -4255,6 +4255,22 @@ public class TestVoltCompiler extends TestCase {
                 "dr table e2;"
                 );
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        schema = "create table geogs ( id integer NOT NULL, " +
+                                    " region1 geography NOT NULL, " +
+                                    " point1 geography_point NOT NULL, " +
+                                    " point2 geography_point NOT NULL);\n" +
+                 "partition table geogs on column id;\n";
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table geogs;");
+        assertTrue(db.getTables().getIgnoreCase("geogs").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table geogs;",
+                "dr table geogs disable;");
+        assertFalse(db.getTables().getIgnoreCase("geogs").getIsdred());
     }
 
     public void testBadDRTable() throws Exception {
