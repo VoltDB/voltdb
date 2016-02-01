@@ -28,6 +28,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -56,10 +57,14 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     private ImmutableMap<URI, ImporterConfig> m_configs = ImmutableMap.of();
     private AtomicReference<ImmutableMap<URI, AbstractImporter>> m_importers = new AtomicReference<>(ImmutableMap.<URI, AbstractImporter> of());
     private volatile boolean m_stopping;
+    private final AtomicBoolean m_starting = new AtomicBoolean(false);
+    // Safe to keep reference here as there is only and it is not susceptible to catalog changes
+    private final ChannelDistributer m_distributer;
 
-    public ImporterLifeCycleManager(AbstractImporterFactory factory)
+    public ImporterLifeCycleManager(AbstractImporterFactory factory, final ChannelDistributer distributer)
     {
         m_factory = factory;
+        m_distributer = distributer;
     }
 
 
@@ -83,13 +88,14 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      * <code>accept()</code>.
      * For importers that must not be run on every site, this will register itself with the
      * resource distributer.
-     *
-     * @param distributer ChannelDistributer that is responsible for allocating resources to nodes.
-     * This will be used only if the importer must not be run on every site.
      */
-    public final void readyForData(ChannelDistributer distributer)
+    public final void readyForData()
     {
-        distributer.registerCallback(m_factory.getTypeName(), this);
+        m_starting.compareAndSet(false, true);
+        if (!m_factory.isImporterRunEveryWhere()) {
+            m_distributer.registerCallback(m_factory.getTypeName(), this);
+        }
+
         if (m_stopping) return;
 
         if (m_executorService != null) { // Should be caused by coding error. Generic RuntimeException is OK
@@ -123,7 +129,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             startImporters(m_importers.get().values());
         } else {
             m_importers.set(ImmutableMap.<URI, AbstractImporter> of());
-            distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
+            m_distributer.registerChannels(m_factory.getTypeName(), m_configs.keySet());
         }
     }
 
@@ -214,10 +220,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      * This is called by the importer framework to stop importers.
      * All resources for this importer will be unregistered
      * from the resource distributer.
-     *
-     * @param distributer the resource distributer from which this importer's resources must be unregistered.
      */
-    public final void stop(ChannelDistributer distributer)
+    public final void stop()
     {
         m_stopping = true;
 
@@ -228,9 +232,11 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             success = m_importers.compareAndSet(oldReference, ImmutableMap.<URI, AbstractImporter> of());
         } while (!success);
 
+        if (!m_starting.get()) return;
+
         stopImporters(oldReference.values());
         if (!m_factory.isImporterRunEveryWhere()) {
-            distributer.registerChannels(m_factory.getTypeName(), Collections.<URI> emptySet());
+            m_distributer.registerChannels(m_factory.getTypeName(), Collections.<URI> emptySet());
         }
 
         if (m_executorService != null) {
