@@ -20,7 +20,7 @@
       <div class="container-fluid">
         <div class="navbar-header">
           <!--<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar"> <span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span> </button>-->
-         <img src="{{ url_for('static',filename='images/logo.jpg') }}" alt="Voltdb Deployment Manager"> </div>
+          <img src="{{ url_for('static',filename='images/logo.jpg') }}" alt="Voltdb Deployment Manager"> </div>
         <!--<div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-left">
             <li class="active"><a href="#" id="dbManager">Cluster Settings</a></li>
@@ -50,12 +50,70 @@
       <div id="divOverlayWrapper" class="overlayWrapper" style="display:none" title="No database has been added. Please click the down icon besides the Database to add a new database.">
       </div>
       <div class="clusterContent">
-      <div class="clusterStartStop">
-    <div class="clusterBtnWrap">
+      <div class="clusterStartStop"  >
+    <div class="clusterBtnWrap" >
       <a href="javaScript:void(0);" id="btnStartCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
       <a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>
     <div class="clear"></div>
+      </div>
+      <!--newly added-->
+    <div class="loadingStart" style="display:none;" >
+    	<p><img src="images/startLoader.gif"/></p>
+    	<p>Starting.......</p>
+    </div>    
+    <div class="databaseRg"  style="display:none;">
+    <a href="#" class="btn">Go to Manangement Center</a>
+    <p>Database Running</p>
     </div>
+    <div id="" class="stalledState" style="display:none;" >
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><span class="glyphicon glyphicon-warning-sign redC" aria-hidden="true"></span>Edit Disk Limit</h4>
+      </div>
+      <div class="modal-body">
+        <div class="containerStalled">
+        <p>Cluster startup did not succeed on all servers.</p>
+        <ul class="listStalled">
+        <li>10.10.183.97</li>
+        <li>Pollus</li>
+        <li class="pullback"><span class="redC"><strong>X</strong></span> Pullux<span class="redC"> <strong>(too much clock skew)</strong></span></li>
+		</ul>
+        
+		</div>
+        <div class="btnSpelled"> 
+   <p> Do you want to stop the cluster?</p> 
+    <button id="" type="button" class="btn">Yes</button></div> 
+           
+ </div>
+    
+    </div>
+  </div>
+</div>	
+	<div id="" class="stalledFail" style="display:none;" >
+  <div class="modal-dialog modal-dialog-center">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"><span class="glyphicon glyphicon-remove-circle redC" aria-hidden="true"></span>Start Failed</h4>
+      </div>
+      <div class="modal-body">
+        <div class="containerStalled">
+        <p>Th cluster filed to start because..............[reason]</p>
+        
+		</div>
+        <div class="btnSpelled"> 
+    <button id="" type="button" class="btn">OK</button></div> 
+ </div>
+ 
+ 
+    
+    </div>
+  </div>
+</div>
+   <!--Newly added ends--> 
+  
       
       </div>
         <div class="resetpb">
