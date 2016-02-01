@@ -31,7 +31,7 @@ import sys, os, subprocess
     options = (
         VOLT.StringOption (None, '--prefix', 'prefix',
                            'file name prefix for uniquely identifying collection',
-                           default = 'voltdb_logs'),
+                           default = ''),
         VOLT.StringOption (None, '--upload', 'host',
                            'upload resulting collection to HOST via SFTP',
                            default = ''),

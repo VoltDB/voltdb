@@ -26,18 +26,19 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.varia.NullAppender;
-import org.hsqldb_voltpatches.lib.tar.TarGenerator;
 import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -259,6 +260,9 @@ public class Collector {
             if (new File(m_systemCheckPath).exists()) {
                 collectionFilesList.add(m_systemCheckPath);
             }
+            if (new File(m_configInfoPath).exists()) {
+                collectionFilesList.add(m_configInfoPath);
+            }
 
             for (String path: m_logPaths) {
                 for (File file: new File(path).getParentFile().listFiles()) {
@@ -353,10 +357,13 @@ public class Collector {
                 rootpath = System.getProperty("user.dir");
             }
 
-            String collectionFilePath = rootpath + File.separator + m_config.prefix + timestamp + ".tgz";
-            File collectionFile = new File(collectionFilePath);
-            TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
-            String folderPath= m_config.prefix + timestamp + File.separator;
+            String folderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
+                                InetAddress.getLocalHost().getHostName() + "_voltlogs_" + timestamp;
+            String folderPath = folderBase + File.separator;
+            String collectionFilePath = rootpath + File.separator + folderBase + ".zip";
+
+            FileOutputStream collectionStream = new FileOutputStream(collectionFilePath);
+            ZipOutputStream zipStream = new ZipOutputStream(collectionStream);
 
             // Collect files with paths indicated in the list
             for (String path: paths) {
@@ -371,31 +378,44 @@ public class Collector {
                 String entryPath = file.getName();
                 for (String logPath: m_logPaths) {
                     if (filename.startsWith(new File(logPath).getName())) {
-                        entryPath = "log" + File.separator + file.getName();
+                        entryPath = "voltdb_logs" + File.separator + file.getName();
                         break;
                     }
                 }
                 if (filename.startsWith("voltdb_crash")) {
-                    entryPath = "voltdb_crash" + File.separator + file.getName();
+                    entryPath = "voltdb_crashfiles" + File.separator + file.getName();
                 }
-                if (filename.startsWith("syslog") || filename.equals("dmesg")) {
-                    entryPath = "syslog" + File.separator + file.getName();
+                if (filename.startsWith("syslog") || filename.equals("dmesg") || filename.equals("systemcheck")) {
+                    entryPath = "system_logs" + File.separator + file.getName();
+                }
+                if (filename.equals("deployment.xml") || filename.equals("catalog.jar") || filename.equals("config.json")) {
+                    entryPath = "voltdb_files" + File.separator + file.getName();
                 }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
-                    tarGenerator.queueEntry(folderPath + entryPath, file);
+                    ZipEntry zEntry= new ZipEntry(folderPath + entryPath);
+                    zipStream.putNextEntry(zEntry);
+                    FileInputStream in = new FileInputStream(path);
+
+                    int len;
+                    byte[] buffer = new byte[1024];
+                    while ((len = in.read(buffer)) > 0) {
+                        zipStream.write(buffer, 0, len);
+                    }
+
+                    in.close();
+                    zipStream.closeEntry();
                 }
             }
 
             String[] sarCmd = {"bash", "-c", "sar -A"};
-            cmd(tarGenerator, sarCmd, folderPath , "sardata");
+            cmd(zipStream, sarCmd, folderPath + "system_logs" + File.separator, "sardata");
 
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
-            cmd(tarGenerator, dmesgCmd, folderPath, "dmesgdata");
+            cmd(zipStream, dmesgCmd, folderPath + "system_logs" + File.separator, "dmesgdata");
+            zipStream.close();
 
-            tarGenerator.write(m_config.calledFromVEM ? null : System.out);
-
-            long sizeInByte = collectionFile.length();
+            long sizeInByte = new File(collectionFilePath).length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
             if (!m_config.calledFromVEM) {
                 System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
@@ -437,7 +457,7 @@ public class Collector {
 
                         if (delLocalCopy) {
                             try {
-                                collectionFile.delete();
+                                new File(collectionFilePath).delete();
                                 if (!m_config.calledFromVEM) {
                                     System.out.println("Local copy "  + collectionFilePath + " deleted");
                                 }
@@ -480,7 +500,7 @@ public class Collector {
         }
     }
 
-    private static void cmd(TarGenerator tarGenerator, String[] command, String folderPathInTar, String resFilename)
+    private static void cmd(ZipOutputStream zipStream, String[] command, String folderPath, String resFilename)
             throws IOException, TarMalformatException {
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
@@ -507,7 +527,18 @@ public class Collector {
         writer.close();
 
         if (tempFile.length() > 0) {
-            tarGenerator.queueEntry(folderPathInTar + resFilename, tempFile);
+            ZipEntry zEntry= new ZipEntry(folderPath + resFilename);
+            zipStream.putNextEntry(zEntry);
+            FileInputStream in = new FileInputStream(tempFile);
+
+            int len;
+            byte[] buffer = new byte[1024];
+            while ((len = in.read(buffer)) > 0) {
+                zipStream.write(buffer, 0, len);
+            }
+
+            in.close();
+            zipStream.closeEntry();
         }
     }
 
