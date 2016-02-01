@@ -72,7 +72,7 @@ public class PushSpecificGeneration {
                 for (int i = 0; i < maxPart; i++) {
                     sz += StandaloneExportManager.getQueuedExportBytes(i, "");
                 }
-                if (sz <= 0) {
+                if (sz <= 0 && StandaloneExportManager.shouldExit()) {
                     break;
                 }
             }

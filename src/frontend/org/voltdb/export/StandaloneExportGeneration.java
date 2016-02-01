@@ -87,12 +87,6 @@ public class StandaloneExportGeneration implements Generation {
 
     private volatile boolean shutdown = false;
 
-    /*
-     * Set to true if this export generation was initialized from disk
-     * instead of being fed data from the current live system
-     */
-    private boolean m_diskBased = false;
-
     /**
      * Constructor to create a new generation of export data
      * @param exportOverflowDirectory
@@ -126,11 +120,10 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     public boolean isContinueingGeneration() {
-        return m_diskBased;
+        return false;
     }
 
     boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
-        m_diskBased = true;
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -216,7 +209,7 @@ public class StandaloneExportGeneration implements Generation {
             File adFile,
             Set<Integer> partitions) throws IOException {
         m_numSources++;
-        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile, m_diskBased);
+        ExportDataSource source = new ExportDataSource( m_onSourceDrained, adFile, false);
         partitions.add(source.getPartitionId());
         m_timestamp = source.getGeneration();
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +

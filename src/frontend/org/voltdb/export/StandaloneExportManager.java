@@ -41,6 +41,7 @@ import org.voltdb.utils.VoltFile;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 
 /**
@@ -157,6 +158,11 @@ public class StandaloneExportManager
 
     }
 
+    public static AtomicBoolean m_exit = new AtomicBoolean(false);
+    public static boolean shouldExit() {
+        return m_exit.get();
+    }
+
     private void rollToNextGeneration(StandaloneExportGeneration drainedGeneration) throws Exception {
         StandaloneExportDataProcessor newProcessor = null;
         StandaloneExportDataProcessor oldProcessor = null;
@@ -203,7 +209,7 @@ public class StandaloneExportManager
             oldProcessor.shutdown();
         }
         if (doexit) {
-            System.exit(0);
+            m_exit.set(true);
         }
     }
 
@@ -240,7 +246,7 @@ public class StandaloneExportManager
          * makes it safe to accept mastership.
          */
         StandaloneExportGeneration gen = m_generations.firstEntry().getValue();
-        if (gen != null && !gen.isContinueingGeneration()) {
+        if (gen != null) {
             gen.acceptMastershipTask(partitionId);
         } else {
             exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);
@@ -386,8 +392,7 @@ public class StandaloneExportManager
         try {
             Map<Long, StandaloneExportGeneration> generations = instance.m_generations;
             if (generations.isEmpty()) {
-                assert(false);
-                return -1;
+                return 0;
             }
 
             long exportBytes = 0;
