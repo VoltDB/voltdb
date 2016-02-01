@@ -604,6 +604,7 @@ def run_voltdb_cmd(cmd, verb, args, database_id):
 
 
 def start_database(database_id, recover=False):
+    sync_configuration()
     members = []
     current_database = [database for database in Global.DATABASES if database['id'] == database_id]
     if not current_database:
@@ -706,8 +707,6 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        # f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
-        # vdm_path = 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'
         path = os.path.join(PATH, 'vdm.xml')
         f = open(path, 'w')
         f.write(main_header)
@@ -1834,7 +1833,7 @@ class RecoverDatabaseAPI(MethodView):
             Status string indicating if the database start request was sent successfully
         """
 
-        start_database(database_id, True)
+        return start_database(database_id, True)
 
 
 class StopDatabaseAPI(MethodView):
@@ -1852,7 +1851,9 @@ class StopDatabaseAPI(MethodView):
 
         try:
             response = stop_database(database_id)
-            return make_response(jsonify({'statusstring': response}), 200)
+	    # Don't use the response in the json we send back
+	    # because voltadmin shutdown gives 'Connection broken' output
+            return make_response(jsonify({'statusstring': 'Shutdown request sent successfully'}), 200)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1969,14 +1970,10 @@ class SyncVdmConfiguration(MethodView):
             print traceback.format_exc()
             return jsonify({'status':'success', 'error': str(errs)})
 
-        # try:
         Global.DATABASES = databases
         Global.SERVERS = servers
         Global.DEPLOYMENT = deployments
         Global.DEPLOYMENT_USERS = deployment_users
-
-        # except Exception, errs:
-        #     print str(errs)
 
         return jsonify({'status':'success'})
 
