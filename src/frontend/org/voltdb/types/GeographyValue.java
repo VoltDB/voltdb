@@ -23,6 +23,7 @@ import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -253,6 +254,45 @@ public class GeographyValue {
 
         sb.append(")");
         return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof GeographyValue)) {
+            return false;
+        }
+
+        GeographyValue that = (GeographyValue)o;
+        if (this == that) {
+            return true;
+        }
+
+        List<List<XYZPoint>> expectedLoops = that.m_loops;
+
+        // check number of rings/loops
+        if (expectedLoops.size() != m_loops.size()) {
+            return false;
+        }
+
+        Iterator<List<XYZPoint>> expectedLoopIt = expectedLoops.iterator();
+        for (List<XYZPoint> actualLoop : m_loops) {
+            List<XYZPoint> expectedLoop = expectedLoopIt.next();
+
+            // check if number of the vertices in loops are equal
+            if (expectedLoop.size() != actualLoop.size()) {
+                return false;
+            };
+
+            Iterator<XYZPoint> expectedVertexIt = expectedLoop.iterator();
+            for (XYZPoint actualPt : actualLoop) {
+                XYZPoint expectedPt = expectedVertexIt.next();
+                if (!expectedPt.equals(actualPt)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /* Serialization format for polygons.
