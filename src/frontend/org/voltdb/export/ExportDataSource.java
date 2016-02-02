@@ -195,7 +195,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
-        assert(!adFile.exists());
         byte jsonBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
@@ -206,6 +205,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             JSONObject jsObj = new JSONObject(stringer.toString());
             jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
         } catch (JSONException e) {
+            exportLog.error("Failed to Write ad file for " + nonce);
             Throwables.propagate(e);
         }
 
