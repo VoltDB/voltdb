@@ -49,6 +49,7 @@ import DeploymentConfig
 import glob
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
 from voltcli import utility
+import voltdbclient
 
 
 APP = Flask(__name__, template_folder="../templates", static_folder="../static")
@@ -2028,6 +2029,20 @@ class VdmAPI(MethodView):
         return Response(vdm_content, mimetype='text/xml')
 
 
+class StatusDatabaseAPI(MethodView):
+    """Class to handle request to issue recover cmd on a server."""
+
+    @staticmethod
+    def get(database_id):
+        try:
+            client = voltdbclient.FastSerializer("localhost", 21212)
+            proc = voltdbclient.VoltProcedure( client, "@Ping")
+            response = proc.call()
+            return jsonify({'status': response.status})
+        except:
+            return jsonify({'status': 0})
+
+
 def main(runner, amodule, config_dir, server):
     try:
         F_DEBUG = os.environ['DEBUG']
@@ -2114,6 +2129,7 @@ def main(runner, amodule, config_dir, server):
     VDM_CONFIGURATION_VIEW = VdmConfiguration.as_view('vdm_configuration_api')
     SYNC_VDM_CONFIGURATION_VIEW = SyncVdmConfiguration.as_view('sync_vdm_configuration_api')
     DATABASE_DEPLOYMENT_VIEW = DatabaseDeploymentAPI.as_view('database_deployment_api')
+    STATUS_DATABASE_VIEW = StatusDatabaseAPI.as_view('status_database_api')
     VDM_VIEW = VdmAPI.as_view('vdm_api')
     APP.add_url_rule('/api/1.0/servers/', defaults={'server_id': None},
                      view_func=SERVER_VIEW, methods=['GET'])
@@ -2146,6 +2162,7 @@ def main(runner, amodule, config_dir, server):
                      view_func=DEPLOYMENT_VIEW, methods=['GET'])
 
     APP.add_url_rule('/api/1.0/deployment/<int:database_id>', view_func=DEPLOYMENT_VIEW, methods=['GET', 'PUT'])
+    APP.add_url_rule('/api/1.0/databases/<int:database_id>/status/', view_func=STATUS_DATABASE_VIEW, methods=['GET'])
     APP.add_url_rule('/api/1.0/deployment/users/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
                      methods=['GET', 'PUT', 'POST', 'DELETE'])
     APP.add_url_rule('/api/1.0/deployment/users/<int:database_id>/<string:username>', view_func=DEPLOYMENT_USER_VIEW,
