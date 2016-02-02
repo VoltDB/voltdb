@@ -51,10 +51,34 @@ static int64_t addPartitionId(int64_t value) {
     return (value << 14) | 44;
 }
 
+class MockHashinator : public TheHashinator {
+public:
+    static MockHashinator* newInstance() {
+        return new MockHashinator();
+    }
+
+    ~MockHashinator() {}
+
+protected:
+   int32_t hashinate(int64_t value) const {
+       return 0;
+   }
+
+   int32_t hashinate(const char *string, int32_t length) const {
+       return 0;
+   }
+
+   int32_t partitionForToken(int32_t hashCode) const {
+       // partition of VoltDBEngine super of MockVoltDBEngine is 0
+       return -1;
+   }
+};
+
 class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(bool isActiveActiveEnabled) {
         m_isActiveActiveEnabled = isActiveActiveEnabled;
+        setHashinator(MockHashinator::newInstance());
     }
     bool getIsActiveActiveDREnabled() const { return m_isActiveActiveEnabled; }
 
