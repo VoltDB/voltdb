@@ -132,7 +132,11 @@ private:
 class DRBinaryLogTest : public Test {
 public:
     DRBinaryLogTest()
-      : m_undoToken(0),
+      : m_drStream(64*1024),
+        m_drReplicatedStream(64*1024),
+        m_drStreamReplica(64*1024),
+        m_drReplicatedStreamReplica(64*1024),
+        m_undoToken(0),
         m_spHandleReplica(0),
         m_engine (new MockVoltDBEngine(false, CLUSTER_ID, &m_topend, &m_pool, &m_drStream, &m_drReplicatedStream)),
         m_engineReplica (new MockVoltDBEngine(false, CLUSTER_ID_REPLICA, &m_topend, &m_pool, &m_drStreamReplica, &m_drReplicatedStreamReplica))
