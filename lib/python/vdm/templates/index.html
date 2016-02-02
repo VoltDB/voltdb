@@ -51,21 +51,21 @@
       </div>
       <div class="clusterContent">
       <div class="clusterStartStop"  >
-    <div class="clusterBtnWrap" >
+    <div class="clusterBtnWrap" style="display:none;">
       <a href="javaScript:void(0);" id="btnStartCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-play playColor"></span><span class="clusterFont">Start <span style="font-size:14px;">Cluster</span></span></a>
-      <a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>
+      <!--<a style="display:none" href="javaScript:void(0);" id="btnStopCluster" class="clustBtn"><span aria-hidden="true" class="glyphicon glyphicon-stop stopColor"></span><span class="clusterFont">Stop  <span style="font-size:14px;">Cluster</span></span></a>-->
     <div class="clear"></div>
       </div>
       <!--newly added-->
     <div class="loadingStart" style="display:none;" >
-    	<p><img src="images/startLoader.gif"/></p>
+    	<p><img src="{{ url_for('static',filename='images/startLoader.gif') }}" alt="startloader"/></p>
     	<p>Starting.......</p>
     </div>    
     <div class="databaseRg"  style="display:none;">
-    <a href="#" class="btn">Go to Manangement Center</a>
+    <a id="vmcLink" class="btn">Go to Manangement Center</a>
     <p>Database Running</p>
     </div>
-    <div id="" class="stalledState" style="display:none;" >
+    <div id="" class="stalledState"  style="display:none;">
   <div class="modal-dialog modal-dialog-center">
     <!-- Modal content-->
     <div class="modal-content">
@@ -100,7 +100,7 @@
       </div>
       <div class="modal-body">
         <div class="containerStalled">
-        <p>Th cluster filed to start because..............[reason]</p>
+        <p>The cluster failed to start because..............[reason]</p>
         
 		</div>
         <div class="btnSpelled"> 
