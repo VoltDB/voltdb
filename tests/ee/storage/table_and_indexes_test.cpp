@@ -64,7 +64,9 @@ private:
 
 class TableAndIndexTest : public Test {
     public:
-        TableAndIndexTest() {
+        TableAndIndexTest()
+            : drStream(64*1024),
+              drReplicatedStream(64*1024) {
             NValueArray* noParams = NULL;
             mockEngine = new MockVoltDBEngine(false);
             engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
