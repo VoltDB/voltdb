@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
@@ -33,7 +32,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.COWSortedMap;
-import org.voltcore.utils.DBBPool;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
@@ -137,7 +135,8 @@ public class StandaloneExportManager
              */
             StandaloneExportDataProcessor proc = m_processor.get();
             if (proc == null) {
-                VoltDB.crashLocalVoltDB("No export data processor found", true, null);
+                System.out.println("No export data processor found.");
+                System.exit(1);
             }
             proc.queueWork(new Runnable() {
                 @Override
@@ -406,66 +405,5 @@ public class StandaloneExportManager
             exportLog.error(e);
         }
         return 0;
-    }
-
-    /*
-     * This method pulls double duty as a means of pushing export buffers
-     * and "syncing" export data to disk. Syncing doesn't imply fsync, it just means
-     * writing the data to a file instead of keeping it all in memory.
-     * End of stream indicates that no more data is coming from this source
-     * for this generation.
-     */
-    public static void pushExportBuffer(
-            long exportGeneration,
-            int partitionId,
-            String signature,
-            long uso,
-            long bufferPtr,
-            ByteBuffer buffer,
-            boolean sync,
-            boolean endOfStream) {
-        //For validating that the memory is released
-        if (bufferPtr != 0) DBBPool.registerUnsafeMemory(bufferPtr);
-        StandaloneExportManager instance = instance();
-        try {
-            StandaloneExportGeneration generation = instance.m_generations.get(exportGeneration);
-            if (generation == null) {
-                if (buffer != null) {
-                    DBBPool.wrapBB(buffer).discard();
-                }
-
-                /*
-                 * If the generation was already drained it is fine for a buffer to come late and miss it
-                 */
-                synchronized(instance) {
-                    if (!instance.m_generationGhosts.contains(exportGeneration)) {
-                        assert(false);
-                        exportLog.error("Could not a find an export generation " + exportGeneration +
-                        ". Should be impossible. Discarding export data");
-                    }
-                }
-                return;
-            }
-
-            generation.pushExportBuffer(partitionId, signature, uso, buffer, sync, endOfStream);
-        } catch (Exception e) {
-            //Don't let anything take down the execution site thread
-            exportLog.error("Error pushing export buffer", e);
-        }
-    }
-
-    public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
-        exportLog.info("Truncating export data after txnId " + snapshotTxnId);
-        for (StandaloneExportGeneration generation : m_generations.values()) {
-            //If the generation was completely drained, wait for the task to finish running
-            //by waiting for the permit that will be generated
-            if (generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
-                try {
-                    m_onGenerationDrainedForTruncation.acquire();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
-                }
-            }
-        }
     }
 }

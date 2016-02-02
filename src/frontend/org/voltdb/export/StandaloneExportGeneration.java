@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.DBBPool;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.Connector;
 import org.voltdb.utils.VoltFile;
 
@@ -74,8 +73,8 @@ public class StandaloneExportGeneration implements Generation {
         @Override
         public void run() {
             if (m_onAllSourcesDrained == null) {
-                VoltDB.crashLocalVoltDB("No export generation roller found.", true, null);
-                return;
+                System.out.println("No export generation roller found.");
+                System.exit(1);
             }
             int numSourcesDrained = m_drainedSources.incrementAndGet();
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
@@ -119,11 +118,12 @@ public class StandaloneExportGeneration implements Generation {
         m_directory = generationDirectory;
     }
 
+    @Override
     public boolean isContinueingGeneration() {
         return false;
     }
 
-    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger messenger) {
+    boolean initializeGenerationFromDisk(final Connector conn, HostMessenger ignored) {
         Set<Integer> partitions = new HashSet<Integer>();
 
         /*
@@ -148,7 +148,8 @@ public class StandaloneExportGeneration implements Generation {
                         addDataSource(f, partitions);
                         hadValidAd = true;
                     } catch (IOException e) {
-                        VoltDB.crashLocalVoltDB("Error intializing export datasource " + f, true, e);
+                        System.out.println("Error intializing export datasource " + f);
+                        System.exit(1);
                     }
                 } else {
                     //Delete ads that have no data
