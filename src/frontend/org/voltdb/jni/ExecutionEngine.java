@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,7 +58,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
         GET_DR_TUPLESTREAM_STATE(1),
-        SET_DR_SEQUENCE_NUMBERS(2);
+        SET_DR_SEQUENCE_NUMBERS(2),
+        SET_DR_PROTOCOL_VERSION(3);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
@@ -1009,7 +1010,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public native static long nativeGetRSS();
 
-    public native static byte[] getTestDRBuffer();
+    public native static byte[] getTestDRBuffer(boolean compatible);
 
     /**
      * Start collecting statistics (starts timer).

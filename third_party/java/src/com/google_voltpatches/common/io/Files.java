@@ -23,6 +23,7 @@ import static com.google_voltpatches.common.io.FileWriteMode.APPEND;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -123,6 +124,15 @@ public final class Files {
     @Override
     public FileInputStream openStream() throws IOException {
       return new FileInputStream(file);
+    }
+
+    @Override
+    public Optional<Long> sizeIfKnown() {
+      if (file.isFile()) {
+        return Optional.of(file.length());
+      } else {
+        return Optional.absent();
+      }
     }
 
     @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,8 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.SerializationHelper;
@@ -149,6 +151,17 @@ public class ParameterSet implements JSONString {
                             }
                         }
                         break;
+                    case GEOGRAPHY_POINT:
+                        size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck() * ((GeographyPointValue[])obj).length;
+                        break;
+                    case GEOGRAPHY:
+                        for (GeographyValue gv : (GeographyValue[])obj) {
+                            size += 4; // length prefix
+                            if (gv != null) {
+                                size += gv.getLengthInBytes();
+                            }
+                        }
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -167,6 +180,14 @@ public class ParameterSet implements JSONString {
             else if (obj == VoltType.NULL_DECIMAL) {
                 size += 16;
                 continue;
+            }
+            else if (obj == VoltType.NULL_POINT) {
+                size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck();
+                continue;
+            }
+            else if (obj == VoltType.NULL_GEOGRAPHY) {
+                    size += 4;
+                    continue;
             } else if (obj instanceof BBContainer) {
                 size += 4 + ((BBContainer)obj).b().remaining();
                 continue;
@@ -199,6 +220,12 @@ public class ParameterSet implements JSONString {
                     break;
                 case DECIMAL:
                     size += 16;
+                    break;
+                case GEOGRAPHY_POINT:
+                    size += VoltType.GEOGRAPHY_POINT.getLengthInBytesForFixedTypesWithoutCheck();
+                    break;
+                case GEOGRAPHY:
+                    size += 4 + ((GeographyValue) obj).getLengthInBytes();
                     break;
                 case VOLTTABLE:
                     size += ((VoltTable) obj).getSerializedSize();
@@ -342,6 +369,15 @@ public class ParameterSet implements JSONString {
             else if (array[i] instanceof String) strings++;
             else if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) nulls++;
             else if (null == array[i]) nulls++;  // Handle nulls in an Object array.  Note only support nulls in STRING type, later we'll reject all other null usage.
+            else if (array[i] instanceof GeographyPointValue
+                    || array[i] instanceof GeographyValue
+                    || array[i] == VoltType.NULL_POINT
+                    || array[i] == VoltType.NULL_GEOGRAPHY) {
+                // Ticket ENG-9311 exists to make geo types work with Object[] arrays passed as parameters.
+                // Fixing that ticket will require updating the logic below.
+                throw new RuntimeException("GeographyPointValue or GeographyValue instances are not yet supported in "
+                        + "Object arrays passed as parameters.  Try passing GeographyPointValue[] or GeographyValue[] instead.");
+            }
             else {
                 String msg = String.format("Type %s not supported in parameter set arrays.",
                                         array[i].getClass().toString());
@@ -564,6 +600,21 @@ public class ParameterSet implements JSONString {
                     }
                     break;
                 }
+                case GEOGRAPHY_POINT :
+                    value = GeographyPointValue.unflattenFromBuffer(in);
+                    if (value == null) {
+                        value = VoltType.NULL_POINT;
+                    }
+                    break;
+                case GEOGRAPHY :
+                    len = in.getInt();
+                    if (len == VoltType.NULL_STRING_LENGTH) {
+                        value = VoltType.NULL_GEOGRAPHY;
+                    }
+                    else {
+                        value = GeographyValue.unflattenFromBuffer(in);
+                    }
+                    break;
                 case BOOLEAN:
                     value = in.get();
                     break;
@@ -673,6 +724,12 @@ public class ParameterSet implements JSONString {
                     case VARBINARY:
                         SerializationHelper.writeArray((byte[][]) obj, buf);
                         break;
+                    case GEOGRAPHY_POINT:
+                        SerializationHelper.writeArray((GeographyPointValue[]) obj, buf);
+                        break;
+                    case GEOGRAPHY:
+                        SerializationHelper.writeArray((GeographyValue[]) obj, buf);
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -693,6 +750,16 @@ public class ParameterSet implements JSONString {
             else if (obj == VoltType.NULL_DECIMAL) {
                 buf.put(VoltType.DECIMAL.getValue());
                 VoltDecimalHelper.serializeNull(buf);
+                continue;
+            }
+            else if (obj == VoltType.NULL_POINT) {
+                    buf.put(VoltType.GEOGRAPHY_POINT.getValue());
+                    GeographyPointValue.serializeNull(buf);
+                    continue;
+            }
+            else if (obj == VoltType.NULL_GEOGRAPHY) {
+                buf.put(VoltType.GEOGRAPHY.getValue());
+                buf.putInt(VoltType.NULL_STRING_LENGTH);
                 continue;
             } else if (obj instanceof BBContainer) {
                 final BBContainer cont = (BBContainer) obj;
@@ -742,6 +809,14 @@ public class ParameterSet implements JSONString {
                     break;
                 case VOLTTABLE:
                     ((VoltTable)obj).flattenToBuffer(buf);
+                    break;
+                case GEOGRAPHY_POINT:
+                    ((GeographyPointValue)obj).flattenToBuffer(buf);
+                    break;
+                case GEOGRAPHY:
+                    GeographyValue gv = (GeographyValue)obj;
+                    buf.putInt(gv.getLengthInBytes());
+                    gv.flattenToBuffer(buf);
                     break;
                 default:
                     throw new RuntimeException("FIXME: Unsupported type " + type);

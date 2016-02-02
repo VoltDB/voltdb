@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -83,10 +83,14 @@ public class TestReportMaker extends TestCase {
     private void validateDeltas(int input, int testcase,
                                 int byte_increment, int percent_increment)
     {
+        if (byte_increment < 0) {
+            System.out.println("Failing case " + testcase + " input " + input +
+                               " byte_increment " + byte_increment);
+        }
         assertTrue(byte_increment >= 0);
         if (byte_increment >= ((1<<19) + MAX_OVERHEAD)) {
             System.out.println("Failing case " + testcase + " input " + input +
-                    " byte_increment " + byte_increment);
+                               " byte_increment " + byte_increment);
         }
         assertTrue(byte_increment < ((1<<19) + MAX_OVERHEAD));
         if (percent_increment >= 66) {
@@ -99,6 +103,9 @@ public class TestReportMaker extends TestCase {
     private int validateAllocation(int input)
     {
         int result = CatalogSizing.testOnlyAllocationSizeForObject(input);
+        // Add the minimum overhead size to the input to establish a baseline
+        // against which the round-up effect can be measured.
+        input += 4 + 8;
         int byte_overhead = result - input;
         int percent_overhead = byte_overhead * 100 / input;
         validateDeltas(input, 0, byte_overhead, percent_overhead);

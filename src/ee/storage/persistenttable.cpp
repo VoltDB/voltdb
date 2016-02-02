@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -81,7 +81,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/MaterializedViewMetadata.h"
-#include "storage/DRTupleStream.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "ExportMaterializedViewMetadata.h"
 
 namespace voltdb {
@@ -135,7 +135,6 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     }
 
     m_preTruncateTable = NULL;
-
     ::memcpy(&m_signature, signature, 20);
 }
 
@@ -396,7 +395,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     engine->rebuildTableCollections();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -524,7 +523,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         setDRTimestampForTuple(ec, target, false);
     }
 
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -533,7 +532,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -675,7 +674,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         setDRTimestampForTuple(ec, sourceTupleWithNewValues, true);
     }
 
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
@@ -684,7 +683,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
+        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -840,7 +839,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = getDRTupleStream(ec);
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
     size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
@@ -848,7 +847,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
         std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
+        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
     }
 
     if (fallible) {

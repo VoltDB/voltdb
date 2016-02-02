@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -474,7 +474,9 @@ public class Inits {
             int httpPort = httpPortStart;
             for (; true; httpPort++) {
                 try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen);
+                    m_rvdb.m_adminListener = new HTTPAdminListener(
+                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen
+                            );
                     success = true;
                     break;
                 } catch (Exception e1) {

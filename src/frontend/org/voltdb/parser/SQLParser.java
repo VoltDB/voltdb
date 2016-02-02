@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -1376,6 +1378,31 @@ public class SQLParser extends SQLPatternFactory
         }
     }
 
+    public static GeographyPointValue parseGeographyPoint(String param) {
+        int spos = param.indexOf("'");
+        int epos = param.lastIndexOf("'");
+        if (spos < 0) {
+            spos = -1;
+        }
+        if (epos < 0) {
+            epos = param.length();
+        }
+        return GeographyPointValue.fromWKT(param.substring(spos+1, epos));
+    }
+
+    public static GeographyValue parseGeography(String param) {
+        int spos = param.indexOf("'");
+        int epos = param.lastIndexOf("'");
+        if (spos < 0) {
+            spos = -1;
+        }
+        if (epos < 0) {
+            epos = param.length();
+        }
+        return GeographyValue.fromWKT(param.substring(spos+1, epos));
+    }
+
+
     /**
      * Given a parameter string, if it's of the form x'0123456789ABCDEF',
      * return a string containing just the digits.  Otherwise, return null.
@@ -1509,6 +1536,11 @@ public class SQLParser extends SQLPatternFactory
                         }
                         else if (paramType.equals("timestamp")) {
                             objParam = parseDate(param);
+                        } else if (paramType.equals("geography_point")) {
+                            objParam = parseGeographyPoint(param);
+                        }
+                        else if (paramType.equals("geography")) {
+                            objParam = parseGeography(param);
                         }
                         else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
                             // A VARBINARY literal may or may not be

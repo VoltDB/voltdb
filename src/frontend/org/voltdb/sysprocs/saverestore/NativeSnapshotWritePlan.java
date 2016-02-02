@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,6 +40,7 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
@@ -70,7 +71,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                             SystemProcedureExecutionContext context,
                                             final VoltTable result,
                                             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                             SiteTracker tracker,
                                             HashinatorSnapshotData hashinatorData,
                                             long timestamp)
@@ -89,7 +90,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                     SystemProcedureExecutionContext context,
                                                     final VoltTable result,
                                                     Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                    Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                                    Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                                     SiteTracker tracker,
                                                     HashinatorSnapshotData hashinatorData,
                                                     long timestamp,
@@ -174,7 +175,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                  final Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+                                                  final Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
@@ -314,7 +315,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             Map<Integer, Map<Integer, DRLogSegmentId>> remoteDCLastIds,
             SystemProcedureExecutionContext context,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, DRLogSegmentId> drTupleStreamInfo,
+            Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             HashinatorSnapshotData hashinatorData,
             long timestamp, int newPartitionCount,
             Table[] tables) throws IOException

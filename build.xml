@@ -20,8 +20,6 @@
     <attribute name="includes" default=""/>
     <sequential>
         <javac
-            target="1.7"
-            source="1.7"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -142,7 +140,7 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='*.jar' />
         <exclude name='ant.jar' />
-        <exclude name='classes-java1.6.jar' />
+        <exclude name='classes-java1.7.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
     <fileset refid="voltpro.classpath"/>
@@ -741,6 +739,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
             <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
+            <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
         </fileset>
     </javadoc>
 
@@ -762,7 +762,7 @@ DISTRIBUTION
     <!-- populate the docs and other core files -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
-            <include name="README"/>
+            <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
             <include name="doc/**"/>
@@ -833,7 +833,6 @@ DISTRIBUTION
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
-            <include name="Click Here to Start.html"/>
             <include name="bin/**"/>
             <include name="doc/tutorials/**" />
             <include name="examples/**"/>
@@ -1036,6 +1035,7 @@ DISTRIBUTION
             <fileset dir="${base.dir}/lib">
                 <include name="python/**" />
                 <exclude name="**/*.pyc" />
+                <exclude name="**/tests/**" />
             </fileset>
         </copy>
         <chmod perm="ugo+rx">
@@ -1446,6 +1446,7 @@ NATIVE EE STUFF
   </exec>
 </target>
 
+<!-- Build the jni library. -->
 <target name='jnicompile'
     depends='compile, jnicompile_temp, uptodate_jni_h.check'
     description="Build C++ JNI library."
@@ -1705,7 +1706,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
-            <jvmarg value="-XX:-UseSplitVerifier"/>
+            <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
@@ -2305,6 +2306,9 @@ TEST CASES
     <condition property="config_postgresql" value="-P" else="">
         <isset property="postgresql"/>
     </condition>
+    <condition property="config_postgis" value="-G" else="">
+        <isset property="postgis"/>
+    </condition>
     <condition property="config_ascii_only" value="-a" else="">
         <isset property="ascii_only"/>
     </condition>
@@ -2366,6 +2370,7 @@ TEST CASES
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
         <arg line="${config_postgresql}" />
+        <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
         <arg line="${config_verbose}" />
         <arg file="${config_suite}" />

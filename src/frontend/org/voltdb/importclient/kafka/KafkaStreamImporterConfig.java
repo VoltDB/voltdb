@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,10 +36,9 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 
 import org.apache.log4j.Logger;
-import org.voltdb.importer.ImportDataProcessor;
+import org.voltdb.importclient.ImportBaseException;
 import org.voltdb.importer.ImporterConfig;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
 /**
  * Holds configuration information required to connect to a single partition for a topic.
@@ -50,8 +50,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     public static final String CLIENT_ID = "voltdb-importer";
     private static final String GROUP_ID = "voltdb";
     private static final int KAFKA_DEFAULT_BROKER_PORT = 9092;
-    private static final String CSV_FORMATTER_NAME = "csv";
-    private static final String TSV_FORMATTER_NAME = "tsv";
 
     // We don't allow period in topic names because we construct URIs using it
     private static final Pattern legalTopicNamesPattern = Pattern.compile("[a-zA-Z0-9\\_-]+");
@@ -64,12 +62,12 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     private final int m_fetchSize;
     private final int m_soTimeout;
     private final String m_procedure;
-    private final char m_separator;
     private final int m_partition;
     private HostAndPort m_partitionLeader;
+    private AbstractFormatterFactory m_formatterFactory;
 
     private KafkaStreamImporterConfig(URI uri, List<HostAndPort> brokers, String topic, int partition, HostAndPort partitionLeader,
-            String groupId, int fetchSize, int soTimeout, String procedure, String formatter)
+            String groupId, int fetchSize, int soTimeout, String procedure, AbstractFormatterFactory formatterFactory)
     {
         m_uri = uri;
         m_brokers = brokers;
@@ -80,7 +78,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         m_fetchSize = fetchSize;
         m_soTimeout = soTimeout;
         m_procedure = procedure;
-        m_separator = CSV_FORMATTER_NAME.equals(formatter) ? CSVParser.DEFAULT_SEPARATOR : '\t';
+        m_formatterFactory = formatterFactory;
     }
 
 
@@ -120,12 +118,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
 
-    public char getSeparator()
-    {
-        return m_separator;
-    }
-
-
     public int getPartition()
     {
         return m_partition;
@@ -148,9 +140,15 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return m_uri;
     }
 
-    public static Map<URI, ImporterConfig> createConfigEntries(Properties props)
+    @Override
+    public AbstractFormatterFactory getFormatterFactory()
     {
-       String brokers = props.getProperty("brokers", "").trim();
+        return m_formatterFactory;
+    }
+
+    public static Map<URI, ImporterConfig> createConfigEntries(Properties props, AbstractFormatterFactory formatterFactory)
+    {
+        String brokers = props.getProperty("brokers", "").trim();
         if (brokers.isEmpty()) {
             throw new IllegalArgumentException("Missing kafka broker");
         }
@@ -171,11 +169,6 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         String procedure = props.getProperty("procedure", "").trim();
         if (procedure.isEmpty()) {
             throw new IllegalArgumentException("Missing procedure.");
-        }
-
-        String formatter = props.getProperty(ImportDataProcessor.IMPORT_FORMATTER, CSV_FORMATTER_NAME).trim().toLowerCase();
-        if (!CSV_FORMATTER_NAME.equals(formatter) && !TSV_FORMATTER_NAME.equals(formatter)) {
-            throw new IllegalArgumentException("Invalid formatter: " + formatter);
         }
 
         //comma separated list of topics.
@@ -204,7 +197,7 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 throw new IllegalArgumentException("topic name " + topic + " is illegal, contains a character other than ASCII alphanumerics, '_' and '-'");
             }
             try {
-                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, formatter, soTimeout, fetchSize));
+                configs.putAll(getConfigsForPartitions(key, hapList, topic, groupId, procedure, soTimeout, fetchSize, formatterFactory));
             } catch(Exception e) {
                 m_logger.warn(String.format("Error trying to get partition information for topic [%s] on host [%s]", topic, hapList.get(0).getHost()), e);
             }
@@ -213,42 +206,90 @@ public class KafkaStreamImporterConfig implements ImporterConfig
         return configs;
     }
 
+    private final static class FailedMetaDataAttempt {
+        final String msg;
+        final Throwable cause;
+
+        FailedMetaDataAttempt(String msg, Throwable cause) {
+            this.cause = cause;
+            this.msg = msg;
+        }
+
+        private void log() {
+            m_logger.error(msg,cause);
+        }
+    }
+
     private static Map<URI, KafkaStreamImporterConfig> getConfigsForPartitions(String key, List<HostAndPort> brokerList,
-            String topic, String groupId, String procedure, String formatter, int soTimeout, int fetchSize)
+            final String topic, String groupId, String procedure, int soTimeout, int fetchSize, AbstractFormatterFactory formatterFactory)
     {
         SimpleConsumer consumer = null;
-        try {
-            consumer = new SimpleConsumer(brokerList.get(0).getHost(), brokerList.get(0).getPort(), soTimeout, fetchSize, CLIENT_ID);
+        Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
+        List<FailedMetaDataAttempt> attempts = new ArrayList<>();
 
-            TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
-            kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
+        Iterator<HostAndPort> hpitr = brokerList.iterator();
+        while (configs.isEmpty() && hpitr.hasNext()) {
+            HostAndPort hp = hpitr.next();
+            try {
+                consumer = new SimpleConsumer(hp.getHost(), hp.getPort(), soTimeout, fetchSize, CLIENT_ID);
 
-            List<TopicMetadata> metaData = resp.topicsMetadata();
-            if (metaData == null) {
-                //called once.
-                throw new RuntimeException("Failed to get topic metadata for topic " + topic);
-            }
-            Map<URI, KafkaStreamImporterConfig> configs = new HashMap<>();
-            for (TopicMetadata item : metaData) {
-                for (PartitionMetadata part : item.partitionsMetadata()) {
-                    URI uri;
-                    try {
-                        uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
-                    } catch (URISyntaxException ex) { // Should not happen
-                        throw new RuntimeException(ex);
-                    }
-                    Broker leader = part.leader();
-                    KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
-                            part.partitionId(), new HostAndPort(leader.host(), leader.port()),
-                            groupId, fetchSize, soTimeout, procedure, formatter);
-                    configs.put(uri, config);
+                TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
+                kafka.javaapi.TopicMetadataResponse resp = consumer.send(req);
+
+                List<TopicMetadata> metaData = resp.topicsMetadata();
+                if (metaData == null) {
+                    attempts.add(new FailedMetaDataAttempt(
+                            "Failed to get topic metadata for topic " + topic + " from host " + hp.getHost(), null
+                            ));
+                    continue;
                 }
+                int partitionCount = 0;
+                for (TopicMetadata item : metaData) {
+                    for (PartitionMetadata part : item.partitionsMetadata()) {
+                        ++partitionCount;
+                        URI uri;
+                        try {
+                            uri = new URI("kafka", key, topic + "/partition/" + part.partitionId());
+                        } catch (URISyntaxException ex) { // Should not happen
+                            throw new KafkaConfigurationException("unable to create topic resource URI", ex);
+                        }
+                        Broker leader = part.leader();
+                        if (leader == null) {
+                            attempts.add(new FailedMetaDataAttempt(
+                                    "Failed to get leader broker for topic " + topic
+                                    + " partition " + part.partitionId() + " from host " + hp.getHost(), null
+                                    ));
+                            continue;
+                        }
+                        KafkaStreamImporterConfig config = new KafkaStreamImporterConfig(uri, brokerList, topic,
+                                part.partitionId(), new HostAndPort(leader.host(), leader.port()),
+                                groupId, fetchSize, soTimeout, procedure, formatterFactory);
+                        configs.put(uri, config);
+                    }
+                }
+                if (configs.size() != partitionCount) {
+                    configs.clear();
+                    continue;
+                }
+            } catch (Exception e) {
+                attempts.add(new FailedMetaDataAttempt(
+                        "Failed to send topic metadata request for topic " + topic + " from host " + hp.getHost(), e
+                        ));
+                continue;
+            } finally {
+                closeConsumer(consumer);
             }
-
-            return configs;
-        } finally {
-            closeConsumer(consumer);
         }
+        if (!attempts.isEmpty()) {
+            for (FailedMetaDataAttempt attempt: attempts) {
+                attempt.log();
+            }
+            attempts.clear();
+            if (configs.isEmpty()) {
+                throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
+            }
+        }
+        return configs;
     }
 
     private static String getBrokerKey(String brokers)
@@ -259,10 +300,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig
     }
 
     public static void closeConsumer(SimpleConsumer consumer) {
-        try {
-            if (consumer != null) {
-                consumer.close();
-            }
+        if (consumer != null) try {
+            consumer.close();
         } catch (Exception e) {
             m_logger.error("Failed to close consumer connection.", e);
         }
@@ -321,6 +360,28 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 return true;
             }
             return (hap.getHost().equals(getHost()) && hap.getPort() == getPort());
+        }
+    }
+
+    public static class KafkaConfigurationException extends ImportBaseException {
+
+        private static final long serialVersionUID = -3413349105074207334L;
+
+        public KafkaConfigurationException() {
+            super();
+        }
+
+        public KafkaConfigurationException(String format, Object... args) {
+            super(format, args);
+        }
+
+        public KafkaConfigurationException(String format, Throwable cause,
+                Object... args) {
+            super(format, cause, args);
+        }
+
+        public KafkaConfigurationException(Throwable cause) {
+            super(cause);
         }
     }
 }

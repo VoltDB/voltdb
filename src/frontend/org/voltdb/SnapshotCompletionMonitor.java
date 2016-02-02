@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -199,9 +199,11 @@ public class SnapshotCompletionMonitor {
             Map<Integer, Long> drSequenceNumbers = new HashMap<>();
             JSONObject drTupleStreamJSON = jsonObj.getJSONObject("drTupleStreamStateInfo");
             Iterator<String> partitionKeys = drTupleStreamJSON.keys();
+            int drVersion = 0;
             while (partitionKeys.hasNext()) {
                 String partitionIdString = partitionKeys.next();
                 JSONObject stateInfo = drTupleStreamJSON.getJSONObject(partitionIdString);
+                drVersion = (int)stateInfo.getLong("drVersion");
                 drSequenceNumbers.put(Integer.valueOf(partitionIdString), stateInfo.getLong("sequenceNumber"));
             }
 
@@ -255,7 +257,8 @@ public class SnapshotCompletionMonitor {
                                 truncReqId,
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
-                                Collections.unmodifiableMap(remoteDCLastIds)));
+                                Collections.unmodifiableMap(remoteDCLastIds),
+                                drVersion));
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }

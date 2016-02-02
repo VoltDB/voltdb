@@ -1,6 +1,6 @@
 CREATE TABLE Store
 (
-    keyspace VARCHAR(128)    NOT NULL
+    keyspace VARBINARY(128)  NOT NULL
 ,   key      VARCHAR(128)    NOT NULL
 ,   value    VARBINARY(2056) NOT NULL
 ,   PRIMARY KEY (keyspace, key)

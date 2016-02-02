@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,8 +43,6 @@
 // This determines the size of the EE results buffer and it's nice
 // if IPC and JNI are matched.
 #define MAX_MSG_SZ (1024*1024*10)
-
-using namespace std;
 
 namespace voltdb {
 class Pool;

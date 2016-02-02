@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,6 +43,7 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -871,6 +872,10 @@ public class ProcedureRunner {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
             } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
+            } else if (type == VoltType.GEOGRAPHY_POINT) {
+                args[ii] = VoltType.NULL_POINT;
+            } else if (type == VoltType.GEOGRAPHY) {
+                args[ii] = VoltType.NULL_GEOGRAPHY;
             } else {
                 throw new VoltAbortException("Unknown type " + type +
                         " can not be converted to NULL representation for arg " + ii +
@@ -1105,7 +1110,12 @@ public class ProcedureRunner {
            msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
-           msg.append("HSQL-BACKEND ERROR\n");
+           String backendType = "HSQL";
+           if (getNonVoltDBBackendIfExists() instanceof PostgreSQLBackend) {
+               backendType = "PostgreSQL";
+           }
+           msg.append(backendType);
+           msg.append("-BACKEND ERROR\n");
            if (e.getCause() != null) {
                e = e.getCause();
            }
@@ -1129,6 +1139,22 @@ public class ProcedureRunner {
        // ensure the message is returned if we're not going to hit the verbose condition below
        if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
+           if (e instanceof org.voltdb.exceptions.InterruptException && m_isReadOnly) {
+               int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
+               int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
+               if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
+                   msg.append(" query-specific timeout period.");
+                   msg.append(" The query-specific timeout is currently " +  individualTimeout/1000.0 + " seconds.");
+               }
+               else {
+                   msg.append(" default query timeout period.");
+               }
+               if (originalTimeout > 0 ) {
+                   msg.append(" The default query timeout is currently " +  originalTimeout/1000.0 + " seconds and can be changed in the systemsettings section of the deployment file.");
+               } else if (originalTimeout == 0) {
+                   msg.append(" The default query timeout is currently set to no timeout and can be changed in the systemsettings section of the deployment file.");
+               }
+           }
        }
 
        // Rarely hide the stack trace.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -211,7 +211,7 @@ public abstract class CatalogSizing {
         return bufferSize;
     }
 
-    private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex) {
+    private static int getVariableColumnSize(int capacity, int dataSize, boolean forIndex, boolean isNullable) {
         assert(capacity >= 0);
         assert(dataSize >= 0);
         // Smaller capacities get fully consumed (plus 1 byte).
@@ -222,29 +222,38 @@ public abstract class CatalogSizing {
         if (forIndex) {
             return 8;
         }
+
+        // For Nullable
+        if (isNullable) {
+            return 8;
+        }
+
         // Larger capacities use pooled buffers sized in powers of 2 or values halfway
         // between powers of 2.
-        // The rounded buffer size includes an object length, typically 4 bytes.
-        int content = 4 + dataSize;
-        int bufferSize = roundedAllocationSize(64, content);
-        // The rounded buffer size has an additional 4-byte allocation size and
-        // 8-byte back pointer overhead. There is also has an 8-byte pointer
-        // in the tuple and an 8-byte StringRef indirection pointer.
-        return bufferSize + 4 + 8 + 8 + 8;
+        // The rounded buffer size includes an object length of 4 bytes and
+        // an 8-byte backpointer used in compaction.
+        int content = 4 + 8 + dataSize;
+        int bufferSize = roundedAllocationSize(8, content);
+        // There is also has an 8-byte pointer in the tuple
+        // and an 8-byte StringRef indirection pointer.
+        return bufferSize + 8 + 8;
     }
 
-    public static int testOnlyAllocationSizeForObject(int requestSize) {
-        if (requestSize <= 48) {
-            // Short-cut calculations for sizes that are not used in the catalog sizing.
-            if (requestSize <= 2) {
-                return 2;
-            }
-            return roundedAllocationSize(4, requestSize);
+    public static int testOnlyAllocationSizeForObject(int dataSize) {
+        // See the comments in getVariableColumnSize for the significance of
+        // these adjustments.
+        int content = 4 + 8 + dataSize;
+        if (content <= 48) {
+            // Short-cut calculations for sizes that are not used in the
+            // catalog sizing.
+            return roundedAllocationSize(16, content);
         }
-        // Otherwise exercise as much of the common catalog sizing code path as possible
-        // but strip out any adjustments that are not directly a result of allocation rounding.
-        // See the comments in getVariableColumnSize for the significance of these adjustments.
-        return getVariableColumnSize(64, requestSize - 4, false) - 4 - 8 - 8 - 8;
+        // Otherwise exercise as much of the catalog sizing code path as
+        // possible but strip out any adjustments that are not directly a
+        // result of allocation rounding.
+        // See the comments in getVariableColumnSize for the significance of
+        // these adjustments.
+        return getVariableColumnSize(64, dataSize, false, false) - 8 - 8;
     }
 
     private static CatalogItemSizeBase getColumnsSize(List<Column> columns, boolean forIndex, boolean bAdjustForDrAA) {
@@ -252,29 +261,24 @@ public abstract class CatalogSizing {
         CatalogItemSizeBase csize = new CatalogItemSizeBase();
         for (Column column: columns) {
             VoltType ctype = VoltType.get((byte)column.getType());
-            switch(ctype) {
-            case STRING: {
-                boolean inBytes = column.getInbytes();
+            boolean isNullable = column.getNullable();
+            if (ctype.isVariableLength()) {
                 int capacity = column.getSize();
-                if (!inBytes) capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
 
-                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
-                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
-                break;
+                if (ctype == VoltType.STRING && !column.getInbytes()) {
+                    capacity *= MAX_BYTES_PER_UTF8_CHARACTER;
+                }
+
+                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex, isNullable);
+                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex, false);
             }
-            case VARBINARY: {
-                int capacity = column.getSize();
-                csize.widthMin += getVariableColumnSize(capacity, 0, forIndex);
-                csize.widthMax += getVariableColumnSize(capacity, capacity, forIndex);
-                break;
-            }
-            default: {
+            else {
                 // Fixed type - use the fixed size.
                 csize.widthMin += ctype.getLengthInBytesForFixedTypes();
                 csize.widthMax += ctype.getLengthInBytesForFixedTypes();
             }
-            }
         }
+
         //For DR active active enabled account for additional timestamp column for conflict detection.
         if (bAdjustForDrAA) {
             csize.widthMin += 8;

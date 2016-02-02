@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -219,7 +219,7 @@ public class paymentByCustomerName extends VoltProcedure {
         return new VoltTable[]{warehouse, district, misc};
     }
 
-    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, byte[] c_last, TimestampType timestamp) throws VoltAbortException {
+    public VoltTable[] run(short w_id, byte d_id, double h_amount, short c_w_id, byte c_d_id, String c_last, TimestampType timestamp) throws VoltAbortException {
         voltQueueSQL(getCustomersByLastName, c_last, c_d_id, c_w_id);
         final VoltTable customers = voltExecuteSQL()[0];
         final int namecnt = customers.getRowCount();

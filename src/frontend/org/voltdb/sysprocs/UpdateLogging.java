@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
+import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -54,10 +55,11 @@ public class UpdateLogging extends VoltSystemProcedure
      * @param xmlConfig New configuration XML document.
      * @return          Standard STATUS table.
      */
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String xmlConfig)
     {
-        VoltDB.instance().logUpdate(xmlConfig, getVoltPrivateRealTransactionIdDontUseMe());
+        VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this));
         ctx.updateBackendLogLevels();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

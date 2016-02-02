@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 public class VarbinaryStringLookup extends VoltProcedure {
     public final SQLStmt sqlSelect = new SQLStmt("select * from blah where ival = ? and s = ?");
 
-    public VoltTable[] run(long ival, byte[] str1, String str2) {
+    public VoltTable[] run(long ival, String str1, String str2) {
         voltQueueSQL(sqlSelect, ival, str1);
         VoltTable t1 = voltExecuteSQL()[0];
         assert(t1.getRowCount() == 1);

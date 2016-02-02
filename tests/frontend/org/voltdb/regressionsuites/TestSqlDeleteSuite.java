@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import java.util.Arrays;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -30,8 +32,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimit;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimitOffset;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
-
-import java.util.Arrays;
 
 /**
  * System tests for DELETE
@@ -414,7 +414,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
                 "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
 
         verifyStmtFails(client, "DELETE FROM P1_VIEW ORDER BY ID ASC LIMIT 1",
-                "INSERT, UPDATE, or DELETE not permitted for view");
+                "DELETE with ORDER BY, LIMIT or OFFSET is currently unsupported on views");
 
         // Check failure for partitioned table where where clause cannot infer
         // partitioning

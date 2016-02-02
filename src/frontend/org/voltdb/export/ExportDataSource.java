@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -195,7 +195,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce);
-        assert(!adFile.exists());
         byte jsonBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
@@ -206,6 +205,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             JSONObject jsObj = new JSONObject(stringer.toString());
             jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
         } catch (JSONException e) {
+            exportLog.error("Failed to Write ad file for " + nonce);
             Throwables.propagate(e);
         }
 
@@ -864,6 +864,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 VoltDB.crashLocalVoltDB("Error attempting to release export bytes", true, e);
                 return;
             }
+        } else {
+            exportLog.info("Ack with 0 for source ");
         }
     }
 

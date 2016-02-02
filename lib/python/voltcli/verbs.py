@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -344,9 +344,10 @@ class VerbSpace(object):
     """
     Manages a collection of Verb objects that support a particular CLI interface.
     """
-    def __init__(self, name, version, description, VOLT, scan_dirs, verbs):
+    def __init__(self, name, version, description, VOLT, scan_dirs, verbs, pro_version):
         self.name        = name
         self.version     = version
+        self.pro_version       = pro_version
         self.description = description.strip()
         self.VOLT        = VOLT
         self.scan_dirs   = scan_dirs

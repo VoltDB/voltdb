@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -144,7 +144,22 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         ClientResponse resp;
         VoltTable vt;
 
-        m_client.callProcedure("@AdHoc", "insert into T4 values (1, 2, 3, 4, 5.5, 6.6, \'test\', \'010101\', 1000, 1111);");
+        m_client.callProcedure("@AdHoc", "insert into T4 values "
+                + "(1, "
+                + "2, "
+                + "3, "
+                + "4, "
+                + "5.5, "
+                + "6.6, "
+                + "\'test\', "
+                + "\'010101\', "
+                + "1000, "
+                + "1111, "
+                + "pointfromtext('point(0 0)'),"
+                + "pointfromtext('point(-2.5 0)'),"
+                + "polygonfromtext('polygon((0 1, -1 1, -1 0, 0 0, 0 1))'),"
+                + "polygonfromtext('polygon((0 2, -2 2, -2 0, 0 0, 0 2))')"
+                + ");");
 
         resp = m_client.callProcedure("@AdHoc", "select * from T4;");
         vt = resp.getResults()[0];
@@ -181,7 +196,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testCreateTableConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T9
         assertTrue(findTableInSystemCatalogResults("T9"));
@@ -431,7 +445,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterTableDropConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T35
         assertTrue(findTableInSystemCatalogResults("T35"));
@@ -531,7 +544,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterTableAddConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T40
         assertTrue(findTableInSystemCatalogResults("T40"));
@@ -738,4 +750,23 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(verifyTableColumnType("T61", "C3", "INTEGER"));
         assertFalse(isDRedTable("T61"));
     }
+
+    @Test
+    public void testGEOIndex() throws Exception {
+        assertTrue(findTableInSystemCatalogResults("GEO"));
+        assertTrue(findTableInSystemCatalogResults("T4"));
+        //assertTrue(findIndexInSystemCatalogResults("GEOINDEX_ISVALID"));
+        assertTrue(findIndexInSystemCatalogResults("GEOINDEX_REASONS"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_ASTEXT_POLYGON"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_LATITUDE"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("INDEX_USES_GEO_DISTANCE_POINT_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_DISTANCE_POLYGON_POINT"));
+        assertTrue(findIndexInSystemCatalogResults("PARTIAL_INDEX_USES_GEO_AREA"));
+        // GEO has three index columns.  Two for IDX
+        // and one for the primary key.
+        assertEquals(3, indexedColumnCount("GEO"));
+    }
+
 }

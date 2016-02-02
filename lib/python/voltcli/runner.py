@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -159,8 +159,7 @@ class JavaRunner(object):
         self.initialize()
         if not os.path.exists(outdir):
             os.makedirs(outdir)
-        utility.run_cmd('javac', '-target', '1.7', '-source', '1.7',
-                          '-classpath', self.classpath, '-d', outdir, *srcfiles)
+        utility.run_cmd('javac', '-classpath', self.classpath, '-d', outdir, *srcfiles)
 
 #===============================================================================
 class VerbRunner(object):
@@ -585,7 +584,7 @@ class VOLT(object):
         self.utility = utility
 
 #===============================================================================
-def load_verbspace(command_name, command_dir, config, version, description, package):
+def load_verbspace(command_name, command_dir, config, version, description, package, pro_version):
 #===============================================================================
     """
     Build a verb space by searching for source files with verbs in this source
@@ -627,7 +626,7 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
         if verb_name not in verbs:
             verbs[verb_name] = verb_cls(verb_name, default_func)
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs)
+    return VerbSpace(command_name, version, description, namespace_VOLT, scan_dirs, verbs, pro_version)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -653,13 +652,15 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
+        verstr = '%%prog version %s Enterprise Edition' % verbspace.version \
+            if verbspace.pro_version else '%%prog version %s' % verbspace.version
         cli.CLIParser.__init__(self, environment.command_name,
                                      verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
                                                 base_cli_spec.description)),
-                                     '%%prog version %s' % verbspace.version)
+                                     verstr)
 
 #===============================================================================
 def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
@@ -718,7 +719,7 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
 
         # Search for modules based on both this file's and the calling script's location.
         verbspace = load_verbspace(command_name, command_dir, config, version,
-                                   description, package)
+                                   description, package, environment.pro_version)
 
         # Make internal commands available to user commands via runner.verbspace().
         internal_verbspaces = {}

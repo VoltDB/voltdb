@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,6 +32,8 @@ import java.util.Random;
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
@@ -42,6 +44,9 @@ public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
     private VoltTable t;
     private VoltTable t2;
+
+    private static final GeographyValue GEOG_VALUE = GeographyValue.fromWKT("POLYGON((0 0, 0 1, -1 1, -1 0, 0 0))");
+    private static final GeographyPointValue GEOG_PT_VALUE = GeographyPointValue.fromWKT("POINT(-122.0264 36.9719)");
 
     @Override
     public void setUp() {
@@ -75,6 +80,8 @@ public class TestVoltTable extends TestCase {
                 new TimestampType(99),
                 new BigDecimal(7654321)
                         .setScale(VoltDecimalHelper.kDefaultScale),
+                GEOG_VALUE,
+                GEOG_PT_VALUE,
                 new Object(), };
 
         for (Object o : primitives) {
@@ -548,6 +555,88 @@ public class TestVoltTable extends TestCase {
         assertTrue(t2.getRowCount() == 0);
     }
 
+    public void testGeographies() {
+        VoltTable vt = new VoltTable(new ColumnInfo("gg", VoltType.GEOGRAPHY));
+        addAllPrimitives(vt, new Class[] {GeographyValue.class});
+
+        VoltTable vtCopy = roundTrip(vt);
+
+        assertEquals(2, vt.getRowCount());
+        assertEquals(2, vtCopy.getRowCount());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        assertNull(vt.getGeographyValue(0));
+        assertNull(vtCopy.getGeographyValue(0));
+        assertNull(vt.get(0, VoltType.GEOGRAPHY));
+        assertTrue(vt.wasNull());
+        assertTrue(vtCopy.wasNull());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        String wkt = GEOG_VALUE.toString();
+        assertEquals(wkt, vt.getGeographyValue(0).toString());
+        assertEquals(wkt, vtCopy.getGeographyValue(0).toString());
+        assertEquals(wkt, vt.getGeographyValue("gg").toString());
+        assertEquals(wkt, vt.get(0, VoltType.GEOGRAPHY).toString());
+
+        byte[] raw = vt.getRaw(0);
+        // Raw bytes does not include the length prefix
+        assertEquals(GEOG_VALUE.getLengthInBytes(), raw.length - 4);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
+        assertFalse(vt.advanceRow());
+        assertFalse(vtCopy.advanceRow());
+    }
+
+    public void testGeographyPoints() {
+        VoltTable vt = new VoltTable(new ColumnInfo("pt", VoltType.GEOGRAPHY_POINT));
+        addAllPrimitives(vt, new Class[] {GeographyPointValue.class});
+
+        VoltTable vtCopy = roundTrip(vt);
+
+        assertEquals(2, vt.getRowCount());
+        assertEquals(2, vtCopy.getRowCount());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        assertNull(vt.getGeographyPointValue(0));
+        assertNull(vtCopy.getGeographyPointValue(0));
+        assertNull(vt.get(0, VoltType.GEOGRAPHY_POINT));
+        assertTrue(vt.wasNull());
+
+        assertTrue(vt.advanceRow());
+        assertTrue(vtCopy.advanceRow());
+
+        String wkt = GEOG_PT_VALUE.toString();
+        assertEquals(wkt, vt.getGeographyPointValue(0).toString());
+        assertEquals(wkt, vtCopy.getGeographyPointValue(0).toString());
+        assertEquals(wkt, vt.getGeographyPointValue("pt").toString());
+        assertEquals(wkt, vt.get(0, VoltType.GEOGRAPHY_POINT).toString());
+
+        byte[] raw = vt.getRaw(0);
+        assertEquals(GeographyPointValue.getLengthInBytes(), raw.length);
+
+        byte[] rawCopy = vtCopy.getRaw(0);
+        assertEquals(raw.length, rawCopy.length);
+        for (int i = 0; i < rawCopy.length; ++i) {
+            assertEquals("raw geography not equal to copy at byte " + i,
+                    raw[i], rawCopy[i]);
+        }
+
+        assertFalse(vt.advanceRow());
+        assertFalse(vtCopy.advanceRow());
+    }
+
     // At least check that NULL_VALUEs of one type get interpreted as NULL
     // if we attempt to put them into a column of a different type
     public void testNulls() {
@@ -886,23 +975,26 @@ public class TestVoltTable extends TestCase {
         // Set the default timezone since we're using a timestamp type.  Eliminate test flakeyness.
         VoltDB.setDefaultTimezone();
 
-        VoltTable table = new VoltTable(
-                new ColumnInfo("tinyint", VoltType.TINYINT), new ColumnInfo(
-                        "smallint", VoltType.SMALLINT), new ColumnInfo(
-                        "integer", VoltType.INTEGER), new ColumnInfo("bigint",
-                        VoltType.BIGINT), new ColumnInfo("float",
-                        VoltType.FLOAT), new ColumnInfo("string",
-                        VoltType.STRING), new ColumnInfo("varbinary",
-                        VoltType.VARBINARY), new ColumnInfo("timestamp",
-                        VoltType.TIMESTAMP), new ColumnInfo("decimal",
-                        VoltType.DECIMAL));
+        VoltTable table = new VoltTable(new ColumnInfo("tinyint",   VoltType.TINYINT),
+                                        new ColumnInfo("smallint",  VoltType.SMALLINT),
+                                        new ColumnInfo("integer",   VoltType.INTEGER),
+                                        new ColumnInfo("bigint",    VoltType.BIGINT),
+                                        new ColumnInfo("float",     VoltType.FLOAT),
+                                        new ColumnInfo("string",    VoltType.STRING),
+                                        new ColumnInfo("varbinary", VoltType.VARBINARY),
+                                        new ColumnInfo("timestamp", VoltType.TIMESTAMP),
+                                        new ColumnInfo("decimal",   VoltType.DECIMAL));
 
         // add a row of nulls the hard way
-        table.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
-                VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,
-                VoltType.NULL_FLOAT, VoltType.NULL_STRING_OR_VARBINARY,
-                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_TIMESTAMP,
-                VoltType.NULL_DECIMAL);
+        table.addRow(VoltType.NULL_TINYINT,
+                     VoltType.NULL_SMALLINT,
+                     VoltType.NULL_INTEGER,
+                     VoltType.NULL_BIGINT,
+                     VoltType.NULL_FLOAT,
+                     VoltType.NULL_STRING_OR_VARBINARY,
+                     VoltType.NULL_STRING_OR_VARBINARY,
+                     VoltType.NULL_TIMESTAMP,
+                     VoltType.NULL_DECIMAL);
 
         // add a row of nulls the easy way
         table.addRow(null, null, null, null, null, null, null, null, null);
@@ -915,20 +1007,113 @@ public class TestVoltTable extends TestCase {
         String formatted_string = table.toFormattedString();
 
         String expected =
-"tinyint smallint integer bigint      float    string varbinary timestamp                  decimal         \n" +
-"------- -------- ------- ----------- -------- ------ --------- -------------------------- ----------------\n" +
-"   NULL     NULL    NULL        NULL     NULL NULL   NULL      NULL                                   NULL\n" +
-"   NULL     NULL    NULL        NULL     NULL NULL   NULL      NULL                                   NULL\n" +
-"    123    12345 1234567 12345678901 1.234567 aabbcc 0A1A0A    1970-01-01 00:00:00.000099 123.450000000000\n";
+"tinyint  smallint  integer  bigint       float     string  varbinary  timestamp                   decimal          \n" +
+"-------- --------- -------- ------------ --------- ------- ---------- --------------------------- -----------------\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"    NULL      NULL     NULL         NULL      NULL NULL    NULL       NULL                                     NULL\n" +
+"     123     12345  1234567  12345678901  1.234567 aabbcc  0A1A0A     1970-01-01 00:00:00.000099   123.450000000000\n";
 
-        if (!formatted_string.equals(expected)) {
+        if (!formatted_string.equals(expected))
+        {
             System.out.println("Received formatted output:");
             System.out.println(formatted_string);
             System.out.println("Expected output:");
             System.out.println(expected);
         }
-
         assertTrue(formatted_string.equals(expected));
+
+
+        table = new VoltTable(new ColumnInfo("bigint",          VoltType.BIGINT),
+                              new ColumnInfo("geography",       VoltType.GEOGRAPHY),
+                              new ColumnInfo("geography_point", VoltType.GEOGRAPHY_POINT),
+                              new ColumnInfo("timestamp", VoltType.TIMESTAMP));
+        table.addRow(VoltType.NULL_BIGINT, VoltType.NULL_GEOGRAPHY, VoltType.NULL_POINT, VoltType.NULL_TIMESTAMP);
+        table.addRow(null, null, null, null);
+        table.addRow(123456789,
+                     new GeographyValue("POLYGON (( 1.1  9.9, " +
+                                                  "-9.1  9.9, " +
+                                                  "-9.1 -9.9, " +
+                                                  " 9.1 -9.9, " +
+                                                  " 1.1  9.9))"),
+                     new GeographyPointValue(-179.0, -89.9),
+                     new TimestampType(-1));
+        formatted_string = table.toFormattedString();
+        expected =
+"bigint     geography                                                    geography_point       timestamp                  \n" +
+"---------- ------------------------------------------------------------ --------------------- ---------------------------\n" +
+"      NULL NULL                                                         NULL                  NULL                       \n" +
+"      NULL NULL                                                         NULL                  NULL                       \n" +
+" 123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))  POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
+            System.out.println(formatted_string);
+            System.out.println("Expected output: (length: " + expected.length() + ")");
+            System.out.println(expected);
+        }
+        assertTrue(formatted_string.equals(expected));
+
+
+        // row with a polygon that max's output column width for geopgraphy column
+        table.addRow(1234567890,
+                    new GeographyValue("POLYGON (( 179.1  89.9, " +
+                                                 "-179.1  89.9, " +
+                                                 "-179.1 -89.9, " +
+                                                 " 179.1 -89.9, " +
+                                                 " 179.1  89.9))"),
+                    new GeographyPointValue(-179.0, -89.9),
+                    new TimestampType(0));
+        formatted_string = table.toFormattedString();
+        expected =
+"bigint      geography                                                                   geography_point       timestamp                  \n" +
+"----------- --------------------------------------------------------------------------- --------------------- ---------------------------\n" +
+"       NULL NULL                                                                        NULL                  NULL                       \n" +
+"       NULL NULL                                                                        NULL                  NULL                       \n" +
+"  123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
+" 1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
+            System.out.println(formatted_string);
+            System.out.println("Expected output: (length: " + expected.length() + ")");
+            System.out.println(expected);
+        }
+        assertTrue(formatted_string.equals(expected));
+
+
+        // row with a polygon that goes beyond max aligned display limit for polygon. This will result in
+        // other columns following to appear further away from their original column
+        table.addRow(12345678901L,
+                new GeographyValue("POLYGON (( 179.12  89.9, " +
+                                             "-179.12  89.9, " +
+                                             "-179.1  -89.9, " +
+                                             " 179.1  -89.9, " +
+                                             "   0     0," +
+                                             "  1.123  1.11," +
+                                             " 179.12  89.9))"),
+                new GeographyPointValue(0, 0),
+                new TimestampType(99));
+        formatted_string = table.toFormattedString();
+        expected =
+"bigint       geography                                                                   geography_point       timestamp                  \n" +
+"------------ --------------------------------------------------------------------------- --------------------- ---------------------------\n" +
+"        NULL NULL                                                                        NULL                  NULL                       \n" +
+"        NULL NULL                                                                        NULL                  NULL                       \n" +
+"   123456789 POLYGON ((1.1 9.9, -9.1 9.9, -9.1 -9.9, 9.1 -9.9, 1.1 9.9))                 POINT (-179.0 -89.9)  1969-12-31 23:59:59.999999 \n" +
+"  1234567890 POLYGON ((179.1 89.9, -179.1 89.9, -179.1 -89.9, 179.1 -89.9, 179.1 89.9))  POINT (-179.0 -89.9)  1970-01-01 00:00:00.000000 \n" +
+" 12345678901 POLYGON ((179.12 89.9, -179.12 89.9, -179.1 -89.9, 179.1 -89.9, 0.0 0.0, 1.123 1.11, 179.12 89.9)) POINT (0.0 0.0)       1970-01-01 00:00:00.000099 \n";
+
+        if (!formatted_string.equals(expected))
+        {
+            System.out.println("Received formatted output: (length: " + formatted_string.length() +")");
+            System.out.println(formatted_string);
+            System.out.println("Expected output: (length: " + expected.length() + ")");
+            System.out.println(expected);
+        }
+        assertTrue(formatted_string.equals(expected));
+
     }
 
     @SuppressWarnings("deprecation")

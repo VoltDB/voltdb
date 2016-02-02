@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,17 +41,24 @@ static inline int memSizeForTupleSchema(uint16_t columnCount,
 }
 
 static inline bool isInlineable(ValueType vt, int32_t length, bool inBytes) {
-    if (vt == VALUE_TYPE_VARCHAR || vt == VALUE_TYPE_VARBINARY) {
-
-        if (vt == VALUE_TYPE_VARBINARY || inBytes) {
+    switch (vt) {
+    case VALUE_TYPE_VARCHAR:
+        if (inBytes) {
             return length < UNINLINEABLE_OBJECT_LENGTH;
         }
+        else {
+            return length < UNINLINEABLE_CHARACTER_LENGTH;
+        }
 
-        // must be a VARCHAR field without inBytes flag set
-        return length < UNINLINEABLE_CHARACTER_LENGTH;
+    case VALUE_TYPE_VARBINARY:
+        return length < UNINLINEABLE_OBJECT_LENGTH;
+
+    case VALUE_TYPE_GEOGRAPHY:
+        return false; // never inlined
+
+    default:
+        return true;
     }
-
-    return true;
 }
 
 TupleSchema* TupleSchema::createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
@@ -239,7 +246,7 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     columnInfo->length = length;
     columnInfo->inBytes = inBytes;
 
-    if (type == VALUE_TYPE_VARCHAR || type == VALUE_TYPE_VARBINARY) {
+    if (isVariableLengthType(type)) {
         if (length == 0) {
             throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
         }
@@ -296,7 +303,7 @@ size_t TupleSchema::getMaxSerializedTupleSize(bool includeHiddenColumns) const {
     for (int i = 0;i < serializeColumnCount; ++i) {
         const TupleSchema::ColumnInfo* columnInfo = getColumnInfoPrivate(i);
         int32_t factor = (columnInfo->type == VALUE_TYPE_VARCHAR && !columnInfo->inBytes) ? MAX_BYTES_PER_UTF8_CHARACTER : 1;
-        if (columnInfo->type == VALUE_TYPE_VARCHAR || columnInfo->type == VALUE_TYPE_VARBINARY) {
+        if (isVariableLengthType((ValueType)columnInfo->type)) {
             bytes += sizeof(int32_t); // value length placeholder for variable length columns
         }
         bytes += columnInfo->length * factor;
@@ -381,7 +388,7 @@ bool TupleSchema::equals(const TupleSchema *other) const
 }
 
 /*
- * Returns the number of string columns that can't be inlined.
+ * Returns the number of variable-length columns that can't be inlined.
  */
 uint16_t TupleSchema::countUninlineableObjectColumns(
         const std::vector<ValueType> columnTypes,
@@ -392,14 +399,8 @@ uint16_t TupleSchema::countUninlineableObjectColumns(
     uint16_t numUninlineableObjects = 0;
     for (int ii = 0; ii < numColumns; ii++) {
         ValueType vt = columnTypes[ii];
-        if (vt == VALUE_TYPE_VARCHAR || vt == VALUE_TYPE_VARBINARY) {
-            if (columnInBytes[ii] || vt == VALUE_TYPE_VARBINARY) {
-                if (columnSizes[ii] >= UNINLINEABLE_OBJECT_LENGTH) {
-                    numUninlineableObjects++;
-                }
-            } else if (columnSizes[ii] >= UNINLINEABLE_CHARACTER_LENGTH) {
-                numUninlineableObjects++;
-            }
+        if (! isInlineable(vt, columnSizes[ii], columnInBytes[ii])) {
+            numUninlineableObjects++;
         }
     }
     return numUninlineableObjects;

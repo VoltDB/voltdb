@@ -1,0 +1,24 @@
+file scripts/geospatial/points.sql;
+
+exec make_point 101 'point(20.666 10.333)';
+exec make_point 102 '  point  (20.666 10.333)    ';
+exec make_point 103 'point(-20.666 -10.333      )';
+exec make_point 104 '  point  (-20.666     -10.333)    ';
+exec make_point 105 'point(10 10)';
+-- Test latitude/longitude ranges.
+exec make_point 106 'point( 100.0   100.0)';
+exec make_point 107 'point( 360.0   45.0)';
+exec make_point 108 'point( 270.0   45.0)';
+exec make_point 109 'point(-100.0  -100.0)';
+exec make_point 110 'point(-360.0  -45.0)';
+exec make_point 111 'point(-270.0  -45.0)';
+-- Syntax errors
+-- Comma separating the coordinates.
+exec make_point 112 'point(0.0, 0.0)';
+
+exec make_point 200 null;
+
+select * from points;
+
+drop procedure make_point;
+drop table points;

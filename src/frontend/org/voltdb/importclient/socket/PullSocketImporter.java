@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.Level;
 import org.voltdb.importer.AbstractImporter;
-import org.voltdb.importer.CSVInvocation;
+import org.voltdb.importer.Invocation;
+import org.voltdb.importer.formatter.Formatter;
 
 import com.google_voltpatches.common.base.Optional;
 
@@ -77,6 +78,7 @@ public class PullSocketImporter extends AbstractImporter {
 
         m_thread = Optional.of(Thread.currentThread());
         Optional<BufferedReader> reader = null;
+        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterFactory().create();
         while (!m_eos.get()) {
             try {
                 reader = attemptBufferedReader();
@@ -88,7 +90,7 @@ public class PullSocketImporter extends AbstractImporter {
                 BufferedReader br = reader.get();
                 String csv = null;
                 while ((csv=br.readLine()) != null) {
-                    CSVInvocation invocation = new CSVInvocation(m_config.getProcedure(), csv);
+                    Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(csv));
                     if (!callProcedure(invocation)) {
                         if (isDebugEnabled()) {
                             debug(null, "Failed to process Invocation possibly bad data: " + csv);

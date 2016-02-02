@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,14 +24,19 @@
 
 package org.voltdb;
 
-import junit.framework.TestCase;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.util.Date;
+import junit.framework.TestCase;
 
 
 public class TestParameterConverter extends TestCase
@@ -128,6 +133,60 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(byte[].class, t);
         assertTrue("expect varbinary", r.getClass() == byte[].class);
         assertEquals(t, Encoder.hexEncode((byte[])r));
+    }
+
+    public void testOneStringToPoint(String rep, GeographyPointValue pt, double epsilon) throws Exception {
+        Object r = ParameterConverter.tryToMakeCompatible(GeographyPointValue.class, rep);
+        assertTrue("expected GeographyPointValue", r.getClass() == GeographyPointValue.class);
+        GeographyPointValue rpt = (GeographyPointValue)r;
+        assertEquals("Cannot convert string to geography point.", pt.getLatitude(),  rpt.getLatitude(),  epsilon);
+        assertEquals("Cannot convert string to geography point.", pt.getLongitude(), rpt.getLongitude(), epsilon);
+    }
+
+    public void testOneStringToPolygon(String actualAsString, GeographyValue expected) throws Exception {
+        Object actual = ParameterConverter.tryToMakeCompatible(GeographyValue.class, actualAsString);
+        assertTrue("expected GeographyValue", actual.getClass() == GeographyValue.class);
+        assertEquals("Cannot convert string to polygon.", expected.toString(), actual.toString());
+    }
+
+    public void testStringToGeographyPointValue() throws Exception {
+        double epsilon = 1.0e-3;
+        // The unfortunately eccentric spacing here is to test parsing white space.
+        testOneStringToPoint("point(20.666 10.333)",               new GeographyPointValue( 20.666,  10.333), epsilon);
+        testOneStringToPoint("  point  (20.666 10.333)    ",       new GeographyPointValue( 20.666,  10.333), epsilon);
+        testOneStringToPoint("point(-20.666 -10.333)",             new GeographyPointValue(-20.666, -10.333), epsilon);
+        testOneStringToPoint("  point  (-20.666   -10.333)    ",   new GeographyPointValue(-20.666, -10.333), epsilon);
+        testOneStringToPoint("point(10 10)",                       new GeographyPointValue(10.0,    10.0),    epsilon);
+        testOneStringToPoint("point(10.0 10.0)",                   new GeographyPointValue(10.0, 10.0),       epsilon);
+        testOneStringToPoint("point(10 10)",                       new GeographyPointValue(10.0, 10.0),       epsilon);
+        // testOneStringToPoint(null, "null");
+    }
+
+    public void testStringToPolygonType() throws Exception {
+        testOneStringToPolygon("polygon((0 0, 1 0, 1 1, 0 1, 0 0))",
+                               new GeographyValue(Collections.singletonList(Arrays.asList(new GeographyPointValue[]{ new GeographyPointValue(0,0),
+                                                                                                           new GeographyPointValue(1, 0),
+                                                                                                           new GeographyPointValue(1, 1),
+                                                                                                           new GeographyPointValue(0, 1),
+                                                                                                           new GeographyPointValue(0, 0) }))));
+        GeographyValue geog;
+        // The Bermuda Triangle, counter clockwise.
+        List<GeographyPointValue> outerLoop = Arrays.asList(new GeographyPointValue(-64.751, 32.305),
+                                                  new GeographyPointValue(-80.437, 25.244),
+                                                  new GeographyPointValue(-66.371, 18.476),
+                                                  new GeographyPointValue(-64.751, 32.305));
+        // A triangular hole
+        // Note that this needs to be clockwise.
+        List<GeographyPointValue> innerLoop = Arrays.asList(new GeographyPointValue(-68.855, 25.361),
+                                                            new GeographyPointValue(-73.381, 28.376),
+                                                            new GeographyPointValue(-68.874, 28.066),
+                                                            new GeographyPointValue(-68.855, 25.361));
+        geog = new GeographyValue(Arrays.asList(outerLoop, innerLoop));
+        String geogRep = "POLYGON((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305), " + "(-68.855 25.361, -73.381 28.376, -68.874 28.066, -68.855 25.361))";
+        testOneStringToPolygon(geogRep, geog);
+        // round trip
+        geog = new GeographyValue(geogRep);
+        testOneStringToPolygon(geogRep, geog);
     }
 
     public void testNulls()

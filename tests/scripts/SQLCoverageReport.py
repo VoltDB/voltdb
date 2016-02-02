@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2015 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -281,6 +281,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     failures = 0
     count = 0
     mismatches = []
+    crashed = []
     voltdb_npes = []
     cmpdb_npes  = []
     all_results = []
@@ -293,8 +294,19 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             except EOFError:
                 break
 
-            jni = cPickle.load(jni_file)
-            cdb = cPickle.load(cmpdb_file)
+            notFound = False
+            try:
+                jni = cPickle.load(jni_file)
+            except EOFError as e:
+                notFound = True
+                jni = {'Status': -99, 'Exception': 'None', 'Result': None,
+                       'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a VoltDB crash!</p>'}
+            try:
+                cdb = cPickle.load(cmpdb_file)
+            except EOFError as e:
+                notFound = True
+                cdb = {'Status': -98, 'Exception': 'None', 'Result': None,
+                       'Info': '<p style="color:red">RESULT NOT FOUND! Probably due to a ' + cmpdb + ' backend crash!</p>'}
 
             count += 1
             if int(jni["Status"]) != 1:
@@ -302,7 +314,9 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
 
             statement["jni"] = jni
             statement["cmp"] = cdb
-            if is_different(statement, cntonly):
+            if notFound:
+                crashed.append(statement)
+            elif is_different(statement, cntonly):
                 mismatches.append(statement)
             if ('NullPointerException' in str(jni)):
                 voltdb_npes.append(statement)
@@ -349,6 +363,10 @@ h2 {text-transform: uppercase}
     if(len(mismatches) > 0):
         sorted(mismatches, cmp=cmp, key=key)
         report += print_section("Mismatched Statements", mismatches, output_dir, cmpdb)
+
+    if(len(crashed) > 0):
+        sorted(crashed, cmp=cmp, key=key)
+        report += print_section("Statements Missing Results, due to a Crash<br>(the first one probably caused the crash)", crashed, output_dir, cmpdb)
 
     if(len(voltdb_npes) > 0):
         sorted(voltdb_npes, cmp=cmp, key=key)

@@ -58,8 +58,8 @@ function cleanall() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/voter/*.java
+    javac -classpath $APPCLASSPATH procedures/voter/*.java
+    javac -classpath $CLIENTCLASSPATH client/voter/*.java
     # build procedure and client jars
     jar cf voter-procs.jar -C procedures voter
     jar cf voter-client.jar -C client voter

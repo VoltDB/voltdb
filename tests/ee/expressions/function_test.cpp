@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -84,8 +84,8 @@ struct FunctionTest : public Test {
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,
-                                  (DRTupleStream *)0,
-                                  (DRTupleStream *)0,
+                                  (AbstractDRTupleStream *)0,
+                                  (AbstractDRTupleStream *)0,
                                   0) {}
         /**
          * A template for calling unary function call expressions.  For any C++

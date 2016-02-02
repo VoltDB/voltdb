@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -179,9 +179,10 @@ public class PlanAssembler {
     /**
      * Return true if tableList includes at least one matview.
      */
-    private static boolean tableListIncludesView(List<Table> tableList) {
+    private boolean tableListIncludesReadOnlyView(List<Table> tableList) {
+        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
         for (Table table : tableList) {
-            if (table.getMaterializer() != null) {
+            if (table.getMaterializer() != null && !exportTables.contains(table.getMaterializer().getTypeName())) {
                 return true;
             }
         }
@@ -310,7 +311,7 @@ public class PlanAssembler {
         // @TODO
         // Need to use StmtTableScan instead
         // check that no modification happens to views
-        if (tableListIncludesView(parsedStmt.m_tableList)) {
+        if (tableListIncludesReadOnlyView(parsedStmt.m_tableList)) {
             throw new PlanningErrorException("Illegal to modify a materialized view.");
         }
 

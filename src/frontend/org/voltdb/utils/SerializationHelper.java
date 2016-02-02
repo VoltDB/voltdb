@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,8 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -187,6 +189,26 @@ public class SerializationHelper {
             }
             return retval;
         }
+        else if (type == GeographyPointValue.class) {
+            final GeographyPointValue[] retval = new GeographyPointValue[count];
+            for (int i = 0; i < count; ++i) {
+                retval[i] = GeographyPointValue.unflattenFromBuffer(buf);
+            }
+            return retval;
+        }
+        else if (type == GeographyValue.class) {
+            final GeographyValue[] retval = new GeographyValue[count];
+            for (int i = 0; i < count; ++i) {
+                int len = buf.getInt(); // length prefix
+                if (len == VoltType.NULL_STRING_LENGTH) {
+                    retval[i] = null;
+                }
+                else {
+                    retval[i] = GeographyValue.unflattenFromBuffer(buf);
+                }
+            }
+            return retval;
+        }
         else if (type == VoltTable.class) {
             final VoltTable[] retval = new VoltTable[count];
             for (int i = 0; i < count; ++i) {
@@ -333,6 +355,41 @@ public class SerializationHelper {
                 writeArray(values[i], buf);
             }
         }
+    }
+
+    public static void writeArray(GeographyPointValue[] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putShort((short) values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                GeographyPointValue.serializeNull(buf);
+            }
+            else {
+                values[i].flattenToBuffer(buf);
+            }
+        }
+    }
+
+    public static void writeArray(GeographyValue[] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putShort((short) values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                buf.putInt(VoltType.NULL_STRING_LENGTH);
+            }
+            else {
+                buf.putInt(values[i].getLengthInBytes());
+                values[i].flattenToBuffer(buf);
+            }
+        }
+
+
     }
 
 }

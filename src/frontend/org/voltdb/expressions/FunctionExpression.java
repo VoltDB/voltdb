@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -357,6 +357,15 @@ public class FunctionExpression extends AbstractExpression {
             result += ")";
         }
         return result;
+    }
+
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        StringBuffer dummyMsg = new StringBuffer();
+        if (!super.isValueTypeIndexable(dummyMsg)) {
+            msg.append("function '"+ m_name.toUpperCase() + "()'");
+            return false;
+        }
+        return true;
     }
 
 }

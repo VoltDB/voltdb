@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -536,7 +536,7 @@ public class TestDeterminism extends PlannerTestCase {
         final boolean ENG8677IsFixed = false;
         // Two tables.  Actually, this is a self join as well.  That
         // may be a reason to not allow it here.
-        assertPlanDeterminismCore("select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where b = ? order by a, c limit 1;",
+        assertPlanDeterminismCore("select tleft.* from ttree_with_key as tleft join ttree_with_key as tright on tleft.id = tright.id where tleft.b = ? order by tleft.a, tleft.c limit 1;",
                                   ENG8677IsFixed,
                                   ENG8677IsFixed,
                                   DeterminismMode.FASTER);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -525,6 +525,11 @@ public class VoltCompiler {
         // Keep the two calls in synch to allow debugging under the same exact conditions.
         Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase, null, null,
                 autogenReaderList, autoGenJarOutput);
+        if (autoGenCatalog == null) {
+            Log.info("Did not verify catalog because it could not be compiled.");
+            return;
+        }
+
         FilteredCatalogDiffEngine diffEng =
                 new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog, false);
         String diffCmds = diffEng.commands();
