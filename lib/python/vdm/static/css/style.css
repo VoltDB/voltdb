@@ -140,6 +140,8 @@ label.error {
 	height: 10px;
 }
 
+.redC { color:#ff0000;}
+
 label.ccErrorMsg {
   line-height: 15px!important;
   height: auto!important;
@@ -536,7 +538,7 @@ ul.nav li a:hover, ul.nav li a.active, ul.nav li.active a {
 }
 .ContentServerBody {
 	overflow: auto;
-	height: 220px;
+	height: 266px;
 }
 .clusterConfig {
 	background: #e4e4e4;
@@ -1174,6 +1176,30 @@ padding:5px; margin:0 0 0 10px; width:47.5%}
 	text-align: center;
 	margin-top: 13%;
 }
+.loadingStart, {text-align: center;}
+.databaseRg { text-align:center; margin-top:15%;} 
+.loadingStart p, .databaseRg p { font-size:20px; font-weight:bold; line-height:40px}
+
+.databaseRg a { font-size:18px;}
+
+.stalledState, .stalledFail { margin-top:0;}
+.stalledState > .modal-dialog-center, .stalledFail > .modal-dialog-center,  { margin-top:5%;}
+.stalledState > .modal-dialog > .modal-content > .modal-header h4.modal-title { text-align:left;}
+.stalledState > .modal-dialog > .modal-content > .modal-header h4 span, .stalledFail > .modal-dialog > .modal-content > .modal-header h4 span {padding-right: 10px;
+    font-size: 25px;
+    position: relative;
+    top: 7px;
+}}
+.containerStalled { margin:0 0 0 20px}
+.containerStalled p { text-align:left;}
+.containerStalled p { padding:20px 0}
+ul.listStalled { margin:0 0 0 20px; text-align:left; }
+ul.listStalled li { line-height:25px;}
+ul.listStalled li.pullback { position:relative; right:14px;}
+
+.btnSpelled { margin:10px 0; margin:0 0 0 20px; text-align:center;}
+.btnSpelled p { padding:10px 0; text-align:left;}
+
 a.clustBtn {
 	display: inline-block;
 	background-image: linear-gradient( #FFFFFF, #f3f3f3 );
