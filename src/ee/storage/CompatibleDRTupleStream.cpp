@@ -42,8 +42,8 @@
 using namespace std;
 using namespace voltdb;
 
-CompatibleDRTupleStream::CompatibleDRTupleStream()
-    : AbstractDRTupleStream(),
+CompatibleDRTupleStream::CompatibleDRTupleStream(int defaultBufferSize)
+    : AbstractDRTupleStream(defaultBufferSize),
       m_lastCommittedSpUniqueId(0),
       m_lastCommittedMpUniqueId(0)
 {}
@@ -454,7 +454,7 @@ bool CompatibleDRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLe
 }
 
 int32_t CompatibleDRTupleStream::getTestDRBuffer(char *outBytes) {
-    CompatibleDRTupleStream stream;
+    CompatibleDRTupleStream stream(2 * 1024 * 1024 + MAGIC_HEADER_SPACE_FOR_JAVA + MAGIC_DR_TRANSACTION_PADDING); // 2MB
     stream.configure(42);
 
     char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
