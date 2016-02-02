@@ -115,7 +115,6 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_tupleLimit(tupleLimit),
     m_purgeExecutorVector(),
     stats_(this),
-    m_data(true, comp<char*>()),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
@@ -190,7 +189,8 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     // In the memcheck it uses the heap instead of a free list to help Valgrind.
     if (!m_blocksWithSpace.empty()) {
         VOLT_TRACE("GRABBED FREE TUPLE!\n");
-        TBPtr block = m_blocksWithSpace.begin().key();
+        stx::btree_set<TBPtr >::iterator begin = m_blocksWithSpace.begin();
+        TBPtr block = (*begin);
         std::pair<char*, int> retval = block->nextFreeTuple();
 
         /**
@@ -1397,7 +1397,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
         fullestIterator = (*bucketMap)[ii]->begin();
         if (fullestIterator != (*bucketMap)[ii]->end()) {
             foundFullest = true;
-            fullest = fullestIterator.key();
+            fullest = *fullestIterator;
             break;
         }
     }
@@ -1494,14 +1494,16 @@ void PersistentTable::doIdleCompaction() {
     }
 }
 
-void PersistentTable::doForcedCompaction() {
+bool PersistentTable::doForcedCompaction() {
     if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
-        return;
+        return false;
     }
     bool hadWork1 = true;
     bool hadWork2 = true;
+    int64_t notPendingCompactions = 0;
+    int64_t pendingCompactions = 0;
 
     char msg[512];
     snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %zd",
@@ -1543,10 +1545,12 @@ void PersistentTable::doForcedCompaction() {
         if (!m_blocksNotPendingSnapshot.empty() && hadWork1) {
             //std::cout << "Compacting blocks not pending snapshot " << m_blocksNotPendingSnapshot.size() << std::endl;
             hadWork1 = doCompactionWithinSubset(&m_blocksNotPendingSnapshotLoad);
+            notPendingCompactions++;
         }
         if (!m_blocksPendingSnapshot.empty() && hadWork2) {
             //std::cout << "Compacting blocks pending snapshot " << m_blocksPendingSnapshot.size() << std::endl;
             hadWork2 = doCompactionWithinSubset(&m_blocksPendingSnapshotLoad);
+            pendingCompactions++;
         }
     }
     //If compactions have been failing lately, but it didn't fail this time
@@ -1560,19 +1564,20 @@ void PersistentTable::doForcedCompaction() {
     }
 
     assert(!compactionPredicate());
-    snprintf(msg, sizeof(msg), "Finished forced compaction with allocated tuple count %zd",
-             ((intmax_t)allocatedTupleCount()));
+    snprintf(msg, sizeof(msg), "Finished forced compaction of %zd non-snapshot blocks and %zd snapshot blocks with allocated tuple count %zd",
+            ((intmax_t)notPendingCompactions), ((intmax_t)pendingCompactions), ((intmax_t)allocatedTupleCount()));
     LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+    return (notPendingCompactions + pendingCompactions) > 0;
 }
 
 void PersistentTable::printBucketInfo() {
     std::cout << std::endl;
     TBMapI iter = m_data.begin();
     while (iter != m_data.end()) {
-        std::cout << "Block " << static_cast<void*>(iter.value()->address()) << " has " <<
-                iter.value()->activeTuples() << " active tuples and " << iter.value()->lastCompactionOffset()
+        std::cout << "Block " << static_cast<void*>(iter.data()->address()) << " has " <<
+                iter.data()->activeTuples() << " active tuples and " << iter.data()->lastCompactionOffset()
                 << " last compaction offset and is in bucket " <<
-                static_cast<void*>(iter.value()->currentBucket().get()) <<
+                static_cast<void*>(iter.data()->currentBucket().get()) <<
                 std::endl;
         iter++;
     }
@@ -1591,7 +1596,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksNotPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksNotPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksNotPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksNotPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>(bucketIter.key()->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
             bucketIter++;
         }
     }
@@ -1610,7 +1615,7 @@ void PersistentTable::printBucketInfo() {
         std::cout << "Bucket " << ii << "(" << static_cast<void*>(m_blocksPendingSnapshotLoad[ii].get()) << ") has size " << m_blocksPendingSnapshotLoad[ii]->size() << std::endl;
         TBBucketI bucketIter = m_blocksPendingSnapshotLoad[ii]->begin();
         while (bucketIter != m_blocksPendingSnapshotLoad[ii]->end()) {
-            std::cout << "\t" << static_cast<void*>(bucketIter.key()->address()) << std::endl;
+            std::cout << "\t" << static_cast<void*>((*bucketIter)->address()) << std::endl;
             bucketIter++;
         }
     }

@@ -932,7 +932,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      */
     @Override
     public void toggleProfiler(final int toggle) {
-        return;
     }
 
 
@@ -1321,7 +1320,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         } catch (final IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     @Override
