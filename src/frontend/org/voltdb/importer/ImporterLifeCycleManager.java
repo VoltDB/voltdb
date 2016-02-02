@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -149,6 +150,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         builder.putAll(Maps.filterKeys(oldReference, notUriIn(assignment.getRemoved())));
         List<AbstractImporter> toStop = new ArrayList<>();
+        List<String> missingURLs = new ArrayList<>();
         for (URI removed: assignment.getRemoved()) {
             if (m_configs.containsKey(removed)) {
                 try {
@@ -162,8 +164,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                             e);
                 }
             } else {
-                s_logger.error("The source for Import has changed its configuration. Importer URL: " + removed.toString() +
-                        ". Use PAUSE and RESUME to refresh the importer.");
+                missingURLs.add(removed.toString());
             }
         }
 
@@ -174,9 +175,13 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                 newImporters.add(importer);
                 builder.put(added, importer);
             } else {
-                s_logger.error("The source for Import has changed its configuration. Importer URL: " + added.toString() +
-                        ". Use PAUSE and RESUME to refresh the importer.");
+                missingURLs.add(added.toString());
             }
+        }
+
+        if (!missingURLs.isEmpty()) {
+            s_logger.error("The source for Import has changed its configuration. Importer URL: " + Joiner.on(", ").join(missingURLs) +
+                    ". Pause and Resume the database to refresh the importer.");
         }
 
         ImmutableMap<URI, AbstractImporter> newReference = builder.build();
