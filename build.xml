@@ -762,7 +762,7 @@ DISTRIBUTION
     <!-- populate the docs and other core files -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
-            <include name="README"/>
+            <include name="README.md"/>
             <include name="README.thirdparty"/>
             <include name="LICENSE"/>
             <include name="doc/**"/>
