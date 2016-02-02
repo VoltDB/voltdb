@@ -288,12 +288,8 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     cmpdb_file = open(cmpdb_path, "rb")
     jni_file = open(jni_path, "rb")
     if modified_sql_path:
-        # TODO: temp debug:
-        print 'Using modified_sql_path:', modified_sql_path
         modified_sql_file = open(modified_sql_path, "rb")
     else:
-        # TODO: temp debug:
-        print 'No modified_sql_path:', modified_sql_path
         modified_sql_file = None
     modified_sql = {}
     failures = 0
