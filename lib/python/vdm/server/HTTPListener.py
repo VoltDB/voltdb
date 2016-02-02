@@ -553,11 +553,7 @@ def run_voltserver_process(voltdb_cmd, outfilename):
     os.chdir(PATH)
     try:
         my_env = os.environ.copy()
-        opts = ''
-        if 'VOLTDB_OPTS' in my_env:
-            opts = my_env['VOLTDB_OPTS']
-        opts = opts + ' -DVDMStarted=true'
-        my_env['VOLTDB_OPTS'] = opts
+        my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
         return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
                                       env=my_env, preexec_fn=ignore_signals, close_fds=True)
     finally:
