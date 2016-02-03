@@ -3037,7 +3037,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
         if (length <= OBJECTLENGTH_NULL) {
             throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
         }
-        output.writeInt(static_cast<int32_t>(length));
+        output.writeInt(length);
 
         // Not a null string: write it out
         if (type != VALUE_TYPE_GEOGRAPHY) {
@@ -3098,10 +3098,18 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
     const ValueType type = getValueType();
     switch (type) {
     case VALUE_TYPE_VARCHAR:
-    case VALUE_TYPE_VARBINARY: {
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY: {
         int32_t length;
         const char* buf = getObject_withoutNull(&length);
-        io.writeBinaryString(buf, length);
+        if (type == VALUE_TYPE_GEOGRAPHY) {
+            io.writeInt(length);
+            // geography gets its own serialization to deal with byte-swapping and endianness
+            getGeographyValue().serializeTo(io);
+        }
+        else {
+            io.writeBinaryString(buf, length);
+        }
         return;
     }
     case VALUE_TYPE_TINYINT:
@@ -3132,7 +3140,6 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
         getGeographyPointValue().serializeTo(io);
         return;
     }
-    case VALUE_TYPE_GEOGRAPHY:
     case VALUE_TYPE_INVALID:
     case VALUE_TYPE_NULL:
     case VALUE_TYPE_BOOLEAN:
