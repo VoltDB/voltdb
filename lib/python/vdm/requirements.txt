@@ -34,3 +34,4 @@ WTForms== 2.0.2
 jsonschema==2.5.1
 flask-cors==2.1.2
 xmltodict==0.4.1
+psutil==3.4.2

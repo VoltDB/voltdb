@@ -36,8 +36,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
@@ -65,6 +63,8 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -4217,17 +4217,6 @@ public class TestVoltCompiler extends TestCase {
               "export table geogs to stream geog_stream;\n";
         badDDLAgainstSimpleSchema(".*Can't EXPORT table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
                                   ddl);
-
-        ddl = "create table geogs ( id integer primary key, " +
-                                  " region1 geography NOT NULL, " +
-                                  " point1 geography_point NOT NULL, " +
-                                  " point2 geography_point NOT NULL);\n" +
-              "dr table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - " +
-                                      "column name: 'POINT1' type: 'GEOGRAPHY_POINT', " +
-                                      "column name: 'POINT2' type: 'GEOGRAPHY_POINT', " +
-                                      "column name: 'REGION1' type: 'GEOGRAPHY'.*",
-                              ddl);
     }
 
     public void testGoodDRTable() throws Exception {
@@ -4266,6 +4255,22 @@ public class TestVoltCompiler extends TestCase {
                 "dr table e2;"
                 );
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        schema = "create table geogs ( id integer NOT NULL, " +
+                                    " region1 geography NOT NULL, " +
+                                    " point1 geography_point NOT NULL, " +
+                                    " point2 geography_point NOT NULL);\n" +
+                 "partition table geogs on column id;\n";
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table geogs;");
+        assertTrue(db.getTables().getIgnoreCase("geogs").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                schema,
+                "dr table geogs;",
+                "dr table geogs disable;");
+        assertFalse(db.getTables().getIgnoreCase("geogs").getIsdred());
     }
 
     public void testBadDRTable() throws Exception {
@@ -4288,32 +4293,6 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
                 "dr table table one;"
                 );
-
-        // geography point
-        String ddl = "create table geogs ( id integer primary key, " +
-                                         " region1 geography NOT NULL);\n" +
-                "dr table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - column name: 'REGION1' type: 'GEOGRAPHY'.*",
-                                   ddl);
-
-        // geography value
-        ddl = "create table geogs ( id integer primary key, " +
-                                  " point1 geography_point NOT NULL );\n" +
-              "dr table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - column name: 'POINT1' type: 'GEOGRAPHY_POINT'.*",
-                ddl);
-
-        // mutiple geo columns
-        ddl = "create table geogs ( id integer primary key, " +
-                                  " region1 geography NOT NULL, " +
-                                  " point1 geography_point NOT NULL, " +
-                                  " point2 geography_point NOT NULL);\n" +
-                     "dr table geogs;\n";
-        badDDLAgainstSimpleSchema(".*Can't DR table 'GEOGS' containing geo type column.s. - " +
-                                                "column name: 'POINT1' type: 'GEOGRAPHY_POINT', " +
-                                                "column name: 'POINT2' type: 'GEOGRAPHY_POINT', " +
-                                                "column name: 'REGION1' type: 'GEOGRAPHY'.*",
-                                  ddl);
     }
 
     public void testCompileFromDDL() throws IOException {

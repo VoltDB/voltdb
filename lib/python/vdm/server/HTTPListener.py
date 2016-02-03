@@ -27,24 +27,26 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from flask import Flask, render_template, jsonify, abort, make_response, request, Response
-from flask.views import MethodView
-from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
-import traceback
-import socket
-import os
-import json
-from xml.etree.ElementTree import Element, SubElement, tostring, XML
-import sys
-import subprocess
-import signal
-import time
-import requests
-from flask.ext.cors import CORS
-from collections import defaultdict
 import ast
+from collections import defaultdict
+from flask import Flask, render_template, jsonify, abort, make_response, request, Response
+from flask.ext.cors import CORS
+from flask.views import MethodView
+import json
+import os
 import os.path
+import psutil
+import requests
+import signal
+import socket
+import subprocess
+import sys
+import time
+import traceback
 import urllib
+from xml.etree.ElementTree import Element, SubElement, tostring, XML
+
+from Validation import ServerInputs, DatabaseInputs, JsonInputs, UserInputs, ConfigValidation
 import DeploymentConfig
 import glob
 sys.path.append(os.path.abspath(os.path.dirname(__file__) + '/' + '../../voltcli'))
@@ -490,6 +492,47 @@ def ignore_signals():
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+def check_and_start_local_server(database_id, recover=False):
+    if Get_Voltdb_Process().isProcessRunning:
+        return make_response(jsonify({'statusstring': 'A VoltDB Server process is already running'}), 500)
+
+    retcode = start_local_server(database_id, recover)
+    if (retcode == 0):
+        return make_response(jsonify({'statusstring': 'Success'}), 200)
+    else:
+        return make_response(jsonify({'statusstring': 'Error starting server'}), 500)
+
+# def is_voltserver_running():
+#     for proc in psutil.process_iter():
+#
+#         try:
+#             cmd = proc.cmdline()
+#             if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
+#
+#                 return True
+#         except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
+#             #print traceback.format_exc()
+#             pass
+#
+#     return False
+
+
+def Get_Voltdb_Process():
+    VoltdbProcess.isProcessRunning = False
+    VoltdbProcess.processId = -1
+    for proc in psutil.process_iter():
+
+        try:
+            cmd = proc.cmdline()
+            if ('-DVDMStarted=true' in cmd) and ('java' in cmd[0]):
+                VoltdbProcess.isProcessRunning = True
+                VoltdbProcess.processId = proc.pid
+                return VoltdbProcess
+        except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied) as e:
+            #print traceback.format_exc()
+            pass
+
+    return VoltdbProcess
 
 def start_local_server(database_id, recover=False):
     deploymentcontents = DeploymentConfig.DeploymentConfiguration.get_database_deployment(database_id)
@@ -506,20 +549,10 @@ def start_local_server(database_id, recover=False):
 
     Global.OUTFILE_COUNTER = Global.OUTFILE_COUNTER + 1
     outfilename = os.path.join(PATH, ('voltserver.output.%s.%u') % (Global.OUTFILE_TIME, Global.OUTFILE_COUNTER))
-    outfile = open(outfilename, 'w')
-
-    # Start server in a separate process
-    oldwd = os.getcwd()
-    os.chdir(PATH)
-    try:
-        voltserver = subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
-                                      preexec_fn=ignore_signals, close_fds=True)
-    finally:
-        os.chdir(oldwd)
+    voltserver = run_voltserver_process(voltdb_cmd, outfilename)
 
     initialized = False
     rfile = open(outfilename, 'r')
-
     # Wait till server is ready or process exited due to error.
     # Wait for a couple of seconds to see if the server errors out
     endtime = time.time() + 2
@@ -535,6 +568,21 @@ def start_local_server(database_id, recover=False):
     else:
         return 1
 
+def run_voltserver_process(voltdb_cmd, outfilename):
+    outfile = open(outfilename, 'w')
+
+    # Start server in a separate process
+    oldwd = os.getcwd()
+    os.chdir(PATH)
+    try:
+        my_env = os.environ.copy()
+        my_env['VOLTDB_OPTS'] = os.getenv('VOLTDB_OPTS', '') +  ' -DVDMStarted=true'
+        return subprocess.Popen(voltdb_cmd, stdout=outfile, stderr=subprocess.STDOUT,
+                                      env=my_env, preexec_fn=ignore_signals, close_fds=True)
+
+
+    finally:
+        os.chdir(oldwd)
 
 def get_voltdb_dir():
     return os.path.realpath(os.path.join(MODULE_PATH, '../../../..', 'bin'))
@@ -593,9 +641,9 @@ def run_voltdb_cmd(cmd, verb, args, database_id):
     user_options = []
     if is_security_enabled(database_id):
         admin = get_admin_user(database_id)
-	if admin is None:
-	    raise Exception('No admin users found')
-	user_options = [ '-u', admin['name'], '-p', admin['password'] ]
+        if admin is None:
+            raise Exception('No admin users found')
+        user_options = [ '-u', admin['name'], '-p', admin['password'] ]
 
     voltdb_dir = get_voltdb_dir()
     voltdb_cmd = [ os.path.join(voltdb_dir, cmd), verb ] + user_options + args
@@ -607,6 +655,9 @@ def run_voltdb_cmd(cmd, verb, args, database_id):
 
 
 def start_database(database_id, recover=False):
+    # sync deployment file first
+    sync_configuration() 
+
     members = []
     current_database = [database for database in Global.DATABASES if database['id'] == database_id]
     if not current_database:
@@ -709,8 +760,6 @@ def write_configuration_file():
     main_header = make_configuration_file()
 
     try:
-        # f = open(PATH + 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml','w')
-        # vdm_path = 'vdm.xml' if PATH.endswith('/') else PATH + '/' + 'vdm.xml'
         path = os.path.join(PATH, 'vdm.xml')
         f = open(path, 'w')
         f.write(main_header)
@@ -1334,6 +1383,9 @@ IS_CURRENT_NODE_ADDED = False
 IS_CURRENT_DATABASE_ADDED = False
 IGNORETOP = { "databaseid" : True, "users" : True}
 
+class VoltdbProcess:
+    isProcessRunning = False
+    processId = -1
 
 class Global:
     """
@@ -1860,7 +1912,7 @@ class RecoverDatabaseAPI(MethodView):
             Status string indicating if the database start request was sent successfully
         """
 
-        start_database(database_id, True)
+        return start_database(database_id, True)
 
 
 class StopDatabaseAPI(MethodView):
@@ -1875,14 +1927,11 @@ class StopDatabaseAPI(MethodView):
         Returns:
             Status string indicating if the stop request was sent successfully
         """
-
         try:
-            response = stop_database(database_id)
-            return make_response(jsonify({'statusstring': response}), 200)
+            os.kill(Get_Voltdb_Process().processId, signal.SIGTERM)
+            return make_response(jsonify({'statusstring': 'success'}), 200)
         except Exception, err:
-            print traceback.format_exc()
-            return make_response(jsonify({'statusstring': str(err)}),
-                                 500)
+            return make_response(jsonify({'statusstring': str(err)}), 500)
 
 
 class StartServerAPI(MethodView):
@@ -1900,13 +1949,7 @@ class StartServerAPI(MethodView):
         """
 
         try:
-            retcode = start_local_server(database_id)
-            if (retcode == 0):
-                return make_response(jsonify({'statusstring': 'Success'}),
-                                             200)
-            else:
-                return make_response(jsonify({'statusstring': 'Error starting server'}),
-                                             500)
+            return check_and_start_local_server(database_id)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1928,13 +1971,7 @@ class RecoverServerAPI(MethodView):
         """
 
         try:
-            retcode = start_local_server(database_id, True)
-            if (retcode == 0):
-                return make_response(jsonify({'statusstring': 'Success'}),
-                                             200)
-            else:
-                return make_response(jsonify({'statusstring': 'Error issuing recover cmd'}),
-                                             500)
+            return check_and_start_local_server(database_id, True)
         except Exception, err:
             print traceback.format_exc()
             return make_response(jsonify({'statusstring': str(err)}),
@@ -1995,14 +2032,10 @@ class SyncVdmConfiguration(MethodView):
             print traceback.format_exc()
             return jsonify({'status':'success', 'error': str(errs)})
 
-        # try:
         Global.DATABASES = databases
         Global.SERVERS = servers
         Global.DEPLOYMENT = deployments
         Global.DEPLOYMENT_USERS = deployment_users
-
-        # except Exception, errs:
-        #     print str(errs)
 
         return jsonify({'status':'success'})
 
@@ -2087,13 +2120,17 @@ class StatusDatabaseAPI(MethodView):
 
     @staticmethod
     def get(database_id):
+
         try:
-            client = voltdbclient.FastSerializer("localhost", 21212)
+            client = voltdbclient.FastSerializer(__IP__, 21212)
             proc = voltdbclient.VoltProcedure( client, "@Ping")
             response = proc.call()
-            return jsonify({'status': response.status})
+            return jsonify({'status': "running"})
         except:
-            return jsonify({'status': 0})
+            if Get_Voltdb_Process().isProcessRunning:
+                return jsonify({'status': "stalled"})
+            else:
+                return jsonify({'status': "stopped"})
 
 
 def main(runner, amodule, config_dir, server):
