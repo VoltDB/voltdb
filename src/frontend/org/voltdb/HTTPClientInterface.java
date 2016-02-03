@@ -59,6 +59,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 public class HTTPClientInterface {
 
     public static final String QUERY_TIMEOUT_PARAM = "Querytimeout";
+    public static final String JSONP = "jsonp";
     private static final VoltLogger m_log;
 
     final static Oid KRB5OID;
@@ -93,6 +94,7 @@ public class HTTPClientInterface {
     private final ExecutorService m_closeAllExecutor;
 
     public final static int MAX_QUERY_PARAM_SIZE = 2 * 1024 * 1024; // 2MB
+    public final static int MAX_FORM_KEYS = 512;
 
     public void setTimeout(int seconds) {
         m_timeout = seconds * 1000;
@@ -121,10 +123,10 @@ public class HTTPClientInterface {
             // handle jsonp pattern
             // http://en.wikipedia.org/wiki/JSON#The_Basic_Idea:_Retrieving_JSON_via_Script_Tags
             if (m_jsonp != null) {
-                msg = String.format("%s( %s )", m_jsonp, msg);
+                msg = asJsonp(m_jsonp, msg);
             }
 
-            m_request.setAttribute("result", msg);
+            m_continuation.setAttribute("result", msg);
             try {
                 m_continuation.resume();
             } catch (IllegalStateException e) {
@@ -150,28 +152,63 @@ public class HTTPClientInterface {
         m_closeAllExecutor.shutdownNow();
     }
 
+    private final static String asJsonp(String jsonp, String msg) {
+        StringBuilder sb = new StringBuilder(jsonp.length() + msg.length() + 8);
+        return sb.append(jsonp).append("( ").append(msg).append(" )").toString();
+    }
+
+    private final static void simpleJsonResponse(String jsonp, String message, HttpServletResponse rsp, int code) {
+        ClientResponseImpl rimpl = new ClientResponseImpl(
+                ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], message);
+        String msg = rimpl.toJSONString();
+        if (jsonp != null) {
+            msg = asJsonp(jsonp, msg);
+        }
+        rsp.setStatus(code);
+        try {
+            rsp.getWriter().print(msg);
+            rsp.getWriter().flush();
+        } catch (IOException e) {
+        }
+    }
+
+    private final static void badRequest(String jsonp, String message, HttpServletResponse rsp) {
+        simpleJsonResponse(jsonp, message, rsp, HttpServletResponse.SC_BAD_REQUEST);
+    }
+
+    private final static void unauthorized(String jsonp, String message, HttpServletResponse rsp) {
+        simpleJsonResponse(jsonp, message, rsp, HttpServletResponse.SC_UNAUTHORIZED);
+    }
+
+    private final static void ok(String jsonp, String message, HttpServletResponse rsp) {
+        simpleJsonResponse(jsonp, message, rsp, HttpServletResponse.SC_OK);
+    }
+
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
         boolean suspended = false;
         boolean forceClose = false;
 
+        String jsonp = request.getHeader(JSONP);
+        if (jsonp != null && jsonp.trim().isEmpty()) {
+            jsonp = null;
+        }
         String authHeader = request.getHeader(HttpHeader.AUTHORIZATION.asString());
         if (m_spnegoEnabled && (authHeader == null || !authHeader.startsWith(HttpHeader.NEGOTIATE.asString()))) {
             m_log.debug("SpengoAuthenticator: sending challenge");
             response.setHeader(HttpHeader.WWW_AUTHENTICATE.asString(), HttpHeader.NEGOTIATE.asString());
-            try {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
-            } catch (IOException ignoreItAsTheBrowserMustHaveClosed) {
-            }
+            unauthorized(jsonp, "must initiate SPNEGO negotiation", response);
+            request.setHandled(true);
             return;
         }
 
-        String result = (String )request.getAttribute("result");
+        final Continuation continuation = ContinuationSupport.getContinuation(request);
+        String result = (String)continuation.getAttribute("result");
         if (result != null) {
             try {
                 response.setStatus(HttpServletResponse.SC_OK);
-                request.setHandled(true);
                 response.getWriter().print(result);
+                request.setHandled(true);
             } catch (IllegalStateException | IOException e){
                // Thrown when we shut down the server via the JSON/HTTP (web studio) API
                // Essentially we're closing everything down from underneath the HTTP request.
@@ -179,12 +216,8 @@ public class HTTPClientInterface {
             }
             return;
         }
-        Continuation continuation = ContinuationSupport.getContinuation(request);
-        if (m_timeout > 0 && continuation.isInitial()) {
-            continuation.setTimeout(m_timeout);
-        }
         //Check if this is resumed request.
-        if (Boolean.TRUE.equals(request.getAttribute("SQLSUBMITTED"))) {
+        if (Boolean.TRUE.equals(continuation.getAttribute("SQLSUBMITTED"))) {
             try {
                 continuation.suspend(response);
             } catch (IllegalStateException e){
@@ -194,23 +227,33 @@ public class HTTPClientInterface {
             }
             return;
         }
-        String jsonp = null;
+
+        if (m_timeout > 0 && continuation.isInitial()) {
+            continuation.setTimeout(m_timeout);
+        }
+
         try {
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
+
                 if (queryParamSize > MAX_QUERY_PARAM_SIZE) {
-                    // We don't want to be building huge strings
-                    throw new Exception("Query string too large: " + String.valueOf(request.getContentLength()));
+                    ok(jsonp, "Query string too large: " + String.valueOf(request.getContentLength()), response);
+                    request.setHandled(true);
+                    return;
                 }
                 if (queryParamSize == 0) {
-                    throw new Exception("Received POST with no parameters in the body.");
+                    ok(jsonp, "Received POST with no parameters in the body.", response);
+                    request.setHandled(true);
+                    return;
                 }
             }
-
-            jsonp = request.getParameter("jsonp");
+            if (jsonp == null) {
+                jsonp = request.getParameter(JSONP);
+            }
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
             String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
+
             int queryTimeout = -1;
             if (timeoutStr != null) {
                 try {
@@ -219,43 +262,29 @@ public class HTTPClientInterface {
                         throw new NumberFormatException();
                     }
                 } catch(NumberFormatException e) {
-                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0],
-                            "Invalid procedure call timeout: " + timeoutStr);
-                    String msg = rimpl.toJSONString();
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    try {
-                        response.getWriter().print(msg);
-                    } catch (IOException e1) {} // Ignore this as browser must have closed.
+                    badRequest(jsonp, "Invalid procedure call timeout: " + timeoutStr, response);
+                    request.setHandled(true);
+                    return;
                 }
             }
 
             // null procs are bad news
             if (procName == null) {
-                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                badRequest(jsonp, "Procedure parameter is missing", response);
+                request.setHandled(true);
                 return;
             }
 
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
-                String msg = authResult.m_message;
-                ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                msg = rimpl.toJSONString();
-                if (jsonp != null) {
-                    msg = String.format("%s( %s )", jsonp, msg);
-                }
-                response.setStatus(HttpServletResponse.SC_OK);
+                ok(jsonp, authResult.m_message, response);
                 request.setHandled(true);
-                try {
-                    response.getWriter().print(msg);
-                } catch (IOException e1) {} // Ignore this as browser must have closed.
                 return;
             }
 
             continuation.suspend(response);
             suspended = true;
+
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
             if (params != null) {
@@ -265,13 +294,15 @@ public class HTTPClientInterface {
                 }
                 // if decoding params has a fail, then fail
                 catch (Exception e) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    badRequest(jsonp, "failed to parse invocation parameters", response);
+                    request.setHandled(true);
                     continuation.complete();
                     return;
                 }
                 // if the paramset has content, but decodes to null, fail
                 if (paramSet == null) {
-                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    badRequest(jsonp, "failed to decode invocation parameters", response);
+                    request.setHandled(true);
                     continuation.complete();
                     return;
                 }
@@ -289,32 +320,26 @@ public class HTTPClientInterface {
                 }
             }
             if (!success) {
+                ok(jsonp, "Server is not accepting work at this time.", response);
+                request.setHandled(true);
                 continuation.complete();
-                throw new Exception("Server is not accepting work at this time.");
+                return;
             }
             if (jsonp != null) {
                 request.setAttribute("jsonp", jsonp);
             }
-            request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
+            continuation.setAttribute("SQLSUBMITTED", Boolean.TRUE);
         } catch (Exception e) {
-            String msg = e.getMessage();
+            String msg = Throwables.getStackTraceAsString(e);
             if (e instanceof IOException || e instanceof NoConnectionsException) {
                 forceClose = true;
             }
-            m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
-            ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-            msg = rimpl.toJSONString();
-            if (jsonp != null) {
-                msg = String.format("%s( %s )", jsonp, msg);
+            m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.WARN, e, "JSON interface exception");
+            ok(jsonp, msg, response);
+            if (suspended) {
+                continuation.complete();
             }
-            response.setStatus(HttpServletResponse.SC_OK);
             request.setHandled(true);
-            try {
-                response.getWriter().print(msg);
-                if (suspended) {
-                    continuation.complete();
-                }
-            } catch (IOException e1) {} // Ignore this as browser must have closed.
         } finally {
             releaseClient(authResult, forceClose);
         }

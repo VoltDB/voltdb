@@ -54,18 +54,16 @@
 package org.voltdb;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -78,6 +76,18 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpVersion;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -143,65 +153,28 @@ public class TestJSONInterface extends TestCase {
         return String.format("http://localhost:%d/%s", port, path);
     }
 
-    public static String callProcOverJSONRaw(String varString, int expectedCode) throws Exception {
-        URL jsonAPIURL = new URL("http://localhost:8095/api/1.0/");
-
-        HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.connect();
-
-        OutputStream connos = conn.getOutputStream();
-
-        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(connos));
-        out.write(varString);
-        out.flush();
-        out.close();
-        connos.close();
-        out = null;
-
-        BufferedReader in = null;
-        try {
-            if (conn.getInputStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getInputStream(), StandardCharsets.UTF_8));
-            }
-        } catch (IOException e) {
-            if (conn.getErrorStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getErrorStream(), StandardCharsets.UTF_8));
-            }
+    public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
+        URI jsonAPIURI = URI.create("http://localhost:8095/api/1.0/");
+        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+            HttpPost post = new HttpPost(jsonAPIURI);
+            RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
+            post.setProtocolVersion(HttpVersion.HTTP_1_1);
+            post.setConfig(rc);
+            post.setEntity(new StringEntity(varString, ContentType.APPLICATION_FORM_URLENCODED));
+            ResponseHandler<String> rh = new ResponseHandler<String>() {
+                @Override
+                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
+                    int status = response.getStatusLine().getStatusCode();
+                    assertEquals(expectedCode, status);
+                    if ((status >= 200 && status < 300) || status == 400) {
+                        HttpEntity entity = response.getEntity();
+                        return entity != null ? EntityUtils.toString(entity) : null;
+                    }
+                    return null;
+                }
+            };
+            return httpclient.execute(post,rh);
         }
-        if (in == null) {
-            throw new Exception("Unable to read response from server");
-        }
-
-        StringBuilder decodedString = new StringBuilder();
-        String line;
-        while ((line = in.readLine()) != null) {
-            decodedString.append(line);
-        }
-        in.close();
-        in = null;
-        // get result code
-        int responseCode = conn.getResponseCode();
-
-        String response = decodedString.toString();
-
-        assertEquals(expectedCode, responseCode);
-
-        try {
-            conn.getInputStream().close();
-            conn.disconnect();
-        } // ignore closing problems here
-        catch (Exception e) {
-        }
-        conn = null;
-
-        //System.err.println(response);
-        return response;
     }
 
     public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
@@ -1483,8 +1456,8 @@ public class TestJSONInterface extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 404);
-            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 404);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 400);
+            callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 400);
         } finally {
             if (server != null) {
                 server.shutdown();
