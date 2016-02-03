@@ -26,24 +26,25 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipOutputStream;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.varia.NullAppender;
-import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.processtools.SFTPSession;
 import org.voltdb.processtools.SFTPSession.SFTPException;
@@ -64,7 +65,7 @@ public class Collector {
     public static long m_currentTimeMillis = System.currentTimeMillis();
 
     private static String m_workingDir = null;
-    private static List<String> m_logPaths = new ArrayList<String>();
+    private static Set<String> m_logPaths = new HashSet<String>();
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata", "syscheckdata"};
 
@@ -88,10 +89,10 @@ public class Collector {
         boolean dryrun = false;
 
         @Option(desc = "exclude heap dump file from collection")
-        boolean skipheapdump = false;
+        boolean skipheapdump = true;
 
         @Option(desc = "number of days of files to collect (files included are log, crash files), Current day value is 1")
-        int days = 14;
+        int days = 7;
 
         @Option(desc = "the voltdbroot path")
         String voltdbroot = "";
@@ -134,7 +135,7 @@ public class Collector {
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
 
-        List<String> collectionFilesList = listCollection(m_config.skipheapdump);
+        Set<String> collectionFilesList = listCollection(m_config.skipheapdump);
 
         if (m_config.dryrun) {
             System.out.println("List of the files to be collected:");
@@ -247,8 +248,8 @@ public class Collector {
         }
     }
 
-    private static List<String> listCollection(boolean skipHeapDump) {
-        List<String> collectionFilesList = new ArrayList<String>();
+    private static Set<String> listCollection(boolean skipHeapDump) {
+        Set<String> collectionFilesList = new HashSet<String>();
 
         try {
             if (new File(m_deploymentPath).exists()) {
@@ -339,7 +340,7 @@ public class Collector {
         m_currentTimeMillis = System.currentTimeMillis();
     }
 
-    private static void generateCollection(List<String> paths, boolean copyToVEM) {
+    private static void generateCollection(Set<String> paths, boolean copyToVEM) {
         try {
             String timestamp = "";
             String rootpath = "";
@@ -358,13 +359,14 @@ public class Collector {
             }
 
             String folderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
-                                InetAddress.getLocalHost().getHostName() + "_voltlogs_" + timestamp;
+                                CoreUtils.getHostnameOrAddress() + "_voltlogs_" + timestamp;
             String folderPath = folderBase + File.separator;
             String collectionFilePath = rootpath + File.separator + folderBase + ".zip";
 
             FileOutputStream collectionStream = new FileOutputStream(collectionFilePath);
             ZipOutputStream zipStream = new ZipOutputStream(collectionStream);
 
+            Map<String, Integer> pathCounter = new HashMap<String, Integer>();
             // Collect files with paths indicated in the list
             for (String path: paths) {
                 // Skip particular items corresponding to temporary files that are only generated during collecting
@@ -385,15 +387,28 @@ public class Collector {
                 if (filename.startsWith("voltdb_crash")) {
                     entryPath = "voltdb_crashfiles" + File.separator + file.getName();
                 }
-                if (filename.startsWith("syslog") || filename.equals("dmesg") || filename.equals("systemcheck")) {
+                if (filename.startsWith("syslog") || filename.equals("dmesg") || filename.equals("systemcheck") ||
+                        filename.startsWith("hs_err_pid")) {
                     entryPath = "system_logs" + File.separator + file.getName();
                 }
                 if (filename.equals("deployment.xml") || filename.equals("catalog.jar") || filename.equals("config.json")) {
                     entryPath = "voltdb_files" + File.separator + file.getName();
                 }
+                if (filename.endsWith(".hprof")) {
+                    entryPath = "heap_dumps" + File.separator + file.getName();
+                }
 
                 if (file.isFile() && file.canRead() && file.length() > 0) {
-                    ZipEntry zEntry= new ZipEntry(folderPath + entryPath);
+                    String zipPath = folderPath + entryPath;
+                    if (pathCounter.containsKey(zipPath)) {
+                        Integer pathCount = pathCounter.get(zipPath);
+                        pathCounter.put(zipPath, pathCount + 1);
+                        zipPath = zipPath.concat("(" + pathCount.toString() + ")");
+                    } else {
+                        pathCounter.put(zipPath, 1);
+                    }
+
+                    ZipEntry zEntry= new ZipEntry(zipPath);
                     zipStream.putNextEntry(zEntry);
                     FileInputStream in = new FileInputStream(path);
 
@@ -501,7 +516,7 @@ public class Collector {
     }
 
     private static void cmd(ZipOutputStream zipStream, String[] command, String folderPath, String resFilename)
-            throws IOException, TarMalformatException {
+            throws IOException, ZipException {
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
 
