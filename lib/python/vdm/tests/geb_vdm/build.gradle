@@ -74,8 +74,7 @@ drivers.each { driver ->
         systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
         systemProperty "geb.env", driver
 
-        // If you wanted to set the baseUrl in your build…
-        // systemProperty "geb.build.baseUrl", "http://1234.com"
+        // Provide url, default value is http://localhost:8000/
         systemProperty "geb.build.baseUrl", getProjectPropertyOrDefaultValue("url", "http://localhost:8000/")
     }
 }
