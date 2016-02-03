@@ -1502,6 +1502,13 @@ class ClusterConfigurationTest extends TestBase {
         println()
     }
 
+    def gebSampleTest(){
+        when: "test"
+        println("Test")
+        then: "test"
+        println("Test")
+    }
+
     def cleanup() { // called after each test
         count = 0
 
