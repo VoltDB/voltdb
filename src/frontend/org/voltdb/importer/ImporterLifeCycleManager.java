@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -150,7 +151,8 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
         builder.putAll(Maps.filterKeys(oldReference, notUriIn(assignment.getRemoved())));
         List<AbstractImporter> toStop = new ArrayList<>();
-        List<String> missingURLs = new ArrayList<>();
+        List<String> missingRemovedURLs = new ArrayList<>();
+        List<String> missingAddedURLs = new ArrayList<>();
         for (URI removed: assignment.getRemoved()) {
             if (m_configs.containsKey(removed)) {
                 try {
@@ -164,7 +166,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                             e);
                 }
             } else {
-                missingURLs.add(removed.toString());
+                missingRemovedURLs.add(removed.toString());
             }
         }
 
@@ -175,13 +177,19 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                 newImporters.add(importer);
                 builder.put(added, importer);
             } else {
-                missingURLs.add(added.toString());
+                missingAddedURLs.add(added.toString());
             }
         }
 
-        if (!missingURLs.isEmpty()) {
-            s_logger.error("The source for Import has changed its configuration. Importer URL: " + Joiner.on(", ").join(missingURLs) +
-                    ". Pause and Resume the database to refresh the importer.");
+        if (!missingRemovedURLs.isEmpty() && !missingAddedURLs.isEmpty()) {
+            Set<String> missingURLs = new HashSet<>(missingRemovedURLs);
+            missingURLs.addAll(missingAddedURLs);
+            s_logger.error("The source for Import has changed its configuration. Importer URL: " +
+                    Joiner.on(", ").join(missingURLs) + ". Pause and Resume the database to refresh the importer.");
+            if (s_logger.isDebugEnabled()) {
+                s_logger.debug("Missing added URLs: " + Joiner.on(", ").join(missingAddedURLs));
+                s_logger.debug("Missing removed URLs: " + Joiner.on(", ").join(missingRemovedURLs));
+            }
         }
 
         ImmutableMap<URI, AbstractImporter> newReference = builder.build();
