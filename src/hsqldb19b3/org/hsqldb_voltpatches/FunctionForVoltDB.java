@@ -582,7 +582,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 throw Error.error(ErrorCode.X_42567,
                         "input type to DWITHIN function is ambiguous");
             }
-            else if (nodes[0].dataType == null || nodes[1].dataType == null || nodes[2].dataType == null) {
+            else if (nodes[0].dataType == null || nodes[1].dataType == null) {
                 // "data type cast needed for parameter or null literal"
                 throw Error.error(ErrorCode.X_42567,
                         "input type to DWITHIN function is ambiguous");
@@ -591,9 +591,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                      (!nodes[1].dataType.isGeographyType() && !nodes[1].dataType.isGeographyPointType())) {
                 // first and second argument should be geography type
                throw Error.error(ErrorCode.X_42565,
-                       "The DWITHIN function evaulates if geographies are within specified distance of one-another for "
+                       "DWITHIN function evaulates if geographies are within specified distance of one-another for "
                      + "POINT-to-POINT, POINT-to-POLYGON and POLYGON-to-POINT geographies only.");
             } else if (nodes[0].dataType.isGeographyType() && nodes[1].dataType.isGeographyType()) {
+                // "incompatible data type in operation"
                 // distance between two polygons is not supported, flag as an error
                 throw Error.error(ErrorCode.X_42565, "DWITHIN between two POLYGONS not supported");
             } else if (nodes[0].dataType.isGeographyPointType() && nodes[1].dataType.isGeographyType()) {
@@ -604,8 +605,15 @@ public class FunctionForVoltDB extends FunctionSQL {
                 nodes[0] = nodes[1];
                 nodes[1] = tempNode;
             }
-            // third argument should be numeric
+            // third argument must be numeric
+            if (nodes[2].dataType == null ) {
+                // "data type cast needed for parameter or null literal"
+                throw Error.error(ErrorCode.X_42567,
+                        "input type DISTANCE to DWITHIN function must be non-negative numeric value");
+            }
+
             if (!nodes[2].dataType.isNumberType()) {
+                // "incompatible data type in operation"
                 throw Error.error(ErrorCode.X_42565,
                         "input type DISTANCE to DWITHIN function must be non-negative numeric value");
             }
