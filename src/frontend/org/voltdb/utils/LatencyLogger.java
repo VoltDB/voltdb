@@ -105,14 +105,9 @@ public class LatencyLogger {
                     }
                     Date now = new Date(table.getLong(0));
                     Histogram newHistogram = AbstractHistogram.fromCompressedBytes(table.getVarbinary(4), CompressionStrategySnappy.INSTANCE);
-                    newHistogram.subtract(m_histogramData);
-                    /*
-                    Histogram diffHistogram;
-                    if (m_histogramData == null)
-                        diffHistogram = newHistogram;
-                    else
-                        diffHistogram = Histogram.diff(newHistogram, m_histogramData);
-                    */
+                    if (m_histogramData != null) {
+                        newHistogram.subtract(m_histogramData);
+                    }
 
                     long totalCount = newHistogram.getTotalCount();
                     if (totalCount > 0)

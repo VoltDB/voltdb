@@ -144,7 +144,6 @@ public class ClientStats {
 
         newer.m_latencyHistogram.subtract(older.m_latencyHistogram);
         retval.m_latencyHistogram = newer.m_latencyHistogram;
-        // retval.m_latencyHistogram = Histogram.diff(newer.m_latencyHistogram, older.m_latencyHistogram);
 
         retval.m_bytesSent = newer.m_bytesSent - older.m_bytesSent;
         retval.m_bytesReceived = newer.m_bytesReceived - older.m_bytesReceived;
@@ -345,7 +344,7 @@ public class ClientStats {
      */
     public double getAverageLatency() {
         if (m_invocationsCompleted == 0) return 0;
-        return (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0;
+        return (m_roundTripTimeNanos / (double)m_invocationsCompleted) / 1000000.0D;
     }
 
     /**
@@ -381,7 +380,7 @@ public class ClientStats {
     public long[] getLatencyBucketsBy1ms() {
         final long buckets[] = new long[ONE_MS_BUCKET_COUNT];
         for (int ii = 0; ii < ONE_MS_BUCKET_COUNT; ii++) {
-            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 1000, (ii + 1) * 1000);
+            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 1000L, (ii + 1) * 1000L);
         }
         return buckets;
     }
@@ -402,7 +401,7 @@ public class ClientStats {
     public long[] getLatencyBucketsBy10ms() {
         final long buckets[] = new long[TEN_MS_BUCKET_COUNT];
         for (int ii = 0; ii < TEN_MS_BUCKET_COUNT; ii++) {
-            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 10000, (ii + 1) * 10000);
+            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 10000L, (ii + 1) * 10000L);
         }
         return buckets;
     }
@@ -423,7 +422,7 @@ public class ClientStats {
     public long[] getLatencyBucketsBy100ms() {
         final long buckets[] = new long[HUNDRED_MS_BUCKET_COUNT];
         for (int ii = 0; ii < HUNDRED_MS_BUCKET_COUNT; ii++) {
-            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 100000, (ii + 1) * 100000);
+            buckets[ii] = m_latencyHistogram.getCountBetweenValues(ii * 100000L, (ii + 1) * 100000L);
         }
         return buckets;
     }
@@ -466,9 +465,9 @@ public class ClientStats {
      */
     public int kPercentileLatency(double percentile) {
         if (m_latencyHistogram.getTotalCount() == 0) return 0;
-        percentile = Math.max(0.0, percentile);
+        percentile = Math.max(0.0D, percentile);
         //Convert from micros to millis for return value, round to nearest integer
-        return (int) (Math.round(m_latencyHistogram.getValueAtPercentile(percentile * 100.0)) / 1000.0);
+        return (int) (Math.round(m_latencyHistogram.getValueAtPercentile(percentile * 100.0D)) / 1000.0);
     }
 
     /**
@@ -487,9 +486,9 @@ public class ClientStats {
      */
     public double kPercentileLatencyAsDouble(double percentile) {
         if (m_latencyHistogram.getTotalCount() == 0) return 0.0;
-        percentile = Math.max(0.0, percentile);
+        percentile = Math.max(0.0D, percentile);
         //Convert from micros to millis for return value, enjoy having precision
-        return m_latencyHistogram.getValueAtPercentile(percentile * 100.0) / 1000.0;
+        return m_latencyHistogram.getValueAtPercentile(percentile * 100.0D) / 1000.0;
     }
 
     /**
