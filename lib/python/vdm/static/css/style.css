@@ -701,6 +701,7 @@ ul.addServerList li:nth-child(1) {
 	margin-left: 5px;
 	overflow-x:hidden;
 }
+.rightSide .chooseFile { padding:6px 0 6px 10px;}
 .main {
 	background-color: #FFFFFF;
 	margin-top: 20px;

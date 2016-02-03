@@ -62,6 +62,8 @@ __IP__ = "localhost"
 
 __PORT__ = 8000
 
+ALLOWED_EXTENSIONS = ['xml']
+
 
 @APP.errorhandler(400)
 def not_found(error):
@@ -1160,6 +1162,15 @@ def get_deployment_from_xml(deployment_xml, is_list):
                 except Exception, err:
                     print str(err)
                     print traceback.format_exc()
+            elif field == 'users':
+                    if deployment_xml[field] is not None:
+                        new_deployment[field] = {}
+                        if type(deployment_xml[field]['user']) is list:
+                            new_deployment[field]['user'] = []
+                            new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'list')
+                        else:
+                            new_deployment[field]['user'] = []
+                            new_deployment[field]['user'] = get_deployment_properties(deployment_xml[field]['user'], 'dict')
             else:
                 new_deployment[field] = convert_deployment_field_required_format(deployment_xml, field)
 
@@ -1228,11 +1239,17 @@ def get_deployment_properties(export_xml, is_list):
         for export in export_xml:
             new_export = {}
             for field in export:
-                new_export[field] = export[field]
+                if field == 'plaintext':
+                    new_export[field] = parse_bool_string(export[field])
+                else:
+                    new_export[field] = export[field]
             exports.append(new_export)
     else:
         for field in export_xml:
-            new_export[field] = export_xml[field]
+            if field == 'plaintext':
+                new_export[field] = parse_bool_string(export_xml[field])
+            else:
+                new_export[field] = export_xml[field]
         exports.append(new_export)
     return exports
 
@@ -1303,6 +1320,14 @@ def etree_to_dict(t):
 
 def parse_bool_string(bool_string):
     return bool_string.upper() == 'TRUE'
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+
+class DictClass(dict):
+    pass
 
 
 IS_CURRENT_NODE_ADDED = False
@@ -2018,6 +2043,34 @@ class DatabaseDeploymentAPI(MethodView):
         return Response(deployment_content, mimetype='text/xml')
 
 
+    @staticmethod
+    def put(database_id):
+        file = request.files['file']
+        if file and allowed_file(file.filename):
+            try:
+                content = file.read()
+                o = XML(content)
+                xml_final = json.loads(json.dumps(etree_to_dict(o)))
+                if 'deployment' not in xml_final:
+                    return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
+                else:
+                    if type(xml_final['deployment']) is dict:
+                        deployment_json = get_deployment_from_xml(xml_final['deployment'], 'dict')
+                        req = DictClass()
+                        req.json = {}
+                        req.json = deployment_json
+                        inputs = JsonInputs(req)
+                        if not inputs.validate():
+                            return jsonify(success=False, errors=inputs.errors)
+                    else:
+                        return jsonify({'status': 'failure', 'error': 'Invalid file content.'})
+                return jsonify({'status': 'success'})
+            except Exception, err:
+                return jsonify({'status': 'failure', 'error': err})
+        else:
+            return jsonify({'status': 'failure', 'error': 'Invalid file type.'})
+
+
 class VdmAPI(MethodView):
     """
     Class to return vdm.xml file
@@ -2174,7 +2227,7 @@ def main(runner, amodule, config_dir, server):
     APP.add_url_rule('/api/1.0/vdm/sync_configuration/',
                      view_func=SYNC_VDM_CONFIGURATION_VIEW, methods=['POST'])
     APP.add_url_rule('/api/1.0/databases/<int:database_id>/deployment/', view_func=DATABASE_DEPLOYMENT_VIEW,
-                     methods=['GET'])
+                     methods=['GET','PUT'])
     APP.add_url_rule('/api/1.0/vdm/', view_func=VDM_VIEW,
                      methods=['GET'])
     APP.run(threaded=True, host=bindIp, port=__PORT__)

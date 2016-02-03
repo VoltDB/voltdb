@@ -155,11 +155,26 @@
             <div class="leftSide"> <span class="clusterConfigIcon" ></span>
             <span class="clustHeadText">Cluster Configuration</span></div>
             <div class="rightSide">
-              <div class="leftSide upDownBtn"> <span class="uploadIcon"></span><span class="file-input  btn-file"> Upload Configuration
-                <input type="file" multiple>
-                </span> </div>
-              <div class="leftSide upDownBtn"><span class="downloadIcon" ></span> Download Configuration</div>
+              <form id="upload-file" method="post" enctype="multipart/form-data">
+                <div class="leftSide upDownBtn chooseFile">
+                 <input id="file" name="file" type="file">
+                </div>
+                <!--<div class="leftSide upDownBtn"> <span class="uploadIcon"></span><span class="file-input  btn-file"> Upload Configuration-->
+                  <!--<input type="file" multiple>-->
+                  <!--</span> </div>-->
+                <div id="upload-file-btn" class="leftSide upDownBtn"><span class="uploadIcon" ></span> Upload Configuration</div>
+                <div class="leftSide upDownBtn"><span class="downloadIcon" ></span> Download Configuration</div>
+              </form>
             </div>
+            <!--<form id="upload-file" method="post" enctype="multipart/form-data">-->
+                <!--<fieldset>-->
+                    <!--&lt;!&ndash;<label for="file">Select a file</label>&ndash;&gt;-->
+                    <!--<input id="file" name="file" type="file">-->
+                <!--</fieldset>-->
+                <!--<fieldset>-->
+                    <!--<button id="upload-file-btn" type="button">Upload</button>-->
+                <!--</fieldset>-->
+            <!--</form>-->
             <div class="clear"></div>
           </div>
         </div>
